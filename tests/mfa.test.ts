@@ -16,7 +16,10 @@ test("MFA secrets are authenticated and encrypted at rest", () => {
   const encrypted = encryptMfaSecret("JBSWY3DPEHPK3PXP");
   assert.notEqual(encrypted.includes("JBSWY3DPEHPK3PXP"), true);
   assert.equal(decryptMfaSecret(encrypted), "JBSWY3DPEHPK3PXP");
-  assert.throws(() => decryptMfaSecret(`${encrypted.slice(0, -1)}A`));
+  const [version, iv, tag, ciphertext] = encrypted.split(".");
+  const tamperedBytes = Buffer.from(ciphertext, "base64url");
+  tamperedBytes[0] ^= 0x01;
+  assert.throws(() => decryptMfaSecret([version, iv, tag, tamperedBytes.toString("base64url")].join(".")));
 });
 
 test("recovery codes are one-time and stored only as hashes", () => {

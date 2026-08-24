@@ -33,7 +33,9 @@ test("integration secrets are encrypted with authenticated storage", () => {
     assert.notEqual(encrypted, "hikcentral-secret");
     assert.equal(decryptIntegrationSecret(encrypted), "hikcentral-secret");
     const parts = encrypted.split(".");
-    parts[3] = `${parts[3].slice(0, -1)}${parts[3].endsWith("A") ? "B" : "A"}`;
+    const tamperedBytes = Buffer.from(parts[3], "base64url");
+    tamperedBytes[0] ^= 0x01;
+    parts[3] = tamperedBytes.toString("base64url");
     assert.throws(() => decryptIntegrationSecret(parts.join(".")));
   } finally {
     if (previous === undefined) delete process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY;
