@@ -6,6 +6,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: stor24-crm-production
+  cancel-in-progress: false
+
 jobs:
   configure:
     runs-on: ubuntu-latest
