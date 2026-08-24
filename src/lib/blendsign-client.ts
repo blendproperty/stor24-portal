@@ -29,6 +29,22 @@ export type BlendSignEnvelope = {
   signers: Array<{ id: string; name: string; email: string | null; order: number; signingUrl: string }>;
 };
 
+export type BlendSignArtifact = "signed" | "certificate";
+
+export async function fetchBlendSignArtifact(envelopeId: string, artifact: BlendSignArtifact) {
+  const baseUrl = process.env.BLENDSIGN_BASE_URL?.replace(/\/$/, "");
+  const apiKey = process.env.BLENDSIGN_API_KEY;
+  if (!baseUrl || !apiKey) throw new Error("BLENDSIGN_CONFIG_REQUIRED");
+  const path = artifact === "signed"
+    ? `/api/envelopes/${encodeURIComponent(envelopeId)}/document?version=signed&download=1`
+    : `/api/envelopes/${encodeURIComponent(envelopeId)}/certificate`;
+  return fetch(`${baseUrl}${path}`, {
+    headers: { authorization: `Bearer ${apiKey}` },
+    cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
+  });
+}
+
 export function blendSignTemplateKey(paymentMethod: PaymentMethod) {
   return paymentMethod === "DEBIT_ORDER" ? "stor24-unit-lease-debit-order" : "stor24-unit-lease";
 }
