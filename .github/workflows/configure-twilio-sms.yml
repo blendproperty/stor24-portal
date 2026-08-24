@@ -1,0 +1,83 @@
+name: Configure Twilio SMS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          test -n "$VPS_HOST"
+          test -n "$VPS_KNOWN_HOSTS"
+          test -n "$VPS_SSH_KEY"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/stor24_crm
+          chmod 600 ~/.ssh/known_hosts ~/.ssh/stor24_crm
+
+      - name: Configure server-only Twilio SMS values
+        env:
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_SMS_FROM: ${{ secrets.TWILIO_SMS_FROM }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          test -n "$TWILIO_ACCOUNT_SID"
+          test -n "$TWILIO_AUTH_TOKEN"
+          test -n "$TWILIO_SMS_FROM"
+          test -n "$VPS_USER"
+          case "$TWILIO_ACCOUNT_SID" in AC*) ;; *) exit 1 ;; esac
+          case "$TWILIO_SMS_FROM" in +*) ;; *) exit 1 ;; esac
+          {
+            printf '%s\n' "$TWILIO_ACCOUNT_SID"
+            printf '%s\n' "$TWILIO_AUTH_TOKEN"
+            printf '%s\n' "$TWILIO_SMS_FROM"
+          } | ssh -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" '
+            set -eu
+            cd /opt/stor24-crm
+            IFS= read -r twilio_account_sid
+            IFS= read -r twilio_auth_token
+            IFS= read -r twilio_sms_from
+            test -n "$twilio_account_sid"
+            test -n "$twilio_auth_token"
+            test -n "$twilio_sms_from"
+            umask 077
+            env_tmp=$(mktemp .env.twilio.XXXXXX)
+            trap '\''rm -f "$env_tmp"'\'' EXIT
+            grep -v -E '\''^(TWILIO_ACCOUNT_SID|TWILIO_AUTH_TOKEN|TWILIO_SMS_FROM)='\'' .env > "$env_tmp" || true
+            printf '\''TWILIO_ACCOUNT_SID=%s\n'\'' "$twilio_account_sid" >> "$env_tmp"
+            printf '\''TWILIO_AUTH_TOKEN=%s\n'\'' "$twilio_auth_token" >> "$env_tmp"
+            printf '\''TWILIO_SMS_FROM=%s\n'\'' "$twilio_sms_from" >> "$env_tmp"
+            chmod 600 "$env_tmp"
+            mv "$env_tmp" .env
+            trap - EXIT
+            test "$(grep -c '\''^TWILIO_ACCOUNT_SID='\'' .env)" -eq 1
+            test "$(grep -c '\''^TWILIO_AUTH_TOKEN='\'' .env)" -eq 1
+            test "$(grep -c '\''^TWILIO_SMS_FROM='\'' .env)" -eq 1
+            container=$(docker compose --env-file .env -f compose.prod.yml ps -q app)
+            current_image=$(docker inspect --format '\''{{.Config.Image}}'\'' "$container")
+            image_tag=${current_image##*:}
+            test -n "$image_tag"
+            IMAGE_TAG="$image_tag" docker compose --env-file .env -f compose.prod.yml up -d --no-deps --force-recreate app
+            container=$(docker compose --env-file .env -f compose.prod.yml ps -q app)
+            for attempt in $(seq 1 40); do
+              state=$(docker inspect --format '\''{{.State.Health.Status}}'\'' "$container")
+              test "$state" = healthy && break
+              test "$state" != unhealthy
+              sleep 2
+            done
+            test "$(docker inspect --format '\''{{.State.Health.Status}}'\'' "$container")" = healthy
+            curl --fail http://127.0.0.1:3014/api/health
+            printf '\''Configured Twilio SMS environment names and restarted the application successfully.\n'\''
+          '
