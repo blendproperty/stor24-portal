@@ -45,6 +45,18 @@ export async function fetchBlendSignArtifact(envelopeId: string, artifact: Blend
   });
 }
 
+export async function resendBlendSignInvitation(envelopeId: string, requestId: string) {
+  const baseUrl = process.env.BLENDSIGN_BASE_URL?.replace(/\/$/, "");
+  const apiKey = process.env.BLENDSIGN_API_KEY;
+  if (!baseUrl || !apiKey) throw new Error("BLENDSIGN_CONFIG_REQUIRED");
+  return fetch(`${baseUrl}/api/v1/envelopes/${encodeURIComponent(envelopeId)}/resend`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${apiKey}`, "idempotency-key": requestId },
+    cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
+  });
+}
+
 export function blendSignTemplateKey(paymentMethod: PaymentMethod) {
   return paymentMethod === "DEBIT_ORDER" ? "stor24-unit-lease-debit-order" : "stor24-unit-lease";
 }
