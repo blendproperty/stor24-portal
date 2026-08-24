@@ -9,9 +9,18 @@ import { blendSignTemplateKey, type BlendSignEnvelope } from "@/lib/blendsign-cl
 type Tx = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends">;
 
 const SIGNING_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+export const PENDING_MOVE_IN_CHARGE_DESCRIPTION = "Move-in charge (pending lease signature)";
+export const COMPLETED_MOVE_IN_CHARGE_DESCRIPTION = "Move-in charge";
 
 function audit(tx: Tx, scope: RequestScope, action: string, entityType: string, entityId: string, facilityId?: string, before?: Prisma.InputJsonValue, after?: Prisma.InputJsonValue) {
   return tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId, actorId: scope.userId, action, entityType, entityId, before, after } });
+}
+
+function completeMoveInCharge(tx: Tx, accountId: string) {
+  return tx.ledgerEntry.updateMany({
+    where: { accountId, type: "CHARGE", description: PENDING_MOVE_IN_CHARGE_DESCRIPTION },
+    data: { description: COMPLETED_MOVE_IN_CHARGE_DESCRIPTION },
+  });
 }
 
 export function hashDocument(content: string) {
@@ -105,7 +114,7 @@ export async function moveIn(scope: RequestScope, input: { reservationId?: strin
     const sentAt = new Date();
     const expiresAt = new Date(sentAt.getTime() + SIGNING_LINK_TTL_MS);
     const document = await tx.document.create({ data: { tenancyId: tenancy.id, type: "LEASE_AGREEMENT", storageKey: "blendsign:pending", provider: "BLENDSIGN", templateKey: blendSignTemplateKey(input.paymentMethod), idempotencyKey: `stor24-lease:${tenancy.id}`, status: "PENDING", sentAt, expiresAt } });
-    if (input.initialCharge > 0) { await tx.ledgerEntry.create({ data: { accountId: account.id, type: "CHARGE", amount: input.initialCharge, description: "Move-in charge (pending lease signature)", effectiveAt: input.startDate, createdById: scope.userId } }); await tx.account.update({ where: { id: account.id }, data: { balance: { increment: input.initialCharge } } }); }
+    if (input.initialCharge > 0) { await tx.ledgerEntry.create({ data: { accountId: account.id, type: "CHARGE", amount: input.initialCharge, description: PENDING_MOVE_IN_CHARGE_DESCRIPTION, effectiveAt: input.startDate, createdById: scope.userId } }); await tx.account.update({ where: { id: account.id }, data: { balance: { increment: input.initialCharge } } }); }
     if (input.reservationId) await tx.reservation.update({ where: { id: input.reservationId }, data: { status: "CONVERTED", convertedTenancyId: tenancy.id } });
     await audit(tx, scope, "tenancy.lease_sent_for_signature", "Tenancy", tenancy.id, input.facilityId);
     return { tenancy, document, customer, facility, unit };
@@ -135,6 +144,7 @@ export async function completeBlendSignEnvelope(envelopeId: string) {
     await tx.occupancy.update({ where: { id: occupancy.id }, data: { status: "ACTIVE" } });
     await tx.unit.update({ where: { id: occupancy.unitId }, data: { status: "OCCUPIED" } });
     await tx.tenancy.update({ where: { id: document.tenancyId }, data: { status: "ACTIVE" } });
+    await completeMoveInCharge(tx, document.tenancy.accountId);
     await tx.document.update({ where: { id: document.id }, data: { status: "SIGNED", signedAt: new Date() } });
     await tx.auditEvent.create({ data: { organisationId: document.tenancy.facility.organisationId, facilityId: document.tenancy.facilityId, actorId: null, action: "tenancy.blendsign_completed", entityType: "Document", entityId: document.id, after: { envelopeId } } });
     return { tenancyId: document.tenancyId, idempotent: false };
@@ -169,6 +179,7 @@ export async function completeLeaseSigning(token: string, input: { signerName: s
     await tx.occupancy.update({ where: { id: occupancy.id }, data: { status: "ACTIVE" } });
     await tx.unit.update({ where: { id: occupancy.unitId }, data: { status: "OCCUPIED" } });
     await tx.tenancy.update({ where: { id: tenancy.id }, data: { status: "ACTIVE" } });
+    await completeMoveInCharge(tx, tenancy.accountId);
     await tx.document.update({ where: { id: document.id }, data: { status: "SIGNED", signerName: input.signerName, signerIp: input.signerIp, signerUserAgent: input.signerUserAgent, initials: initialsRecord, signedAt: new Date() } });
     await tx.auditEvent.create({ data: { organisationId: tenancy.facility.organisationId, facilityId: tenancy.facilityId, actorId: null, action: "tenancy.lease_signed", entityType: "Document", entityId: document.id } });
     return { tenancyId: tenancy.id };
