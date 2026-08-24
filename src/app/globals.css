@@ -736,6 +736,15 @@ button:disabled { cursor: not-allowed; opacity: .62; }
 .summary-cell {
   padding: 17px 20px;
   background: white;
+  color: var(--ink);
+  text-decoration: none;
+  transition: background-color .15s ease, box-shadow .15s ease;
+}
+
+a.summary-cell:hover,
+a.summary-cell:focus-visible {
+  background: #fff8f3;
+  box-shadow: inset 0 -3px var(--orange);
 }
 
 .summary-cell span,
@@ -855,11 +864,23 @@ button:disabled { cursor: not-allowed; opacity: .62; }
 }
 
 .module-card {
+  display: flex;
+  flex-direction: column;
   min-height: 160px;
   padding: 20px;
   border: 1px solid var(--line);
   border-radius: 15px;
   background: white;
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+
+a.module-card:hover,
+a.module-card:focus-visible {
+  border-color: var(--orange);
+  box-shadow: 0 10px 24px rgba(57, 45, 32, .08);
+  transform: translateY(-2px);
 }
 
 .module-card svg {
@@ -876,6 +897,11 @@ button:disabled { cursor: not-allowed; opacity: .62; }
   color: var(--muted);
   font-size: 11px;
   line-height: 1.55;
+}
+
+.module-card .text-button {
+  margin-top: auto;
+  padding-top: 16px;
 }
 
 .hub-stack {

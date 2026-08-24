@@ -1,4 +1,5 @@
 import { Banknote, CreditCard, FileText, Receipt, RefreshCcw, WalletCards } from "lucide-react";
+import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { db } from "@/lib/db";
 
@@ -6,12 +7,12 @@ export const metadata = { title: "Billing & payments" };
 export const dynamic = "force-dynamic";
 
 const modules = [
-  [CreditCard, "Take payment", "Post a card, bank, cash or EFT payment and allocate it to open charges."],
-  [RefreshCcw, "Autopay runs", "Schedule tokenised recurring payments, retries and exception handling."],
-  [FileText, "Invoices & statements", "Generate, deliver and track account documents by billing cycle."],
-  [Receipt, "Receipt audit", "Trace posted payments, reversals, refunds and operator activity."],
-  [Banknote, "Refund approvals", "Route refunds and write-offs through configured approval thresholds."],
-  [WalletCards, "Daily close", "Reconcile tenders and provider settlements before locking the period."],
+  [CreditCard, "Take payment", "Post a card, bank, cash or EFT payment and allocate it to open charges.", "/operations/accounts", "Open accounts"],
+  [RefreshCcw, "Autopay runs", "Review recurring-payment and arrears work requiring follow-up.", "/collections", "Open collections"],
+  [FileText, "Invoices & statements", "Generate and export available account and financial reports.", "/reports", "Open reports"],
+  [Receipt, "Receipt audit", "Trace posted payments, reversals, refunds and operator activity.", "/audit", "Open audit trail"],
+  [Banknote, "Refund approvals", "Route refunds and write-offs through controlled adjustments.", "/adjustments", "Open adjustments"],
+  [WalletCards, "Daily close", "Review financial reporting used for reconciliation and period close.", "/reports", "Open reports"],
 ] as const;
 
 function formatCurrency(value: number) {
@@ -37,20 +38,20 @@ export default async function BillingPage() {
         eyebrow="Financial operations"
         title="Billing & payments"
         description="Operate the tenant subledger, recurring billing, payments, refunds and daily reconciliation."
-        action={<button className="button button-primary"><CreditCard size={16} /> Take payment</button>}
+        action={<Link href="/operations/accounts" className="button button-primary"><CreditCard size={16} /> Take payment</Link>}
       />
       <section className="summary-strip">
         {[
-          ["Collected this month", formatCurrency(collectedThisMonth)],
-          ["Outstanding balance", formatCurrency(outstandingBalance)],
-          ["Active tenancies billed", String(activeTenancyCount)],
-        ].map(([label, value]) => (
-          <div className="summary-cell" key={label}><span>{label}</span><strong>{value}</strong></div>
+          ["Collected this month", formatCurrency(collectedThisMonth), "/operations/accounts"],
+          ["Outstanding balance", formatCurrency(outstandingBalance), "/collections"],
+          ["Active tenancies billed", String(activeTenancyCount), "/tenants"],
+        ].map(([label, value, href]) => (
+          <Link className="summary-cell" href={href} key={label}><span>{label}</span><strong>{value}</strong></Link>
         ))}
       </section>
       <section className="module-grid">
-        {modules.map(([Icon, title, copy]) => (
-          <article className="module-card" key={title}><Icon size={22} /><h3>{title}</h3><p>{copy}</p></article>
+        {modules.map(([Icon, title, copy, href, action]) => (
+          <Link className="module-card" href={href} key={title}><Icon size={22} /><h3>{title}</h3><p>{copy}</p><span className="text-button">{action} →</span></Link>
         ))}
       </section>
     </div>
