@@ -2,6 +2,7 @@ import { BadgePercent, Building2, Cable, FileSignature, KeyRound, ShieldCheck } 
 import { PageHeader } from "@/components/page-header";
 import { ChangePasswordForm } from "@/components/change-password-form";
 import Link from "next/link";
+import { MfaSettings } from "@/components/mfa-settings";
 
 export const metadata = { title: "Settings" };
 
@@ -27,6 +28,7 @@ export default function SettingsPage() {
           <Link className="module-card" href={href} key={title}><Icon size={22} /><h3>{title}</h3><p>{copy}</p></Link>
         ))}
       </section>
+      <section className="panel panel-spacious"><div className="panel-heading"><div><h2>Two-step verification</h2><p className="panel-subtitle">Protect this staff account with an authenticator app and one-time recovery codes.</p></div><ShieldCheck className="positive-icon" /></div><MfaSettings /></section>
       <section className="panel panel-spacious"><div className="panel-heading"><div><h2>Account password</h2><p className="panel-subtitle">Update your password and invalidate all existing sessions.</p></div><ShieldCheck className="positive-icon" /></div><ChangePasswordForm /></section>
     </div>
   );

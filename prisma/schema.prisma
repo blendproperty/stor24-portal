@@ -595,10 +595,22 @@ model User {
   dailyCloses         DailyClose[]
   passwordResetTokens PasswordResetToken[]
   reportRuns          ReportRun[]
+  mfaCredential       MfaCredential?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 
   @@unique([organisationId, email])
+}
+
+model MfaCredential {
+  id                 String    @id @default(cuid())
+  userId             String    @unique
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  secretEncrypted    String
+  recoveryCodeHashes Json      @default("[]")
+  enabledAt          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 }
 
 model PasswordResetToken {
