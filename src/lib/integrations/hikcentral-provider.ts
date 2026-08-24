@@ -5,6 +5,13 @@ import type { ProviderResult } from "@/lib/integrations/providers";
 type FetchLike = typeof fetch;
 type FacilityAccessConfig = { organisationIndexCode: string; doorIndexCodes: string[] };
 
+export type HikCentralProviderConfiguration = {
+  baseUrl: string;
+  appKey: string;
+  appSecret: string;
+  facilities: Record<string, FacilityAccessConfig>;
+};
+
 export type HikCentralEnrollmentInput = {
   facilityId: string;
   personCode: string;
@@ -41,7 +48,7 @@ export function hikCentralSignature(input: {
   };
 }
 
-function facilityConfig(facilityId: string): FacilityAccessConfig {
+function environmentFacilityConfig(facilityId: string): FacilityAccessConfig {
   const raw = required("HIKCENTRAL_FACILITY_CONFIG_JSON");
   const parsed = JSON.parse(raw) as Record<string, FacilityAccessConfig>;
   const config = parsed[facilityId];
@@ -59,12 +66,19 @@ function providerFailure(error: unknown): ProviderResult<never> {
 
 export class HikCentralAccessProvider {
   readonly category = "ACCESS_CONTROL" as const;
-  constructor(private readonly request: FetchLike = fetch) {}
+  constructor(private readonly request: FetchLike = fetch, private readonly configuration?: HikCentralProviderConfiguration) {}
+
+  private facilityConfig(facilityId: string) {
+    if (!this.configuration) return environmentFacilityConfig(facilityId);
+    const config = this.configuration.facilities[facilityId];
+    if (!config?.organisationIndexCode || !config.doorIndexCodes.length) throw new Error("CONFIG_REQUIRED:HIKCENTRAL_FACILITY_MAPPING");
+    return config;
+  }
 
   private async post(path: string, payload: Record<string, unknown>) {
-    const baseUrl = required("HIKCENTRAL_BASE_URL").replace(/\/$/, "");
-    const appKey = required("HIKCENTRAL_APP_KEY");
-    const appSecret = required("HIKCENTRAL_APP_SECRET");
+    const baseUrl = (this.configuration?.baseUrl ?? required("HIKCENTRAL_BASE_URL")).replace(/\/$/, "");
+    const appKey = this.configuration?.appKey ?? required("HIKCENTRAL_APP_KEY");
+    const appSecret = this.configuration?.appSecret ?? required("HIKCENTRAL_APP_SECRET");
     const body = JSON.stringify(payload);
     const timestamp = Date.now().toString();
     const nonce = randomUUID();
@@ -99,7 +113,7 @@ export class HikCentralAccessProvider {
 
   async enroll(input: HikCentralEnrollmentInput): Promise<ProviderResult<{ personId: string; personCode: string }>> {
     try {
-      const config = facilityConfig(input.facilityId);
+      const config = this.facilityConfig(input.facilityId);
       const person = await this.post(process.env.HIKCENTRAL_PERSON_ADD_PATH ?? "/artemis/api/resource/v1/person/single/add", {
         personCode: input.personCode,
         personGivenName: input.givenName,
@@ -121,7 +135,7 @@ export class HikCentralAccessProvider {
 
   async revoke(input: { facilityId: string; personId: string }): Promise<ProviderResult<{ revoked: true }>> {
     try {
-      const config = facilityConfig(input.facilityId);
+      const config = this.facilityConfig(input.facilityId);
       await this.post(process.env.HIKCENTRAL_PERMISSION_DELETE_PATH ?? "/artemis/api/acps/v1/auth_config/delete", {
         personIds: [input.personId],
         resourceInfos: config.doorIndexCodes.map((resourceIndexCode) => ({ resourceIndexCode, resourceType: "door" })),

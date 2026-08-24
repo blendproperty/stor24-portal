@@ -15,7 +15,8 @@ export async function GET() {
       db.role.findMany({ where: { organisationId }, orderBy: { name: "asc" } }),
       db.user.findMany({ where: { organisationId, ...(allowedFacilityIds ? { roleAssignments: { some: { facilityId: facilityScope } } } : {}) }, select: { id: true, name: true, email: true, active: true }, orderBy: { name: "asc" } }),
     ]);
-    return Response.json({ data: { profiles, integrations, charges, discounts, facilities, roles, users } });
+    const safeIntegrations = integrations.map((integration) => ({ ...integration, config: {} }));
+    return Response.json({ data: { profiles, integrations: safeIntegrations, charges, discounts, facilities, roles, users } });
   } catch (error) { return authErrorResponse(error); }
 }
 
@@ -35,6 +36,7 @@ export async function PUT(request: Request) {
     }
     if (body.kind === "integration") {
       const input = integrationSchema.parse(body.payload);
+      if (input.category === "ACCESS_CONTROL" && input.provider === "HIKCENTRAL") return Response.json({ error: { code: "DEDICATED_CONFIGURATION_REQUIRED", message: "Configure Hikvision from the secure Hikvision integration page." } }, { status: 400 });
       if (input.facilityId) await requirePermission("configuration.manage", input.facilityId);
       const existing = await db.integrationConnection.findFirst({ where: { organisationId, facilityId: input.facilityId ?? null, category: input.category, provider: input.provider } });
       const connection = existing

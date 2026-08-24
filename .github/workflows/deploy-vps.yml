@@ -51,6 +51,11 @@ jobs:
             "cd /opt/stor24-crm && \
              git fetch origin '$DEPLOY_REF' && \
              git checkout --detach FETCH_HEAD && \
+             if ! grep -q '^INTEGRATION_CONFIG_ENCRYPTION_KEY=' .env; then \
+               umask 077; \
+               integration_key=\$(openssl rand -hex 32); \
+               printf 'INTEGRATION_CONFIG_ENCRYPTION_KEY=%s\n' \"\$integration_key\" >> .env; \
+             fi && \
              mkdir -p /opt/backups && \
              docker exec stor24-crm-postgres-1 pg_dump -U stor24 -d stor24_crm | gzip > /opt/backups/stor24-crm-predeploy-\$(date +%Y%m%d-%H%M%S).sql.gz && \
              IMAGE_TAG=\$(git rev-parse --short HEAD) docker compose --env-file .env -f compose.prod.yml build app migrate && \

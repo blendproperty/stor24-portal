@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import { db } from "@/lib/db";
 import { HikCentralAccessProvider } from "@/lib/integrations/hikcentral-provider";
+import { loadHikCentralRuntimeConfiguration } from "@/lib/integrations/hikcentral-configuration";
 import type { RequestScope } from "@/lib/scope";
 import { requireFacility } from "@/lib/scope";
 
@@ -40,7 +41,8 @@ export async function enrollBiometricAccess(scope: RequestScope, input: { facili
     update: { status: "PENDING", consentPolicy: BIOMETRIC_CONSENT_POLICY, consentAt: new Date(), consentRecordedById: scope.userId, faceImageSha256: imageDigest, failureCode: null, failureMessage: null, revokedAt: null },
   });
   const customer = occupancy.tenancy.customer;
-  const result = await new HikCentralAccessProvider().enroll({ facilityId: input.facilityId, personCode, givenName: customer.firstName ?? customer.companyName ?? "Stor24", familyName: customer.lastName ?? "Customer", faceBase64: bytes.toString("base64"), validFrom: occupancy.startDate, validUntil: occupancy.endDate ?? undefined });
+  const provider = new HikCentralAccessProvider(fetch, await loadHikCentralRuntimeConfiguration(scope.organisationId, input.facilityId));
+  const result = await provider.enroll({ facilityId: input.facilityId, personCode, givenName: customer.firstName ?? customer.companyName ?? "Stor24", familyName: customer.lastName ?? "Customer", faceBase64: bytes.toString("base64"), validFrom: occupancy.startDate, validUntil: occupancy.endDate ?? undefined });
   if (!result.ok) {
     await db.$transaction([
       db.biometricEnrollment.update({ where: { id: enrollment.id }, data: { status: "FAILED", failureCode: result.code, failureMessage: result.message } }),
@@ -61,7 +63,8 @@ export async function revokeBiometricAccess(scope: RequestScope, enrollmentId: s
   if (!enrollment) throw new Error("NOT_FOUND");
   await requireFacility(scope, enrollment.facilityId);
   if (!enrollment.externalPersonId) throw new Error("BIOMETRIC_PERSON_NOT_PROVISIONED");
-  const result = await new HikCentralAccessProvider().revoke({ facilityId: enrollment.facilityId, personId: enrollment.externalPersonId });
+  const provider = new HikCentralAccessProvider(fetch, await loadHikCentralRuntimeConfiguration(scope.organisationId, enrollment.facilityId));
+  const result = await provider.revoke({ facilityId: enrollment.facilityId, personId: enrollment.externalPersonId });
   if (!result.ok) throw new Error(result.code);
   return db.$transaction(async (tx) => {
     const updated = await tx.biometricEnrollment.update({ where: { id: enrollment.id }, data: { status: "REVOKED", revokedAt: new Date(), retentionUntil: new Date() } });

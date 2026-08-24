@@ -1,10 +1,10 @@
 import { requirePermission } from "@/lib/auth-guards";
+import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-const connections = [
+const baseConnections = [
   { category: "Payments", provider: "Not selected", status: "CONFIG_REQUIRED", lastCheckedAt: null, backlog: 0, message: "Choose and credential an approved payment provider." },
-  { category: "Access control", provider: "Not selected", status: "CONFIG_REQUIRED", lastCheckedAt: null, backlog: 0, message: "Map a supported access-control provider and facility." },
   { category: "Email", provider: "Not selected", status: "CONFIG_REQUIRED", lastCheckedAt: null, backlog: 0, message: "Sender domain and provider credentials are required." },
   { category: "SMS", provider: "Not selected", status: "CONFIG_REQUIRED", lastCheckedAt: null, backlog: 0, message: "Sender identity and provider credentials are required." },
   { category: "Accounting", provider: "File export", status: "DEGRADED", lastCheckedAt: null, backlog: 2, message: "Mapping approval is outstanding; no vendor transmission occurs." },
@@ -13,5 +13,11 @@ const connections = [
 
 export async function GET() {
   const session = await requirePermission("integrations.view");
-  return Response.json({ data: connections, meta: { role: session.role, liveChecksPerformed: false } });
+  const scope = session.allowedFacilityIds ? { OR: [{ facilityId: null }, { facilityId: { in: session.allowedFacilityIds } }] } : {};
+  const hikConnections = await db.integrationConnection.findMany({ where: { organisationId: session.organisationId, category: "ACCESS_CONTROL", provider: "HIKCENTRAL", ...scope }, select: { facilityId: true, status: true, lastHealthAt: true, lastSuccessAt: true, failureMessage: true } });
+  const company = hikConnections.find((item) => item.facilityId === null);
+  const facilities = hikConnections.filter((item) => item.facilityId !== null);
+  const connectedFacilities = facilities.filter((item) => item.status === "CONNECTED");
+  const access = { category: "Access control", provider: "Hikvision / HikCentral", status: company?.status === "CONNECTED" && connectedFacilities.length ? "CONNECTED" : company ? "CONFIGURED" : "CONFIG_REQUIRED", lastCheckedAt: company?.lastHealthAt ?? null, backlog: 0, message: connectedFacilities.length ? `${connectedFacilities.length} facility connection verified.` : company?.failureMessage ?? "Add credentials, map a facility and run a live connection test." };
+  return Response.json({ data: [baseConnections[0], access, ...baseConnections.slice(1)], meta: { role: session.role, liveChecksPerformed: Boolean(company?.lastHealthAt) } });
 }

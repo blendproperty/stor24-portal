@@ -10,14 +10,6 @@ import { BlendSignReconciliationActions } from "@/components/blendsign-reconcili
 export const metadata = { title: "Integrations" };
 export const dynamic = "force-dynamic";
 
-const connections = [
-  ["BlendSign", "BlendSign", "Connected", "Lease envelopes and completed artifacts", "positive"],
-  ["Payments", "Netcash", "Configuration required", "Credentials and provider contract pending", "warning"],
-  ["Access control", "Provider not selected", "Configuration required", "Facility mapping and reconciliation required", "warning"],
-  ["Email / messaging", "Partially configured", "Partial", "SMS and WhatsApp provider work remains", "warning"],
-  ["Accounting", "MRI export queue", "Partial", "Integration method and chart mapping awaiting approval", "warning"],
-] as const;
-
 function customerName(customer: { firstName: string | null; lastName: string | null; companyName: string | null }) {
   return customer.companyName || [customer.firstName, customer.lastName].filter(Boolean).join(" ") || "Unnamed customer";
 }
@@ -25,10 +17,11 @@ function customerName(customer: { firstName: string | null; lastName: string | n
 export default async function IntegrationsPage() {
   const scope = await requirePermissionScope("operations.view");
   const facilityFilter = scope.unrestrictedFacilities ? {} : { facilityId: { in: scope.facilityIds } };
-  const [documents, inboxCounts, outboxCounts] = await Promise.all([
+  const [documents, inboxCounts, outboxCounts, hikCentralConnections] = await Promise.all([
     db.document.findMany({ where: { provider: "BLENDSIGN", type: "LEASE_AGREEMENT", tenancy: { facility: { organisationId: scope.organisationId }, ...facilityFilter } }, include: { tenancy: { include: { customer: true, account: true, facility: true, occupancies: { where: { status: { in: ["ACTIVE", "NOTICE_GIVEN", "PENDING"] } }, include: { unit: true }, orderBy: { createdAt: "desc" }, take: 1 } } } }, orderBy: { createdAt: "desc" }, take: 100 }),
     db.webhookInbox.groupBy({ by: ["status"], where: { organisationId: scope.organisationId }, _count: true }),
     db.webhookOutbox.groupBy({ by: ["status"], where: { organisationId: scope.organisationId }, _count: true }),
+    db.integrationConnection.findMany({ where: { organisationId: scope.organisationId, category: "ACCESS_CONTROL", provider: "HIKCENTRAL", ...(scope.unrestrictedFacilities ? {} : { OR: [{ facilityId: null }, { facilityId: { in: scope.facilityIds } }] }) }, select: { facilityId: true, status: true, lastSuccessAt: true } }),
   ]);
   const rows = documents.map((document) => ({ document, state: classifyBlendSignLease({ status: document.status, externalId: document.externalId, createdAt: document.createdAt, expiresAt: document.expiresAt, tenancyStatus: document.tenancy.status }) }));
   const completed = rows.filter((row) => row.state === "COMPLETED").length;
@@ -36,6 +29,16 @@ export default async function IntegrationsPage() {
   const actionRequired = rows.filter((row) => blendSignLeaseStateNeedsAction(row.state)).length;
   const inbox = Object.fromEntries(inboxCounts.map((item) => [item.status, item._count]));
   const outbox = Object.fromEntries(outboxCounts.map((item) => [item.status, item._count]));
+  const hikCompany = hikCentralConnections.find((item) => item.facilityId === null);
+  const hikFacilities = hikCentralConnections.filter((item) => item.facilityId !== null);
+  const hikConnected = hikCompany?.status === "CONNECTED" && hikFacilities.some((item) => item.status === "CONNECTED");
+  const connections = [
+    ["BlendSign", "BlendSign", "Connected", "Lease envelopes and completed artifacts", "positive", null],
+    ["Payments", "Netcash", "Configuration required", "Credentials and provider contract pending", "warning", null],
+    ["Access control", "Hikvision / HikCentral", hikConnected ? "Connected" : hikCompany ? "Ready to test" : "Configuration required", hikConnected ? `${hikFacilities.filter((item) => item.status === "CONNECTED").length} facility connection verified` : "Add credentials, map the facility doors and run a live test", hikConnected ? "positive" : "warning", "/settings/integrations/hikvision"],
+    ["Email / messaging", "Partially configured", "Partial", "SMS and WhatsApp provider work remains", "warning", null],
+    ["Accounting", "MRI export queue", "Partial", "Integration method and chart mapping awaiting approval", "warning", null],
+  ] as const;
 
   return <div className="page-stack">
     <PageHeader eyebrow="Connection centre" title="Integrations & webhooks" description="Live provider state, lease-envelope reconciliation and delivery backlogs. Failures remain visible until resolved." />
@@ -45,7 +48,7 @@ export default async function IntegrationsPage() {
     <section className="panel integration-table"><div className="panel-heading"><div><h2>BlendSign lease reconciliation</h2><p className="panel-subtitle">The latest 100 facility-authorised lease documents, classified from persisted Stor24 state.</p></div><Activity className="muted-icon" /></div><div className="table-wrap"><table className="data-table"><thead><tr><th>Account</th><th>Customer / unit</th><th>Facility</th><th>Document</th><th>Operational state</th><th>Sent / expires</th><th>Action</th></tr></thead><tbody>
       {rows.length ? rows.map(({ document, state }) => <tr key={document.id}><td><Link className="primary-cell" href={`/operations/accounts?accountId=${encodeURIComponent(document.tenancy.accountId)}`}>{document.tenancy.account.accountNumber}</Link></td><td>{customerName(document.tenancy.customer)}<span className="secondary-cell">Unit {document.tenancy.occupancies[0]?.unit.number ?? "—"}</span></td><td>{document.tenancy.facility.name}</td><td>{document.templateKey ?? "Lease"}<span className="secondary-cell">{document.externalId ?? "No envelope ID"}</span></td><td><StatusPill tone={blendSignLeaseStateNeedsAction(state) ? "warning" : state === "COMPLETED" ? "positive" : "neutral"}>{blendSignLeaseStateLabel(state)}</StatusPill></td><td>{document.sentAt?.toLocaleString("en-ZA") ?? document.createdAt.toLocaleString("en-ZA")}<span className="secondary-cell">{document.expiresAt ? `Expires ${document.expiresAt.toLocaleString("en-ZA")}` : "No expiry recorded"}</span></td><td>{state === "DISPATCH_FAILED" ? <BlendSignReconciliationActions documentId={document.id} action="retry-dispatch"/> : state === "OVERDUE" || state === "AWAITING_SIGNATURE" ? <BlendSignReconciliationActions documentId={document.id} action="resend-invitation"/> : <span className="secondary-cell">No action</span>}</td></tr>) : <tr><td colSpan={7} className="empty-cell">No BlendSign lease documents found in your authorised facilities.</td></tr>}
     </tbody></table></div></section>
-    <section className="panel integration-table"><div className="panel-heading"><div><h2>Connection health</h2><p className="panel-subtitle">Only integrations with production evidence are shown as connected.</p></div><Activity className="muted-icon" /></div><div className="table-wrap"><table className="data-table"><thead><tr><th>Category</th><th>Provider</th><th>State</th><th>Detail</th></tr></thead><tbody>{connections.map(([category, provider, state, detail, tone]) => <tr key={category}><td className="primary-cell">{category}</td><td>{provider}</td><td><StatusPill tone={tone}>{state}</StatusPill></td><td>{detail}</td></tr>)}</tbody></table></div></section>
+    <section className="panel integration-table"><div className="panel-heading"><div><h2>Connection health</h2><p className="panel-subtitle">Only integrations with production evidence are shown as connected.</p></div><Activity className="muted-icon" /></div><div className="table-wrap"><table className="data-table"><thead><tr><th>Category</th><th>Provider</th><th>State</th><th>Detail</th></tr></thead><tbody>{connections.map(([category, provider, state, detail, tone, href]) => <tr key={category}><td className="primary-cell">{category}</td><td>{href ? <Link className="primary-cell" href={href}>{provider}</Link> : provider}</td><td><StatusPill tone={tone}>{state}</StatusPill></td><td>{href ? <Link href={href}>{detail}</Link> : detail}</td></tr>)}</tbody></table></div></section>
     <section className="dashboard-grid">
       <article className="panel panel-spacious"><div className="panel-heading"><div><h2>Webhook inbox</h2><p className="panel-subtitle">Persisted provider events by processing state.</p></div><Webhook className="muted-icon" /></div><div className="state-list"><div><Clock3 /><span><strong>Pending / processing</strong><small>{(inbox.PENDING ?? 0) + (inbox.PROCESSING ?? 0)} events</small></span></div><div><CheckCircle2 /><span><strong>Processed</strong><small>{inbox.SUCCEEDED ?? 0} events</small></span></div><div><AlertTriangle /><span><strong>Failed / dead letter</strong><small>{(inbox.FAILED ?? 0) + (inbox.DEAD_LETTER ?? 0)} events</small></span></div></div></article>
       <article className="panel panel-spacious"><div className="panel-heading"><div><h2>Transactional outbox</h2><p className="panel-subtitle">Persisted outbound finance and provider work by delivery state.</p></div><Cable className="muted-icon" /></div><div className="state-list"><div><Clock3 /><span><strong>Pending / processing</strong><small>{(outbox.PENDING ?? 0) + (outbox.PROCESSING ?? 0)} deliveries</small></span></div><div><CheckCircle2 /><span><strong>Delivered</strong><small>{outbox.SUCCEEDED ?? 0} deliveries</small></span></div><div><AlertTriangle /><span><strong>Failed / dead letter</strong><small>{(outbox.FAILED ?? 0) + (outbox.DEAD_LETTER ?? 0)} deliveries</small></span></div></div></article>
