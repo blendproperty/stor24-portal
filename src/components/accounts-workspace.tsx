@@ -22,7 +22,7 @@ function generateReference(accountNumber: string) {
   return `${accountNumber}-${stamp}-${suffix}`;
 }
 
-export function AccountsWorkspace({ initialDocumentId }: { initialDocumentId?: string }) {
+export function AccountsWorkspace({ initialAccountId, initialDocumentId }: { initialAccountId?: string; initialDocumentId?: string }) {
   const [data, setData] = useState<Data | null>(null);
   const [selectedId, setSelectedId] = useState("");
   const [search, setSearch] = useState("");
@@ -39,14 +39,16 @@ export function AccountsWorkspace({ initialDocumentId }: { initialDocumentId?: s
       if (!response.ok) setError(payload.error?.message ?? "Accounts could not be loaded.");
       else {
         setData(payload.data);
-        const linkedAccount = initialDocumentId
+        const linkedAccount = initialAccountId
+          ? payload.data.accounts.find((account: Account) => account.id === initialAccountId)
+          : initialDocumentId
           ? payload.data.accounts.find((account: Account) => account.tenancy?.documents.some((document) => document.id === initialDocumentId))
           : undefined;
         setSelectedId(linkedAccount?.id || payload.data.accounts[0]?.id || "");
       }
     });
     return () => { cancelled = true; };
-  }, [initialDocumentId]);
+  }, [initialAccountId, initialDocumentId]);
   const selected = data?.accounts.find((account) => account.id === selectedId) ?? null;
   const visible = useMemo(() => data?.accounts.filter((account) => `${account.accountNumber} ${customerName(account)} ${account.tenancy?.occupancies[0]?.unit.number ?? ""}`.toLowerCase().includes(search.toLowerCase())) ?? [], [data, search]);
   const active = data?.accounts.filter((account) => ["ACTIVE", "NOTICE_GIVEN"].includes(account.tenancy?.status ?? "")).length ?? 0;

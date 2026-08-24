@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import {
   ListOrdered,
   Pencil,
@@ -34,6 +35,7 @@ type Unit = {
   status: string;
   monthlyRate: string;
   taxRate: string;
+  accountId: string | null;
   unitType: UnitType;
 };
 type Facility = {
@@ -117,6 +119,9 @@ export function UnitInventoryWorkspace({
   );
 
   async function refresh() {
+    const accountByUnitId = new Map(
+      facilities.flatMap((facility) => facility.units.map((unit) => [unit.id, unit.accountId] as const)),
+    );
     const [facilityResponse, typeResponse, unitResponse] = await Promise.all([
       fetch("/api/v1/leasing/facilities", { cache: "no-store" }),
       fetch("/api/v1/leasing/unit-types", { cache: "no-store" }),
@@ -137,7 +142,7 @@ export function UnitInventoryWorkspace({
         ),
         units: unitPayload.data.filter(
           (unit: Unit) => unit.facilityId === facility.id,
-        ),
+        ).map((unit: Unit) => ({ ...unit, accountId: accountByUnitId.get(unit.id) ?? null })),
       })),
     );
   }
@@ -415,7 +420,7 @@ export function UnitInventoryWorkspace({
                   visible.map((unit) => (
                     <tr key={unit.id}>
                       <td>{unit.facility.name}</td>
-                      <td className="primary-cell">{unit.number}</td>
+                      <td className="primary-cell">{unit.accountId ? <Link className="inventory-unit-link" href={`/operations/accounts?accountId=${encodeURIComponent(unit.accountId)}`}>{unit.number}<span>Open account</span></Link> : unit.number}</td>
                       <td>{unit.unitType.name}</td>
                       <td>
                         {display === "size"

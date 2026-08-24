@@ -2101,6 +2101,9 @@ a.module-card:focus-visible {
 .inventory-type-actions { display: flex; gap: 5px; padding-right: 10px; }
 .inventory-type-actions .text-button { display: inline-flex; align-items: center; gap: 4px; padding: 6px; font-size: 10px; }
 .inventory-type-actions .text-button:disabled { color: #a7ada9; cursor: not-allowed; opacity: .7; }
+.inventory-unit-link { display: inline-flex; flex-direction: column; gap: 2px; color: var(--ink); text-decoration: none; }
+.inventory-unit-link span { color: var(--orange); font-size: 9px; font-weight: 750; }
+.inventory-unit-link:hover, .inventory-unit-link:focus-visible { color: var(--orange); text-decoration: underline; text-underline-offset: 3px; }
 .inventory-modal { width: min(720px,calc(100vw - 30px)); }
 .inventory-dialog-error { margin: 12px 0 0; }
 .inventory-form { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 13px; margin-top: 18px; }
