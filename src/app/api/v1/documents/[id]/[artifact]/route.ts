@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { fetchBlendSignArtifact, type BlendSignArtifact } from "@/lib/blendsign-client";
 import { db } from "@/lib/db";
 import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
@@ -10,6 +11,7 @@ function isArtifact(value: string): value is BlendSignArtifact {
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string; artifact: string }> }) {
   try {
+    const requestId = `DOC-${randomUUID().slice(0, 8).toUpperCase()}`;
     const { id, artifact } = await context.params;
     if (!isArtifact(artifact)) return Response.json({ error: { code: "NOT_FOUND", message: "Document not found." } }, { status: 404 });
     const auth = await requirePermission("operations.view");
@@ -33,12 +35,13 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       return Response.json({ error: { code: "BLENDSIGN_DOCUMENT_UNAVAILABLE", message: status === 409 ? "The completed document is still being prepared." : "The completed document is currently unavailable." } }, { status });
     }
     const body = await upstream.arrayBuffer();
-    await db.auditEvent.create({ data: { organisationId: auth.organisationId, facilityId: document.tenancy.facilityId, actorId: auth.user.id, action: `document.${artifact}.downloaded`, entityType: "Document", entityId: document.id } });
+    await db.auditEvent.create({ data: { organisationId: auth.organisationId, facilityId: document.tenancy.facilityId, actorId: auth.user.id, action: `document.${artifact}.downloaded`, entityType: "Document", entityId: document.id, requestId } });
     return new Response(body, { headers: {
       "content-type": "application/pdf",
       "content-disposition": upstream.headers.get("content-disposition") ?? `attachment; filename="stor24-${artifact}.pdf"`,
       "cache-control": "private, no-store, max-age=0",
       "x-content-type-options": "nosniff",
+      "x-request-id": requestId,
     } });
   } catch (error) {
     return authErrorResponse(error);
