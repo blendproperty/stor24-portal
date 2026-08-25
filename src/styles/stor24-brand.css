@@ -75,6 +75,47 @@ body {
   background: rgba(255, 255, 255, 0.055);
 }
 
+.connectivity-compact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.connectivity-compact span {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: #45d39d;
+  box-shadow: 0 0 0 4px rgba(69, 211, 157, 0.12);
+}
+
+.connectivity-compact[data-online="false"] span {
+  background: var(--stor24-orange);
+  box-shadow: 0 0 0 4px rgba(255, 90, 10, 0.14);
+}
+
+.connectivity-compact small { margin: 0; }
+
+.connectivity-banner {
+  position: fixed;
+  z-index: 100;
+  inset: 14px 14px auto auto;
+  display: grid;
+  width: min(430px, calc(100vw - 28px));
+  gap: 3px;
+  padding: 14px 18px;
+  border: 1px solid rgba(7, 20, 17, 0.22);
+  border-radius: 15px;
+  color: white;
+  box-shadow: 0 18px 45px rgba(7, 20, 17, 0.24);
+}
+
+.connectivity-banner.is-offline { background: #9f3d0b; }
+.connectivity-banner strong { font-size: 14px; }
+.connectivity-banner span { font-size: 12px; line-height: 1.4; }
+
 .topbar {
   border-bottom-color: rgba(7, 20, 17, 0.1);
   background: rgba(245, 243, 234, 0.9);

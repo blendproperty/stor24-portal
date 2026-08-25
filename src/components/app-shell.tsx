@@ -29,6 +29,7 @@ import {
 import { clsx } from "clsx";
 import { useRouter } from "next/navigation";
 import type { SessionPayload } from "@/lib/session";
+import { ConnectivityStatus } from "@/components/connectivity-status";
 
 const navigation = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -75,6 +76,7 @@ export function AppShell({ children, session }: { children: React.ReactNode; ses
 
   return (
     <div className="app-shell">
+      <ConnectivityStatus />
       <aside className="sidebar">
         <Link className="brand" href="/">
           <Image
@@ -117,10 +119,9 @@ export function AppShell({ children, session }: { children: React.ReactNode; ses
         </nav>
         <div className="sidebar-footer">
           <div className="facility-card">
-            <span />
             <div>
               <strong>Stor24 Randburg</strong>
-              <small>Online · Africa/Johannesburg</small>
+              <ConnectivityStatus compact />
             </div>
           </div>
         </div>

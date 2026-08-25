@@ -1,6 +1,6 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
-> Last reviewed: 24 August 2026. Read this file before planning or changing the repository. Update it whenever a material capability, decision, deployment state, or cross-repository contract changes.
+> Last reviewed: 25 August 2026. Read this file before planning or changing the repository. Update it whenever a material capability, decision, deployment state, or cross-repository contract changes.
 
 ## Product identity and non-negotiable boundary
 
@@ -67,6 +67,7 @@ Brett asked for a security audit of sign-in/auth across all three repositories (
 
 ## Implemented foundations
 
+- **Redundancy Stage 2 / installable PWA safe shell — code-complete 25 August 2026, not deployed.** The internal operations portal now has a Next.js web-app manifest, approved STOR 24 icons, production-only service-worker registration, a static branded offline shell and a live connectivity indicator in the facility sidebar plus a prominent offline warning. The service worker intercepts navigation only to provide `offline.html` after a network failure. Its persistent cache allowlist contains only that shell, the manifest and approved `/brand/` and `/icons/` assets. It never intercepts or caches `/api/...`, authenticated application pages, login/session responses, cookies, customer/account data, documents, payments, biometrics or credentials, and it provides no background-sync/offline-write queue. Each production build generates a unique service-worker cache version; activation deletes older `stor24-shell-*` caches and claims clients. Reconnection reloads the static offline shell against the live route, so no offline action can be replayed or duplicated. Evidence: Next route types and TypeScript passed; lint had only the three pre-existing Twilio/Netcash warnings; all 60 tests passed including new public-shell and cache-boundary tests; and the full Next.js 16 production build generated `/manifest.webmanifest`. A local standalone-server check returned 200 for the manifest, generated service worker, offline shell and icon; the service-worker response had `no-cache/no-store` and `Service-Worker-Allowed: /`; `/api/v1/accounts` still returned 401 without a session and `/` still redirected to login. Supported-browser installation, actual offline launch/update behaviour and production regression checks remain required after an authorised deployment before this task can be described as live-verified.
 - Database-backed authentication, password recovery, invitation flow, sessions, RBAC and security audit events.
 - Organisation and facility scoping with permission checks on protected server routes.
 - Facility, inventory, unit, map and configuration foundations.
@@ -124,7 +125,7 @@ MRI Property Central — approved finance system of record
 9. **Completed 24 August 2026:** live `/graphs` data and the public quote-form-to-CRM lead path were verified end to end with the approved `Task Nine UAT` record.
 10. **Completed and live-verified 24 August 2026:** staff MFA/2FA is deployed; the organisation owner proved authenticator and one-time recovery-code login plus the corresponding audit records. Enroll remaining administrators and facility managers individually. `stor24-cms` MFA remains a separate repository task.
 11. **Repository review fixes recorded 24 August 2026:** authenticate and safely expose Netcash callbacks after the official provider contract is confirmed; enforce facility scope on leasing customer results; validate reservation/lead ownership and lifecycle during move-in; and resolve dependency advisories plus route-level integration-test gaps. These are tracked separately in Asana and are not silently included in Task 6.
-12. **Redundancy/PWA task recorded 24 August 2026:** build an installable Stor24 application shell with a branded offline state and strict cache boundaries. Cache only static application/brand assets; never cache authentication, APIs, customer/account data, documents, payments, biometrics or integration credentials. Encrypted operational snapshots and offline write/synchronisation queues are separate later phases.
+12. **Redundancy/PWA safe shell code-complete 25 August 2026; deployment/UAT pending:** the install manifest, approved icons, build-versioned service worker, static branded offline shell, connectivity status and strict cache-boundary tests are implemented. Cache storage is limited to the static shell/brand allowlist; authentication, APIs and operational data remain network-only. Deploy, install on a supported facility desktop/tablet browser, test cold offline launch and reconnection, and prove a second deployment replaces the first cache before closing the Asana task. Encrypted operational snapshots and offline write/synchronisation queues remain separate later phases.
 
 ## Working rules for any AI assistant (selected, most relevant)
 

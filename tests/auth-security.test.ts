@@ -10,6 +10,15 @@ test("session proxy allows only the HMAC-authenticated BlendSign webhook path", 
   assert.equal(isPublicPathname("/api/webhooks/unknown"), false);
 });
 
+test("PWA shell assets are public without exposing protected application routes", () => {
+  assert.equal(isPublicPathname("/sw.js"), true);
+  assert.equal(isPublicPathname("/manifest.webmanifest"), true);
+  assert.equal(isPublicPathname("/offline.html"), true);
+  assert.equal(isPublicPathname("/icons/icon-192.png"), true);
+  assert.equal(isPublicPathname("/accounts"), false);
+  assert.equal(isPublicPathname("/api/v1/accounts"), false);
+});
+
 test("permission matcher supports exact, scoped, read-only and owner grants", () => {
   assert.equal(permissionGranted(["leads.create"], "leads.create"), true);
   assert.equal(permissionGranted(["facility.*"], "facility.update"), true);
