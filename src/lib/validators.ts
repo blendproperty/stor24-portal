@@ -14,6 +14,23 @@ export const createLeadSchema = z.object({
 
 export type CreateLeadInput = z.infer<typeof createLeadSchema>;
 
+export const offlineLeadSyncSchema = z.object({
+  submissionId: z.string().uuid(),
+  deviceId: z.string().trim().regex(/^[a-zA-Z0-9-]{16,64}$/),
+  capturedAt: z.iso.datetime(),
+  firstName: z.string().trim().min(1).max(80),
+  lastName: z.string().trim().min(1).max(80),
+  email: z.email().optional(),
+  phone: z.string().trim().min(7).max(30),
+  facilityId: z.string().trim().min(1).max(64),
+  desiredUnitTypeId: z.string().trim().min(1).max(64).optional(),
+  expectedMoveIn: z.iso.date().optional(),
+  notes: z.string().trim().max(2000).optional(),
+  consentToContact: z.literal(true),
+});
+
+export type OfflineLeadSyncInput = z.infer<typeof offlineLeadSyncSchema>;
+
 const id = z.string().trim().min(1).max(64);
 const money = z.coerce.number().nonnegative().max(10_000_000);
 const optionalText = z.string().trim().max(2000).optional();

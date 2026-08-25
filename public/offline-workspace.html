@@ -6,12 +6,12 @@
   <meta name="theme-color" content="#071411">
   <title>STOR 24 Offline Workspace</title>
   <link rel="stylesheet" href="/offline-workspace.css">
-  <style>header span.online{color:#a9dc86}header span.offline{color:#ffb48e}.snapshot-meta strong.warning{color:#a86800}.notice{border-left:4px solid #ff5a0a;background:#fff4ee;border-radius:8px;padding:12px 14px;font-weight:700}.notice.warning{border-color:#d48b00;background:#fff8df}</style>
+  <style>header span.online{color:#a9dc86}header span.offline{color:#ffb48e}.snapshot-meta strong.warning{color:#a86800}.notice{border-left:4px solid #ff5a0a;background:#fff4ee;border-radius:8px;padding:12px 14px;font-weight:700}.notice.warning{border-color:#d48b00;background:#fff8df}.lead-panel{border-top:1px solid #dce1df;margin-top:28px;padding-top:24px}.lead-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.lead-grid .wide{grid-column:1/-1}.consent{display:flex;flex-direction:row;align-items:flex-start}.outbox{list-style:none;padding:0}.outbox li{display:flex;justify-content:space-between;gap:12px;border-top:1px solid #e3e7e5;padding:12px 0}.outbox span,.outbox small{display:block;color:#5b6764}.outbox button{padding:8px 12px;margin-left:6px}@media(max-width:700px){.lead-grid{grid-template-columns:1fr}.outbox li{flex-direction:column}}</style>
 </head>
 <body>
   <header><img src="/brand/stor24-logo-white.svg" alt="STOR 24"><div><strong>Offline workspace</strong><span id="connection">Checking connection…</span></div><a href="/">Live portal</a></header>
   <main>
-    <section class="intro"><p class="eyebrow">REDUNDANCY PILOT · READ ONLY</p><h1>Facility information when the internet is unavailable.</h1><p>This pilot encrypts an approved operational snapshot on this device. It contains no customer names, contact details, payments, documents or biometric information.</p></section>
+    <section class="intro"><p class="eyebrow">REDUNDANCY PILOT · ENCRYPTED</p><h1>Keep working when the internet is unavailable.</h1><p>The operational snapshot remains read-only. New leads can be captured into an encrypted device queue and securely synced after connectivity returns.</p></section>
     <section class="card" id="setup-panel">
       <h2>Prepare this device while online</h2>
       <div class="form-grid"><label>Facility<select id="facility"><option value="">Loading facilities…</option></select></label><label>Device name<input id="device-label" maxlength="80" placeholder="Example: Reception tablet"></label><label>Offline unlock passphrase<input id="setup-passphrase" type="password" minlength="8" autocomplete="new-password" placeholder="At least 8 characters"></label></div>
@@ -31,7 +31,21 @@
       <div class="metrics" id="metrics"></div>
       <nav class="tabs" aria-label="Snapshot sections"><button data-view="units" class="active">Units</button><button data-view="leads">Leads</button><button data-view="reservations">Reservations</button><button data-view="tasks">Tasks</button></nav>
       <div class="table-wrap"><table><thead id="table-head"></thead><tbody id="table-body"></tbody></table></div>
-      <p class="read-only">Read-only pilot: nothing entered here is queued or written back to the live CRM.</p>
+      <p class="read-only">Units, existing leads, reservations and tasks remain read-only. Payments, leases, documents and biometrics are never queued offline.</p>
+      <section class="lead-panel" aria-labelledby="capture-lead-title">
+        <p class="eyebrow">ENCRYPTED OFFLINE OUTBOX</p><h2 id="capture-lead-title">Capture a new lead</h2>
+        <form id="lead-form"><div class="lead-grid">
+          <label>First name<input name="firstName" maxlength="80" required></label><label>Last name<input name="lastName" maxlength="80" required></label>
+          <label>Mobile number<input name="phone" maxlength="30" required></label><label>Email address<input name="email" type="email"></label>
+          <label>Required unit type<select name="desiredUnitTypeId" id="lead-unit-type"><option value="">Any unit type</option></select></label><label>Expected move-in<input name="expectedMoveIn" type="date"></label>
+          <label class="wide">Enquiry notes<textarea name="notes" maxlength="2000" rows="3"></textarea></label>
+          <label class="wide consent"><input name="consentToContact" type="checkbox" required> Customer agreed that STOR 24 may contact them about this enquiry.</label>
+        </div><button type="submit">Encrypt and queue lead</button></form>
+        <p id="lead-status" class="status" aria-live="polite"></p>
+        <div class="snapshot-head"><h3>Waiting to sync: <span id="queue-count">0</span></h3><button id="sync-now" type="button">Sync now</button></div>
+        <ul id="outbox-list" class="outbox"></ul>
+        <p class="hint">Automatic sync runs when this unlocked app detects internet. If the app was closed, reopen and unlock it to sync. Successfully synced personal details are removed from this device.</p>
+      </section>
     </section>
   </main>
   <script src="/offline-workspace.js" defer></script>
