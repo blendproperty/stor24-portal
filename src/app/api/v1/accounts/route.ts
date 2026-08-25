@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
 import { sameOrigin } from "@/lib/request-security";
 import { accountPaymentSchema } from "@/lib/validators";
+import { sendWhatsAppTemplate } from "@/lib/whatsapp";
 
 export async function GET() {
   try {
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
     const parsed = accountPaymentSchema.safeParse(await request.json());
     if (!parsed.success) return Response.json({ error: { message: "Check the payment details.", fields: parsed.error.flatten().fieldErrors } }, { status: 422 });
     const actor = await requirePermission("payments.manage");
-    const account = await db.account.findFirst({ where: { id: parsed.data.accountId, customer: { organisationId: actor.organisationId } }, include: { tenancy: true } });
+    const account = await db.account.findFirst({ where: { id: parsed.data.accountId, customer: { organisationId: actor.organisationId } }, include: { customer: true, tenancy: { include: { facility: true, occupancies: { where: { status: { in: ["ACTIVE", "NOTICE_GIVEN"] } }, include: { unit: true }, take: 1 } } } } });
     if (!account?.tenancy) return Response.json({ error: { message: "Account not found." } }, { status: 404 });
     await requirePermission("payments.manage", account.tenancy.facilityId);
     const idempotencyKey = `manual-${randomUUID()}`;
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
       await tx.auditEvent.create({ data: { organisationId: actor.organisationId, facilityId: account.tenancy!.facilityId, actorId: actor.user.id, action: "payment.posted", entityType: "Payment", entityId: payment.id, after: { accountId: account.id, amount: parsed.data.amount, method: parsed.data.method, ledgerEntryId: ledger.id } } });
       return { payment, balance: updated.balance };
     });
+    if (account.customer.phone) await sendWhatsAppTemplate({ organisationId: actor.organisationId, facilityId: account.tenancy.facilityId, customerId: account.customer.id, recipient: account.customer.phone, consent: account.customer.communicationConsent, messageType: "PAYMENT_RECEIVED", idempotencyKey: `${idempotencyKey}:WHATSAPP`, variables: { "1": account.customer.firstName || account.customer.companyName || "customer", "2": `R${parsed.data.amount.toFixed(2)}`, "3": parsed.data.receivedAt.toLocaleDateString("en-ZA"), "4": account.accountNumber, "5": `R${Number(result.balance).toFixed(2)}` } });
     return Response.json({ data: result }, { status: 201 });
   } catch (error) { return authErrorResponse(error); }
 }

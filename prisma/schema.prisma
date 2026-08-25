@@ -953,6 +953,8 @@ model CommunicationLog {
   templateId     String?
   template       CommunicationTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
   channel        String
+  direction      String                 @default("OUTBOUND")
+  messageType    String?
   recipientHash  String
   provider       String?
   providerRef    String?
@@ -963,10 +965,17 @@ model CommunicationLog {
   queuedAt       DateTime               @default(now())
   sentAt         DateTime?
   deliveredAt    DateTime?
+  readAt         DateTime?
   failedAt       DateTime?
+  attempts       Int                    @default(1)
+  nextRetryAt    DateTime?
+  optedOutAt     DateTime?
+  metadata       Json?
 
   @@index([organisationId, status, queuedAt])
   @@index([customerId, queuedAt])
+  @@index([providerRef])
+  @@index([organisationId, channel, queuedAt])
 }
 
 model WebhookInbox {

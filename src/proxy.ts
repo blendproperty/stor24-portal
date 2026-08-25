@@ -3,7 +3,7 @@ import { sessionCookieName, verifySessionToken } from "@/lib/session";
 import { db } from "@/lib/db";
 
 const publicPagePrefixes = ["/login", "/forgot-password", "/reset-password/", "/invite/", "/setup/", "/brand/", "/icons/", "/sign/", "/offline.html", "/offline-workspace.html", "/offline-workspace.css", "/offline-workspace.js", "/manifest.webmanifest", "/sw.js"];
-const publicApiPrefixes = ["/api/health", "/api/auth/login", "/api/auth/mfa/verify", "/api/auth/setup", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/public/v1/", "/api/webhooks/blendsign", "/api/v1/invitations/accept", "/api/v1/webhooks/inbound/", "/api/v1/billing/run-monthly"];
+const publicApiPrefixes = ["/api/health", "/api/auth/login", "/api/auth/mfa/verify", "/api/auth/setup", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/public/v1/", "/api/webhooks/blendsign", "/api/webhooks/twilio/", "/api/v1/invitations/accept", "/api/v1/webhooks/inbound/", "/api/v1/billing/run-monthly"];
 
 export function isPublicPathname(pathname: string) {
   return publicPagePrefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix)) ||

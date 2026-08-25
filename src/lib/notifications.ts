@@ -1,8 +1,9 @@
 import { db } from "@/lib/db";
 import { emailProvider, escapeEmailHtml } from "@/lib/email";
-import { TwilioSmsProvider, TwilioWhatsAppProvider } from "@/lib/integrations/twilio-provider";
+import { TwilioSmsProvider } from "@/lib/integrations/twilio-provider";
 import type { ProviderResult } from "@/lib/integrations/providers";
 import { privacyHash } from "@/lib/request-security";
+import { sendWhatsAppTemplate } from "@/lib/whatsapp";
 
 type Channel = "EMAIL" | "SMS" | "WHATSAPP";
 
@@ -11,7 +12,7 @@ type ReservationConfirmationInput = {
   facilityId: string;
   customerId: string;
   idempotencyKey: string;
-  consent: { email: boolean; sms: boolean; phone: boolean };
+  consent: { email: boolean; sms: boolean; phone: boolean; whatsapp?: boolean };
   to: { email: string; phone: string };
   variables: {
     firstName: string;
@@ -129,14 +130,8 @@ export async function notifyReservationConfirmed(input: ReservationConfirmationI
     results.push({ channel: "SMS", ok: result.ok });
   }
 
-  if (input.consent.sms && input.to.phone) {
-    const { templateId, body } = await resolveTemplate(input.organisationId, "WHATSAPP");
-    const idempotencyKey = `${input.idempotencyKey}:WHATSAPP`;
-    const result: ProviderResult<{ status: "QUEUED" }> = await new TwilioWhatsAppProvider().send(
-      { recipient: input.to.phone, body: render(body, input.variables) },
-      { organisationId: input.organisationId, facilityId: input.facilityId, idempotencyKey },
-    );
-    await logDelivery({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, templateId, channel: "WHATSAPP", recipient: input.to.phone, idempotencyKey, provider: "twilio", result: result.ok ? { ok: true, providerReference: result.providerReference } : { ok: false, code: result.code, message: result.message } });
+  if (input.consent.whatsapp && input.to.phone) {
+    const result = await sendWhatsAppTemplate({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, recipient: input.to.phone, consent: input.consent, messageType: "RESERVATION_CONFIRMED", idempotencyKey: `${input.idempotencyKey}:WHATSAPP`, variables: { "1": input.variables.firstName, "2": input.variables.unitNumber, "3": input.variables.facilityName, "4": input.variables.holdExpiresAt, "5": `R${input.variables.monthlyRateZar}` } });
     results.push({ channel: "WHATSAPP", ok: result.ok });
   }
 

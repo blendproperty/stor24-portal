@@ -1,0 +1,64 @@
+name: Configure WhatsApp Templates
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stor24-crm-production
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          test -n "$VPS_HOST" && test -n "$VPS_KNOWN_HOSTS" && test -n "$VPS_SSH_KEY"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/stor24_crm
+          chmod 600 ~/.ssh/known_hosts ~/.ssh/stor24_crm
+
+      - name: Install approved template identifiers with automation disabled
+        env:
+          RESERVATION: ${{ secrets.TWILIO_WHATSAPP_RESERVATION_CONFIRMED_SID }}
+          PAYMENT: ${{ secrets.TWILIO_WHATSAPP_PAYMENT_RECEIVED_SID }}
+          MOVE_IN: ${{ secrets.TWILIO_WHATSAPP_MOVE_IN_REMINDER_SID }}
+          ACCESS: ${{ secrets.TWILIO_WHATSAPP_ACCESS_READY_SID }}
+          REMINDER: ${{ secrets.TWILIO_WHATSAPP_PAYMENT_REMINDER_SID }}
+          OVERDUE: ${{ secrets.TWILIO_WHATSAPP_PAYMENT_OVERDUE_SID }}
+          MOVE_OUT: ${{ secrets.TWILIO_WHATSAPP_MOVE_OUT_CONFIRMATION_SID }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          for sid in "$RESERVATION" "$PAYMENT" "$MOVE_IN" "$ACCESS" "$REMINDER" "$OVERDUE" "$MOVE_OUT"; do case "$sid" in HX????????????????????????????????) ;; *) exit 1 ;; esac; done
+          printf '%s\n' "$RESERVATION" "$PAYMENT" "$MOVE_IN" "$ACCESS" "$REMINDER" "$OVERDUE" "$MOVE_OUT" | ssh -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" '
+            set -eu
+            cd /opt/stor24-crm
+            IFS= read -r reservation; IFS= read -r payment; IFS= read -r move_in; IFS= read -r access; IFS= read -r reminder; IFS= read -r overdue; IFS= read -r move_out
+            umask 077
+            env_tmp=$(mktemp .env.whatsapp-templates.XXXXXX)
+            trap '\''rm -f "$env_tmp"'\'' EXIT
+            grep -v -E '\''^(TWILIO_WHATSAPP_(RESERVATION_CONFIRMED|PAYMENT_RECEIVED|MOVE_IN_REMINDER|ACCESS_READY|PAYMENT_REMINDER|PAYMENT_OVERDUE|MOVE_OUT_CONFIRMATION)_SID|WHATSAPP_AUTOMATION_ENABLED)='\'' .env > "$env_tmp" || true
+            printf '\''TWILIO_WHATSAPP_RESERVATION_CONFIRMED_SID=%s\n'\'' "$reservation" >> "$env_tmp"
+            printf '\''TWILIO_WHATSAPP_PAYMENT_RECEIVED_SID=%s\n'\'' "$payment" >> "$env_tmp"
+            printf '\''TWILIO_WHATSAPP_MOVE_IN_REMINDER_SID=%s\n'\'' "$move_in" >> "$env_tmp"
+            printf '\''TWILIO_WHATSAPP_ACCESS_READY_SID=%s\n'\'' "$access" >> "$env_tmp"
+            printf '\''TWILIO_WHATSAPP_PAYMENT_REMINDER_SID=%s\n'\'' "$reminder" >> "$env_tmp"
+            printf '\''TWILIO_WHATSAPP_PAYMENT_OVERDUE_SID=%s\n'\'' "$overdue" >> "$env_tmp"
+            printf '\''TWILIO_WHATSAPP_MOVE_OUT_CONFIRMATION_SID=%s\n'\'' "$move_out" >> "$env_tmp"
+            printf '\''WHATSAPP_AUTOMATION_ENABLED=false\n'\'' >> "$env_tmp"
+            chmod 600 "$env_tmp" && mv "$env_tmp" .env
+            trap - EXIT
+            container=$(docker compose --env-file .env -f compose.prod.yml ps -q app)
+            current_image=$(docker inspect --format '\''{{.Config.Image}}'\'' "$container")
+            IMAGE_TAG=${current_image##*:} docker compose --env-file .env -f compose.prod.yml up -d --no-deps --force-recreate app
+          '

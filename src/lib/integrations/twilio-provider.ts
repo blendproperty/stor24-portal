@@ -20,13 +20,20 @@ async function sendTwilioMessage(kind: "SMS" | "WHATSAPP", to: string, body: str
   const recipient = kind === "WHATSAPP" ? `whatsapp:${to}` : to;
   const sender = kind === "WHATSAPP" ? `whatsapp:${from}` : from;
 
+  const statusCallback = process.env.APP_URL
+    ? `${process.env.APP_URL.replace(/\/$/, "")}/api/webhooks/twilio/status`
+    : undefined;
   try {
+    const fields = content
+      ? { To: recipient, From: sender, ContentSid: content.sid, ContentVariables: JSON.stringify(content.variables) }
+      : { To: recipient, From: sender, Body: body };
+    const form = new URLSearchParams();
+    for (const [key, value] of Object.entries(fields)) if (value !== undefined) form.set(key, value);
+    if (statusCallback) form.set("StatusCallback", statusCallback);
     const response = await fetch(`${TWILIO_API}/Accounts/${auth.sid}/Messages.json`, {
       method: "POST",
       headers: { authorization: auth.header, "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams(content
-        ? { To: recipient, From: sender, ContentSid: content.sid, ContentVariables: JSON.stringify(content.variables) }
-        : { To: recipient, From: sender, Body: body }),
+      body: form,
     });
     const payload = await response.json() as TwilioMessageResponse;
     if (!response.ok)

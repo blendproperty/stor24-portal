@@ -5,6 +5,7 @@ import { HikCentralAccessProvider } from "@/lib/integrations/hikcentral-provider
 import { loadHikCentralRuntimeConfiguration } from "@/lib/integrations/hikcentral-configuration";
 import type { RequestScope } from "@/lib/scope";
 import { requireFacility } from "@/lib/scope";
+import { sendWhatsAppTemplate } from "@/lib/whatsapp";
 
 export const BIOMETRIC_CONSENT_POLICY = "stor24-facility-access-v1";
 export const MAX_FACE_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -50,12 +51,17 @@ export async function enrollBiometricAccess(scope: RequestScope, input: { facili
     ]);
     throw new Error(result.code);
   }
-  return db.$transaction(async (tx) => {
+  const updated = await db.$transaction(async (tx) => {
     const updated = await tx.biometricEnrollment.update({ where: { id: enrollment.id }, data: { status: "ACTIVE", externalPersonId: result.data.personId, externalPersonCode: result.data.personCode, providerReference: result.providerReference, provisionedAt: new Date(), failureCode: null, failureMessage: null } });
     await tx.occupancy.update({ where: { id: occupancy.id }, data: { accessState: "ACTIVE" } });
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: input.facilityId, actorId: scope.userId, action: "biometric.enrolment.activated", entityType: "BiometricEnrollment", entityId: enrollment.id, after: { provider: "HIKCENTRAL", personCode } } });
     return updated;
   });
+  if (customer.phone) {
+    const details = await db.occupancy.findUnique({ where: { id: occupancy.id }, include: { unit: true, tenancy: { include: { facility: true } } } });
+    if (details) await sendWhatsAppTemplate({ organisationId: scope.organisationId, facilityId: input.facilityId, customerId: input.customerId, recipient: customer.phone, consent: customer.communicationConsent, messageType: "ACCESS_READY", idempotencyKey: `access-ready:${enrollment.id}:WHATSAPP`, variables: { "1": customer.firstName || customer.companyName || "customer", "2": details.unit.number, "3": details.tenancy.facility.name } });
+  }
+  return updated;
 }
 
 export async function revokeBiometricAccess(scope: RequestScope, enrollmentId: string) {
