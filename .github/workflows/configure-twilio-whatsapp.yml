@@ -1,0 +1,71 @@
+name: Configure Twilio WhatsApp
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stor24-crm-production
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          test -n "$VPS_HOST"
+          test -n "$VPS_KNOWN_HOSTS"
+          test -n "$VPS_SSH_KEY"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/stor24_crm
+          chmod 600 ~/.ssh/known_hosts ~/.ssh/stor24_crm
+
+      - name: Configure server-only Twilio WhatsApp sender
+        env:
+          TWILIO_WHATSAPP_FROM: ${{ secrets.TWILIO_WHATSAPP_FROM }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          test -n "$TWILIO_WHATSAPP_FROM"
+          test -n "$VPS_USER"
+          case "$TWILIO_WHATSAPP_FROM" in +*) ;; *) exit 1 ;; esac
+          printf '%s\n' "$TWILIO_WHATSAPP_FROM" | ssh -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" '
+            set -eu
+            cd /opt/stor24-crm
+            IFS= read -r twilio_whatsapp_from
+            test -n "$twilio_whatsapp_from"
+            case "$twilio_whatsapp_from" in +*) ;; *) exit 1 ;; esac
+            umask 077
+            env_tmp=$(mktemp .env.twilio-whatsapp.XXXXXX)
+            trap '\''rm -f "$env_tmp"'\'' EXIT
+            grep -v -E '\''^TWILIO_WHATSAPP_FROM='\'' .env > "$env_tmp" || true
+            printf '\''TWILIO_WHATSAPP_FROM=%s\n'\'' "$twilio_whatsapp_from" >> "$env_tmp"
+            chmod 600 "$env_tmp"
+            mv "$env_tmp" .env
+            trap - EXIT
+            test "$(grep -c '\''^TWILIO_WHATSAPP_FROM='\'' .env)" -eq 1
+            container=$(docker compose --env-file .env -f compose.prod.yml ps -q app)
+            current_image=$(docker inspect --format '\''{{.Config.Image}}'\'' "$container")
+            image_tag=${current_image##*:}
+            test -n "$image_tag"
+            IMAGE_TAG="$image_tag" docker compose --env-file .env -f compose.prod.yml up -d --no-deps --force-recreate app
+            container=$(docker compose --env-file .env -f compose.prod.yml ps -q app)
+            for attempt in $(seq 1 40); do
+              state=$(docker inspect --format '\''{{.State.Health.Status}}'\'' "$container")
+              test "$state" = healthy && break
+              test "$state" != unhealthy
+              sleep 2
+            done
+            test "$(docker inspect --format '\''{{.State.Health.Status}}'\'' "$container")" = healthy
+            curl --fail http://127.0.0.1:3014/api/health
+            printf '\''Configured Twilio WhatsApp sender and restarted the application successfully.\n'\''
+          '
