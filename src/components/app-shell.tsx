@@ -55,6 +55,7 @@ const navigation = [
   { href: "/phone", label: "Phone integration", icon: PhoneCall },
   { href: "/audit", label: "Security audit", icon: ScrollText },
   { href: "/offline-workspace.html", label: "Offline workspace", icon: WifiOff },
+  { href: "/offline-readiness", label: "Offline readiness", icon: ShieldCheck },
 ];
 
 export function AppShell({ children, session }: { children: React.ReactNode; session: SessionPayload | null }) {
