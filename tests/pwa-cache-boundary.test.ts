@@ -36,6 +36,8 @@ test("offline pilot encrypts its device snapshot and keeps sensitive fields out 
   assert.match(workspace, /Refresh offline copy|refresh/);
   assert.match(workspace, /EXPIRING SOON/);
   assert.match(workspace, /crypto\.randomUUID\(\)/);
+  assert.match(workspace, /\/api\/v1\/offline\/leads/);
+  assert.match(workspace, /persistSnapshot/);
   assert.match(route, /"Cache-Control": "no-store"/);
   assert.match(route, /offline\.snapshot\.downloaded/);
   assert.match(route, /deviceId/);

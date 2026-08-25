@@ -53,7 +53,7 @@ export async function GET(request: Request) {
     const [units, leads, reservations, tasks] = await Promise.all([
       db.unit.findMany({
         where: { facilityId },
-        select: { id: true, number: true, floor: true, zone: true, status: true, monthlyRate: true, updatedAt: true, unitType: { select: { name: true } } },
+        select: { id: true, number: true, floor: true, zone: true, status: true, monthlyRate: true, updatedAt: true, unitType: { select: { id: true, name: true } } },
         orderBy: { number: "asc" },
       }),
       db.lead.findMany({
