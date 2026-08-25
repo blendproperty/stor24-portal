@@ -1,11 +1,27 @@
 import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
+import { createHash } from "node:crypto";
 
 const SNAPSHOT_HOURS = 12;
 
+async function snapshotRevision(facilityId: string, organisationId: string, facilityUpdatedAt: Date) {
+  const [unit, lead, reservation, task] = await Promise.all([
+    db.unit.aggregate({ where: { facilityId }, _max: { updatedAt: true }, _count: true }),
+    db.lead.aggregate({ where: { facilityId }, _max: { updatedAt: true }, _count: true }),
+    db.reservation.aggregate({ where: { facilityId }, _max: { updatedAt: true }, _count: true }),
+    db.task.aggregate({ where: { organisationId, facilityId }, _max: { updatedAt: true }, _count: true }),
+  ]);
+  const revisionAt = [facilityUpdatedAt, unit._max.updatedAt, lead._max.updatedAt, reservation._max.updatedAt, task._max.updatedAt]
+    .filter((value): value is Date => Boolean(value))
+    .sort((a, b) => b.getTime() - a.getTime())[0].toISOString();
+  const revision = createHash("sha256").update(JSON.stringify({ revisionAt, counts: [unit._count, lead._count, reservation._count, task._count] })).digest("hex");
+  return { revision, revisionAt };
+}
+
 export async function GET(request: Request) {
   try {
-    const facilityId = new URL(request.url).searchParams.get("facilityId")?.trim();
+    const params = new URL(request.url).searchParams;
+    const facilityId = params.get("facilityId")?.trim();
     if (!facilityId) {
       const auth = await requirePermission("operations.view");
       const facilities = await db.facility.findMany({
@@ -22,6 +38,17 @@ export async function GET(request: Request) {
       select: { id: true, name: true, code: true, timezone: true, updatedAt: true },
     });
     if (!facility) throw new Error("FORBIDDEN");
+
+    const { revision, revisionAt } = await snapshotRevision(facilityId, auth.organisationId, facility.updatedAt);
+    if (params.get("check") === "1") {
+      return Response.json({ data: { facilityId, revision, revisionAt } }, { headers: { "Cache-Control": "no-store", Pragma: "no-cache" } });
+    }
+
+    const deviceId = params.get("deviceId")?.trim();
+    const deviceLabel = params.get("deviceLabel")?.trim().slice(0, 80);
+    if (!deviceId || !/^[a-zA-Z0-9-]{16,64}$/.test(deviceId)) {
+      return Response.json({ error: { code: "VALIDATION_ERROR", message: "A valid offline device identifier is required." } }, { status: 422 });
+    }
 
     const [units, leads, reservations, tasks] = await Promise.all([
       db.unit.findMany({
@@ -59,7 +86,7 @@ export async function GET(request: Request) {
         action: "offline.snapshot.downloaded",
         entityType: "Facility",
         entityId: facilityId,
-        after: { expiresAt: expiresAt.toISOString(), unitCount: units.length, leadCount: leads.length, reservationCount: reservations.length, taskCount: tasks.length },
+        after: { deviceId, deviceLabel: deviceLabel || "Unnamed device", revision, revisionAt, expiresAt: expiresAt.toISOString(), unitCount: units.length, leadCount: leads.length, reservationCount: reservations.length, taskCount: tasks.length },
       },
     });
 
@@ -67,6 +94,8 @@ export async function GET(request: Request) {
       data: {
         version: 1,
         generatedAt: generatedAt.toISOString(),
+        revision,
+        revisionAt,
         expiresAt: expiresAt.toISOString(),
         facility,
         units: units.map((unit) => ({ ...unit, monthlyRate: unit.monthlyRate.toString() })),

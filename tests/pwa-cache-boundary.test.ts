@@ -6,6 +6,7 @@ const serviceWorkerPath = new URL("../src/pwa/service-worker-template.js", impor
 const offlineShellPath = new URL("../public/offline.html", import.meta.url);
 const offlineWorkspacePath = new URL("../public/offline-workspace.js", import.meta.url);
 const snapshotRoutePath = new URL("../src/app/api/v1/offline/snapshot/route.ts", import.meta.url);
+const readinessPagePath = new URL("../src/app/offline-readiness/page.tsx", import.meta.url);
 
 test("PWA caches only the offline shell and approved brand assets", async () => {
   const source = await readFile(serviceWorkerPath, "utf8");
@@ -29,11 +30,26 @@ test("offline pilot encrypts its device snapshot and keeps sensitive fields out 
 
   assert.match(worker, /"\/offline-workspace\.html"/);
   assert.match(workspace, /PBKDF2/);
-  assert.match(workspace, /iterations:310000/);
+  assert.match(workspace, /iterations:\s*310000/);
   assert.match(workspace, /AES-GCM/);
+  assert.match(workspace, /checkForUpdate/);
+  assert.match(workspace, /Refresh offline copy|refresh/);
+  assert.match(workspace, /EXPIRING SOON/);
+  assert.match(workspace, /crypto\.randomUUID\(\)/);
   assert.match(route, /"Cache-Control": "no-store"/);
   assert.match(route, /offline\.snapshot\.downloaded/);
+  assert.match(route, /deviceId/);
+  assert.match(route, /revisionAt/);
   assert.doesNotMatch(route, /firstName|lastName|companyName|email|phone|identityRef|billingAddress|customer:/);
+});
+
+test("offline readiness is permission-scoped and derives device state from audit events", async () => {
+  const source = await readFile(readinessPagePath, "utf8");
+  assert.match(source, /requirePermission\("operations\.manage"\)/);
+  assert.match(source, /offline\.snapshot\.downloaded/);
+  assert.match(source, /allowedFacilityIds/);
+  assert.match(source, /deviceLabel/);
+  assert.doesNotMatch(source, /ciphertext|passphrase/);
 });
 
 test("offline shell returns to the live portal after manual or automatic reconnection", async () => {
