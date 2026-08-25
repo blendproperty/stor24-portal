@@ -40,6 +40,7 @@ test("offline shell returns to the live portal after manual or automatic reconne
   const source = await readFile(offlineShellPath, "utf8");
 
   assert.match(source, /onclick="location\.replace\('\/'\)"/);
+  assert.match(source, /href="\/offline-workspace\.html"/);
   assert.match(source, /addEventListener\("online",\(\)=>location\.replace\("\/"\)\)/);
   assert.doesNotMatch(source, /location\.reload\(\)/);
 });
