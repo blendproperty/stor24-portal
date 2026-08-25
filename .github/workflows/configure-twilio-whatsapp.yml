@@ -32,27 +32,33 @@ jobs:
       - name: Configure server-only Twilio WhatsApp sender
         env:
           TWILIO_WHATSAPP_FROM: ${{ secrets.TWILIO_WHATSAPP_FROM }}
+          TWILIO_WHATSAPP_TEST_CONTENT_SID: ${{ secrets.TWILIO_WHATSAPP_TEST_CONTENT_SID }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
           test -n "$TWILIO_WHATSAPP_FROM"
+          test -n "$TWILIO_WHATSAPP_TEST_CONTENT_SID"
           test -n "$VPS_USER"
           case "$TWILIO_WHATSAPP_FROM" in +*) ;; *) exit 1 ;; esac
-          printf '%s\n' "$TWILIO_WHATSAPP_FROM" | ssh -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" '
+          printf '%s\n%s\n' "$TWILIO_WHATSAPP_FROM" "$TWILIO_WHATSAPP_TEST_CONTENT_SID" | ssh -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" '
             set -eu
             cd /opt/stor24-crm
             IFS= read -r twilio_whatsapp_from
+            IFS= read -r twilio_whatsapp_test_content_sid
             test -n "$twilio_whatsapp_from"
             case "$twilio_whatsapp_from" in +*) ;; *) exit 1 ;; esac
+            case "$twilio_whatsapp_test_content_sid" in HX????????????????????????????????) ;; *) exit 1 ;; esac
             umask 077
             env_tmp=$(mktemp .env.twilio-whatsapp.XXXXXX)
             trap '\''rm -f "$env_tmp"'\'' EXIT
-            grep -v -E '\''^TWILIO_WHATSAPP_FROM='\'' .env > "$env_tmp" || true
+            grep -v -E '\''^(TWILIO_WHATSAPP_FROM|TWILIO_WHATSAPP_TEST_CONTENT_SID)='\'' .env > "$env_tmp" || true
             printf '\''TWILIO_WHATSAPP_FROM=%s\n'\'' "$twilio_whatsapp_from" >> "$env_tmp"
+            printf '\''TWILIO_WHATSAPP_TEST_CONTENT_SID=%s\n'\'' "$twilio_whatsapp_test_content_sid" >> "$env_tmp"
             chmod 600 "$env_tmp"
             mv "$env_tmp" .env
             trap - EXIT
             test "$(grep -c '\''^TWILIO_WHATSAPP_FROM='\'' .env)" -eq 1
+            test "$(grep -c '\''^TWILIO_WHATSAPP_TEST_CONTENT_SID='\'' .env)" -eq 1
             container=$(docker compose --env-file .env -f compose.prod.yml ps -q app)
             current_image=$(docker inspect --format '\''{{.Config.Image}}'\'' "$container")
             image_tag=${current_image##*:}

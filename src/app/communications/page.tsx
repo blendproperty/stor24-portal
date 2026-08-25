@@ -17,7 +17,7 @@ const templates = [
 export default async function CommunicationsPage() {
   const session = await getSession();
   const smsConfigured = Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_SMS_FROM);
-  const whatsAppConfigured = Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_FROM);
+  const whatsAppConfigured = Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_FROM && process.env.TWILIO_WHATSAPP_TEST_CONTENT_SID);
   return <div className="page-stack">
     <PageHeader eyebrow="Customer engagement" title="Communications" description="Versioned templates, provider status and privacy-safe delivery controls for email and SMS." />
     <section className="summary-strip"><div className="summary-cell"><span>Active templates</span><strong>0</strong></div><div className="summary-cell"><span>Draft templates</span><strong>4</strong></div><div className="summary-cell"><span>Queued</span><strong>0</strong></div><div className="summary-cell"><span>Failed</span><strong>0</strong></div></section>
