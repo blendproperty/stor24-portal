@@ -25,6 +25,7 @@ import {
   Webhook,
   MessagesSquare,
   Warehouse,
+  WifiOff,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useRouter } from "next/navigation";
@@ -53,6 +54,7 @@ const navigation = [
   { href: "/map", label: "Facility map", icon: LandPlot },
   { href: "/phone", label: "Phone integration", icon: PhoneCall },
   { href: "/audit", label: "Security audit", icon: ScrollText },
+  { href: "/offline-workspace.html", label: "Offline workspace", icon: WifiOff },
 ];
 
 export function AppShell({ children, session }: { children: React.ReactNode; session: SessionPayload | null }) {

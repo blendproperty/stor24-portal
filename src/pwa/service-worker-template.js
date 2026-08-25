@@ -3,6 +3,9 @@
 const CACHE_VERSION = "stor24-shell-__BUILD_VERSION__";
 const SHELL_ASSETS = [
   "/offline.html",
+  "/offline-workspace.html",
+  "/offline-workspace.css",
+  "/offline-workspace.js",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
@@ -45,6 +48,10 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith("/api/")) return;
 
   if (request.mode === "navigate") {
+    if (url.pathname === "/offline-workspace.html") {
+      event.respondWith(fetch(request).catch(() => caches.match("/offline-workspace.html")));
+      return;
+    }
     event.respondWith(fetch(request).catch(() => caches.match("/offline.html")));
     return;
   }

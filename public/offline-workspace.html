@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#071411">
+  <title>STOR 24 Offline Workspace</title>
+  <link rel="stylesheet" href="/offline-workspace.css">
+</head>
+<body>
+  <header><img src="/brand/stor24-logo-white.svg" alt="STOR 24"><div><strong>Offline workspace</strong><span id="connection">Checking connection…</span></div><a href="/">Live portal</a></header>
+  <main>
+    <section class="intro"><p class="eyebrow">REDUNDANCY PILOT · READ ONLY</p><h1>Facility information when the internet is unavailable.</h1><p>This pilot encrypts an approved operational snapshot on this device. It contains no customer names, contact details, payments, documents or biometric information.</p></section>
+    <section class="card" id="setup-panel">
+      <h2>Prepare this device while online</h2>
+      <div class="form-grid"><label>Facility<select id="facility"><option value="">Loading facilities…</option></select></label><label>Offline unlock passphrase<input id="setup-passphrase" type="password" minlength="8" autocomplete="new-password" placeholder="At least 8 characters"></label></div>
+      <p class="hint">Use a passphrase you can remember. It is never sent to or stored by STOR 24 and cannot be recovered.</p>
+      <button id="prepare" type="button">Download and encrypt snapshot</button>
+      <p id="setup-status" class="status" aria-live="polite"></p>
+    </section>
+    <section class="card" id="unlock-panel">
+      <h2>Open saved offline information</h2>
+      <div class="unlock-row"><label>Passphrase<input id="unlock-passphrase" type="password" autocomplete="current-password"></label><button id="unlock" type="button">Unlock workspace</button><button id="erase" type="button" class="secondary">Erase offline copy</button></div>
+      <p id="unlock-status" class="status" aria-live="polite"></p>
+    </section>
+    <section id="workspace" hidden>
+      <div class="snapshot-head"><div><p class="eyebrow">ENCRYPTED LOCAL SNAPSHOT</p><h2 id="facility-name"></h2></div><div class="snapshot-meta"><strong id="snapshot-state"></strong><span id="snapshot-time"></span></div></div>
+      <div class="metrics" id="metrics"></div>
+      <nav class="tabs" aria-label="Snapshot sections"><button data-view="units" class="active">Units</button><button data-view="leads">Leads</button><button data-view="reservations">Reservations</button><button data-view="tasks">Tasks</button></nav>
+      <div class="table-wrap"><table><thead id="table-head"></thead><tbody id="table-body"></tbody></table></div>
+      <p class="read-only">Read-only pilot: nothing entered here is queued or written back to the live CRM.</p>
+    </section>
+  </main>
+  <script src="/offline-workspace.js" defer></script>
+</body>
+</html>
