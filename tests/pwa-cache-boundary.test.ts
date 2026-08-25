@@ -4,6 +4,8 @@ import test from "node:test";
 
 const serviceWorkerPath = new URL("../src/pwa/service-worker-template.js", import.meta.url);
 const offlineShellPath = new URL("../public/offline.html", import.meta.url);
+const offlineWorkspacePath = new URL("../public/offline-workspace.js", import.meta.url);
+const snapshotRoutePath = new URL("../src/app/api/v1/offline/snapshot/route.ts", import.meta.url);
 
 test("PWA caches only the offline shell and approved brand assets", async () => {
   const source = await readFile(serviceWorkerPath, "utf8");
@@ -18,10 +20,27 @@ test("PWA caches only the offline shell and approved brand assets", async () => 
   assert.doesNotMatch(source, /\/accounts|\/customers|\/payments|\/documents|\/biometrics/);
 });
 
+test("offline pilot encrypts its device snapshot and keeps sensitive fields out of the API contract", async () => {
+  const [worker, workspace, route] = await Promise.all([
+    readFile(serviceWorkerPath, "utf8"),
+    readFile(offlineWorkspacePath, "utf8"),
+    readFile(snapshotRoutePath, "utf8"),
+  ]);
+
+  assert.match(worker, /"\/offline-workspace\.html"/);
+  assert.match(workspace, /PBKDF2/);
+  assert.match(workspace, /iterations:310000/);
+  assert.match(workspace, /AES-GCM/);
+  assert.match(route, /"Cache-Control": "no-store"/);
+  assert.match(route, /offline\.snapshot\.downloaded/);
+  assert.doesNotMatch(route, /firstName|lastName|companyName|email|phone|identityRef|billingAddress|customer:/);
+});
+
 test("offline shell returns to the live portal after manual or automatic reconnection", async () => {
   const source = await readFile(offlineShellPath, "utf8");
 
   assert.match(source, /onclick="location\.replace\('\/'\)"/);
+  assert.match(source, /href="\/offline-workspace\.html"/);
   assert.match(source, /addEventListener\("online",\(\)=>location\.replace\("\/"\)\)/);
   assert.doesNotMatch(source, /location\.reload\(\)/);
 });
