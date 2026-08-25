@@ -11,7 +11,7 @@ function twilioAuth() {
   return { sid, header: `Basic ${Buffer.from(`${sid}:${token}`).toString("base64")}` };
 }
 
-async function sendTwilioMessage(kind: "SMS" | "WHATSAPP", to: string, body: string): Promise<ProviderResult<{ status: "QUEUED" }>> {
+async function sendTwilioMessage(kind: "SMS" | "WHATSAPP", to: string, body: string, content?: { sid: string; variables: Record<string, string> }): Promise<ProviderResult<{ status: "QUEUED" }>> {
   const auth = twilioAuth();
   const from = kind === "WHATSAPP" ? process.env.TWILIO_WHATSAPP_FROM : process.env.TWILIO_SMS_FROM;
   if (!auth || !from)
@@ -24,7 +24,9 @@ async function sendTwilioMessage(kind: "SMS" | "WHATSAPP", to: string, body: str
     const response = await fetch(`${TWILIO_API}/Accounts/${auth.sid}/Messages.json`, {
       method: "POST",
       headers: { authorization: auth.header, "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ To: recipient, From: sender, Body: body }),
+      body: new URLSearchParams(content
+        ? { To: recipient, From: sender, ContentSid: content.sid, ContentVariables: JSON.stringify(content.variables) }
+        : { To: recipient, From: sender, Body: body }),
     });
     const payload = await response.json() as TwilioMessageResponse;
     if (!response.ok)
@@ -78,5 +80,10 @@ export class TwilioWhatsAppProvider implements MessageProvider {
 
   async send(message: { recipient: string; subject?: string; body: string }, _context: ProviderContext) {
     return sendTwilioMessage("WHATSAPP", message.recipient, message.body);
+  }
+
+  async sendTemplate(recipient: string, contentSid: string, variables: Record<string, string>, _context: ProviderContext) {
+    if (!/^HX[a-f0-9]{32}$/i.test(contentSid)) return { ok: false as const, retryable: false, code: "INVALID_CONTENT_SID", message: "Twilio WhatsApp template SID is invalid." };
+    return sendTwilioMessage("WHATSAPP", recipient, "", { sid: contentSid, variables });
   }
 }
