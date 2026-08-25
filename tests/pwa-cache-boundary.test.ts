@@ -38,10 +38,15 @@ test("offline pilot encrypts its device snapshot and keeps sensitive fields out 
   assert.match(workspace, /crypto\.randomUUID\(\)/);
   assert.match(workspace, /\/api\/v1\/offline\/leads/);
   assert.match(workspace, /persistSnapshot/);
+  assert.match(workspace, /unitTypeSize/);
+  assert.match(workspace, /\["size", "Size"\]/);
   assert.match(route, /"Cache-Control": "no-store"/);
   assert.match(route, /offline\.snapshot\.downloaded/);
   assert.match(route, /deviceId/);
   assert.match(route, /revisionAt/);
+  assert.match(route, /widthMetres/);
+  assert.match(route, /lengthMetres/);
+  assert.match(route, /areaSqMetres/);
   assert.doesNotMatch(route, /firstName|lastName|companyName|email|phone|identityRef|billingAddress|customer:/);
 });
 
