@@ -53,12 +53,12 @@ export async function GET(request: Request) {
     const [units, leads, reservations, tasks] = await Promise.all([
       db.unit.findMany({
         where: { facilityId },
-        select: { id: true, number: true, floor: true, zone: true, status: true, monthlyRate: true, updatedAt: true, unitType: { select: { id: true, name: true } } },
+        select: { id: true, number: true, floor: true, zone: true, status: true, monthlyRate: true, updatedAt: true, unitType: { select: { id: true, name: true, widthMetres: true, lengthMetres: true, areaSqMetres: true } } },
         orderBy: { number: "asc" },
       }),
       db.lead.findMany({
         where: { facilityId },
-        select: { id: true, stage: true, source: true, expectedMoveIn: true, nextActionAt: true, updatedAt: true, desiredUnitType: { select: { name: true } } },
+        select: { id: true, stage: true, source: true, expectedMoveIn: true, nextActionAt: true, updatedAt: true, desiredUnitType: { select: { name: true, widthMetres: true, lengthMetres: true, areaSqMetres: true } } },
         orderBy: { updatedAt: "desc" },
         take: 250,
       }),
@@ -98,8 +98,8 @@ export async function GET(request: Request) {
         revisionAt,
         expiresAt: expiresAt.toISOString(),
         facility,
-        units: units.map((unit) => ({ ...unit, monthlyRate: unit.monthlyRate.toString() })),
-        leads,
+        units: units.map((unit) => ({ ...unit, monthlyRate: unit.monthlyRate.toString(), unitType: { ...unit.unitType, widthMetres: unit.unitType.widthMetres?.toString() ?? null, lengthMetres: unit.unitType.lengthMetres?.toString() ?? null, areaSqMetres: unit.unitType.areaSqMetres?.toString() ?? null } })),
+        leads: leads.map((lead) => ({ ...lead, desiredUnitType: lead.desiredUnitType ? { ...lead.desiredUnitType, widthMetres: lead.desiredUnitType.widthMetres?.toString() ?? null, lengthMetres: lead.desiredUnitType.lengthMetres?.toString() ?? null, areaSqMetres: lead.desiredUnitType.areaSqMetres?.toString() ?? null } : null })),
         reservations,
         tasks,
       },
