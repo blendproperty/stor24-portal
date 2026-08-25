@@ -16,8 +16,8 @@
       <h1>You&apos;re offline.</h1>
       <p>The secure STOR 24 operations system needs a live connection. Reconnect to sign in and work with current facility information.</p>
       <div class="notice">No customer data, payments, documents, biometrics or staff actions are stored or queued on this device.</div>
-      <button type="button" onclick="location.reload()">Try again</button>
+      <button type="button" onclick="location.replace('/')">Try again</button>
     </main>
-    <script>addEventListener("online",()=>location.reload())</script>
+    <script>addEventListener("online",()=>location.replace("/"))</script>
   </body>
 </html>

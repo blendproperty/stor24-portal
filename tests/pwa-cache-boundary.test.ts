@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const serviceWorkerPath = new URL("../src/pwa/service-worker-template.js", import.meta.url);
+const offlineShellPath = new URL("../public/offline.html", import.meta.url);
 
 test("PWA caches only the offline shell and approved brand assets", async () => {
   const source = await readFile(serviceWorkerPath, "utf8");
@@ -15,6 +16,14 @@ test("PWA caches only the offline shell and approved brand assets", async () => 
 
   assert.doesNotMatch(source, /indexedDB|localStorage|sessionStorage|BackgroundSync|sync\.register/i);
   assert.doesNotMatch(source, /\/accounts|\/customers|\/payments|\/documents|\/biometrics/);
+});
+
+test("offline shell returns to the live portal after manual or automatic reconnection", async () => {
+  const source = await readFile(offlineShellPath, "utf8");
+
+  assert.match(source, /onclick="location\.replace\('\/'\)"/);
+  assert.match(source, /addEventListener\("online",\(\)=>location\.replace\("\/"\)\)/);
+  assert.doesNotMatch(source, /location\.reload\(\)/);
 });
 
 test("each build replaces older STOR 24 shell caches", async () => {
