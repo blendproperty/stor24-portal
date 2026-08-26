@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { publicReservationSchema } from "../src/lib/public-booking-contract";
 import { validTwilioSignature } from "../src/lib/twilio-webhooks";
@@ -15,6 +16,12 @@ test("public reservations preserve explicit WhatsApp consent", () => {
   const parsed = publicReservationSchema.parse({ facilitySlug: "midpoint", unitId: "unit-1", firstName: "Test", lastName: "Customer", email: "test@example.com", phone: "+27817088120", communicationConsent: { whatsapp: true }, idempotencyKey: "1234567890abcdef" });
   assert.equal(parsed.communicationConsent.whatsapp, true);
   assert.equal(parsed.communicationConsent.sms, false);
+});
+
+test("reservation WhatsApp start-date variable uses intended move-in, not hold expiry", () => {
+  const notifications = readFileSync(new URL("../src/lib/notifications.ts", import.meta.url), "utf8");
+  assert.match(notifications, /"4": input\.variables\.intendedMoveIn/);
+  assert.doesNotMatch(notifications, /"4": input\.variables\.holdExpiresAt/);
 });
 
 test("automation is fail-closed unless explicitly enabled", () => {
