@@ -423,11 +423,34 @@ model Reservation {
   contactVerifiedAt  DateTime?
   convertedTenancyId String?           @unique
   convertedTenancy   Tenancy?          @relation(fields: [convertedTenancyId], references: [id])
+  publicPaymentSessions PublicPaymentSession[]
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 
   @@index([facilityId, status, holdExpiresAt])
   @@index([journey, viewingAt])
+}
+
+model PublicPaymentSession {
+  id                 String      @id @default(cuid())
+  reservationId      String
+  reservation        Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  status             String      @default("PENDING")
+  provider           String      @default("STOR24_SIMULATOR")
+  amount             Decimal     @db.Decimal(14, 2)
+  currency           String      @default("ZAR")
+  description        String
+  checkoutTokenHash  String
+  idempotencyKey     String      @unique
+  providerReference  String      @unique
+  failureCode        String?
+  expiresAt          DateTime
+  processedAt        DateTime?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  @@index([reservationId, status])
+  @@index([status, expiresAt])
 }
 
 model Tenancy {
