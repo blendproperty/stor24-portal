@@ -45,6 +45,7 @@ export async function POST(request: Request) {
               : "This reservation request conflicts with an earlier request.",
         },
       }, { status: error.status });
+    if (error instanceof Error && error.message === "OTP_DELIVERY_FAILED") return Response.json({ error: { code: "VERIFICATION_DELIVERY_FAILED", message: "We could not send the verification code. Check the mobile number and try again." } }, { status: 502 });
     return Response.json({ error: { code: "INTERNAL_ERROR", message: "The reservation could not be completed." } }, { status: 500 });
   }
 }

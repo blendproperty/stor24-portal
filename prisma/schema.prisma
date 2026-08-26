@@ -345,6 +345,8 @@ model Customer {
   companyName          String?
   email                String?
   phone                String?
+  phoneVerifiedAt      DateTime?
+  emailVerifiedAt      DateTime?
   identityRef          String?
   taxNumber            String?
   dateOfBirth          DateTime?
@@ -408,6 +410,10 @@ model Reservation {
   publicReference    String?           @unique
   idempotencyKey     String?           @unique
   source             String            @default("INTERNAL")
+  verificationCodeHash String?
+  verificationExpiresAt DateTime?
+  verificationAttempts Int             @default(0)
+  contactVerifiedAt  DateTime?
   convertedTenancyId String?           @unique
   convertedTenancy   Tenancy?          @relation(fields: [convertedTenancyId], references: [id])
   createdAt          DateTime          @default(now())

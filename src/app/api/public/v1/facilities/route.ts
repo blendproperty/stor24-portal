@@ -1,11 +1,14 @@
 import { db } from "@/lib/db";
 import { publicApiAuthorized } from "@/lib/public-booking-contract";
+import { releaseExpiredPublicReservations } from "@/lib/public-booking-service";
 
 const noStore = { "cache-control": "private, no-store, max-age=0" };
 
 export async function GET(request: Request) {
   if (!publicApiAuthorized(request))
     return Response.json({ error: { code: "UNAUTHENTICATED", message: "Request rejected." } }, { status: 401 });
+
+  await releaseExpiredPublicReservations();
 
   const facilities = await db.facility.findMany({
     where: { active: true, publicBookingEnabled: true, publicSlug: { not: null } },

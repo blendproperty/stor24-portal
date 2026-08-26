@@ -5,6 +5,7 @@ import {
   publicAvailability,
   publicElementConfig,
   publicReservationSchema,
+  publicReservationVerificationEnabled,
   reservationHoldHours,
   secureKeyMatches,
 } from "../src/lib/public-booking-contract.ts";
@@ -49,5 +50,8 @@ test("references are readable and reservation holds are bounded", () => {
   assert.equal(createPublicReference(new Date("2026-08-13T10:00:00.000Z"), "abc123"), "ST24-20260813-ABC123");
   assert.equal(reservationHoldHours("0"), 1);
   assert.equal(reservationHoldHours("1000"), 168);
-  assert.equal(reservationHoldHours("invalid"), 48);
+  assert.equal(reservationHoldHours("invalid"), 24);
+  assert.equal(publicReservationVerificationEnabled(undefined), false);
+  assert.equal(publicReservationVerificationEnabled("false"), false);
+  assert.equal(publicReservationVerificationEnabled("TRUE"), true);
 });

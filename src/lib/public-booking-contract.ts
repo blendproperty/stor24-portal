@@ -56,6 +56,19 @@ export function createPublicReference(now = new Date(), token = randomBytes(3).t
 }
 
 export function reservationHoldHours(raw = process.env.PUBLIC_RESERVATION_HOLD_HOURS) {
-  const parsed = Number(raw ?? 48);
-  return Number.isFinite(parsed) ? Math.min(168, Math.max(1, Math.round(parsed))) : 48;
+  const parsed = Number(raw ?? 24);
+  return Number.isFinite(parsed) ? Math.min(168, Math.max(1, Math.round(parsed))) : 24;
 }
+
+export function publicReservationVerificationEnabled(raw = process.env.PUBLIC_RESERVATION_VERIFICATION_ENABLED) {
+  return raw?.trim().toLowerCase() === "true";
+}
+
+export const publicReservationVerificationSchema = z.object({
+  reference: z.string().trim().regex(/^ST24-\d{8}-[A-F0-9]{6}$/),
+  code: z.string().trim().regex(/^\d{6}$/),
+});
+
+export const publicReservationResendSchema = z.object({
+  reference: z.string().trim().regex(/^ST24-\d{8}-[A-F0-9]{6}$/),
+});
