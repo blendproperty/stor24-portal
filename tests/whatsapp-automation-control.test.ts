@@ -18,7 +18,10 @@ test("customer sends require both server gate and organisation toggle", () => {
   assert.match(sender, /AUTOMATION_DISABLED/);
 });
 
-test("template configuration keeps the server safety gate closed", () => {
+test("template configuration exposes a validated UAT safety gate input defaulting closed", () => {
   const workflow = read(".github/workflows/configure-whatsapp-templates.yml");
-  assert.match(workflow, /WHATSAPP_AUTOMATION_ENABLED=false/);
+  assert.match(workflow, /automation_gate/);
+  assert.match(workflow, /default: "false"/);
+  assert.match(workflow, /WHATSAPP_AUTOMATION_ENABLED=%s/);
+  assert.match(workflow, /true\|false/);
 });

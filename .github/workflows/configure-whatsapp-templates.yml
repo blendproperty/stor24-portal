@@ -2,6 +2,15 @@ name: Configure WhatsApp Templates
 
 on:
   workflow_dispatch:
+    inputs:
+      automation_gate:
+        description: "Allow the owner-controlled in-app automation switch"
+        required: true
+        type: choice
+        default: "false"
+        options:
+          - "false"
+          - "true"
 
 permissions:
   contents: read
@@ -27,7 +36,7 @@ jobs:
           printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/stor24_crm
           chmod 600 ~/.ssh/known_hosts ~/.ssh/stor24_crm
 
-      - name: Install approved template identifiers with automation disabled
+      - name: Install approved template identifiers and set the safety gate
         env:
           RESERVATION: ${{ secrets.TWILIO_WHATSAPP_RESERVATION_CONFIRMED_SID }}
           PAYMENT: ${{ secrets.TWILIO_WHATSAPP_PAYMENT_RECEIVED_SID }}
@@ -38,12 +47,15 @@ jobs:
           MOVE_OUT: ${{ secrets.TWILIO_WHATSAPP_MOVE_OUT_CONFIRMATION_SID }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
+          AUTOMATION_GATE: ${{ inputs.automation_gate }}
         run: |
+          case "$AUTOMATION_GATE" in true|false) ;; *) exit 1 ;; esac
           for sid in "$RESERVATION" "$PAYMENT" "$MOVE_IN" "$ACCESS" "$REMINDER" "$OVERDUE" "$MOVE_OUT"; do case "$sid" in HX????????????????????????????????) ;; *) exit 1 ;; esac; done
-          printf '%s\n' "$RESERVATION" "$PAYMENT" "$MOVE_IN" "$ACCESS" "$REMINDER" "$OVERDUE" "$MOVE_OUT" | ssh -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" '
+          printf '%s\n' "$RESERVATION" "$PAYMENT" "$MOVE_IN" "$ACCESS" "$REMINDER" "$OVERDUE" "$MOVE_OUT" "$AUTOMATION_GATE" | ssh -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" '
             set -eu
             cd /opt/stor24-crm
-            IFS= read -r reservation; IFS= read -r payment; IFS= read -r move_in; IFS= read -r access; IFS= read -r reminder; IFS= read -r overdue; IFS= read -r move_out
+            IFS= read -r reservation; IFS= read -r payment; IFS= read -r move_in; IFS= read -r access; IFS= read -r reminder; IFS= read -r overdue; IFS= read -r move_out; IFS= read -r automation_gate
+            case "$automation_gate" in true|false) ;; *) exit 1 ;; esac
             umask 077
             env_tmp=$(mktemp .env.whatsapp-templates.XXXXXX)
             trap '\''rm -f "$env_tmp"'\'' EXIT
@@ -55,7 +67,7 @@ jobs:
             printf '\''TWILIO_WHATSAPP_PAYMENT_REMINDER_SID=%s\n'\'' "$reminder" >> "$env_tmp"
             printf '\''TWILIO_WHATSAPP_PAYMENT_OVERDUE_SID=%s\n'\'' "$overdue" >> "$env_tmp"
             printf '\''TWILIO_WHATSAPP_MOVE_OUT_CONFIRMATION_SID=%s\n'\'' "$move_out" >> "$env_tmp"
-            printf '\''WHATSAPP_AUTOMATION_ENABLED=false\n'\'' >> "$env_tmp"
+            printf '\''WHATSAPP_AUTOMATION_ENABLED=%s\n'\'' "$automation_gate" >> "$env_tmp"
             chmod 600 "$env_tmp" && mv "$env_tmp" .env
             trap - EXIT
             container=$(docker compose --env-file .env -f compose.prod.yml ps -q app)
