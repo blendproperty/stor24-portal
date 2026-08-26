@@ -165,7 +165,7 @@ export async function notifyViewingBooked(input: Omit<ReservationConfirmationInp
     results.push({ channel: "SMS", ok: result.ok });
   }
   if (input.consent.whatsapp && input.to.phone) {
-    const result = await sendWhatsAppTemplate({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, recipient: input.to.phone, consent: input.consent, messageType: "VIEWING_BOOKED", idempotencyKey: `${input.idempotencyKey}:WHATSAPP`, variables: { "1": input.variables.firstName, "2": input.variables.unitNumber, "3": input.variables.facilityName, "4": input.variables.viewingAt, "5": input.variables.holdExpiresAt, "6": input.variables.reference }, allowWhenAutomationDisabled: input.allowWhatsappWhenAutomationDisabled });
+    const result = await sendWhatsAppTemplate({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, recipient: input.to.phone, consent: input.consent, messageType: "VIEWING_BOOKED", idempotencyKey: `${input.idempotencyKey}:WHATSAPP`, variables: { "1": input.variables.firstName, "2": input.variables.unitNumber, "3": input.variables.facilityName, "4": input.variables.viewingAt, "5": input.variables.reference }, allowWhenAutomationDisabled: input.allowWhatsappWhenAutomationDisabled });
     results.push({ channel: "WHATSAPP", ok: result.ok });
   }
   return results;

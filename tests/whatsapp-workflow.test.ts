@@ -24,9 +24,9 @@ test("reservation WhatsApp start-date variable uses intended move-in, not hold e
   assert.doesNotMatch(notifications, /"4": input\.variables\.holdExpiresAt/);
 });
 
-test("viewing WhatsApp includes the 24-hour expiry before the reference", () => {
+test("viewing WhatsApp remains compatible with the approved five-variable template", () => {
   const notifications = readFileSync(new URL("../src/lib/notifications.ts", import.meta.url), "utf8");
-  assert.match(notifications, /messageType: "VIEWING_BOOKED"[\s\S]*?"5": input\.variables\.holdExpiresAt, "6": input\.variables\.reference/);
+  assert.match(notifications, /messageType: "VIEWING_BOOKED"[\s\S]*?"5": input\.variables\.reference/);
 });
 
 test("automation is fail-closed unless explicitly enabled", () => {
