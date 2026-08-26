@@ -14,7 +14,7 @@ type AttributeRow = { name: string; description: string; used: boolean };
 type SetupSection = "STORE_INFORMATION" | "TENANT_DEFAULTS" | "WEBSITE_ATTRIBUTES" | "PROGRAM_DEFAULTS";
 
 const setupDomains = new Set<SetupSection>(["STORE_INFORMATION", "TENANT_DEFAULTS", "WEBSITE_ATTRIBUTES", "PROGRAM_DEFAULTS"]);
-const weekDays = ["Weekday", "Saturday", "Sunday"] as const;
+const hoursPeriods = ["Weekday", "Saturday", "Sunday", "PublicHoliday"] as const;
 const citiesByProvince: Record<string, string[]> = {
   "Eastern Cape": ["Bhisho", "East London", "Gqeberha", "Graaff-Reinet", "Mthatha"],
   "Free State": ["Bethlehem", "Bloemfontein", "Sasolburg", "Welkom"],
@@ -31,11 +31,27 @@ const blankStore = {
   dbaName: "", legalName: "", address1: "", address2: "", city: "", province: "", postalCode: "", country: "South Africa",
   phone: "", fax: "", primaryDivision: "", managementArea: "", taxNumber: "", contactName: "", email: "",
   websiteUrl: "", onlinePayments: false, directions: "", latitude: "", longitude: "",
-  weekdayClosed: false, weekdayStart: "08:00", weekdayEnd: "17:00", saturdayClosed: false, saturdayStart: "08:00", saturdayEnd: "13:00", sundayClosed: true, sundayStart: "", sundayEnd: "",
+  accessWeekdayClosed: false, accessWeekdayStart: "07:00", accessWeekdayEnd: "18:00",
+  accessSaturdayClosed: false, accessSaturdayStart: "08:00", accessSaturdayEnd: "17:00",
+  accessSundayClosed: true, accessSundayStart: "", accessSundayEnd: "",
+  accessPublicHolidayClosed: true, accessPublicHolidayStart: "", accessPublicHolidayEnd: "",
+  officeWeekdayClosed: false, officeWeekdayStart: "08:00", officeWeekdayEnd: "17:00",
+  officeSaturdayClosed: false, officeSaturdayStart: "09:00", officeSaturdayEnd: "12:00",
+  officeSundayClosed: true, officeSundayStart: "", officeSundayEnd: "",
+  officePublicHolidayClosed: true, officePublicHolidayStart: "", officePublicHolidayEnd: "",
 };
 
 function textValue(value: unknown) { return typeof value === "string" ? value : ""; }
 function booleanValue(value: unknown) { return value === true; }
+
+function legacyOfficeHours(initial?: Record<string, unknown>) {
+  if (!initial || Object.keys(initial).some((key) => key.startsWith("office"))) return {};
+  return {
+    officeWeekdayClosed: booleanValue(initial.weekdayClosed), officeWeekdayStart: textValue(initial.weekdayStart), officeWeekdayEnd: textValue(initial.weekdayEnd),
+    officeSaturdayClosed: booleanValue(initial.saturdayClosed), officeSaturdayStart: textValue(initial.saturdayStart), officeSaturdayEnd: textValue(initial.saturdayEnd),
+    officeSundayClosed: booleanValue(initial.sundayClosed), officeSundayStart: textValue(initial.sundayStart), officeSundayEnd: textValue(initial.sundayEnd),
+  };
+}
 
 export function CompanyWorkspace() {
   const [data, setData] = useState<SetupData | null>(null);
@@ -130,7 +146,7 @@ function SetupNavButton({ active, configured, icon, label, onClick }: { active: 
 }
 
 function StoreInformation({ initial, facility, busy, onSave }: { initial?: Record<string, unknown>; facility?: Facility; busy: boolean; onSave: (config: Record<string, unknown>, publicSettings: { publicSlug: string | null; publicBookingEnabled: boolean }) => void }) {
-  const values = { ...blankStore, ...initial };
+  const values = { ...blankStore, ...legacyOfficeHours(initial), ...initial };
   const [province, setProvince] = useState(textValue(values.province));
   const [city, setCity] = useState(textValue(values.city));
   const cityOptions = citiesByProvince[province] ?? [];
@@ -142,16 +158,26 @@ function StoreInformation({ initial, facility, busy, onSave }: { initial?: Recor
     onSave(config, { publicSlug, publicBookingEnabled });
   }
   return <form action={submit} className="company-form">
-    <div className="panel-heading"><div><p className="eyebrow">General setup</p><h2>Store information</h2><p className="panel-subtitle">Contact information, business hours, location and website details for the selected facility.</p></div><Building2 className="positive-icon"/></div>
+    <div className="panel-heading"><div><p className="eyebrow">General setup</p><h2>Store information</h2><p className="panel-subtitle">Contact information, access hours, office hours, location and website details for the selected facility.</p></div><Building2 className="positive-icon"/></div>
     <div className="company-form-grid">
       <fieldset><legend>Contact information</legend><div className="field-grid two-column">
         <Field name="dbaName" label="Store name (DBA)" value={textValue(values.dbaName)} required/><Field name="legalName" label="Store legal name" value={textValue(values.legalName)}/><Field name="address1" label="Store address" value={textValue(values.address1)} required/><Field name="address2" label="Address line 2" value={textValue(values.address2)}/><SelectField name="province" label="Province" value={province} options={provinces} placeholder="Select a province" required onChange={(event) => { const nextProvince = event.target.value; setProvince(nextProvince); setCity((current) => citiesByProvince[nextProvince]?.includes(current) ? current : ""); }}/><SelectField name="city" label="City" value={city} options={cityOptions} placeholder={province ? "Select a major city" : "Select a province first"} disabled={!province} required onChange={(event) => setCity(event.target.value)}/><Field name="postalCode" label="Postal code" value={textValue(values.postalCode)} required/><Field name="country" label="Country" value={textValue(values.country)} required/><Field name="phone" label="Phone" value={textValue(values.phone)}/><Field name="fax" label="Fax" value={textValue(values.fax)}/><Field name="primaryDivision" label="Primary division" value={textValue(values.primaryDivision)}/><Field name="managementArea" label="Management area" value={textValue(values.managementArea)} maxLength={10}/><Field name="taxNumber" label="Tax number" value={textValue(values.taxNumber)}/><Field name="contactName" label="Store contact" value={textValue(values.contactName)}/><Field name="email" label="Email address" value={textValue(values.email)} type="email"/></div></fieldset>
-      <fieldset><legend><Clock3 size={16}/>Business hours</legend><div className="hours-grid">{weekDays.map((day) => { const key = day.toLowerCase(); return <div className="hours-row" key={day}><label className="check-label"><input type="checkbox" name={`${key}Closed`} defaultChecked={booleanValue(values[`${key}Closed` as keyof typeof values])}/><span>Closed {day}</span></label><Field name={`${key}Start`} label="Start" value={textValue(values[`${key}Start` as keyof typeof values])} type="time"/><Field name={`${key}End`} label="End" value={textValue(values[`${key}End` as keyof typeof values])} type="time"/></div>; })}</div><p className="field-help">Business day runs from 00:00 to 23:59.</p></fieldset>
+      <HoursSchedule prefix="access" title="Access hours" values={values}/>
+      <HoursSchedule prefix="office" title="Office hours" values={values}/>
       <fieldset><legend><MapPin size={16}/>Store location</legend><div className="field-grid two-column"><Field name="latitude" label="Latitude" value={textValue(values.latitude)} inputMode="decimal"/><Field name="longitude" label="Longitude" value={textValue(values.longitude)} inputMode="decimal"/></div></fieldset>
       <fieldset><legend><Globe2 size={16}/>Website information</legend><div className="field-grid"><Field name="websiteUrl" label="Website URL" value={textValue(values.websiteUrl)} type="url"/><label className="check-label"><input type="checkbox" name="onlinePayments" defaultChecked={booleanValue(values.onlinePayments)}/><span>Online payments supported</span></label><label>Driving directions or location description<textarea name="directions" rows={5} defaultValue={textValue(values.directions)}/></label></div></fieldset>
       <fieldset><legend><Globe2 size={16}/>Website booking</legend><div className="field-grid"><Field name="publicSlug" label="Public store address" defaultValue={facility?.publicSlug ?? ""} placeholder="midpoint" pattern="[a-z0-9]+(?:-[a-z0-9]+)*"/><p className="field-help">Used in the public booking URL, for example /storage/midpoint.</p><label className="check-label"><input type="checkbox" name="publicBookingEnabled" defaultChecked={facility?.publicBookingEnabled ?? false}/><span>Show this store and its available units on the public website</span></label><p className="safe-config-note"><CheckCircle2 size={16}/>Only customer-safe availability and map details are shared. Staff, tenant and internal configuration data remain private.</p></div></fieldset>
     </div><FormFooter busy={busy}/>
   </form>;
+}
+
+function HoursSchedule({ prefix, title, values }: { prefix: "access" | "office"; title: string; values: Record<string, unknown> }) {
+  const [closed, setClosed] = useState<Record<string, boolean>>(() => Object.fromEntries(hoursPeriods.map((period) => [period, booleanValue(values[`${prefix}${period}Closed`])] )));
+  const labels: Record<(typeof hoursPeriods)[number], string> = { Weekday: "Weekday", Saturday: "Saturday", Sunday: "Sunday", PublicHoliday: "Public holidays" };
+  return <fieldset className="hours-fieldset"><legend><Clock3 size={16}/>{title}</legend><div className="hours-grid">{hoursPeriods.map((period) => {
+    const isClosed = closed[period];
+    return <div className="hours-row" key={period}><label className="check-label"><input type="checkbox" name={`${prefix}${period}Closed`} checked={isClosed} onChange={(event) => setClosed((current) => ({ ...current, [period]: event.target.checked }))}/><span>Closed {labels[period]}</span></label><Field name={`${prefix}${period}Start`} label="Start" value={textValue(values[`${prefix}${period}Start`])} type="time" disabled={isClosed} required={!isClosed}/><Field name={`${prefix}${period}End`} label="End" value={textValue(values[`${prefix}${period}End`])} type="time" disabled={isClosed} required={!isClosed}/></div>;
+  })}</div><p className="field-help">Set independently for each facility. Closed periods do not require start or end times.</p></fieldset>;
 }
 
 function WebsiteAttributes({ initial, busy, onSave }: { initial?: Record<string, unknown>; busy: boolean; onSave: (config: Record<string, unknown>) => void }) {

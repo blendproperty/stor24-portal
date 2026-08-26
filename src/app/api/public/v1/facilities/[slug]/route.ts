@@ -11,6 +11,14 @@ const publicStoreKeys = [
   "phone", "email", "websiteUrl", "directions", "latitude", "longitude",
   "weekdayClosed", "weekdayStart", "weekdayEnd", "saturdayClosed", "saturdayStart",
   "saturdayEnd", "sundayClosed", "sundayStart", "sundayEnd",
+  "accessWeekdayClosed", "accessWeekdayStart", "accessWeekdayEnd",
+  "accessSaturdayClosed", "accessSaturdayStart", "accessSaturdayEnd",
+  "accessSundayClosed", "accessSundayStart", "accessSundayEnd",
+  "accessPublicHolidayClosed", "accessPublicHolidayStart", "accessPublicHolidayEnd",
+  "officeWeekdayClosed", "officeWeekdayStart", "officeWeekdayEnd",
+  "officeSaturdayClosed", "officeSaturdayStart", "officeSaturdayEnd",
+  "officeSundayClosed", "officeSundayStart", "officeSundayEnd",
+  "officePublicHolidayClosed", "officePublicHolidayStart", "officePublicHolidayEnd",
 ] as const;
 
 function safeStoreInformation(value: unknown) {
