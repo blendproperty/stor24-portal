@@ -6,6 +6,9 @@ import { db } from "@/lib/db";
 import { classifyBlendSignLease, blendSignLeaseStateLabel, blendSignLeaseStateNeedsAction } from "@/lib/blendsign-reconciliation";
 import { requirePermissionScope } from "@/lib/scope";
 import { BlendSignReconciliationActions } from "@/components/blendsign-reconciliation-actions";
+import { WhatsAppAutomationControl } from "@/components/whatsapp-automation-control";
+import { getWhatsAppAutomationState } from "@/lib/integrations/whatsapp-automation";
+import { requireSession } from "@/lib/auth-guards";
 
 export const metadata = { title: "Integrations" };
 export const dynamic = "force-dynamic";
@@ -17,7 +20,9 @@ function customerName(customer: { firstName: string | null; lastName: string | n
 export default async function IntegrationsPage() {
   const scope = await requirePermissionScope("operations.view");
   const facilityFilter = scope.unrestrictedFacilities ? {} : { facilityId: { in: scope.facilityIds } };
-  const [documents, inboxCounts, outboxCounts, hikCentralConnections] = await Promise.all([
+  const [session, whatsAppState, documents, inboxCounts, outboxCounts, hikCentralConnections] = await Promise.all([
+    requireSession(),
+    getWhatsAppAutomationState(scope.organisationId),
     db.document.findMany({ where: { provider: "BLENDSIGN", type: "LEASE_AGREEMENT", tenancy: { facility: { organisationId: scope.organisationId }, ...facilityFilter } }, include: { tenancy: { include: { customer: true, account: true, facility: true, occupancies: { where: { status: { in: ["ACTIVE", "NOTICE_GIVEN", "PENDING"] } }, include: { unit: true }, orderBy: { createdAt: "desc" }, take: 1 } } } }, orderBy: { createdAt: "desc" }, take: 100 }),
     db.webhookInbox.groupBy({ by: ["status"], where: { organisationId: scope.organisationId }, _count: true }),
     db.webhookOutbox.groupBy({ by: ["status"], where: { organisationId: scope.organisationId }, _count: true }),
@@ -32,6 +37,7 @@ export default async function IntegrationsPage() {
   const hikCompany = hikCentralConnections.find((item) => item.facilityId === null);
   const hikFacilities = hikCentralConnections.filter((item) => item.facilityId !== null);
   const hikConnected = hikCompany?.status === "CONNECTED" && hikFacilities.some((item) => item.status === "CONNECTED");
+  const whatsAppConfigured = Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_FROM && process.env.TWILIO_WHATSAPP_RESERVATION_CONFIRMED_SID);
   const connections = [
     ["BlendSign", "BlendSign", "Connected", "Lease envelopes and completed artifacts", "positive", null],
     ["Payments", "Netcash", "Configuration required", "Credentials and provider contract pending", "warning", null],
@@ -45,6 +51,7 @@ export default async function IntegrationsPage() {
     <section className="summary-strip">
       <div className="summary-cell"><span>Completed leases</span><strong>{completed}</strong></div><div className="summary-cell"><span>Awaiting signature</span><strong>{awaiting}</strong></div><div className="summary-cell"><span>Lease action required</span><strong>{actionRequired}</strong></div><div className="summary-cell"><span>Dead-letter events</span><strong>{(inbox.DEAD_LETTER ?? 0) + (outbox.DEAD_LETTER ?? 0)}</strong></div>
     </section>
+    <WhatsAppAutomationControl enabled={whatsAppState.enabled} serverGateEnabled={whatsAppState.serverGateEnabled} configured={whatsAppConfigured} canManage={session.role === "Organisation owner"}/>
     <section className="panel integration-table"><div className="panel-heading"><div><h2>BlendSign lease reconciliation</h2><p className="panel-subtitle">The latest 100 facility-authorised lease documents, classified from persisted Stor24 state.</p></div><Activity className="muted-icon" /></div><div className="table-wrap"><table className="data-table"><thead><tr><th>Account</th><th>Customer / unit</th><th>Facility</th><th>Document</th><th>Operational state</th><th>Sent / expires</th><th>Action</th></tr></thead><tbody>
       {rows.length ? rows.map(({ document, state }) => <tr key={document.id}><td><Link className="primary-cell" href={`/operations/accounts?accountId=${encodeURIComponent(document.tenancy.accountId)}`}>{document.tenancy.account.accountNumber}</Link></td><td>{customerName(document.tenancy.customer)}<span className="secondary-cell">Unit {document.tenancy.occupancies[0]?.unit.number ?? "—"}</span></td><td>{document.tenancy.facility.name}</td><td>{document.templateKey ?? "Lease"}<span className="secondary-cell">{document.externalId ?? "No envelope ID"}</span></td><td><StatusPill tone={blendSignLeaseStateNeedsAction(state) ? "warning" : state === "COMPLETED" ? "positive" : "neutral"}>{blendSignLeaseStateLabel(state)}</StatusPill></td><td>{document.sentAt?.toLocaleString("en-ZA") ?? document.createdAt.toLocaleString("en-ZA")}<span className="secondary-cell">{document.expiresAt ? `Expires ${document.expiresAt.toLocaleString("en-ZA")}` : "No expiry recorded"}</span></td><td>{state === "DISPATCH_FAILED" ? <BlendSignReconciliationActions documentId={document.id} action="retry-dispatch"/> : state === "OVERDUE" || state === "AWAITING_SIGNATURE" ? <BlendSignReconciliationActions documentId={document.id} action="resend-invitation"/> : <span className="secondary-cell">No action</span>}</td></tr>) : <tr><td colSpan={7} className="empty-cell">No BlendSign lease documents found in your authorised facilities.</td></tr>}
     </tbody></table></div></section>

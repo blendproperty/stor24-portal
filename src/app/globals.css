@@ -842,6 +842,12 @@ a.summary-cell:focus-visible {
 .check-label input { width: auto !important; min-height: auto !important; margin-top: 3px; }
 .safe-config-note { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 12px; border-radius: 10px; background: var(--amber-soft); color: var(--amber); font-size: 12px; line-height: 1.5; }
 .safe-config-note svg { flex: none; }
+.whatsapp-automation-card { display: grid; gap: 16px; }
+.whatsapp-automation-state { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); }
+.whatsapp-automation-state > div { display: grid; gap: 3px; }
+.whatsapp-automation-state small { color: var(--muted); }
+.integration-state-dot { width: 11px; height: 11px; flex: none; border-radius: 999px; background: #a7afa9; box-shadow: 0 0 0 4px rgba(167,175,169,.16); }
+.integration-state-dot.active { background: #159457; box-shadow: 0 0 0 4px rgba(21,148,87,.14); }
 .hikvision-layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
 .hikvision-layout .panel { min-width: 0; }
 .hikvision-facility-picker { width: 100%; min-width: 0; }

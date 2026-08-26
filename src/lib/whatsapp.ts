@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { TwilioWhatsAppProvider } from "@/lib/integrations/twilio-provider";
 import { privacyHash } from "@/lib/request-security";
+import { getWhatsAppAutomationState, whatsAppServerGateEnabled } from "@/lib/integrations/whatsapp-automation";
 
 export const WHATSAPP_TEMPLATE_ENV = {
   RESERVATION_CONFIRMED: "TWILIO_WHATSAPP_RESERVATION_CONFIRMED_SID",
@@ -16,7 +17,7 @@ export type WhatsAppMessageType = keyof typeof WHATSAPP_TEMPLATE_ENV;
 type Consent = { whatsapp?: boolean; optedOutAt?: string | null } | null | undefined;
 
 export function whatsAppAutomationEnabled() {
-  return process.env.WHATSAPP_AUTOMATION_ENABLED === "true";
+  return whatsAppServerGateEnabled();
 }
 
 export function hasWhatsAppConsent(value: unknown): value is Consent {
@@ -37,7 +38,7 @@ export async function sendWhatsAppTemplate(input: {
   allowWhenAutomationDisabled?: boolean;
 }) {
   if (!hasWhatsAppConsent(input.consent)) return { ok: false as const, code: "CONSENT_REQUIRED" };
-  if (!input.allowWhenAutomationDisabled && !whatsAppAutomationEnabled()) return { ok: false as const, code: "AUTOMATION_DISABLED" };
+  if (!input.allowWhenAutomationDisabled && !(await getWhatsAppAutomationState(input.organisationId)).enabled) return { ok: false as const, code: "AUTOMATION_DISABLED" };
   const contentSid = process.env[WHATSAPP_TEMPLATE_ENV[input.messageType]];
   if (!contentSid) return { ok: false as const, code: "TEMPLATE_NOT_CONFIGURED" };
 
