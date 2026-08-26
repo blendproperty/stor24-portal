@@ -176,6 +176,9 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
           unitNumber: created.unit.number,
           monthlyRateZar: created.quotedRate.toString(),
           holdExpiresAt: created.holdExpiresAt?.toISOString() ?? "",
+          intendedMoveIn: created.intendedMoveIn
+            ? created.intendedMoveIn.toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Johannesburg" })
+            : "To be confirmed",
           reference: created.publicReference ?? "",
         },
       });
