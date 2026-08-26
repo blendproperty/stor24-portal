@@ -6,6 +6,7 @@ import {
   ListOrdered,
   Pencil,
   Plus,
+  BadgeDollarSign,
   RotateCcw,
   Search,
   ShieldCheck,
@@ -117,6 +118,26 @@ export function UnitInventoryWorkspace({
       })) ?? [],
     [selectedFacility],
   );
+
+  async function applyMidrandMarketRates() {
+    if (!selectedFacility || !window.confirm(`Apply the August 2026 Midrand market rate curve to all ${selectedFacility.units.length} standard unit rates at ${selectedFacility.name}? Existing tenancy rents and reservation quotes will not change.`)) return;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    const response = await fetch("/api/v1/leasing/unit-rates", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ facilityId: selectedFacility.id, modelVersion: "MIDRAND_2026_08_V1" }),
+    });
+    const result = await response.json().catch(() => ({}));
+    setBusy(false);
+    if (!response.ok) {
+      setError(result.error?.message ?? "The market rates could not be applied.");
+      return;
+    }
+    await refresh();
+    setNotice(`${result.data.updated} unit rates updated. Range ${money(String(result.data.minimumRate))} to ${money(String(result.data.maximumRate))}.`);
+  }
 
   async function refresh() {
     const accountByUnitId = new Map(
@@ -265,6 +286,14 @@ export function UnitInventoryWorkspace({
         description="Store-scoped unit register, physical attributes, availability and operational rates."
         action={
           <div className="form-actions">
+            <button
+              className="button button-secondary"
+              onClick={() => void applyMidrandMarketRates()}
+              disabled={!selectedFacility?.units.length || busy}
+            >
+              <BadgeDollarSign size={15} />
+              Apply Midrand rates
+            </button>
             <button
               className="button button-secondary"
               onClick={() => {
