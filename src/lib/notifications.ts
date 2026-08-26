@@ -145,7 +145,7 @@ export async function notifyViewingBooked(input: Omit<ReservationConfirmationInp
   viewingAt: string; holdExpiresAt: string; reference: string;
 } }) {
   const results: Array<{ channel: Channel; ok: boolean }> = [];
-  const body = `Hi ${input.variables.firstName},\n\nYour viewing of Unit ${input.variables.unitNumber} at ${input.variables.facilityName} is booked for ${input.variables.viewingAt}. The unit is reserved for your visit until ${input.variables.holdExpiresAt}.\n\nReference: ${input.variables.reference}. You can pay at the facility or request an online payment link after viewing.\n\nStor24`;
+  const body = `Hi ${input.variables.firstName},\n\nYour viewing of Unit ${input.variables.unitNumber} at ${input.variables.facilityName} is booked for ${input.variables.viewingAt}. Your 24-hour viewing window is active until ${input.variables.holdExpiresAt}, and the unit stays reserved throughout.\n\nReference: ${input.variables.reference}. You can pay at the facility or request an online payment link after viewing.\n\nStor24`;
   if (input.consent.email && input.to.email) {
     const idempotencyKey = `${input.idempotencyKey}:EMAIL`;
     try {
@@ -165,7 +165,7 @@ export async function notifyViewingBooked(input: Omit<ReservationConfirmationInp
     results.push({ channel: "SMS", ok: result.ok });
   }
   if (input.consent.whatsapp && input.to.phone) {
-    const result = await sendWhatsAppTemplate({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, recipient: input.to.phone, consent: input.consent, messageType: "VIEWING_BOOKED", idempotencyKey: `${input.idempotencyKey}:WHATSAPP`, variables: { "1": input.variables.firstName, "2": input.variables.unitNumber, "3": input.variables.facilityName, "4": input.variables.viewingAt, "5": input.variables.reference }, allowWhenAutomationDisabled: input.allowWhatsappWhenAutomationDisabled });
+    const result = await sendWhatsAppTemplate({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, recipient: input.to.phone, consent: input.consent, messageType: "VIEWING_BOOKED", idempotencyKey: `${input.idempotencyKey}:WHATSAPP`, variables: { "1": input.variables.firstName, "2": input.variables.unitNumber, "3": input.variables.facilityName, "4": input.variables.viewingAt, "5": input.variables.holdExpiresAt, "6": input.variables.reference }, allowWhenAutomationDisabled: input.allowWhatsappWhenAutomationDisabled });
     results.push({ channel: "WHATSAPP", ok: result.ok });
   }
   return results;

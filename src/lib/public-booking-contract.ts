@@ -66,14 +66,9 @@ export function reservationHoldHours(raw = process.env.PUBLIC_RESERVATION_HOLD_H
   return Number.isFinite(parsed) ? Math.min(168, Math.max(1, Math.round(parsed))) : 24;
 }
 
-export function publicViewingWindowDays(raw = process.env.PUBLIC_VIEWING_WINDOW_DAYS) {
-  const parsed = Number(raw ?? 7);
-  return Number.isFinite(parsed) ? Math.min(30, Math.max(1, Math.round(parsed))) : 7;
-}
-
-export function publicViewingGraceMinutes(raw = process.env.PUBLIC_VIEWING_GRACE_MINUTES) {
-  const parsed = Number(raw ?? 120);
-  return Number.isFinite(parsed) ? Math.min(720, Math.max(30, Math.round(parsed))) : 120;
+export function publicViewingWindowHours(raw = process.env.PUBLIC_VIEWING_WINDOW_HOURS) {
+  const parsed = Number(raw ?? 24);
+  return Number.isFinite(parsed) ? Math.min(72, Math.max(1, Math.round(parsed))) : 24;
 }
 
 export function publicReservationVerificationEnabled(raw = process.env.PUBLIC_RESERVATION_VERIFICATION_ENABLED) {

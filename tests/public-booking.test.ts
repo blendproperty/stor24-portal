@@ -6,8 +6,7 @@ import {
   publicElementConfig,
   publicReservationSchema,
   publicReservationVerificationEnabled,
-  publicViewingGraceMinutes,
-  publicViewingWindowDays,
+  publicViewingWindowHours,
   reservationHoldHours,
   secureKeyMatches,
 } from "../src/lib/public-booking-contract.ts";
@@ -66,8 +65,7 @@ test("references are readable and reservation holds are bounded", () => {
   assert.equal(publicReservationVerificationEnabled(undefined), false);
   assert.equal(publicReservationVerificationEnabled("false"), false);
   assert.equal(publicReservationVerificationEnabled("TRUE"), true);
-  assert.equal(publicViewingWindowDays("0"), 1);
-  assert.equal(publicViewingWindowDays("100"), 30);
-  assert.equal(publicViewingGraceMinutes("5"), 30);
-  assert.equal(publicViewingGraceMinutes("1000"), 720);
+  assert.equal(publicViewingWindowHours("0"), 1);
+  assert.equal(publicViewingWindowHours("100"), 72);
+  assert.equal(publicViewingWindowHours("invalid"), 24);
 });

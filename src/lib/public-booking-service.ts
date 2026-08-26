@@ -3,8 +3,7 @@ import { db } from "@/lib/db";
 import {
   createPublicReference,
   publicReservationVerificationEnabled,
-  publicViewingGraceMinutes,
-  publicViewingWindowDays,
+  publicViewingWindowHours,
   reservationHoldHours,
   type PublicReservationInput,
 } from "@/lib/public-booking-contract";
@@ -69,7 +68,7 @@ function localViewingParts(value: Date, timeZone: string) {
 
 function viewingSlotAllowed(viewingAt: Date, timeZone: string, rawConfig: unknown, now = new Date()) {
   if (viewingAt.getTime() < now.getTime() + 30 * 60_000) return false;
-  if (viewingAt.getTime() > now.getTime() + publicViewingWindowDays() * 86_400_000) return false;
+  if (viewingAt.getTime() > now.getTime() + publicViewingWindowHours() * 3_600_000) return false;
   const config = rawConfig && typeof rawConfig === "object" && !Array.isArray(rawConfig) ? rawConfig as Record<string, unknown> : {};
   const parts = localViewingParts(viewingAt, timeZone);
   const period = parts.weekday === "Saturday" ? "Saturday" : parts.weekday === "Sunday" ? "Sunday" : "Weekday";
@@ -81,10 +80,8 @@ function viewingSlotAllowed(viewingAt: Date, timeZone: string, rawConfig: unknow
   return !closed && Boolean(start && end) && time >= start && time < end;
 }
 
-function confirmedHoldExpiry(reservation: { journey: string; viewingAt: Date | null }, verifiedAt: Date) {
-  return reservation.journey === "VIEWING" && reservation.viewingAt
-    ? new Date(reservation.viewingAt.getTime() + publicViewingGraceMinutes() * 60_000)
-    : new Date(verifiedAt.getTime() + reservationHoldHours() * 60 * 60 * 1000);
+function confirmedHoldExpiry(verifiedAt: Date) {
+  return new Date(verifiedAt.getTime() + reservationHoldHours() * 60 * 60 * 1000);
 }
 
 async function notifyPublicReservation(input: {
@@ -286,7 +283,7 @@ export async function verifyPublicReservation(reference: string, code: string) {
     return { ok: false as const, code: "INVALID_CODE" };
   }
   const verifiedAt = new Date();
-  const holdExpiresAt = confirmedHoldExpiry(reservation, verifiedAt);
+  const holdExpiresAt = confirmedHoldExpiry(verifiedAt);
   const updated = await db.$transaction(async (tx) => {
     const item = await tx.reservation.update({ where: { id: reservation.id }, data: { contactVerifiedAt: verifiedAt, holdExpiresAt, verificationCodeHash: null, verificationExpiresAt: null }, include: reservationInclude });
     await tx.customer.update({ where: { id: reservation.customerId }, data: { phoneVerifiedAt: verifiedAt } });
