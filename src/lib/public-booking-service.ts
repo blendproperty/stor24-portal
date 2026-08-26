@@ -3,17 +3,19 @@ import { db } from "@/lib/db";
 import {
   createPublicReference,
   publicReservationVerificationEnabled,
+  publicViewingGraceMinutes,
+  publicViewingWindowDays,
   reservationHoldHours,
   type PublicReservationInput,
 } from "@/lib/public-booking-contract";
-import { notifyReservationConfirmed } from "@/lib/notifications";
+import { notifyReservationConfirmed, notifyViewingBooked } from "@/lib/notifications";
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { TwilioSmsProvider, TwilioWhatsAppProvider, normalizeTwilioRecipient } from "@/lib/integrations/twilio-provider";
 
 export class PublicBookingError extends Error {
   constructor(
-    public readonly code: "FACILITY_NOT_FOUND" | "UNIT_UNAVAILABLE" | "IDEMPOTENCY_CONFLICT",
-    public readonly status: 404 | 409,
+    public readonly code: "FACILITY_NOT_FOUND" | "UNIT_UNAVAILABLE" | "IDEMPOTENCY_CONFLICT" | "VIEWING_SLOT_UNAVAILABLE",
+    public readonly status: 404 | 409 | 422,
   ) {
     super(code);
   }
@@ -23,6 +25,8 @@ function reservationResult(reservation: {
   publicReference: string | null;
   status: string;
   holdExpiresAt: Date | null;
+  journey: string;
+  viewingAt: Date | null;
   quotedRate: { toString(): string };
   unit: { number: string; unitType: { name: string; areaSqMetres: { toString(): string } | null } };
   facility: { name: string; publicSlug: string | null };
@@ -31,6 +35,8 @@ function reservationResult(reservation: {
     reference: reservation.publicReference,
     status: reservation.status,
     holdExpiresAt: reservation.holdExpiresAt?.toISOString() ?? null,
+    journey: reservation.journey,
+    viewingAt: reservation.viewingAt?.toISOString() ?? null,
     quotedMonthlyRateZar: Number(reservation.quotedRate.toString()),
     facility: { name: reservation.facility.name, slug: reservation.facility.publicSlug },
     unit: {
@@ -54,6 +60,57 @@ function verificationHash(reservationId: string, code: string) {
 
 const verificationWindowMs = 10 * 60 * 1000;
 
+function localViewingParts(value: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-ZA", {
+    timeZone, weekday: "long", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(value);
+  return Object.fromEntries(parts.map((part) => [part.type, part.value])) as Record<string, string>;
+}
+
+function viewingSlotAllowed(viewingAt: Date, timeZone: string, rawConfig: unknown, now = new Date()) {
+  if (viewingAt.getTime() < now.getTime() + 30 * 60_000) return false;
+  if (viewingAt.getTime() > now.getTime() + publicViewingWindowDays() * 86_400_000) return false;
+  const config = rawConfig && typeof rawConfig === "object" && !Array.isArray(rawConfig) ? rawConfig as Record<string, unknown> : {};
+  const parts = localViewingParts(viewingAt, timeZone);
+  const period = parts.weekday === "Saturday" ? "Saturday" : parts.weekday === "Sunday" ? "Sunday" : "Weekday";
+  const defaults = period === "Weekday" ? ["08:00", "17:00"] : period === "Saturday" ? ["09:00", "12:00"] : ["", ""];
+  const closed = typeof config[`office${period}Closed`] === "boolean" ? config[`office${period}Closed`] : period === "Sunday";
+  const start = typeof config[`office${period}Start`] === "string" ? config[`office${period}Start`] as string : defaults[0];
+  const end = typeof config[`office${period}End`] === "string" ? config[`office${period}End`] as string : defaults[1];
+  const time = `${parts.hour}:${parts.minute}`;
+  return !closed && Boolean(start && end) && time >= start && time < end;
+}
+
+function confirmedHoldExpiry(reservation: { journey: string; viewingAt: Date | null }, verifiedAt: Date) {
+  return reservation.journey === "VIEWING" && reservation.viewingAt
+    ? new Date(reservation.viewingAt.getTime() + publicViewingGraceMinutes() * 60_000)
+    : new Date(verifiedAt.getTime() + reservationHoldHours() * 60 * 60 * 1000);
+}
+
+async function notifyPublicReservation(input: {
+  organisationId: string; facilityId: string; customerId: string; idempotencyKey: string;
+  consent: { email: boolean; sms: boolean; phone: boolean; whatsapp?: boolean };
+  to: { email: string; phone: string }; allowWhatsappWhenAutomationDisabled?: boolean;
+  journey: string; firstName: string; facilityName: string; unitNumber: string;
+  monthlyRateZar: string; holdExpiresAt: string; intendedMoveIn: Date | null; viewingAt: Date | null; reference: string;
+}) {
+  if (input.journey === "VIEWING" && input.viewingAt) {
+    return notifyViewingBooked({ ...input, variables: {
+      firstName: input.firstName, facilityName: input.facilityName, unitNumber: input.unitNumber,
+      monthlyRateZar: input.monthlyRateZar,
+      viewingAt: input.viewingAt.toLocaleString("en-ZA", { dateStyle: "long", timeStyle: "short", timeZone: "Africa/Johannesburg" }),
+      holdExpiresAt: new Date(input.holdExpiresAt).toLocaleString("en-ZA", { dateStyle: "long", timeStyle: "short", timeZone: "Africa/Johannesburg" }),
+      reference: input.reference,
+    } });
+  }
+  return notifyReservationConfirmed({ ...input, variables: {
+    firstName: input.firstName, facilityName: input.facilityName, unitNumber: input.unitNumber,
+    monthlyRateZar: input.monthlyRateZar, holdExpiresAt: input.holdExpiresAt,
+    intendedMoveIn: input.intendedMoveIn ? input.intendedMoveIn.toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Johannesburg" }) : "To be confirmed",
+    reference: input.reference,
+  } });
+}
+
 async function deliverVerificationCode(input: { code: string; phone: string; organisationId: string; facilityId: string; idempotencyKey: string }) {
   const context = { organisationId: input.organisationId, facilityId: input.facilityId, idempotencyKey: input.idempotencyKey };
   const contentSid = process.env.TWILIO_WHATSAPP_VERIFICATION_SID ?? "";
@@ -70,7 +127,7 @@ async function deliverVerificationCode(input: { code: string; phone: string; org
 
 export async function releaseExpiredPublicReservations(now = new Date()) {
   const expired = await db.reservation.findMany({
-    where: { status: "ACTIVE", source: "PUBLIC_WEBSITE", holdExpiresAt: { lte: now } },
+    where: { status: "ACTIVE", source: { in: ["PUBLIC_WEBSITE", "PUBLIC_VIEWING"] }, holdExpiresAt: { lte: now } },
     select: { id: true, unitId: true },
     take: 100,
   });
@@ -102,9 +159,15 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
 
   const facility = await db.facility.findFirst({
     where: { publicSlug: input.facilitySlug, publicBookingEnabled: true, active: true },
-    select: { id: true, organisationId: true, name: true },
+    select: {
+      id: true, organisationId: true, name: true, timezone: true,
+      configurationProfiles: { where: { domain: "STORE_INFORMATION", name: "Default", status: "READY" }, select: { config: true }, take: 1 },
+    },
   });
   if (!facility) throw new PublicBookingError("FACILITY_NOT_FOUND", 404);
+  if (input.journey === "VIEWING" && (!input.viewingAt || !viewingSlotAllowed(input.viewingAt, facility.timezone, facility.configurationProfiles[0]?.config))) {
+    throw new PublicBookingError("VIEWING_SLOT_UNAVAILABLE", 422);
+  }
   const verificationCode = verificationEnabled ? randomInt(0, 1_000_000).toString().padStart(6, "0") : "";
 
   try {
@@ -122,10 +185,11 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
       });
       if (claimed.count !== 1) throw new PublicBookingError("UNIT_UNAVAILABLE", 409);
 
+      const source = input.journey === "VIEWING" ? "PUBLIC_VIEWING" : "PUBLIC_WEBSITE";
       const consent = {
         ...input.communicationConsent,
         recordedAt: new Date().toISOString(),
-        source: "PUBLIC_WEBSITE",
+        source,
       };
       let customer = verificationEnabled ? null : await tx.customer.findFirst({ where: { organisationId: facility.organisationId, email: { equals: input.email, mode: "insensitive" } }, orderBy: { updatedAt: "desc" } });
       if (!customer) customer = await tx.customer.create({ data: { organisationId: facility.organisationId, type: "INDIVIDUAL", firstName: input.firstName, lastName: input.lastName, email: input.email, phone: normalizeTwilioRecipient(input.phone) ?? input.phone, communicationConsent: consent } });
@@ -135,8 +199,8 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
           facilityId: facility.id,
           customerId: customer.id,
           desiredUnitTypeId: unit.unitTypeId,
-          stage: "RESERVED",
-          source: "PUBLIC_WEBSITE",
+          stage: input.journey === "VIEWING" ? "VIEWING_BOOKED" : "RESERVED",
+          source,
           expectedMoveIn: input.intendedMoveIn,
           notes: input.websitePath ? `Website path: ${input.websitePath}` : undefined,
         },
@@ -149,13 +213,15 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
           leadId: lead.id,
           unitId: unit.id,
           quotedRate: unit.monthlyRate,
+          journey: input.journey,
           holdExpiresAt,
           intendedMoveIn: input.intendedMoveIn,
+          viewingAt: input.viewingAt,
           verificationExpiresAt: verificationEnabled ? holdExpiresAt : null,
           verificationCodeHash: verificationEnabled ? "PENDING" : null,
           publicReference: createPublicReference(),
           idempotencyKey: input.idempotencyKey,
-          source: "PUBLIC_WEBSITE",
+          source,
         },
         include: reservationInclude,
       });
@@ -170,7 +236,7 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
           requestId: input.idempotencyKey,
           ipHash,
           after: {
-            source: "PUBLIC_WEBSITE",
+            source,
             unitId: unit.id,
             leadId: lead.id,
             holdExpiresAt: holdExpiresAt.toISOString(),
@@ -183,7 +249,7 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
     const { created, customerId } = reservation;
 
     if (!verificationEnabled) {
-      await notifyReservationConfirmed({ organisationId: facility.organisationId, facilityId: facility.id, customerId, idempotencyKey: input.idempotencyKey, consent: input.communicationConsent, to: { email: input.email, phone: input.phone }, variables: { firstName: input.firstName, facilityName: created.facility.name, unitNumber: created.unit.number, monthlyRateZar: created.quotedRate.toString(), holdExpiresAt: created.holdExpiresAt?.toISOString() ?? "", intendedMoveIn: created.intendedMoveIn ? created.intendedMoveIn.toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Johannesburg" }) : "To be confirmed", reference: created.publicReference ?? "" } });
+      await notifyPublicReservation({ organisationId: facility.organisationId, facilityId: facility.id, customerId, idempotencyKey: input.idempotencyKey, consent: input.communicationConsent, to: { email: input.email, phone: input.phone }, journey: created.journey, firstName: input.firstName, facilityName: created.facility.name, unitNumber: created.unit.number, monthlyRateZar: created.quotedRate.toString(), holdExpiresAt: created.holdExpiresAt?.toISOString() ?? "", intendedMoveIn: created.intendedMoveIn, viewingAt: created.viewingAt, reference: created.publicReference ?? "" });
       return { ...reservationResult(created), verificationRequired: false };
     }
     const otp = await deliverVerificationCode({ code: verificationCode, phone: input.phone, organisationId: facility.organisationId, facilityId: facility.id, idempotencyKey: `${input.idempotencyKey}:VERIFY` });
@@ -220,14 +286,14 @@ export async function verifyPublicReservation(reference: string, code: string) {
     return { ok: false as const, code: "INVALID_CODE" };
   }
   const verifiedAt = new Date();
-  const holdExpiresAt = new Date(verifiedAt.getTime() + reservationHoldHours() * 60 * 60 * 1000);
+  const holdExpiresAt = confirmedHoldExpiry(reservation, verifiedAt);
   const updated = await db.$transaction(async (tx) => {
     const item = await tx.reservation.update({ where: { id: reservation.id }, data: { contactVerifiedAt: verifiedAt, holdExpiresAt, verificationCodeHash: null, verificationExpiresAt: null }, include: reservationInclude });
     await tx.customer.update({ where: { id: reservation.customerId }, data: { phoneVerifiedAt: verifiedAt } });
     await tx.auditEvent.create({ data: { organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, action: "public_reservation.contact_verified", entityType: "Reservation", entityId: reservation.id, requestId: reservation.idempotencyKey, after: { verifiedAt: verifiedAt.toISOString(), holdExpiresAt: holdExpiresAt.toISOString() } } });
     return item;
   });
-  await notifyReservationConfirmed({ organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, customerId: reservation.customerId, idempotencyKey: reservation.idempotencyKey ?? reservation.id, consent: reservation.customer.communicationConsent as { email: boolean; sms: boolean; phone: boolean; whatsapp?: boolean }, to: { email: reservation.customer.email ?? "", phone: reservation.customer.phone ?? "" }, allowWhatsappWhenAutomationDisabled: true, variables: { firstName: reservation.customer.firstName ?? "customer", facilityName: reservation.facility.name, unitNumber: reservation.unit.number, monthlyRateZar: reservation.quotedRate.toString(), holdExpiresAt: holdExpiresAt.toISOString(), intendedMoveIn: reservation.intendedMoveIn ? reservation.intendedMoveIn.toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Johannesburg" }) : "To be confirmed", reference } });
+  await notifyPublicReservation({ organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, customerId: reservation.customerId, idempotencyKey: reservation.idempotencyKey ?? reservation.id, consent: reservation.customer.communicationConsent as { email: boolean; sms: boolean; phone: boolean; whatsapp?: boolean }, to: { email: reservation.customer.email ?? "", phone: reservation.customer.phone ?? "" }, allowWhatsappWhenAutomationDisabled: true, journey: reservation.journey, firstName: reservation.customer.firstName ?? "customer", facilityName: reservation.facility.name, unitNumber: reservation.unit.number, monthlyRateZar: reservation.quotedRate.toString(), holdExpiresAt: holdExpiresAt.toISOString(), intendedMoveIn: reservation.intendedMoveIn, viewingAt: reservation.viewingAt, reference });
   return { ok: true as const, ...reservationResult(updated) };
 }
 

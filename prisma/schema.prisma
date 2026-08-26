@@ -72,6 +72,11 @@ enum ReservationStatus {
   EXPIRED
 }
 
+enum ReservationJourney {
+  RENTAL
+  VIEWING
+}
+
 enum LedgerEntryType {
   CHARGE
   PAYMENT
@@ -404,9 +409,11 @@ model Reservation {
   unitId             String
   unit               Unit              @relation(fields: [unitId], references: [id])
   status             ReservationStatus @default(ACTIVE)
+  journey            ReservationJourney @default(RENTAL)
   quotedRate         Decimal           @db.Decimal(12, 2)
   holdExpiresAt      DateTime?
   intendedMoveIn     DateTime?
+  viewingAt          DateTime?
   publicReference    String?           @unique
   idempotencyKey     String?           @unique
   source             String            @default("INTERNAL")
@@ -420,6 +427,7 @@ model Reservation {
   updatedAt          DateTime          @updatedAt
 
   @@index([facilityId, status, holdExpiresAt])
+  @@index([journey, viewingAt])
 }
 
 model Tenancy {

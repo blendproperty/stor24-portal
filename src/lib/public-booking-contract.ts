@@ -9,6 +9,8 @@ export const publicReservationSchema = z.object({
   email: z.email().transform((value) => value.trim().toLowerCase()),
   phone: z.string().trim().min(7).max(30),
   intendedMoveIn: z.coerce.date().optional(),
+  journey: z.enum(["RENTAL", "VIEWING"]).default("RENTAL"),
+  viewingAt: z.coerce.date().optional(),
   communicationConsent: z.object({
     email: z.boolean().default(false),
     sms: z.boolean().default(false),
@@ -18,6 +20,10 @@ export const publicReservationSchema = z.object({
   idempotencyKey: z.string().trim().min(16).max(100),
   websitePath: z.string().trim().max(300).optional(),
   honeypot: z.string().max(0).optional(),
+}).superRefine((value, context) => {
+  if (value.journey === "VIEWING" && !value.viewingAt) {
+    context.addIssue({ code: "custom", path: ["viewingAt"], message: "Choose a viewing appointment." });
+  }
 });
 
 export type PublicReservationInput = z.infer<typeof publicReservationSchema>;
@@ -58,6 +64,16 @@ export function createPublicReference(now = new Date(), token = randomBytes(3).t
 export function reservationHoldHours(raw = process.env.PUBLIC_RESERVATION_HOLD_HOURS) {
   const parsed = Number(raw ?? 24);
   return Number.isFinite(parsed) ? Math.min(168, Math.max(1, Math.round(parsed))) : 24;
+}
+
+export function publicViewingWindowDays(raw = process.env.PUBLIC_VIEWING_WINDOW_DAYS) {
+  const parsed = Number(raw ?? 7);
+  return Number.isFinite(parsed) ? Math.min(30, Math.max(1, Math.round(parsed))) : 7;
+}
+
+export function publicViewingGraceMinutes(raw = process.env.PUBLIC_VIEWING_GRACE_MINUTES) {
+  const parsed = Number(raw ?? 120);
+  return Number.isFinite(parsed) ? Math.min(720, Math.max(30, Math.round(parsed))) : 120;
 }
 
 export function publicReservationVerificationEnabled(raw = process.env.PUBLIC_RESERVATION_VERIFICATION_ENABLED) {

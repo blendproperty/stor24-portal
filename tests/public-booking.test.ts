@@ -6,6 +6,8 @@ import {
   publicElementConfig,
   publicReservationSchema,
   publicReservationVerificationEnabled,
+  publicViewingGraceMinutes,
+  publicViewingWindowDays,
   reservationHoldHours,
   secureKeyMatches,
 } from "../src/lib/public-booking-contract.ts";
@@ -36,6 +38,16 @@ test("public reservations validate identity, consent and idempotency", () => {
   assert.equal(publicReservationSchema.safeParse({ facilitySlug: "midpoint", honeypot: "spam" }).success, false);
 });
 
+test("reserve-to-view requires a viewing appointment", () => {
+  const base = {
+    facilitySlug: "midpoint", unitId: "unit-169", firstName: "View", lastName: "Customer",
+    email: "view@example.test", phone: "+27817088120", idempotencyKey: "viewing-test-request-0001",
+  };
+  assert.equal(publicReservationSchema.safeParse({ ...base, journey: "VIEWING" }).success, false);
+  assert.equal(publicReservationSchema.safeParse({ ...base, journey: "VIEWING", viewingAt: "2026-08-27T08:00:00.000Z" }).success, true);
+  assert.equal(publicReservationSchema.parse(base).journey, "RENTAL");
+});
+
 test("public map output collapses private status and config details", () => {
   assert.equal(publicAvailability("AVAILABLE"), "AVAILABLE");
   assert.equal(publicAvailability("OCCUPIED"), "UNAVAILABLE");
@@ -54,4 +66,8 @@ test("references are readable and reservation holds are bounded", () => {
   assert.equal(publicReservationVerificationEnabled(undefined), false);
   assert.equal(publicReservationVerificationEnabled("false"), false);
   assert.equal(publicReservationVerificationEnabled("TRUE"), true);
+  assert.equal(publicViewingWindowDays("0"), 1);
+  assert.equal(publicViewingWindowDays("100"), 30);
+  assert.equal(publicViewingGraceMinutes("5"), 30);
+  assert.equal(publicViewingGraceMinutes("1000"), 720);
 });

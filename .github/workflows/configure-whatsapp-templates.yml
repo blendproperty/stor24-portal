@@ -47,6 +47,7 @@ jobs:
       - name: Install approved template identifiers and set the safety gate
         env:
           RESERVATION: ${{ secrets.TWILIO_WHATSAPP_RESERVATION_CONFIRMED_SID }}
+          VIEWING: ${{ secrets.TWILIO_WHATSAPP_VIEWING_BOOKED_SID }}
           PAYMENT: ${{ secrets.TWILIO_WHATSAPP_PAYMENT_RECEIVED_SID }}
           MOVE_IN: ${{ secrets.TWILIO_WHATSAPP_MOVE_IN_REMINDER_SID }}
           ACCESS: ${{ secrets.TWILIO_WHATSAPP_ACCESS_READY_SID }}
@@ -62,18 +63,20 @@ jobs:
           case "$AUTOMATION_GATE" in true|false) ;; *) exit 1 ;; esac
           case "$VERIFICATION_GATE" in true|false) ;; *) exit 1 ;; esac
           for sid in "$RESERVATION" "$PAYMENT" "$MOVE_IN" "$ACCESS" "$REMINDER" "$OVERDUE" "$MOVE_OUT"; do case "$sid" in HX????????????????????????????????) ;; *) exit 1 ;; esac; done
+          if [ -n "$VIEWING" ]; then case "$VIEWING" in HX????????????????????????????????) ;; *) exit 1 ;; esac; fi
           if [ "$VERIFICATION_GATE" = true ]; then case "$VERIFICATION" in HX????????????????????????????????) ;; *) exit 1 ;; esac; fi
-          printf '%s\n' "$RESERVATION" "$PAYMENT" "$MOVE_IN" "$ACCESS" "$REMINDER" "$OVERDUE" "$MOVE_OUT" "$VERIFICATION" "$AUTOMATION_GATE" "$VERIFICATION_GATE" | ssh -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" '
+          printf '%s\n' "$RESERVATION" "$VIEWING" "$PAYMENT" "$MOVE_IN" "$ACCESS" "$REMINDER" "$OVERDUE" "$MOVE_OUT" "$VERIFICATION" "$AUTOMATION_GATE" "$VERIFICATION_GATE" | ssh -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" '
             set -eu
             cd /opt/stor24-crm
-            IFS= read -r reservation; IFS= read -r payment; IFS= read -r move_in; IFS= read -r access; IFS= read -r reminder; IFS= read -r overdue; IFS= read -r move_out; IFS= read -r verification; IFS= read -r automation_gate; IFS= read -r verification_gate
+            IFS= read -r reservation; IFS= read -r viewing; IFS= read -r payment; IFS= read -r move_in; IFS= read -r access; IFS= read -r reminder; IFS= read -r overdue; IFS= read -r move_out; IFS= read -r verification; IFS= read -r automation_gate; IFS= read -r verification_gate
             case "$automation_gate" in true|false) ;; *) exit 1 ;; esac
             case "$verification_gate" in true|false) ;; *) exit 1 ;; esac
             umask 077
             env_tmp=$(mktemp .env.whatsapp-templates.XXXXXX)
             trap '\''rm -f "$env_tmp"'\'' EXIT
-            grep -v -E '\''^(TWILIO_WHATSAPP_(RESERVATION_CONFIRMED|PAYMENT_RECEIVED|MOVE_IN_REMINDER|ACCESS_READY|PAYMENT_REMINDER|PAYMENT_OVERDUE|MOVE_OUT_CONFIRMATION|VERIFICATION)_SID|WHATSAPP_AUTOMATION_ENABLED|PUBLIC_RESERVATION_VERIFICATION_ENABLED)='\'' .env > "$env_tmp" || true
+            grep -v -E '\''^(TWILIO_WHATSAPP_(RESERVATION_CONFIRMED|VIEWING_BOOKED|PAYMENT_RECEIVED|MOVE_IN_REMINDER|ACCESS_READY|PAYMENT_REMINDER|PAYMENT_OVERDUE|MOVE_OUT_CONFIRMATION|VERIFICATION)_SID|WHATSAPP_AUTOMATION_ENABLED|PUBLIC_RESERVATION_VERIFICATION_ENABLED)='\'' .env > "$env_tmp" || true
             printf '\''TWILIO_WHATSAPP_RESERVATION_CONFIRMED_SID=%s\n'\'' "$reservation" >> "$env_tmp"
+            if [ -n "$viewing" ]; then printf '\''TWILIO_WHATSAPP_VIEWING_BOOKED_SID=%s\n'\'' "$viewing" >> "$env_tmp"; fi
             printf '\''TWILIO_WHATSAPP_PAYMENT_RECEIVED_SID=%s\n'\'' "$payment" >> "$env_tmp"
             printf '\''TWILIO_WHATSAPP_MOVE_IN_REMINDER_SID=%s\n'\'' "$move_in" >> "$env_tmp"
             printf '\''TWILIO_WHATSAPP_ACCESS_READY_SID=%s\n'\'' "$access" >> "$env_tmp"
