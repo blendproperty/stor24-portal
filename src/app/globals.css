@@ -787,6 +787,7 @@ a.summary-cell:focus-visible {
 .hours-row { display: grid; grid-template-columns: minmax(70px, .75fr) repeat(2, minmax(0, 1fr)); gap: 8px; align-items: end; }
 .hours-row > * { min-width: 0; }
 .hours-row input[type="time"] { min-width: 0; padding-inline: 8px; }
+.hours-row input[type="time"]:disabled { border-style: dashed; background: var(--paper); color: var(--muted); }
 .field-help { margin: 12px 0 0; color: var(--muted); font-size: 11px; }
 .form-footer { display: flex; justify-content: flex-end; padding-top: 4px; }
 .attribute-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
