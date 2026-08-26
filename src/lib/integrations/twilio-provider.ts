@@ -11,13 +11,23 @@ function twilioAuth() {
   return { sid, header: `Basic ${Buffer.from(`${sid}:${token}`).toString("base64")}` };
 }
 
+export function normalizeTwilioRecipient(value: string) {
+  const compact = value.trim().replace(/[\s()-]/g, "");
+  if (/^\+[1-9]\d{7,14}$/.test(compact)) return compact;
+  if (/^0\d{9}$/.test(compact)) return `+27${compact.slice(1)}`;
+  if (/^27\d{9}$/.test(compact)) return `+${compact}`;
+  return null;
+}
+
 async function sendTwilioMessage(kind: "SMS" | "WHATSAPP", to: string, body: string, content?: { sid: string; variables: Record<string, string> }): Promise<ProviderResult<{ status: "QUEUED" }>> {
   const auth = twilioAuth();
   const from = kind === "WHATSAPP" ? process.env.TWILIO_WHATSAPP_FROM : process.env.TWILIO_SMS_FROM;
   if (!auth || !from)
     return { ok: false, retryable: false, code: "CONFIG_REQUIRED", message: `Twilio ${kind} has not been configured.` };
 
-  const recipient = kind === "WHATSAPP" ? `whatsapp:${to}` : to;
+  const normalizedTo = normalizeTwilioRecipient(to);
+  if (!normalizedTo) return { ok: false, retryable: false, code: "INVALID_RECIPIENT", message: "The recipient must be a valid South African or international phone number." };
+  const recipient = kind === "WHATSAPP" ? `whatsapp:${normalizedTo}` : normalizedTo;
   const sender = kind === "WHATSAPP" ? `whatsapp:${from}` : from;
 
   const statusCallback = process.env.APP_URL
