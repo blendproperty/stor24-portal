@@ -13,8 +13,11 @@ type LeaseEnvelopeInput = {
     identityRef: string | null;
     taxNumber: string | null;
     billingAddress: unknown;
+    alternateContact: unknown;
+    emergencyContact: unknown;
+    workContact: unknown;
   };
-  facility: { name: string };
+  facility: { name: string; storeInformation?: unknown };
   unit: { number: string; unitType: { name: string; widthMetres: unknown; lengthMetres: unknown; areaSqMetres: unknown } };
   startDate: Date;
   monthlyRate: number;
@@ -51,6 +54,10 @@ export async function createBlendSignLeaseEnvelope(input: LeaseEnvelopeInput): P
 
   const name = input.customer.companyName || [input.customer.firstName, input.customer.lastName].filter(Boolean).join(" ") || "Customer";
   const address = addressRecord(input.customer.billingAddress);
+  const alternate = addressRecord(input.customer.alternateContact);
+  const emergency = addressRecord(input.customer.emergencyContact);
+  const work = addressRecord(input.customer.workContact);
+  const owner = addressRecord(input.facility.storeInformation);
   const data: Record<string, string> = {
     "tenant.fullName": name,
     "tenant.email": input.customer.email,
@@ -70,15 +77,31 @@ export async function createBlendSignLeaseEnvelope(input: LeaseEnvelopeInput): P
   if (address.address || address.street || address.line1) data["tenant.address"] = address.address || address.street || address.line1;
   if (address.city) data["tenant.city"] = address.city;
   if (address.postalCode || address.postcode) data["tenant.postalCode"] = address.postalCode || address.postcode;
+  if (work.company) data["tenant.employerName"] = work.company;
+  if (work.address) data["tenant.employerAddress"] = work.address;
+  const employerContact = [work.contact, work.phone, work.email].filter(Boolean).join(" | ");
+  if (employerContact) data["tenant.employerContactDetails"] = employerContact;
+  if (alternate.name) data["tenant.alternativeContact1.name"] = alternate.name;
+  if (alternate.phone) data["tenant.alternativeContact1.phone"] = alternate.phone;
+  if (alternate.relationship) data["tenant.alternativeContact1.relationship"] = alternate.relationship;
+  if (emergency.name) data["tenant.alternativeContact2.name"] = emergency.name;
+  if (emergency.phone) data["tenant.alternativeContact2.phone"] = emergency.phone;
+  if (emergency.relationship) data["tenant.alternativeContact2.relationship"] = emergency.relationship;
+  if (owner.legalName || owner.dbaName) data["owner.companyName"] = owner.legalName || owner.dbaName;
+  if (owner.registrationNumber) data["owner.registrationNumber"] = owner.registrationNumber;
+  if (owner.address1) data["owner.address"] = [owner.address1, owner.address2].filter(Boolean).join(", ");
+  if (owner.city) data["owner.city"] = owner.city;
+  if (owner.postalCode) data["owner.postalCode"] = owner.postalCode;
+  if (owner.taxNumber) data["owner.vatNumber"] = owner.taxNumber;
+  if (owner.mobile || owner.phone) data["owner.mobile"] = owner.mobile || owner.phone;
+  if (owner.email) data["owner.email"] = owner.email;
   data["stor24.representativeName"] = input.representative.name;
   if (input.paymentMethod === "DEBIT_ORDER") {
     data["payment.debitOrder"] = "true";
     data["billing.contactEmail"] = input.customer.email;
-    data["debitOrder.commencementDate"] = input.startDate.toISOString().slice(0, 10);
-    data["debitOrder.amount"] = input.monthlyRate.toFixed(2);
-    if (input.customer.companyName) {
-      data["tenant.contactPerson"] = [input.customer.firstName, input.customer.lastName].filter(Boolean).join(" ");
-    }
+    data["debit.commencementDate"] = input.startDate.toISOString().slice(0, 10);
+    data["debit.amount"] = input.monthlyRate.toFixed(2);
+    data["tenant.contactPerson"] = [input.customer.firstName, input.customer.lastName].filter(Boolean).join(" ") || name;
   }
   else if (input.paymentMethod === "CARD") data["payment.creditCard"] = "true";
   else data["payment.eftOther"] = "true";

@@ -8,7 +8,7 @@ import {
 const noStore = { "cache-control": "private, no-store, max-age=0" };
 const publicStoreKeys = [
   "dbaName", "address1", "address2", "city", "province", "postalCode", "country",
-  "phone", "email", "websiteUrl", "directions", "latitude", "longitude",
+  "mobile", "email", "websiteUrl", "directions", "latitude", "longitude",
   "weekdayClosed", "weekdayStart", "weekdayEnd", "saturdayClosed", "saturdayStart",
   "saturdayEnd", "sundayClosed", "sundayStart", "sundayEnd",
 ] as const;
