@@ -14,6 +14,7 @@ type ReservationConfirmationInput = {
   idempotencyKey: string;
   consent: { email: boolean; sms: boolean; phone: boolean; whatsapp?: boolean };
   to: { email: string; phone: string };
+  allowWhatsappWhenAutomationDisabled?: boolean;
   variables: {
     firstName: string;
     facilityName: string;
@@ -132,7 +133,7 @@ export async function notifyReservationConfirmed(input: ReservationConfirmationI
   }
 
   if (input.consent.whatsapp && input.to.phone) {
-    const result = await sendWhatsAppTemplate({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, recipient: input.to.phone, consent: input.consent, messageType: "RESERVATION_CONFIRMED", idempotencyKey: `${input.idempotencyKey}:WHATSAPP`, variables: { "1": input.variables.firstName, "2": input.variables.unitNumber, "3": input.variables.facilityName, "4": input.variables.intendedMoveIn, "5": `R${input.variables.monthlyRateZar}` } });
+    const result = await sendWhatsAppTemplate({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, recipient: input.to.phone, consent: input.consent, messageType: "RESERVATION_CONFIRMED", idempotencyKey: `${input.idempotencyKey}:WHATSAPP`, variables: { "1": input.variables.firstName, "2": input.variables.unitNumber, "3": input.variables.facilityName, "4": input.variables.intendedMoveIn, "5": `R${input.variables.monthlyRateZar}` }, allowWhenAutomationDisabled: input.allowWhatsappWhenAutomationDisabled });
     results.push({ channel: "WHATSAPP", ok: result.ok });
   }
 

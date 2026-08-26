@@ -18,6 +18,13 @@ test("customer sends require both server gate and organisation toggle", () => {
   assert.match(sender, /AUTOMATION_DISABLED/);
 });
 
+test("verified public holds send their consented confirmation while lifecycle automation stays disabled", () => {
+  const booking = read("src/lib/public-booking-service.ts");
+  const notifications = read("src/lib/notifications.ts");
+  assert.match(booking, /allowWhatsappWhenAutomationDisabled: true/);
+  assert.match(notifications, /allowWhenAutomationDisabled: input\.allowWhatsappWhenAutomationDisabled/);
+});
+
 test("template configuration exposes a validated UAT safety gate input defaulting closed", () => {
   const workflow = read(".github/workflows/configure-whatsapp-templates.yml");
   assert.match(workflow, /automation_gate/);
