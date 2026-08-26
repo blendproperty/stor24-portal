@@ -170,3 +170,9 @@ Both journeys must converge on the same CRM-owned customer, unit, reservation, p
 A CRM capability is complete only when it is database-backed, scoped, permission-enforced, audited, tested, operationally owned and — where an external provider or deployment is involved — configured and proven end to end with reconciliation and exception handling.
 
 **Note on this revision:** condensed from a much longer version to reliably get through after repeated tool timeouts — full historical detail (e-signature v1/v2/v3 narrative, reservation-cancel proof steps, deployment gotchas, numbered working rules 1–23) remains in git history at commit `1f1b4393`/`09cc0a8e`/`04fead0e`/`377eb088` and should be restored/merged forward on the next substantial edit rather than left condensed indefinitely.
+### Office-hours-aware viewing protection (2026-08-26)
+
+- Viewing appointments are valid only inside the selected facility's configured office hours.
+- The booking horizon is three days so a Friday/Saturday enquiry can select the next Monday opening.
+- A verified viewing reservation is protected for at least 24 hours and, when closures push the appointment later, through the appointment plus one hour.
+- The hold deadline is inventory protection, not an entitlement to arrive outside the booked appointment or after office closing.

@@ -2,6 +2,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import {
   createPublicReference,
+  confirmedPublicHoldExpiry,
   publicReservationVerificationEnabled,
   publicViewingWindowHours,
   reservationHoldHours,
@@ -68,7 +69,8 @@ function localViewingParts(value: Date, timeZone: string) {
 
 function viewingSlotAllowed(viewingAt: Date, timeZone: string, rawConfig: unknown, now = new Date()) {
   if (viewingAt.getTime() < now.getTime() + 30 * 60_000) return false;
-  if (viewingAt.getTime() > now.getTime() + publicViewingWindowHours() * 3_600_000) return false;
+  const bookingHorizonHours = Math.max(publicViewingWindowHours(), 72);
+  if (viewingAt.getTime() > now.getTime() + bookingHorizonHours * 3_600_000) return false;
   const config = rawConfig && typeof rawConfig === "object" && !Array.isArray(rawConfig) ? rawConfig as Record<string, unknown> : {};
   const parts = localViewingParts(viewingAt, timeZone);
   const period = parts.weekday === "Saturday" ? "Saturday" : parts.weekday === "Sunday" ? "Sunday" : "Weekday";
@@ -78,10 +80,6 @@ function viewingSlotAllowed(viewingAt: Date, timeZone: string, rawConfig: unknow
   const end = typeof config[`office${period}End`] === "string" ? config[`office${period}End`] as string : defaults[1];
   const time = `${parts.hour}:${parts.minute}`;
   return !closed && Boolean(start && end) && time >= start && time < end;
-}
-
-function confirmedHoldExpiry(verifiedAt: Date) {
-  return new Date(verifiedAt.getTime() + reservationHoldHours() * 60 * 60 * 1000);
 }
 
 async function notifyPublicReservation(input: {
@@ -283,7 +281,7 @@ export async function verifyPublicReservation(reference: string, code: string) {
     return { ok: false as const, code: "INVALID_CODE" };
   }
   const verifiedAt = new Date();
-  const holdExpiresAt = confirmedHoldExpiry(verifiedAt);
+  const holdExpiresAt = confirmedPublicHoldExpiry(verifiedAt, reservation.journey, reservation.viewingAt);
   const updated = await db.$transaction(async (tx) => {
     const item = await tx.reservation.update({ where: { id: reservation.id }, data: { contactVerifiedAt: verifiedAt, holdExpiresAt, verificationCodeHash: null, verificationExpiresAt: null }, include: reservationInclude });
     await tx.customer.update({ where: { id: reservation.customerId }, data: { phoneVerifiedAt: verifiedAt } });

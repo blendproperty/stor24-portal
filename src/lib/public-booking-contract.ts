@@ -71,6 +71,12 @@ export function publicViewingWindowHours(raw = process.env.PUBLIC_VIEWING_WINDOW
   return Number.isFinite(parsed) ? Math.min(72, Math.max(1, Math.round(parsed))) : 24;
 }
 
+export function confirmedPublicHoldExpiry(verifiedAt: Date, journey = "RENTAL", viewingAt?: Date | null, holdHours = reservationHoldHours()) {
+  const minimumExpiry = verifiedAt.getTime() + holdHours * 60 * 60 * 1000;
+  const viewingExpiry = journey === "VIEWING" && viewingAt ? viewingAt.getTime() + 60 * 60 * 1000 : 0;
+  return new Date(Math.max(minimumExpiry, viewingExpiry));
+}
+
 export function publicReservationVerificationEnabled(raw = process.env.PUBLIC_RESERVATION_VERIFICATION_ENABLED) {
   return raw?.trim().toLowerCase() === "true";
 }

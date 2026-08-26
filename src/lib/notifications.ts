@@ -145,7 +145,7 @@ export async function notifyViewingBooked(input: Omit<ReservationConfirmationInp
   viewingAt: string; holdExpiresAt: string; reference: string;
 } }) {
   const results: Array<{ channel: Channel; ok: boolean }> = [];
-  const body = `Hi ${input.variables.firstName},\n\nYour viewing of Unit ${input.variables.unitNumber} at ${input.variables.facilityName} is booked for ${input.variables.viewingAt}. Your 24-hour viewing window is active until ${input.variables.holdExpiresAt}, and the unit stays reserved throughout.\n\nReference: ${input.variables.reference}. You can pay at the facility or request an online payment link after viewing.\n\nStor24`;
+  const body = `Hi ${input.variables.firstName},\n\nYour viewing of Unit ${input.variables.unitNumber} at ${input.variables.facilityName} is booked for ${input.variables.viewingAt}, during office hours. The unit is protected for you until ${input.variables.holdExpiresAt}. Please arrive for your booked appointment; after-hours viewing is not available.\n\nReference: ${input.variables.reference}. You can pay at the facility or request an online payment link after viewing.\n\nStor24`;
   if (input.consent.email && input.to.email) {
     const idempotencyKey = `${input.idempotencyKey}:EMAIL`;
     try {

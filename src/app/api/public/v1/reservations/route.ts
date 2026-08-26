@@ -43,7 +43,7 @@ export async function POST(request: Request) {
             : error.code === "FACILITY_NOT_FOUND"
               ? "That store is not available for online booking."
               : error.code === "VIEWING_SLOT_UNAVAILABLE"
-                ? "Choose a viewing time during the store's office hours within the next 24 hours."
+                ? "Choose an available viewing appointment during the store's office hours within the next three days."
               : "This reservation request conflicts with an earlier request.",
         },
       }, { status: error.status });

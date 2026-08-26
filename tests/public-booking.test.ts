@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   createPublicReference,
+  confirmedPublicHoldExpiry,
   publicAvailability,
   publicElementConfig,
   publicReservationSchema,
@@ -45,6 +46,18 @@ test("reserve-to-view requires a viewing appointment", () => {
   assert.equal(publicReservationSchema.safeParse({ ...base, journey: "VIEWING" }).success, false);
   assert.equal(publicReservationSchema.safeParse({ ...base, journey: "VIEWING", viewingAt: "2026-08-27T08:00:00.000Z" }).success, true);
   assert.equal(publicReservationSchema.parse(base).journey, "RENTAL");
+});
+
+test("viewing holds cover a later office-hours appointment", () => {
+  const verified = new Date("2026-08-29T08:00:00.000Z");
+  const mondayViewing = new Date("2026-08-31T08:00:00.000Z");
+  assert.equal(confirmedPublicHoldExpiry(verified, "VIEWING", mondayViewing, 24).toISOString(), "2026-08-31T09:00:00.000Z");
+});
+
+test("viewing holds retain the normal 24-hour minimum", () => {
+  const verified = new Date("2026-08-26T13:00:00.000Z");
+  const nextMorning = new Date("2026-08-27T08:00:00.000Z");
+  assert.equal(confirmedPublicHoldExpiry(verified, "VIEWING", nextMorning, 24).toISOString(), "2026-08-27T13:00:00.000Z");
 });
 
 test("public map output collapses private status and config details", () => {
