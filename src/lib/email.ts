@@ -37,6 +37,44 @@ export function stor24EmailVerificationHtml(code: string) {
 </html>`;
 }
 
+export function stor24ReservationHeldHtml(input: {
+  firstName: string;
+  facilityName: string;
+  unitNumber: string;
+  monthlyRateZar: string;
+  holdExpiresAt: string;
+  intendedMoveIn: string;
+  reference: string;
+}) {
+  const value = Object.fromEntries(Object.entries(input).map(([key, item]) => [key, escapeEmailHtml(item)])) as Record<keyof typeof input, string>;
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f5f3ea;color:#071411;font-family:Arial,Helvetica,sans-serif;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">Unit ${value.unitNumber} is safely held for you. Reference ${value.reference}.</div>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background:#f5f3ea;"><tr><td align="center" style="padding:28px 14px;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background:#fff;border:1px solid #dfe3df;border-radius:22px;overflow:hidden;">
+      <tr><td style="height:7px;background:#ff5a0a;font-size:0;line-height:0;">&nbsp;</td></tr>
+      <tr><td style="padding:30px 32px 14px;"><div style="font-size:32px;line-height:1;font-weight:900;letter-spacing:-2px;">ST<span style="color:#ff5a0a;font-size:30px;">&#11042;</span>R<sup style="font-size:15px;letter-spacing:-1px;">24</sup></div></td></tr>
+      <tr><td style="padding:12px 32px 34px;">
+        <div style="margin-bottom:12px;color:#ff5a0a;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;">Space secured</div>
+        <h1 style="margin:0 0 12px;font-size:30px;line-height:1.12;letter-spacing:-1px;">Nice one, ${value.firstName}. Your unit is held.</h1>
+        <p style="margin:0 0 24px;color:#52615b;font-size:16px;line-height:1.55;">We&rsquo;ve taken Unit ${value.unitNumber} off the market while you finish the next steps.</p>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background:#071411;border-radius:16px;color:#fff;">
+          <tr><td style="padding:22px 24px;">
+            <div style="margin-bottom:14px;color:#ff8b51;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;">Your Stor24 hold</div>
+            <div style="font-size:17px;font-weight:800;">Unit ${value.unitNumber} &middot; ${value.facilityName}</div>
+            <div style="margin-top:8px;color:#c7d2cd;font-size:14px;line-height:1.6;">R${value.monthlyRateZar} per month<br>Move-in: ${value.intendedMoveIn}<br>Held until: ${value.holdExpiresAt}</div>
+          </td></tr>
+        </table>
+        <p style="margin:22px 0 5px;color:#52615b;font-size:14px;line-height:1.55;">Your team will be in touch if anything else is needed.</p>
+        <p style="margin:0;color:#071411;font-size:14px;font-weight:800;">Reference: <span style="color:#ff5a0a;">${value.reference}</span></p>
+      </td></tr>
+      <tr><td style="padding:18px 32px;background:#071411;color:#aebcb6;font-size:12px;line-height:1.5;">Safe space. Smart storage. Stor24.</td></tr>
+    </table>
+  </td></tr></table>
+</body></html>`;
+}
+
 function parseFromAddress(raw: string | undefined) {
   const match = raw?.match(/^(.*)<(.+)>$/);
   if (match) return { name: match[1].trim().replace(/^"|"$/g, "") || undefined, email: match[2].trim() };

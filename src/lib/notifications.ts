@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { emailProvider, escapeEmailHtml } from "@/lib/email";
+import { emailProvider, escapeEmailHtml, stor24ReservationHeldHtml } from "@/lib/email";
 import { TwilioSmsProvider } from "@/lib/integrations/twilio-provider";
 import type { ProviderResult } from "@/lib/integrations/providers";
 import { privacyHash } from "@/lib/request-security";
@@ -92,6 +92,12 @@ async function logDelivery(input: {
   });
 }
 
+function customerDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("en-ZA", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Africa/Johannesburg" }).replace(",", " at");
+}
+
 /**
  * Sends the reservation-confirmation notification across whichever channels
  * the customer consented to, using an active CommunicationTemplate for the
@@ -113,13 +119,14 @@ export async function notifyReservationConfirmed(input: ReservationConfirmationI
   if (input.consent.email && input.to.email) {
     const { templateId, subject, body } = await resolveTemplate(input.organisationId, "EMAIL");
     const idempotencyKey = `${input.idempotencyKey}:EMAIL`;
-    const renderedBody = render(body, input.variables);
+    const emailVariables = { ...input.variables, holdExpiresAt: customerDateTime(input.variables.holdExpiresAt) };
+    const renderedBody = render(body, emailVariables);
     try {
       await emailProvider().send({
         to: input.to.email,
         subject: render(subject ?? "Your Stor24 reservation", input.variables),
         text: renderedBody,
-        html: `<p>${escapeEmailHtml(renderedBody).replaceAll("\n", "<br/>")}</p>`,
+        html: stor24ReservationHeldHtml(emailVariables),
       });
       await logDelivery({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, templateId, channel: "EMAIL", recipient: input.to.email, idempotencyKey, provider: process.env.EMAIL_PROVIDER ?? "disabled", result: { ok: true, providerReference: "" } });
       results.push({ channel: "EMAIL", ok: true });

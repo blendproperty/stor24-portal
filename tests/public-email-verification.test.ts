@@ -25,3 +25,11 @@ test("email verification uses the branded Stor24 security-code template", () => 
   assert.match(email, /#ff5a0a/);
   assert.match(email, /This code expires in 10 minutes/);
 });
+
+test("reservation holds use the branded Stor24 confirmation template", () => {
+  assert.match(email, /export function stor24ReservationHeldHtml/);
+  assert.match(booking, /notifyReservationConfirmed/);
+  const notifications = fs.readFileSync("src/lib/notifications.ts", "utf8");
+  assert.match(notifications, /stor24ReservationHeldHtml\(emailVariables\)/);
+  assert.match(notifications, /customerDateTime/);
+});
