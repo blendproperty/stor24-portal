@@ -98,7 +98,7 @@ export async function createBlendSignLeaseEnvelope(input: LeaseEnvelopeInput): P
   if (owner.address1) data["owner.address"] = [owner.address1, owner.address2].filter(Boolean).join(", ");
   if (owner.city) data["owner.city"] = owner.city;
   if (owner.postalCode) data["owner.postalCode"] = owner.postalCode;
-  if (owner.phone) data["owner.phone"] = owner.phone;
+  if (owner.phone) data["owner.mobile"] = owner.phone;
   if (owner.taxNumber) data["owner.vatNumber"] = owner.taxNumber;
   if (owner.email) data["owner.email"] = owner.email;
   if (input.customer.identityRef) data["tenant.idNumber"] = input.customer.identityRef;

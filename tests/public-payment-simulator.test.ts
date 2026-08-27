@@ -35,6 +35,13 @@ test("simulated success prepares a UAT lease and customer follow-up without a ch
   assert.match(source, /session\.paymentMethod/);
 });
 
+test("Stor24 owner contact uses the BlendSign template mobile key", async () => {
+  const fs = await import("node:fs/promises");
+  const source = await fs.readFile("src/lib/blendsign-client.ts", "utf8");
+  assert.match(source, /data\["owner\.mobile"\] = owner\.phone/);
+  assert.doesNotMatch(source, /data\["owner\.phone"\]/);
+});
+
 test("the hosted payment choice is required before completion", async () => {
   const source = await import("node:fs/promises").then((fs) => fs.readFile("src/app/api/public/v1/payments/simulated/complete/route.ts", "utf8"));
   assert.match(source, /paymentMethod: z\.enum\(\["DEBIT_ORDER", "CARD", "EFT"\]\)/);
