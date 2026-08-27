@@ -41,7 +41,7 @@ export async function completeSimulatedPayment(sessionId: string, checkoutToken:
   if (!session || tokenHash(checkoutToken) !== session.checkoutTokenHash) return { ok: false as const, code: "NOT_FOUND" };
   if (session.status !== "PENDING") {
     const followUp = session.status === "SUCCEEDED" ? await runSimulatedPaymentFollowUp(session.id) : null;
-    return { ok: true as const, status: session.status, idempotent: true, followUpStatus: followUp?.status, reference: session.reservation.publicReference, providerReference: session.providerReference };
+    return { ok: true as const, status: session.status, idempotent: true, followUpStatus: followUp?.status, signingUrl: followUp && "signingUrl" in followUp ? followUp.signingUrl : undefined, reference: session.reservation.publicReference, providerReference: session.providerReference };
   }
   const effectiveOutcome: SimulatedPaymentOutcome = session.expiresAt <= new Date() ? "TIMEOUT" : outcome;
   const status = effectiveOutcome === "SUCCESS" ? "SUCCEEDED" : effectiveOutcome;
@@ -58,5 +58,5 @@ export async function completeSimulatedPayment(sessionId: string, checkoutToken:
     await tx.auditEvent.create({ data: { organisationId: session.reservation.customer.organisationId, facilityId: session.reservation.facilityId, action: `public_payment.simulator_${status.toLowerCase()}`, entityType: "PublicPaymentSession", entityId: session.id, requestId: session.idempotencyKey, after: { status, simulated: true } } });
   });
   const followUp = status === "SUCCEEDED" ? await runSimulatedPaymentFollowUp(session.id) : null;
-  return { ok: true as const, status, idempotent: false, followUpStatus: followUp?.status, reference: session.reservation.publicReference, providerReference: session.providerReference };
+  return { ok: true as const, status, idempotent: false, followUpStatus: followUp?.status, signingUrl: followUp && "signingUrl" in followUp ? followUp.signingUrl : undefined, reference: session.reservation.publicReference, providerReference: session.providerReference };
 }

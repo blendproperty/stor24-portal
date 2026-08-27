@@ -26,6 +26,7 @@ test("simulated success prepares a UAT lease and customer follow-up without a ch
   assert.match(source, /sim-payment:\$\{session\.id\}:WHATSAPP/);
   assert.match(source, /allowWhenAutomationDisabled: true/);
   assert.match(source, /Promise\.all/);
+  assert.match(source, /signingUrl: signer\.signingUrl/);
   assert.doesNotMatch(source, /\b(payment|ledgerEntry)\.create\s*\(/);
 });
 

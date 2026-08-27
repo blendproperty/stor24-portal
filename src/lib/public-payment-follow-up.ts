@@ -120,7 +120,7 @@ export async function runSimulatedPaymentFollowUp(sessionId: string) {
       db.publicPaymentSession.update({ where: { id: session.id }, data: { followUpStatus: "COMPLETED", followUpError: null } }),
       db.auditEvent.create({ data: { organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, action: "public_payment.simulator_follow_up_completed", entityType: "PublicPaymentSession", entityId: session.id, after: { simulated: true, tenancyId: result.tenancy.id, documentId: result.document.id, envelopeId: envelope.envelopeId } } }),
     ]);
-    return { ok: true as const, status: "COMPLETED", tenancyId: result.tenancy.id, documentId: result.document.id };
+    return { ok: true as const, status: "COMPLETED", tenancyId: result.tenancy.id, documentId: result.document.id, signingUrl: signer.signingUrl };
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 500) : "SIMULATED_PAYMENT_FOLLOW_UP_FAILED";
     await db.publicPaymentSession.update({ where: { id: sessionId }, data: { followUpStatus: "FAILED", followUpError: message } });
