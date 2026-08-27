@@ -15,6 +15,7 @@ type LeaseEnvelopeInput = {
     billingAddress: unknown;
   };
   facility: { name: string };
+  ownerDetails?: Record<string, unknown>;
   unit: { number: string; unitType: { name: string; widthMetres: unknown; lengthMetres: unknown; areaSqMetres: unknown } };
   startDate: Date;
   monthlyRate: number;
@@ -81,6 +82,7 @@ export async function createBlendSignLeaseEnvelope(input: LeaseEnvelopeInput): P
 
   const name = input.customer.companyName || [input.customer.firstName, input.customer.lastName].filter(Boolean).join(" ") || "Customer";
   const address = addressRecord(input.customer.billingAddress);
+  const owner = addressRecord(input.ownerDetails);
   const data: Record<string, string> = {
     "tenant.fullName": name,
     "tenant.email": input.customer.email,
@@ -91,6 +93,14 @@ export async function createBlendSignLeaseEnvelope(input: LeaseEnvelopeInput): P
     "lease.monthlyRental": input.monthlyRate.toFixed(2),
     "lease.deposit": input.monthlyRate.toFixed(2),
   };
+  data["owner.companyName"] = owner.legalName || owner.dbaName || input.facility.name;
+  if (owner.registrationNumber) data["owner.registrationNumber"] = owner.registrationNumber;
+  if (owner.address1) data["owner.address"] = [owner.address1, owner.address2].filter(Boolean).join(", ");
+  if (owner.city) data["owner.city"] = owner.city;
+  if (owner.postalCode) data["owner.postalCode"] = owner.postalCode;
+  if (owner.phone) data["owner.phone"] = owner.phone;
+  if (owner.taxNumber) data["owner.vatNumber"] = owner.taxNumber;
+  if (owner.email) data["owner.email"] = owner.email;
   if (input.customer.identityRef) data["tenant.idNumber"] = input.customer.identityRef;
   if (input.customer.phone) {
     data["tenant.phone"] = input.customer.phone;
