@@ -19,6 +19,14 @@ on:
         options:
           - "false"
           - "true"
+      payment_simulator_gate:
+        description: "Enable the no-money public Pay now simulator for controlled UAT"
+        required: true
+        type: choice
+        default: "false"
+        options:
+          - "false"
+          - "true"
 
 permissions:
   contents: read
@@ -59,22 +67,25 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
           AUTOMATION_GATE: ${{ inputs.automation_gate }}
           VERIFICATION_GATE: ${{ inputs.reservation_verification_gate }}
+          PAYMENT_SIMULATOR_GATE: ${{ inputs.payment_simulator_gate }}
         run: |
           case "$AUTOMATION_GATE" in true|false) ;; *) exit 1 ;; esac
           case "$VERIFICATION_GATE" in true|false) ;; *) exit 1 ;; esac
+          case "$PAYMENT_SIMULATOR_GATE" in true|false) ;; *) exit 1 ;; esac
           for sid in "$RESERVATION" "$PAYMENT" "$MOVE_IN" "$ACCESS" "$REMINDER" "$OVERDUE" "$MOVE_OUT"; do case "$sid" in HX????????????????????????????????) ;; *) exit 1 ;; esac; done
           if [ -n "$VIEWING" ]; then case "$VIEWING" in HX????????????????????????????????) ;; *) exit 1 ;; esac; fi
           if [ "$VERIFICATION_GATE" = true ]; then case "$VERIFICATION" in HX????????????????????????????????) ;; *) exit 1 ;; esac; fi
-          printf '%s\n' "$RESERVATION" "$VIEWING" "$PAYMENT" "$MOVE_IN" "$ACCESS" "$REMINDER" "$OVERDUE" "$MOVE_OUT" "$VERIFICATION" "$AUTOMATION_GATE" "$VERIFICATION_GATE" | ssh -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" '
+          printf '%s\n' "$RESERVATION" "$VIEWING" "$PAYMENT" "$MOVE_IN" "$ACCESS" "$REMINDER" "$OVERDUE" "$MOVE_OUT" "$VERIFICATION" "$AUTOMATION_GATE" "$VERIFICATION_GATE" "$PAYMENT_SIMULATOR_GATE" | ssh -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" '
             set -eu
             cd /opt/stor24-crm
-            IFS= read -r reservation; IFS= read -r viewing; IFS= read -r payment; IFS= read -r move_in; IFS= read -r access; IFS= read -r reminder; IFS= read -r overdue; IFS= read -r move_out; IFS= read -r verification; IFS= read -r automation_gate; IFS= read -r verification_gate
+            IFS= read -r reservation; IFS= read -r viewing; IFS= read -r payment; IFS= read -r move_in; IFS= read -r access; IFS= read -r reminder; IFS= read -r overdue; IFS= read -r move_out; IFS= read -r verification; IFS= read -r automation_gate; IFS= read -r verification_gate; IFS= read -r payment_simulator_gate
             case "$automation_gate" in true|false) ;; *) exit 1 ;; esac
             case "$verification_gate" in true|false) ;; *) exit 1 ;; esac
+            case "$payment_simulator_gate" in true|false) ;; *) exit 1 ;; esac
             umask 077
             env_tmp=$(mktemp .env.whatsapp-templates.XXXXXX)
             trap '\''rm -f "$env_tmp"'\'' EXIT
-            grep -v -E '\''^(TWILIO_WHATSAPP_(RESERVATION_CONFIRMED|VIEWING_BOOKED|PAYMENT_RECEIVED|MOVE_IN_REMINDER|ACCESS_READY|PAYMENT_REMINDER|PAYMENT_OVERDUE|MOVE_OUT_CONFIRMATION|VERIFICATION)_SID|WHATSAPP_AUTOMATION_ENABLED|PUBLIC_RESERVATION_VERIFICATION_ENABLED)='\'' .env > "$env_tmp" || true
+            grep -v -E '\''^(TWILIO_WHATSAPP_(RESERVATION_CONFIRMED|VIEWING_BOOKED|PAYMENT_RECEIVED|MOVE_IN_REMINDER|ACCESS_READY|PAYMENT_REMINDER|PAYMENT_OVERDUE|MOVE_OUT_CONFIRMATION|VERIFICATION)_SID|WHATSAPP_AUTOMATION_ENABLED|PUBLIC_RESERVATION_VERIFICATION_ENABLED|PUBLIC_PAYMENT_SIMULATOR_ENABLED)='\'' .env > "$env_tmp" || true
             printf '\''TWILIO_WHATSAPP_RESERVATION_CONFIRMED_SID=%s\n'\'' "$reservation" >> "$env_tmp"
             if [ -n "$viewing" ]; then printf '\''TWILIO_WHATSAPP_VIEWING_BOOKED_SID=%s\n'\'' "$viewing" >> "$env_tmp"; fi
             printf '\''TWILIO_WHATSAPP_PAYMENT_RECEIVED_SID=%s\n'\'' "$payment" >> "$env_tmp"
@@ -86,6 +97,7 @@ jobs:
             printf '\''TWILIO_WHATSAPP_VERIFICATION_SID=%s\n'\'' "$verification" >> "$env_tmp"
             printf '\''WHATSAPP_AUTOMATION_ENABLED=%s\n'\'' "$automation_gate" >> "$env_tmp"
             printf '\''PUBLIC_RESERVATION_VERIFICATION_ENABLED=%s\n'\'' "$verification_gate" >> "$env_tmp"
+            printf '\''PUBLIC_PAYMENT_SIMULATOR_ENABLED=%s\n'\'' "$payment_simulator_gate" >> "$env_tmp"
             chmod 600 "$env_tmp" && mv "$env_tmp" .env
             trap - EXIT
             container=$(docker compose --env-file .env -f compose.prod.yml ps -q app)
