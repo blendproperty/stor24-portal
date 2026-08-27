@@ -1,4 +1,5 @@
 import { dispatchBlendSignLease } from "@/lib/blendsign-lease-service";
+import { resendBlendSignInvitation } from "@/lib/blendsign-client";
 import { db } from "@/lib/db";
 import { moveIn, type MoveInResult } from "@/lib/leasing-service";
 import { sendLeaseSigningLink } from "@/lib/notifications";
@@ -82,6 +83,17 @@ export async function runSimulatedPaymentFollowUp(sessionId: string) {
     const customerName = reservation.customer.companyName || [reservation.customer.firstName, reservation.customer.lastName].filter(Boolean).join(" ") || "customer";
     const signer = envelope.signers.find((item) => item.email === reservation.customer.email) ?? envelope.signers.find((item) => item.order === 1);
     if (!signer?.signingUrl) throw new Error("BLENDSIGN_SIGNING_URL_MISSING");
+    const invitation = await resendBlendSignInvitation(envelope.envelopeId, `sim-payment:${session.id}:BLENDSIGN_INVITE`);
+    if (!invitation.ok) throw new Error(`BLENDSIGN_INVITATION_FAILED_${invitation.status}`);
+    await db.auditEvent.create({ data: {
+      organisationId: reservation.customer.organisationId,
+      facilityId: reservation.facilityId,
+      action: "public_payment.blendsign_invitation_sent",
+      entityType: "Document",
+      entityId: result.document.id,
+      requestId: `sim-payment:${session.id}:BLENDSIGN_INVITE`,
+      after: { simulated: true, envelopeId: envelope.envelopeId },
+    } });
     const account = await db.account.findUnique({ where: { id: result.tenancy.accountId }, select: { accountNumber: true } });
     if (!account) throw new Error("ACCOUNT_NOT_FOUND");
     const [email, whatsapp] = await Promise.all([

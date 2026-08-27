@@ -27,6 +27,8 @@ test("simulated success prepares a UAT lease and customer follow-up without a ch
   assert.match(source, /allowWhenAutomationDisabled: true/);
   assert.match(source, /Promise\.all/);
   assert.match(source, /signingUrl: signer\.signingUrl/);
+  assert.match(source, /resendBlendSignInvitation/);
+  assert.match(source, /public_payment\.blendsign_invitation_sent/);
   assert.doesNotMatch(source, /\b(payment|ledgerEntry)\.create\s*\(/);
 });
 
