@@ -25,6 +25,27 @@ async function existingMoveInResult(tenancyId: string): Promise<MoveInResult | n
 }
 
 export async function runSimulatedPaymentFollowUp(sessionId: string) {
+  const current = await db.publicPaymentSession.findUnique({
+    where: { id: sessionId },
+    select: { followUpStatus: true, reservation: { select: { convertedTenancyId: true } } },
+  });
+  if (current?.followUpStatus === "COMPLETED") {
+    const document = current.reservation.convertedTenancyId ? await db.document.findFirst({
+      where: { tenancyId: current.reservation.convertedTenancyId, type: "LEASE_AGREEMENT_UAT" },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, externalId: true },
+    }) : null;
+    const [email, whatsapp] = await Promise.all([
+      document ? db.communicationLog.findUnique({ where: { idempotencyKey: `lease-sign:${document.id}` }, select: { status: true } }) : null,
+      db.communicationLog.findUnique({ where: { idempotencyKey: `sim-payment:${sessionId}:WHATSAPP` }, select: { status: true } }),
+    ]);
+    const evidenceComplete = Boolean(document?.externalId && email?.status === "SUCCEEDED" && whatsapp && whatsapp.status !== "FAILED");
+    if (evidenceComplete) return { ok: true as const, status: "COMPLETED" };
+    await db.publicPaymentSession.update({
+      where: { id: sessionId },
+      data: { followUpStatus: "FAILED", followUpError: "FOLLOW_UP_EVIDENCE_MISSING" },
+    });
+  }
   const claimed = await db.publicPaymentSession.updateMany({
     where: { id: sessionId, status: "SUCCEEDED", followUpStatus: { in: ["NOT_STARTED", "FAILED"] } },
     data: { followUpStatus: "PROCESSING", followUpError: null },
@@ -84,6 +105,14 @@ export async function runSimulatedPaymentFollowUp(sessionId: string) {
       variables: { "1": reservation.customer.firstName || reservation.customer.companyName || "customer", "2": `R${Number(session.amount).toFixed(2)} UAT`, "3": new Date().toLocaleDateString("en-ZA"), "4": account.accountNumber, "5": "R0.00" },
     }) : { ok: false as const, code: "NO_PHONE" };
     if (!whatsapp.ok) throw new Error(`PAYMENT_WHATSAPP_${whatsapp.code}`);
+    const [emailEvidence, whatsappEvidence, documentEvidence] = await Promise.all([
+      db.communicationLog.findUnique({ where: { idempotencyKey: `lease-sign:${result.document.id}` }, select: { status: true } }),
+      db.communicationLog.findUnique({ where: { idempotencyKey: `sim-payment:${session.id}:WHATSAPP` }, select: { status: true } }),
+      db.document.findUnique({ where: { id: result.document.id }, select: { externalId: true } }),
+    ]);
+    if (!documentEvidence?.externalId || emailEvidence?.status !== "SUCCEEDED" || !whatsappEvidence || whatsappEvidence.status === "FAILED") {
+      throw new Error("FOLLOW_UP_EVIDENCE_MISSING");
+    }
     await db.$transaction([
       db.publicPaymentSession.update({ where: { id: session.id }, data: { followUpStatus: "COMPLETED", followUpError: null } }),
       db.auditEvent.create({ data: { organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, action: "public_payment.simulator_follow_up_completed", entityType: "PublicPaymentSession", entityId: session.id, after: { simulated: true, tenancyId: result.tenancy.id, documentId: result.document.id, envelopeId: envelope.envelopeId } } }),

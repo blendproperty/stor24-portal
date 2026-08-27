@@ -80,7 +80,15 @@ async function logDelivery(input: {
       sentAt: input.result.ok ? new Date() : undefined,
       failedAt: input.result.ok ? undefined : new Date(),
     },
-    update: {},
+    update: {
+      provider: input.provider,
+      providerRef: input.result.ok ? input.result.providerReference : null,
+      status: input.result.ok ? "SUCCEEDED" : "FAILED",
+      failureCode: input.result.ok ? null : input.result.code,
+      failureMessage: input.result.ok ? null : input.result.message,
+      sentAt: input.result.ok ? new Date() : null,
+      failedAt: input.result.ok ? null : new Date(),
+    },
   });
 }
 

@@ -21,6 +21,9 @@ test("simulated success prepares a UAT lease and customer follow-up without a ch
   assert.match(source, /simulation: true/);
   assert.match(source, /PAYMENT_RECEIVED/);
   assert.match(source, /sendLeaseSigningLink/);
+  assert.match(source, /FOLLOW_UP_EVIDENCE_MISSING/);
+  assert.match(source, /lease-sign:\$\{result\.document\.id\}/);
+  assert.match(source, /sim-payment:\$\{session\.id\}:WHATSAPP/);
   assert.doesNotMatch(source, /\b(payment|ledgerEntry)\.create\s*\(/);
 });
 

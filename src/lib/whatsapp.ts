@@ -1,3 +1,4 @@
+import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { TwilioWhatsAppProvider } from "@/lib/integrations/twilio-provider";
 import { privacyHash } from "@/lib/request-security";
@@ -44,14 +45,14 @@ export async function sendWhatsAppTemplate(input: {
   if (!contentSid) return { ok: false as const, code: "TEMPLATE_NOT_CONFIGURED" };
 
   const existing = await db.communicationLog.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
-  if (existing) return { ok: existing.status !== "FAILED", code: "DUPLICATE", logId: existing.id };
+  if (existing && existing.status !== "FAILED") return { ok: true as const, code: "DUPLICATE", logId: existing.id };
 
   const result = await new TwilioWhatsAppProvider().sendTemplate(input.recipient, contentSid, input.variables, {
     organisationId: input.organisationId,
     facilityId: input.facilityId,
     idempotencyKey: input.idempotencyKey,
   });
-  const log = await db.communicationLog.create({ data: {
+  const delivery: Prisma.CommunicationLogUncheckedCreateInput = {
     organisationId: input.organisationId,
     facilityId: input.facilityId,
     customerId: input.customerId,
@@ -68,7 +69,20 @@ export async function sendWhatsAppTemplate(input: {
     failedAt: result.ok ? undefined : new Date(),
     nextRetryAt: !result.ok && result.retryable ? new Date(Date.now() + 5 * 60_000) : undefined,
     metadata: { contentSid, variables: input.variables },
-  } });
+  };
+  const log = await db.communicationLog.upsert({
+    where: { idempotencyKey: input.idempotencyKey },
+    create: delivery,
+    update: {
+      providerRef: result.ok ? result.providerReference : null,
+      status: result.ok ? "PROCESSING" : "FAILED",
+      failureCode: result.ok ? null : result.code,
+      failureMessage: result.ok ? null : result.message,
+      failedAt: result.ok ? null : new Date(),
+      nextRetryAt: !result.ok && result.retryable ? new Date(Date.now() + 5 * 60_000) : null,
+      metadata: { contentSid, variables: input.variables },
+    },
+  });
   return result.ok ? { ok: true as const, logId: log.id, providerReference: result.providerReference } : { ok: false as const, logId: log.id, code: result.code };
 }
 

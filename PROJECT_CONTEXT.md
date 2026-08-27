@@ -1,6 +1,6 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
-> Last reviewed: 25 August 2026. Read this file before planning or changing the repository. Update it whenever a material capability, decision, deployment state, or cross-repository contract changes.
+> Last reviewed: 27 August 2026. Read this file before planning or changing the repository. Update it whenever a material capability, decision, deployment state, or cross-repository contract changes.
 
 ## Product identity and non-negotiable boundary
 
@@ -176,3 +176,10 @@ A CRM capability is complete only when it is database-backed, scoped, permission
 - The booking horizon is three days so a Friday/Saturday enquiry can select the next Monday opening.
 - A verified viewing reservation is protected for at least 24 hours and, when closures push the appointment later, through the appointment plus one hour.
 - The hold deadline is inventory protection, not an entitlement to arrive outside the booked appointment or after office closing.
+
+## Delivery update — 27 August 2026
+
+- Redundancy stages 2–5 are implemented: installable safe-shell PWA, encrypted 12-hour no-PII operational snapshots, readiness/audit controls, and an encrypted idempotent offline lead outbox. PRs #11–#15 were merged/deployed on 25 August; installed-PWA cold-offline unlock, reconnection and live lead creation were user-verified. Offline payments, leases, biometrics and general write queues remain out of scope.
+- Consent-led WhatsApp workflows and approved-template testing are implemented, but general lifecycle automation remains deliberately disabled (`WHATSAPP_AUTOMATION_ENABLED=false`). Enabling it requires controlled UAT of sender/template configuration, callbacks, opt-out and failure handling.
+- Verified public holds and reserve-to-view support were built across the CRM/public pair. Corrected office-hours and 24-hour viewing behaviour must not be called live until branch promotion, deployment and fresh end-to-end UAT are evidenced.
+- Commits `25d65bd`, `90181e3` and `42340ea` add a gated payment simulator and follow-up workflow. It makes no real provider charge and must create no real `Payment` or `LedgerEntry`. Production UAT exposed a false-positive completion result: the public page could say the lease and WhatsApp were sent without corresponding persisted delivery evidence. The correction requires a BlendSign external envelope reference plus successful email and non-failed WhatsApp communication logs before marking follow-up complete, and permits failed idempotent email/WhatsApp attempts to be retried safely.
