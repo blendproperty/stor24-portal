@@ -2,6 +2,41 @@ export type EmailMessage = { to: string; subject: string; text: string; html: st
 export interface EmailProvider { send(message: EmailMessage): Promise<void> }
 export function escapeEmailHtml(value: string) { return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[character]!); }
 
+export function stor24EmailVerificationHtml(code: string) {
+  const safeCode = escapeEmailHtml(code);
+  return `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f5f3ea;color:#071411;font-family:Arial,Helvetica,sans-serif;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">Your secure Stor24 verification code is ${safeCode}. It expires in 10 minutes.</div>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background:#f5f3ea;">
+    <tr><td align="center" style="padding:28px 14px;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border:1px solid #dfe3df;border-radius:22px;overflow:hidden;">
+        <tr><td style="height:7px;background:#ff5a0a;font-size:0;line-height:0;">&nbsp;</td></tr>
+        <tr><td style="padding:30px 32px 16px;">
+          <div style="font-size:32px;line-height:1;font-weight:900;letter-spacing:-2px;color:#071411;">ST<span style="color:#ff5a0a;font-size:30px;">&#11042;</span>R<sup style="font-size:15px;letter-spacing:-1px;">24</sup></div>
+        </td></tr>
+        <tr><td style="padding:10px 32px 34px;">
+          <div style="margin-bottom:12px;color:#ff5a0a;font-size:11px;line-height:1.4;font-weight:800;letter-spacing:2px;text-transform:uppercase;">Quick security check</div>
+          <h1 style="margin:0 0 12px;font-size:30px;line-height:1.12;letter-spacing:-1px;color:#071411;">Let&rsquo;s confirm it&rsquo;s you.</h1>
+          <p style="margin:0 0 24px;color:#52615b;font-size:16px;line-height:1.55;">Use this six-digit code to verify your email and keep your Stor24 booking moving.</p>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background:#071411;border-radius:16px;">
+            <tr><td align="center" style="padding:25px 16px;">
+              <div style="margin-bottom:8px;color:#aebcb6;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Your verification code</div>
+              <div style="color:#ffffff;font-size:38px;line-height:1.15;font-weight:900;letter-spacing:10px;">${safeCode}</div>
+            </td></tr>
+          </table>
+          <p style="margin:22px 0 0;color:#52615b;font-size:14px;line-height:1.55;"><strong style="color:#071411;">Ready when you are.</strong> This code expires in 10 minutes.</p>
+          <p style="margin:10px 0 0;color:#7b8883;font-size:12px;line-height:1.5;">Didn&rsquo;t request this? You can safely ignore this email. Never share this code with anyone&mdash;including the Stor24 team.</p>
+        </td></tr>
+        <tr><td style="padding:18px 32px;background:#071411;color:#aebcb6;font-size:12px;line-height:1.5;">Safe space. Smart storage. Stor24.</td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
 function parseFromAddress(raw: string | undefined) {
   const match = raw?.match(/^(.*)<(.+)>$/);
   if (match) return { name: match[1].trim().replace(/^"|"$/g, "") || undefined, email: match[2].trim() };

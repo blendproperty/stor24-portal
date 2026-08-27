@@ -11,7 +11,7 @@ import {
 import { notifyReservationConfirmed, notifyViewingBooked } from "@/lib/notifications";
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { TwilioSmsProvider, TwilioWhatsAppProvider, normalizeTwilioRecipient } from "@/lib/integrations/twilio-provider";
-import { emailProvider, escapeEmailHtml } from "@/lib/email";
+import { emailProvider, stor24EmailVerificationHtml } from "@/lib/email";
 import { privacyHash } from "@/lib/request-security";
 
 export class PublicBookingError extends Error {
@@ -130,7 +130,7 @@ async function deliverEmailVerificationCode(input: { code: string; email: string
   const subject = "Your Stor24 email verification code";
   const text = `Your Stor24 verification code is ${input.code}. It expires in 10 minutes. Do not share this code.`;
   try {
-    await emailProvider().send({ to: input.email, subject, text, html: `<p>${escapeEmailHtml(text)}</p>` });
+    await emailProvider().send({ to: input.email, subject, text, html: stor24EmailVerificationHtml(input.code) });
     await db.communicationLog.upsert({
       where: { idempotencyKey: input.idempotencyKey },
       create: { organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, channel: "EMAIL", messageType: "EMAIL_VERIFICATION", recipientHash: privacyHash(input.email), provider: process.env.EMAIL_PROVIDER ?? "configured", status: "SUCCEEDED", idempotencyKey: input.idempotencyKey, sentAt: new Date() },
