@@ -23,7 +23,7 @@ export default async function IntegrationsPage() {
   const [session, whatsAppState, documents, inboxCounts, outboxCounts, hikCentralConnections] = await Promise.all([
     requireSession(),
     getWhatsAppAutomationState(scope.organisationId),
-    db.document.findMany({ where: { provider: "BLENDSIGN", type: "LEASE_AGREEMENT", tenancy: { facility: { organisationId: scope.organisationId }, ...facilityFilter } }, include: { tenancy: { include: { customer: true, account: true, facility: true, occupancies: { where: { status: { in: ["ACTIVE", "NOTICE_GIVEN", "PENDING"] } }, include: { unit: true }, orderBy: { createdAt: "desc" }, take: 1 } } } }, orderBy: { createdAt: "desc" }, take: 100 }),
+    db.document.findMany({ where: { provider: "BLENDSIGN", type: { in: ["LEASE_AGREEMENT", "LEASE_AGREEMENT_UAT"] }, tenancy: { facility: { organisationId: scope.organisationId }, ...facilityFilter } }, include: { tenancy: { include: { customer: true, account: true, facility: true, occupancies: { where: { status: { in: ["ACTIVE", "NOTICE_GIVEN", "PENDING"] } }, include: { unit: true }, orderBy: { createdAt: "desc" }, take: 1 } } } }, orderBy: { createdAt: "desc" }, take: 100 }),
     db.webhookInbox.groupBy({ by: ["status"], where: { organisationId: scope.organisationId }, _count: true }),
     db.webhookOutbox.groupBy({ by: ["status"], where: { organisationId: scope.organisationId }, _count: true }),
     db.integrationConnection.findMany({ where: { organisationId: scope.organisationId, category: "ACCESS_CONTROL", provider: "HIKCENTRAL", ...(scope.unrestrictedFacilities ? {} : { OR: [{ facilityId: null }, { facilityId: { in: scope.facilityIds } }] }) }, select: { facilityId: true, status: true, lastSuccessAt: true } }),
