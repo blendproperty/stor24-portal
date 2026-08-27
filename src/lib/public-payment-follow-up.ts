@@ -41,7 +41,7 @@ export async function runSimulatedPaymentFollowUp(sessionId: string) {
       db.communicationLog.findUnique({ where: { idempotencyKey: `sim-payment:${sessionId}:WHATSAPP` }, select: { status: true } }),
     ]);
     const evidenceComplete = Boolean(document?.externalId && email?.status === "SUCCEEDED" && whatsapp && whatsapp.status !== "FAILED");
-    if (evidenceComplete) return { ok: true as const, status: "COMPLETED" };
+    if (evidenceComplete) return { ok: true as const, status: "COMPLETED", leaseInvitationSent: true, whatsappConfirmationSent: true };
     await db.publicPaymentSession.update({
       where: { id: sessionId },
       data: { followUpStatus: "FAILED", followUpError: "FOLLOW_UP_EVIDENCE_MISSING" },
@@ -56,6 +56,9 @@ export async function runSimulatedPaymentFollowUp(sessionId: string) {
     return { ok: existing?.followUpStatus === "COMPLETED", status: existing?.followUpStatus ?? "NOT_FOUND" };
   }
 
+  let signingUrl: string | undefined;
+  let leaseInvitationSent = false;
+  let whatsappConfirmationSent = false;
   try {
     const session = await db.publicPaymentSession.findUnique({
       where: { id: sessionId },
@@ -85,8 +88,10 @@ export async function runSimulatedPaymentFollowUp(sessionId: string) {
     const customerName = reservation.customer.companyName || [reservation.customer.firstName, reservation.customer.lastName].filter(Boolean).join(" ") || "customer";
     const signer = envelope.signers.find((item) => item.email === reservation.customer.email) ?? envelope.signers.find((item) => item.order === 1);
     if (!signer?.signingUrl) throw new Error("BLENDSIGN_SIGNING_URL_MISSING");
+    signingUrl = signer.signingUrl;
     const invitation = await resendBlendSignInvitation(envelope.envelopeId, `sim-payment:${session.id}:BLENDSIGN_INVITE`);
     if (!invitation.ok) throw new Error(`BLENDSIGN_INVITATION_FAILED_${invitation.status}`);
+    leaseInvitationSent = true;
     await db.auditEvent.create({ data: {
       organisationId: reservation.customer.organisationId,
       facilityId: reservation.facilityId,
@@ -120,6 +125,7 @@ export async function runSimulatedPaymentFollowUp(sessionId: string) {
         allowWhenAutomationDisabled: true,
       }) : Promise.resolve({ ok: false as const, code: "NO_PHONE" }),
     ]);
+    whatsappConfirmationSent = whatsapp.ok;
     const failures = [!email.ok ? `LEASE_EMAIL_${email.reason}` : null, !whatsapp.ok ? `PAYMENT_WHATSAPP_${whatsapp.code}` : null].filter(Boolean);
     if (failures.length) throw new Error(failures.join(";"));
     const [emailEvidence, whatsappEvidence, documentEvidence] = await Promise.all([
@@ -134,10 +140,10 @@ export async function runSimulatedPaymentFollowUp(sessionId: string) {
       db.publicPaymentSession.update({ where: { id: session.id }, data: { followUpStatus: "COMPLETED", followUpError: null } }),
       db.auditEvent.create({ data: { organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, action: "public_payment.simulator_follow_up_completed", entityType: "PublicPaymentSession", entityId: session.id, after: { simulated: true, tenancyId: result.tenancy.id, documentId: result.document.id, envelopeId: envelope.envelopeId } } }),
     ]);
-    return { ok: true as const, status: "COMPLETED", tenancyId: result.tenancy.id, documentId: result.document.id, signingUrl: signer.signingUrl };
+    return { ok: true as const, status: "COMPLETED", tenancyId: result.tenancy.id, documentId: result.document.id, signingUrl, leaseInvitationSent, whatsappConfirmationSent };
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 500) : "SIMULATED_PAYMENT_FOLLOW_UP_FAILED";
     await db.publicPaymentSession.update({ where: { id: sessionId }, data: { followUpStatus: "FAILED", followUpError: message } });
-    return { ok: false as const, status: "FAILED", error: message };
+    return { ok: false as const, status: "FAILED", error: message, signingUrl, leaseInvitationSent, whatsappConfirmationSent };
   }
 }

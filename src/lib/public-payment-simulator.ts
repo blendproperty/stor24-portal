@@ -42,7 +42,7 @@ export async function completeSimulatedPayment(sessionId: string, checkoutToken:
   if (session.status !== "PENDING") {
     if (!session.paymentMethod) await db.publicPaymentSession.update({ where: { id: session.id }, data: { paymentMethod } });
     const followUp = session.status === "SUCCEEDED" ? await runSimulatedPaymentFollowUp(session.id) : null;
-    return { ok: true as const, status: session.status, idempotent: true, followUpStatus: followUp?.status, signingUrl: followUp && "signingUrl" in followUp ? followUp.signingUrl : undefined, reference: session.reservation.publicReference, providerReference: session.providerReference };
+    return { ok: true as const, status: session.status, idempotent: true, followUpStatus: followUp?.status, signingUrl: followUp && "signingUrl" in followUp ? followUp.signingUrl : undefined, leaseInvitationSent: followUp && "leaseInvitationSent" in followUp ? followUp.leaseInvitationSent : false, whatsappConfirmationSent: followUp && "whatsappConfirmationSent" in followUp ? followUp.whatsappConfirmationSent : false, reference: session.reservation.publicReference, providerReference: session.providerReference };
   }
   if (!paymentMethod) return { ok: false as const, code: "PAYMENT_METHOD_REQUIRED" };
   const effectiveOutcome: SimulatedPaymentOutcome = session.expiresAt <= new Date() ? "TIMEOUT" : outcome;
@@ -60,5 +60,5 @@ export async function completeSimulatedPayment(sessionId: string, checkoutToken:
     await tx.auditEvent.create({ data: { organisationId: session.reservation.customer.organisationId, facilityId: session.reservation.facilityId, action: `public_payment.simulator_${status.toLowerCase()}`, entityType: "PublicPaymentSession", entityId: session.id, requestId: session.idempotencyKey, after: { status, paymentMethod, simulated: true } } });
   });
   const followUp = status === "SUCCEEDED" ? await runSimulatedPaymentFollowUp(session.id) : null;
-  return { ok: true as const, status, idempotent: false, followUpStatus: followUp?.status, signingUrl: followUp && "signingUrl" in followUp ? followUp.signingUrl : undefined, reference: session.reservation.publicReference, providerReference: session.providerReference };
+  return { ok: true as const, status, idempotent: false, followUpStatus: followUp?.status, signingUrl: followUp && "signingUrl" in followUp ? followUp.signingUrl : undefined, leaseInvitationSent: followUp && "leaseInvitationSent" in followUp ? followUp.leaseInvitationSent : false, whatsappConfirmationSent: followUp && "whatsappConfirmationSent" in followUp ? followUp.whatsappConfirmationSent : false, reference: session.reservation.publicReference, providerReference: session.providerReference };
 }
