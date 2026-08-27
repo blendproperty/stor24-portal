@@ -80,6 +80,7 @@ export function UnitInventoryWorkspace({
   const [busy, setBusy] = useState(false);
   const [forceDeleteCount, setForceDeleteCount] = useState(0);
   const [renumberDialog, setRenumberDialog] = useState(false);
+  const [confirmingRelease, setConfirmingRelease] = useState(false);
   const selectedFacility = facilities.find(
     (facility) => facility.id === facilityId,
   );
@@ -141,8 +142,12 @@ export function UnitInventoryWorkspace({
 
   async function releaseOrphanedReservations(unit?: Unit) {
     if (!selectedFacility) return;
-    const target = unit ? `unit ${unit.number}` : `reserved units at ${selectedFacility.name}`;
-    if (!window.confirm(`Check ${target} and release only units that have no active reservation and no pending or active occupancy? Units with genuine customer records will remain reserved.`)) return;
+    if (!unit && !confirmingRelease) {
+      setConfirmingRelease(true);
+      setNotice("Review complete: click Confirm safe release to clean only cancelled test holds. Genuine customer records remain protected.");
+      return;
+    }
+    if (unit && !window.confirm(`Check unit ${unit.number} and release it only when no active reservation and no protected occupancy remains?`)) return;
     setBusy(true);
     setError("");
     setNotice("");
@@ -153,6 +158,7 @@ export function UnitInventoryWorkspace({
     });
     const result = await response.json().catch(() => ({}));
     setBusy(false);
+    setConfirmingRelease(false);
     if (!response.ok) {
       setError(result.error?.message ?? "The reserved-unit check could not be completed.");
       return;
@@ -316,12 +322,12 @@ export function UnitInventoryWorkspace({
         action={
           <div className="form-actions">
             <button
-              className="button button-secondary"
+              className={`button ${confirmingRelease ? "button-primary" : "button-secondary"}`}
               onClick={() => void releaseOrphanedReservations()}
               disabled={!selectedFacility?.units.some((unit) => unit.status === "RESERVED") || busy}
             >
               <ShieldCheck size={15} />
-              Release cancelled holds
+              {confirmingRelease ? "Confirm safe release" : "Release cancelled holds"}
             </button>
             <button
               className="button button-secondary"
