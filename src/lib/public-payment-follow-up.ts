@@ -2,7 +2,6 @@ import { dispatchBlendSignLease } from "@/lib/blendsign-lease-service";
 import { resendBlendSignInvitation } from "@/lib/blendsign-client";
 import { db } from "@/lib/db";
 import { moveIn, type MoveInResult } from "@/lib/leasing-service";
-import { sendLeaseSigningLink } from "@/lib/notifications";
 import type { RequestScope } from "@/lib/scope";
 import { sendWhatsAppTemplate } from "@/lib/whatsapp";
 
@@ -85,7 +84,6 @@ export async function runSimulatedPaymentFollowUp(sessionId: string) {
     }
     const paymentMethod = session.paymentMethod as "DEBIT_ORDER" | "CARD" | "EFT";
     const envelope = await dispatchBlendSignLease(scope, result, { paymentMethod, startDate: result.tenancy.startDate, monthlyRate: Number(reservation.quotedRate), simulation: true });
-    const customerName = reservation.customer.companyName || [reservation.customer.firstName, reservation.customer.lastName].filter(Boolean).join(" ") || "customer";
     const signer = envelope.signers.find((item) => item.email === reservation.customer.email) ?? envelope.signers.find((item) => item.order === 1);
     if (!signer?.signingUrl) throw new Error("BLENDSIGN_SIGNING_URL_MISSING");
     signingUrl = signer.signingUrl;
@@ -109,17 +107,7 @@ export async function runSimulatedPaymentFollowUp(sessionId: string) {
     } });
     const account = await db.account.findUnique({ where: { id: result.tenancy.accountId }, select: { accountNumber: true } });
     if (!account) throw new Error("ACCOUNT_NOT_FOUND");
-    const [, whatsapp] = await Promise.all([
-      sendLeaseSigningLink({
-        organisationId: reservation.customer.organisationId,
-        facilityId: reservation.facilityId,
-        customerId: reservation.customerId,
-        documentId: result.document.id,
-        to: { email: reservation.customer.email },
-        variables: { customerName, facilityName: reservation.facility.name, unitNumber: reservation.unit.number, signingUrl: signer.signingUrl, expiresAt: result.document.expiresAt?.toLocaleString("en-ZA") ?? "soon" },
-        simulation: true,
-      }),
-      reservation.customer.phone ? sendWhatsAppTemplate({
+    const whatsapp = reservation.customer.phone ? await sendWhatsAppTemplate({
         organisationId: reservation.customer.organisationId,
         facilityId: reservation.facilityId,
         customerId: reservation.customerId,
@@ -129,12 +117,10 @@ export async function runSimulatedPaymentFollowUp(sessionId: string) {
         idempotencyKey: `sim-payment:${session.id}:WHATSAPP`,
         variables: { "1": reservation.customer.firstName || reservation.customer.companyName || "customer", "2": `R${Number(session.amount).toFixed(2)} UAT`, "3": new Date().toLocaleDateString("en-ZA"), "4": account.accountNumber, "5": "R0.00" },
         allowWhenAutomationDisabled: true,
-      }) : Promise.resolve({ ok: false as const, code: "NO_PHONE" }),
-    ]);
+      }) : { ok: false as const, code: "NO_PHONE" };
     whatsappConfirmationSent = whatsapp.ok;
-    // BlendSign is the authoritative lease-delivery channel. The branded CRM
-    // email is a supplementary fallback and must not turn a successfully queued
-    // BlendSign invitation into a false lease-delivery failure.
+    // BlendSign is the single authoritative lease-email channel. Sending a
+    // second CRM email duplicates the invitation and creates conflicting copy.
     const failures = [!whatsapp.ok ? `PAYMENT_WHATSAPP_${whatsapp.code}` : null].filter(Boolean);
     if (failures.length) throw new Error(failures.join(";"));
     const [invitationEvidence, whatsappEvidence, documentEvidence] = await Promise.all([
