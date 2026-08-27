@@ -31,6 +31,21 @@ export const offlineLeadSyncSchema = z.object({
 
 export type OfflineLeadSyncInput = z.infer<typeof offlineLeadSyncSchema>;
 
+export const offlineReservationSyncSchema = z.object({
+  submissionId: z.string().uuid(),
+  leadSubmissionId: z.string().uuid(),
+  deviceId: z.string().trim().regex(/^[a-zA-Z0-9-]{16,64}$/),
+  capturedAt: z.iso.datetime(),
+  facilityId: z.string().trim().min(1).max(64),
+  customerId: z.string().trim().min(1).max(64),
+  leadId: z.string().trim().min(1).max(64),
+  unitId: z.string().trim().min(1).max(64),
+  quotedRate: z.coerce.number().positive().max(10_000_000),
+  intendedMoveIn: z.iso.date().optional(),
+});
+
+export type OfflineReservationSyncInput = z.infer<typeof offlineReservationSyncSchema>;
+
 const id = z.string().trim().min(1).max(64);
 const money = z.coerce.number().nonnegative().max(10_000_000);
 const optionalText = z.string().trim().max(2000).optional();
