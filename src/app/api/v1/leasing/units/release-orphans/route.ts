@@ -43,7 +43,24 @@ export async function POST(request: Request) {
           reservations: { where: { status: "ACTIVE" }, select: { id: true } },
           occupancies: {
             where: { status: { in: [...blockingOccupancyStatuses] } },
-            select: { id: true, status: true, tenancy: { select: { id: true, status: true } } },
+            select: {
+              id: true,
+              status: true,
+              tenancy: {
+                select: {
+                  id: true,
+                  status: true,
+                  reservation: {
+                    select: {
+                      status: true,
+                      publicPaymentSessions: { select: { provider: true } },
+                    },
+                  },
+                  documents: { select: { id: true, type: true, signedAt: true } },
+                  account: { select: { payments: { where: { status: "SUCCEEDED" }, select: { id: true } } } },
+                },
+              },
+            },
           },
         },
         orderBy: { number: "asc" },
@@ -55,10 +72,39 @@ export async function POST(request: Request) {
       for (const unit of candidates) {
         const reasons: string[] = [];
         if (unit.reservations.length) reasons.push(`${unit.reservations.length} active reservation${unit.reservations.length === 1 ? "" : "s"}`);
-        if (unit.occupancies.length) reasons.push(`${unit.occupancies.length} pending or active occupancy record${unit.occupancies.length === 1 ? "" : "s"}`);
+        const cancellableTestOccupancies = unit.occupancies.filter((occupancy) => {
+          const tenancy = occupancy.tenancy;
+          const paymentSessions = tenancy.reservation?.publicPaymentSessions ?? [];
+          return occupancy.status === "PENDING"
+            && tenancy.status === "DRAFT"
+            && tenancy.reservation?.status === "CANCELLED"
+            && tenancy.account.payments.length === 0
+            && tenancy.documents.every((document) => document.type === "LEASE_AGREEMENT_UAT" && !document.signedAt)
+            && paymentSessions.every((session) => session.provider === "STOR24_SIMULATOR");
+        });
+        const protectedOccupancies = unit.occupancies.filter((occupancy) => !cancellableTestOccupancies.some((candidate) => candidate.id === occupancy.id));
+        if (protectedOccupancies.length) reasons.push(`${protectedOccupancies.length} pending or active occupancy record${protectedOccupancies.length === 1 ? "" : "s"}`);
         if (reasons.length) {
           blocked.push({ unit: unit.number, reasons });
           continue;
+        }
+
+        for (const occupancy of cancellableTestOccupancies) {
+          await tx.occupancy.update({ where: { id: occupancy.id }, data: { status: "CANCELLED", endDate: new Date(), accessState: "REVOKED" } });
+          await tx.tenancy.update({ where: { id: occupancy.tenancy.id }, data: { status: "CANCELLED", endDate: new Date() } });
+          await tx.document.updateMany({ where: { tenancyId: occupancy.tenancy.id, signedAt: null }, data: { status: "CANCELLED", signingToken: null } });
+          await tx.auditEvent.create({
+            data: {
+              organisationId: auth.organisationId,
+              facilityId: facility.id,
+              actorId: auth.user.id,
+              action: "tenancy.cancelled_test_artifact_cleanup",
+              entityType: "Tenancy",
+              entityId: occupancy.tenancy.id,
+              before: { status: "DRAFT", occupancyStatus: "PENDING" },
+              after: { status: "CANCELLED", occupancyStatus: "CANCELLED", simulated: true },
+            },
+          });
         }
 
         const changed = await tx.unit.updateMany({
