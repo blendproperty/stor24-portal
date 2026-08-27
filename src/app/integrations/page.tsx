@@ -10,6 +10,8 @@ import { WhatsAppAutomationControl } from "@/components/whatsapp-automation-cont
 import { getWhatsAppAutomationState } from "@/lib/integrations/whatsapp-automation";
 import { requireSession } from "@/lib/auth-guards";
 import { configuredMessagingChannels, messagingReadiness, type MessagingChannel } from "@/lib/integrations/messaging-readiness";
+import { listHikCentralConfiguration } from "@/lib/integrations/hikcentral-configuration";
+import { hikCentralReadiness } from "@/lib/integrations/hikcentral-readiness";
 
 export const metadata = { title: "Integrations" };
 export const dynamic = "force-dynamic";
@@ -21,13 +23,13 @@ function customerName(customer: { firstName: string | null; lastName: string | n
 export default async function IntegrationsPage() {
   const scope = await requirePermissionScope("operations.view");
   const facilityFilter = scope.unrestrictedFacilities ? {} : { facilityId: { in: scope.facilityIds } };
-  const [session, whatsAppState, documents, inboxCounts, outboxCounts, hikCentralConnections, successfulDeliveries, successfulMessagingTests] = await Promise.all([
+  const [session, whatsAppState, documents, inboxCounts, outboxCounts, hikCentralConfiguration, successfulDeliveries, successfulMessagingTests] = await Promise.all([
     requireSession(),
     getWhatsAppAutomationState(scope.organisationId),
     db.document.findMany({ where: { provider: "BLENDSIGN", type: { in: ["LEASE_AGREEMENT", "LEASE_AGREEMENT_UAT"] }, tenancy: { facility: { organisationId: scope.organisationId }, ...facilityFilter } }, include: { tenancy: { include: { customer: true, account: true, facility: true, occupancies: { where: { status: { in: ["ACTIVE", "NOTICE_GIVEN", "PENDING"] } }, include: { unit: true }, orderBy: { createdAt: "desc" }, take: 1 } } } }, orderBy: { createdAt: "desc" }, take: 100 }),
     db.webhookInbox.groupBy({ by: ["status"], where: { organisationId: scope.organisationId }, _count: true }),
     db.webhookOutbox.groupBy({ by: ["status"], where: { organisationId: scope.organisationId }, _count: true }),
-    db.integrationConnection.findMany({ where: { organisationId: scope.organisationId, category: "ACCESS_CONTROL", provider: "HIKCENTRAL", ...(scope.unrestrictedFacilities ? {} : { OR: [{ facilityId: null }, { facilityId: { in: scope.facilityIds } }] }) }, select: { facilityId: true, status: true, lastSuccessAt: true } }),
+    listHikCentralConfiguration(scope),
     db.communicationLog.findMany({ where: { organisationId: scope.organisationId, channel: { in: ["EMAIL", "SMS", "WHATSAPP"] }, status: "SUCCEEDED" }, select: { channel: true }, distinct: ["channel"] }),
     db.auditEvent.findMany({ where: { organisationId: scope.organisationId, action: { in: ["communication.sms.test_succeeded", "communication.whatsapp.test_succeeded"] } }, select: { action: true }, distinct: ["action"] }),
   ]);
@@ -37,9 +39,7 @@ export default async function IntegrationsPage() {
   const actionRequired = rows.filter((row) => blendSignLeaseStateNeedsAction(row.state)).length;
   const inbox = Object.fromEntries(inboxCounts.map((item) => [item.status, item._count]));
   const outbox = Object.fromEntries(outboxCounts.map((item) => [item.status, item._count]));
-  const hikCompany = hikCentralConnections.find((item) => item.facilityId === null);
-  const hikFacilities = hikCentralConnections.filter((item) => item.facilityId !== null);
-  const hikConnected = hikCompany?.status === "CONNECTED" && hikFacilities.some((item) => item.status === "CONNECTED");
+  const accessControl = hikCentralReadiness(hikCentralConfiguration);
   const configuredChannels = configuredMessagingChannels(process.env);
   const verifiedChannels = new Set<MessagingChannel>(successfulDeliveries.flatMap((item) => item.channel === "EMAIL" ? ["Email"] : item.channel === "SMS" ? ["SMS"] : item.channel === "WHATSAPP" ? ["WhatsApp"] : []));
   if (successfulMessagingTests.some((item) => item.action === "communication.sms.test_succeeded")) verifiedChannels.add("SMS");
@@ -49,7 +49,7 @@ export default async function IntegrationsPage() {
   const connections = [
     ["BlendSign", "BlendSign", "Connected", "Lease envelopes and completed artifacts", "positive", null],
     ["Payments", "Netcash", "Configuration required", "Credentials and provider contract pending", "warning", null],
-    ["Access control", "Hikvision / HikCentral", hikConnected ? "Connected" : hikCompany ? "Ready to test" : "Configuration required", hikConnected ? `${hikFacilities.filter((item) => item.status === "CONNECTED").length} facility connection verified` : "Add credentials, map the facility doors and run a live test", hikConnected ? "positive" : "warning", "/settings/integrations/hikvision"],
+    ["Access control", "Hikvision / HikCentral", accessControl.state, accessControl.detail, accessControl.tone, "/settings/integrations/hikvision"],
     ["Email / messaging", "Email / Twilio", messaging.state, messaging.detail, messaging.tone, "/communications"],
     ["Accounting", "MRI export queue", "Partial", "Integration method and chart mapping awaiting approval", "warning", null],
   ] as const;
