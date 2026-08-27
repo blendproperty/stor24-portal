@@ -9,6 +9,7 @@ import { BlendSignReconciliationActions } from "@/components/blendsign-reconcili
 import { WhatsAppAutomationControl } from "@/components/whatsapp-automation-control";
 import { getWhatsAppAutomationState } from "@/lib/integrations/whatsapp-automation";
 import { requireSession } from "@/lib/auth-guards";
+import { configuredMessagingChannels, messagingReadiness, type MessagingChannel } from "@/lib/integrations/messaging-readiness";
 
 export const metadata = { title: "Integrations" };
 export const dynamic = "force-dynamic";
@@ -20,13 +21,15 @@ function customerName(customer: { firstName: string | null; lastName: string | n
 export default async function IntegrationsPage() {
   const scope = await requirePermissionScope("operations.view");
   const facilityFilter = scope.unrestrictedFacilities ? {} : { facilityId: { in: scope.facilityIds } };
-  const [session, whatsAppState, documents, inboxCounts, outboxCounts, hikCentralConnections] = await Promise.all([
+  const [session, whatsAppState, documents, inboxCounts, outboxCounts, hikCentralConnections, successfulDeliveries, successfulMessagingTests] = await Promise.all([
     requireSession(),
     getWhatsAppAutomationState(scope.organisationId),
     db.document.findMany({ where: { provider: "BLENDSIGN", type: { in: ["LEASE_AGREEMENT", "LEASE_AGREEMENT_UAT"] }, tenancy: { facility: { organisationId: scope.organisationId }, ...facilityFilter } }, include: { tenancy: { include: { customer: true, account: true, facility: true, occupancies: { where: { status: { in: ["ACTIVE", "NOTICE_GIVEN", "PENDING"] } }, include: { unit: true }, orderBy: { createdAt: "desc" }, take: 1 } } } }, orderBy: { createdAt: "desc" }, take: 100 }),
     db.webhookInbox.groupBy({ by: ["status"], where: { organisationId: scope.organisationId }, _count: true }),
     db.webhookOutbox.groupBy({ by: ["status"], where: { organisationId: scope.organisationId }, _count: true }),
     db.integrationConnection.findMany({ where: { organisationId: scope.organisationId, category: "ACCESS_CONTROL", provider: "HIKCENTRAL", ...(scope.unrestrictedFacilities ? {} : { OR: [{ facilityId: null }, { facilityId: { in: scope.facilityIds } }] }) }, select: { facilityId: true, status: true, lastSuccessAt: true } }),
+    db.communicationLog.findMany({ where: { organisationId: scope.organisationId, channel: { in: ["EMAIL", "SMS", "WHATSAPP"] }, status: "SUCCEEDED" }, select: { channel: true }, distinct: ["channel"] }),
+    db.auditEvent.findMany({ where: { organisationId: scope.organisationId, action: { in: ["communication.sms.test_succeeded", "communication.whatsapp.test_succeeded"] } }, select: { action: true }, distinct: ["action"] }),
   ]);
   const rows = documents.map((document) => ({ document, state: classifyBlendSignLease({ status: document.status, externalId: document.externalId, createdAt: document.createdAt, expiresAt: document.expiresAt, tenancyStatus: document.tenancy.status }) }));
   const completed = rows.filter((row) => row.state === "COMPLETED").length;
@@ -37,12 +40,17 @@ export default async function IntegrationsPage() {
   const hikCompany = hikCentralConnections.find((item) => item.facilityId === null);
   const hikFacilities = hikCentralConnections.filter((item) => item.facilityId !== null);
   const hikConnected = hikCompany?.status === "CONNECTED" && hikFacilities.some((item) => item.status === "CONNECTED");
-  const whatsAppConfigured = Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_FROM && process.env.TWILIO_WHATSAPP_RESERVATION_CONFIRMED_SID);
+  const configuredChannels = configuredMessagingChannels(process.env);
+  const verifiedChannels = new Set<MessagingChannel>(successfulDeliveries.flatMap((item) => item.channel === "EMAIL" ? ["Email"] : item.channel === "SMS" ? ["SMS"] : item.channel === "WHATSAPP" ? ["WhatsApp"] : []));
+  if (successfulMessagingTests.some((item) => item.action === "communication.sms.test_succeeded")) verifiedChannels.add("SMS");
+  if (successfulMessagingTests.some((item) => item.action === "communication.whatsapp.test_succeeded")) verifiedChannels.add("WhatsApp");
+  const messaging = messagingReadiness(configuredChannels, verifiedChannels);
+  const whatsAppConfigured = configuredChannels.has("WhatsApp");
   const connections = [
     ["BlendSign", "BlendSign", "Connected", "Lease envelopes and completed artifacts", "positive", null],
     ["Payments", "Netcash", "Configuration required", "Credentials and provider contract pending", "warning", null],
     ["Access control", "Hikvision / HikCentral", hikConnected ? "Connected" : hikCompany ? "Ready to test" : "Configuration required", hikConnected ? `${hikFacilities.filter((item) => item.status === "CONNECTED").length} facility connection verified` : "Add credentials, map the facility doors and run a live test", hikConnected ? "positive" : "warning", "/settings/integrations/hikvision"],
-    ["Email / messaging", "Partially configured", "Partial", "SMS and WhatsApp provider work remains", "warning", null],
+    ["Email / messaging", "Email / Twilio", messaging.state, messaging.detail, messaging.tone, "/communications"],
     ["Accounting", "MRI export queue", "Partial", "Integration method and chart mapping awaiting approval", "warning", null],
   ] as const;
 
