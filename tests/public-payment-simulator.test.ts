@@ -24,6 +24,8 @@ test("simulated success prepares a UAT lease and customer follow-up without a ch
   assert.match(source, /FOLLOW_UP_EVIDENCE_MISSING/);
   assert.match(source, /lease-sign:\$\{result\.document\.id\}/);
   assert.match(source, /sim-payment:\$\{session\.id\}:WHATSAPP/);
+  assert.match(source, /allowWhenAutomationDisabled: true/);
+  assert.match(source, /Promise\.all/);
   assert.doesNotMatch(source, /\b(payment|ledgerEntry)\.create\s*\(/);
 });
 
@@ -34,4 +36,10 @@ test("UAT lease signatures cannot activate a real tenancy or occupy a unit", asy
   const guardReturn = source.indexOf("return { tenancyId: document.tenancyId, idempotent: false, simulation: true }", guard);
   assert.ok(guard >= 0 && guardReturn > guard);
   assert.ok(activation === -1 || guardReturn < activation);
+});
+
+test("configured Twilio credentials provide a lease-email fallback", async () => {
+  const source = await import("node:fs/promises").then((fs) => fs.readFile("src/lib/email.ts", "utf8"));
+  assert.match(source, /TWILIO_ACCOUNT_SID && process\.env\.TWILIO_AUTH_TOKEN/);
+  assert.match(source, /return new TwilioEmailProvider\(\)/);
 });

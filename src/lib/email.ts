@@ -79,5 +79,6 @@ export function emailProvider(): EmailProvider {
   if (process.env.EMAIL_PROVIDER === "resend") return new ResendEmailProvider();
   if (process.env.EMAIL_PROVIDER === "sendgrid") return new SendGridEmailProvider();
   if (process.env.EMAIL_PROVIDER === "twilio") return new TwilioEmailProvider();
+  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) return new TwilioEmailProvider();
   return new DisabledEmailProvider();
 }

@@ -82,29 +82,32 @@ export async function runSimulatedPaymentFollowUp(sessionId: string) {
     const customerName = reservation.customer.companyName || [reservation.customer.firstName, reservation.customer.lastName].filter(Boolean).join(" ") || "customer";
     const signer = envelope.signers.find((item) => item.email === reservation.customer.email) ?? envelope.signers.find((item) => item.order === 1);
     if (!signer?.signingUrl) throw new Error("BLENDSIGN_SIGNING_URL_MISSING");
-    const email = await sendLeaseSigningLink({
-      organisationId: reservation.customer.organisationId,
-      facilityId: reservation.facilityId,
-      customerId: reservation.customerId,
-      documentId: result.document.id,
-      to: { email: reservation.customer.email },
-      variables: { customerName, facilityName: reservation.facility.name, unitNumber: reservation.unit.number, signingUrl: signer.signingUrl, expiresAt: result.document.expiresAt?.toLocaleString("en-ZA") ?? "soon" },
-      simulation: true,
-    });
-    if (!email.ok) throw new Error(`LEASE_EMAIL_${email.reason}`);
     const account = await db.account.findUnique({ where: { id: result.tenancy.accountId }, select: { accountNumber: true } });
     if (!account) throw new Error("ACCOUNT_NOT_FOUND");
-    const whatsapp = reservation.customer.phone ? await sendWhatsAppTemplate({
-      organisationId: reservation.customer.organisationId,
-      facilityId: reservation.facilityId,
-      customerId: reservation.customerId,
-      recipient: reservation.customer.phone,
-      consent: reservation.customer.communicationConsent,
-      messageType: "PAYMENT_RECEIVED",
-      idempotencyKey: `sim-payment:${session.id}:WHATSAPP`,
-      variables: { "1": reservation.customer.firstName || reservation.customer.companyName || "customer", "2": `R${Number(session.amount).toFixed(2)} UAT`, "3": new Date().toLocaleDateString("en-ZA"), "4": account.accountNumber, "5": "R0.00" },
-    }) : { ok: false as const, code: "NO_PHONE" };
-    if (!whatsapp.ok) throw new Error(`PAYMENT_WHATSAPP_${whatsapp.code}`);
+    const [email, whatsapp] = await Promise.all([
+      sendLeaseSigningLink({
+        organisationId: reservation.customer.organisationId,
+        facilityId: reservation.facilityId,
+        customerId: reservation.customerId,
+        documentId: result.document.id,
+        to: { email: reservation.customer.email },
+        variables: { customerName, facilityName: reservation.facility.name, unitNumber: reservation.unit.number, signingUrl: signer.signingUrl, expiresAt: result.document.expiresAt?.toLocaleString("en-ZA") ?? "soon" },
+        simulation: true,
+      }),
+      reservation.customer.phone ? sendWhatsAppTemplate({
+        organisationId: reservation.customer.organisationId,
+        facilityId: reservation.facilityId,
+        customerId: reservation.customerId,
+        recipient: reservation.customer.phone,
+        consent: reservation.customer.communicationConsent,
+        messageType: "PAYMENT_RECEIVED",
+        idempotencyKey: `sim-payment:${session.id}:WHATSAPP`,
+        variables: { "1": reservation.customer.firstName || reservation.customer.companyName || "customer", "2": `R${Number(session.amount).toFixed(2)} UAT`, "3": new Date().toLocaleDateString("en-ZA"), "4": account.accountNumber, "5": "R0.00" },
+        allowWhenAutomationDisabled: true,
+      }) : Promise.resolve({ ok: false as const, code: "NO_PHONE" }),
+    ]);
+    const failures = [!email.ok ? `LEASE_EMAIL_${email.reason}` : null, !whatsapp.ok ? `PAYMENT_WHATSAPP_${whatsapp.code}` : null].filter(Boolean);
+    if (failures.length) throw new Error(failures.join(";"));
     const [emailEvidence, whatsappEvidence, documentEvidence] = await Promise.all([
       db.communicationLog.findUnique({ where: { idempotencyKey: `lease-sign:${result.document.id}` }, select: { status: true } }),
       db.communicationLog.findUnique({ where: { idempotencyKey: `sim-payment:${session.id}:WHATSAPP` }, select: { status: true } }),
