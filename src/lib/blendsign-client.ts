@@ -74,6 +74,15 @@ function unitSize(unitType: LeaseEnvelopeInput["unit"]["unitType"]) {
   return unitType.name;
 }
 
+export function absoluteBlendSignUrl(baseUrl: string, signingUrl: string) {
+  const base = new URL(`${baseUrl.replace(/\/$/, "")}/`);
+  const resolved = new URL(signingUrl, base);
+  if (resolved.origin !== base.origin || !resolved.pathname.startsWith("/sign/")) {
+    throw new Error("BLENDSIGN_SIGNING_URL_INVALID");
+  }
+  return resolved.toString();
+}
+
 export async function createBlendSignLeaseEnvelope(input: LeaseEnvelopeInput): Promise<BlendSignEnvelope> {
   const baseUrl = process.env.BLENDSIGN_BASE_URL?.replace(/\/$/, "");
   const apiKey = process.env.BLENDSIGN_API_KEY;
@@ -140,5 +149,11 @@ export async function createBlendSignLeaseEnvelope(input: LeaseEnvelopeInput): P
   });
   const payload = await response.json() as BlendSignEnvelope & { error?: unknown };
   if (!response.ok) throw new Error(`BLENDSIGN_CREATE_FAILED:${response.status}:${JSON.stringify(payload.error ?? payload)}`);
-  return payload;
+  return {
+    ...payload,
+    signers: payload.signers.map((signer) => ({
+      ...signer,
+      signingUrl: absoluteBlendSignUrl(baseUrl, signer.signingUrl),
+    })),
+  };
 }
