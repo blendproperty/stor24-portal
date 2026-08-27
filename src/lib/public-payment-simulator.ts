@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
+import { runSimulatedPaymentFollowUp } from "@/lib/public-payment-follow-up";
 
 export type SimulatedPaymentOutcome = "SUCCESS" | "DECLINED" | "CANCELLED" | "TIMEOUT";
 
@@ -38,7 +39,10 @@ export async function completeSimulatedPayment(sessionId: string, checkoutToken:
   if (!publicPaymentSimulatorEnabled()) return { ok: false as const, code: "DISABLED" };
   const session = await db.publicPaymentSession.findUnique({ where: { id: sessionId }, include: { reservation: { include: { customer: true, unit: true, facility: true } } } });
   if (!session || tokenHash(checkoutToken) !== session.checkoutTokenHash) return { ok: false as const, code: "NOT_FOUND" };
-  if (session.status !== "PENDING") return { ok: true as const, status: session.status, idempotent: true, reference: session.reservation.publicReference, providerReference: session.providerReference };
+  if (session.status !== "PENDING") {
+    const followUp = session.status === "SUCCEEDED" ? await runSimulatedPaymentFollowUp(session.id) : null;
+    return { ok: true as const, status: session.status, idempotent: true, followUpStatus: followUp?.status, reference: session.reservation.publicReference, providerReference: session.providerReference };
+  }
   const effectiveOutcome: SimulatedPaymentOutcome = session.expiresAt <= new Date() ? "TIMEOUT" : outcome;
   const status = effectiveOutcome === "SUCCESS" ? "SUCCEEDED" : effectiveOutcome;
   const now = new Date();
@@ -53,5 +57,6 @@ export async function completeSimulatedPayment(sessionId: string, checkoutToken:
     }
     await tx.auditEvent.create({ data: { organisationId: session.reservation.customer.organisationId, facilityId: session.reservation.facilityId, action: `public_payment.simulator_${status.toLowerCase()}`, entityType: "PublicPaymentSession", entityId: session.id, requestId: session.idempotencyKey, after: { status, simulated: true } } });
   });
-  return { ok: true as const, status, idempotent: false, reference: session.reservation.publicReference, providerReference: session.providerReference };
+  const followUp = status === "SUCCEEDED" ? await runSimulatedPaymentFollowUp(session.id) : null;
+  return { ok: true as const, status, idempotent: false, followUpStatus: followUp?.status, reference: session.reservation.publicReference, providerReference: session.providerReference };
 }

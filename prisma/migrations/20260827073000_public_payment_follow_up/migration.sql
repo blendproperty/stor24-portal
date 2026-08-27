@@ -1,0 +1,3 @@
+ALTER TABLE "PublicPaymentSession"
+ADD COLUMN "followUpStatus" TEXT NOT NULL DEFAULT 'NOT_STARTED',
+ADD COLUMN "followUpError" TEXT;

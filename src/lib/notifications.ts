@@ -193,12 +193,15 @@ export async function sendLeaseSigningLink(input: {
   documentId: string;
   to: { email: string | null };
   variables: { customerName: string; facilityName: string; unitNumber: string; signingUrl: string; expiresAt: string };
+  simulation?: boolean;
 }) {
   if (!input.to.email) return { ok: false as const, reason: "NO_EMAIL" as const };
 
   const idempotencyKey = `lease-sign:${input.documentId}`;
-  const subject = `Please sign your Stor24 lease — Unit ${input.variables.unitNumber}`;
-  const body = `Hi ${input.variables.customerName},\n\nYour storage lease for Unit ${input.variables.unitNumber} at ${input.variables.facilityName} is ready for your signature.\n\nReview and sign here: ${input.variables.signingUrl}\n\nThis link expires on ${input.variables.expiresAt}. If it expires before you sign, contact Stor24 for a new link.\n\nStor24`;
+  const existing = await db.communicationLog.findUnique({ where: { idempotencyKey }, select: { status: true } });
+  if (existing?.status === "SUCCEEDED") return { ok: true as const, idempotent: true as const };
+  const subject = `${input.simulation ? "UAT TEST — " : ""}Please sign your Stor24 lease — Unit ${input.variables.unitNumber}`;
+  const body = `Hi ${input.variables.customerName},\n\n${input.simulation ? "This is a Stor24 UAT test. No money moved and signing will not activate a real tenancy.\n\n" : ""}Your storage lease for Unit ${input.variables.unitNumber} at ${input.variables.facilityName} is ready for your signature.\n\nReview and sign here: ${input.variables.signingUrl}\n\nThis link expires on ${input.variables.expiresAt}. If it expires before you sign, contact Stor24 for a new link.\n\nStor24`;
 
   try {
     await emailProvider().send({

@@ -20,6 +20,7 @@ type LeaseEnvelopeInput = {
   monthlyRate: number;
   representative: { name: string; email: string };
   autoCountersign?: boolean;
+  simulation?: boolean;
 };
 
 export type BlendSignEnvelope = {
@@ -119,7 +120,7 @@ export async function createBlendSignLeaseEnvelope(input: LeaseEnvelopeInput): P
     body: JSON.stringify({
       templateKey: blendSignTemplateKey(input.paymentMethod),
       externalReference: input.tenancyId,
-      title: `Stor24 lease - unit ${input.unit.number}`,
+      title: `${input.simulation ? "UAT TEST - " : ""}Stor24 lease - unit ${input.unit.number}`,
       data,
       recipients: [
         { role: "Signer 1", name, email: input.customer.email },

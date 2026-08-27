@@ -100,7 +100,7 @@ export async function cancelReservation(scope: RequestScope, reservationId: stri
  * The Tenancy/Occupancy only become ACTIVE/OCCUPIED once the customer
  * actually signs, via the authenticated BlendSign webhook.
  */
-export async function moveIn(scope: RequestScope, input: { reservationId?: string; facilityId: string; customerId: string; unitId: string; startDate: Date; monthlyRate?: number; initialCharge: number; accessState: string; paymentMethod: "DEBIT_ORDER" | "CARD" | "EFT" | "OTHER" }) {
+export async function moveIn(scope: RequestScope, input: { reservationId?: string; facilityId: string; customerId: string; unitId: string; startDate: Date; monthlyRate?: number; initialCharge: number; accessState: string; paymentMethod: "DEBIT_ORDER" | "CARD" | "EFT" | "OTHER"; simulation?: boolean }) {
   await requireFacility(scope, input.facilityId);
   return db.$transaction(async (tx) => {
     const unit = await tx.unit.findFirst({ where: { id: input.unitId, facilityId: input.facilityId, status: { in: ["AVAILABLE", "RESERVED"] } }, include: { unitType: true } });
@@ -114,7 +114,7 @@ export async function moveIn(scope: RequestScope, input: { reservationId?: strin
     await tx.unit.update({ where: { id: unit.id }, data: { status: "RESERVED" } });
     const sentAt = new Date();
     const expiresAt = new Date(sentAt.getTime() + SIGNING_LINK_TTL_MS);
-    const document = await tx.document.create({ data: { tenancyId: tenancy.id, type: "LEASE_AGREEMENT", storageKey: "blendsign:pending", provider: "BLENDSIGN", templateKey: blendSignTemplateKey(input.paymentMethod), idempotencyKey: `stor24-lease:${tenancy.id}`, status: "PENDING", sentAt, expiresAt } });
+    const document = await tx.document.create({ data: { tenancyId: tenancy.id, type: input.simulation ? "LEASE_AGREEMENT_UAT" : "LEASE_AGREEMENT", storageKey: "blendsign:pending", provider: "BLENDSIGN", templateKey: blendSignTemplateKey(input.paymentMethod), idempotencyKey: `stor24-lease:${tenancy.id}`, status: "PENDING", sentAt, expiresAt } });
     if (input.initialCharge > 0) { await tx.ledgerEntry.create({ data: { accountId: account.id, type: "CHARGE", amount: input.initialCharge, description: PENDING_MOVE_IN_CHARGE_DESCRIPTION, effectiveAt: input.startDate, createdById: scope.userId } }); await tx.account.update({ where: { id: account.id }, data: { balance: { increment: input.initialCharge } } }); }
     if (input.reservationId) await tx.reservation.update({ where: { id: input.reservationId }, data: { status: "CONVERTED", convertedTenancyId: tenancy.id } });
     await audit(tx, scope, "tenancy.lease_sent_for_signature", "Tenancy", tenancy.id, input.facilityId);
@@ -139,7 +139,12 @@ export async function completeBlendSignEnvelope(envelopeId: string) {
   return db.$transaction(async (tx) => {
     const document = await tx.document.findUnique({ where: { externalId: envelopeId }, include: { tenancy: { include: { occupancies: true, facility: true } } } });
     if (!document) throw new Error("NOT_FOUND");
-    if (document.status === "SIGNED") return { tenancyId: document.tenancyId, idempotent: true };
+    if (document.status === "SIGNED") return { tenancyId: document.tenancyId, idempotent: true, simulation: document.type === "LEASE_AGREEMENT_UAT" };
+    if (document.type === "LEASE_AGREEMENT_UAT") {
+      await tx.document.update({ where: { id: document.id }, data: { status: "SIGNED", signedAt: new Date() } });
+      await tx.auditEvent.create({ data: { organisationId: document.tenancy.facility.organisationId, facilityId: document.tenancy.facilityId, actorId: null, action: "tenancy.uat_lease_signed", entityType: "Document", entityId: document.id, after: { envelopeId, simulated: true } } });
+      return { tenancyId: document.tenancyId, idempotent: false, simulation: true };
+    }
     const occupancy = document.tenancy.occupancies.find((item) => item.status === "PENDING");
     if (!occupancy) throw new Error("CONFLICT");
     await tx.occupancy.update({ where: { id: occupancy.id }, data: { status: "ACTIVE" } });

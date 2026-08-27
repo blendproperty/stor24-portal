@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { attachBlendSignEnvelope, type MoveInResult } from "@/lib/leasing-service";
 import type { RequestScope } from "@/lib/scope";
 
-export async function dispatchBlendSignLease(scope: RequestScope, result: MoveInResult, input: { paymentMethod: "DEBIT_ORDER" | "CARD" | "EFT" | "OTHER"; startDate: Date; monthlyRate?: number }) {
+export async function dispatchBlendSignLease(scope: RequestScope, result: MoveInResult, input: { paymentMethod: "DEBIT_ORDER" | "CARD" | "EFT" | "OTHER"; startDate: Date; monthlyRate?: number; simulation?: boolean }) {
   const representative = await db.user.findUnique({ where: { id: scope.userId }, select: { name: true, email: true } });
   if (!representative) throw new Error("UNAUTHENTICATED");
   const profile = await db.configurationProfile.findFirst({ where: { organisationId: scope.organisationId, facilityId: result.facility.id, domain: "PROGRAM_DEFAULTS", name: "Default", status: "READY" }, select: { config: true } });
@@ -21,6 +21,7 @@ export async function dispatchBlendSignLease(scope: RequestScope, result: MoveIn
     monthlyRate: Number(input.monthlyRate ?? result.unit.monthlyRate),
     representative,
     autoCountersign: moveIn.blendSignAutoCountersign === true,
+    simulation: input.simulation,
   });
   await attachBlendSignEnvelope(scope, result.document.id, envelope);
   return envelope;

@@ -444,6 +444,8 @@ model PublicPaymentSession {
   idempotencyKey     String      @unique
   providerReference  String      @unique
   failureCode        String?
+  followUpStatus     String      @default("NOT_STARTED")
+  followUpError      String?
   expiresAt          DateTime
   processedAt        DateTime?
   createdAt          DateTime    @default(now())
