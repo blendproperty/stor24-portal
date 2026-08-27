@@ -11,6 +11,8 @@ import {
 import { notifyReservationConfirmed, notifyViewingBooked } from "@/lib/notifications";
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { TwilioSmsProvider, TwilioWhatsAppProvider, normalizeTwilioRecipient } from "@/lib/integrations/twilio-provider";
+import { emailProvider, escapeEmailHtml } from "@/lib/email";
+import { privacyHash } from "@/lib/request-security";
 
 export class PublicBookingError extends Error {
   constructor(
@@ -56,6 +58,10 @@ const reservationInclude = {
 
 function verificationHash(reservationId: string, code: string) {
   return createHash("sha256").update(`${process.env.PUBLIC_BOOKING_API_KEY}:${reservationId}:${code}`).digest("hex");
+}
+
+function emailVerificationHash(reservationId: string, code: string) {
+  return createHash("sha256").update(`${process.env.PUBLIC_BOOKING_API_KEY}:${reservationId}:email:${code}`).digest("hex");
 }
 
 const verificationWindowMs = 10 * 60 * 1000;
@@ -118,6 +124,28 @@ async function deliverVerificationCode(input: { code: string; phone: string; org
     context,
   );
   return sms.ok ? { ok: true as const, channel: "SMS" as const } : { ok: false as const };
+}
+
+async function deliverEmailVerificationCode(input: { code: string; email: string; organisationId: string; facilityId: string; customerId: string; idempotencyKey: string }) {
+  const subject = "Your Stor24 email verification code";
+  const text = `Your Stor24 verification code is ${input.code}. It expires in 10 minutes. Do not share this code.`;
+  try {
+    await emailProvider().send({ to: input.email, subject, text, html: `<p>${escapeEmailHtml(text)}</p>` });
+    await db.communicationLog.upsert({
+      where: { idempotencyKey: input.idempotencyKey },
+      create: { organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, channel: "EMAIL", messageType: "EMAIL_VERIFICATION", recipientHash: privacyHash(input.email), provider: process.env.EMAIL_PROVIDER ?? "configured", status: "SUCCEEDED", idempotencyKey: input.idempotencyKey, sentAt: new Date() },
+      update: { status: "SUCCEEDED", failureCode: null, failureMessage: null, sentAt: new Date(), failedAt: null },
+    });
+    return { ok: true as const };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Email send failed.";
+    await db.communicationLog.upsert({
+      where: { idempotencyKey: input.idempotencyKey },
+      create: { organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, channel: "EMAIL", messageType: "EMAIL_VERIFICATION", recipientHash: privacyHash(input.email), provider: process.env.EMAIL_PROVIDER ?? "disabled", status: "FAILED", idempotencyKey: input.idempotencyKey, failureCode: "SEND_FAILED", failureMessage: message, failedAt: new Date() },
+      update: { status: "FAILED", failureCode: "SEND_FAILED", failureMessage: message, failedAt: new Date() },
+    });
+    return { ok: false as const };
+  }
 }
 
 export async function releaseExpiredPublicReservations(now = new Date()) {
@@ -302,4 +330,39 @@ export async function resendPublicReservationVerification(reference: string) {
   const result = await deliverVerificationCode({ code, phone: reservation.customer.phone ?? "", organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, idempotencyKey: `${reservation.idempotencyKey ?? reservation.id}:VERIFY:${reservation.verificationAttempts + 1}` });
   await db.auditEvent.create({ data: { organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, action: result.ok ? "public_reservation.verification_resent" : "public_reservation.verification_resend_failed", entityType: "Reservation", entityId: reservation.id, requestId: reservation.idempotencyKey, after: { channel: result.ok ? result.channel : null, expiresAt: verificationExpiresAt.toISOString() } } });
   return result.ok ? { ok: true as const, verificationChannel: result.channel, verificationExpiresAt: verificationExpiresAt.toISOString() } : { ok: false as const, code: "DELIVERY_FAILED" };
+}
+
+export async function startPublicEmailVerification(reference: string) {
+  if (!publicReservationVerificationEnabled()) return { ok: false as const, code: "DISABLED" };
+  const reservation = await db.reservation.findUnique({ where: { publicReference: reference }, include: { customer: true } });
+  if (!reservation || reservation.status !== "ACTIVE" || !reservation.contactVerifiedAt || reservation.journey !== "RENTAL" || !reservation.customer.email) return { ok: false as const, code: "NOT_FOUND" };
+  if (reservation.customer.emailVerifiedAt) return { ok: true as const, alreadyVerified: true, verificationExpiresAt: null };
+  const code = randomInt(0, 1_000_000).toString().padStart(6, "0");
+  const verificationExpiresAt = new Date(Date.now() + verificationWindowMs);
+  const attempt = reservation.verificationAttempts + 1;
+  await db.reservation.update({ where: { id: reservation.id }, data: { verificationCodeHash: emailVerificationHash(reservation.id, code), verificationExpiresAt, verificationAttempts: attempt } });
+  const delivery = await deliverEmailVerificationCode({ code, email: reservation.customer.email, organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, customerId: reservation.customerId, idempotencyKey: `${reservation.idempotencyKey ?? reservation.id}:EMAIL_VERIFY:${attempt}` });
+  await db.auditEvent.create({ data: { organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, action: delivery.ok ? "public_reservation.email_verification_sent" : "public_reservation.email_verification_failed", entityType: "Reservation", entityId: reservation.id, requestId: reservation.idempotencyKey, after: { expiresAt: verificationExpiresAt.toISOString() } } });
+  if (!delivery.ok) return { ok: false as const, code: "DELIVERY_FAILED" };
+  return { ok: true as const, alreadyVerified: false, verificationExpiresAt: verificationExpiresAt.toISOString() };
+}
+
+export async function verifyPublicReservationEmail(reference: string, code: string) {
+  if (!publicReservationVerificationEnabled()) return { ok: false as const, code: "DISABLED" };
+  const reservation = await db.reservation.findUnique({ where: { publicReference: reference }, include: { customer: true } });
+  if (!reservation || reservation.status !== "ACTIVE" || !reservation.contactVerifiedAt || reservation.customer.emailVerifiedAt) return { ok: false as const, code: "NOT_FOUND" };
+  if (!reservation.verificationExpiresAt || reservation.verificationExpiresAt < new Date() || reservation.verificationAttempts >= 10) return { ok: false as const, code: "EXPIRED" };
+  const expected = Buffer.from(reservation.verificationCodeHash ?? "", "hex");
+  const actual = Buffer.from(emailVerificationHash(reservation.id, code), "hex");
+  if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
+    await db.reservation.update({ where: { id: reservation.id }, data: { verificationAttempts: { increment: 1 } } });
+    return { ok: false as const, code: "INVALID_CODE" };
+  }
+  const verifiedAt = new Date();
+  await db.$transaction([
+    db.customer.update({ where: { id: reservation.customerId }, data: { emailVerifiedAt: verifiedAt } }),
+    db.reservation.update({ where: { id: reservation.id }, data: { verificationCodeHash: null, verificationExpiresAt: null } }),
+    db.auditEvent.create({ data: { organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, action: "public_reservation.email_verified", entityType: "Reservation", entityId: reservation.id, requestId: reservation.idempotencyKey, after: { verifiedAt: verifiedAt.toISOString() } } }),
+  ]);
+  return { ok: true as const, emailVerifiedAt: verifiedAt.toISOString() };
 }

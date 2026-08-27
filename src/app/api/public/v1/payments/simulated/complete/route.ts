@@ -2,7 +2,7 @@ import { z } from "zod";
 import { publicApiAuthorized } from "@/lib/public-booking-contract";
 import { completeSimulatedPayment } from "@/lib/public-payment-simulator";
 
-const schema = z.object({ sessionId: z.string().min(10), checkoutToken: z.string().min(32), outcome: z.enum(["SUCCESS", "DECLINED", "CANCELLED", "TIMEOUT"]), paymentMethod: z.enum(["DEBIT_ORDER", "CARD", "EFT"]) });
+const schema = z.object({ sessionId: z.string().min(10), checkoutToken: z.string().min(32), outcome: z.enum(["SUCCESS", "DECLINED", "CANCELLED", "TIMEOUT"]), paymentMethod: z.enum(["DEBIT_ORDER", "CARD", "EFT"]).optional() });
 export async function POST(request: Request) {
   if (!publicApiAuthorized(request)) return Response.json({ error: { message: "Request rejected." } }, { status: 401 });
   const parsed = schema.safeParse(await request.json().catch(() => null));

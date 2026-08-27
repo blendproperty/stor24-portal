@@ -18,7 +18,7 @@ export async function startSimulatedPayment(reference: string, idempotencyKey: s
     where: { publicReference: reference },
     include: { facility: true, unit: true, customer: true, publicPaymentSessions: { orderBy: { createdAt: "desc" }, take: 1 } },
   });
-  if (!reservation || reservation.status !== "ACTIVE" || !reservation.contactVerifiedAt || reservation.journey !== "RENTAL")
+  if (!reservation || reservation.status !== "ACTIVE" || !reservation.contactVerifiedAt || !reservation.customer.emailVerifiedAt || reservation.journey !== "RENTAL")
     return { ok: false as const, code: "RESERVATION_UNAVAILABLE" };
 
   const existing = reservation.publicPaymentSessions[0];
@@ -35,7 +35,7 @@ export async function startSimulatedPayment(reference: string, idempotencyKey: s
   return { ok: true as const, sessionId: session.id, checkoutToken: token, providerReference, expiresAt: expiresAt.toISOString(), amountZar: Number(session.amount), currency: session.currency, description: session.description, facilityName: reservation.facility.name, unitNumber: reservation.unit.number, customerName: reservation.customer.firstName };
 }
 
-export async function completeSimulatedPayment(sessionId: string, checkoutToken: string, outcome: SimulatedPaymentOutcome, paymentMethod: "DEBIT_ORDER" | "CARD" | "EFT") {
+export async function completeSimulatedPayment(sessionId: string, checkoutToken: string, outcome: SimulatedPaymentOutcome, paymentMethod?: "DEBIT_ORDER" | "CARD" | "EFT") {
   if (!publicPaymentSimulatorEnabled()) return { ok: false as const, code: "DISABLED" };
   const session = await db.publicPaymentSession.findUnique({ where: { id: sessionId }, include: { reservation: { include: { customer: true, unit: true, facility: true } } } });
   if (!session || tokenHash(checkoutToken) !== session.checkoutTokenHash) return { ok: false as const, code: "NOT_FOUND" };
@@ -44,6 +44,7 @@ export async function completeSimulatedPayment(sessionId: string, checkoutToken:
     const followUp = session.status === "SUCCEEDED" ? await runSimulatedPaymentFollowUp(session.id) : null;
     return { ok: true as const, status: session.status, idempotent: true, followUpStatus: followUp?.status, signingUrl: followUp && "signingUrl" in followUp ? followUp.signingUrl : undefined, reference: session.reservation.publicReference, providerReference: session.providerReference };
   }
+  if (!paymentMethod) return { ok: false as const, code: "PAYMENT_METHOD_REQUIRED" };
   const effectiveOutcome: SimulatedPaymentOutcome = session.expiresAt <= new Date() ? "TIMEOUT" : outcome;
   const status = effectiveOutcome === "SUCCESS" ? "SUCCEEDED" : effectiveOutcome;
   const now = new Date();
