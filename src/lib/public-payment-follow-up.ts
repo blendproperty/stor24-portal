@@ -36,11 +36,11 @@ export async function runSimulatedPaymentFollowUp(sessionId: string) {
       orderBy: { createdAt: "desc" },
       select: { id: true, externalId: true },
     }) : null;
-    const [email, whatsapp] = await Promise.all([
-      document ? db.communicationLog.findUnique({ where: { idempotencyKey: `lease-sign:${document.id}` }, select: { status: true } }) : null,
+    const [invitation, whatsapp] = await Promise.all([
+      document ? db.auditEvent.findFirst({ where: { entityId: document.id, action: "public_payment.blendsign_invitation_sent" }, select: { id: true } }) : null,
       db.communicationLog.findUnique({ where: { idempotencyKey: `sim-payment:${sessionId}:WHATSAPP` }, select: { status: true } }),
     ]);
-    const evidenceComplete = Boolean(document?.externalId && email?.status === "SUCCEEDED" && whatsapp && whatsapp.status !== "FAILED");
+    const evidenceComplete = Boolean(document?.externalId && invitation && whatsapp && whatsapp.status !== "FAILED");
     if (evidenceComplete) return { ok: true as const, status: "COMPLETED", leaseInvitationSent: true, whatsappConfirmationSent: true };
     await db.publicPaymentSession.update({
       where: { id: sessionId },
@@ -89,8 +89,14 @@ export async function runSimulatedPaymentFollowUp(sessionId: string) {
     const signer = envelope.signers.find((item) => item.email === reservation.customer.email) ?? envelope.signers.find((item) => item.order === 1);
     if (!signer?.signingUrl) throw new Error("BLENDSIGN_SIGNING_URL_MISSING");
     signingUrl = signer.signingUrl;
-    const invitation = await resendBlendSignInvitation(envelope.envelopeId, `sim-payment:${session.id}:BLENDSIGN_INVITE`);
-    if (!invitation.ok) throw new Error(`BLENDSIGN_INVITATION_FAILED_${invitation.status}`);
+    // A newly-created BlendSign envelope has already queued the first signing
+    // invitation. Re-send only when this is an idempotent retry; failure of that
+    // supplementary reminder must not erase the fact that the lease is ready.
+    let reminderAccepted: boolean | null = null;
+    if (envelope.idempotent) {
+      const reminder = await resendBlendSignInvitation(envelope.envelopeId, `sim-payment:${session.id}:BLENDSIGN_INVITE`);
+      reminderAccepted = reminder.ok;
+    }
     leaseInvitationSent = true;
     await db.auditEvent.create({ data: {
       organisationId: reservation.customer.organisationId,
@@ -99,11 +105,11 @@ export async function runSimulatedPaymentFollowUp(sessionId: string) {
       entityType: "Document",
       entityId: result.document.id,
       requestId: `sim-payment:${session.id}:BLENDSIGN_INVITE`,
-      after: { simulated: true, envelopeId: envelope.envelopeId },
+      after: { simulated: true, envelopeId: envelope.envelopeId, invitationQueued: !envelope.idempotent, reminderAccepted },
     } });
     const account = await db.account.findUnique({ where: { id: result.tenancy.accountId }, select: { accountNumber: true } });
     if (!account) throw new Error("ACCOUNT_NOT_FOUND");
-    const [email, whatsapp] = await Promise.all([
+    const [, whatsapp] = await Promise.all([
       sendLeaseSigningLink({
         organisationId: reservation.customer.organisationId,
         facilityId: reservation.facilityId,
@@ -126,14 +132,17 @@ export async function runSimulatedPaymentFollowUp(sessionId: string) {
       }) : Promise.resolve({ ok: false as const, code: "NO_PHONE" }),
     ]);
     whatsappConfirmationSent = whatsapp.ok;
-    const failures = [!email.ok ? `LEASE_EMAIL_${email.reason}` : null, !whatsapp.ok ? `PAYMENT_WHATSAPP_${whatsapp.code}` : null].filter(Boolean);
+    // BlendSign is the authoritative lease-delivery channel. The branded CRM
+    // email is a supplementary fallback and must not turn a successfully queued
+    // BlendSign invitation into a false lease-delivery failure.
+    const failures = [!whatsapp.ok ? `PAYMENT_WHATSAPP_${whatsapp.code}` : null].filter(Boolean);
     if (failures.length) throw new Error(failures.join(";"));
-    const [emailEvidence, whatsappEvidence, documentEvidence] = await Promise.all([
-      db.communicationLog.findUnique({ where: { idempotencyKey: `lease-sign:${result.document.id}` }, select: { status: true } }),
+    const [invitationEvidence, whatsappEvidence, documentEvidence] = await Promise.all([
+      db.auditEvent.findFirst({ where: { entityId: result.document.id, action: "public_payment.blendsign_invitation_sent" }, select: { id: true } }),
       db.communicationLog.findUnique({ where: { idempotencyKey: `sim-payment:${session.id}:WHATSAPP` }, select: { status: true } }),
       db.document.findUnique({ where: { id: result.document.id }, select: { externalId: true } }),
     ]);
-    if (!documentEvidence?.externalId || emailEvidence?.status !== "SUCCEEDED" || !whatsappEvidence || whatsappEvidence.status === "FAILED") {
+    if (!documentEvidence?.externalId || !invitationEvidence || !whatsappEvidence || whatsappEvidence.status === "FAILED") {
       throw new Error("FOLLOW_UP_EVIDENCE_MISSING");
     }
     await db.$transaction([

@@ -22,13 +22,14 @@ test("simulated success prepares a UAT lease and customer follow-up without a ch
   assert.match(source, /PAYMENT_RECEIVED/);
   assert.match(source, /sendLeaseSigningLink/);
   assert.match(source, /FOLLOW_UP_EVIDENCE_MISSING/);
-  assert.match(source, /lease-sign:\$\{result\.document\.id\}/);
+  assert.match(source, /invitationEvidence/);
   assert.match(source, /sim-payment:\$\{session\.id\}:WHATSAPP/);
   assert.match(source, /allowWhenAutomationDisabled: true/);
   assert.match(source, /Promise\.all/);
   assert.match(source, /signingUrl: signer\.signingUrl/);
   assert.match(source, /resendBlendSignInvitation/);
   assert.match(source, /public_payment\.blendsign_invitation_sent/);
+  assert.match(source, /supplementary fallback/);
   assert.doesNotMatch(source, /\b(payment|ledgerEntry)\.create\s*\(/);
   assert.doesNotMatch(source, /paymentMethod:\s*"CARD"/);
   assert.match(source, /session\.paymentMethod/);
