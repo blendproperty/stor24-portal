@@ -79,10 +79,42 @@ export async function createReservation(scope: RequestScope, data: Prisma.Reserv
 }
 
 export async function cancelReservation(scope: RequestScope, reservationId: string) {
-  const reservation = await db.reservation.findFirst({ where: { id: reservationId }, include: { unit: true } });
+  const reservation = await db.reservation.findFirst({
+    where: { id: reservationId },
+    include: {
+      unit: true,
+      publicPaymentSessions: { select: { provider: true } },
+      convertedTenancy: {
+        include: {
+          occupancies: { select: { id: true, status: true } },
+          documents: { select: { id: true, type: true, signedAt: true } },
+          account: { select: { payments: { where: { status: "SUCCEEDED" }, select: { id: true } } } },
+        },
+      },
+    },
+  });
   if (!reservation) throw new Error("NOT_FOUND"); await requireFacility(scope, reservation.facilityId); if (reservation.status !== "ACTIVE") throw new Error("CONFLICT");
   return db.$transaction(async (tx) => {
     const entity = await tx.reservation.update({ where: { id: reservation.id }, data: { status: "CANCELLED" } });
+    const tenancy = reservation.convertedTenancy;
+    const safeUatDraft = tenancy
+      && tenancy.status === "DRAFT"
+      && tenancy.occupancies.every((occupancy) => occupancy.status === "PENDING")
+      && tenancy.documents.every((document) => document.type === "LEASE_AGREEMENT_UAT" && !document.signedAt)
+      && tenancy.account.payments.length === 0
+      && reservation.publicPaymentSessions.every((session) => session.provider === "STOR24_SIMULATOR");
+    if (safeUatDraft && tenancy) {
+      await tx.occupancy.updateMany({
+        where: { tenancyId: tenancy.id, status: "PENDING" },
+        data: { status: "CANCELLED", endDate: new Date(), accessState: "REVOKED" },
+      });
+      await tx.document.updateMany({
+        where: { tenancyId: tenancy.id, signedAt: null },
+        data: { status: "CANCELLED", signingToken: null },
+      });
+      await tx.tenancy.update({ where: { id: tenancy.id }, data: { status: "CANCELLED", endDate: new Date() } });
+      await audit(tx, scope, "tenancy.cancelled_with_uat_reservation", "Tenancy", tenancy.id, reservation.facilityId);
+    }
     const otherActive = await tx.reservation.count({ where: { unitId: reservation.unitId, status: "ACTIVE", id: { not: reservation.id } } });
     const blockingOccupancy = await tx.occupancy.count({ where: { unitId: reservation.unitId, status: { in: ["PENDING", "ACTIVE", "NOTICE_GIVEN"] } } });
     const released = !otherActive && !blockingOccupancy

@@ -53,6 +53,22 @@ type RenumberChange = {
   oldNumber: string;
   newNumber: string;
 };
+type UatResetPreview = {
+  customers: number;
+  leads: number;
+  reservations: number;
+  paymentSessions: number;
+  tenancies: number;
+  occupancies: number;
+  documents: number;
+  accounts: number;
+  payments: number;
+  ledgerEntries: number;
+  biometricEnrollments: number;
+  customerTasksDetached: number;
+  communicationsAnonymised: number;
+  unitsReleased: number;
+};
 
 const editableStatuses = ["AVAILABLE", "SERVICE", "UNAVAILABLE"];
 const statusLabel = (status: string) =>
@@ -81,6 +97,8 @@ export function UnitInventoryWorkspace({
   const [forceDeleteCount, setForceDeleteCount] = useState(0);
   const [renumberDialog, setRenumberDialog] = useState(false);
   const [confirmingRelease, setConfirmingRelease] = useState(false);
+  const [uatResetPreview, setUatResetPreview] = useState<UatResetPreview | null>(null);
+  const [uatResetConfirmation, setUatResetConfirmation] = useState("");
   const selectedFacility = facilities.find(
     (facility) => facility.id === facilityId,
   );
@@ -172,6 +190,34 @@ export function UnitInventoryWorkspace({
       : blocked.length
         ? `Nothing released. ${blocked.map((item) => `Unit ${item.unit}: ${item.reasons.join(" and ")}`).join("; ")}.`
         : "No orphaned reserved units were found.");
+  }
+
+  async function uatReset(action: "preview" | "reset") {
+    setBusy(true);
+    setError("");
+    setNotice("");
+    const response = await fetch("/api/v1/admin/uat-reset", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(action === "preview"
+        ? { action }
+        : { action, confirmation: uatResetConfirmation }),
+    });
+    const result = await response.json().catch(() => ({}));
+    setBusy(false);
+    if (!response.ok) {
+      setError(result.error?.message ?? "The UAT reset could not be completed.");
+      return;
+    }
+    if (action === "preview") {
+      setUatResetPreview(result.data);
+      setNotice("Reset preview ready. Review the counts below before confirming.");
+      return;
+    }
+    setUatResetPreview(null);
+    setUatResetConfirmation("");
+    await refresh();
+    setNotice(`${result.data.customers} test customer${result.data.customers === 1 ? "" : "s"} removed and ${result.data.unitsReleased} unit${result.data.unitsReleased === 1 ? "" : "s"} released. Inventory, rates and configuration were preserved.`);
   }
 
   async function refresh() {
@@ -322,6 +368,14 @@ export function UnitInventoryWorkspace({
         action={
           <div className="form-actions">
             <button
+              className="button button-danger"
+              onClick={() => void uatReset("preview")}
+              disabled={busy}
+            >
+              <Trash2 size={15} />
+              Reset UAT customers
+            </button>
+            <button
               className={`button ${confirmingRelease ? "button-primary" : "button-secondary"}`}
               onClick={() => void releaseOrphanedReservations()}
               disabled={!selectedFacility?.units.some((unit) => unit.status === "RESERVED") || busy}
@@ -376,6 +430,41 @@ export function UnitInventoryWorkspace({
       />
     {notice ? <p className="form-success">{notice}</p> : null}
     {error && !dialog ? <p className="form-error">{error}</p> : null}
+      {uatResetPreview ? (
+        <section className="panel uat-reset-preview" aria-label="UAT reset preview">
+          <div>
+            <p className="eyebrow">Destructive UAT reset preview</p>
+            <h2>{uatResetPreview.customers} test customers will be removed</h2>
+            <p>
+              This will remove {uatResetPreview.reservations} reservations, {uatResetPreview.tenancies} draft or test tenancies,
+              {" "}{uatResetPreview.occupancies} occupancy records, {uatResetPreview.documents} lease records and {uatResetPreview.paymentSessions} simulated payment sessions.
+              {" "}{uatResetPreview.unitsReleased} linked units will return to Available.
+            </p>
+            <p>Facilities, units, unit types, rates, maps, integrations, templates and audit events will remain.</p>
+          </div>
+          <label>
+            Type <strong>RESET TEST CUSTOMERS</strong> to confirm
+            <input
+              value={uatResetConfirmation}
+              onChange={(event) => setUatResetConfirmation(event.target.value)}
+              autoComplete="off"
+            />
+          </label>
+          <div className="form-actions">
+            <button type="button" className="button button-secondary" onClick={() => { setUatResetPreview(null); setUatResetConfirmation(""); }}>
+              Keep the test data
+            </button>
+            <button
+              type="button"
+              className="button button-danger"
+              disabled={busy || uatResetConfirmation !== "RESET TEST CUSTOMERS"}
+              onClick={() => void uatReset("reset")}
+            >
+              <Trash2 size={15} /> Delete test customers and release units
+            </button>
+          </div>
+        </section>
+      ) : null}
       <section className="summary-strip">
         {summaries.map(([label, count]) => (
           <div className="summary-cell" key={label}>
