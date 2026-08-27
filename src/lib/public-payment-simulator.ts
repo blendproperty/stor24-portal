@@ -35,11 +35,12 @@ export async function startSimulatedPayment(reference: string, idempotencyKey: s
   return { ok: true as const, sessionId: session.id, checkoutToken: token, providerReference, expiresAt: expiresAt.toISOString(), amountZar: Number(session.amount), currency: session.currency, description: session.description, facilityName: reservation.facility.name, unitNumber: reservation.unit.number, customerName: reservation.customer.firstName };
 }
 
-export async function completeSimulatedPayment(sessionId: string, checkoutToken: string, outcome: SimulatedPaymentOutcome) {
+export async function completeSimulatedPayment(sessionId: string, checkoutToken: string, outcome: SimulatedPaymentOutcome, paymentMethod: "DEBIT_ORDER" | "CARD" | "EFT") {
   if (!publicPaymentSimulatorEnabled()) return { ok: false as const, code: "DISABLED" };
   const session = await db.publicPaymentSession.findUnique({ where: { id: sessionId }, include: { reservation: { include: { customer: true, unit: true, facility: true } } } });
   if (!session || tokenHash(checkoutToken) !== session.checkoutTokenHash) return { ok: false as const, code: "NOT_FOUND" };
   if (session.status !== "PENDING") {
+    if (!session.paymentMethod) await db.publicPaymentSession.update({ where: { id: session.id }, data: { paymentMethod } });
     const followUp = session.status === "SUCCEEDED" ? await runSimulatedPaymentFollowUp(session.id) : null;
     return { ok: true as const, status: session.status, idempotent: true, followUpStatus: followUp?.status, signingUrl: followUp && "signingUrl" in followUp ? followUp.signingUrl : undefined, reference: session.reservation.publicReference, providerReference: session.providerReference };
   }
@@ -47,7 +48,7 @@ export async function completeSimulatedPayment(sessionId: string, checkoutToken:
   const status = effectiveOutcome === "SUCCESS" ? "SUCCEEDED" : effectiveOutcome;
   const now = new Date();
   await db.$transaction(async (tx) => {
-    await tx.publicPaymentSession.update({ where: { id: session.id }, data: { status, failureCode: effectiveOutcome === "SUCCESS" ? null : effectiveOutcome, processedAt: now } });
+    await tx.publicPaymentSession.update({ where: { id: session.id }, data: { status, paymentMethod, failureCode: effectiveOutcome === "SUCCESS" ? null : effectiveOutcome, processedAt: now } });
     if (effectiveOutcome === "SUCCESS") {
       await tx.reservation.update({ where: { id: session.reservationId }, data: { holdExpiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000) } });
       if (session.reservation.leadId) await tx.lead.update({ where: { id: session.reservation.leadId }, data: { stage: "QUALIFIED" } });
@@ -55,7 +56,7 @@ export async function completeSimulatedPayment(sessionId: string, checkoutToken:
       const cancelled = await tx.reservation.updateMany({ where: { id: session.reservationId, status: "ACTIVE" }, data: { status: "CANCELLED" } });
       if (cancelled.count) await tx.unit.updateMany({ where: { id: session.reservation.unitId, status: "RESERVED" }, data: { status: "AVAILABLE" } });
     }
-    await tx.auditEvent.create({ data: { organisationId: session.reservation.customer.organisationId, facilityId: session.reservation.facilityId, action: `public_payment.simulator_${status.toLowerCase()}`, entityType: "PublicPaymentSession", entityId: session.id, requestId: session.idempotencyKey, after: { status, simulated: true } } });
+    await tx.auditEvent.create({ data: { organisationId: session.reservation.customer.organisationId, facilityId: session.reservation.facilityId, action: `public_payment.simulator_${status.toLowerCase()}`, entityType: "PublicPaymentSession", entityId: session.id, requestId: session.idempotencyKey, after: { status, paymentMethod, simulated: true } } });
   });
   const followUp = status === "SUCCEEDED" ? await runSimulatedPaymentFollowUp(session.id) : null;
   return { ok: true as const, status, idempotent: false, followUpStatus: followUp?.status, signingUrl: followUp && "signingUrl" in followUp ? followUp.signingUrl : undefined, reference: session.reservation.publicReference, providerReference: session.providerReference };

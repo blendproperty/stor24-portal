@@ -62,6 +62,7 @@ export async function runSimulatedPaymentFollowUp(sessionId: string) {
       include: { reservation: { include: { customer: true, facility: true, unit: { include: { unitType: true } } } } },
     });
     if (!session) throw new Error("PAYMENT_SESSION_NOT_FOUND");
+    if (!session.paymentMethod || !["DEBIT_ORDER", "CARD", "EFT"].includes(session.paymentMethod)) throw new Error("PAYMENT_METHOD_REQUIRED");
     const reservation = session.reservation;
     const scope = await automationScope(reservation.customer.organisationId, reservation.facilityId);
     let result = reservation.convertedTenancyId ? await existingMoveInResult(reservation.convertedTenancyId) : null;
@@ -75,11 +76,12 @@ export async function runSimulatedPaymentFollowUp(sessionId: string) {
         monthlyRate: Number(reservation.quotedRate),
         initialCharge: 0,
         accessState: "PENDING_SIGNATURE",
-        paymentMethod: "CARD",
+        paymentMethod: session.paymentMethod as "DEBIT_ORDER" | "CARD" | "EFT",
         simulation: true,
       });
     }
-    const envelope = await dispatchBlendSignLease(scope, result, { paymentMethod: "CARD", startDate: result.tenancy.startDate, monthlyRate: Number(reservation.quotedRate), simulation: true });
+    const paymentMethod = session.paymentMethod as "DEBIT_ORDER" | "CARD" | "EFT";
+    const envelope = await dispatchBlendSignLease(scope, result, { paymentMethod, startDate: result.tenancy.startDate, monthlyRate: Number(reservation.quotedRate), simulation: true });
     const customerName = reservation.customer.companyName || [reservation.customer.firstName, reservation.customer.lastName].filter(Boolean).join(" ") || "customer";
     const signer = envelope.signers.find((item) => item.email === reservation.customer.email) ?? envelope.signers.find((item) => item.order === 1);
     if (!signer?.signingUrl) throw new Error("BLENDSIGN_SIGNING_URL_MISSING");

@@ -30,6 +30,13 @@ test("simulated success prepares a UAT lease and customer follow-up without a ch
   assert.match(source, /resendBlendSignInvitation/);
   assert.match(source, /public_payment\.blendsign_invitation_sent/);
   assert.doesNotMatch(source, /\b(payment|ledgerEntry)\.create\s*\(/);
+  assert.doesNotMatch(source, /paymentMethod:\s*"CARD"/);
+  assert.match(source, /session\.paymentMethod/);
+});
+
+test("the hosted payment choice is required before completion", async () => {
+  const source = await import("node:fs/promises").then((fs) => fs.readFile("src/app/api/public/v1/payments/simulated/complete/route.ts", "utf8"));
+  assert.match(source, /paymentMethod: z\.enum\(\["DEBIT_ORDER", "CARD", "EFT"\]\)/);
 });
 
 test("UAT lease signatures cannot activate a real tenancy or occupy a unit", async () => {
