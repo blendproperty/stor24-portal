@@ -1,0 +1,59 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+import { offlineReservationSyncSchema } from "../src/lib/validators.ts";
+
+const servicePath = new URL("../src/lib/offline-reservation-service.ts", import.meta.url);
+const routePath = new URL("../src/app/api/v1/offline/reservations/route.ts", import.meta.url);
+const workspacePath = new URL("../public/offline-workspace.js", import.meta.url);
+const shellPath = new URL("../public/offline-workspace.html", import.meta.url);
+const schemaPath = new URL("../prisma/schema.prisma", import.meta.url);
+
+const valid = {
+  submissionId: "3c729f3f-b3f6-48dc-829b-271d47a1d544",
+  leadSubmissionId: "4ae7f0d5-5de2-4c52-b36d-0f50914f6226",
+  deviceId: "3c9db879-7906-4512-b718-2a05f43fd8d1",
+  capturedAt: "2026-08-27T08:00:00.000Z",
+  facilityId: "facility-test",
+  customerId: "customer-test",
+  leadId: "lead-test",
+  unitId: "unit-test",
+  quotedRate: 900,
+  intendedMoveIn: "2026-09-01",
+};
+
+test("offline reservation sync requires stable identities and a positive quote", () => {
+  assert.equal(offlineReservationSyncSchema.safeParse(valid).success, true);
+  assert.equal(offlineReservationSyncSchema.safeParse({ ...valid, submissionId: "unstable" }).success, false);
+  assert.equal(offlineReservationSyncSchema.safeParse({ ...valid, quotedRate: 0 }).success, false);
+});
+
+test("offline reservation sync atomically claims availability and is idempotent", async () => {
+  const [service, route, schema] = await Promise.all([readFile(servicePath, "utf8"), readFile(routePath, "utf8"), readFile(schemaPath, "utf8")]);
+  assert.match(schema, /idempotencyKey\s+String\?\s+@unique/);
+  assert.match(route, /requirePermissionScope\("reservations\.manage", parsed\.data\.facilityId\)/);
+  assert.match(route, /sameOrigin\(request\)/);
+  assert.match(route, /UNIT_UNAVAILABLE/);
+  assert.match(service, /db\.\$transaction/);
+  assert.match(service, /updateMany/);
+  assert.match(service, /status: "AVAILABLE"/);
+  assert.match(service, /claimed\.count !== 1/);
+  assert.match(service, /idempotencyKey: key/);
+  assert.match(service, /offline\.reservation\.synced/);
+  assert.match(service, /source: "OFFLINE_PWA"/);
+  assert.match(service, /HOLD_HOURS = 24/);
+  assert.match(service, /publicReference: reservationReference/);
+  assert.doesNotMatch(service, /document|payment|biometric|identityRef/i);
+});
+
+test("offline reservation conflicts remain encrypted and editable", async () => {
+  const [workspace, shell] = await Promise.all([readFile(workspacePath, "utf8"), readFile(shellPath, "utf8")]);
+  assert.match(workspace, /snapshot\.reservationOutbox/);
+  assert.match(workspace, /\/api\/v1\/offline\/reservations/);
+  assert.match(workspace, /response\.status === 409/);
+  assert.match(workspace, /item\.status = "CONFLICT"/);
+  assert.match(workspace, /saveReservationEdit/);
+  assert.match(shell, /not confirmed while offline/i);
+  assert.match(shell, /Payments, leases, documents and biometrics are never queued offline/);
+  assert.doesNotMatch(workspace, /BackgroundSync|sync\.register/);
+});
