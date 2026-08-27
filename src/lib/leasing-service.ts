@@ -84,9 +84,13 @@ export async function cancelReservation(scope: RequestScope, reservationId: stri
   return db.$transaction(async (tx) => {
     const entity = await tx.reservation.update({ where: { id: reservation.id }, data: { status: "CANCELLED" } });
     const otherActive = await tx.reservation.count({ where: { unitId: reservation.unitId, status: "ACTIVE", id: { not: reservation.id } } });
-    const activeOccupancy = await tx.occupancy.count({ where: { unitId: reservation.unitId, status: "ACTIVE" } });
-    if (!otherActive && !activeOccupancy && reservation.unit.status === "RESERVED") await tx.unit.update({ where: { id: reservation.unitId }, data: { status: "AVAILABLE" } });
-    await audit(tx, scope, "reservation.cancelled", "Reservation", entity.id, reservation.facilityId); return entity;
+    const blockingOccupancy = await tx.occupancy.count({ where: { unitId: reservation.unitId, status: { in: ["PENDING", "ACTIVE", "NOTICE_GIVEN"] } } });
+    const released = !otherActive && !blockingOccupancy
+      ? await tx.unit.updateMany({ where: { id: reservation.unitId, status: "RESERVED" }, data: { status: "AVAILABLE" } })
+      : { count: 0 };
+    await audit(tx, scope, "reservation.cancelled", "Reservation", entity.id, reservation.facilityId);
+    if (!released.count) await audit(tx, scope, "reservation.cancelled_unit_retained", "Unit", reservation.unitId, reservation.facilityId);
+    return { ...entity, unitReleased: released.count === 1, blockers: { activeReservations: otherActive, pendingOrActiveOccupancies: blockingOccupancy } };
   });
 }
 

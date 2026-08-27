@@ -139,6 +139,35 @@ export function UnitInventoryWorkspace({
     setNotice(`${result.data.updated} unit rates updated. Range ${money(String(result.data.minimumRate))} to ${money(String(result.data.maximumRate))}.`);
   }
 
+  async function releaseOrphanedReservations(unit?: Unit) {
+    if (!selectedFacility) return;
+    const target = unit ? `unit ${unit.number}` : `reserved units at ${selectedFacility.name}`;
+    if (!window.confirm(`Check ${target} and release only units that have no active reservation and no pending or active occupancy? Units with genuine customer records will remain reserved.`)) return;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    const response = await fetch("/api/v1/leasing/units/release-orphans", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ facilityId: selectedFacility.id, unitId: unit?.id }),
+    });
+    const result = await response.json().catch(() => ({}));
+    setBusy(false);
+    if (!response.ok) {
+      setError(result.error?.message ?? "The reserved-unit check could not be completed.");
+      return;
+    }
+    await refresh();
+    const released = result.data.released as string[];
+    const blocked = result.data.blocked as Array<{ unit: string; reasons: string[] }>;
+    if (unit && released.length) setDialog(null);
+    setNotice(released.length
+      ? `${released.length} orphaned reserved unit${released.length === 1 ? "" : "s"} released: ${released.join(", ")}.${blocked.length ? ` ${blocked.length} protected by active records.` : ""}`
+      : blocked.length
+        ? `Nothing released. ${blocked.map((item) => `Unit ${item.unit}: ${item.reasons.join(" and ")}`).join("; ")}.`
+        : "No orphaned reserved units were found.");
+  }
+
   async function refresh() {
     const accountByUnitId = new Map(
       facilities.flatMap((facility) => facility.units.map((unit) => [unit.id, unit.accountId] as const)),
@@ -286,6 +315,14 @@ export function UnitInventoryWorkspace({
         description="Store-scoped unit register, physical attributes, availability and operational rates."
         action={
           <div className="form-actions">
+            <button
+              className="button button-secondary"
+              onClick={() => void releaseOrphanedReservations()}
+              disabled={!selectedFacility?.units.some((unit) => unit.status === "RESERVED") || busy}
+            >
+              <ShieldCheck size={15} />
+              Release cancelled holds
+            </button>
             <button
               className="button button-secondary"
               onClick={() => void applyMidrandMarketRates()}
@@ -556,6 +593,7 @@ export function UnitInventoryWorkspace({
           submit={submit}
           deleteUnitType={deleteUnitType}
           deleteUnit={deleteUnit}
+          releaseOrphanedReservations={releaseOrphanedReservations}
           forceDeleteCount={forceDeleteCount}
         />
       ) : null}
@@ -778,6 +816,7 @@ function InventoryDialog({
   submit,
   deleteUnitType,
   deleteUnit,
+  releaseOrphanedReservations,
   forceDeleteCount,
 }: {
   state: DialogState;
@@ -789,6 +828,7 @@ function InventoryDialog({
   submit: (form: FormData) => void;
   deleteUnitType: (unitType: UnitType, confirmed?: boolean, force?: boolean) => void;
   deleteUnit: (unit: Unit) => void;
+  releaseOrphanedReservations: (unit?: Unit) => Promise<void>;
   forceDeleteCount: number;
 }) {
   const isType = state.kind === "type";
@@ -977,6 +1017,14 @@ function InventoryDialog({
                     )}
                   </select>
                 </label>
+              ) : null}
+              {editingUnit?.status === "RESERVED" ? (
+                <div className="inventory-form-wide managed-status-recovery">
+                  <p>This status is protected from manual editing. Use the guarded check to release it only when no active reservation or occupancy remains.</p>
+                  <button type="button" className="button button-secondary" disabled={busy} onClick={() => void releaseOrphanedReservations(editingUnit)}>
+                    <ShieldCheck size={15} /> Check and release cancelled hold
+                  </button>
+                </div>
               ) : null}
             </>
           )}

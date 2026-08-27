@@ -2145,6 +2145,9 @@ a.module-card:focus-visible {
 .reconciliation-action small { max-width: 180px; color: var(--muted); font-size: 9px; line-height: 1.35; }
 .inventory-modal { width: min(720px,calc(100vw - 30px)); }
 .inventory-dialog-error { margin: 12px 0 0; }
+.managed-status-recovery { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px; border: 1px solid #f0c6ad; border-radius: 12px; background: #fff8f3; }
+.managed-status-recovery p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.managed-status-recovery .button { flex: 0 0 auto; }
 .inventory-form { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 13px; margin-top: 18px; }
 .inventory-calculated-field input { background: white; font-weight: 800; }
 .inventory-calculated-field small { color: var(--muted); font-size: 10px; font-weight: 600; line-height: 1.35; }
@@ -2163,7 +2166,7 @@ a.module-card:focus-visible {
 .renumber-preview > div { display: flex; flex-wrap: wrap; gap: 6px; }
 .renumber-preview > div span { padding: 5px 8px; border-radius: 999px; background: white; font-weight: 750; }
 @media (max-width: 980px) { .inventory-toolbar { grid-template-columns: repeat(2,minmax(0,1fr)); } .inventory-layout { grid-template-columns: 1fr; } }
-@media (max-width: 640px) { .inventory-toolbar, .inventory-form { grid-template-columns: 1fr; } .inventory-form-wide { grid-column: auto; } .renumber-row { grid-template-columns: 80px 1fr; } .renumber-row > span { grid-column: 1 / -1; } }
+@media (max-width: 640px) { .inventory-toolbar, .inventory-form { grid-template-columns: 1fr; } .inventory-form-wide { grid-column: auto; } .managed-status-recovery { align-items: stretch; flex-direction: column; } .renumber-row { grid-template-columns: 80px 1fr; } .renumber-row > span { grid-column: 1 / -1; } }
 .map-editor-header { display: flex; align-items: end; gap: 12px; padding: 14px; }
 .map-editor-header label, .map-properties label { display: grid; gap: 5px; color: var(--muted); font-size: 11px; font-weight: 750; }
 .map-editor-header select, .map-properties input, .map-unit-modal input, .map-unit-modal select, .map-duplicate-modal select { min-height: 40px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--ink); }
