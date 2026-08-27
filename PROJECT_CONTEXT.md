@@ -1,5 +1,34 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Claude takeover handover — 27 August 2026
+
+Before changing anything, Claude must read the current `PROJECT_CONTEXT.md` from all three canonical GitHub repositories, then inspect the current remote branch, working tree, recent commits and relevant implementation. Do not rely on conversation history alone.
+
+1. CRM/operations: `blendproperty/stor24-portal` — this file — production branch `main`.
+2. Public booking site: `blendproperty/stor24` — production branch `master`.
+3. E-signing: `blendproperty/blendsign` — production branch `main`.
+
+Current CRM handover state:
+
+- Remote `main` and the reviewed branch `codex/verified-24h-hold-crm` both point to `e04803c` (`Do not misreport queued BlendSign leases`).
+- The CRM owns customers, units, reservations, holds, occupancies, payment-method selection, communication evidence and the server-to-server BlendSign request. The public site must not create leases or choose BlendSign templates directly.
+- Implemented flows include verified 24-hour holds, office-hours-aware reserve-to-view, WhatsApp mobile verification, separate email verification before Pay Now, a UAT-only payment simulator, payment-method routing for card/EFT/debit order, independently recorded confirmation and lease-delivery outcomes, and safe idempotent recovery when post-payment follow-up fails.
+- Payment-method routing selects the standard lease for card/EFT and the debit-order lease for debit order. Debit-order merge fields were aligned in `b6845c4`.
+- BlendSign lease creation and invitation delivery were implemented through `25eabba`, `d8e1ad1`, `c326d1e` and later reliability corrections. `e04803c` prevents a queued/failed lease request from being presented to the public site as successfully delivered.
+- UAT cleanup tools now release orphaned/cancelled holds and remove linked test customer, reservation, tenancy, occupancy, lease and simulated-payment data through explicit preview and confirmation. These are destructive UAT controls; do not broaden them to production customers.
+- Customer emails for verification and reservation holds use the Stor24 visual identity. WhatsApp and email verification are distinct channels and must remain visually and semantically clear.
+- Store/company data is now passed into lease merge fields (`eb8b592`). Verify the configured facility/company record rather than hard-coding owner details.
+- No real Netcash transaction exists yet. The payment simulator must remain clearly labelled UAT-only and must not create real `Payment` or `LedgerEntry` records. Real payment work requires Netcash sandbox credentials, signed callbacks, reconciliation, duplicate-callback handling and failure/timeout tests.
+- General WhatsApp lifecycle automation must remain consent-based and gated. Do not infer marketing consent from operational booking preferences.
+
+Next recommended work:
+
+1. Run one clean end-to-end debit-order UAT and one card/EFT UAT using new test customers; verify mobile code, email code, payment method, reservation state, WhatsApp confirmation, lease template, BlendSign invitation, signer-editable fields, completion email and signed PDF.
+2. Record the reservation/payment/communication/lease IDs and verify audit evidence in the CRM instead of relying only on screenshots.
+3. Confirm the two active BlendSign templates and their merge-field mappings against the current API before changing either workflow.
+4. Keep the simulator gated until Netcash is implemented; then replace only the hosted payment step while preserving the verified identity, reservation and lease orchestration.
+5. Investigate any post-payment result that disagrees with actual lease delivery; the UI must reflect recorded channel outcomes, not timing assumptions.
+
 > Last reviewed: 27 August 2026. Read this file before planning or changing the repository. Update it whenever a material capability, decision, deployment state, or cross-repository contract changes.
 
 ## Product identity and non-negotiable boundary
