@@ -7,6 +7,7 @@
   <title>STOR 24 Offline Workspace</title>
   <link rel="stylesheet" href="/offline-workspace.css">
   <style>header span.online{color:#a9dc86}header span.checking{color:#ffd27d}header span.syncing{color:#ffd27d}header span.offline{color:#ffb48e}.snapshot-meta strong.warning{color:#a86800}.notice{border-left:4px solid #ff5a0a;background:#fff4ee;border-radius:8px;padding:12px 14px;font-weight:700}.notice.warning{border-color:#d48b00;background:#fff8df}.notice.success{border-color:#4c8b2b;background:#f1faec}.lead-panel{border-top:1px solid #dce1df;margin-top:28px;padding-top:24px}.lead-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.lead-grid .wide{grid-column:1/-1}.consent{display:flex;flex-direction:row;align-items:flex-start}.outbox{list-style:none;padding:0}.outbox li{display:flex;justify-content:space-between;gap:12px;border-top:1px solid #e3e7e5;padding:12px 0}.outbox span,.outbox small{display:block;color:#5b6764}.outbox button{padding:8px 12px;margin-left:6px}.reservation-fields{border:1px solid #f0c5ad;background:#fff8f4;border-radius:10px;padding:14px}.reservation-editor{margin:16px 0;padding:16px;border:1px solid #d48b00;border-radius:10px;background:#fff8df}.receipt-list strong{font-family:monospace}.health-panel{margin:14px 0}.staff-guidance{margin:16px 0;padding:14px;border:1px solid #dce1df;border-radius:10px;background:#f7f8f7}.staff-guidance h3{margin-top:0}@media(max-width:700px){.lead-grid{grid-template-columns:1fr}.outbox li{flex-direction:column}}</style>
+  <style>[hidden]{display:none!important}</style>
 </head>
 <body>
   <header><img src="/brand/stor24-logo-white.svg" alt="STOR 24"><div><strong>Offline workspace</strong><span id="connection">Checking connection…</span></div><a href="/">Live portal</a></header>
@@ -34,17 +35,31 @@
       <div class="table-wrap"><table><thead id="table-head"></thead><tbody id="table-body"></tbody></table></div>
       <p class="read-only">Units, existing leads, reservations and tasks remain read-only. An offline reservation is only a request until the server confirms availability after reconnection. Payments, leases, documents and biometrics are never queued offline.</p>
       <aside class="staff-guidance"><h3>What staff must tell the customer</h3><p>While offline, STOR 24 records a <strong>request</strong> for the selected unit. The unit is not held or confirmed until this device reconnects, successfully syncs, and displays a reservation reference. If another device reserved it first, choose a different available unit.</p></aside>
-      <section class="lead-panel" aria-labelledby="capture-lead-title">
-        <p class="eyebrow">ENCRYPTED OFFLINE OUTBOX</p><h2 id="capture-lead-title">Capture a new lead</h2>
-        <form id="lead-form"><div class="lead-grid">
-          <label>First name<input name="firstName" maxlength="80" required></label><label>Last name<input name="lastName" maxlength="80" required></label>
-          <label>Mobile number<input name="phone" maxlength="30" required></label><label>Email address<input name="email" type="email"></label>
-          <label>Required unit type<select name="desiredUnitTypeId" id="lead-unit-type"><option value="">Any unit type</option></select></label><label>Expected move-in<input name="expectedMoveIn" type="date"></label>
-          <div class="wide reservation-fields"><label class="consent"><input name="requestReservation" type="checkbox" id="request-reservation"> Request this specific unit when internet returns (not confirmed while offline).</label><div class="lead-grid" id="reservation-fields" hidden><label>Specific available unit<select name="unitId" id="lead-unit"><option value="">Select a unit</option></select></label><label>Quoted monthly rate (R)<input name="quotedRate" type="number" min="0.01" step="0.01"></label></div></div>
-          <label class="wide">Enquiry notes<textarea name="notes" maxlength="2000" rows="3"></textarea></label>
-          <label class="wide consent"><input name="consentToContact" type="checkbox" required> Customer agreed that STOR 24 may contact them about this enquiry.</label>
-          <fieldset class="wide reservation-fields"><legend>Customer confirmation channels</legend><p class="hint">Tick only channels the customer explicitly agreed to use for this enquiry.</p><div class="lead-grid"><label class="consent"><input name="consentEmail" type="checkbox"> Email confirmation</label><label class="consent"><input name="consentSms" type="checkbox"> SMS confirmation</label><label class="consent"><input name="consentWhatsapp" type="checkbox"> WhatsApp confirmation</label></div></fieldset>
-        </div><button type="submit">Encrypt and queue lead</button></form>
+      <section class="lead-panel capture-shell" aria-labelledby="capture-lead-title">
+        <div class="capture-heading"><div><p class="eyebrow">ENCRYPTED OFFLINE OUTBOX</p><h2 id="capture-lead-title">Capture a new lead</h2><p>Record the enquiry once. STOR 24 will secure it on this device and complete the confirmed actions when connectivity returns.</p></div><span class="secure-badge">Encrypted on device</span></div>
+        <form id="lead-form" class="lead-capture-form">
+          <section class="form-section"><div class="section-heading"><span>01</span><div><h3>Customer details</h3><p>Who should the facility team contact?</p></div></div><div class="lead-grid">
+            <label>First name<input name="firstName" maxlength="80" autocomplete="given-name" placeholder="e.g. Peter" required></label><label>Last name<input name="lastName" maxlength="80" autocomplete="family-name" placeholder="e.g. Piper" required></label>
+            <label>Mobile number<input name="phone" type="tel" maxlength="30" autocomplete="tel" placeholder="e.g. 081 234 5678" required></label><label>Email address <small>Optional</small><input name="email" type="email" autocomplete="email" placeholder="name@example.com"></label>
+          </div></section>
+          <section class="form-section"><div class="section-heading"><span>02</span><div><h3>Storage requirement</h3><p>Capture what the customer needs and when.</p></div></div><div class="lead-grid">
+            <label>Required unit type<select name="desiredUnitTypeId" id="lead-unit-type"><option value="">Any unit type</option></select></label><label>Expected move-in<input name="expectedMoveIn" type="date"></label>
+            <label class="wide">Enquiry notes <small>Optional</small><textarea name="notes" maxlength="2000" rows="4" placeholder="Access needs, preferred location, timing or other useful context"></textarea></label>
+          </div></section>
+          <section class="form-section reservation-choice"><div class="section-heading"><span>03</span><div><h3>Specific unit request</h3><p>Only request a unit when the customer wants that exact space.</p></div></div>
+            <label class="switch-row"><span><strong>Request a specific unit</strong><small>The unit is not confirmed until the server accepts it after reconnection.</small></span><input name="requestReservation" type="checkbox" id="request-reservation" role="switch"><i aria-hidden="true"></i></label>
+            <div class="lead-grid reservation-detail-grid" id="reservation-fields" hidden><label>Specific available unit<select name="unitId" id="lead-unit"><option value="">Select a unit</option></select></label><label>Quoted monthly rate (R)<input name="quotedRate" type="number" min="0.01" step="0.01" placeholder="0.00"></label></div>
+          </section>
+          <section class="form-section consent-section"><div class="section-heading"><span>04</span><div><h3>Consent and confirmations</h3><p>Record exactly what the customer approved.</p></div></div>
+            <label class="switch-row primary-consent"><span><strong>Permission to contact</strong><small>The customer agreed that STOR 24 may contact them about this enquiry.</small></span><input name="consentToContact" type="checkbox" role="switch" required><i aria-hidden="true"></i></label>
+            <div class="channel-panel"><div><strong>Confirmation channels</strong><p>Enable only channels explicitly approved for this enquiry.</p></div><div class="channel-switches">
+              <label class="channel-toggle"><span>Email</span><input name="consentEmail" type="checkbox" role="switch"><i aria-hidden="true"></i></label>
+              <label class="channel-toggle"><span>SMS</span><input name="consentSms" type="checkbox" role="switch"><i aria-hidden="true"></i></label>
+              <label class="channel-toggle"><span>WhatsApp</span><input name="consentWhatsapp" type="checkbox" role="switch"><i aria-hidden="true"></i></label>
+            </div></div>
+          </section>
+          <div class="form-submit-bar"><div><strong>Ready to secure this enquiry?</strong><small>Personal details remain encrypted until a successful sync.</small></div><button type="submit">Encrypt and queue lead <span aria-hidden="true">→</span></button></div>
+        </form>
         <p id="lead-status" class="status" aria-live="polite"></p>
         <div class="snapshot-head"><h3>Leads waiting: <span id="queue-count">0</span> · Reservation requests: <span id="reservation-queue-count">0</span></h3><button id="sync-now" type="button">Sync now</button></div>
         <ul id="outbox-list" class="outbox"></ul>

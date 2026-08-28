@@ -56,7 +56,7 @@ test("offline reservation conflicts remain encrypted and editable", async () => 
   assert.match(workspace, /response\.status === 409/);
   assert.match(workspace, /item\.status = "CONFLICT"/);
   assert.match(workspace, /saveReservationEdit/);
-  assert.match(shell, /not confirmed while offline/i);
+  assert.match(shell, /not confirmed until the server accepts it after reconnection/i);
   assert.match(shell, /Payments, leases, documents and biometrics are never queued offline/);
   assert.doesNotMatch(workspace, /BackgroundSync|sync\.register/);
 });
@@ -82,10 +82,12 @@ test("offline operator UI distinguishes connectivity, refreshes conflicts and re
   assert.match(workspace, /Availability refreshed\. Choose another unit/);
   assert.match(workspace, /renderQueueHealth/);
   assert.match(workspace, /renderReceipts/);
-  assert.match(shell, /Request this specific unit when internet returns/);
+  assert.match(shell, /Request a specific unit/);
   assert.match(shell, /Recent sync receipts/);
   assert.match(shell, /unit is not held or confirmed until/i);
-  assert.match(shell, /Customer confirmation channels/);
+  assert.match(shell, /Confirmation channels/);
+  assert.match(shell, /role="switch"/);
+  assert.match(shell, /class="form-submit-bar"/);
   assert.match(workspace, /communications: payload\.data\.communications/);
   assert.match(workspace, /Continue to lease/);
   assert.match(workspace, /Payment link unavailable/);
