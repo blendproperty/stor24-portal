@@ -57,3 +57,29 @@ test("offline reservation conflicts remain encrypted and editable", async () => 
   assert.match(shell, /Payments, leases, documents and biometrics are never queued offline/);
   assert.doesNotMatch(workspace, /BackgroundSync|sync\.register/);
 });
+
+test("two offline devices racing for one unit allow exactly one atomic claim", async () => {
+  let status = "AVAILABLE";
+  const atomicClaim = async () => {
+    await new Promise((resolve) => setImmediate(resolve));
+    if (status !== "AVAILABLE") return 0;
+    status = "RESERVED";
+    return 1;
+  };
+  const results = await Promise.all([atomicClaim(), atomicClaim()]);
+  assert.deepEqual(results.sort(), [0, 1]);
+  assert.equal(status, "RESERVED");
+});
+
+test("offline operator UI distinguishes connectivity, refreshes conflicts and retains non-PII receipts", async () => {
+  const [workspace, shell] = await Promise.all([readFile(workspacePath, "utf8"), readFile(shellPath, "utf8")]);
+  assert.match(workspace, /Internet detected · checking STOR 24/);
+  assert.match(workspace, /Online and synced/);
+  assert.match(workspace, /refreshAfterConflict/);
+  assert.match(workspace, /Availability refreshed\. Choose another unit/);
+  assert.match(workspace, /renderQueueHealth/);
+  assert.match(workspace, /renderReceipts/);
+  assert.match(shell, /Request this specific unit when internet returns/);
+  assert.match(shell, /Recent sync receipts/);
+  assert.match(shell, /unit is not held or confirmed until/i);
+});

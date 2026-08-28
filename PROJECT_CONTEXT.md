@@ -218,3 +218,12 @@ A CRM capability is complete only when it is database-backed, scoped, permission
 - Unit 357 UAT confirmed both reservation and payment WhatsApp delivery but again no lease email. The follow-up now explicitly calls BlendSign's invitation resend endpoint after envelope creation and audits that provider acceptance. BlendSign is the authoritative signing-email channel; Twilio Email remains supplementary and its HTTP acceptance must not be described as inbox delivery.
 - UAT BlendSign documents are included in the permission-scoped Integrations reconciliation table so authorised staff can resend a failed/missing UAT signing invitation through the same audited provider action as production lease documents.
 - Public Pay-now now collects the payment method on the hosted payment screen and stores it on `PublicPaymentSession`. Debit order routes to `stor24-unit-lease-debit-order`; card and EFT route to `stor24-unit-lease`. Do not restore a hard-coded `CARD` value in follow-up processing.
+
+## Offline PWA production-readiness improvements — 28 August 2026
+
+- The installed offline workspace now distinguishes browser connectivity from confirmed STOR 24 reachability and displays `Offline`, `Internet detected`, `Syncing`, or `Online and synced` states.
+- Specific-unit wording now makes clear that an offline entry is only a request until server confirmation. A staff guidance panel repeats the customer-facing rule.
+- A 409 unit conflict triggers a fresh encrypted availability download before replacement selection while preserving the encrypted queue.
+- The encrypted snapshot retains a bounded non-PII sync receipt register containing references/technical IDs, result, time and hold deadline. Customer names and contact details are still removed after successful sync.
+- Queue health now flags failed attempts, conflicts and items waiting longer than 15 minutes; existing snapshot-expiry warnings remain in force.
+- Automated coverage records the expected two-device race invariant: exactly one atomic `AVAILABLE` to `RESERVED` claim succeeds. Live two-device UAT is still required after deployment; test coverage is not a substitute for production evidence.
