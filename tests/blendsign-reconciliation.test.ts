@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { classifyBlendSignLease } from "../src/lib/blendsign-reconciliation";
 
@@ -11,3 +12,9 @@ test("recent pending documents are still dispatching", () => assert.equal(classi
 test("old pending documents without an envelope failed dispatch", () => assert.equal(classifyBlendSignLease({ ...base, status: "PENDING", externalId: null }, now), "DISPATCH_FAILED"));
 test("expired sent documents are overdue", () => assert.equal(classifyBlendSignLease({ ...base, expiresAt: new Date("2026-08-23T07:00:00.000Z") }, now), "OVERDUE"));
 test("unexpired sent documents await signature", () => assert.equal(classifyBlendSignLease(base, now), "AWAITING_SIGNATURE"));
+test("every BlendSign exception state has an operator action", () => {
+  const page = readFileSync(new URL("../src/app/integrations/page.tsx", import.meta.url), "utf8");
+  assert.match(page, /DISPATCH_FAILED[\s\S]*retry-dispatch/);
+  assert.match(page, /OVERDUE[\s\S]*resend-invitation/);
+  assert.match(page, /RECONCILIATION_REQUIRED[\s\S]*Review account/);
+});
