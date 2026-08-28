@@ -11,7 +11,11 @@ export async function POST(request: Request) {
   try {
     const scope = await requirePermissionScope("reservations.manage", parsed.data.facilityId);
     const data = await syncOfflineReservation(scope, parsed.data);
-    return Response.json({ data }, { status: data.idempotent ? 200 : 201, headers: { "Cache-Control": "no-store", Pragma: "no-cache" } });
+    return Response.json({ data: { ...data, nextActions: {
+      openReservationUrl: `/reservations?reservation=${encodeURIComponent(data.reservationId)}`,
+      continueToLeaseUrl: `/operations/move-in?reservation=${encodeURIComponent(data.reservationId)}`,
+      paymentLink: { status: "BLOCKED", reason: "Netcash must pass sandbox and authenticated-webhook verification before live payment links are enabled." },
+    } } }, { status: data.idempotent ? 200 : 201, headers: { "Cache-Control": "no-store", Pragma: "no-cache" } });
   } catch (error) {
     if (error instanceof Error && error.message === "UNIT_UNAVAILABLE") {
       return Response.json({ error: { code: "UNIT_UNAVAILABLE", message: "That unit is no longer available. Refresh the offline copy and choose another unit." } }, { status: 409 });
