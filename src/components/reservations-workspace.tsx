@@ -7,32 +7,575 @@ import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { formatSouthAfricaDateTime } from "@/lib/south-africa-time";
 
-type Unit = { id: string; facilityId: string; number: string; monthlyRate: string; unitType: { name: string; areaSqMetres: string | null } };
+type Unit = {
+  id: string;
+  facilityId: string;
+  number: string;
+  monthlyRate: string;
+  unitType: { name: string; areaSqMetres: string | null };
+};
 type Facility = { id: string; name: string; units: Unit[] };
-type Customer = { id: string; firstName: string | null; lastName: string | null; companyName: string | null; email: string | null; phone: string | null };
-type Reservation = { id: string; status: string; quotedRate: string; holdExpiresAt: string | null; intendedMoveIn: string | null; createdAt: string; facility: { id: string; name: string }; customer: Customer; unit: Unit; lead: { id: string } | null; convertedTenancy: { id: string } | null };
-type Payload = { facilities: Facility[]; customers: Customer[]; reservations: Reservation[] };
-const customerName = (customer: Customer) => customer.companyName || [customer.firstName, customer.lastName].filter(Boolean).join(" ") || "Unnamed customer";
+type Customer = {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  companyName: string | null;
+  email: string | null;
+  phone: string | null;
+};
+type Reservation = {
+  id: string;
+  status: string;
+  quotedRate: string;
+  holdExpiresAt: string | null;
+  intendedMoveIn: string | null;
+  createdAt: string;
+  facility: { id: string; name: string };
+  customer: Customer;
+  unit: Unit;
+  lead: { id: string } | null;
+  convertedTenancy: { id: string } | null;
+};
+type Payload = {
+  facilities: Facility[];
+  customers: Customer[];
+  reservations: Reservation[];
+};
+const customerName = (customer: Customer) =>
+  customer.companyName ||
+  [customer.firstName, customer.lastName].filter(Boolean).join(" ") ||
+  "Unnamed customer";
 const formatDate = (date: string | null) => formatSouthAfricaDateTime(date);
 
 export function ReservationsWorkspace() {
-  const [data, setData] = useState<Payload>({ facilities: [], customers: [], reservations: [] }); const [facilityId, setFacilityId] = useState(""); const [status, setStatus] = useState("ACTIVE"); const [query, setQuery] = useState("");
-  const [dialog, setDialog] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [notice, setNotice] = useState("");
-  const load = useCallback(async () => { const response = await fetch("/api/v1/reservations", { cache: "no-store" }); const payload = await response.json(); if (!response.ok) { setError(payload.error?.message ?? "Reservations could not be loaded."); return; } setData(payload.data); setFacilityId((current) => current || payload.data.facilities[0]?.id || ""); }, []);
-  useEffect(() => { let active = true; fetch("/api/v1/reservations", { cache: "no-store" }).then(async (response) => ({ response, payload: await response.json() })).then(({ response, payload }) => { if (!active) return; if (!response.ok) { setError(payload.error?.message ?? "Reservations could not be loaded."); return; } setData(payload.data); setFacilityId(payload.data.facilities[0]?.id || ""); }); return () => { active = false; }; }, []);
-  const [now] = useState(() => Date.now()); const expiring = data.reservations.filter((item) => item.status === "ACTIVE" && item.holdExpiresAt && new Date(item.holdExpiresAt).getTime() <= now + 3 * 86400000).length;
-  const visible = useMemo(() => data.reservations.filter((item) => (!facilityId || item.facility.id === facilityId) && (!status || item.status === status) && (!query || `${customerName(item.customer)} ${item.unit.number} ${item.unit.unitType.name}`.toLowerCase().includes(query.toLowerCase()))), [data.reservations, facilityId, status, query]);
-  async function create(form: FormData) { setBusy(true); setError(""); setNotice(""); const response = await fetch("/api/v1/reservations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ facilityId: form.get("facilityId"), customerId: form.get("customerId"), unitId: form.get("unitId"), quotedRate: form.get("quotedRate"), holdExpiresAt: form.get("holdExpiresAt") || undefined, intendedMoveIn: form.get("intendedMoveIn") || undefined }) }); const payload = await response.json(); setBusy(false); if (!response.ok) { setError(response.status === 409 ? "That unit is no longer available. Refresh and choose another unit." : payload.error?.message ?? "The reservation could not be created."); return; } setDialog(false); setNotice("Reservation created and the unit is now held."); await load(); }
-  async function cancel(item: Reservation) { if (!confirm(`Cancel the reservation for unit ${item.unit.number} and release the unit?`)) return; setError(""); const response = await fetch(`/api/v1/reservations?id=${encodeURIComponent(item.id)}`, { method: "DELETE" }); const payload = await response.json(); if (!response.ok) { setError(payload.error?.message ?? "The reservation could not be cancelled."); return; } setNotice(payload.data.unitReleased ? `Reservation cancelled. Unit ${item.unit.number} is available again.` : `Reservation cancelled, but unit ${item.unit.number} remains protected by another active reservation or occupancy. Review it under Units & rates.`); await load(); }
-  return <div className="page-stack reservations-workspace"><PageHeader eyebrow="Lead to lease" title="Reservations & holds" description="Reserve available units, monitor hold expiry and convert confirmed reservations into move-ins." action={<button className="button button-primary" onClick={() => { setDialog(true); setError(""); }} disabled={!data.facilities.some((facility) => facility.units.length) || !data.customers.length}><Plus size={16}/>New reservation</button>}/>{error && !dialog ? <p className="form-error">{error}</p> : null}{notice ? <p className="form-success">{notice}</p> : null}
-    <section className="summary-strip">{[["Active holds", data.reservations.filter((item) => item.status === "ACTIVE").length], ["Expiring / overdue", expiring], ["Converted", data.reservations.filter((item) => item.status === "CONVERTED").length], ["Available units", data.facilities.reduce((sum, facility) => sum + facility.units.length, 0)]].map(([label,count]) => <div className="summary-cell" key={label}><span>{label}</span><strong>{count}</strong></div>)}</section>
-    <section className="panel reservation-toolbar"><label>Store<select value={facilityId} onChange={(event) => setFacilityId(event.target.value)}><option value="">All permitted stores</option>{data.facilities.map((facility) => <option value={facility.id} key={facility.id}>{facility.name}</option>)}</select></label><label>Status<select value={status} onChange={(event) => setStatus(event.target.value)}><option value="">All statuses</option>{["ACTIVE","CONVERTED","CANCELLED","EXPIRED"].map((item) => <option value={item} key={item}>{item.toLowerCase()}</option>)}</select></label><label><span>Search</span><span className="toolbar-search"><Search size={15}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Customer, unit or type"/></span></label></section>
-    <section className="panel"><div className="table-wrap"><table className="data-table"><thead><tr><th>Customer</th><th>Store</th><th>Unit</th><th>Quoted rate</th><th>Hold expires</th><th>Intended move-in</th><th>Status</th><th></th></tr></thead><tbody>{visible.length ? visible.map((item) => { const overdue = item.status === "ACTIVE" && item.holdExpiresAt && new Date(item.holdExpiresAt).getTime() < now; return <tr key={item.id}><td className="primary-cell">{customerName(item.customer)}<small>{item.customer.phone || item.customer.email}</small></td><td>{item.facility.name}</td><td><strong>{item.unit.number}</strong><small>{item.unit.unitType.name}</small></td><td>R {Number(item.quotedRate).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</td><td className={overdue ? "reservation-overdue" : ""}>{formatDate(item.holdExpiresAt)}{overdue ? <small>Overdue</small> : null}</td><td>{formatDate(item.intendedMoveIn)}</td><td><StatusPill tone={item.status === "ACTIVE" ? overdue ? "warning" : "positive" : "neutral"}>{item.status}</StatusPill></td><td>{item.status === "ACTIVE" ? <div className="reservation-actions"><Link href={`/operations/move-in?reservation=${encodeURIComponent(item.id)}`} className="text-button">Move in</Link><button className="text-button danger" onClick={() => void cancel(item)}>Cancel</button></div> : null}</td></tr>; }) : <tr><td colSpan={8} className="empty-cell">No reservations match these filters.</td></tr>}</tbody></table></div></section>
-    {dialog ? <ReservationDialog data={data} defaultFacilityId={facilityId || data.facilities[0]?.id || ""} busy={busy} error={error} close={() => setDialog(false)} create={create}/> : null}
-  </div>;
+  const [data, setData] = useState<Payload>({
+    facilities: [],
+    customers: [],
+    reservations: [],
+  });
+  const [facilityId, setFacilityId] = useState("");
+  const [status, setStatus] = useState("ACTIVE");
+  const [query, setQuery] = useState("");
+  const [dialog, setDialog] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const load = useCallback(async () => {
+    const response = await fetch("/api/v1/reservations", { cache: "no-store" });
+    const payload = await response.json();
+    if (!response.ok) {
+      setError(payload.error?.message ?? "Reservations could not be loaded.");
+      return;
+    }
+    setData(payload.data);
+    setFacilityId((current) => current || payload.data.facilities[0]?.id || "");
+  }, []);
+  useEffect(() => {
+    let active = true;
+    fetch("/api/v1/reservations", { cache: "no-store" })
+      .then(async (response) => ({ response, payload: await response.json() }))
+      .then(({ response, payload }) => {
+        if (!active) return;
+        if (!response.ok) {
+          setError(
+            payload.error?.message ?? "Reservations could not be loaded.",
+          );
+          return;
+        }
+        setData(payload.data);
+        setFacilityId(payload.data.facilities[0]?.id || "");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+  const [now] = useState(() => Date.now());
+  const expiring = data.reservations.filter(
+    (item) =>
+      item.status === "ACTIVE" &&
+      item.holdExpiresAt &&
+      new Date(item.holdExpiresAt).getTime() <= now + 3 * 86400000,
+  ).length;
+  const visible = useMemo(
+    () =>
+      data.reservations.filter(
+        (item) =>
+          (!facilityId || item.facility.id === facilityId) &&
+          (!status || item.status === status) &&
+          (!query ||
+            `${customerName(item.customer)} ${item.unit.number} ${item.unit.unitType.name}`
+              .toLowerCase()
+              .includes(query.toLowerCase())),
+      ),
+    [data.reservations, facilityId, status, query],
+  );
+  async function create(form: FormData) {
+    setBusy(true);
+    setError("");
+    setNotice("");
+    const response = await fetch("/api/v1/reservations", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        facilityId: form.get("facilityId"),
+        customerId: form.get("customerId"),
+        unitId: form.get("unitId"),
+        quotedRate: form.get("quotedRate"),
+        holdExpiresAt: form.get("holdExpiresAt") || undefined,
+        intendedMoveIn: form.get("intendedMoveIn") || undefined,
+      }),
+    });
+    const payload = await response.json();
+    setBusy(false);
+    if (!response.ok) {
+      setError(
+        response.status === 409
+          ? "That unit is no longer available. Refresh and choose another unit."
+          : (payload.error?.message ?? "The reservation could not be created."),
+      );
+      return;
+    }
+    setDialog(false);
+    setNotice("Reservation created and the unit is now held.");
+    await load();
+  }
+  async function cancel(item: Reservation) {
+    if (
+      !confirm(
+        `Cancel the reservation for unit ${item.unit.number} and release the unit?`,
+      )
+    )
+      return;
+    setError("");
+    const response = await fetch(
+      `/api/v1/reservations?id=${encodeURIComponent(item.id)}`,
+      { method: "DELETE" },
+    );
+    const payload = await response.json();
+    if (!response.ok) {
+      setError(
+        payload.error?.message ?? "The reservation could not be cancelled.",
+      );
+      return;
+    }
+    setNotice(
+      payload.data.unitReleased
+        ? `Reservation cancelled. Unit ${item.unit.number} is available again.`
+        : `Reservation cancelled, but unit ${item.unit.number} remains protected by another active reservation or occupancy. Review it under Units & rates.`,
+    );
+    await load();
+  }
+  async function extend(item: Reservation) {
+    const current = item.holdExpiresAt ? item.holdExpiresAt.slice(0, 10) : "";
+    const date = prompt(
+      "Extend the hold until which date? Use YYYY-MM-DD.",
+      current,
+    );
+    if (!date) return;
+    const reason = prompt("Record the reason for this extension.");
+    if (!reason) return;
+    setError("");
+    const response = await fetch("/api/v1/reservations", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        action: "EXTEND",
+        reservationId: item.id,
+        holdExpiresAt: `${date}T23:59:59.999+02:00`,
+        reason,
+      }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      setError(
+        response.status === 409
+          ? "Choose a future date later than the current hold expiry."
+          : (payload.error?.message ??
+              "The reservation could not be extended."),
+      );
+      return;
+    }
+    setNotice(
+      `Reservation for unit ${item.unit.number} extended to ${formatDate(payload.data.holdExpiresAt)}.`,
+    );
+    await load();
+  }
+  async function expire(item: Reservation) {
+    if (
+      !confirm(
+        `Expire the overdue reservation for unit ${item.unit.number} and release the unit?`,
+      )
+    )
+      return;
+    const reason = prompt(
+      "Record the reason for expiring this reservation.",
+      "Hold expired without conversion",
+    );
+    if (!reason) return;
+    setError("");
+    const response = await fetch("/api/v1/reservations", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        action: "EXPIRE",
+        reservationId: item.id,
+        reason,
+      }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      setError(
+        response.status === 409
+          ? "Only an active overdue reservation can be expired."
+          : (payload.error?.message ?? "The reservation could not be expired."),
+      );
+      return;
+    }
+    setNotice(
+      payload.data.unitReleased
+        ? `Reservation expired. Unit ${item.unit.number} is available again.`
+        : `Reservation expired, but unit ${item.unit.number} remains protected by another active reservation or occupancy.`,
+    );
+    await load();
+  }
+  return (
+    <div className="page-stack reservations-workspace">
+      <PageHeader
+        eyebrow="Lead to lease"
+        title="Reservations & holds"
+        description="Reserve available units, monitor hold expiry and convert confirmed reservations into move-ins."
+        action={
+          <button
+            className="button button-primary"
+            onClick={() => {
+              setDialog(true);
+              setError("");
+            }}
+            disabled={
+              !data.facilities.some((facility) => facility.units.length) ||
+              !data.customers.length
+            }
+          >
+            <Plus size={16} />
+            New reservation
+          </button>
+        }
+      />
+      {error && !dialog ? <p className="form-error">{error}</p> : null}
+      {notice ? <p className="form-success">{notice}</p> : null}
+      <section className="summary-strip">
+        {[
+          [
+            "Active holds",
+            data.reservations.filter((item) => item.status === "ACTIVE").length,
+          ],
+          ["Expiring / overdue", expiring],
+          [
+            "Converted",
+            data.reservations.filter((item) => item.status === "CONVERTED")
+              .length,
+          ],
+          [
+            "Available units",
+            data.facilities.reduce(
+              (sum, facility) => sum + facility.units.length,
+              0,
+            ),
+          ],
+        ].map(([label, count]) => (
+          <div className="summary-cell" key={label}>
+            <span>{label}</span>
+            <strong>{count}</strong>
+          </div>
+        ))}
+      </section>
+      <section className="panel reservation-toolbar">
+        <label>
+          Store
+          <select
+            value={facilityId}
+            onChange={(event) => setFacilityId(event.target.value)}
+          >
+            <option value="">All permitted stores</option>
+            {data.facilities.map((facility) => (
+              <option value={facility.id} key={facility.id}>
+                {facility.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Status
+          <select
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+          >
+            <option value="">All statuses</option>
+            {["ACTIVE", "CONVERTED", "CANCELLED", "EXPIRED"].map((item) => (
+              <option value={item} key={item}>
+                {item.toLowerCase()}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Search</span>
+          <span className="toolbar-search">
+            <Search size={15} />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Customer, unit or type"
+            />
+          </span>
+        </label>
+      </section>
+      <section className="panel">
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th>Store</th>
+                <th>Unit</th>
+                <th>Quoted rate</th>
+                <th>Hold expires</th>
+                <th>Intended move-in</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.length ? (
+                visible.map((item) => {
+                  const overdue =
+                    item.status === "ACTIVE" &&
+                    item.holdExpiresAt &&
+                    new Date(item.holdExpiresAt).getTime() < now;
+                  return (
+                    <tr key={item.id}>
+                      <td className="primary-cell">
+                        {customerName(item.customer)}
+                        <small>
+                          {item.customer.phone || item.customer.email}
+                        </small>
+                      </td>
+                      <td>{item.facility.name}</td>
+                      <td>
+                        <strong>{item.unit.number}</strong>
+                        <small>{item.unit.unitType.name}</small>
+                      </td>
+                      <td>
+                        R{" "}
+                        {Number(item.quotedRate).toLocaleString("en-ZA", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </td>
+                      <td className={overdue ? "reservation-overdue" : ""}>
+                        {formatDate(item.holdExpiresAt)}
+                        {overdue ? <small>Overdue</small> : null}
+                      </td>
+                      <td>{formatDate(item.intendedMoveIn)}</td>
+                      <td>
+                        <StatusPill
+                          tone={
+                            item.status === "ACTIVE"
+                              ? overdue
+                                ? "warning"
+                                : "positive"
+                              : "neutral"
+                          }
+                        >
+                          {item.status}
+                        </StatusPill>
+                      </td>
+                      <td>
+                        {item.status === "ACTIVE" ? (
+                          <div className="reservation-actions">
+                            <Link
+                              href={`/operations/move-in?reservation=${encodeURIComponent(item.id)}`}
+                              className="text-button"
+                            >
+                              Move in
+                            </Link>
+                            <button
+                              className="text-button"
+                              onClick={() => void extend(item)}
+                            >
+                              Extend
+                            </button>
+                            {overdue ? (
+                              <button
+                                className="text-button danger"
+                                onClick={() => void expire(item)}
+                              >
+                                Expire
+                              </button>
+                            ) : null}
+                            <button
+                              className="text-button danger"
+                              onClick={() => void cancel(item)}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={8} className="empty-cell">
+                    No reservations match these filters.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      {dialog ? (
+        <ReservationDialog
+          data={data}
+          defaultFacilityId={facilityId || data.facilities[0]?.id || ""}
+          busy={busy}
+          error={error}
+          close={() => setDialog(false)}
+          create={create}
+        />
+      ) : null}
+    </div>
+  );
 }
 
-function ReservationDialog({ data, defaultFacilityId, busy, error, close, create }: { data: Payload; defaultFacilityId: string; busy: boolean; error: string; close: () => void; create: (form: FormData) => void }) {
-  const [facilityId, setFacilityId] = useState(defaultFacilityId); const units = data.facilities.find((facility) => facility.id === facilityId)?.units ?? []; const [unitId, setUnitId] = useState(units[0]?.id ?? ""); const selectedUnit = units.find((unit) => unit.id === unitId); const [defaultExpiry] = useState(() => new Date(Date.now() + 7 * 86400000).toISOString().slice(0,10));
-  return <div className="modal-backdrop"><div className="modal-card reservation-modal"><button className="modal-close" onClick={close}><X size={18}/></button><p className="eyebrow">Inventory hold</p><h2>New reservation</h2><form action={create} className="inventory-form"><label>Store<select name="facilityId" value={facilityId} onChange={(event) => { const next = event.target.value; setFacilityId(next); setUnitId(data.facilities.find((facility) => facility.id === next)?.units[0]?.id ?? ""); }}>{data.facilities.map((facility) => <option value={facility.id} key={facility.id}>{facility.name}</option>)}</select></label><label>Customer<select name="customerId" required><option value="">Select customer</option>{data.customers.map((customer) => <option value={customer.id} key={customer.id}>{customerName(customer)}</option>)}</select></label><label className="inventory-form-wide">Available unit<select name="unitId" value={unitId} onChange={(event) => setUnitId(event.target.value)} required>{units.map((unit) => <option value={unit.id} key={unit.id}>{unit.number} · {unit.unitType.name}{unit.unitType.areaSqMetres ? ` · ${unit.unitType.areaSqMetres} m²` : ""}</option>)}</select></label><label>Quoted monthly rate (R)<input name="quotedRate" type="number" step=".01" min="0" key={selectedUnit?.id} defaultValue={selectedUnit?.monthlyRate} required/></label><label>Hold expires<input name="holdExpiresAt" type="date" defaultValue={defaultExpiry}/></label><label>Intended move-in<input name="intendedMoveIn" type="date"/></label>{error ? <p className="form-error inventory-form-wide">{error}</p> : null}<div className="form-actions inventory-form-wide"><button type="button" className="button button-secondary" onClick={close}>Cancel</button><button className="button button-primary" disabled={busy || !units.length}><CalendarCheck size={15}/>{busy ? "Reserving…" : "Reserve unit"}</button></div></form></div></div>;
+function ReservationDialog({
+  data,
+  defaultFacilityId,
+  busy,
+  error,
+  close,
+  create,
+}: {
+  data: Payload;
+  defaultFacilityId: string;
+  busy: boolean;
+  error: string;
+  close: () => void;
+  create: (form: FormData) => void;
+}) {
+  const [facilityId, setFacilityId] = useState(defaultFacilityId);
+  const units =
+    data.facilities.find((facility) => facility.id === facilityId)?.units ?? [];
+  const [unitId, setUnitId] = useState(units[0]?.id ?? "");
+  const selectedUnit = units.find((unit) => unit.id === unitId);
+  const [defaultExpiry] = useState(() =>
+    new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+  );
+  return (
+    <div className="modal-backdrop">
+      <div className="modal-card reservation-modal">
+        <button className="modal-close" onClick={close}>
+          <X size={18} />
+        </button>
+        <p className="eyebrow">Inventory hold</p>
+        <h2>New reservation</h2>
+        <form action={create} className="inventory-form">
+          <label>
+            Store
+            <select
+              name="facilityId"
+              value={facilityId}
+              onChange={(event) => {
+                const next = event.target.value;
+                setFacilityId(next);
+                setUnitId(
+                  data.facilities.find((facility) => facility.id === next)
+                    ?.units[0]?.id ?? "",
+                );
+              }}
+            >
+              {data.facilities.map((facility) => (
+                <option value={facility.id} key={facility.id}>
+                  {facility.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Customer
+            <select name="customerId" required>
+              <option value="">Select customer</option>
+              {data.customers.map((customer) => (
+                <option value={customer.id} key={customer.id}>
+                  {customerName(customer)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="inventory-form-wide">
+            Available unit
+            <select
+              name="unitId"
+              value={unitId}
+              onChange={(event) => setUnitId(event.target.value)}
+              required
+            >
+              {units.map((unit) => (
+                <option value={unit.id} key={unit.id}>
+                  {unit.number} · {unit.unitType.name}
+                  {unit.unitType.areaSqMetres
+                    ? ` · ${unit.unitType.areaSqMetres} m²`
+                    : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Quoted monthly rate (R)
+            <input
+              name="quotedRate"
+              type="number"
+              step=".01"
+              min="0"
+              key={selectedUnit?.id}
+              defaultValue={selectedUnit?.monthlyRate}
+              required
+            />
+          </label>
+          <label>
+            Hold expires
+            <input
+              name="holdExpiresAt"
+              type="date"
+              defaultValue={defaultExpiry}
+            />
+          </label>
+          <label>
+            Intended move-in
+            <input name="intendedMoveIn" type="date" />
+          </label>
+          {error ? (
+            <p className="form-error inventory-form-wide">{error}</p>
+          ) : null}
+          <div className="form-actions inventory-form-wide">
+            <button
+              type="button"
+              className="button button-secondary"
+              onClick={close}
+            >
+              Cancel
+            </button>
+            <button
+              className="button button-primary"
+              disabled={busy || !units.length}
+            >
+              <CalendarCheck size={15} />
+              {busy ? "Reserving…" : "Reserve unit"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 }

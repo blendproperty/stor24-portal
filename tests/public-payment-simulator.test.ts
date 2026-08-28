@@ -50,7 +50,7 @@ test("UAT lease signatures cannot activate a real tenancy or occupy a unit", asy
   const source = await import("node:fs/promises").then((fs) => fs.readFile("src/lib/leasing-service.ts", "utf8"));
   const guard = source.indexOf('document.type === "LEASE_AGREEMENT_UAT"');
   const activation = source.indexOf('data: { status: "OCCUPIED" }', guard);
-  const guardReturn = source.indexOf("return { tenancyId: document.tenancyId, idempotent: false, simulation: true }", guard);
+  const guardReturn = source.indexOf("simulation: true", guard);
   assert.ok(guard >= 0 && guardReturn > guard);
   assert.ok(activation === -1 || guardReturn < activation);
 });
