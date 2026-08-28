@@ -6,14 +6,15 @@ export async function GET() {
   try {
     const { organisationId, allowedFacilityIds } = await requirePermission("operations.view");
     const facilityScope = allowedFacilityIds ? { in: allowedFacilityIds } : undefined;
-    const [tasks, notes, maintenance, products, dailyCloses] = await Promise.all([
+    const [tasks, notes, maintenance, products, dailyCloses, facilities] = await Promise.all([
       db.task.findMany({ where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { facility: true, assignee: true }, orderBy: [{ status: "asc" }, { dueAt: "asc" }], take: 100 }),
       db.unitNote.findMany({ where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { unit: true, author: true }, orderBy: { createdAt: "desc" }, take: 30 }),
       db.maintenanceRequest.findMany({ where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { facility: true, unit: true, assignedTo: true }, orderBy: [{ status: "asc" }, { dueAt: "asc" }], take: 100 }),
       db.product.findMany({ where: { organisationId, active: true, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { facility: true }, orderBy: { name: "asc" } }),
       db.dailyClose.findMany({ where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { facility: true, closedBy: true }, orderBy: { businessDate: "desc" }, take: 30 }),
+      db.facility.findMany({ where: { organisationId, active: true, ...(facilityScope ? { id: facilityScope } : {}) }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     ]);
-    return Response.json({ data: { tasks, notes, maintenance, products, dailyCloses } });
+    return Response.json({ data: { tasks, notes, maintenance, products, dailyCloses, facilities } });
   } catch (error) { return authErrorResponse(error); }
 }
 
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json() as { kind?: string; payload?: unknown };
     const permission = body.kind === "stockMovement" || body.kind === "product" ? "inventory.manage" : body.kind === "dailyClose" ? "daily_close.perform" : "operations.manage";
-    const { organisationId, user } = await requirePermission(permission);
+    const { organisationId, user, allowedFacilityIds } = await requirePermission(permission);
     const ensureFacility = async (facilityId: string) => {
       await requirePermission(permission, facilityId);
       if (!await db.facility.count({ where: { id: facilityId, organisationId, active: true } })) throw new Error("FORBIDDEN");
@@ -31,6 +32,9 @@ export async function POST(request: Request) {
 
     if (body.kind === "task") {
       const input = createTaskSchema.parse(body.payload);
+      if (!input.facilityId && allowedFacilityIds) {
+        return Response.json({ error: { code: "FACILITY_REQUIRED", message: "Choose a permitted facility for this task." } }, { status: 400 });
+      }
       if (input.facilityId) await ensureFacility(input.facilityId);
       result = await db.task.create({ data: { organisationId, createdById: user.id, ...input, dueAt: input.dueAt ? new Date(input.dueAt) : undefined } });
     } else if (body.kind === "unitNote") {
