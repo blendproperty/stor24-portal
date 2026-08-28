@@ -23,7 +23,7 @@ export default async function ReportsPage() {
         title="Reports"
         description="Governed operational and financial reporting for individual facilities and the portfolio."
       />
-      <ReportsWorkspace reports={availableReports(permissions)} facilities={facilities} initialFrom={from} initialTo={today} canExport={hasPermission(permissions, "reports.export")} canSchedule={hasPermission(permissions, "reports.schedule")} />
+      <ReportsWorkspace reports={availableReports(permissions)} facilities={facilities} initialFrom={from} initialTo={today} canExport={hasPermission(permissions, "reports.export")} />
     </div>
   );
 }

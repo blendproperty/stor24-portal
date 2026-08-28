@@ -19,6 +19,7 @@ test("report exports use scoped production data and never synthetic rows", () =>
   assert.match(service, /requireFacility\(scope, parameters\.facilityId\)/);
   assert.match(workspace, /facilities\.map/);
   assert.doesNotMatch(workspace, /Stor24 Randburg/);
+  assert.doesNotMatch(workspace, /Schedule report/);
 });
 
 test("report parameters reject reversed date ranges", () => {
