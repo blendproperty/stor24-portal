@@ -4,14 +4,15 @@ import { useMemo, useState } from "react";
 import { CalendarClock, Download, Filter, LockKeyhole } from "lucide-react";
 import type { ReportDefinition } from "@/lib/reporting";
 
-export function ReportsWorkspace({ reports, canExport, canSchedule }: { reports: readonly ReportDefinition[]; canExport: boolean; canSchedule: boolean }) {
+export function ReportsWorkspace({ reports, facilities, initialFrom, initialTo, canExport, canSchedule }: { reports: readonly ReportDefinition[]; facilities: { id: string; name: string }[]; initialFrom: string; initialTo: string; canExport: boolean; canSchedule: boolean }) {
   const [group, setGroup] = useState("All");
   const [reportKey, setReportKey] = useState(reports[0]?.key ?? "");
-  const [from, setFrom] = useState("2026-05-01");
-  const [to, setTo] = useState("2026-07-31");
+  const [from, setFrom] = useState(initialFrom);
+  const [to, setTo] = useState(initialTo);
+  const [facilityId, setFacilityId] = useState("");
   const groups = useMemo(() => ["All", ...new Set(reports.map((report) => report.group))], [reports]);
   const visible = group === "All" ? reports : reports.filter((report) => report.group === group);
-  const exportHref = `/api/v1/reports/export?${new URLSearchParams({ reportKey, from, to, format: "CSV", groupBy: "month" })}`;
+  const exportHref = `/api/v1/reports/export?${new URLSearchParams({ reportKey, from, to, format: "CSV", groupBy: "month", ...(facilityId ? { facilityId } : {}) })}`;
 
   return (
     <div className="report-workspace">
@@ -21,7 +22,7 @@ export function ReportsWorkspace({ reports, canExport, canSchedule }: { reports:
           <label>Report<select value={reportKey} onChange={(event) => setReportKey(event.target.value)}>{reports.map((report) => <option value={report.key} key={report.key}>{report.name}</option>)}</select></label>
           <label>From<input type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label>
           <label>To<input type="date" value={to} onChange={(event) => setTo(event.target.value)} /></label>
-          <label>Facility<select><option>All permitted facilities</option><option>Stor24 Randburg</option></select></label>
+          <label>Facility<select value={facilityId} onChange={(event) => setFacilityId(event.target.value)}><option value="">All permitted facilities</option>{facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}</select></label>
         </div>
         <div className="report-actions">
           {canExport ? <a className="button button-primary" href={exportHref}><Download size={16} /> Export CSV</a> : <span className="permission-note"><LockKeyhole size={15} /> Your role can view but not export.</span>}

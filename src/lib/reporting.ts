@@ -17,7 +17,8 @@ export const reportDefinitions: readonly ReportDefinition[] = [
   { key: "lead-conversion", name: "Lead conversion", group: "Sales", description: "Source, stage velocity, conversion and loss reasons.", permission: "reports.sales", formats: ["CSV", "JSON"] },
   { key: "rent-roll", name: "Rent roll & tenant ledger", group: "Finance", description: "Rates, balances and account activity.", permission: "reports.financial", formats: ["CSV", "JSON"] },
   { key: "receivables-ageing", name: "Receivables ageing", group: "Finance", description: "Outstanding balances grouped by age and delinquency stage.", permission: "reports.financial", formats: ["CSV", "JSON"] },
-  { key: "collections-performance", name: "Collections performance", group: "Collections", description: "Stage movement, contacts, promises and recoveries.", permission: "reports.collections", formats: ["CSV", "JSON"] },
+  { key: "collections-performance", name: "Collections workload", group: "Collections", description: "Current positive balances and period account activity requiring collections attention.", permission: "reports.collections", formats: ["CSV", "JSON"] },
+  { key: "insurance-participation", name: "Insurance participation", group: "Operations", description: "Tenant cover, waivers, snapshotted premiums and outstanding decisions.", permission: "reports.view", formats: ["CSV", "JSON"] },
   { key: "integration-health", name: "Integration health", group: "Integrations", description: "Connection state, failures, webhook backlog and retries.", permission: "integrations.view", formats: ["CSV", "JSON"] },
 ] as const;
 
@@ -35,7 +36,6 @@ export type ReportParameters = z.infer<typeof reportParametersSchema>;
 export function availableReports(permissions: readonly string[]) {
   return reportDefinitions.filter((report) => hasPermission([...permissions], report.permission));
 }
-
 export function findPermittedReport(permissions: readonly string[], key: string) {
   return availableReports(permissions).find((report) => report.key === key);
 }
@@ -51,13 +51,3 @@ export function toCsv(rows: ReadonlyArray<Record<string, string | number | boole
   return [headers.map(escape).join(","), ...rows.map((row) => headers.map((header) => escape(row[header])).join(","))].join("\r\n");
 }
 
-export function syntheticReportRows(parameters: ReportParameters) {
-  const labels = parameters.groupBy === "facility" ? ["Stor24 Randburg"] : ["May 2026", "June 2026", "July 2026"];
-  return labels.map((period, index) => ({
-    period,
-    facility: parameters.facilityId ?? "All permitted facilities",
-    report: parameters.reportKey,
-    value: [88.4, 90.1, 91.6][index] ?? 91.6,
-    source: "synthetic-demo",
-  }));
-}
