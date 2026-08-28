@@ -47,6 +47,7 @@ export const offlineReservationSyncSchema = z.object({
   unitId: z.string().trim().min(1).max(64),
   quotedRate: z.coerce.number().positive().max(10_000_000),
   intendedMoveIn: z.iso.date().optional(),
+  paymentMethod: z.enum(["DEBIT_ORDER", "CARD", "EFT", "UNDECIDED"]),
 });
 
 export type OfflineReservationSyncInput = z.infer<typeof offlineReservationSyncSchema>;

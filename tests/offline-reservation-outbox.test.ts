@@ -8,6 +8,8 @@ const routePath = new URL("../src/app/api/v1/offline/reservations/route.ts", imp
 const workspacePath = new URL("../public/offline-workspace.js", import.meta.url);
 const shellPath = new URL("../public/offline-workspace.html", import.meta.url);
 const schemaPath = new URL("../prisma/schema.prisma", import.meta.url);
+const moveInPagePath = new URL("../src/app/operations/move-in/page.tsx", import.meta.url);
+const moveInWorkspacePath = new URL("../src/components/move-in-workspace.tsx", import.meta.url);
 
 const valid = {
   submissionId: "3c729f3f-b3f6-48dc-829b-271d47a1d544",
@@ -20,12 +22,14 @@ const valid = {
   unitId: "unit-test",
   quotedRate: 900,
   intendedMoveIn: "2026-09-01",
+  paymentMethod: "DEBIT_ORDER" as const,
 };
 
 test("offline reservation sync requires stable identities and a positive quote", () => {
   assert.equal(offlineReservationSyncSchema.safeParse(valid).success, true);
   assert.equal(offlineReservationSyncSchema.safeParse({ ...valid, submissionId: "unstable" }).success, false);
   assert.equal(offlineReservationSyncSchema.safeParse({ ...valid, quotedRate: 0 }).success, false);
+  assert.equal(offlineReservationSyncSchema.safeParse({ ...valid, paymentMethod: "CASH" }).success, false);
 });
 
 test("offline reservation sync atomically claims availability and is idempotent", async () => {
@@ -41,6 +45,7 @@ test("offline reservation sync atomically claims availability and is idempotent"
   assert.match(service, /idempotencyKey: key/);
   assert.match(service, /offline\.reservation\.synced/);
   assert.match(service, /source: "OFFLINE_PWA"/);
+  assert.match(service, /paymentMethod: input\.paymentMethod/);
   assert.match(service, /HOLD_HOURS = 24/);
   assert.match(service, /publicReference: reservationReference/);
   assert.match(service, /notifyReservationConfirmed/);
@@ -88,7 +93,21 @@ test("offline operator UI distinguishes connectivity, refreshes conflicts and re
   assert.match(shell, /Confirmation channels/);
   assert.match(shell, /role="switch"/);
   assert.match(shell, /class="form-submit-bar"/);
+  assert.match(shell, /Intended payment method/);
+  assert.match(shell, /Debit order — mandate lease/);
+  assert.match(workspace, /paymentMethod/);
   assert.match(workspace, /communications: payload\.data\.communications/);
   assert.match(workspace, /Continue to lease/);
   assert.match(workspace, /Payment link unavailable/);
+});
+
+test("offline payment intent prefills the reservation-to-BlendSign handoff", async () => {
+  const [page, workspace] = await Promise.all([readFile(moveInPagePath, "utf8"), readFile(moveInWorkspacePath, "utf8")]);
+  assert.match(page, /initialReservationId/);
+  assert.match(page, /paymentMethod: reservation\.paymentMethod/);
+  assert.match(workspace, /initialReservation\?\.customerId/);
+  assert.match(workspace, /initialReservation\?\.unitId/);
+  assert.match(workspace, /initialReservation\?\.paymentMethod === "UNDECIDED" \? ""/);
+  assert.match(workspace, /Select and confirm payment method/);
+  assert.match(workspace, /Prefilled from the reservation/);
 });

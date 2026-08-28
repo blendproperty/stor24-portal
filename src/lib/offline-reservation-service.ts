@@ -78,6 +78,7 @@ export async function syncOfflineReservation(scope: RequestScope, input: Offline
           quotedRate: input.quotedRate,
           holdExpiresAt,
           intendedMoveIn: input.intendedMoveIn ? new Date(`${input.intendedMoveIn}T00:00:00.000Z`) : undefined,
+          paymentMethod: input.paymentMethod,
           source: "OFFLINE_PWA",
           idempotencyKey: key,
           publicReference: reservationReference(input.capturedAt, input.submissionId),
@@ -105,7 +106,7 @@ export async function syncOfflineReservation(scope: RequestScope, input: Offline
           entityType: "Reservation",
           entityId: reservation.id,
           requestId: input.submissionId,
-          after: { deviceId: input.deviceId, capturedAt: input.capturedAt, unitId: input.unitId, source: "OFFLINE_PWA", holdExpiresAt: holdExpiresAt.toISOString() },
+          after: { deviceId: input.deviceId, capturedAt: input.capturedAt, unitId: input.unitId, source: "OFFLINE_PWA", holdExpiresAt: holdExpiresAt.toISOString(), paymentMethod: input.paymentMethod },
         },
       });
       return { reservationId: reservation.id, reference: reservation.publicReference, holdExpiresAt: holdExpiresAt.toISOString(), idempotent: false };
