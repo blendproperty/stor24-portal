@@ -10,6 +10,14 @@ export function formatSouthAfricaDateTime(value: string | Date | null) {
   }).format(new Date(value));
 }
 
+export function formatSouthAfricaDate(value: string | Date | null) {
+  if (!value) return "—";
+  return new Intl.DateTimeFormat("en-ZA", {
+    timeZone: SOUTH_AFRICA_TIME_ZONE,
+    dateStyle: "medium",
+  }).format(new Date(value));
+}
+
 export function southAfricaDateKey(value: string | Date) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: SOUTH_AFRICA_TIME_ZONE,

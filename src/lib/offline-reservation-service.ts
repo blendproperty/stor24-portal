@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { notifyReservationConfirmed } from "@/lib/notifications";
 import { requireFacility, type RequestScope } from "@/lib/scope";
 import type { OfflineReservationSyncInput } from "@/lib/validators";
+import { formatSouthAfricaDate } from "@/lib/south-africa-time";
 
 const HOLD_HOURS = 24;
 
@@ -127,7 +128,7 @@ export async function syncOfflineReservation(scope: RequestScope, input: Offline
         unitNumber: details.unit.number,
         monthlyRateZar: Number(details.quotedRate).toFixed(2),
         holdExpiresAt: created.holdExpiresAt,
-        intendedMoveIn: details.intendedMoveIn?.toLocaleDateString("en-ZA") ?? "To be confirmed",
+        intendedMoveIn: details.intendedMoveIn ? formatSouthAfricaDate(details.intendedMoveIn) : "To be confirmed",
         reference: details.publicReference ?? created.reference ?? "",
       },
     }).catch(() => [] as Array<{ channel: DeliveryChannel; ok: boolean }>);

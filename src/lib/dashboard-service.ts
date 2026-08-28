@@ -1,40 +1,45 @@
 import { db } from "@/lib/db";
 import { facilityWhere, type RequestScope } from "@/lib/scope";
+import { SOUTH_AFRICA_TIME_ZONE, southAfricaDateKey } from "@/lib/south-africa-time";
 
-function startOfMonth(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), 1);
+const SOUTH_AFRICA_OFFSET_MS = 2 * 60 * 60 * 1000;
+
+function southAfricaParts(value = new Date()) {
+  const [year, month, day] = southAfricaDateKey(value).split("-").map(Number);
+  return { year, month: month - 1, day };
 }
-function endOfMonth(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth() + 1, 1);
+function startOfMonth(d: Date) {
+  const { year, month } = southAfricaParts(d);
+  return new Date(Date.UTC(year, month, 1) - SOUTH_AFRICA_OFFSET_MS);
+}
+function monthBounds(year: number, month: number) {
+  return { start: new Date(Date.UTC(year, month, 1) - SOUTH_AFRICA_OFFSET_MS), end: new Date(Date.UTC(year, month + 1, 1) - SOUTH_AFRICA_OFFSET_MS) };
 }
 function monthLabel(d: Date) {
-  return d.toLocaleDateString("en-ZA", { month: "short" });
-}
-function startOfDay(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  return d.toLocaleDateString("en-ZA", { month: "short", timeZone: SOUTH_AFRICA_TIME_ZONE });
 }
 function dayLabel(d: Date) {
-  return d.toLocaleDateString("en-ZA", { weekday: "short" });
+  return d.toLocaleDateString("en-ZA", { weekday: "short", timeZone: SOUTH_AFRICA_TIME_ZONE });
 }
 
 function last12Months(): { start: Date; end: Date; label: string }[] {
   const months: { start: Date; end: Date; label: string }[] = [];
-  const now = new Date();
+  const { year, month } = southAfricaParts();
   for (let i = 11; i >= 0; i--) {
-    const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push({ start: startOfMonth(monthDate), end: endOfMonth(monthDate), label: monthLabel(monthDate) });
+    const calendarMonth = new Date(Date.UTC(year, month - i, 15, 12));
+    const bounds = monthBounds(calendarMonth.getUTCFullYear(), calendarMonth.getUTCMonth());
+    months.push({ ...bounds, label: monthLabel(bounds.start) });
   }
   return months;
 }
 
 function last7Days(): { start: Date; end: Date; label: string; isToday: boolean }[] {
   const days: { start: Date; end: Date; label: string; isToday: boolean }[] = [];
-  const today = startOfDay(new Date());
+  const { year, month, day } = southAfricaParts();
   for (let i = 6; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    const next = new Date(d);
-    next.setDate(next.getDate() + 1);
+    const calendarDay = new Date(Date.UTC(year, month, day - i));
+    const d = new Date(calendarDay.getTime() - SOUTH_AFRICA_OFFSET_MS);
+    const next = new Date(d.getTime() + 24 * 60 * 60 * 1000);
     days.push({ start: d, end: next, label: dayLabel(d), isToday: i === 0 });
   }
   return days;

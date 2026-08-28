@@ -32,7 +32,7 @@ function formatRate(amount: number) {
   return `R ${amount.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`;
 }
 function formatDate(date: Date) {
-  return date.toLocaleDateString("en-ZA", { year: "numeric", month: "long", day: "numeric" });
+  return date.toLocaleDateString("en-ZA", { year: "numeric", month: "long", day: "numeric", timeZone: "Africa/Johannesburg" });
 }
 
 const CLAUSE_DEFINITIONS: ClauseDefinition[] = [

@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/page-header";
 import { requirePermission } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
+import { formatSouthAfricaDateTime } from "@/lib/south-africa-time";
 
 export const metadata = { title: "Offline readiness" };
 export const dynamic = "force-dynamic";
@@ -49,7 +50,7 @@ export default async function OfflineReadinessPage() {
         const info = details(event.after);
         const expiresAt = info.expiresAt ? new Date(info.expiresAt) : null;
         const state = !expiresAt ? "Unknown" : expiresAt.getTime() <= now ? "Expired" : expiresAt.getTime() - now <= 2 * 60 * 60 * 1000 ? "Expiring soon" : "Ready";
-        return <tr key={event.id}><td className="primary-cell">{info.deviceLabel || "Unnamed device"}<span className="secondary-cell">{info.deviceId || "Legacy snapshot"}</span></td><td>{event.facility?.name ?? "Unavailable"}</td><td>{event.actor?.name ?? "Unknown"}<span className="secondary-cell">{event.actor?.email ?? "—"}</span></td><td>{event.occurredAt.toLocaleString("en-ZA")}</td><td>{state}<span className="secondary-cell">{expiresAt ? `Expires ${expiresAt.toLocaleString("en-ZA")}` : "No expiry recorded"}</span></td></tr>;
+        return <tr key={event.id}><td className="primary-cell">{info.deviceLabel || "Unnamed device"}<span className="secondary-cell">{info.deviceId || "Legacy snapshot"}</span></td><td>{event.facility?.name ?? "Unavailable"}</td><td>{event.actor?.name ?? "Unknown"}<span className="secondary-cell">{event.actor?.email ?? "—"}</span></td><td>{formatSouthAfricaDateTime(event.occurredAt)}</td><td>{state}<span className="secondary-cell">{expiresAt ? `Expires ${formatSouthAfricaDateTime(expiresAt)} SAST` : "No expiry recorded"}</span></td></tr>;
       }) : <tr><td colSpan={5} className="empty-cell">No offline devices have prepared a tracked snapshot yet.</td></tr>}</tbody>
     </table></div></section>
   </div>;

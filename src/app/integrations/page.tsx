@@ -18,6 +18,7 @@ import {
 import { requirePermissionScope } from "@/lib/scope";
 import { BlendSignReconciliationActions } from "@/components/blendsign-reconciliation-actions";
 import { WhatsAppAutomationControl } from "@/components/whatsapp-automation-control";
+import { formatSouthAfricaDateTime } from "@/lib/south-africa-time";
 import { getWhatsAppAutomationState } from "@/lib/integrations/whatsapp-automation";
 import { requireSession } from "@/lib/auth-guards";
 import {
@@ -311,11 +312,10 @@ export default async function IntegrationsPage() {
                       </StatusPill>
                     </td>
                     <td>
-                      {document.sentAt?.toLocaleString("en-ZA") ??
-                        document.createdAt.toLocaleString("en-ZA")}
+                      {formatSouthAfricaDateTime(document.sentAt ?? document.createdAt)} SAST
                       <span className="secondary-cell">
                         {document.expiresAt
-                          ? `Expires ${document.expiresAt.toLocaleString("en-ZA")}`
+                          ? `Expires ${formatSouthAfricaDateTime(document.expiresAt)} SAST`
                           : "No expiry recorded"}
                       </span>
                     </td>

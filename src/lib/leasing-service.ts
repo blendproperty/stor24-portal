@@ -6,6 +6,7 @@ import { revokeBiometricAccess } from "@/lib/biometric-access-service";
 import { sendWhatsAppTemplate } from "@/lib/whatsapp";
 import { LEASE_CLAUSE_KEYS, type LeaseClauseKey } from "@/lib/lease-agreement-content";
 import { blendSignTemplateKey, type BlendSignEnvelope } from "@/lib/blendsign-client";
+import { formatSouthAfricaDate } from "@/lib/south-africa-time";
 
 type Tx = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends">;
 
@@ -312,6 +313,6 @@ export async function moveOut(scope: RequestScope, input: { tenancyId: string; m
   const activeBiometrics = await db.biometricEnrollment.findMany({ where: { occupancy: { tenancyId: entity.id }, status: "ACTIVE" }, select: { id: true } });
   for (const enrollment of activeBiometrics) await revokeBiometricAccess(scope, enrollment.id);
   const notification = await db.tenancy.findUnique({ where: { id: entity.id }, include: { customer: true, facility: true, occupancies: { include: { unit: true }, orderBy: { updatedAt: "desc" }, take: 1 } } });
-  if (notification?.customer.phone) await sendWhatsAppTemplate({ organisationId: scope.organisationId, facilityId: notification.facilityId, customerId: notification.customerId, recipient: notification.customer.phone, consent: notification.customer.communicationConsent, messageType: "MOVE_OUT_CONFIRMATION", idempotencyKey: `move-out:${entity.id}:WHATSAPP`, variables: { "1": notification.customer.firstName || notification.customer.companyName || "customer", "2": notification.occupancies[0]?.unit.number || "", "3": notification.facility.name, "4": input.movedOutAt.toLocaleDateString("en-ZA") } });
+  if (notification?.customer.phone) await sendWhatsAppTemplate({ organisationId: scope.organisationId, facilityId: notification.facilityId, customerId: notification.customerId, recipient: notification.customer.phone, consent: notification.customer.communicationConsent, messageType: "MOVE_OUT_CONFIRMATION", idempotencyKey: `move-out:${entity.id}:WHATSAPP`, variables: { "1": notification.customer.firstName || notification.customer.companyName || "customer", "2": notification.occupancies[0]?.unit.number || "", "3": notification.facility.name, "4": formatSouthAfricaDate(input.movedOutAt) } });
   return entity;
 }

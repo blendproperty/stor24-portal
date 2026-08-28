@@ -31,9 +31,13 @@ function parseCsv(source) {
 function records(rows, required, file, errors) {
   const header = rows[0]?.map((value) => value.trim()) ?? [];
   for (const field of required) if (!header.includes(field)) errors.push(`${file}: missing required column ${field}`);
-  return rows.slice(1).map((values, rowIndex) => Object.fromEntries(header.map((field, index) => [field, values[index]?.trim() ?? ""]))).filter((record) => {
-    if (!record.legacy_id) errors.push(`${file}: row ${rowIndex + 2} has no legacy_id`);
-    return Boolean(record.legacy_id);
+  return rows.slice(1).flatMap((values, rowIndex) => {
+    const record = Object.fromEntries(header.map((field, index) => [field, values[index]?.trim() ?? ""]));
+    if (!record.legacy_id) {
+      errors.push(`${file}: row ${rowIndex + 2} has no legacy_id`);
+      return [];
+    }
+    return [record];
   });
 }
 

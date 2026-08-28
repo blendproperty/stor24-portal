@@ -107,7 +107,7 @@ test("offline payment intent prefills the reservation-to-BlendSign handoff", asy
   assert.match(page, /paymentMethod: reservation\.paymentMethod/);
   assert.match(workspace, /initialReservation\?\.customerId/);
   assert.match(workspace, /initialReservation\?\.unitId/);
-  assert.match(workspace, /initialReservation\?\.paymentMethod === "UNDECIDED" \? ""/);
+  assert.match(workspace, /initialReservation\?\.paymentMethod\s*===\s*"UNDECIDED"\s*\?\s*""/);
   assert.match(workspace, /Select and confirm payment method/);
   assert.match(workspace, /Prefilled from the reservation/);
 });

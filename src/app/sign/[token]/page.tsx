@@ -2,10 +2,15 @@ import { notFound } from "next/navigation";
 import { getLeaseForSigning } from "@/lib/leasing-service";
 import { buildLeaseClauses } from "@/lib/lease-agreement-content";
 import { LeaseSigningForm } from "@/components/lease-signing-form";
+import { formatSouthAfricaDateTime } from "@/lib/south-africa-time";
 
 export const dynamic = "force-dynamic";
 
-export default async function SignLeasePage({ params }: { params: Promise<{ token: string }> }) {
+export default async function SignLeasePage({
+  params,
+}: {
+  params: Promise<{ token: string }>;
+}) {
   const { token } = await params;
   const lease = await getLeaseForSigning(token);
   if (!lease) notFound();
@@ -19,12 +24,17 @@ export default async function SignLeasePage({ params }: { params: Promise<{ toke
   });
 
   return (
-    <main style={{ maxWidth: 760, margin: "40px auto", padding: "0 16px 64px" }}>
+    <main
+      style={{ maxWidth: 760, margin: "40px auto", padding: "0 16px 64px" }}
+    >
       <div className="panel panel-spacious">
         <p className="eyebrow">Stor24 lease agreement</p>
-        <h1>{lease.facilityName} · Unit {lease.unitNumber}</h1>
+        <h1>
+          {lease.facilityName} · Unit {lease.unitNumber}
+        </h1>
         <p className="lease-summary">
-          Prepared for {lease.customerName}. Please read every clause, initial it, then sign at the bottom.
+          Prepared for {lease.customerName}. Please read every clause, initial
+          it, then sign at the bottom.
         </p>
 
         {lease.status === "SIGNED" ? (
@@ -32,7 +42,10 @@ export default async function SignLeasePage({ params }: { params: Promise<{ toke
             <h2>Signed</h2>
             <p>
               This agreement was signed by {lease.signerName}
-              {lease.signedAt ? ` on ${new Date(lease.signedAt).toLocaleString("en-ZA")}` : ""}. No further action is needed.
+              {lease.signedAt
+                ? ` on ${formatSouthAfricaDateTime(lease.signedAt)} SAST`
+                : ""}
+              . No further action is needed.
             </p>
           </div>
         ) : lease.expired ? (

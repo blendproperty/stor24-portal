@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { moveIn, type MoveInResult } from "@/lib/leasing-service";
 import type { RequestScope } from "@/lib/scope";
 import { sendWhatsAppTemplate } from "@/lib/whatsapp";
+import { formatSouthAfricaDate } from "@/lib/south-africa-time";
 
 async function automationScope(organisationId: string, facilityId: string): Promise<RequestScope> {
   const user = await db.user.findFirst({
@@ -115,7 +116,7 @@ export async function runSimulatedPaymentFollowUp(sessionId: string) {
         consent: reservation.customer.communicationConsent,
         messageType: "PAYMENT_RECEIVED",
         idempotencyKey: `sim-payment:${session.id}:WHATSAPP`,
-        variables: { "1": reservation.customer.firstName || reservation.customer.companyName || "customer", "2": `R${Number(session.amount).toFixed(2)} UAT`, "3": new Date().toLocaleDateString("en-ZA"), "4": account.accountNumber, "5": "R0.00" },
+        variables: { "1": reservation.customer.firstName || reservation.customer.companyName || "customer", "2": `R${Number(session.amount).toFixed(2)} UAT`, "3": formatSouthAfricaDate(new Date()), "4": account.accountNumber, "5": "R0.00" },
         allowWhenAutomationDisabled: true,
       }) : { ok: false as const, code: "NO_PHONE" };
     whatsappConfirmationSent = whatsapp.ok;

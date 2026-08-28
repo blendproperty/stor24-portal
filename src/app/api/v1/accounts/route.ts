@@ -4,6 +4,7 @@ import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
 import { sameOrigin } from "@/lib/request-security";
 import { accountPaymentSchema } from "@/lib/validators";
 import { sendWhatsAppTemplate } from "@/lib/whatsapp";
+import { formatSouthAfricaDate } from "@/lib/south-africa-time";
 
 export async function GET() {
   try {
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
       await tx.auditEvent.create({ data: { organisationId: actor.organisationId, facilityId: account.tenancy!.facilityId, actorId: actor.user.id, action: "payment.posted", entityType: "Payment", entityId: payment.id, after: { accountId: account.id, amount: parsed.data.amount, method: parsed.data.method, ledgerEntryId: ledger.id } } });
       return { payment, balance: updated.balance };
     });
-    if (account.customer.phone) await sendWhatsAppTemplate({ organisationId: actor.organisationId, facilityId: account.tenancy.facilityId, customerId: account.customer.id, recipient: account.customer.phone, consent: account.customer.communicationConsent, messageType: "PAYMENT_RECEIVED", idempotencyKey: `${idempotencyKey}:WHATSAPP`, variables: { "1": account.customer.firstName || account.customer.companyName || "customer", "2": `R${parsed.data.amount.toFixed(2)}`, "3": parsed.data.receivedAt.toLocaleDateString("en-ZA"), "4": account.accountNumber, "5": `R${Number(result.balance).toFixed(2)}` } });
+    if (account.customer.phone) await sendWhatsAppTemplate({ organisationId: actor.organisationId, facilityId: account.tenancy.facilityId, customerId: account.customer.id, recipient: account.customer.phone, consent: account.customer.communicationConsent, messageType: "PAYMENT_RECEIVED", idempotencyKey: `${idempotencyKey}:WHATSAPP`, variables: { "1": account.customer.firstName || account.customer.companyName || "customer", "2": `R${parsed.data.amount.toFixed(2)}`, "3": formatSouthAfricaDate(parsed.data.receivedAt), "4": account.accountNumber, "5": `R${Number(result.balance).toFixed(2)}` } });
     return Response.json({ data: result }, { status: 201 });
   } catch (error) { return authErrorResponse(error); }
 }
