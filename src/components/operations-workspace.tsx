@@ -11,7 +11,7 @@ type Task = { id: string; title: string; status: string; priority: string; dueAt
 type Maintenance = { id: string; title: string; status: string; priority: string; unit?: { number: string } | null; facility: { name: string } };
 type Product = { id: string; sku: string; name: string; quantityOnHand: number; reorderPoint: number; sellingPrice: string; facility: { name: string } };
 type Close = { id: string; businessDate: string; status: string; variance: string | null; facility: { name: string } };
-type Facility = { id: string; name: string };
+type Facility = { id: string; name: string; units: { id: string; number: string; status: string }[] };
 type OperationsData = { tasks: Task[]; maintenance: Maintenance[]; products: Product[]; dailyCloses: Close[]; notes: unknown[]; facilities: Facility[] };
 
 export function OperationsWorkspace() {
@@ -19,6 +19,8 @@ export function OperationsWorkspace() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [showTask, setShowTask] = useState(false);
+  const [showMaintenance, setShowMaintenance] = useState(false);
+  const [maintenanceFacilityId, setMaintenanceFacilityId] = useState("");
 
   const load = useCallback(async () => {
     const response = await fetch("/api/v1/operations", { cache: "no-store" });
@@ -49,6 +51,44 @@ export function OperationsWorkspace() {
     await load();
   }
 
+  async function createMaintenance(formData: FormData) {
+    setBusy(true);
+    const response = await fetch("/api/v1/operations", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "maintenance",
+        payload: {
+          facilityId: formData.get("facilityId"),
+          unitId: formData.get("unitId") || undefined,
+          title: formData.get("title"),
+          description: formData.get("description") || undefined,
+          priority: formData.get("priority"),
+          dueAt: formData.get("dueAt") ? new Date(String(formData.get("dueAt"))).toISOString() : undefined,
+        },
+      }),
+    });
+    const payload = await response.json();
+    setBusy(false);
+    if (!response.ok) { setError(payload.error?.message ?? "Maintenance request could not be created."); return; }
+    setShowMaintenance(false);
+    setMaintenanceFacilityId("");
+    await load();
+  }
+
+  async function updateMaintenance(id: string, status: "IN_PROGRESS" | "COMPLETED" | "CANCELLED") {
+    setBusy(true);
+    const response = await fetch(`/api/v1/operations/maintenance/${id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    const payload = await response.json();
+    setBusy(false);
+    if (!response.ok) { setError(payload.error?.message ?? "Maintenance request could not be updated."); return; }
+    await load();
+  }
+
   const openTasks = data?.tasks.filter((task) => !["COMPLETED", "CANCELLED"].includes(task.status)) ?? [];
   const service = data?.maintenance.filter((item) => !["COMPLETED", "CANCELLED"].includes(item.status)) ?? [];
   const reorder = data?.products.filter((product) => product.quantityOnHand <= product.reorderPoint) ?? [];
@@ -69,8 +109,8 @@ export function OperationsWorkspace() {
       <article className="panel panel-spacious"><div className="panel-heading"><div><p className="eyebrow">Work queues</p><h2>Assigned operational tasks</h2></div><ClipboardList size={21}/></div>
         <div className="work-list">{openTasks.length ? openTasks.map((task) => <div className="work-row" key={task.id}><span className={`work-icon ${task.priority === "URGENT" ? "work-icon-danger" : task.priority === "HIGH" ? "work-icon-warning" : ""}`}><ClipboardList size={18}/></span><span className="work-copy"><strong>{task.title}</strong><small>{task.facility?.name ?? "Portfolio"} · {task.assignee?.name ?? "Unassigned"} · {task.dueAt ? `${formatSouthAfricaDateTime(task.dueAt)} SAST` : "No due date"}</small></span><button className="text-button" onClick={() => completeTask(task.id)}>Complete</button></div>) : <div className="empty-state"><CheckCircle2 size={32}/><strong>No open tasks</strong><p>Create a task to start the facility work queue.</p></div>}</div>
       </article>
-      <article className="panel panel-spacious"><div className="panel-heading"><div><p className="eyebrow">Service required</p><h2>Maintenance queue</h2></div><Wrench size={21}/></div>
-        <div className="work-list">{service.length ? service.map((item) => <div className="work-row" key={item.id}><span className="work-icon work-icon-warning"><Wrench size={18}/></span><span className="work-copy"><strong>{item.title}</strong><small>{item.facility.name}{item.unit ? ` · Unit ${item.unit.number}` : ""}</small></span><StatusPill tone={item.priority === "URGENT" ? "danger" : "warning"}>{item.status}</StatusPill></div>) : <div className="empty-state"><Wrench size={32}/><strong>No service requests</strong><p>Unit and facility maintenance will appear here.</p></div>}</div>
+      <article className="panel panel-spacious"><div className="panel-heading"><div><p className="eyebrow">Service required</p><h2>Maintenance queue</h2></div><button className="button button-secondary" onClick={() => setShowMaintenance(true)}><Plus size={16}/> New request</button></div>
+        <div className="work-list">{service.length ? service.map((item) => <div className="work-row" key={item.id}><span className="work-icon work-icon-warning"><Wrench size={18}/></span><span className="work-copy"><strong>{item.title}</strong><small>{item.facility.name}{item.unit ? ` · Unit ${item.unit.number}` : ""}</small></span><StatusPill tone={item.priority === "URGENT" ? "danger" : "warning"}>{item.status}</StatusPill><span className="inline-actions">{item.status !== "IN_PROGRESS" ? <button className="text-button" disabled={busy} onClick={() => updateMaintenance(item.id, "IN_PROGRESS")}>Start</button> : null}<button className="text-button" disabled={busy} onClick={() => updateMaintenance(item.id, "COMPLETED")}>Complete</button><button className="text-button" disabled={busy} onClick={() => updateMaintenance(item.id, "CANCELLED")}>Cancel</button></span></div>) : <div className="empty-state"><Wrench size={32}/><strong>No service requests</strong><p>Unit and facility maintenance will appear here.</p></div>}</div>
       </article>
     </section>
     <section className="dashboard-grid">
@@ -78,5 +118,6 @@ export function OperationsWorkspace() {
       <article className="panel"><div className="hub-heading"><div><h2>End-of-day control</h2><p>Closed periods and recorded cash variance.</p></div><RefreshCw size={20}/></div><div className="table-wrap"><table className="data-table"><thead><tr><th>Date</th><th>Facility</th><th>Status</th><th>Variance</th></tr></thead><tbody>{data?.dailyCloses.length ? data.dailyCloses.map((close) => <tr key={close.id}><td>{formatSouthAfricaDate(close.businessDate)}</td><td>{close.facility.name}</td><td><StatusPill tone="positive">{close.status}</StatusPill></td><td>{close.variance ?? "—"}</td></tr>) : <tr><td colSpan={4} className="empty-cell">No daily closes recorded.</td></tr>}</tbody></table></div></article>
     </section>
     {showTask ? <div className="modal-backdrop"><div className="modal-card" role="dialog" aria-modal="true"><p className="eyebrow">Work queue</p><h2>Create operational task</h2><form action={createTask} className="invite-form"><label>Facility<select name="facilityId" required><option value="">Choose facility</option>{data?.facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}</select></label><label>Title<input name="title" required minLength={2}/></label><label>Description<textarea name="description" rows={4}/></label><label>Priority<select name="priority" defaultValue="NORMAL"><option>LOW</option><option>NORMAL</option><option>HIGH</option><option>URGENT</option></select></label><label>Due date<input name="dueAt" type="datetime-local"/></label><div className="form-actions"><button type="button" className="button button-secondary" onClick={() => setShowTask(false)}>Cancel</button><button className="button button-primary" disabled={busy || !data?.facilities.length}>{busy ? "Saving…" : "Create task"}</button></div></form></div></div> : null}
+    {showMaintenance ? <div className="modal-backdrop"><div className="modal-card" role="dialog" aria-modal="true"><p className="eyebrow">Unit availability</p><h2>Create maintenance request</h2><p className="panel-subtitle">Selecting a unit immediately removes it from bookable availability until all linked maintenance is complete.</p><form action={createMaintenance} className="invite-form"><label>Facility<select name="facilityId" required value={maintenanceFacilityId} onChange={(event) => setMaintenanceFacilityId(event.target.value)}><option value="">Choose facility</option>{data?.facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}</select></label><label>Unit (optional)<select name="unitId" defaultValue=""><option value="">Facility-level request</option>{data?.facilities.find((facility) => facility.id === maintenanceFacilityId)?.units.map((unit) => <option key={unit.id} value={unit.id}>Unit {unit.number}{unit.status === "SERVICE" ? " · already in service" : ""}</option>)}</select></label><label>Title<input name="title" required minLength={2}/></label><label>Description<textarea name="description" rows={4}/></label><label>Priority<select name="priority" defaultValue="NORMAL"><option>LOW</option><option>NORMAL</option><option>HIGH</option><option>URGENT</option></select></label><label>Due date<input name="dueAt" type="datetime-local"/></label><div className="form-actions"><button type="button" className="button button-secondary" onClick={() => { setShowMaintenance(false); setMaintenanceFacilityId(""); }}>Cancel</button><button className="button button-primary" disabled={busy || !maintenanceFacilityId}>{busy ? "Saving…" : "Create request"}</button></div></form></div></div> : null}
   </div>;
 }

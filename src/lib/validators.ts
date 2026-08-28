@@ -304,6 +304,10 @@ export const maintenanceSchema = z.object({
   dueAt: z.iso.datetime().optional(),
 });
 
+export const updateMaintenanceSchema = z.object({
+  status: z.enum(["OPEN", "SCHEDULED", "IN_PROGRESS", "BLOCKED", "COMPLETED", "CANCELLED"]),
+});
+
 export const productSchema = z.object({
   facilityId: z.string().cuid(),
   sku: z.string().trim().min(1).max(60),

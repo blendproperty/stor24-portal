@@ -12,7 +12,19 @@ export async function GET() {
       db.maintenanceRequest.findMany({ where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { facility: true, unit: true, assignedTo: true }, orderBy: [{ status: "asc" }, { dueAt: "asc" }], take: 100 }),
       db.product.findMany({ where: { organisationId, active: true, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { facility: true }, orderBy: { name: "asc" } }),
       db.dailyClose.findMany({ where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { facility: true, closedBy: true }, orderBy: { businessDate: "desc" }, take: 30 }),
-      db.facility.findMany({ where: { organisationId, active: true, ...(facilityScope ? { id: facilityScope } : {}) }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+      db.facility.findMany({
+        where: { organisationId, active: true, ...(facilityScope ? { id: facilityScope } : {}) },
+        select: {
+          id: true,
+          name: true,
+          units: {
+            where: { status: { in: ["AVAILABLE", "SERVICE"] } },
+            select: { id: true, number: true, status: true },
+            orderBy: { number: "asc" },
+          },
+        },
+        orderBy: { name: "asc" },
+      }),
     ]);
     return Response.json({ data: { tasks, notes, maintenance, products, dailyCloses, facilities } });
   } catch (error) { return authErrorResponse(error); }
@@ -28,6 +40,7 @@ export async function POST(request: Request) {
       if (!await db.facility.count({ where: { id: facilityId, organisationId, active: true } })) throw new Error("FORBIDDEN");
     };
     let result: unknown;
+    let audited = false;
     const entityType = body.kind ?? "unknown";
 
     if (body.kind === "task") {
@@ -46,8 +59,21 @@ export async function POST(request: Request) {
     } else if (body.kind === "maintenance") {
       const input = maintenanceSchema.parse(body.payload);
       await ensureFacility(input.facilityId);
-      if (input.unitId && !await db.unit.count({ where: { id: input.unitId, facilityId: input.facilityId } })) throw new Error("FORBIDDEN");
-      result = await db.maintenanceRequest.create({ data: { organisationId, ...input, dueAt: input.dueAt ? new Date(input.dueAt) : undefined } });
+      result = await db.$transaction(async (tx) => {
+        if (input.unitId) {
+          const unit = await tx.unit.findFirst({ where: { id: input.unitId, facilityId: input.facilityId } });
+          if (!unit) throw new Error("FORBIDDEN");
+          if (!["AVAILABLE", "SERVICE"].includes(unit.status)) throw new Error("UNIT_NOT_AVAILABLE");
+          if (unit.status === "AVAILABLE") {
+            const claimed = await tx.unit.updateMany({ where: { id: unit.id, status: "AVAILABLE" }, data: { status: "SERVICE" } });
+            if (claimed.count !== 1) throw new Error("UNIT_NOT_AVAILABLE");
+          }
+        }
+        const maintenance = await tx.maintenanceRequest.create({ data: { organisationId, ...input, dueAt: input.dueAt ? new Date(input.dueAt) : undefined } });
+        await tx.auditEvent.create({ data: { organisationId, actorId: user.id, action: "maintenance.create", entityType: "maintenance", entityId: maintenance.id, after: maintenance } });
+        return maintenance;
+      });
+      audited = true;
     } else if (body.kind === "product") {
       const input = productSchema.parse(body.payload);
       await ensureFacility(input.facilityId);
@@ -78,10 +104,11 @@ export async function POST(request: Request) {
     }
 
     const entityId = typeof result === "object" && result && "id" in result ? String(result.id) : "unknown";
-    await db.auditEvent.create({ data: { organisationId, actorId: user.id, action: `${entityType}.create`, entityType, entityId, after: JSON.parse(JSON.stringify(result)) } });
+    if (!audited) await db.auditEvent.create({ data: { organisationId, actorId: user.id, action: `${entityType}.create`, entityType, entityId, after: JSON.parse(JSON.stringify(result)) } });
     return Response.json({ data: result }, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.message === "INSUFFICIENT_STOCK") return Response.json({ error: { code: error.message, message: "This movement would make stock negative." } }, { status: 409 });
+    if (error instanceof Error && error.message === "UNIT_NOT_AVAILABLE") return Response.json({ error: { code: error.message, message: "Only an available unit can be placed into service." } }, { status: 409 });
     return authErrorResponse(error);
   }
 }

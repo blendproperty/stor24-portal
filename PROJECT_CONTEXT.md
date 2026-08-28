@@ -15,6 +15,10 @@ Current production evidence:
 - Reporting uses scoped production data and no longer exposes the inactive scheduling control. `/api/health` checks database readiness and the production monitor runs every ten minutes.
 - `docs/OPERATIONAL_UAT_AND_TRAINING.md` and `docs/PRODUCTION_READINESS_CHECKLIST.md` are the release evidence and training pack. CI #274 passed at `9c0b831` with 149 tests; the later reservation lifecycle release passed 151 tests locally and in CI.
 
+Current Step 2 build awaiting promotion:
+
+- Unit-linked maintenance now has an operator workflow in `/operations`: staff can create, start, complete or cancel a request. Creation atomically changes only an `AVAILABLE` unit to `SERVICE`, immediately removing it from public and staff availability. Completion/cancellation releases a `SERVICE` unit only when no other active maintenance request, active reservation or pending/active occupancy protects it. Creation and status changes are facility-scoped and audited. Local gates passed on 28 August 2026: typecheck, production build, lint with 0 errors and the 4 pre-existing warnings, and 155 tests. Do not call this production-live until CI, VPS deployment and controlled unit lifecycle UAT pass.
+
 Immediate human-owned gates:
 
 1. Complete the live public booking CAPTCHA and mobile/email verification, then confirm the resulting CRM reservation before cancelling the approved test record.
