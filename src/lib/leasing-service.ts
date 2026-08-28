@@ -28,14 +28,38 @@ export function hashDocument(content: string) {
   return createHash("sha256").update(content, "utf8").digest("hex");
 }
 
+export function leasingCustomerWhere(scope: RequestScope, facilityIds: string[]): Prisma.CustomerWhereInput {
+  const organisation = { organisationId: scope.organisationId };
+  if (scope.unrestrictedFacilities) return organisation;
+  return {
+    ...organisation,
+    OR: [
+      { leads: { some: { facilityId: { in: facilityIds } } } },
+      { reservations: { some: { facilityId: { in: facilityIds } } } },
+      { tenancies: { some: { facilityId: { in: facilityIds } } } },
+    ],
+  };
+}
+
+export function moveInReservationWhere(input: { reservationId: string; facilityId: string; customerId: string; unitId: string }): Prisma.ReservationWhereInput {
+  return {
+    id: input.reservationId,
+    facilityId: input.facilityId,
+    customerId: input.customerId,
+    unitId: input.unitId,
+    status: "ACTIVE",
+  };
+}
+
 export async function listLeasing(scope: RequestScope) {
   const facilities = await db.facility.findMany({
     where: facilityWhere(scope), orderBy: { name: "asc" },
     include: { unitTypes: { orderBy: { name: "asc" } }, units: { include: { unitType: true }, orderBy: { number: "asc" } } },
   });
   const facilityIds = facilities.map((facility) => facility.id);
+  const relatedFacilityWhere = scope.unrestrictedFacilities ? {} : { facilityId: { in: facilityIds } };
   const [customers, leads, reservations, tenancies] = await Promise.all([
-    db.customer.findMany({ where: { organisationId: scope.organisationId }, include: { leads: { orderBy: { updatedAt: "desc" }, take: 10 }, reservations: { include: { facility: true, unit: true }, orderBy: { updatedAt: "desc" }, take: 10 }, tenancies: { include: { facility: true, account: true, occupancies: { include: { unit: { include: { unitType: true } } }, orderBy: { startDate: "desc" } }, documents: { where: { type: "LEASE_AGREEMENT" }, orderBy: { createdAt: "desc" }, take: 1 } }, orderBy: { updatedAt: "desc" } } }, orderBy: { updatedAt: "desc" } }),
+    db.customer.findMany({ where: leasingCustomerWhere(scope, facilityIds), include: { leads: { where: relatedFacilityWhere, orderBy: { updatedAt: "desc" }, take: 10 }, reservations: { where: relatedFacilityWhere, include: { facility: true, unit: true }, orderBy: { updatedAt: "desc" }, take: 10 }, tenancies: { where: relatedFacilityWhere, include: { facility: true, account: true, occupancies: { include: { unit: { include: { unitType: true } } }, orderBy: { startDate: "desc" } }, documents: { where: { type: "LEASE_AGREEMENT" }, orderBy: { createdAt: "desc" }, take: 1 } }, orderBy: { updatedAt: "desc" } } }, orderBy: { updatedAt: "desc" } }),
     db.lead.findMany({ where: { facilityId: { in: facilityIds } }, include: { customer: true, desiredUnitType: true, facility: true }, orderBy: { updatedAt: "desc" } }),
     db.reservation.findMany({ where: { facilityId: { in: facilityIds } }, include: { customer: true, unit: true, facility: true }, orderBy: { updatedAt: "desc" } }),
     db.tenancy.findMany({ where: { facilityId: { in: facilityIds } }, include: { customer: true, account: true, facility: true, occupancies: { include: { unit: true }, orderBy: { startDate: "desc" } }, documents: { where: { type: "LEASE_AGREEMENT" }, orderBy: { createdAt: "desc" }, take: 1 } }, orderBy: { updatedAt: "desc" } }),
@@ -71,9 +95,10 @@ export async function createReservation(scope: RequestScope, data: Prisma.Reserv
   return db.$transaction(async (tx) => {
     const unit = await tx.unit.findFirst({ where: { id: data.unitId, facilityId: data.facilityId, status: "AVAILABLE" } });
     const customer = await tx.customer.findFirst({ where: { id: data.customerId, organisationId: scope.organisationId } });
-    if (!unit || !customer) throw new Error("CONFLICT");
+    const lead = data.leadId ? await tx.lead.findFirst({ where: { id: data.leadId, facilityId: data.facilityId, customerId: data.customerId } }) : null;
+    if (!unit || !customer || (data.leadId && !lead)) throw new Error("CONFLICT");
     const entity = await tx.reservation.create({ data }); await tx.unit.update({ where: { id: unit.id }, data: { status: "RESERVED" } });
-    if (data.leadId) await tx.lead.update({ where: { id: data.leadId }, data: { stage: "RESERVED" } });
+    if (lead) await tx.lead.update({ where: { id: lead.id }, data: { stage: "RESERVED" } });
     await audit(tx, scope, "reservation.created", "Reservation", entity.id, data.facilityId); return entity;
   });
 }
@@ -142,7 +167,8 @@ export async function moveIn(scope: RequestScope, input: { reservationId?: strin
     const unit = await tx.unit.findFirst({ where: { id: input.unitId, facilityId: input.facilityId, status: { in: ["AVAILABLE", "RESERVED"] } }, include: { unitType: true } });
     const customer = await tx.customer.findFirst({ where: { id: input.customerId, organisationId: scope.organisationId } });
     const facility = await tx.facility.findFirst({ where: { id: input.facilityId } });
-    if (!unit || !customer || !facility) throw new Error("CONFLICT");
+    const reservation = input.reservationId ? await tx.reservation.findFirst({ where: moveInReservationWhere({ ...input, reservationId: input.reservationId }) }) : null;
+    if (!unit || !customer || !facility || (input.reservationId && !reservation)) throw new Error("CONFLICT");
     const account = await tx.account.create({ data: { customerId: customer.id, accountNumber: `ST24-${Date.now().toString(36).toUpperCase()}` } });
     const monthlyRate = input.monthlyRate ?? unit.monthlyRate;
     const tenancy = await tx.tenancy.create({ data: { facilityId: input.facilityId, customerId: customer.id, accountId: account.id, status: "DRAFT", startDate: input.startDate, paymentMethod: input.paymentMethod, occupancies: { create: { unitId: unit.id, status: "PENDING", startDate: input.startDate, monthlyRate, accessState: input.accessState } } } });
@@ -152,7 +178,7 @@ export async function moveIn(scope: RequestScope, input: { reservationId?: strin
     const expiresAt = new Date(sentAt.getTime() + SIGNING_LINK_TTL_MS);
     const document = await tx.document.create({ data: { tenancyId: tenancy.id, type: input.simulation ? "LEASE_AGREEMENT_UAT" : "LEASE_AGREEMENT", storageKey: "blendsign:pending", provider: "BLENDSIGN", templateKey: blendSignTemplateKey(input.paymentMethod), idempotencyKey: `stor24-lease:${tenancy.id}`, status: "PENDING", sentAt, expiresAt } });
     if (input.initialCharge > 0) { await tx.ledgerEntry.create({ data: { accountId: account.id, type: "CHARGE", amount: input.initialCharge, description: PENDING_MOVE_IN_CHARGE_DESCRIPTION, effectiveAt: input.startDate, createdById: scope.userId } }); await tx.account.update({ where: { id: account.id }, data: { balance: { increment: input.initialCharge } } }); }
-    if (input.reservationId) await tx.reservation.update({ where: { id: input.reservationId }, data: { status: "CONVERTED", convertedTenancyId: tenancy.id } });
+    if (reservation) await tx.reservation.update({ where: { id: reservation.id }, data: { status: "CONVERTED", convertedTenancyId: tenancy.id } });
     await audit(tx, scope, "tenancy.lease_sent_for_signature", "Tenancy", tenancy.id, input.facilityId);
     return { tenancy, document, customer, facility, unit };
   });
