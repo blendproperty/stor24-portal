@@ -43,6 +43,7 @@ const navigation = [
   { href: "/collections", label: "Collections", icon: ShieldAlert },
   { href: "/access", label: "Facial access", icon: ShieldCheck },
   { href: "/operations", label: "Operations", icon: Building2 },
+  { href: "/insurance", label: "Insurance", icon: ShieldCheck },
   { href: "/adjustments", label: "Adjustments", icon: SlidersHorizontal },
   { href: "/company", label: "Company & setup", icon: Settings },
   { href: "/reports", label: "Reports", icon: BarChart3 },

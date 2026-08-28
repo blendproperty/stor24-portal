@@ -189,6 +189,8 @@ model Organisation {
   webhookInbox           WebhookInbox[]
   webhookOutbox          WebhookOutbox[]
   biometricEnrollments   BiometricEnrollment[]
+  insurancePlans         InsurancePlan[]
+  insuranceEnrollments   InsuranceEnrollment[]
   invitations            UserInvitation[]
   configurationProfiles  ConfigurationProfile[]
   chargeDefinitions      ChargeDefinition[]
@@ -255,6 +257,8 @@ model Facility {
   webhookInbox          WebhookInbox[]
   webhookOutbox          WebhookOutbox[]
   biometricEnrollments  BiometricEnrollment[]
+  insurancePlans        InsurancePlan[]
+  insuranceEnrollments  InsuranceEnrollment[]
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
 
@@ -473,6 +477,7 @@ model Tenancy {
   occupancies Occupancy[]
   reservation Reservation?
   documents   Document[]
+  insuranceEnrollment InsuranceEnrollment?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
@@ -529,6 +534,58 @@ model BiometricEnrollment {
   @@unique([occupancyId, purpose])
   @@index([organisationId, facilityId, status])
   @@index([customerId, status])
+}
+
+model InsurancePlan {
+  id             String       @id @default(cuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  facilityId     String?
+  facility       Facility?    @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  code           String
+  name           String
+  providerName   String?
+  coverageAmount Decimal      @db.Decimal(14, 2)
+  monthlyPremium Decimal      @db.Decimal(14, 2)
+  excessAmount   Decimal      @default(0) @db.Decimal(14, 2)
+  policyVersion  String?
+  termsUrl       String?
+  active         Boolean      @default(true)
+  enrollments    InsuranceEnrollment[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organisationId, facilityId, code])
+  @@index([organisationId, active])
+  @@index([facilityId, active])
+}
+
+model InsuranceEnrollment {
+  id             String         @id @default(cuid())
+  organisationId String
+  organisation   Organisation   @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  facilityId     String
+  facility       Facility       @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  tenancyId      String         @unique
+  tenancy        Tenancy        @relation(fields: [tenancyId], references: [id], onDelete: Cascade)
+  planId         String?
+  plan           InsurancePlan? @relation(fields: [planId], references: [id], onDelete: Restrict)
+  status         String
+  providerName   String?
+  policyVersion  String?
+  coverageAmount Decimal?       @db.Decimal(14, 2)
+  monthlyPremium Decimal?       @db.Decimal(14, 2)
+  excessAmount   Decimal?       @db.Decimal(14, 2)
+  effectiveFrom  DateTime?
+  endedAt        DateTime?
+  acknowledgedAt DateTime
+  waiverReason   String?
+  createdById    String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([organisationId, status])
+  @@index([facilityId, status])
 }
 
 model Account {

@@ -184,6 +184,24 @@ export const discountPlanSchema = z.object({
   rules: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])),
 });
 
+export const insurancePlanSchema = z.object({
+  facilityId: z.string().cuid().nullable().optional(),
+  code: z.string().trim().min(1).max(40).transform((value) => value.toUpperCase()),
+  name: z.string().trim().min(2).max(120),
+  providerName: z.string().trim().max(120).optional(),
+  coverageAmount: z.number().positive(),
+  monthlyPremium: z.number().nonnegative(),
+  excessAmount: z.number().nonnegative().default(0),
+  policyVersion: z.string().trim().max(80).optional(),
+  termsUrl: z.url().optional(),
+});
+
+export const insuranceDecisionSchema = z.discriminatedUnion("decision", [
+  z.object({ tenancyId: z.string().cuid(), decision: z.literal("ENROL"), planId: z.string().cuid(), effectiveFrom: z.iso.date() }),
+  z.object({ tenancyId: z.string().cuid(), decision: z.literal("WAIVE"), waiverReason: z.string().trim().min(3).max(500) }),
+  z.object({ tenancyId: z.string().cuid(), decision: z.literal("CANCEL") }),
+]);
+
 export const forgotPasswordSchema = z.object({ email: z.string().trim().toLowerCase().email() });
 export const resetPasswordSchema = z.object({ token: z.string().min(32).max(200), password: strongPasswordSchema });
 export const changePasswordSchema = z.object({ currentPassword: z.string().min(1).max(128), password: strongPasswordSchema });
