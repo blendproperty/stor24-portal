@@ -225,3 +225,27 @@ export async function getUnitStatsByFacility(scope: RequestScope): Promise<Facil
   );
   return stats;
 }
+
+export async function getOperationsHome(scope: RequestScope) {
+  const now = new Date();
+  const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+  const facilityIds = scope.unrestrictedFacilities ? null : scope.facilityIds;
+  const optionalFacilityScope = facilityIds ? { OR: [{ facilityId: null }, { facilityId: { in: facilityIds } }] } : {};
+
+  const [kpis, receivables, activeLeads, overdueAccounts, expiringReservations, dueTasks, followUpLeads, activity] = await Promise.all([
+    getDashboardKpis(scope),
+    db.account.aggregate({ _sum: { balance: true }, where: { tenancy: { facility: facilityWhere(scope) } } }),
+    db.lead.count({ where: { facility: facilityWhere(scope), stage: { notIn: ["WON", "LOST"] } } }),
+    db.account.count({ where: { balance: { gt: 0 }, tenancy: { facility: facilityWhere(scope) } } }),
+    db.reservation.count({ where: { facility: facilityWhere(scope), status: "ACTIVE", holdExpiresAt: { lte: threeDaysFromNow } } }),
+    db.task.count({ where: { organisationId: scope.organisationId, status: { notIn: ["COMPLETED", "CANCELLED"] }, dueAt: { lte: threeDaysFromNow }, ...optionalFacilityScope } }),
+    db.lead.count({ where: { facility: facilityWhere(scope), stage: { notIn: ["WON", "LOST"] }, nextActionAt: { lte: threeDaysFromNow } } }),
+    db.auditEvent.findMany({ where: { organisationId: scope.organisationId, ...optionalFacilityScope }, include: { actor: { select: { name: true } }, facility: { select: { name: true } } }, orderBy: { occurredAt: "desc" }, take: 8 }),
+  ]);
+
+  return {
+    metrics: { occupancyPct: kpis.occupancyPct, occupiedUnits: kpis.occupiedUnits, totalUnits: kpis.totalUnits, receivables: Number(receivables._sum.balance ?? 0), overdueAccounts, activeLeads, newLeadsThisWeek: kpis.newLeadsThisWeek },
+    queue: { expiringReservations, dueTasks, followUpLeads },
+    activity,
+  };
+}
