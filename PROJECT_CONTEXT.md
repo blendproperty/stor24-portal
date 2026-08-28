@@ -1,5 +1,30 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Operational-readiness handover — 28 August 2026
+
+The accelerated operational target is Thursday 3 September 2026. Financial-provider work and Hikvision are explicitly excluded from this release. Do not treat those exclusions as permission to weaken the operational database, facility scope, audit, booking, leasing, insurance, reporting or recovery controls.
+
+Current production evidence:
+
+- Public `/book` is accessible and displays Store 1 - Midpoint with live inventory. The live calculator recommends specific units, distinguishes unavailable units and displays the selected unit's current monthly rate. The hold form exposes separate Email, SMS, WhatsApp and Phone service-contact preferences and states that they are not marketing consent.
+- The historical live reserve/cancel proof is reconciled and closed in Asana: reservation `cmsy96mu6000501o0mcgrxm2i` moved unit 104 from Reserved to Vacant after a `200/CANCELLED` response, with inventory restored. A newer public CAPTCHA/mobile-code end-to-end run remains outstanding and must be completed by a human; automation must not bypass CAPTCHA or OTP.
+- Commit `8be2f37` adds permission-scoped, reason-required reservation extension and overdue expiry. Extensions must be later than the current deadline and in the future. Expiry atomically claims only an active overdue reservation, clears verification secrets, audits the decision and releases the unit only if no other active reservation or pending/active occupancy protects it. CI #275 and VPS deployment #260 passed; live `/reservations` shows the Extend action. Mutating UAT for Extend/Expire still requires an approved test reservation.
+- Commit `09e8ca5` makes South African time explicit across operational screens and reporting boundaries. CI #273 and VPS deployment #258 passed; live `/audit` displays SAST-formatted events. Do not rely on the VPS host timezone for business dates.
+- Facility/ownership isolation fixes are deployed (`95e372b`) and the corresponding security tasks are closed. Live dashboard, calendar, move-in handoff, facility-scoped tasks, BlendSign exception actions, insurance operations, reports, database-aware health monitoring and migration validation are deployed through commits `426f270`, `69c4c56`, `9fb7e5c`, `7b6be71`, `e6ad99e`, `2e844a2`, `bc8d94b`, `db4bcbd` and `f10ba5c`.
+- Insurance is structurally operational but cannot be commercially configured until the business supplies the approved provider, product, cover, premium, excess and policy wording. No values may be invented.
+- Reporting uses scoped production data and no longer exposes the inactive scheduling control. `/api/health` checks database readiness and the production monitor runs every ten minutes.
+- `docs/OPERATIONAL_UAT_AND_TRAINING.md` and `docs/PRODUCTION_READINESS_CHECKLIST.md` are the release evidence and training pack. CI #274 passed at `9c0b831` with 149 tests; the later reservation lifecycle release passed 151 tests locally and in CI.
+
+Immediate human-owned gates:
+
+1. Complete the live public booking CAPTCHA and mobile/email verification, then confirm the resulting CRM reservation before cancelling the approved test record.
+2. Supply an approved consenting WhatsApp UAT number.
+3. Approve the exact BlendSign controlled retry/resend and named recipient immediately before sending.
+4. Supply approved insurance commercial values and policy wording.
+5. Supply an authorised operational legacy export for the migration rehearsal. Never commit populated exports or paste customer data into Asana.
+
+Do not close the overall readiness work merely because code, CI or deployment is green. Each external or state-changing workflow needs refreshed, database-backed production evidence and named business sign-off.
+
 ## Claude takeover handover — 27 August 2026
 
 Before changing anything, Claude must read the current `PROJECT_CONTEXT.md` from all three canonical GitHub repositories, then inspect the current remote branch, working tree, recent commits and relevant implementation. Do not rely on conversation history alone.
