@@ -1,30 +1,24 @@
+import Link from "next/link";
 import { CalendarDays, Clock3 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
+import { getOperationsCalendar } from "@/lib/calendar-service";
+import { requireScope } from "@/lib/scope";
+import { SOUTH_AFRICA_TIME_ZONE } from "@/lib/south-africa-time";
 
 export const metadata = { title: "Calendar" };
 
-const days = [
-  ["Mon 03", "4", "Move-outs · 2", "Lead follow-ups · 2"],
-  ["Tue 04", "6", "Rate reviews · 3", "Collections · 3"],
-  ["Wed 05", "3", "Move-ins · 2", "Inspection · 1"],
-  ["Thu 06", "8", "Autopay retry · 5", "Viewings · 3"],
-  ["Fri 07", "5", "Daily close · 1", "Tenant tasks · 4"],
-];
+const dayLabel = (key: string) => new Intl.DateTimeFormat("en-ZA", { timeZone: SOUTH_AFRICA_TIME_ZONE, weekday: "short", day: "2-digit", month: "short" }).format(new Date(`${key}T12:00:00+02:00`));
+const timeLabel = (value: Date) => new Intl.DateTimeFormat("en-ZA", { timeZone: SOUTH_AFRICA_TIME_ZONE, hour: "2-digit", minute: "2-digit", hour12: false }).format(value);
 
-export default function CalendarPage() {
-  return (
-    <div className="page-stack">
-      <PageHeader eyebrow="Work scheduling" title="Calendar" description="One facility-aware calendar for move activity, lead follow-ups, collections, rates and operational tasks." />
-      <section className="calendar-grid">
-        {days.map(([day, count, first, second]) => (
-          <article className="calendar-day" key={day}>
-            <div><CalendarDays size={18} /><strong>{day}</strong><span>{count} items</span></div>
-            <p><Clock3 size={14} /> {first}</p>
-            <p><Clock3 size={14} /> {second}</p>
-          </article>
-        ))}
-      </section>
-    </div>
-  );
+export default async function CalendarPage() {
+  const days = await getOperationsCalendar(await requireScope());
+  return <div className="page-stack">
+    <PageHeader eyebrow="Work scheduling" title="Calendar" description="Live facility-scoped tasks, lead follow-ups, viewings and scheduled move-outs in South African time."/>
+    <section className="calendar-grid">
+      {days.map((day) => <article className="calendar-day" key={day.key}>
+        <div><CalendarDays size={18}/><strong>{dayLabel(day.key)}</strong><span>{day.items.length} {day.items.length === 1 ? "item" : "items"}</span></div>
+        {day.items.length ? day.items.map((item) => <Link href={item.href} key={`${item.kind}-${item.id}`}><Clock3 size={14}/><span><strong>{timeLabel(item.at)} · {item.title}</strong><small>{item.detail}</small></span></Link>) : <p><Clock3 size={14}/>No scheduled work</p>}
+      </article>)}
+    </section>
+  </div>;
 }
-
