@@ -1,0 +1,30 @@
+name: Monitor production
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stor24-production-monitor
+  cancel-in-progress: true
+
+jobs:
+  readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Verify public application and database readiness
+        env:
+          HEALTH_URL: https://stor24-site.srv938083.hstgr.cloud/api/health
+        run: |
+          response="$(curl --fail --silent --show-error --max-time 20 "$HEALTH_URL")"
+          node -e '
+            const value = JSON.parse(process.argv[1]);
+            if (value.service !== "stor24-crm" || value.status !== "ok" || value.database !== "ok") {
+              throw new Error(`Unhealthy STOR24 response: ${JSON.stringify(value)}`);
+            }
+          ' "$response"

@@ -1,9 +1,13 @@
-export const dynamic = "force-static";
+import { db } from "@/lib/db";
 
-export function GET() {
-  return Response.json({
-    service: "stor24-crm",
-    status: "ok",
-    version: "0.1.0",
-  });
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  const checkedAt = new Date().toISOString();
+  try {
+    await db.$queryRaw`SELECT 1`;
+    return Response.json({ service: "stor24-crm", status: "ok", database: "ok", checkedAt });
+  } catch {
+    return Response.json({ service: "stor24-crm", status: "degraded", database: "unavailable", checkedAt }, { status: 503 });
+  }
 }
