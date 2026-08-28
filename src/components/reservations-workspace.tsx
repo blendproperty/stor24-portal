@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CalendarCheck, Plus, Search, X } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
+import { formatSouthAfricaDateTime } from "@/lib/south-africa-time";
 
 type Unit = { id: string; facilityId: string; number: string; monthlyRate: string; unitType: { name: string; areaSqMetres: string | null } };
 type Facility = { id: string; name: string; units: Unit[] };
@@ -12,7 +13,7 @@ type Customer = { id: string; firstName: string | null; lastName: string | null;
 type Reservation = { id: string; status: string; quotedRate: string; holdExpiresAt: string | null; intendedMoveIn: string | null; createdAt: string; facility: { id: string; name: string }; customer: Customer; unit: Unit; lead: { id: string } | null; convertedTenancy: { id: string } | null };
 type Payload = { facilities: Facility[]; customers: Customer[]; reservations: Reservation[] };
 const customerName = (customer: Customer) => customer.companyName || [customer.firstName, customer.lastName].filter(Boolean).join(" ") || "Unnamed customer";
-const formatDate = (date: string | null) => date ? new Date(date).toLocaleDateString("en-ZA") : "—";
+const formatDate = (date: string | null) => formatSouthAfricaDateTime(date);
 
 export function ReservationsWorkspace() {
   const [data, setData] = useState<Payload>({ facilities: [], customers: [], reservations: [] }); const [facilityId, setFacilityId] = useState(""); const [status, setStatus] = useState("ACTIVE"); const [query, setQuery] = useState("");
