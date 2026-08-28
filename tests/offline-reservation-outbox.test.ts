@@ -43,7 +43,10 @@ test("offline reservation sync atomically claims availability and is idempotent"
   assert.match(service, /source: "OFFLINE_PWA"/);
   assert.match(service, /HOLD_HOURS = 24/);
   assert.match(service, /publicReference: reservationReference/);
-  assert.doesNotMatch(service, /document|payment|biometric|identityRef/i);
+  assert.match(service, /notifyReservationConfirmed/);
+  assert.match(service, /Follow up offline reservation/);
+  assert.match(service, /deliverySummary/);
+  assert.doesNotMatch(service, /tx\.(?:document|payment|biometricEnrollment)\.(?:create|update)|identityRef/i);
 });
 
 test("offline reservation conflicts remain encrypted and editable", async () => {
@@ -82,4 +85,8 @@ test("offline operator UI distinguishes connectivity, refreshes conflicts and re
   assert.match(shell, /Request this specific unit when internet returns/);
   assert.match(shell, /Recent sync receipts/);
   assert.match(shell, /unit is not held or confirmed until/i);
+  assert.match(shell, /Customer confirmation channels/);
+  assert.match(workspace, /communications: payload\.data\.communications/);
+  assert.match(workspace, /Continue to lease/);
+  assert.match(workspace, /Payment link unavailable/);
 });

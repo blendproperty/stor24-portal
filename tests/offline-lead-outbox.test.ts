@@ -19,11 +19,13 @@ const valid = {
   facilityId: "facility-test",
   expectedMoveIn: "2026-09-01",
   consentToContact: true,
+  communicationConsent: { email: true, sms: true, whatsapp: false },
 };
 
 test("offline lead sync requires contact consent and stable retry identity", () => {
   assert.equal(offlineLeadSyncSchema.safeParse(valid).success, true);
   assert.equal(offlineLeadSyncSchema.safeParse({ ...valid, consentToContact: false }).success, false);
+  assert.equal(offlineLeadSyncSchema.parse(valid).communicationConsent.whatsapp, false);
   assert.equal(offlineLeadSyncSchema.safeParse({ ...valid, submissionId: "not-stable" }).success, false);
 });
 
@@ -35,6 +37,7 @@ test("offline lead creation is transactional, scoped, audited and idempotent", a
   assert.match(service, /db\.\$transaction/);
   assert.match(service, /offlineSubmissionId: input\.submissionId/);
   assert.match(service, /offline\.lead\.synced/);
+  assert.match(service, /whatsapp: input\.communicationConsent\.whatsapp/);
   assert.match(service, /requestId: input\.submissionId/);
   assert.match(service, /raced\.facility\.organisationId === scope\.organisationId/);
   assert.doesNotMatch(service, /identityRef|billingAddress|document|payment|biometric/i);

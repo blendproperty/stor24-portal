@@ -28,9 +28,10 @@ export async function syncOfflineLead(scope: RequestScope, input: OfflineLeadSyn
           email: input.email,
           phone: input.phone,
           communicationConsent: {
-            email: Boolean(input.email),
-            sms: true,
+            email: Boolean(input.email) && input.communicationConsent.email,
+            sms: input.communicationConsent.sms,
             phone: true,
+            whatsapp: input.communicationConsent.whatsapp,
             recordedAt: input.capturedAt,
             source: "OFFLINE_PWA",
           },
@@ -56,7 +57,7 @@ export async function syncOfflineLead(scope: RequestScope, input: OfflineLeadSyn
           entityType: "Lead",
           entityId: lead.id,
           requestId: input.submissionId,
-          after: { deviceId: input.deviceId, capturedAt: input.capturedAt, source: "OFFLINE_PWA" },
+          after: { deviceId: input.deviceId, capturedAt: input.capturedAt, source: "OFFLINE_PWA", communicationConsent: input.communicationConsent },
         },
       });
       return { leadId: lead.id, customerId: customer.id, idempotent: false };

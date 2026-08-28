@@ -109,9 +109,8 @@ function customerDateTime(value: string) {
  * reservation itself. Every attempt, success or failure, is logged to
  * CommunicationLog with the recipient stored only as a privacy-safe hash.
  *
- * Note: WhatsApp currently reuses the "phone" consent checkbox (there is no
- * separate WhatsApp opt-in in the booking form or the consent schema).
- * Revisit if the business wants WhatsApp consent tracked distinctly.
+ * WhatsApp requires its own active consent flag. Phone or SMS permission must
+ * never be treated as WhatsApp permission.
  */
 export async function notifyReservationConfirmed(input: ReservationConfirmationInput) {
   const results: Array<{ channel: Channel; ok: boolean }> = [];

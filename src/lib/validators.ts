@@ -27,6 +27,11 @@ export const offlineLeadSyncSchema = z.object({
   expectedMoveIn: z.iso.date().optional(),
   notes: z.string().trim().max(2000).optional(),
   consentToContact: z.literal(true),
+  communicationConsent: z.object({
+    email: z.boolean().default(false),
+    sms: z.boolean().default(false),
+    whatsapp: z.boolean().default(false),
+  }).default({ email: false, sms: false, whatsapp: false }),
 });
 
 export type OfflineLeadSyncInput = z.infer<typeof offlineLeadSyncSchema>;
