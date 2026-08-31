@@ -9,6 +9,16 @@
 - The scheduled `Monitor production` workflow is not reliable evidence on its own: runs `#13` and `#14` failed while the direct database-aware health endpoint was healthy, after earlier successful runs. Investigate and stabilise the monitor separately; do not misreport those monitor failures as a confirmed CRM outage.
 - Cross-repository baseline at the same checkpoint: public portal `a0db67252e95da04c95bf0a6687b3a4b5bc16db3` (deploy `#143`), CMS `694ac9389bf24b9e730b4413698d2f9c4a2f90c1` (deploy `#23`) and BlendSign `142c4632189bd6a69463c792641d365e614fd9c4` (deploy `#33`). All four deployment runs succeeded. This closes baseline reconciliation only; it does not close the remaining end-to-end UAT gates.
 
+## Move-out workflow hardening — 31 August 2026
+
+- Built on clean branch `codex/move-out-workflow` from `origin/main` commit `383cff4`; the obsolete local `codex/fix-facility-patch-validation` checkout and its unrelated changes were not used.
+- Move-out input now requires an explicit replay/idempotency key, operational reason/condition notes and coherent deposit treatment (`NONE`, `REFUND_DUE` or `APPLY_TO_BALANCE`). The staff Accounts workflow captures these fields and reuses the same key for a submitted operation.
+- Active biometric access is revoked before tenancy closure. A failure therefore stops closure instead of leaving a closed tenancy with live recorded access.
+- Occupancies close atomically. Each vacated unit is recalculated against remaining active occupancy, maintenance and reservation claims, producing `OCCUPIED`, `SERVICE`, `RESERVED` or `AVAILABLE` instead of being released unconditionally.
+- Final charges and applied deposit credits have stable ledger references. A refund due creates a high-priority staff task rather than claiming that an unprocessed provider refund occurred. Active insurance enrolment is ended at the move-out date.
+- `tenancy.moved_out` audit evidence now records the before state, idempotency key, effective date, final charge, deposit decision, notes, access state and resulting unit state. Same-key retries return the completed result and reuse the WhatsApp idempotency key; conflicting retries fail closed.
+- Local validation passed: Prisma client generation, TypeScript, 161/161 tests, production build and lint with zero errors (four pre-existing warnings). This is implemented and locally verified only; do not call it deployed or live-proven until CI, VPS deployment and controlled production UAT pass.
+
 ## Operational-readiness handover — 28 August 2026
 
 The accelerated operational target is Thursday 3 September 2026. Financial-provider work and Hikvision are explicitly excluded from this release. Do not treat those exclusions as permission to weaken the operational database, facility scope, audit, booking, leasing, insurance, reporting or recovery controls.

@@ -1060,10 +1060,57 @@ export async function moveOut(
     tenancyId: string;
     movedOutAt: Date;
     finalCharge: number;
-    notes?: string;
+    depositAction: "NONE" | "REFUND_DUE" | "APPLY_TO_BALANCE";
+    depositAmount: number;
+    idempotencyKey: string;
+    notes: string;
   },
 ) {
-  const entity = await db.$transaction(async (tx) => {
+  const existing = await db.tenancy.findFirst({
+    where: { id: input.tenancyId, facility: facilityWhere(scope) },
+    include: {
+      occupancies: { include: { unit: true } },
+      customer: true,
+      facility: true,
+    },
+  });
+  if (!existing) throw new Error("NOT_FOUND");
+  if (input.movedOutAt < existing.startDate) throw new Error("CONFLICT");
+  if (existing.noticeDate && input.movedOutAt < existing.noticeDate)
+    throw new Error("CONFLICT");
+
+  const previousMoveOut = await db.auditEvent.findFirst({
+    where: {
+      organisationId: scope.organisationId,
+      facilityId: existing.facilityId,
+      action: "tenancy.moved_out",
+      entityId: existing.id,
+      after: { path: ["idempotencyKey"], equals: input.idempotencyKey },
+    },
+  });
+  const previousAfter = previousMoveOut?.after && typeof previousMoveOut.after === "object" && !Array.isArray(previousMoveOut.after)
+    ? previousMoveOut.after as Record<string, Prisma.JsonValue>
+    : null;
+  if (previousAfter && (
+    previousAfter.movedOutAt !== input.movedOutAt.toISOString() ||
+    Number(previousAfter.finalCharge) !== input.finalCharge ||
+    previousAfter.depositAction !== input.depositAction ||
+    Number(previousAfter.depositAmount) !== input.depositAmount ||
+    previousAfter.notes !== input.notes
+  )) throw new Error("CONFLICT");
+  const replayed = existing.status === "CLOSED" && Boolean(previousMoveOut);
+  if (existing.status === "CLOSED" && !replayed) throw new Error("CONFLICT");
+
+  if (!replayed) {
+    const activeBiometrics = await db.biometricEnrollment.findMany({
+      where: { occupancy: { tenancyId: existing.id }, status: "ACTIVE" },
+      select: { id: true },
+    });
+    for (const enrollment of activeBiometrics)
+      await revokeBiometricAccess(scope, enrollment.id);
+  }
+
+  const result = replayed ? { entity: existing, releasedUnits: [] as { unitId: string; status: string }[] } : await db.$transaction(async (tx) => {
     const tenancy = await tx.tenancy.findFirst({
       where: {
         id: input.tenancyId,
@@ -1075,7 +1122,7 @@ export async function moveOut(
       },
     });
     if (!tenancy) throw new Error("NOT_FOUND");
-    await tx.occupancy.updateMany({
+    const closedOccupancies = await tx.occupancy.updateMany({
       where: {
         tenancyId: tenancy.id,
         status: { in: ["ACTIVE", "NOTICE_GIVEN"] },
@@ -1086,10 +1133,19 @@ export async function moveOut(
         accessState: "REVOKED",
       },
     });
-    await tx.unit.updateMany({
-      where: { id: { in: tenancy.occupancies.map((o) => o.unitId) } },
-      data: { status: "AVAILABLE" },
-    });
+    if (closedOccupancies.count !== tenancy.occupancies.length)
+      throw new Error("CONFLICT");
+    const releasedUnits: { unitId: string; status: string }[] = [];
+    for (const occupancy of tenancy.occupancies) {
+      const [occupied, maintenance, reservation] = await Promise.all([
+        tx.occupancy.count({ where: { unitId: occupancy.unitId, status: { in: ["PENDING", "ACTIVE", "TRANSFERRING", "NOTICE_GIVEN"] } } }),
+        tx.maintenanceRequest.count({ where: { unitId: occupancy.unitId, status: { in: ["OPEN", "SCHEDULED", "IN_PROGRESS", "BLOCKED"] } } }),
+        tx.reservation.count({ where: { unitId: occupancy.unitId, status: "ACTIVE" } }),
+      ]);
+      const status = occupied ? "OCCUPIED" : maintenance ? "SERVICE" : reservation ? "RESERVED" : "AVAILABLE";
+      await tx.unit.update({ where: { id: occupancy.unitId }, data: { status } });
+      releasedUnits.push({ unitId: occupancy.unitId, status });
+    }
     const entity = await tx.tenancy.update({
       where: { id: tenancy.id },
       data: { status: "CLOSED", endDate: input.movedOutAt },
@@ -1100,9 +1156,11 @@ export async function moveOut(
           accountId: tenancy.accountId,
           type: "CHARGE",
           amount: input.finalCharge,
-          description: input.notes || "Final move-out charge",
+          description: "Final move-out charge",
           effectiveAt: input.movedOutAt,
+          externalRef: `move-out:${tenancy.id}:${input.idempotencyKey}:charge`,
           createdById: scope.userId,
+          metadata: { moveOutIdempotencyKey: input.idempotencyKey, notes: input.notes },
         },
       });
       await tx.account.update({
@@ -1110,6 +1168,35 @@ export async function moveOut(
         data: { balance: { increment: input.finalCharge } },
       });
     }
+    if (input.depositAction === "APPLY_TO_BALANCE") {
+      await tx.ledgerEntry.create({ data: {
+        accountId: tenancy.accountId,
+        type: "CREDIT",
+        amount: input.depositAmount,
+        description: "Move-out deposit applied to account balance",
+        effectiveAt: input.movedOutAt,
+        externalRef: `move-out:${tenancy.id}:${input.idempotencyKey}:deposit-credit`,
+        createdById: scope.userId,
+        metadata: { moveOutIdempotencyKey: input.idempotencyKey },
+      } });
+      await tx.account.update({ where: { id: tenancy.accountId }, data: { balance: { decrement: input.depositAmount } } });
+    }
+    if (input.depositAction === "REFUND_DUE") {
+      await tx.task.create({ data: {
+        organisationId: scope.organisationId,
+        facilityId: tenancy.facilityId,
+        customerId: tenancy.customerId,
+        createdById: scope.userId,
+        title: "Process move-out deposit refund",
+        description: `Refund R${input.depositAmount.toFixed(2)} after final account and unit-condition approval. Move-out reference: ${input.idempotencyKey}`,
+        priority: "HIGH",
+        dueAt: input.movedOutAt,
+      } });
+    }
+    await tx.insuranceEnrollment.updateMany({
+      where: { tenancyId: tenancy.id, status: { notIn: ["ENDED", "CANCELLED"] } },
+      data: { status: "ENDED", endedAt: input.movedOutAt },
+    });
     await audit(
       tx,
       scope,
@@ -1117,17 +1204,26 @@ export async function moveOut(
       "Tenancy",
       entity.id,
       tenancy.facilityId,
+      {
+        tenancyStatus: tenancy.status,
+        occupancies: tenancy.occupancies.map((occupancy) => ({ occupancyId: occupancy.id, unitId: occupancy.unitId, status: occupancy.status, accessState: occupancy.accessState })),
+      },
+      {
+        idempotencyKey: input.idempotencyKey,
+        tenancyStatus: "CLOSED",
+        movedOutAt: input.movedOutAt.toISOString(),
+        finalCharge: input.finalCharge,
+        depositAction: input.depositAction,
+        depositAmount: input.depositAmount,
+        notes: input.notes,
+        units: releasedUnits,
+        accessState: "REVOKED",
+      },
     );
-    return entity;
+    return { entity, releasedUnits };
   });
-  const activeBiometrics = await db.biometricEnrollment.findMany({
-    where: { occupancy: { tenancyId: entity.id }, status: "ACTIVE" },
-    select: { id: true },
-  });
-  for (const enrollment of activeBiometrics)
-    await revokeBiometricAccess(scope, enrollment.id);
   const notification = await db.tenancy.findUnique({
-    where: { id: entity.id },
+    where: { id: result.entity.id },
     include: {
       customer: true,
       facility: true,
@@ -1146,7 +1242,7 @@ export async function moveOut(
       recipient: notification.customer.phone,
       consent: notification.customer.communicationConsent,
       messageType: "MOVE_OUT_CONFIRMATION",
-      idempotencyKey: `move-out:${entity.id}:WHATSAPP`,
+      idempotencyKey: `move-out:${result.entity.id}:${input.idempotencyKey}:WHATSAPP`,
       variables: {
         "1":
           notification.customer.firstName ||
@@ -1157,5 +1253,5 @@ export async function moveOut(
         "4": formatSouthAfricaDate(input.movedOutAt),
       },
     });
-  return entity;
+  return { tenancy: result.entity, releasedUnits: result.releasedUnits, replayed };
 }

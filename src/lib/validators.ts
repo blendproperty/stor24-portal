@@ -225,7 +225,17 @@ export const moveOutSchema = z.object({
   tenancyId: id,
   movedOutAt: z.coerce.date(),
   finalCharge: money.default(0),
-  notes: optionalText,
+  depositAction: z.enum(["NONE", "REFUND_DUE", "APPLY_TO_BALANCE"]).default("NONE"),
+  depositAmount: money.default(0),
+  idempotencyKey: z.string().trim().min(8).max(120).regex(/^[A-Za-z0-9:_-]+$/),
+  notes: z.string().trim().min(3).max(2000),
+}).superRefine((value, ctx) => {
+  if (value.depositAction === "NONE" && value.depositAmount !== 0) {
+    ctx.addIssue({ code: "custom", path: ["depositAmount"], message: "Deposit amount must be zero when no deposit action is selected." });
+  }
+  if (value.depositAction !== "NONE" && value.depositAmount <= 0) {
+    ctx.addIssue({ code: "custom", path: ["depositAmount"], message: "Enter the deposit amount to be processed." });
+  }
 });
 export const accountPaymentSchema = z.object({
   accountId: id,

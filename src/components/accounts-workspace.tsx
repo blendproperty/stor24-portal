@@ -97,6 +97,7 @@ export function AccountsWorkspace({
   const [search, setSearch] = useState("");
   const [dialog, setDialog] = useState<Dialog>(null);
   const [paymentReference, setPaymentReference] = useState("");
+  const [moveOutIdempotencyKey, setMoveOutIdempotencyKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -207,6 +208,9 @@ export function AccountsWorkspace({
         tenancyId: selected?.tenancy?.id,
         movedOutAt: new Date(String(formData.get("movedOutAt"))).toISOString(),
         finalCharge: Number(formData.get("finalCharge") || 0),
+        depositAction: formData.get("depositAction"),
+        depositAmount: Number(formData.get("depositAmount") || 0),
+        idempotencyKey: moveOutIdempotencyKey,
         notes: formData.get("notes") || undefined,
       },
       "Move-out completed.",
@@ -367,6 +371,7 @@ export function AccountsWorkspace({
                   }
                   onClick={() => {
                     setError("");
+                    setMoveOutIdempotencyKey(crypto.randomUUID());
                     setDialog("moveOut");
                   }}
                 >
@@ -598,8 +603,20 @@ export function AccountsWorkspace({
                   />
                 </label>
                 <label>
-                  Notes
-                  <textarea name="notes" rows={4} maxLength={2000} />
+                  Deposit treatment
+                  <select name="depositAction" defaultValue="NONE" required>
+                    <option value="NONE">No deposit action</option>
+                    <option value="REFUND_DUE">Refund requires processing</option>
+                    <option value="APPLY_TO_BALANCE">Apply deposit to balance</option>
+                  </select>
+                </label>
+                <label>
+                  Deposit amount
+                  <input name="depositAmount" type="number" min="0" step="0.01" defaultValue="0" />
+                </label>
+                <label>
+                  Move-out reason and condition notes
+                  <textarea name="notes" rows={4} minLength={3} maxLength={2000} required />
                 </label>
                 <ActionButtons
                   busy={busy}

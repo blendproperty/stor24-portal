@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { accountPaymentSchema, customerSchema, facilitySchema, moveInSchema, noticeSchema, transferSchema, unitTypeSchema } from "../src/lib/validators";
+import { accountPaymentSchema, customerSchema, facilitySchema, moveInSchema, moveOutSchema, noticeSchema, transferSchema, unitTypeSchema } from "../src/lib/validators";
 
 test("unit types accept single-character operational names", () => {
   assert.equal(unitTypeSchema.safeParse({ facilityId: "facility-1", name: "A", widthMetres: 4.838, lengthMetres: 7.233, areaSqMetres: 35 }).success, true);
@@ -56,4 +56,28 @@ test("transfers atomically claim the destination and audit both unit identities"
   assert.match(transferSource, /if \(claimed\.count !== 1\) throw new Error\("CONFLICT"\)/);
   assert.match(transferSource, /\{ unitId: current\.unitId, occupancyId: current\.id \}/);
   assert.match(transferSource, /\{ unitId: next\.id, occupancyId: occupancy\.id,/);
+});
+
+test("move-out requires a replay key, operational notes and coherent deposit treatment", () => {
+  const base = { tenancyId: "tenancy-1", movedOutAt: "2026-08-31", finalCharge: 125, idempotencyKey: "move-out-test-001", notes: "Unit inspected and cleared." };
+  assert.equal(moveOutSchema.safeParse({ ...base, depositAction: "NONE", depositAmount: 0 }).success, true);
+  assert.equal(moveOutSchema.safeParse({ ...base, depositAction: "REFUND_DUE", depositAmount: 500 }).success, true);
+  assert.equal(moveOutSchema.safeParse({ ...base, depositAction: "NONE", depositAmount: 500 }).success, false);
+  assert.equal(moveOutSchema.safeParse({ ...base, depositAction: "REFUND_DUE", depositAmount: 0 }).success, false);
+  assert.equal(moveOutSchema.safeParse({ ...base, idempotencyKey: "bad key", depositAction: "NONE", depositAmount: 0 }).success, false);
+  assert.equal(moveOutSchema.safeParse({ ...base, notes: "", depositAction: "NONE", depositAmount: 0 }).success, false);
+});
+
+test("move-out guards inventory, access, finance, audit and replay behavior", () => {
+  const source = readFileSync(new URL("../src/lib/leasing-service.ts", import.meta.url), "utf8");
+  const moveOutSource = source.slice(source.indexOf("export async function moveOut("));
+  assert.match(moveOutSource, /previousMoveOut[\s\S]*idempotencyKey/);
+  assert.match(moveOutSource, /previousAfter[\s\S]*previousAfter\.movedOutAt[\s\S]*throw new Error\("CONFLICT"\)/);
+  assert.match(moveOutSource, /revokeBiometricAccess\(scope, enrollment\.id\)/);
+  assert.match(moveOutSource, /maintenanceRequest\.count[\s\S]*reservation\.count/);
+  assert.match(moveOutSource, /occupied \? "OCCUPIED" : maintenance \? "SERVICE" : reservation \? "RESERVED" : "AVAILABLE"/);
+  assert.match(moveOutSource, /externalRef: `move-out:\$\{tenancy\.id\}:\$\{input\.idempotencyKey\}:charge`/);
+  assert.match(moveOutSource, /title: "Process move-out deposit refund"/);
+  assert.match(moveOutSource, /action: "tenancy\.moved_out"|"tenancy\.moved_out"/);
+  assert.match(moveOutSource, /units: releasedUnits[\s\S]*accessState: "REVOKED"/);
 });
