@@ -11,7 +11,7 @@ export async function GET() {
     const { organisationId, allowedFacilityIds } = await requirePermission("ledger.view");
     const accounts = await db.account.findMany({
       where: { customer: { organisationId }, tenancy: allowedFacilityIds ? { facilityId: { in: allowedFacilityIds } } : undefined },
-      include: { customer: true, tenancy: { include: { facility: true, documents: { where: { type: "LEASE_AGREEMENT" }, orderBy: { createdAt: "desc" } }, occupancies: { where: { status: { in: ["ACTIVE", "NOTICE_GIVEN"] } }, include: { unit: { include: { unitType: true } } } } } }, ledgerEntries: { orderBy: [{ effectiveAt: "desc" }, { createdAt: "desc" }], take: 50 }, payments: { orderBy: { createdAt: "desc" }, take: 25 } },
+      include: { customer: true, tenancy: { include: { facility: true, documents: { where: { type: "LEASE_AGREEMENT" }, orderBy: { createdAt: "desc" } }, occupancies: { where: { status: { in: ["PENDING", "ACTIVE", "NOTICE_GIVEN"] } }, include: { unit: { include: { unitType: true } } }, orderBy: { startDate: "desc" }, take: 1 } } }, ledgerEntries: { orderBy: [{ effectiveAt: "desc" }, { createdAt: "desc" }], take: 50 }, payments: { orderBy: { createdAt: "desc" }, take: 25 } },
       orderBy: { updatedAt: "desc" }, take: 250,
     });
     const facilities = await db.facility.findMany({ where: { organisationId, active: true, ...(allowedFacilityIds ? { id: { in: allowedFacilityIds } } : {}) }, include: { units: { where: { status: "AVAILABLE" }, include: { unitType: true }, orderBy: { number: "asc" } } }, orderBy: { name: "asc" } });

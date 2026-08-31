@@ -50,6 +50,7 @@ type Account = {
     facility: { name: string };
     documents: { id: string; status: string; signedAt: string | null }[];
     occupancies: {
+      status: string;
       unit: { number: string; unitType: { name: string } };
       monthlyRate: string;
     }[];
@@ -78,6 +79,12 @@ const customerName = (account: Account) =>
     .filter(Boolean)
     .join(" ") ||
   "Unnamed customer";
+const occupancyLabel = (status?: string) => {
+  if (status === "PENDING") return "Pending lease signature";
+  if (status === "NOTICE_GIVEN") return "Notice given";
+  if (status === "ACTIVE") return "Active occupancy";
+  return "Access closed";
+};
 
 function generateReference(accountNumber: string) {
   const stamp = southAfricaDateKey(new Date()).replaceAll("-", "");
@@ -382,11 +389,7 @@ export function AccountsWorkspace({
               <div className="account-info-grid">
                 <div>
                   <span>Security status</span>
-                  <strong>
-                    {selected.tenancy?.occupancies[0]
-                      ? "Active occupancy"
-                      : "Access closed"}
-                  </strong>
+                  <strong>{occupancyLabel(selected.tenancy?.occupancies[0]?.status)}</strong>
                 </div>
                 <div>
                   <span>Monthly rent</span>

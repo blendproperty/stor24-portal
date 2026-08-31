@@ -9,6 +9,15 @@
 - The scheduled `Monitor production` workflow is not reliable evidence on its own: runs `#13` and `#14` failed while the direct database-aware health endpoint was healthy, after earlier successful runs. Investigate and stabilise the monitor separately; do not misreport those monitor failures as a confirmed CRM outage.
 - Cross-repository baseline at the same checkpoint: public portal `a0db67252e95da04c95bf0a6687b3a4b5bc16db3` (deploy `#143`), CMS `694ac9389bf24b9e730b4413698d2f9c4a2f90c1` (deploy `#23`) and BlendSign `142c4632189bd6a69463c792641d365e614fd9c4` (deploy `#33`). All four deployment runs succeeded. This closes baseline reconciliation only; it does not close the remaining end-to-end UAT gates.
 
+## Pending move-in account summary — 31 August 2026
+
+- **Implementation:** the Accounts read model now includes the newest `PENDING`, `ACTIVE` or `NOTICE_GIVEN` occupancy. A newly created move-in therefore retains its selected unit, unit type and monthly rate immediately after redirect instead of temporarily showing Unit `—` and R0. Pending records are labelled `Pending lease signature`; they are not presented as active access, and the existing transfer/move-out activation guards remain unchanged.
+- **Testing:** Prisma client generation passed; all 163 tests passed, including focused pending-occupancy regression coverage; Next route generation and TypeScript passed; lint completed with zero errors and the four pre-existing Twilio/Netcash warnings; and the full Next.js production build generated all 70 static pages successfully.
+- **Commit and push:** pending.
+- **Merge:** pending.
+- **Deployment and configuration:** pending; no configuration change is required.
+- **Live production verification:** pending. Verify a controlled newly created draft move-in on Accounts before signing, then confirm the same account changes from `Pending lease signature` to active occupancy after the authenticated BlendSign completion callback. No provider, financial or customer mutation is authorised by this code-only evidence.
+
 ## Move-out workflow hardening — 31 August 2026
 
 - Built on clean branch `codex/move-out-workflow` from `origin/main` commit `383cff4`; the obsolete local `codex/fix-facility-patch-validation` checkout and its unrelated changes were not used.
