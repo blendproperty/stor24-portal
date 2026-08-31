@@ -215,6 +215,16 @@ MRI Property Central — approved finance system of record
 
 **Resolved 18 August 2026:** the CMS's live CRM-shaped collections (`contacts`, `deals`, `activities`, `units`) and their five dashboards were removed from `stor24-cms` — see that repository's `PROJECT_CONTEXT.md`. Brett liked the visual style of those now-removed dashboards; the new `/graphs` executive dashboard in this repository (see Implemented foundations) is the corrected, properly-owned version of that reporting experience.
 
+### Customer and lead ownership task close-out — 31 August 2026
+
+- **Implementation:** no runtime code was required for this governance slice. The approved contract is now reconciled across the canonical CRM, public-portal and CMS contexts: this CRM alone owns persisted customer, lead, reservation, tenancy, occupancy and operational-audit truth; the public portal captures and presents customer journeys through sanitised server-side CRM APIs; the CMS owns editorial content, approved media and publication state only.
+- **Testing / validation:** current source was inspected, not inferred. Prisma defines `Customer`, `Lead`, `Reservation`, `Tenancy` and `Occupancy`; `src/lib/public-lead-service.ts` and `src/lib/public-booking-service.ts` persist the public lead and reservation flows; the public API routes delegate to those services. The existing live quote UAT from 24 August remains the production proof that a public quote becomes a CRM `Customer` + `Lead`.
+- **Commit and push:** this documentation-only close-out is committed and pushed with the matching context updates in all three repositories. Remote presence must be checked with `git show origin/main:PROJECT_CONTEXT.md` before handoff.
+- **Merge:** the context update is promoted directly to `main`; no separate application-code merge is involved.
+- **Deployment / configuration:** none required; this slice changes governance documentation only.
+- **Live production verification:** no new production mutation was performed. Existing live evidence remains the 24 August quote-to-CRM UAT and the production-confirmed removal of the CMS shadow-CRM collections. This does not close unrelated finance, provider, data, training or approval gates.
+- **Follow-up preserved:** the public portal's legacy `/pricing` source still reads the retired CMS `storage-units` endpoint. It must be removed or changed to a sanitised CRM pricing contract before pricing ownership can be called clean; it does not create or store customer/lead records and therefore does not block this customer-and-lead ownership close-out.
+
 ## Priority next work
 
 ### Public customer journeys reviewed 26 August 2026
