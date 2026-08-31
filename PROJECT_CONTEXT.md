@@ -257,6 +257,15 @@ A CRM capability is complete only when it is database-backed, scoped, permission
 - UAT BlendSign documents are included in the permission-scoped Integrations reconciliation table so authorised staff can resend a failed/missing UAT signing invitation through the same audited provider action as production lease documents.
 - Public Pay-now now collects the payment method on the hosted payment screen and stores it on `PublicPaymentSession`. Debit order routes to `stor24-unit-lease-debit-order`; card and EFT route to `stor24-unit-lease`. Do not restore a hard-coded `CARD` value in follow-up processing.
 
+## BlendSign retry/idempotency production UAT — 31 August 2026
+
+- With explicit approval, the live Move In workflow created disposable debit-order UAT account `ST24-MTGUH18X` for `Premium UAT 2808`, Midpoint Unit 103, R1,100 monthly rent, R0 initial charge and start date 31 August 2026. The verified test recipient is `doveybrett@gmail.com`.
+- BlendSign created one envelope/document, `cmtguh1t200015iu2lgmn6nrw`, using `stor24-unit-lease-debit-order`. The Integrations reconciliation screen showed `Awaiting signature`, sent 31 August 2026 08:15 SAST and expiring 07 September 2026 08:15 SAST.
+- One reminder and one immediate duplicate retry were submitted. Both returned `Signing invitation queued again`; the same document ID remained in place and the awaiting-signature count remained one, so no duplicate envelope was created.
+- This proves live envelope identity/idempotency through the retry path, but it does not by itself prove that the provider suppressed a duplicate email. Recipient mailbox or authenticated BlendSign audit evidence is still required before that narrower claim is closed.
+- After the move-in redirect, the Accounts summary temporarily presented the draft as Unit `—` and R0 although Integrations correctly reconciled it to Unit 103. Treat that presentation mismatch as a separate account-summary defect; do not confuse it with envelope creation failure.
+- The three older reconciliation-required records remain unchanged. Webhook inbox remained 134 processed, 0 pending and 0 failed/dead-letter; transactional outbox remained empty.
+
 ## Offline PWA production-readiness improvements — 28 August 2026
 
 - The installed offline workspace now distinguishes browser connectivity from confirmed STOR 24 reachability and displays `Offline`, `Internet detected`, `Syncing`, or `Online and synced` states.
