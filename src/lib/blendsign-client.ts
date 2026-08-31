@@ -33,6 +33,13 @@ export type BlendSignEnvelope = {
 
 export type BlendSignArtifact = "signed" | "certificate";
 
+export const BLENDSIGN_REMINDER_COOLDOWN_MS = 5 * 60 * 1000;
+
+export function blendSignReminderRequestId(documentId: string, at = new Date()) {
+  const window = Math.floor(at.getTime() / BLENDSIGN_REMINDER_COOLDOWN_MS);
+  return `stor24-reminder:${documentId}:${window}`;
+}
+
 export async function fetchBlendSignArtifact(envelopeId: string, artifact: BlendSignArtifact) {
   const baseUrl = process.env.BLENDSIGN_BASE_URL?.replace(/\/$/, "");
   const apiKey = process.env.BLENDSIGN_API_KEY;
