@@ -1,5 +1,7 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+> Last reviewed: 31 August 2026. Read this file before planning or changing the repository. Update it whenever a material capability, decision, deployment state, or cross-repository contract changes.
+
 ## Operational-readiness handover — 28 August 2026
 
 The accelerated operational target is Thursday 3 September 2026. Financial-provider work and Hikvision are explicitly excluded from this release. Do not treat those exclusions as permission to weaken the operational database, facility scope, audit, booking, leasing, insurance, reporting or recovery controls.
@@ -258,3 +260,14 @@ A CRM capability is complete only when it is database-backed, scoped, permission
 - Automated coverage records the expected two-device race invariant: exactly one atomic `AVAILABLE` to `RESERVED` claim succeeds. Live two-device UAT is still required after deployment; test coverage is not a substitute for production evidence.
 - Post-sync continuation is now code-complete on the feature branch: the offline form records separate email, SMS and WhatsApp consent; a newly confirmed offline reservation invokes the existing server-side reservation notification service; delivery outcomes return to the encrypted non-PII receipt; and the same transaction creates a high-priority CRM follow-up task to choose viewing, payment or lease continuation. Successful retries read existing communication evidence instead of resending a confirmation.
 - Receipt actions open the reservation and move-in workflows. Live payment-link creation remains explicitly blocked in the response and UI until Netcash sandbox behaviour and authenticated callbacks are proven; the offline device never creates a payment, lease, document or biometric record.
+
+## Programme evidence refresh — 31 August 2026
+
+- Asana programme `1217529585497952` records 46 tasks: 21 complete and 25 open after the confirmed CMS ownership boundary was closed. Overall programme status remains amber / at risk; task count is not a weighted delivery percentage.
+- Live evidence recorded across the programme includes the secured public booking API, staff MFA, quote-to-CRM lead capture, standard and debit-order BlendSign journeys, completed PDF/certificate retrieval, reserve/cancel availability restoration, and the bounded maintenance lifecycle `Available -> Service -> Available`.
+- BlendSign's principal signing journeys are live-proven, but the parent remains open until invalid-signature, duplicate/idempotency, unknown-key/missing-role and provider-outage handling plus the final evidence pack are complete.
+- Transactional email and outbound SMS are live-proven. WhatsApp consent, template and lifecycle controls are implemented, but general lifecycle automation remains disabled pending controlled production UAT.
+- Pay-now remains a gated UAT simulator. Netcash contract, credentials, callback verification/replay specification, real settlement, reconciliation and exception ownership remain open.
+- MRI/MDA system ownership, master-data mappings, posting model, sandbox method, reconciliation controls and accountable exception owners remain open design/approval gates.
+- Hikvision/MEL administration and scoped configuration exist, but live enrolment, entry and revocation proof remain blocked by the untrusted HikCentral TLS chain and the still-to-be-confirmed responsibility/POPIA boundary.
+- Migration rehearsal, full cross-system integration/security UAT, staff training, monitoring/recovery, cut-over and business approval remain go-live gates.
