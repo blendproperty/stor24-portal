@@ -2,6 +2,13 @@
 
 > Last reviewed: 31 August 2026. Read this file before planning or changing the repository. Update it whenever a material capability, decision, deployment state, or cross-repository contract changes.
 
+## Verified production baseline — 31 August 2026
+
+- Repository `blendproperty/stor24-portal` production branch `main` is at `bce09438718437b5ab06052c5af069a73f329be8`. CI run `#278` and VPS deployment run `#263` completed successfully; the deployment run identifies that exact commit.
+- Direct production readback returned HTTP 200 from `https://stor24-site.srv938083.hstgr.cloud/api/health` with service `stor24-crm`, application status `ok` and database status `ok`.
+- The scheduled `Monitor production` workflow is not reliable evidence on its own: runs `#13` and `#14` failed while the direct database-aware health endpoint was healthy, after earlier successful runs. Investigate and stabilise the monitor separately; do not misreport those monitor failures as a confirmed CRM outage.
+- Cross-repository baseline at the same checkpoint: public portal `a0db67252e95da04c95bf0a6687b3a4b5bc16db3` (deploy `#143`), CMS `694ac9389bf24b9e730b4413698d2f9c4a2f90c1` (deploy `#23`) and BlendSign `142c4632189bd6a69463c792641d365e614fd9c4` (deploy `#33`). All four deployment runs succeeded. This closes baseline reconciliation only; it does not close the remaining end-to-end UAT gates.
+
 ## Operational-readiness handover — 28 August 2026
 
 The accelerated operational target is Thursday 3 September 2026. Financial-provider work and Hikvision are explicitly excluded from this release. Do not treat those exclusions as permission to weaken the operational database, facility scope, audit, booking, leasing, insurance, reporting or recovery controls.
