@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 type PaymentMethod = "DEBIT_ORDER" | "CARD" | "EFT" | "OTHER";
 
 type LeaseEnvelopeInput = {
@@ -37,7 +39,8 @@ export const BLENDSIGN_REMINDER_COOLDOWN_MS = 5 * 60 * 1000;
 
 export function blendSignReminderRequestId(documentId: string, at = new Date()) {
   const window = Math.floor(at.getTime() / BLENDSIGN_REMINDER_COOLDOWN_MS);
-  return `stor24-reminder:${documentId}:${window}`;
+  const digest = createHash("sha256").update(`${documentId}:${window}`).digest("hex").slice(0, 24).toUpperCase();
+  return `REM-${digest}`;
 }
 
 export async function fetchBlendSignArtifact(envelopeId: string, artifact: BlendSignArtifact) {

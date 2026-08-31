@@ -24,6 +24,7 @@ test("reminder retries share a stable idempotency key inside the cooldown window
   const repeat = new Date(first.getTime() + 30_000);
   assert.equal(blendSignReminderRequestId("doc-1", first), blendSignReminderRequestId("doc-1", repeat));
   assert.notEqual(blendSignReminderRequestId("doc-1", first), blendSignReminderRequestId("doc-2", first));
+  assert.match(blendSignReminderRequestId("doc-1", first), /^REM-[A-F0-9]{24}$/);
 });
 test("reminder idempotency key rotates after the cooldown window", () => {
   const first = new Date("2026-08-31T08:15:01.000Z");
