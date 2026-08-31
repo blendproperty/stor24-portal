@@ -17,7 +17,9 @@
 - Occupancies close atomically. Each vacated unit is recalculated against remaining active occupancy, maintenance and reservation claims, producing `OCCUPIED`, `SERVICE`, `RESERVED` or `AVAILABLE` instead of being released unconditionally.
 - Final charges and applied deposit credits have stable ledger references. A refund due creates a high-priority staff task rather than claiming that an unprocessed provider refund occurred. Active insurance enrolment is ended at the move-out date.
 - `tenancy.moved_out` audit evidence now records the before state, idempotency key, effective date, final charge, deposit decision, notes, access state and resulting unit state. Same-key retries return the completed result and reuse the WhatsApp idempotency key; conflicting retries fail closed.
-- Local validation passed: Prisma client generation, TypeScript, 161/161 tests, production build and lint with zero errors (four pre-existing warnings). This is implemented and locally verified only; do not call it deployed or live-proven until CI, VPS deployment and controlled production UAT pass.
+- Local validation passed: Prisma client generation, TypeScript, 161/161 tests, production build and lint with zero errors (four pre-existing warnings).
+- Commit `9225c85` was fast-forwarded to `main`. CI run `#288` and VPS deployment run `#273` completed successfully for that exact revision. Direct production readback returned service `stor24-crm`, application status `ok` and database status `ok` at `2026-08-31T08:21:20.113Z`.
+- Controlled mutating production UAT remains open. The available Edge profile redirected `/operations/accounts` to `/login`, while the signed-in in-app browser session was not available to this task's control channel. Do not call move-out end-to-end live-proven until an authorised operator signs in and the disposable tenancy lifecycle, unit state, ledger/task result, access state and `tenancy.moved_out` audit event are read back.
 
 ## Operational-readiness handover — 28 August 2026
 
