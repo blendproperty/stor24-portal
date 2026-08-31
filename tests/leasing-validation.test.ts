@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { accountPaymentSchema, customerSchema, facilitySchema, moveInSchema, noticeSchema, transferSchema, unitTypeSchema } from "../src/lib/validators";
 
@@ -46,4 +47,13 @@ test("account payments require a positive amount and supported tender", () => {
   assert.equal(accountPaymentSchema.safeParse({ accountId: "account-1", amount: 250, method: "EFT", receivedAt: "2026-08-07" }).success, true);
   assert.equal(accountPaymentSchema.safeParse({ accountId: "account-1", amount: 0, method: "EFT", receivedAt: "2026-08-07" }).success, false);
   assert.equal(accountPaymentSchema.safeParse({ accountId: "account-1", amount: 250, method: "CHEQUE", receivedAt: "2026-08-07" }).success, false);
+});
+
+test("transfers atomically claim the destination and audit both unit identities", () => {
+  const source = readFileSync(new URL("../src/lib/leasing-service.ts", import.meta.url), "utf8");
+  const transferSource = source.slice(source.indexOf("export async function transfer("), source.indexOf("export async function giveNotice("));
+  assert.match(transferSource, /tx\.unit\.updateMany\([\s\S]*status: "AVAILABLE"[\s\S]*data: \{ status: "OCCUPIED" \}/);
+  assert.match(transferSource, /if \(claimed\.count !== 1\) throw new Error\("CONFLICT"\)/);
+  assert.match(transferSource, /\{ unitId: current\.unitId, occupancyId: current\.id \}/);
+  assert.match(transferSource, /\{ unitId: next\.id, occupancyId: occupancy\.id,/);
 });

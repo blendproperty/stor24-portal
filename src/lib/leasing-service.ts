@@ -966,6 +966,15 @@ export async function transfer(
     });
     if (!next) throw new Error("CONFLICT");
     const current = tenancy.occupancies[0];
+    const claimed = await tx.unit.updateMany({
+      where: {
+        id: next.id,
+        facilityId: tenancy.facilityId,
+        status: "AVAILABLE",
+      },
+      data: { status: "OCCUPIED" },
+    });
+    if (claimed.count !== 1) throw new Error("CONFLICT");
     await tx.tenancy.update({
       where: { id: tenancy.id },
       data: { status: "ACTIVE" },
@@ -992,10 +1001,6 @@ export async function transfer(
         accessState: "PENDING",
       },
     });
-    await tx.unit.update({
-      where: { id: next.id },
-      data: { status: "OCCUPIED" },
-    });
     await audit(
       tx,
       scope,
@@ -1003,6 +1008,8 @@ export async function transfer(
       "Tenancy",
       tenancy.id,
       tenancy.facilityId,
+      { unitId: current.unitId, occupancyId: current.id },
+      { unitId: next.id, occupancyId: occupancy.id, effectiveAt: input.effectiveAt.toISOString(), monthlyRate: Number(occupancy.monthlyRate) },
     );
     return occupancy;
   });
