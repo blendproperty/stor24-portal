@@ -1,6 +1,46 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
-> Last reviewed: 31 August 2026. Read this file before planning or changing the repository. Update it whenever a material capability, decision, deployment state, or cross-repository contract changes.
+> Last reviewed: 1 September 2026. Read this file before planning or changing the repository. Update it whenever a material capability, decision, deployment state, or cross-repository contract changes.
+
+## Claude handover snapshot — 1 September 2026
+
+This is the canonical programme handover. Historical sections below preserve the evidence available when each slice was delivered; where they still say “pending” or quote an older remote head, this snapshot and later dated evidence supersede them. Do not delete the history merely to make the file shorter.
+
+### Current repository and production boundary
+
+- **CRM/operations:** `blendproperty/stor24-portal`, production branch `main`, reviewed remote head `874a5916f351930952af254209645b8c420597e5` (`docs: close customer and lead ownership task`). This handover was prepared in a clean branch from that exact remote head; the old local `codex/fix-facility-patch-validation` checkout is not a promotion source.
+- **Public site:** `blendproperty/stor24`, production branch `master`, reviewed remote head `c1ccd979de6dedc391b27f112ce06b3307a593fa` (`docs: record live hero verification`).
+- **CMS/editorial:** `blendproperty/stor24-cms`, production branch `main`, reviewed remote head `cfb481344fa9f2096481b323844c6751b5dbe48a` (`docs: reconcile customer and lead ownership`). The CMS owns editorial content only; it must not become a second customer, lead, reservation or operational database.
+- **BlendSign:** `blendproperty/blendsign`, production branch `main`, reviewed remote head `7a66cae3505fb1d5963d9718d34a5bb0b79c8404` (`docs: close BlendSign failure acceptance`). BlendSign owns envelopes, signatures, sealed documents, certificates and signing-delivery evidence; CRM owns tenancy activation and operational state.
+- **Live read-only evidence at 15:26 SAST on 1 September 2026:** CRM `/api/health` returned HTTP 200 with application and database `ok`; public `/api/health` returned HTTP 200 with CMS and CRM dependencies healthy; `/`, `/book` and `/space-guide` returned HTTP 200. `/book` was pinned to Midpoint without a store selector. `/pricing` redirected permanently to `/book`; `/locations`, `/locations/sandton` and `/storage-near-me` redirected permanently to `/storage/midpoint`.
+- Health and route responses prove availability and routing only. They do not prove the remaining state-changing workflows, provider configuration, inbox delivery, payment settlement, access-control action or staff readiness.
+
+### Verified implementation and live evidence already closed
+
+- Staff MFA for the organisation owner; secured public APIs; quote-to-CRM customer/lead capture; scoped dashboard/reporting; South African operational time; facility isolation; database-aware health; migration-validation tooling; reservation hold/release plus staff extension/expiry; bounded maintenance `AVAILABLE -> SERVICE -> AVAILABLE`; standard and debit-order BlendSign signing; sealed PDF/certificate retrieval; reminder cooldown and provider-outage retry evidence; transfer lifecycle; zero-balance/no-deposit move-out; and real-time unit-availability recalculation have production evidence recorded below.
+- The pending move-in account-summary correction is implemented, tested, promoted and deployed at `cc0cda3`. Only its convenient functional readback remains open; do not create a real lease solely to manufacture that screenshot.
+- Customer and lead ownership is closed in favour of the CRM. The public site and CMS may present or collect data only through the agreed CRM contracts.
+- The public site is now a single-store Midpoint journey with direct booking and the 3D space guide. Its current repository contains the supplied 3D assets, compact packing, scaled office presets and performance work. Refer to that repository's own `PROJECT_CONTEXT.md` for asset hashes, browser evidence and its remaining visual checks.
+
+### Outstanding work in safe execution order
+
+1. **Human-controlled public booking proof:** with Brett's approval and a consenting test recipient, complete CAPTCHA plus mobile/email verification, confirm the reservation and communication evidence in CRM, then cancel/expire the disposable record and prove the unit returns to availability. Never bypass CAPTCHA or OTP. Use the same authorised move-in opportunity to read back the pending account's selected unit, rate and `Pending lease signature` state before signing.
+2. **Unit-transfer legal document:** keep Asana task `1217529587240241` on hold. Legal must approve addendum versus replacement agreement, effective date, payment-mandate treatment, deposit/pro-rata/fee wording and signature requirements before any BlendSign template or transfer signing gate is built. The executed original agreement remains immutable and linked.
+3. **WhatsApp lifecycle UAT:** keep general lifecycle automation disabled. Obtain an approved consenting number; verify sender/template configuration, E.164 normalisation, signed callbacks, delivery/read state, inbound replies, STOP/opt-out, failure tasks, retry/idempotency and owner switch behaviour before considering enablement.
+4. **Netcash and billing:** the current Pay Now path is a clearly gated simulator, not money movement. Obtain the provider contract, service keys and sandbox access; confirm official request/callback fields; implement authenticated callbacks with replay protection and idempotency; prove AVS/mandates, collection and hosted payment failure/timeout/duplicate cases; reconcile statement, `Payment` and ledger state; assign exception ownership; only then connect monthly billing. Do not activate real debit-order or payment flows from the scaffold alone.
+5. **MRI/MDA finance boundary:** obtain the authoritative system owner, export/import method, master-data and chart-of-account mappings, posting model, sandbox/rehearsal method, reconciliation controls, correction/reversal process and accountable exception owners. The current `mri://pending-integration-decision` destination is deliberately a placeholder.
+6. **Hikvision/MEL access pilot:** resolve the untrusted HikCentral TLS chain and approve the direct-versus-n8n responsibility and POPIA boundary. Then configure approved OpenAPI credentials and Midpoint door mappings and prove connection, enrolment, actual entry, revocation, outage and reconciliation. Configuration screens are not live access-control proof.
+7. **Commercial and operational readiness:** supply approved insurance provider/product/premium/excess/policy wording; enrol remaining privileged staff in MFA; provide an authorised legacy export for a migration rehearsal; complete the two-device offline race/recovery UAT; stabilise/verify monitoring; finish staff training, recovery rehearsal, cut-over plan, support ownership and named business sign-off.
+8. **Public-site residual QA:** complete cache-busted production visual checks for the supplied Office Pack ladder/expanded office assets and the full 124-piece Large office run; investigate or formally accept the three embedded-texture blob warnings. Preserve the unrelated local `tsconfig.json` modification unless its owner explicitly authorises a change.
+9. **CMS security:** implement and prove MFA separately for the CMS administrative surface; CRM MFA does not protect CMS accounts.
+
+### Takeover rules
+
+- Start every slice by fetching the relevant remote, checking the exact checkout/branch/status and reading that repository's current `PROJECT_CONTEXT.md`; do not work from the stale nested worktrees in the Sitelink folder.
+- Work one bounded slice at a time. Separate implementation, automated testing, commit/push, merge, deployment/configuration, live verification, business UAT and approval in every status update.
+- Do not mutate production customer, provider, financial, access-control or signing state without Brett's explicit approval immediately before the action. Use disposable UAT records and retain evidence before cleanup.
+- After validation, update every affected canonical `PROJECT_CONTEXT.md`, reconcile Asana when in scope, and confirm the context commit exists on the intended remote production branch before calling the slice complete.
+- A ready-to-paste continuation brief is maintained in `CLAUDE_CONTINUATION_PROMPT.md`.
 
 ## Verified production baseline — 31 August 2026
 
