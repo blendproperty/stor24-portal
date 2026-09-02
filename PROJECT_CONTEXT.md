@@ -380,3 +380,13 @@ A CRM capability is complete only when it is database-backed, scoped, permission
 - MRI/MDA system ownership, master-data mappings, posting model, sandbox method, reconciliation controls and accountable exception owners remain open design/approval gates.
 - Hikvision/MEL administration and scoped configuration exist, but live enrolment, entry and revocation proof remain blocked by the untrusted HikCentral TLS chain and the still-to-be-confirmed responsibility/POPIA boundary.
 - Migration rehearsal, full cross-system integration/security UAT, staff training, monitoring/recovery, cut-over and business approval remain go-live gates.
+
+## Netcash test-account configuration — 2 September 2026
+
+- **Implementation:** added a permission-scoped Netcash test-account workspace under Integrations. It accepts the 12-digit test merchant account number plus the Account Service, Debit Orders and Pay Now service keys, validates all three through Netcash's documented `ValidateServiceKey` SOAP contract, and stores them only after the account and all services return status `001`. Stored values use the existing AES-GCM integration-secret vault; the UI and API expose only presence/status indicators. The existing guessed transaction scaffold now fails closed unless a separate transaction-processing flag is explicitly enabled; this workspace cannot submit payments or debit orders.
+- **Testing / validation:** Prisma generation, TypeScript checking, 165 automated tests, lint (0 errors; 4 existing unused-variable warnings) and the Next.js production build passed locally. Focused tests cover the documented SOAP request/service identifiers and parsing of the provider's account/service status response. No real Netcash request was made because the 12-digit test merchant account number is still missing.
+- **Commit and push:** pending at the time of this entry; record the resulting revision and remote evidence before handoff.
+- **Merge:** pending.
+- **Deployment / configuration:** pending. No Netcash value has been entered into production and no provider setting has been changed.
+- **Live production verification:** not yet performed. The setup page, permission boundary and provider validation result still require live verification after deployment.
+- **Open provider gates:** obtain the 12-digit Netcash test merchant account number, enter the three test service keys already supplied by Netcash, receive four `001` results, then confirm the real transaction submission, hosted checkout, callback authentication/replay, failure/retry and reconciliation contracts before enabling any transaction flow. MRI remains a separate integration decision and is unaffected by this slice.

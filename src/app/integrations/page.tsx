@@ -185,9 +185,9 @@ export default async function IntegrationsPage() {
       "Payments",
       "Netcash",
       "Configuration required",
-      "Credentials and provider contract pending",
+      "Validate the dedicated test account; transaction processing stays disabled",
       "warning",
-      null,
+      "/settings/integrations/netcash",
     ],
     [
       "Access control",

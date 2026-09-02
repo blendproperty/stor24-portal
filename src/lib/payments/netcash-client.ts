@@ -36,6 +36,7 @@ export type NetcashConfig = {
   statementServiceKey?: string;
   softwareVendorKey?: string;
   environment: "sandbox" | "live";
+  transactionProcessingEnabled?: boolean;
 };
 
 const NETCASH_API_BASE = "https://api.netcash.co.za";
@@ -56,7 +57,11 @@ export async function getNetcashConnection(organisationId: string, facilityId?: 
 }
 
 function config(connection: { config: unknown }): NetcashConfig {
-  return connection.config as NetcashConfig;
+  const configured = connection.config as NetcashConfig;
+  if (configured.transactionProcessingEnabled !== true) {
+    throw new Error("NETCASH_TRANSACTION_PROCESSING_DISABLED");
+  }
+  return configured;
 }
 
 async function netcashRequest<T>(path: string, body: Record<string, unknown>): Promise<T> {
