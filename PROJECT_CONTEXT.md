@@ -6,7 +6,8 @@
 
 - **Implementation:** added `docs/STOR24_OUTSTANDING_TASKS.md` as the canonical, status-labelled programme backlog for handover. It records Netcash and Hikvision as explicitly blocked pending API information, separates all external approval/provider/data gates from executable UAT and engineering work, supplies exit criteria, and identifies completed work that must not be reopened without new evidence.
 - **Validation:** reconciled the register against this current CRM context, the current public-site context through its 2 September calculator-to-booking production fix, and the recorded cross-system ownership boundaries. No production state, provider configuration, secrets or Asana task states were changed.
-- **Commit/push, merge and remote presence:** record these after promotion. This is a documentation-only change and does not itself require or prove an application deployment.
+- **Commit and push:** task register and initial context record were committed as `8f43f19` (`docs: consolidate outstanding STOR24 tasks`). The final context reconciliation is recorded in the following documentation commit; both were pushed to the handover branch and fast-forwarded to `main` after confirming the remote had not moved.
+- **Merge and remote presence:** no merge commit was required. Remote readback confirmed `docs/STOR24_OUTSTANDING_TASKS.md` and this context entry on `origin/main`.
 - **Deployment/configuration and live verification:** not applicable to the Markdown artifact. Existing production evidence is referenced, not re-performed. Provider, Legal, UAT, migration, training, monitoring and business-approval gates remain open exactly as listed in the register.
 
 ## Claude handover snapshot — 1 September 2026
