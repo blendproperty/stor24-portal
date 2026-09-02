@@ -35,6 +35,7 @@ type UserRow = {
   scope: string;
   active?: boolean;
   permissions: string[];
+  mfaEnabled?: boolean;
 };
 
 type RoleOption = { name: string; permissions: string[] };
@@ -264,6 +265,7 @@ export function UsersWorkspace() {
                 <th>Security level</th>
                 <th>Store access</th>
                 <th>Status</th>
+                <th>MFA</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -299,6 +301,11 @@ export function UsersWorkspace() {
                       tone={user.active === false ? "neutral" : "positive"}
                     >
                       {user.active === false ? "Inactive" : "Active"}
+                    </StatusPill>
+                  </td>
+                  <td>
+                    <StatusPill tone={user.mfaEnabled ? "positive" : "neutral"}>
+                      {user.mfaEnabled ? "MFA enabled" : "MFA not enabled"}
                     </StatusPill>
                   </td>
                   <td>
