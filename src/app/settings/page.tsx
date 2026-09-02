@@ -8,7 +8,7 @@ export const metadata = { title: "Settings" };
 
 const modules = [
   [Building2, "Organisation & facilities", "Portfolio hierarchy, facilities, buildings, zones and operating hours.", "/company"],
-  [ShieldCheck, "Users & permissions", "Scoped roles, approval thresholds and report access.", "/security"],
+  [ShieldCheck, "Users & permissions", "Scoped roles, approval thresholds and report access.", "/users"],
   [BadgePercent, "Rates & billing rules", "Rate plans, fees, deposits, tax, discounts and collection policies.", "/company"],
   [FileSignature, "Documents & templates", "Agreements, notices, invoices, receipts and communication templates.", "/company"],
   [KeyRound, "Hikvision access control", "Secure OpenAPI credentials, facility mapping and access lifecycle rules.", "/settings/integrations/hikvision"],
