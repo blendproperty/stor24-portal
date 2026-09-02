@@ -15,6 +15,9 @@ const eslintConfig = defineConfig([
     "src/generated/prisma/**",
     "graphify-out/**",
     "node_modules.partial/**",
+    // Vendored third-party source (see file header for license/origin) —
+    // not subject to this project's lint rules.
+    "src/lib/vendor/**",
   ]),
 ]);
 
