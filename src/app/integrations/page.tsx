@@ -393,7 +393,15 @@ export default async function IntegrationsPage() {
                     <td>
                       <StatusPill tone={tone}>{state}</StatusPill>
                     </td>
-                    <td>{href ? <Link href={href}>{detail}</Link> : detail}</td>
+                    <td>
+  {href ? (
+    <Link className="text-button" href={href}>
+      Configure
+    </Link>
+  ) : (
+    detail
+  )}
+</td>
                   </tr>
                 ),
               )}
