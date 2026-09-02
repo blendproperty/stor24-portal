@@ -31,7 +31,7 @@ export async function GET() {
     }),
     db.user.findMany({
       where: { organisationId: organisation.id },
-      include: { roleAssignments: { include: { role: true, facility: true } } },
+      include: { roleAssignments: { include: { role: true, facility: true } }, mfaCredential: { select: { enabledAt: true } } },
       orderBy: { name: "asc" },
       take: 100,
     }),
@@ -58,6 +58,7 @@ export async function GET() {
       role: user.roleAssignments[0]?.role.name ?? "Unassigned",
       scope: user.roleAssignments[0]?.facility?.name ?? "All facilities",
       permissions: user.roleAssignments[0]?.role.permissions ?? [],
+      mfaEnabled: Boolean(user.mfaCredential?.enabledAt),
     })),
     roles,
     facilities,
