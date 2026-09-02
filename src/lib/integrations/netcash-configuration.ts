@@ -29,12 +29,62 @@ type StoredNetcashConfiguration = {
   transactionProcessingEnabled?: unknown;
 };
 
+type AuditPayloadValue = string | number | boolean | null | Array<Record<string, string | boolean>>;
+
 export type NetcashServiceValidation = {
   accountStatus: string;
   services: Array<{ serviceId: "1" | "5" | "14"; status: string }>;
 };
 
+export type NetcashValidationDiagnostic = {
+  account: { status: string; message: string; valid: boolean };
+  services: Array<{ serviceId: "1" | "5" | "14"; label: string; status: string; message: string; valid: boolean }>;
+  validServiceCount: number;
+  allValid: boolean;
+};
+
 const serviceLabels = { "1": "Debit Orders and DebiCheck", "5": "Account Services", "14": "Pay Now" } as const;
+const statusMessages: Record<string, string> = {
+  "001": "Validated",
+  "104": "Account invalid or inactive",
+  "105": "Service not active for this account",
+  "106": "Service key invalid or inactive",
+  "201": "Account temporarily locked",
+};
+
+export class NetcashProviderValidationError extends Error {
+  validation: NetcashServiceValidation;
+
+  constructor(validation: NetcashServiceValidation) {
+    super("NETCASH_KEYS_NOT_VALIDATED");
+    this.name = "NetcashProviderValidationError";
+    this.validation = validation;
+  }
+}
+
+export function describeNetcashStatus(status: string) {
+  return statusMessages[status] ?? `Netcash status ${status || "unknown"}`;
+}
+
+export function summariseNetcashValidation(validation: NetcashServiceValidation): NetcashValidationDiagnostic {
+  const services = validation.services.map((item) => ({
+    ...item,
+    label: serviceLabels[item.serviceId],
+    message: describeNetcashStatus(item.status),
+    valid: item.status === "001",
+  }));
+  const validServiceCount = services.filter((item) => item.valid).length;
+  return {
+    account: {
+      status: validation.accountStatus,
+      message: describeNetcashStatus(validation.accountStatus),
+      valid: validation.accountStatus === "001",
+    },
+    services,
+    validServiceCount,
+    allValid: validation.accountStatus === "001" && validServiceCount === 3,
+  };
+}
 
 function configuredString(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
@@ -109,6 +159,19 @@ async function netcashConnection(organisationId: string) {
   });
 }
 
+async function recordNetcashAudit(scope: RequestScope, action: string, after: Record<string, AuditPayloadValue>) {
+  await db.auditEvent.create({
+    data: {
+      organisationId: scope.organisationId,
+      actorId: scope.userId,
+      action,
+      entityType: "Integration",
+      entityId: "NETCASH",
+      after,
+    },
+  });
+}
+
 export async function listNetcashConfiguration(scope: RequestScope) {
   const connection = await netcashConnection(scope.organisationId);
   const stored = (connection?.config ?? {}) as StoredNetcashConfiguration;
@@ -136,25 +199,63 @@ export async function validateAndSaveNetcashConfiguration(scope: RequestScope, i
   try {
     validation = await validateNetcashServiceKeys(parsed);
   } catch (error) {
+    const now = new Date();
+    const failureCode = error instanceof Error ? error.message.split(":")[0] : "NETCASH_VALIDATION_FAILED";
     if (existing) {
       await db.integrationConnection.update({
         where: { id: existing.id },
         data: {
           status: "DEGRADED",
-          lastHealthAt: new Date(),
-          lastFailureAt: new Date(),
+          lastHealthAt: now,
+          lastFailureAt: now,
           consecutiveFailures: { increment: 1 },
-          failureCode: error instanceof Error ? error.message.split(":")[0] : "NETCASH_VALIDATION_FAILED",
+          failureCode,
           failureMessage: "The Netcash test credentials could not be validated.",
         },
       });
     }
+    await recordNetcashAudit(scope, "integration.netcash.validation.failed", {
+      environment: "test",
+      failureCode,
+      result: "provider-or-transport-error",
+      credentialsStored: false,
+      transactionProcessingEnabled: false,
+    });
     throw error;
   }
-  if (validation.accountStatus !== "001" || validation.services.some((item) => item.status !== "001")) {
-    const statuses = validation.services.map((item) => `${serviceLabels[item.serviceId]}: ${item.status}`).join(", ");
-    throw new Error(`NETCASH_KEYS_NOT_VALIDATED:${validation.accountStatus}:${statuses}`);
+
+  const diagnostic = summariseNetcashValidation(validation);
+  if (!diagnostic.allValid) {
+    const now = new Date();
+    const failureMessage = [
+      `Account: ${diagnostic.account.status} ${diagnostic.account.message}`,
+      ...diagnostic.services.map((item) => `${item.label}: ${item.status} ${item.message}`),
+    ].join(" | ");
+    if (existing) {
+      await db.integrationConnection.update({
+        where: { id: existing.id },
+        data: {
+          status: "DEGRADED",
+          lastHealthAt: now,
+          lastFailureAt: now,
+          consecutiveFailures: { increment: 1 },
+          failureCode: "NETCASH_KEYS_NOT_VALIDATED",
+          failureMessage,
+        },
+      });
+    }
+    await recordNetcashAudit(scope, diagnostic.validServiceCount > 0 ? "integration.netcash.validation.partial" : "integration.netcash.validation.failed", {
+      environment: "test",
+      accountStatus: diagnostic.account.status,
+      accountMessage: diagnostic.account.message,
+      services: diagnostic.services.map(({ serviceId, label, status, message, valid }) => ({ serviceId, label, status, message, valid })),
+      validServiceCount: diagnostic.validServiceCount,
+      credentialsStored: false,
+      transactionProcessingEnabled: false,
+    });
+    throw new NetcashProviderValidationError(validation);
   }
+
   const now = new Date();
   const config = {
     environment: "test",
@@ -167,15 +268,15 @@ export async function validateAndSaveNetcashConfiguration(scope: RequestScope, i
   const connection = existing
     ? await db.integrationConnection.update({ where: { id: existing.id }, data: { config, status: "CONNECTED", lastHealthAt: now, lastSuccessAt: now, consecutiveFailures: 0, failureCode: null, failureMessage: null } })
     : await db.integrationConnection.create({ data: { organisationId: scope.organisationId, category: NETCASH_CATEGORY, provider: NETCASH_PROVIDER, config, status: "CONNECTED", lastHealthAt: now, lastSuccessAt: now } });
-  await db.auditEvent.create({
-    data: {
-      organisationId: scope.organisationId,
-      actorId: scope.userId,
-      action: "integration.netcash.test_credentials.validated",
-      entityType: "IntegrationConnection",
-      entityId: connection.id,
-      after: { environment: "test", accountStatus: validation.accountStatus, services: validation.services, transactionProcessingEnabled: false },
-    },
+  await recordNetcashAudit(scope, "integration.netcash.validation.succeeded", {
+    environment: "test",
+    accountStatus: diagnostic.account.status,
+    accountMessage: diagnostic.account.message,
+    services: diagnostic.services.map(({ serviceId, label, status, message, valid }) => ({ serviceId, label, status, message, valid })),
+    validServiceCount: diagnostic.validServiceCount,
+    credentialsStored: true,
+    transactionProcessingEnabled: false,
+    connectionId: connection.id,
   });
   return validation;
 }

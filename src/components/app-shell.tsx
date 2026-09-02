@@ -54,7 +54,7 @@ const navigation = [
   { href: "/prorate", label: "Prorate calculator", icon: Calculator },
   { href: "/map", label: "Facility map", icon: LandPlot },
   { href: "/phone", label: "Phone integration", icon: PhoneCall },
-  { href: "/audit", label: "Security audit", icon: ScrollText },
+  { href: "/audit", label: "System audit", icon: ScrollText },
   { href: "/offline-workspace.html", label: "Offline workspace", icon: WifiOff },
   { href: "/offline-readiness", label: "Offline readiness", icon: ShieldCheck },
 ];
