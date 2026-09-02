@@ -4,7 +4,7 @@ import test from "node:test";
 import { buildValidateServiceKeyEnvelope, parseValidateServiceKeyResponse } from "../src/lib/integrations/netcash-configuration";
 
 const input = {
-  merchantAccount: "599990123456",
+  merchantAccount: "51005101234",
   accountServiceKey: "00000000-0000-4000-8000-000000000005",
   debitOrderServiceKey: "00000000-0000-4000-8000-000000000001",
   payNowServiceKey: "00000000-0000-4000-8000-000000000014",
@@ -13,7 +13,7 @@ const input = {
 test("Netcash validation envelope uses the documented SOAP endpoint and service IDs", () => {
   const xml = buildValidateServiceKeyEnvelope(input);
   assert.match(xml, /NIWS_Partner\/ValidateServiceKey/);
-  assert.match(xml, /<t:MerchantAccount>599990123456<\/t:MerchantAccount>/);
+  assert.match(xml, /<t:MerchantAccount>51005101234<\/t:MerchantAccount>/);
   assert.deepEqual([...xml.matchAll(/<t:ServiceId>(\d+)<\/t:ServiceId>/g)].map((match) => match[1]), ["5", "1", "14"]);
   assert.doesNotMatch(xml, /api\.netcash\.co\.za\/inbound-payments/);
 });

@@ -14,7 +14,7 @@ export const NETCASH_PARTNER_ENDPOINT = "https://ws.netcash.co.za/NIWS/niws_part
 export const NETCASH_SOFTWARE_VENDOR_KEY = "24ade73c-98cf-47b3-99be-cc7b867b3080";
 
 const configurationSchema = z.object({
-  merchantAccount: z.string().trim().regex(/^\d{12}$/, "Enter the 12-digit Netcash test account number."),
+  merchantAccount: z.string().trim().regex(/^5\d{10}$/, "Enter the 11-digit Netcash test account number beginning with 5."),
   accountServiceKey: z.uuid(),
   debitOrderServiceKey: z.uuid(),
   payNowServiceKey: z.uuid(),
