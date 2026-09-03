@@ -1,5 +1,4 @@
 import { z } from "zod";
-
 import { db } from "@/lib/db";
 import {
   decryptIntegrationSecret,
@@ -7,19 +6,16 @@ import {
   integrationEncryptionConfigured,
 } from "@/lib/integrations/integration-secret-vault";
 import type { RequestScope } from "@/lib/scope";
-
 export const NETCASH_CATEGORY = "PAYMENTS";
 export const NETCASH_PROVIDER = "NETCASH";
 export const NETCASH_PARTNER_ENDPOINT = "https://ws.netcash.co.za/NIWS/niws_partner.svc";
 export const NETCASH_SOFTWARE_VENDOR_KEY = "24ade73c-98cf-47b3-99be-cc7b867b3080";
-
 const configurationSchema = z.object({
   merchantAccount: z.string().trim().regex(/^5\d{10}$/, "Enter the 11-digit Netcash test account number beginning with 5."),
   accountServiceKey: z.uuid(),
   debitOrderServiceKey: z.uuid(),
   payNowServiceKey: z.uuid(),
 });
-
 type StoredNetcashConfiguration = {
   environment?: unknown;
   merchantAccountEncrypted?: unknown;
@@ -28,21 +24,17 @@ type StoredNetcashConfiguration = {
   payNowServiceKeyEncrypted?: unknown;
   transactionProcessingEnabled?: unknown;
 };
-
 type AuditPayloadValue = string | number | boolean | null | Array<Record<string, string | boolean>>;
-
 export type NetcashServiceValidation = {
   accountStatus: string;
   services: Array<{ serviceId: "1" | "5" | "14"; status: string }>;
 };
-
 export type NetcashValidationDiagnostic = {
   account: { status: string; message: string; valid: boolean };
   services: Array<{ serviceId: "1" | "5" | "14"; label: string; status: string; message: string; valid: boolean }>;
   validServiceCount: number;
   allValid: boolean;
 };
-
 const serviceLabels = { "1": "Debit Orders and DebiCheck", "5": "Account Services", "14": "Pay Now" } as const;
 const statusMessages: Record<string, string> = {
   "001": "Validated",
@@ -51,21 +43,17 @@ const statusMessages: Record<string, string> = {
   "106": "Service key invalid or inactive",
   "201": "Account temporarily locked",
 };
-
 export class NetcashProviderValidationError extends Error {
   validation: NetcashServiceValidation;
-
   constructor(validation: NetcashServiceValidation) {
     super("NETCASH_KEYS_NOT_VALIDATED");
     this.name = "NetcashProviderValidationError";
     this.validation = validation;
   }
 }
-
 export function describeNetcashStatus(status: string) {
   return statusMessages[status] ?? `Netcash status ${status || "unknown"}`;
 }
-
 export function summariseNetcashValidation(validation: NetcashServiceValidation): NetcashValidationDiagnostic {
   const services = validation.services.map((item) => ({
     ...item,
@@ -85,11 +73,9 @@ export function summariseNetcashValidation(validation: NetcashServiceValidation)
     allValid: validation.accountStatus === "001" && validServiceCount === 3,
   };
 }
-
 function configuredString(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
 }
-
 function escapeXml(value: string) {
   return value.replace(/[&<>"']/g, (character) => ({
     "&": "&amp;",
@@ -99,7 +85,6 @@ function escapeXml(value: string) {
     "'": "&apos;",
   })[character]!);
 }
-
 export function buildValidateServiceKeyEnvelope(input: z.infer<typeof configurationSchema>) {
   const services = [
     ["5", input.accountServiceKey],
@@ -108,17 +93,18 @@ export function buildValidateServiceKeyEnvelope(input: z.infer<typeof configurat
   ] as const;
   return `<?xml version="1.0" encoding="utf-8"?>\n` +
     `<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://www.w3.org/2005/08/addressing" xmlns:t="http://tempuri.org/">` +
-    `<s:Header><a:Action s:mustUnderstand="1">http://tempuri.org/NIWS_Partner/ValidateServiceKey</a:Action><a:To s:mustUnderstand="1">${NETCASH_PARTNER_ENDPOINT}</a:To></s:Header>` +
+    // NOTE: the WSDL contract name is "INIWS_Partner" (interface prefix "I"), not "NIWS_Partner".
+    // The addressing Action must match this exactly or WCF returns an ActionNotSupported /
+    // ContractFilter mismatch fault before it even looks at the body.
+    `<s:Header><a:Action s:mustUnderstand="1">http://tempuri.org/INIWS_Partner/ValidateServiceKey</a:Action><a:To s:mustUnderstand="1">${NETCASH_PARTNER_ENDPOINT}</a:To></s:Header>` +
     `<s:Body><t:ValidateServiceKey><t:request><t:SoftwareVendorKey>${NETCASH_SOFTWARE_VENDOR_KEY}</t:SoftwareVendorKey>` +
     `<t:MerchantAccount>${escapeXml(input.merchantAccount)}</t:MerchantAccount><t:ServiceInfoList>` +
     services.map(([serviceId, serviceKey]) => `<t:ServiceInfo><t:ServiceId>${serviceId}</t:ServiceId><t:ServiceKey>${escapeXml(serviceKey)}</t:ServiceKey></t:ServiceInfo>`).join("") +
     `</t:ServiceInfoList></t:request></t:ValidateServiceKey></s:Body></s:Envelope>`;
 }
-
 function firstTag(xml: string, tag: string) {
   return xml.match(new RegExp(`<(?:[\\w-]+:)?${tag}(?:\\s[^>]*)?>([^<]*)<\\/(?:[\\w-]+:)?${tag}>`, "i"))?.[1]?.trim() ?? "";
 }
-
 export function parseValidateServiceKeyResponse(xml: string): NetcashServiceValidation {
   const fault = firstTag(xml, "Text") || firstTag(xml, "faultstring");
   if (fault) throw new Error(`NETCASH_SOAP_FAULT:${fault.slice(0, 300)}`);
@@ -130,11 +116,16 @@ export function parseValidateServiceKeyResponse(xml: string): NetcashServiceVali
   })).filter((item) => ["1", "5", "14"].includes(item.serviceId) && item.status);
   const returnedIds = new Set(services.map((item) => item.serviceId));
   if (!accountStatus || services.length !== 3 || !["1", "5", "14"].every((serviceId) => returnedIds.has(serviceId as "1" | "5" | "14"))) {
+    // NOTE: verify this still matches once the Action fix above is live. The sample response we
+    // captured (with a real SoftwareVendorKey but placeholder service keys) returned a top-level
+    // AccountStatus and an empty <ServiceInfo/> with no ServiceInfoResponse blocks at all. If
+    // Netcash's real per-key response doesn't nest ServiceId/ServiceStatus inside
+    // ServiceInfoResponse elements, this parser needs to be adjusted to match the actual shape —
+    // log the raw `xml` here once and inspect it against a live call with real keys.
     throw new Error("NETCASH_RESPONSE_INVALID");
   }
   return { accountStatus, services };
 }
-
 export async function validateNetcashServiceKeys(
   input: z.infer<typeof configurationSchema>,
   request: typeof fetch = fetch,
@@ -142,7 +133,7 @@ export async function validateNetcashServiceKeys(
   const response = await request(NETCASH_PARTNER_ENDPOINT, {
     method: "POST",
     headers: {
-      "content-type": 'application/soap+xml; charset=utf-8; action="http://tempuri.org/NIWS_Partner/ValidateServiceKey"',
+      "content-type": 'application/soap+xml; charset=utf-8; action="http://tempuri.org/INIWS_Partner/ValidateServiceKey"',
       accept: "application/soap+xml, text/xml",
     },
     body: buildValidateServiceKeyEnvelope(input),
@@ -152,13 +143,11 @@ export async function validateNetcashServiceKeys(
   if (!response.ok) throw new Error(`NETCASH_HTTP_${response.status}`);
   return parseValidateServiceKeyResponse(xml);
 }
-
 async function netcashConnection(organisationId: string) {
   return db.integrationConnection.findFirst({
     where: { organisationId, facilityId: null, category: NETCASH_CATEGORY, provider: NETCASH_PROVIDER },
   });
 }
-
 async function recordNetcashAudit(scope: RequestScope, action: string, after: Record<string, AuditPayloadValue>) {
   await db.auditEvent.create({
     data: {
@@ -171,7 +160,6 @@ async function recordNetcashAudit(scope: RequestScope, action: string, after: Re
     },
   });
 }
-
 export async function listNetcashConfiguration(scope: RequestScope) {
   const connection = await netcashConnection(scope.organisationId);
   const stored = (connection?.config ?? {}) as StoredNetcashConfiguration;
@@ -190,7 +178,6 @@ export async function listNetcashConfiguration(scope: RequestScope) {
     failureMessage: connection?.failureMessage ?? null,
   };
 }
-
 export async function validateAndSaveNetcashConfiguration(scope: RequestScope, input: unknown) {
   if (!integrationEncryptionConfigured()) throw new Error("CONFIG_REQUIRED:INTEGRATION_CONFIG_ENCRYPTION_KEY");
   const parsed = configurationSchema.parse(input);
@@ -223,7 +210,6 @@ export async function validateAndSaveNetcashConfiguration(scope: RequestScope, i
     });
     throw error;
   }
-
   const diagnostic = summariseNetcashValidation(validation);
   if (!diagnostic.allValid) {
     const now = new Date();
@@ -255,7 +241,6 @@ export async function validateAndSaveNetcashConfiguration(scope: RequestScope, i
     });
     throw new NetcashProviderValidationError(validation);
   }
-
   const now = new Date();
   const config = {
     environment: "test",
@@ -280,7 +265,6 @@ export async function validateAndSaveNetcashConfiguration(scope: RequestScope, i
   });
   return validation;
 }
-
 export async function loadNetcashTestCredentials(organisationId: string) {
   const connection = await netcashConnection(organisationId);
   const stored = (connection?.config ?? {}) as StoredNetcashConfiguration;
