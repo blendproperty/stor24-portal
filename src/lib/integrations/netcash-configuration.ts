@@ -116,13 +116,9 @@ export function parseValidateServiceKeyResponse(xml: string): NetcashServiceVali
   })).filter((item) => ["1", "5", "14"].includes(item.serviceId) && item.status);
   const returnedIds = new Set(services.map((item) => item.serviceId));
   if (!accountStatus || services.length !== 3 || !["1", "5", "14"].every((serviceId) => returnedIds.has(serviceId as "1" | "5" | "14"))) {
-    // NOTE: verify this still matches once the Action fix above is live. The sample response we
-    // captured (with a real SoftwareVendorKey but placeholder service keys) returned a top-level
-    // AccountStatus and an empty <ServiceInfo/> with no ServiceInfoResponse blocks at all. If
-    // Netcash's real per-key response doesn't nest ServiceId/ServiceStatus inside
-    // ServiceInfoResponse elements, this parser needs to be adjusted to match the actual shape —
-    // log the raw `xml` here once and inspect it against a live call with real keys.
-    throw new Error("NETCASH_RESPONSE_INVALID");
+    // Surface the actual response so we can see Netcash's real shape instead of guessing blind.
+    const snippet = xml.replace(/\s+/g, " ").trim().slice(0, 500);
+    throw new Error(`NETCASH_RESPONSE_INVALID:${snippet}`);
   }
   return { accountStatus, services };
 }
@@ -187,7 +183,8 @@ export async function validateAndSaveNetcashConfiguration(scope: RequestScope, i
     validation = await validateNetcashServiceKeys(parsed);
   } catch (error) {
     const now = new Date();
-    const failureCode = error instanceof Error ? error.message.split(":")[0] : "NETCASH_VALIDATION_FAILED";
+    const message = error instanceof Error ? error.message : "NETCASH_VALIDATION_FAILED";
+    const failureCode = message.split(":")[0];
     if (existing) {
       await db.integrationConnection.update({
         where: { id: existing.id },
@@ -197,13 +194,14 @@ export async function validateAndSaveNetcashConfiguration(scope: RequestScope, i
           lastFailureAt: now,
           consecutiveFailures: { increment: 1 },
           failureCode,
-          failureMessage: "The Netcash test credentials could not be validated.",
+          failureMessage: message.slice(0, 500),
         },
       });
     }
     await recordNetcashAudit(scope, "integration.netcash.validation.failed", {
       environment: "test",
       failureCode,
+      failureDetail: message.slice(0, 500),
       result: "provider-or-transport-error",
       credentialsStored: false,
       transactionProcessingEnabled: false,
