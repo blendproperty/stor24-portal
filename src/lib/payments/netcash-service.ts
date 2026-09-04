@@ -134,13 +134,20 @@ export async function collectMonthlyRent(organisationId: string, facilityId: str
   }
 }
 
-/** Once-off payment (deposit, arrears, ad-hoc charge) via Netcash's hosted Pay Now checkout. */
+/**
+ * Once-off payment (deposit, arrears, ad-hoc charge) via Netcash's hosted Pay
+ * Now eCommerce checkout. Unlike the other functions in this file, this
+ * doesn't call Netcash at all -- it returns a form the caller must render
+ * and auto-submit from the customer's browser (see the doc comment on
+ * createPayNowCheckout in netcash-client.ts for why, and for the one-time
+ * NetConnector Profile URLs that must be configured in the Netcash portal
+ * before a real postback can arrive).
+ */
 export async function createOnceOffCheckout(organisationId: string, facilityId: string | null, params: {
   accountId: string;
   amount: number;
   description: string;
   customerEmail?: string;
-  appBaseUrl: string;
 }) {
   const connection = await getNetcashConnection(organisationId, facilityId);
   const idempotencyKey = `netcash-paynow-${params.accountId}-${randomUUID()}`;
@@ -155,18 +162,18 @@ export async function createOnceOffCheckout(organisationId: string, facilityId: 
     },
   });
   try {
-    const result = await createPayNowCheckout(connection, {
+    const checkout = createPayNowCheckout(connection, {
       reference: payment.id,
       amount: params.amount,
       description: params.description,
       customerEmail: params.customerEmail,
-      returnUrl: `${params.appBaseUrl}/payments/${payment.id}/return`,
-      cancelUrl: `${params.appBaseUrl}/payments/${payment.id}/cancel`,
-      notifyUrl: `${params.appBaseUrl}/api/webhooks/netcash`,
     });
-    await db.payment.update({ where: { id: payment.id }, data: { providerRef: result.reference } });
+    // providerRef is the p2 reference we sent (payment.id) -- the Notify
+    // postback returns it as Reference, and RequestTrace (Netcash's own
+    // transaction identifier) only becomes known once that postback arrives.
+    await db.payment.update({ where: { id: payment.id }, data: { providerRef: payment.id } });
     await recordHealth(connection.id, true);
-    return { payment, redirectUrl: result.redirectUrl };
+    return { payment, checkout };
   } catch (err) {
     await db.payment.update({ where: { id: payment.id }, data: { status: "FAILED", failureCode: "CHECKOUT_CREATE_FAILED" } });
     await recordHealth(connection.id, false, "CHECKOUT_CREATE_FAILED", err instanceof Error ? err.message : String(err));

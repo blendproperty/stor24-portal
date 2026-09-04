@@ -8,23 +8,45 @@
  * provider in this repo is configured -- see IntegrationConnection in
  * prisma/schema.prisma.
  *
- * IMPORTANT -- NOT YET VERIFIED LIVE.
- * The endpoint paths, field names and payload shapes below are a best-effort
- * scaffold built from Netcash's public developer docs (api.netcash.co.za) as
- * captured during this session -- full page content could not be fully read
- * in this environment (docs pages exceeded fetch limits). Before this goes
- * anywhere near real money:
- *   1. Get a Netcash sandbox account and real service keys.
- *   2. Confirm every endpoint path and field name against Netcash's current
- *      docs (they use different key names per product -- ServiceKey,
- *      VendorKey, SoftwareVendorKey turn up in different products).
- *   3. Confirm the notify/webhook callback contract (signature/hash
- *      verification is stubbed in src/app/api/webhooks/netcash/route.ts and
- *      MUST be replaced with Netcash's actual verification scheme).
+ * STATUS PER PRODUCT -- read this before trusting any function below.
+ *
+ * Pay Now eCommerce (createPayNowCheckout / checkPayNowTransactionStatus) --
+ * CONFIRMED 4 September 2026 against https://api.netcash.co.za/inbound-payments/pay-now/pay-now-ecommerce/
+ * and the linked TransactionStatus/Check page. This is NOT a server-to-server
+ * REST call like the rest of this file -- it's a browser form POST to
+ * https://paynow.netcash.co.za/site/paynow.aspx (fields m1/m2/p2/p3/p4/Budget
+ * etc), and Netcash does not accept per-request ReturnUrl/CancelUrl/NotifyUrl
+ * parameters for this product: those three URLs are configured once, per
+ * service key, in the Netcash merchant account's Pay Now "NetConnector
+ * Profile" settings. See the doc comments on each function below for exactly
+ * what still needs doing in that portal before this is live-testable.
+ * There is also no documented signature/hash scheme for the Notify postback
+ * -- Netcash's own docs are silent on it for this product -- so
+ * checkPayNowTransactionStatus() exists specifically so the webhook handler
+ * can treat the POSTed body as untrusted and re-verify server-to-server via
+ * RequestTrace before mutating any Payment/LedgerEntry record.
+ *
+ * Every other product below (eMandate, DebiCheck, standard debit order, AVS,
+ * statement) is UNVERIFIED. The endpoint paths, field names and payload
+ * shapes are a best-effort scaffold built from Netcash's public developer
+ * docs as captured in an earlier session -- those pages could not be fully
+ * read at the time (they exceeded the fetch tool's output limit). Before any
+ * of those go anywhere near real money:
+ *   1. Get a Netcash sandbox account and real service keys for that product.
+ *   2. Confirm the actual endpoint path and field names against Netcash's
+ *      current docs for that specific product page (they use different key
+ *      names per product -- ServiceKey, VendorKey, SoftwareVendorKey turn up
+ *      differently across products, and at least two of them -- Pay Now
+ *      Billing and Scan to Pay -- turned out to be entirely different
+ *      integration shapes (SOAP file-upload; GET-with-query-params) from
+ *      what was guessed here for Pay Now, so don't assume this file's
+ *      existing shape is a safe template for the others).
+ *   3. Confirm each product's own notify/webhook callback contract.
  *   4. Run a real transaction in Netcash's sandbox end to end before
  *      enabling this for a facility.
  */
 import { db } from "@/lib/db";
+import { NETCASH_SOFTWARE_VENDOR_KEY } from "@/lib/integrations/netcash-configuration";
 
 export type NetcashConfig = {
   accountServiceKey?: string; // "Account" / merchant-level service key
@@ -193,30 +215,87 @@ export async function submitStandardDebitOrder(connection: { config: unknown }, 
   );
 }
 
-/** Pay Now -- hosted/redirect once-off payment (card, EFT, etc). Returns a URL to redirect the customer to. */
-export async function createPayNowCheckout(connection: { config: unknown }, params: {
-  reference: string;
-  amount: number;
-  description: string;
+export const NETCASH_PAY_NOW_ACTION_URL = "https://paynow.netcash.co.za/site/paynow.aspx";
+
+/**
+ * Pay Now eCommerce -- builds the hidden-field set for a browser form POST to
+ * NETCASH_PAY_NOW_ACTION_URL. This does NOT call Netcash from the server:
+ * Netcash's docs are explicit that the form must be submitted by the
+ * customer's own browser with target="_top" (never inside an iframe), so the
+ * caller renders these fields into an auto-submitting <form> and lets the
+ * browser navigate there.
+ *
+ * ReturnUrl/CancelUrl/NotifyUrl are deliberately NOT fields here -- eCommerce
+ * doesn't accept them per-request. Before this can be used for a real test
+ * transaction, log into the Netcash merchant portal, open the Pay Now
+ * service key's NetConnector Profile, and set:
+ *   - Notify URL   -> {appBaseUrl}/api/webhooks/netcash
+ *   - Accept URL   -> {appBaseUrl}/payments/{paymentId}/return  (or a fixed
+ *                      generic accept page if Netcash won't accept a
+ *                      per-transaction URL here either -- check the portal)
+ *   - Decline URL  -> {appBaseUrl}/payments/{paymentId}/cancel
+ * "If you're developing on behalf of a Netcash client, supply the client
+ * with the postback URLs they need to insert in your NetConnector profile"
+ * -- direct from Netcash's docs, i.e. this really is a one-time manual step
+ * in their dashboard, not something this codebase can configure.
+ */
+export function createPayNowCheckout(connection: { config: unknown }, params: {
+  reference: string; // becomes p2 -- max 25 chars, single-use per Netcash's docs
+  amount: number; // ZAR
+  description: string; // becomes p3 -- max 50 chars
   customerEmail?: string;
-  returnUrl: string;
-  cancelUrl: string;
-  notifyUrl: string;
-}) {
+  extra1?: string; // returned verbatim on the Notify postback as Extra1
+  extra2?: string;
+  extra3?: string;
+}): { actionUrl: string; method: "POST"; fields: Record<string, string> } {
   const cfg = config(connection);
-  return netcashRequest<{ redirectUrl: string; reference: string; raw: unknown }>(
-    "/inbound-payments/pay-now/checkout",
-    {
-      ServiceKey: cfg.payNowServiceKey,
-      Reference: params.reference,
-      Amount: params.amount,
-      Description: params.description,
-      Email: params.customerEmail,
-      ReturnUrl: params.returnUrl,
-      CancelUrl: params.cancelUrl,
-      NotifyUrl: params.notifyUrl,
-    },
-  );
+  if (!cfg.payNowServiceKey) throw new Error("NETCASH_PAY_NOW_SERVICE_KEY_MISSING");
+  if (params.reference.length > 25) throw new Error(`NETCASH_PAY_NOW_REFERENCE_TOO_LONG: ${params.reference.length} chars, max 25`);
+  if (params.description.length > 50) throw new Error(`NETCASH_PAY_NOW_DESCRIPTION_TOO_LONG: ${params.description.length} chars, max 50`);
+  if (!(params.amount > 0)) throw new Error("NETCASH_PAY_NOW_AMOUNT_MUST_BE_POSITIVE");
+  const fields: Record<string, string> = {
+    m1: cfg.payNowServiceKey,
+    m2: NETCASH_SOFTWARE_VENDOR_KEY,
+    p2: params.reference,
+    p3: params.description,
+    p4: params.amount.toFixed(2),
+    Budget: "Y",
+  };
+  if (params.customerEmail) fields.m9 = params.customerEmail;
+  if (params.extra1) fields.m4 = params.extra1;
+  if (params.extra2) fields.m5 = params.extra2;
+  if (params.extra3) fields.m6 = params.extra3;
+  return { actionUrl: NETCASH_PAY_NOW_ACTION_URL, method: "POST", fields };
+}
+
+/**
+ * Server-to-server re-verification of a Pay Now transaction by RequestTrace.
+ * Netcash's eCommerce Notify postback has no documented signature/hash, so
+ * it must be treated as a hint, not proof -- the webhook handler calls this
+ * with the RequestTrace from the postback and only mutates Payment/
+ * LedgerEntry state based on THIS response, never the raw postback body.
+ * No service key or auth header is documented for this endpoint -- it's
+ * scoped by the (effectively unguessable) RequestTrace value alone.
+ */
+export async function checkPayNowTransactionStatus(requestTrace: string, request: typeof fetch = fetch) {
+  const res = await request(`https://ws.netcash.co.za/PayNow/TransactionStatus/Check?RequestTrace=${encodeURIComponent(requestTrace)}`);
+  const text = await res.text();
+  if (!res.ok) throw new Error(`NETCASH_TRANSACTION_STATUS_HTTP_${res.status}: ${text.slice(0, 500)}`);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error(`NETCASH_TRANSACTION_STATUS_NON_JSON: ${text.slice(0, 500)}`);
+  }
+  const body = parsed as { RequestTrace?: string; Amount?: string; TransactionAccepted?: boolean; Reference?: string; Reason?: string };
+  return {
+    requestTrace: body.RequestTrace ?? requestTrace,
+    amount: body.Amount,
+    accepted: body.TransactionAccepted === true,
+    reference: body.Reference,
+    reason: body.Reason,
+    raw: body,
+  };
 }
 
 /** Account Verification Service -- confirm a bank account is valid/open before setting up a mandate. */
