@@ -17,6 +17,11 @@
  * Delivery tracking: reuses `CommunicationLog`, following the exact
  * upsert-by-idempotencyKey pattern src/lib/whatsapp.ts already uses for
  * WhatsApp sends — same model, same shape, different channel.
+ * `CommunicationLog.status` is the `DeliveryStatus` enum (PENDING /
+ * PROCESSING / SUCCEEDED / FAILED / DEAD_LETTER) — a synchronous send that
+ * succeeds is recorded as SUCCEEDED, not "SENT" (there is no such enum
+ * value; `Document.status` is the separate free-text field that uses
+ * "SENT").
  *
  * Numbering: `INV-{year}-{sequence}` / `STMT-{year}-{sequence}` by counting
  * existing Document rows for the organisation this year. This is a
@@ -110,7 +115,7 @@ export async function sendInvoiceEmail(input: { accountId: string; organisationI
 
   const company = await getBillingDocumentCompanyDetails(context.organisationId, context.facilityId);
   const invoiceNumber = await nextDocumentNumber(context.organisationId, "INVOICE");
-  const lines: InvoiceLedgerLine[] = entries.map((entry) => ({ id: entry.id, description: entry.description, effectiveAt: entry.effectiveAt, amount: entry.amount, taxAmount: entry.taxAmount }));
+  const lines: InvoiceLedgerLine[] = entries.map((entry) => ({ id: entry.id, description: entry.description, effectiveAt: entry.effectiveAt, amount: entry.amount.toString(), taxAmount: entry.taxAmount.toString() }));
 
   const html = renderInvoiceHtml({
     invoiceNumber,
@@ -122,7 +127,7 @@ export async function sendInvoiceEmail(input: { accountId: string; organisationI
     billingAddressLines: addressLines(context.customer.billingAddress),
     unitLabel: context.unitLabel ?? undefined,
     accountNumber: context.account.accountNumber,
-    currentBalance: context.account.balance as number,
+    currentBalance: String(context.account.balance),
     lines,
     payNowUrl: input.payNowUrl,
   });
@@ -157,8 +162,8 @@ export async function sendInvoiceEmail(input: { accountId: string; organisationI
     await emailProvider().send({ to: context.customer.email, subject: `Invoice ${invoiceNumber} from Stor24`, text: `Invoice ${invoiceNumber} — see the attached details. Total due reflects your current account balance.`, html });
     const log = await db.communicationLog.upsert({
       where: { idempotencyKey: commsIdempotencyKey },
-      create: { organisationId: context.organisationId, facilityId: context.facilityId, customerId: context.customer.id, channel: "EMAIL", direction: "OUTBOUND", messageType: "INVOICE", recipientHash: createHash("sha256").update(context.customer.email).digest("hex"), status: "SENT", idempotencyKey: commsIdempotencyKey, sentAt: new Date(), metadata: { documentId: document.id, invoiceNumber } },
-      update: { status: "SENT", sentAt: new Date() },
+      create: { organisationId: context.organisationId, facilityId: context.facilityId, customerId: context.customer.id, channel: "EMAIL", direction: "OUTBOUND", messageType: "INVOICE", recipientHash: createHash("sha256").update(context.customer.email).digest("hex"), status: "SUCCEEDED", idempotencyKey: commsIdempotencyKey, sentAt: new Date(), metadata: { documentId: document.id, invoiceNumber } },
+      update: { status: "SUCCEEDED", sentAt: new Date() },
     });
     await db.document.update({ where: { id: document.id }, data: { sentAt: new Date(), status: "SENT" } });
     await db.auditEvent.create({ data: { organisationId: context.organisationId, facilityId: context.facilityId, actorId: input.actorId, action: "billing_document.invoice_sent", entityType: "Document", entityId: document.id, after: { invoiceNumber, accountId: context.account.id, ledgerEntryIds: input.ledgerEntryIds, communicationLogId: log.id } } });
@@ -199,7 +204,7 @@ export async function sendStatementEmail(input: { accountId: string; organisatio
 
   const company = await getBillingDocumentCompanyDetails(context.organisationId, context.facilityId);
   const statementNumber = await nextDocumentNumber(context.organisationId, "STATEMENT");
-  const lines: StatementLedgerLine[] = rangeEntries.map((entry) => ({ id: entry.id, type: entry.type, description: entry.description, effectiveAt: entry.effectiveAt, amount: entry.amount }));
+  const lines: StatementLedgerLine[] = rangeEntries.map((entry) => ({ id: entry.id, type: entry.type, description: entry.description, effectiveAt: entry.effectiveAt, amount: entry.amount.toString() }));
 
   const html = renderStatementHtml({
     statementNumber,
@@ -236,8 +241,8 @@ export async function sendStatementEmail(input: { accountId: string; organisatio
     await emailProvider().send({ to: context.customer.email, subject: `Your Stor24 statement (${statementNumber})`, text: `Statement ${statementNumber} for the period ${from.toDateString()} to ${input.to.toDateString()}. Closing balance: R${closingBalance.toFixed(2)}.`, html });
     const log = await db.communicationLog.upsert({
       where: { idempotencyKey: commsIdempotencyKey },
-      create: { organisationId: context.organisationId, facilityId: context.facilityId, customerId: context.customer.id, channel: "EMAIL", direction: "OUTBOUND", messageType: "STATEMENT", recipientHash: createHash("sha256").update(context.customer.email).digest("hex"), status: "SENT", idempotencyKey: commsIdempotencyKey, sentAt: new Date(), metadata: { documentId: document.id, statementNumber } },
-      update: { status: "SENT", sentAt: new Date() },
+      create: { organisationId: context.organisationId, facilityId: context.facilityId, customerId: context.customer.id, channel: "EMAIL", direction: "OUTBOUND", messageType: "STATEMENT", recipientHash: createHash("sha256").update(context.customer.email).digest("hex"), status: "SUCCEEDED", idempotencyKey: commsIdempotencyKey, sentAt: new Date(), metadata: { documentId: document.id, statementNumber } },
+      update: { status: "SUCCEEDED", sentAt: new Date() },
     });
     await db.document.update({ where: { id: document.id }, data: { sentAt: new Date(), status: "SENT" } });
     await db.auditEvent.create({ data: { organisationId: context.organisationId, facilityId: context.facilityId, actorId: input.actorId, action: "billing_document.statement_sent", entityType: "Document", entityId: document.id, after: { statementNumber, accountId: context.account.id, from: from.toISOString(), to: input.to.toISOString(), communicationLogId: log.id } } });
