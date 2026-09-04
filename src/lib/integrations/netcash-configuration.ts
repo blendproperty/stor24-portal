@@ -92,15 +92,27 @@ export function buildValidateServiceKeyEnvelope(input: z.infer<typeof configurat
     ["14", input.payNowServiceKey],
   ] as const;
   return `<?xml version="1.0" encoding="utf-8"?>\n` +
-    `<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://www.w3.org/2005/08/addressing" xmlns:t="http://tempuri.org/">` +
+    `<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://www.w3.org/2005/08/addressing" xmlns:nc="http://schemas.datacontract.org/2004/07/NC.DG.TMS.C.WCF.NIWS" xmlns:t="http://tempuri.org/">` +
     // NOTE: the WSDL contract name is "INIWS_Partner" (interface prefix "I"), not "NIWS_Partner".
     // The addressing Action must match this exactly or WCF returns an ActionNotSupported /
     // ContractFilter mismatch fault before it even looks at the body.
+    //
+    // NOTE 2: the wrapper elements (ValidateServiceKey, request) live in the tempuri.org
+    // operation namespace ("t:"), but the DATA fields inside `request` belong to the
+    // ValidateServiceKeyRequest DataContract, whose namespace is schemas.datacontract.org/...
+    // ("nc:") — confirmed by the same namespace appearing on every response under "b:".
+    // Sending these fields under "t:" instead of "nc:" doesn't error — WCF's
+    // DataContractSerializer silently ignores elements in the wrong namespace, so every
+    // field deserialized to null regardless of what was sent, which is why the account
+    // always came back as a generic AccountStatus 200 with everything nil.
     `<s:Header><a:Action s:mustUnderstand="1">http://tempuri.org/INIWS_Partner/ValidateServiceKey</a:Action><a:To s:mustUnderstand="1">${NETCASH_PARTNER_ENDPOINT}</a:To></s:Header>` +
-    `<s:Body><t:ValidateServiceKey><t:request><t:SoftwareVendorKey>${NETCASH_SOFTWARE_VENDOR_KEY}</t:SoftwareVendorKey>` +
-    `<t:MerchantAccount>${escapeXml(input.merchantAccount)}</t:MerchantAccount><t:ServiceInfoList>` +
-    services.map(([serviceId, serviceKey]) => `<t:ServiceInfo><t:ServiceId>${serviceId}</t:ServiceId><t:ServiceKey>${escapeXml(serviceKey)}</t:ServiceKey></t:ServiceInfo>`).join("") +
-    `</t:ServiceInfoList></t:request></t:ValidateServiceKey></s:Body></s:Envelope>`;
+    `<s:Body><t:ValidateServiceKey><t:request>` +
+    `<nc:MerchantAccount>${escapeXml(input.merchantAccount)}</nc:MerchantAccount>` +
+    `<nc:ServiceInfoList>` +
+    services.map(([serviceId, serviceKey]) => `<nc:ServiceInfo><nc:ServiceId>${serviceId}</nc:ServiceId><nc:ServiceKey>${escapeXml(serviceKey)}</nc:ServiceKey></nc:ServiceInfo>`).join("") +
+    `</nc:ServiceInfoList>` +
+    `<nc:SoftwareVendorKey>${NETCASH_SOFTWARE_VENDOR_KEY}</nc:SoftwareVendorKey>` +
+    `</t:request></t:ValidateServiceKey></s:Body></s:Envelope>`;
 }
 function firstTag(xml: string, tag: string) {
   return xml.match(new RegExp(`<(?:[\\w-]+:)?${tag}(?:\\s[^>]*)?>([^<]*)<\\/(?:[\\w-]+:)?${tag}>`, "i"))?.[1]?.trim() ?? "";
