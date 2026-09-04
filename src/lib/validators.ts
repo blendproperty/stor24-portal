@@ -245,6 +245,24 @@ export const accountPaymentSchema = z.object({
   receivedAt: z.coerce.date(),
 });
 
+// Staff-triggered "send invoice" / "send statement" for an account -- see
+// src/app/api/v1/accounts/[id]/documents/route.ts and
+// src/lib/finance/billing-documents-service.ts. An invoice names the
+// specific LedgerEntry rows it covers (so it can't silently drift from
+// what the customer was actually shown); a statement names a date range
+// and defaults `from` to since-the-last-statement when omitted.
+export const sendBillingDocumentSchema = z.discriminatedUnion("documentType", [
+  z.object({
+    documentType: z.literal("INVOICE"),
+    ledgerEntryIds: z.array(id).min(1).max(200),
+  }),
+  z.object({
+    documentType: z.literal("STATEMENT"),
+    from: z.iso.date().optional(),
+    to: z.iso.date(),
+  }),
+]);
+
 export const createInvitationSchema = z.object({
   name: z.string().trim().min(2).max(120),
   email: z.email().transform((value) => value.toLowerCase()),
