@@ -2,6 +2,15 @@
 
 > Last reviewed: 7 September 2026. Read this file before planning or changing the repository. Update it whenever a material capability, decision, deployment state, or cross-repository contract changes.
 
+## Netcash controlled test-processing switch — 7 September 2026
+
+- **Implementation:** branch `codex/netcash-test-processing-toggle` starts from remote production `main` revision `acff6f4`. The permission-scoped Netcash integration workspace now exposes an explicit enable/disable control for the existing transaction-processing gate. Enablement requires the exact typed confirmation, a `CONNECTED` provider record, all encrypted test credentials and an explicit `test` environment; disabling has a separate confirmation. The configuration change and its actor-attributed audit event commit atomically. The screen states that current authorisation is limited to controlled R10 Pay Now UAT and does not authorise debit orders, DebiCheck, eMandate or AVS.
+- **Testing / validation:** the focused Netcash configuration and Pay Now suites passed 24/24; the full repository suite passed 188/188; Prisma client generation and TypeScript passed; lint completed with zero errors and six pre-existing unused-variable warnings; and the Next.js production build passed with all 72 routes generated. A final focused regression and TypeScript rerun also passed after making the configuration update and audit event atomic.
+- **Commit and push:** not yet performed.
+- **Merge:** not performed.
+- **Deployment and configuration:** not performed by this branch. The operator reported that Netcash's Accept, Decline and Re-direct URLs were updated to the public website result page while Notify remains the CRM webhook; that portal configuration has not yet been independently exercised by a fresh transaction. The production processing gate remains disabled until this branch is reviewed, merged, deployed and explicitly enabled through the UI.
+- **Live production verification:** not performed. After deployment, enable the gate only for the planned session, complete a bounded R10 Pay Now website transaction, verify the matching `Payment`, `WebhookInbox` and audit records, then disable the gate. Decline, cancel, timeout and duplicate-notify cases remain required. Other Netcash products, reconciliation, exception ownership and business sign-off remain open.
+
 ## Netcash public status/readback contract — 7 September 2026
 
 - **Implementation:** branch `codex/netcash-public-status` starts from merged `main` revision `1eb2b21`. The hosted Pay Now form now carries the public reservation reference in Netcash's documented `m4` extra field, and a public-key-authenticated, no-store status endpoint returns only the bounded R10 payment state after proving that the requested payment belongs to the reservation-specific account. Browser return parameters remain untrusted.

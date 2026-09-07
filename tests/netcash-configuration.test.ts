@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import test from "node:test";
 import {
   buildValidateServiceKeyEnvelope,
   describeNetcashStatus,
+  NETCASH_DISABLE_CONFIRMATION,
+  NETCASH_ENABLE_CONFIRMATION,
+  netcashTransactionProcessingSchema,
   parseValidateServiceKeyResponse,
   summariseNetcashValidation,
   validateNetcashServiceKeys,
@@ -65,4 +69,24 @@ test("Netcash diagnostics never contain supplied service keys", () => {
   assert.doesNotMatch(serialised, new RegExp(input.accountServiceKey));
   assert.doesNotMatch(serialised, new RegExp(input.debitOrderServiceKey));
   assert.doesNotMatch(serialised, new RegExp(input.payNowServiceKey));
+});
+test("Netcash test transaction processing requires an exact direction-specific confirmation", () => {
+  assert.equal(netcashTransactionProcessingSchema.parse({ enabled: true, confirmation: NETCASH_ENABLE_CONFIRMATION }).enabled, true);
+  assert.equal(netcashTransactionProcessingSchema.parse({ enabled: false, confirmation: NETCASH_DISABLE_CONFIRMATION }).enabled, false);
+  assert.throws(() => netcashTransactionProcessingSchema.parse({ enabled: true, confirmation: "enable" }), /ENABLE NETCASH TEST PAYMENTS/);
+  assert.throws(() => netcashTransactionProcessingSchema.parse({ enabled: false, confirmation: NETCASH_ENABLE_CONFIRMATION }), /DISABLE NETCASH TEST PAYMENTS/);
+});
+
+test("Netcash test processing control remains permission-scoped, test-only and audited", () => {
+  const route = fs.readFileSync("src/app/api/v1/integrations/netcash/route.ts", "utf8");
+  const service = fs.readFileSync("src/lib/integrations/netcash-configuration.ts", "utf8");
+  const workspace = fs.readFileSync("src/components/netcash-integration-workspace.tsx", "utf8");
+  assert.match(route, /requirePermissionScope\("integrations\.manage"\)/);
+  assert.match(route, /sameOrigin\(request\)/);
+  assert.match(service, /stored\.environment !== "test"/);
+  assert.match(service, /connection\.status !== "CONNECTED"/);
+  assert.match(service, /integration\.netcash\.test_processing\.enabled/);
+  assert.match(service, /authorisedProduct: "PAY_NOW"/);
+  assert.match(service, /db\.\$transaction/);
+  assert.match(workspace, /debit orders, DebiCheck, eMandate and AVS remain unverified/);
 });
