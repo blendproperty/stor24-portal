@@ -84,9 +84,10 @@ test("Netcash test processing control remains permission-scoped, test-only and a
   assert.match(route, /requirePermissionScope\("integrations\.manage"\)/);
   assert.match(route, /sameOrigin\(request\)/);
   assert.match(service, /stored\.environment !== "test"/);
-  assert.match(service, /connection\.status !== "CONNECTED"/);
+  assert.match(service, /\["CONNECTED", "HEALTHY"\]\.includes\(connection\.status\)/);
   assert.match(service, /integration\.netcash\.test_processing\.enabled/);
   assert.match(service, /authorisedProduct: "PAY_NOW"/);
   assert.match(service, /db\.\$transaction/);
   assert.match(workspace, /debit orders, DebiCheck, eMandate and AVS remain unverified/);
+  assert.match(workspace, /status === "CONNECTED" \|\| status === "HEALTHY"/);
 });

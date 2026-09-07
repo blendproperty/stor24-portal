@@ -299,7 +299,7 @@ export async function setNetcashTransactionProcessing(scope: RequestScope, input
       stored.debitOrderServiceKeyEncrypted,
       stored.payNowServiceKeyEncrypted,
     ].every(configuredString);
-    if (stored.environment !== "test" || connection.status !== "CONNECTED" || !credentialsReady) {
+    if (stored.environment !== "test" || !["CONNECTED", "HEALTHY"].includes(connection.status) || !credentialsReady) {
       throw new Error("CONFIG_REQUIRED:NETCASH_TEST_CREDENTIALS");
     }
   }
