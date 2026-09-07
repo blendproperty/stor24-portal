@@ -8,6 +8,7 @@ import {
 } from "../src/lib/payments/netcash-client";
 import { encryptIntegrationSecret } from "../src/lib/integrations/integration-secret-vault";
 import { NETCASH_SANDBOX_PAYMENT_AMOUNT_ZAR } from "../src/lib/public-netcash-payment";
+import { reconcileNetcashPayment } from "../src/lib/payments/netcash-reconciliation";
 
 // Confirmed 4 September 2026 against Netcash's Pay Now eCommerce docs
 // (https://api.netcash.co.za/inbound-payments/pay-now/pay-now-ecommerce/):
@@ -206,4 +207,28 @@ test("Transaction status check fails closed on a non-JSON response", async () =>
     () => checkPayNowTransactionStatus("bad-trace", async () => new Response("<html>not json</html>", { status: 200 })),
     /NETCASH_TRANSACTION_STATUS_NON_JSON/,
   );
+});
+
+test("Netcash internal reconciliation requires exactly one matching ledger entry", () => {
+  const payment = { id: "pay-1", status: "SUCCEEDED", amount: "10.00", providerRef: "pay-1" };
+  const ledger = { id: "ledger-1", type: "PAYMENT", amount: "10.00", externalRef: "trace-1", metadata: { provider: "NETCASH", paymentId: "pay-1" } };
+  assert.equal(reconcileNetcashPayment(payment, [ledger]).state, "MATCHED");
+  assert.equal(reconcileNetcashPayment(payment, []).state, "MISSING_LEDGER");
+  assert.equal(reconcileNetcashPayment(payment, [ledger, { ...ledger, id: "ledger-2" }]).state, "DUPLICATE_LEDGER");
+  assert.equal(reconcileNetcashPayment({ ...payment, status: "PENDING" }, []).state, "PENDING");
+  assert.equal(reconcileNetcashPayment({ ...payment, status: "FAILED" }, []).state, "FAILED");
+});
+
+test("Netcash webhook is idempotent and posts the account balance once", async () => {
+  const source = await import("node:fs/promises").then((fs) => fs.readFile("src/app/api/webhooks/netcash/route.ts", "utf8"));
+  assert.match(source, /if \(!inbox\)/);
+  assert.match(source, /duplicate: true/);
+  assert.match(source, /status: \{ not: "SUCCEEDED" \}/);
+  assert.match(source, /balance: \{ decrement: payment\.amount \}/);
+  assert.match(source, /paymentId: payment\.id/);
+  assert.match(source, /verified\.reference !== providerRef/);
+  assert.match(source, /Number\(verified\.amount\) === Number\(payment\.amount\)/);
+  assert.match(source, /NETCASH_VERIFICATION_MISMATCH/);
+  assert.doesNotMatch(source, /providerRef: requestTrace/);
+  assert.doesNotMatch(source, /organisationId = "UNKNOWN"/);
 });
