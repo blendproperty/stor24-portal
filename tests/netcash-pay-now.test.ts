@@ -3,8 +3,10 @@ import test from "node:test";
 import {
   createPayNowCheckout,
   checkPayNowTransactionStatus,
+  decryptNetcashConfig,
   NETCASH_PAY_NOW_ACTION_URL,
 } from "../src/lib/payments/netcash-client";
+import { encryptIntegrationSecret } from "../src/lib/integrations/integration-secret-vault";
 
 // Confirmed 4 September 2026 against Netcash's Pay Now eCommerce docs
 // (https://api.netcash.co.za/inbound-payments/pay-now/pay-now-ecommerce/):
@@ -20,6 +22,48 @@ const connection = {
     transactionProcessingEnabled: true,
   },
 };
+
+test("saved Netcash credentials are decrypted before transaction code uses them", () => {
+  const previous = process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY;
+  process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY = "test-key-that-is-at-least-thirty-two-characters";
+  try {
+    const config = decryptNetcashConfig({
+      environment: "test",
+      merchantAccountEncrypted: encryptIntegrationSecret("50000000000"),
+      accountServiceKeyEncrypted: encryptIntegrationSecret("account-key"),
+      debitOrderServiceKeyEncrypted: encryptIntegrationSecret("debit-order-key"),
+      payNowServiceKeyEncrypted: encryptIntegrationSecret("pay-now-key"),
+      transactionProcessingEnabled: true,
+    });
+    assert.deepEqual(config, {
+      environment: "sandbox",
+      merchantAccount: "50000000000",
+      accountServiceKey: "account-key",
+      debitOrderServiceKey: "debit-order-key",
+      payNowServiceKey: "pay-now-key",
+      transactionProcessingEnabled: true,
+    });
+    assert.equal(createPayNowCheckout({ config }, {
+      reference: "PMT-DECRYPTED",
+      amount: 10,
+      description: "Sandbox payment",
+    }).fields.m1, "pay-now-key");
+  } finally {
+    if (previous === undefined) delete process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY;
+    else process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY = previous;
+  }
+});
+
+test("missing encrypted credentials stay absent and processing remains disabled by default", () => {
+  assert.deepEqual(decryptNetcashConfig({ environment: "test" }), {
+    environment: "sandbox",
+    merchantAccount: undefined,
+    accountServiceKey: undefined,
+    debitOrderServiceKey: undefined,
+    payNowServiceKey: undefined,
+    transactionProcessingEnabled: false,
+  });
+});
 
 test("Pay Now checkout posts to the documented eCommerce action URL with the correct field names", () => {
   const checkout = createPayNowCheckout(connection, {

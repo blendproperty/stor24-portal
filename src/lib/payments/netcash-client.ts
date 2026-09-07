@@ -47,8 +47,10 @@
  */
 import { db } from "@/lib/db";
 import { NETCASH_SOFTWARE_VENDOR_KEY } from "@/lib/integrations/netcash-configuration";
+import { decryptIntegrationSecret } from "@/lib/integrations/integration-secret-vault";
 
 export type NetcashConfig = {
+  merchantAccount?: string;
   accountServiceKey?: string; // "Account" / merchant-level service key
   payNowServiceKey?: string;
   debitOrderServiceKey?: string;
@@ -63,6 +65,33 @@ export type NetcashConfig = {
 
 const NETCASH_API_BASE = "https://api.netcash.co.za";
 
+type StoredNetcashConfig = {
+  environment?: unknown;
+  merchantAccountEncrypted?: unknown;
+  accountServiceKeyEncrypted?: unknown;
+  debitOrderServiceKeyEncrypted?: unknown;
+  payNowServiceKeyEncrypted?: unknown;
+  transactionProcessingEnabled?: unknown;
+};
+
+function decryptConfiguredSecret(value: unknown) {
+  return typeof value === "string" && value.length > 0
+    ? decryptIntegrationSecret(value)
+    : undefined;
+}
+
+export function decryptNetcashConfig(value: unknown): NetcashConfig {
+  const stored = (value ?? {}) as StoredNetcashConfig;
+  return {
+    environment: stored.environment === "live" ? "live" : "sandbox",
+    merchantAccount: decryptConfiguredSecret(stored.merchantAccountEncrypted),
+    accountServiceKey: decryptConfiguredSecret(stored.accountServiceKeyEncrypted),
+    debitOrderServiceKey: decryptConfiguredSecret(stored.debitOrderServiceKeyEncrypted),
+    payNowServiceKey: decryptConfiguredSecret(stored.payNowServiceKeyEncrypted),
+    transactionProcessingEnabled: stored.transactionProcessingEnabled === true,
+  };
+}
+
 export async function getNetcashConnection(organisationId: string, facilityId?: string | null) {
   const connection = await db.integrationConnection.findFirst({
     where: {
@@ -75,7 +104,7 @@ export async function getNetcashConnection(organisationId: string, facilityId?: 
   if (!connection) {
     throw new Error("NETCASH_NOT_CONFIGURED");
   }
-  return connection;
+  return { ...connection, config: decryptNetcashConfig(connection.config) };
 }
 
 function config(connection: { config: unknown }): NetcashConfig {
