@@ -66,7 +66,7 @@ export default async function NetcashPaymentsPage() {
       <div className="summary-cell"><span>Not collected</span><strong>{failed}</strong></div>
     </section>
     <section className="panel netcash-ops-note"><AlertTriangle size={18} /><div><strong>Settlement is not yet reconciled</strong><p>These controls match Stor24’s Payment and LedgerEntry records. Do not treat them as proof of bank settlement until the Netcash statement contract has been verified and imported.</p></div></section>
-    <section className="panel table-panel">
+    <section className="panel table-panel netcash-payments-panel">
       <div className="panel-heading"><div><h2>Recent Netcash payments</h2><p>Latest 250 attempts, newest first.</p></div></div>
       <div className="table-scroll"><table className="data-table"><thead><tr><th>Created</th><th>Customer / account</th><th>Payment</th><th>Provider reference</th><th>Outcome</th><th>Internal reconciliation</th></tr></thead><tbody>
         {rows.map(({ payment, reconciliation }) => {
