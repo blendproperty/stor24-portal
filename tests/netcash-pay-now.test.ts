@@ -7,6 +7,7 @@ import {
   NETCASH_PAY_NOW_ACTION_URL,
 } from "../src/lib/payments/netcash-client";
 import { encryptIntegrationSecret } from "../src/lib/integrations/integration-secret-vault";
+import { NETCASH_SANDBOX_PAYMENT_AMOUNT_ZAR } from "../src/lib/public-netcash-payment";
 
 // Confirmed 4 September 2026 against Netcash's Pay Now eCommerce docs
 // (https://api.netcash.co.za/inbound-payments/pay-now/pay-now-ecommerce/):
@@ -63,6 +64,18 @@ test("missing encrypted credentials stay absent and processing remains disabled 
     payNowServiceKey: undefined,
     transactionProcessingEnabled: false,
   });
+});
+
+test("the public Netcash journey is pinned to the bounded R10 sandbox amount", async () => {
+  assert.equal(NETCASH_SANDBOX_PAYMENT_AMOUNT_ZAR, 10);
+  const source = await import("node:fs/promises").then((fs) => fs.readFile("src/lib/public-netcash-payment.ts", "utf8"));
+  assert.match(source, /contactVerifiedAt/);
+  assert.match(source, /customer\.emailVerifiedAt/);
+  assert.match(source, /netcash-public-test-/);
+  assert.match(source, /account\.upsert/);
+  assert.match(source, /ST24-T-\$\{reservation\.id\}/);
+  assert.match(source, /public_payment\.netcash_sandbox_started/);
+  assert.doesNotMatch(source, /quotedRate/);
 });
 
 test("Pay Now checkout posts to the documented eCommerce action URL with the correct field names", () => {

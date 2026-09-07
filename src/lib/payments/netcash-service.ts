@@ -148,11 +148,13 @@ export async function createOnceOffCheckout(organisationId: string, facilityId: 
   amount: number;
   description: string;
   customerEmail?: string;
+  idempotencyKey?: string;
 }) {
   const connection = await getNetcashConnection(organisationId, facilityId);
-  const idempotencyKey = `netcash-paynow-${params.accountId}-${randomUUID()}`;
-  const payment = await db.payment.create({
-    data: {
+  const idempotencyKey = params.idempotencyKey ?? `netcash-paynow-${params.accountId}-${randomUUID()}`;
+  let payment = await db.payment.upsert({
+    where: { idempotencyKey },
+    create: {
       accountId: params.accountId,
       status: "PENDING",
       amount: params.amount,
@@ -160,7 +162,18 @@ export async function createOnceOffCheckout(organisationId: string, facilityId: 
       provider: "NETCASH",
       idempotencyKey,
     },
+    update: {},
   });
+  if (payment.accountId !== params.accountId || Number(payment.amount) !== params.amount || payment.method !== "PAY_NOW" || payment.provider !== "NETCASH") {
+    throw new Error("NETCASH_IDEMPOTENCY_CONFLICT");
+  }
+  if (payment.status === "SUCCEEDED") throw new Error("NETCASH_PAYMENT_ALREADY_SUCCEEDED");
+  if (payment.status === "FAILED") {
+    payment = await db.payment.update({
+      where: { id: payment.id },
+      data: { status: "PENDING", failureCode: null },
+    });
+  }
   try {
     const checkout = createPayNowCheckout(connection, {
       reference: payment.id,
