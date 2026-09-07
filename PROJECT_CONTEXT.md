@@ -2,6 +2,15 @@
 
 > Last reviewed: 7 September 2026. Read this file before planning or changing the repository. Update it whenever a material capability, decision, deployment state, or cross-repository contract changes.
 
+## Netcash Pay Now test-card reference — 7 September 2026
+
+- **Implementation:** documentation-only update recording Netcash's published Pay Now eCommerce test cards for the controlled R10 UAT. Successful responses: Visa `4000000000000002`, Mastercard `5200000000000015`. Failed responses: Visa `4000000000000036`, Mastercard `5200000000000049`. For all four, use any future expiry date in `MMYY` format and CVC/CVV `123`. Source: `https://api.netcash.co.za/inbound-payments/pay-now/pay-now-ecommerce/`, “Testing payment methods” / “Test Card Details”. These are public provider test values, not customer card data or Stor24 secrets.
+- **Testing / validation:** the values and instructions were read directly from Netcash's developer documentation on 7 September 2026. Netcash explicitly advises using them only while the Pay Now service is in **TEST MODE** to avoid charges. Its separate testing page states that Netcash does not provide a general sandbox; developers receive a dedicated testing account that exercises transactions in a live environment. Both statements must be preserved together.
+- **Commit and push:** the reference was committed as `ef6ecd6` on branch `codex/netcash-test-card-context`; this status correction is included on the same branch for push and review.
+- **Merge:** pending.
+- **Deployment and configuration:** no code, credential or provider configuration is changed here. Before using any listed card, independently confirm that the dedicated Pay Now NetConnector profile still has “Make test mode active” enabled and that the CRM's controlled test-processing gate is enabled only for the UAT session.
+- **Live production verification:** not claimed by this reference entry. The successful card is intended for the next R10 success-path proof and the failed card for decline handling. Cancel, timeout and duplicate-notify cases still require separate evidence; `Payment`, `WebhookInbox` and audit records must be checked after every attempt. Disable the controlled test-processing gate after the session. Debit orders, DebiCheck, eMandate, AVS, reconciliation, exception ownership and business sign-off remain separate open gates.
+
 ## Netcash HEALTHY-status activation correction — 7 September 2026
 
 - **Implementation:** branch `codex/netcash-healthy-status-fix` starts from merged production `main` revision `b3b1f78`. The Netcash test-processing control now treats both `CONNECTED` (credential validation) and `HEALTHY` (successful provider transaction/readback) as validated states. The prior literal `CONNECTED` check incorrectly disabled the button for the existing production record because the earlier successful sandbox transaction had correctly advanced it to `HEALTHY`. All other test-environment, encrypted-credential, permission, exact-confirmation and audit controls remain unchanged.
