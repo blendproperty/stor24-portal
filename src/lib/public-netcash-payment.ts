@@ -39,6 +39,7 @@ export async function startPublicNetcashSandboxPayment(reference: string, idempo
       amount: NETCASH_SANDBOX_PAYMENT_AMOUNT_ZAR,
       description: `STOR24 test - Unit ${reservation.unit.number}`,
       customerEmail: reservation.customer.email ?? undefined,
+      extra1: reference,
       idempotencyKey: `netcash-public-test-${idempotencyKey}`,
     },
   );
@@ -65,5 +66,37 @@ export async function startPublicNetcashSandboxPayment(reference: string, idempo
     facilityName: reservation.facility.name,
     unitNumber: reservation.unit.number,
     checkout: checkout.checkout,
+  };
+}
+
+export async function getPublicNetcashSandboxPayment(reference: string, paymentId: string) {
+  const reservation = await db.reservation.findUnique({
+    where: { publicReference: reference },
+    select: { id: true, status: true, journey: true },
+  });
+  if (!reservation || reservation.journey !== "RENTAL") {
+    return { ok: false as const, code: "PAYMENT_UNAVAILABLE" };
+  }
+  const account = await db.account.findUnique({
+    where: { accountNumber: `ST24-T-${reservation.id}` },
+    select: {
+      payments: {
+        where: { id: paymentId, provider: "NETCASH", method: "PAY_NOW" },
+        select: { id: true, status: true, amount: true, currency: true, failureCode: true, processedAt: true },
+        take: 1,
+      },
+    },
+  });
+  const payment = account?.payments[0];
+  if (!payment) return { ok: false as const, code: "PAYMENT_UNAVAILABLE" };
+  return {
+    ok: true as const,
+    paymentId: payment.id,
+    status: payment.status,
+    amountZar: Number(payment.amount),
+    currency: payment.currency,
+    failureCode: payment.failureCode,
+    processedAt: payment.processedAt?.toISOString() ?? null,
+    reservationStatus: reservation.status,
   };
 }

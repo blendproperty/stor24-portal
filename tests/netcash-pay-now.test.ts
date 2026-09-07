@@ -75,7 +75,18 @@ test("the public Netcash journey is pinned to the bounded R10 sandbox amount", a
   assert.match(source, /account\.upsert/);
   assert.match(source, /ST24-T-\$\{reservation\.id\}/);
   assert.match(source, /public_payment\.netcash_sandbox_started/);
+  assert.match(source, /extra1: reference/);
+  assert.match(source, /ST24-T-\$\{reservation\.id\}/);
+  assert.match(source, /provider: "NETCASH"/);
   assert.doesNotMatch(source, /quotedRate/);
+});
+
+test("public Netcash status is scoped to the reservation-specific account and payment", async () => {
+  const source = await import("node:fs/promises").then((fs) => fs.readFile("src/app/api/public/v1/payments/netcash/status/route.ts", "utf8"));
+  assert.match(source, /publicApiAuthorized/);
+  assert.match(source, /reference/);
+  assert.match(source, /paymentId/);
+  assert.match(source, /cache-control/);
 });
 
 test("Pay Now checkout posts to the documented eCommerce action URL with the correct field names", () => {
