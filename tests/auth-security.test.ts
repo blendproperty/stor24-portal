@@ -10,6 +10,10 @@ test("session proxy allows only the HMAC-authenticated BlendSign webhook path", 
   assert.equal(isPublicPathname("/api/webhooks/unknown"), false);
 });
 
+test("session proxy allows the unauthenticated Netcash Pay Now webhook path", () => {
+  assert.equal(isPublicPathname("/api/webhooks/netcash"), true);
+});
+
 test("PWA shell assets are public without exposing protected application routes", () => {
   assert.equal(isPublicPathname("/sw.js"), true);
   assert.equal(isPublicPathname("/manifest.webmanifest"), true);
