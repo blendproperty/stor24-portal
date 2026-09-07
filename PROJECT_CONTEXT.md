@@ -2,6 +2,15 @@
 
 > Last reviewed: 7 September 2026. Read this file before planning or changing the repository. Update it whenever a material capability, decision, deployment state, or cross-repository contract changes.
 
+## Netcash HEALTHY-status activation correction — 7 September 2026
+
+- **Implementation:** branch `codex/netcash-healthy-status-fix` starts from merged production `main` revision `b3b1f78`. The Netcash test-processing control now treats both `CONNECTED` (credential validation) and `HEALTHY` (successful provider transaction/readback) as validated states. The prior literal `CONNECTED` check incorrectly disabled the button for the existing production record because the earlier successful sandbox transaction had correctly advanced it to `HEALTHY`. All other test-environment, encrypted-credential, permission, exact-confirmation and audit controls remain unchanged.
+- **Testing / validation:** live read-only inspection reproduced the defect: 3/3 keys were stored, the exact confirmation was entered and a prior successful validation timestamp existed, while the UI mislabeled the `HEALTHY` record as `Configuration required` and disabled the action. The full check then passed: TypeScript, 188/188 automated tests, lint with zero errors and the same six pre-existing warnings, and the production build with all 72 routes generated.
+- **Commit and push:** not yet performed.
+- **Merge:** not performed.
+- **Deployment and configuration:** not performed. PR #38 merged as `b3b1f78`; CI #340 and VPS deployment #326 completed successfully, and direct health readback returned application and database status `ok` before this correction.
+- **Live production verification:** the defect is reproduced but the correction is not deployed. The transaction gate remains disabled and no new Netcash transaction was initiated.
+
 ## Netcash controlled test-processing switch — 7 September 2026
 
 - **Implementation:** branch `codex/netcash-test-processing-toggle` starts from remote production `main` revision `acff6f4`. The permission-scoped Netcash integration workspace now exposes an explicit enable/disable control for the existing transaction-processing gate. Enablement requires the exact typed confirmation, a `CONNECTED` provider record, all encrypted test credentials and an explicit `test` environment; disabling has a separate confirmation. The configuration change and its actor-attributed audit event commit atomically. The screen states that current authorisation is limited to controlled R10 Pay Now UAT and does not authorise debit orders, DebiCheck, eMandate or AVS.

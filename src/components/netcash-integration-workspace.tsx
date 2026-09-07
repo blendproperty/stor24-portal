@@ -26,8 +26,9 @@ type ValidationDiagnostic = {
   allValid: boolean;
 };
 
-function statusTone(status: string) { return status === "CONNECTED" ? "positive" : status === "DEGRADED" ? "warning" : "neutral"; }
-function statusLabel(status: string) { return status === "CONNECTED" ? "Test keys validated" : status === "DEGRADED" ? "Validation failed" : "Configuration required"; }
+function validatedStatus(status: string) { return status === "CONNECTED" || status === "HEALTHY"; }
+function statusTone(status: string) { return validatedStatus(status) ? "positive" : status === "DEGRADED" ? "warning" : "neutral"; }
+function statusLabel(status: string) { return validatedStatus(status) ? "Test keys validated" : status === "DEGRADED" ? "Validation failed" : "Configuration required"; }
 
 export function NetcashIntegrationWorkspace() {
   const [configuration, setConfiguration] = useState<Configuration | null>(null);
@@ -135,7 +136,7 @@ export function NetcashIntegrationWorkspace() {
       </> : <>
         <label>Type <strong>ENABLE NETCASH TEST PAYMENTS</strong> to confirm<input value={enableConfirmation} onChange={(event) => setEnableConfirmation(event.target.value)} disabled={!canManage || busy}/></label>
         <p className="safe-config-note"><LockKeyhole size={17}/>Enabling this does not approve live collections. It opens the existing Netcash transaction gate only for the stored test configuration and records the action in System Audit.</p>
-        <div className="form-footer"><button type="button" className="button button-primary" disabled={!canManage || busy || configuration?.status !== "CONNECTED" || configuredCount !== 3 || enableConfirmation !== "ENABLE NETCASH TEST PAYMENTS"} onClick={() => void setTestProcessing(true)}>{busy ? "Updating…" : "Enable controlled test payments"}</button></div>
+        <div className="form-footer"><button type="button" className="button button-primary" disabled={!canManage || busy || !validatedStatus(configuration?.status ?? "DISCONNECTED") || configuredCount !== 3 || enableConfirmation !== "ENABLE NETCASH TEST PAYMENTS"} onClick={() => void setTestProcessing(true)}>{busy ? "Updating…" : "Enable controlled test payments"}</button></div>
       </>}
     </section>
   </div>;
