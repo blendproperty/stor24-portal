@@ -7,6 +7,7 @@ export const metadata = { title: "Billing & payments" };
 export const dynamic = "force-dynamic";
 
 const modules = [
+  [CreditCard, "Netcash operations", "Match Netcash outcomes to Stor24 payment and ledger records and surface exceptions.", "/billing/netcash", "Review Netcash"],
   [CreditCard, "Take payment", "Post a card, bank, cash or EFT payment and allocate it to open charges.", "/operations/accounts", "Open accounts"],
   [RefreshCcw, "Autopay runs", "Review recurring-payment and arrears work requiring follow-up.", "/collections", "Open collections"],
   [FileText, "Invoices & statements", "Generate and export available account and financial reports.", "/reports", "Open reports"],

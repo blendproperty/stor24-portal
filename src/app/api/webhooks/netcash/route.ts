@@ -13,9 +13,9 @@
  * is Netcash's own transaction identifier and forging one that also passes
  * Netcash's status-check as accepted would require actually having paid.
  *
- * Every inbound call is first persisted to WebhookInbox verbatim (so nothing
- * is ever lost even if processing throws), then processed idempotently by
- * externalEventId (RequestTrace).
+ * Every callback with a recognised tenant-owned Payment is first persisted to
+ * WebhookInbox, then processed idempotently by externalEventId (RequestTrace).
+ * Unattributable callbacks are acknowledged without inventing a tenant id.
  */
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
@@ -43,23 +43,24 @@ export async function POST(request: Request) {
     ? await db.payment.findFirst({ where: { provider: "NETCASH", providerRef } })
     : null;
 
-  // Resolve the owning organisation for the WebhookInbox row: walk
-  // Payment -> Account -> Customer -> Organisation when we have a match.
-  // Unmatched callbacks (no providerRef, or providerRef we don't recognise)
-  // get organisationId "UNKNOWN" and are left for manual triage -- we'd
-  // rather record an unattributed webhook than silently drop it.
-  let organisationId = "UNKNOWN";
-  if (payment) {
-    const account = await db.account.findUnique({
-      where: { id: payment.accountId },
-      include: { customer: { select: { organisationId: true } } },
-    });
-    organisationId = account?.customer.organisationId ?? "UNKNOWN";
+  // WebhookInbox is tenant-owned. If the reference cannot be resolved we
+  // deliberately do not invent an organisation id (which would violate the
+  // foreign key and turn a harmless malformed callback into a 500).
+  if (!payment) {
+    return NextResponse.json({ received: true, matched: false }, { status: 202 });
+  }
+
+  const account = await db.account.findUnique({
+    where: { id: payment.accountId },
+    include: { customer: { select: { organisationId: true } } },
+  });
+  if (!account) {
+    return NextResponse.json({ received: true, matched: false }, { status: 202 });
   }
 
   const inbox = await db.webhookInbox.create({
     data: {
-      organisationId,
+      organisationId: account.customer.organisationId,
       provider: "NETCASH",
       eventType: "PAY_NOW_NOTIFY",
       externalEventId,
@@ -73,7 +74,13 @@ export async function POST(request: Request) {
     throw err;
   });
 
-  if (!payment || !requestTrace) {
+  // A repeated Netcash delivery is already represented by the original inbox
+  // row and must not post the payment or ledger a second time.
+  if (!inbox) {
+    return NextResponse.json({ received: true, matched: true, duplicate: true });
+  }
+
+  if (!requestTrace) {
     // Nothing to reconcile against yet, or Netcash sent no RequestTrace to
     // verify against -- leave the inbox row PENDING for manual triage.
     return NextResponse.json({ received: true, matched: false });
@@ -95,9 +102,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true, matched: true, verified: false });
   }
 
+  const amountMatches = verified.amount !== undefined && Number(verified.amount) === Number(payment.amount);
+  if (verified.reference !== providerRef || !amountMatches) {
+    await db.webhookInbox.update({
+      where: { id: inbox.id },
+      data: {
+        status: "FAILED",
+        failureCode: "NETCASH_VERIFICATION_MISMATCH",
+        failureMessage: "The verified Netcash reference or amount did not match the pending Stor24 payment.",
+      },
+    });
+    return NextResponse.json({ received: true, matched: true, verified: false });
+  }
+
   if (verified.accepted) {
     await db.$transaction(async (tx) => {
-      await tx.payment.update({ where: { id: payment.id }, data: { status: "SUCCEEDED", processedAt: new Date(), providerRef: requestTrace } });
+      const transitioned = await tx.payment.updateMany({
+        where: { id: payment.id, status: { not: "SUCCEEDED" } },
+        // Keep providerRef as the p2/reference sent to Netcash. RequestTrace is
+        // Netcash's transaction id and is stored on the ledger/inbox instead.
+        data: { status: "SUCCEEDED", processedAt: new Date(), failureCode: null },
+      });
+      if (!transitioned.count) return;
       await tx.ledgerEntry.create({
         data: {
           accountId: payment.accountId,
@@ -106,9 +132,10 @@ export async function POST(request: Request) {
           description: `Netcash payment received (${payment.method})`,
           effectiveAt: new Date(),
           externalRef: requestTrace,
-          metadata: { provider: "NETCASH", verifiedStatus: verified.raw, postedPayload: payload },
+          metadata: { provider: "NETCASH", paymentId: payment.id, requestTrace, verifiedStatus: verified.raw, postedPayload: payload },
         },
       });
+      await tx.account.update({ where: { id: payment.accountId }, data: { balance: { decrement: payment.amount } } });
     });
     await enqueueMriExport(payment.id).catch(() => undefined); // MRI export is best-effort, not payment-blocking
   } else {

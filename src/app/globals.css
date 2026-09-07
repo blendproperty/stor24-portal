@@ -2152,6 +2152,16 @@ a.module-card:focus-visible {
 .inventory-unit-link:hover, .inventory-unit-link:focus-visible { color: var(--orange); text-decoration: underline; text-underline-offset: 3px; }
 .reconciliation-action { display: grid; gap: 5px; min-width: 120px; }
 .reconciliation-action small { max-width: 180px; color: var(--muted); font-size: 9px; line-height: 1.35; }
+.netcash-ops-summary .summary-cell { cursor: default; }
+.netcash-ops-note { display: flex; align-items: flex-start; gap: 12px; padding: 16px; border-color: #f0c6ad; background: #fff8f3; }
+.netcash-ops-note svg { flex: 0 0 auto; color: #c74600; }
+.netcash-ops-note strong, .netcash-ops-note p { margin: 0; }
+.netcash-ops-note p { margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.netcash-reconciliation-state { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; border-radius: 999px; font-size: 10px; font-weight: 850; white-space: nowrap; }
+.netcash-reconciliation-state.success { background: #e8f8ee; color: #087443; }
+.netcash-reconciliation-state.warning { background: #fff2d9; color: #8a5700; }
+.netcash-reconciliation-state.danger { background: #feeceb; color: #a5221b; }
+.netcash-reconciliation-state.neutral { background: #eef1ef; color: #52615b; }
 .inventory-modal { width: min(720px,calc(100vw - 30px)); }
 .inventory-dialog-error { margin: 12px 0 0; }
 .managed-status-recovery { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px; border: 1px solid #f0c6ad; border-radius: 12px; background: #fff8f3; }
