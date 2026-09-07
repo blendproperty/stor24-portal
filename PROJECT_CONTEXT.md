@@ -2,6 +2,15 @@
 
 > Last reviewed: 7 September 2026. Read this file before planning or changing the repository. Update it whenever a material capability, decision, deployment state, or cross-repository contract changes.
 
+## Netcash public status/readback contract — 7 September 2026
+
+- **Implementation:** branch `codex/netcash-public-status` starts from merged `main` revision `1eb2b21`. The hosted Pay Now form now carries the public reservation reference in Netcash's documented `m4` extra field, and a public-key-authenticated, no-store status endpoint returns only the bounded R10 payment state after proving that the requested payment belongs to the reservation-specific account. Browser return parameters remain untrusted.
+- **Testing / validation:** Prisma client generation passed; all 186 automated tests passed; type generation and TypeScript passed; lint completed with zero errors and the six pre-existing warnings; the production build passed and generated all 72 routes, including `/api/public/v1/payments/netcash/status`.
+- **Commit and push:** prepared on `codex/netcash-public-status`; commit and push evidence will be recorded after promotion.
+- **Merge:** not performed.
+- **Deployment and configuration:** PR #36 deployment run #322 passed before this slice began. This slice does not alter Netcash credentials, profile URLs or the transaction-processing flag.
+- **Live production verification:** not performed. The public website handoff, customer return UX and real success/decline/cancel/timeout/duplicate UAT remain open. AVS, eMandate, DebiCheck, standard debit orders, reconciliation, exception ownership and business sign-off remain separate gates.
+
 ## Netcash stored-credential decryption — 7 September 2026
 
 - **Implementation:** on branch `codex/netcash-credential-decryption` from exact `origin/main` revision `1a5ca22`, `getNetcashConnection()` now converts the AES-GCM encrypted Netcash configuration stored by the Integrations workspace into the runtime-only configuration consumed by transaction functions. The merchant account and Account Service, Debit Orders and Pay Now keys are decrypted only on the server; absent fields remain absent, the test environment maps to `sandbox`, and transaction processing remains disabled unless its existing explicit flag is true.
@@ -15,9 +24,9 @@
 
 - **Implementation:** branch `codex/netcash-paynow-checkout` starts from merged `main` revision `36bc30d`. A new authenticated public API path validates that a reservation is active, rental-based, mobile-verified and separately email-verified; creates or reuses a reservation-specific customer account; creates or reuses an idempotent real Netcash `Payment`; fixes the provider amount at R10.00 rather than trusting or charging the displayed rental; and returns the documented hosted Pay Now form contract. Existing transaction processing remains fail-closed unless explicitly enabled. Successful payments cannot be restarted and idempotency-key conflicts are rejected.
 - **Testing / validation:** type generation and TypeScript passed; all 185 automated tests passed, including a new boundary test for the fixed R10 amount, verification prerequisites, reservation-specific account identity, idempotency and audit marker. Lint completed with zero errors and the same six pre-existing warnings. The Next.js production build passed and generated all 71 routes, including `/api/public/v1/payments/netcash/start`.
-- **Commit and push:** pending at the time of this entry; intended changes are limited to the public Netcash start route/service, idempotent Pay Now orchestration, tests and this context update.
-- **Merge:** not performed.
-- **Deployment and configuration:** not performed. The public website still calls the simulator route; no Netcash or production feature flag changed.
+- **Commit and push:** implementation commit `8dc5d84` was pushed to `codex/netcash-paynow-checkout`.
+- **Merge:** PR #36 was squash-merged to `main` as `1eb2b21` after PR CI run #335 passed; main CI run #336 also passed.
+- **Deployment and configuration:** VPS deployment run #322 completed successfully. The public website still calls the simulator route; no Netcash credential, NetConnector profile or production feature flag changed.
 - **Live production verification:** not performed. This slice supplies the CRM checkout-start contract only. Website form handoff, customer return/status UX, payment-success continuation and failed/cancelled/timed-out/duplicate-callback UAT remain open.
 
 ## Stakeholder evidence reconciliation — 7 September 2026

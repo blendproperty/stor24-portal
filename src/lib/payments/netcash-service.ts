@@ -148,6 +148,7 @@ export async function createOnceOffCheckout(organisationId: string, facilityId: 
   amount: number;
   description: string;
   customerEmail?: string;
+  extra1?: string;
   idempotencyKey?: string;
 }) {
   const connection = await getNetcashConnection(organisationId, facilityId);
@@ -180,6 +181,7 @@ export async function createOnceOffCheckout(organisationId: string, facilityId: 
       amount: params.amount,
       description: params.description,
       customerEmail: params.customerEmail,
+      extra1: params.extra1,
     });
     // providerRef is the p2 reference we sent (payment.id) -- the Notify
     // postback returns it as Reference, and RequestTrace (Netcash's own
