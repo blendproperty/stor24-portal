@@ -6,7 +6,7 @@
 
 - **Implementation:** branch `codex/netcash-public-status` starts from merged `main` revision `1eb2b21`. The hosted Pay Now form now carries the public reservation reference in Netcash's documented `m4` extra field, and a public-key-authenticated, no-store status endpoint returns only the bounded R10 payment state after proving that the requested payment belongs to the reservation-specific account. Browser return parameters remain untrusted.
 - **Testing / validation:** Prisma client generation passed; all 186 automated tests passed; type generation and TypeScript passed; lint completed with zero errors and the six pre-existing warnings; the production build passed and generated all 72 routes, including `/api/public/v1/payments/netcash/status`.
-- **Commit and push:** prepared on `codex/netcash-public-status`; commit and push evidence will be recorded after promotion.
+- **Commit and push:** implementation and context were committed as `3a8b3fa` and pushed to `origin/codex/netcash-public-status`; pull-request creation is the next promotion step.
 - **Merge:** not performed.
 - **Deployment and configuration:** PR #36 deployment run #322 passed before this slice began. This slice does not alter Netcash credentials, profile URLs or the transaction-processing flag.
 - **Live production verification:** not performed. The public website handoff, customer return UX and real success/decline/cancel/timeout/duplicate UAT remain open. AVS, eMandate, DebiCheck, standard debit orders, reconciliation, exception ownership and business sign-off remain separate gates.
