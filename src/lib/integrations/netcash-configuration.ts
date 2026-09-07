@@ -10,11 +10,22 @@ export const NETCASH_CATEGORY = "PAYMENTS";
 export const NETCASH_PROVIDER = "NETCASH";
 export const NETCASH_PARTNER_ENDPOINT = "https://ws.netcash.co.za/NIWS/niws_partner.svc";
 export const NETCASH_SOFTWARE_VENDOR_KEY = "24ade73c-98cf-47b3-99be-cc7b867b3080";
+export const NETCASH_ENABLE_CONFIRMATION = "ENABLE NETCASH TEST PAYMENTS";
+export const NETCASH_DISABLE_CONFIRMATION = "DISABLE NETCASH TEST PAYMENTS";
 const configurationSchema = z.object({
   merchantAccount: z.string().trim().regex(/^5\d{10}$/, "Enter the 11-digit Netcash test account number beginning with 5."),
   accountServiceKey: z.uuid(),
   debitOrderServiceKey: z.uuid(),
   payNowServiceKey: z.uuid(),
+});
+export const netcashTransactionProcessingSchema = z.object({
+  enabled: z.boolean(),
+  confirmation: z.string(),
+}).superRefine((input, context) => {
+  const expected = input.enabled ? NETCASH_ENABLE_CONFIRMATION : NETCASH_DISABLE_CONFIRMATION;
+  if (input.confirmation !== expected) {
+    context.addIssue({ code: "custom", path: ["confirmation"], message: `Type ${expected} exactly.` });
+  }
 });
 type StoredNetcashConfiguration = {
   environment?: unknown;
@@ -274,6 +285,51 @@ export async function validateAndSaveNetcashConfiguration(scope: RequestScope, i
     connectionId: connection.id,
   });
   return validation;
+}
+export async function setNetcashTransactionProcessing(scope: RequestScope, input: unknown) {
+  const parsed = netcashTransactionProcessingSchema.parse(input);
+  const connection = await netcashConnection(scope.organisationId);
+  if (!connection) throw new Error("CONFIG_REQUIRED:NETCASH_TEST_CREDENTIALS");
+
+  const stored = (connection.config ?? {}) as StoredNetcashConfiguration;
+  if (parsed.enabled) {
+    const credentialsReady = [
+      stored.merchantAccountEncrypted,
+      stored.accountServiceKeyEncrypted,
+      stored.debitOrderServiceKeyEncrypted,
+      stored.payNowServiceKeyEncrypted,
+    ].every(configuredString);
+    if (stored.environment !== "test" || connection.status !== "CONNECTED" || !credentialsReady) {
+      throw new Error("CONFIG_REQUIRED:NETCASH_TEST_CREDENTIALS");
+    }
+  }
+
+  await db.$transaction([
+    db.integrationConnection.update({
+      where: { id: connection.id },
+      data: {
+        config: {
+          ...(connection.config as Record<string, unknown>),
+          transactionProcessingEnabled: parsed.enabled,
+        },
+      },
+    }),
+    db.auditEvent.create({
+      data: {
+        organisationId: scope.organisationId,
+        actorId: scope.userId,
+        action: parsed.enabled ? "integration.netcash.test_processing.enabled" : "integration.netcash.test_processing.disabled",
+        entityType: "Integration",
+        entityId: "NETCASH",
+        after: {
+          environment: "test",
+          transactionProcessingEnabled: parsed.enabled,
+          connectionId: connection.id,
+          authorisedProduct: "PAY_NOW",
+        },
+      },
+    }),
+  ]);
 }
 export async function loadNetcashTestCredentials(organisationId: string) {
   const connection = await netcashConnection(organisationId);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, KeyRound, LockKeyhole, RefreshCw, ShieldCheck } from "lucide-react";
+import { CheckCircle2, KeyRound, LockKeyhole, RefreshCw, ShieldCheck, TestTube2 } from "lucide-react";
 
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
@@ -36,6 +36,7 @@ export function NetcashIntegrationWorkspace() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [diagnostic, setDiagnostic] = useState<ValidationDiagnostic | null>(null);
+  const [enableConfirmation, setEnableConfirmation] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -75,6 +76,26 @@ export function NetcashIntegrationWorkspace() {
     setNotice("All three Netcash test service keys validated and were stored securely. Transaction processing remains disabled.");
   }
 
+  async function setTestProcessing(enabled: boolean) {
+    if (!enabled && !window.confirm("Disable Netcash test transaction processing now?")) return;
+    setBusy(true); setError(""); setNotice("");
+    const response = await fetch("/api/v1/integrations/netcash", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        action: "set-test-transaction-processing",
+        payload: {
+          enabled,
+          confirmation: enabled ? enableConfirmation : "DISABLE NETCASH TEST PAYMENTS",
+        },
+      }),
+    });
+    const payload = await response.json(); setBusy(false);
+    if (!response.ok) { setError(payload.error?.message ?? "Netcash test transaction processing could not be changed."); return; }
+    setConfiguration(payload.data); setEnableConfirmation("");
+    setNotice(enabled ? "Netcash test transaction processing enabled for controlled Pay Now UAT." : "Netcash test transaction processing disabled.");
+  }
+
   const configuredCount = configuration ? [configuration.accountServiceKeyConfigured, configuration.debitOrderServiceKeyConfigured, configuration.payNowServiceKeyConfigured].filter(Boolean).length : 0;
   return <div className="page-stack">
     <PageHeader eyebrow="Company setup · Integrations" title="Netcash test connection" description="Validate the dedicated Netcash test account and store its service keys securely. This screen cannot submit payments or debit orders." />
@@ -106,5 +127,16 @@ export function NetcashIntegrationWorkspace() {
       <div className="hikvision-health"><StatusPill tone={statusTone(configuration?.status ?? "DISCONNECTED")}>{statusLabel(configuration?.status ?? "DISCONNECTED")}</StatusPill><span>{configuration?.lastSuccessAt ? `Last successful validation ${new Date(configuration.lastSuccessAt).toLocaleString("en-ZA")}` : configuration?.failureMessage ?? "No successful provider validation yet."}</span></div>
       <div className="form-footer"><button className="button button-primary" disabled={!canManage || !configuration?.encryptionReady || busy}><RefreshCw size={15}/>{busy ? "Validating…" : "Validate and save test keys"}</button></div>
     </form>
+    <section className="panel panel-spacious company-form">
+      <div className="panel-heading"><div><p className="eyebrow">Controlled sandbox UAT</p><h2>Test transaction processing</h2><p className="panel-subtitle">This gate applies only to the validated dedicated test account. Current authorisation is limited to controlled R10 Pay Now tests; debit orders, DebiCheck, eMandate and AVS remain unverified and must not be initiated.</p></div><TestTube2 className="positive-icon"/></div>
+      {configuration?.transactionProcessingEnabled ? <>
+        <p className="safe-config-note"><ShieldCheck size={17}/>Test processing is enabled. Disable it immediately after the planned UAT session.</p>
+        <div className="form-footer"><button type="button" className="button button-danger" disabled={!canManage || busy} onClick={() => void setTestProcessing(false)}>{busy ? "Updating…" : "Disable test payments"}</button></div>
+      </> : <>
+        <label>Type <strong>ENABLE NETCASH TEST PAYMENTS</strong> to confirm<input value={enableConfirmation} onChange={(event) => setEnableConfirmation(event.target.value)} disabled={!canManage || busy}/></label>
+        <p className="safe-config-note"><LockKeyhole size={17}/>Enabling this does not approve live collections. It opens the existing Netcash transaction gate only for the stored test configuration and records the action in System Audit.</p>
+        <div className="form-footer"><button type="button" className="button button-primary" disabled={!canManage || busy || configuration?.status !== "CONNECTED" || configuredCount !== 3 || enableConfirmation !== "ENABLE NETCASH TEST PAYMENTS"} onClick={() => void setTestProcessing(true)}>{busy ? "Updating…" : "Enable controlled test payments"}</button></div>
+      </>}
+    </section>
   </div>;
 }
