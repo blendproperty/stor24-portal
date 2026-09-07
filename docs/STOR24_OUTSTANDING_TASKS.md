@@ -25,6 +25,8 @@ This is the consolidated outstanding-work register for the STOR 24 programme. It
 
 Existing code is a provider scaffold and the public Pay Now journey is a UAT simulator. It must not be described or enabled as real payment processing.
 
+**Update, 7 September 2026:** Pay Now specifically (only) now has a verified contract, sandbox credentials, an authenticated callback path (server-to-server re-verification, since Netcash defines no callback signature scheme) and one genuine successful sandbox transaction — see `PROJECT_CONTEXT.md` → "Netcash Pay Now sandbox proof — 7 September 2026" for full evidence, including two further pre-existing bugs found and fixed (a session-auth gap that blocked the webhook, now shipped; a credential-decryption gap, proven only in a disposable test environment and not yet merged to `main`). This does not change the BLOCKED status above: it does not cover AVS, eMandate/DebiCheck or standard debit orders; failed/cancelled/timed-out/duplicate-callback cases; reconciliation; exception ownership; or business approval — all of the checklist below remains open exactly as stated.
+
 - [ ] Obtain the signed/approved Netcash product and onboarding contract for the exact services STOR 24 will use.
 - [ ] Obtain sandbox credentials, account/service keys, vendor key if required, base URLs and activation status.
 - [ ] Obtain authoritative endpoint paths, request/response schemas and worked examples for Pay Now, AVS, eMandate/DebiCheck, standard debit orders and statement retrieval.
