@@ -2,6 +2,15 @@
 
 > Last reviewed: 7 September 2026. Read this file before planning or changing the repository. Update it whenever a material capability, decision, deployment state, or cross-repository contract changes.
 
+## Netcash stored-credential decryption — 7 September 2026
+
+- **Implementation:** on branch `codex/netcash-credential-decryption` from exact `origin/main` revision `1a5ca22`, `getNetcashConnection()` now converts the AES-GCM encrypted Netcash configuration stored by the Integrations workspace into the runtime-only configuration consumed by transaction functions. The merchant account and Account Service, Debit Orders and Pay Now keys are decrypted only on the server; absent fields remain absent, the test environment maps to `sandbox`, and transaction processing remains disabled unless its existing explicit flag is true.
+- **Testing / validation:** Prisma client generation passed; type generation and TypeScript passed; all 184 automated tests passed, including new coverage proving that an encrypted Pay Now key reaches the documented hosted-checkout form builder and that missing credentials remain fail-closed. Lint completed with zero errors and six pre-existing unused-variable warnings. A clean local dependency installation was required because Turbopack correctly rejected an external `node_modules` junction; after that correction the Next.js production build compiled, type-checked and generated all 70 pages successfully.
+- **Commit and push:** application implementation, focused Pay Now tests and the initial context record were committed as `12fe6e4` and pushed to `origin/codex/netcash-credential-decryption`. This follow-up context correction is included on the same branch for the pull request.
+- **Merge:** not yet performed. This repository's protected `main` requires the normal reviewed PR flow.
+- **Deployment and configuration:** not performed. No Netcash credential, NetConnector profile or transaction-processing flag was changed.
+- **Live production verification:** not performed. The existing single R10 sandbox success remains the only live transaction evidence. Website checkout creation and failed, cancelled, timed-out and duplicate-callback cases remain subsequent slices; AVS, eMandate, DebiCheck, standard debit orders, reconciliation, exception ownership and business sign-off remain open.
+
 ## Stakeholder evidence reconciliation — 7 September 2026
 
 - **Implementation:** this documentation refresh supports the revised stakeholder mind map. Remote `main` was read at `23e47f5`. Newer merged work absent from the previous context includes staff-triggered invoice/statement generation and email (`a7c018b`, PR #28), Netcash Pay Now eCommerce contract and server-to-server webhook re-verification (`9004461`, PR #29), and the Netcash webhook session-auth exemption (`20114bd`, PR #30). These are merged capabilities, not a claim of verified customer self-service or live settlement. The older simulator-only narrative is historical and must be reconciled with current deployed configuration before use.
