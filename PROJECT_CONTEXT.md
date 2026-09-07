@@ -490,7 +490,7 @@ A CRM capability is complete only when it is database-backed, scoped, permission
 
 - **Implementation:** the Netcash payments panel now has page-specific, roomier padding for its heading, column headings, payment rows and secondary text. A narrower responsive value preserves usable spacing on small screens without changing every dense CRM table.
 - **Testing / validation:** `git diff --check`, TypeScript generation/checking and ESLint passed; all 190 automated tests passed; after replacing the checkout's external dependency junction with a normal local dependency directory, the Next.js production build compiled successfully and generated all 72 routes including `/billing/netcash`.
-- **Commit and push:** pending in this working branch.
+- **Commit and push:** implementation and validation record committed as `8755cc3` (`style: improve Netcash operations spacing`) on `codex/netcash-ops-live-evidence`; this evidence correction is included in the same pushed branch.
 - **Merge:** not yet merged.
 - **Deployment and configuration:** not yet deployed; no Netcash or database configuration is changed.
 - **Live production verification:** pending deployment. The existing payment-processing, failure-path, duplicate-delivery, statement-reconciliation and business approval gates above remain unchanged.
