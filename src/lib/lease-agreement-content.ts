@@ -6,7 +6,9 @@
 // whenever clause wording changes materially, so historically signed documents remain
 // tied to the exact version of the text the signer actually saw and initialled.
 
-export const LEASE_VERSION = "v1-draft-2026-08-18";
+export const LEASE_VERSION = "v2-draft-payment-method-2026-09-08";
+
+export type PublicLeasePaymentMethod = "CARD" | "EFT" | "DEBIT_ORDER";
 
 export type LeaseClauseKey =
   | "premises_and_use"
@@ -15,7 +17,8 @@ export type LeaseClauseKey =
   | "insurance_and_liability"
   | "prohibited_items"
   | "default_and_termination"
-  | "data_and_privacy";
+  | "data_and_privacy"
+  | "payment_authority";
 
 export type LeaseClauseContext = {
   facilityName: string;
@@ -24,6 +27,7 @@ export type LeaseClauseContext = {
   customerName: string;
   monthlyRate: number;
   startDate: Date;
+  paymentMethod: PublicLeasePaymentMethod;
 };
 
 type ClauseDefinition = { key: LeaseClauseKey; title: string; body: (ctx: LeaseClauseContext) => string };
@@ -71,6 +75,15 @@ const CLAUSE_DEFINITIONS: ClauseDefinition[] = [
     title: "7. Data and privacy",
     body: () => `The Licensor will process the Licensee's personal information (including, where applicable, biometric access data) in accordance with the Protection of Personal Information Act and the Licensor's privacy notice, solely for the purposes of operating this agreement and the facility.`,
   },
+  {
+    key: "payment_authority",
+    title: "8. Payment instruction and authority",
+    body: (ctx) => ctx.paymentMethod === "DEBIT_ORDER"
+      ? `The Licensee selects debit order and authorises recurring collection of the monthly licence fee from the nominated bank account, subject to a valid debit-order mandate and applicable banking rules. This authority remains effective until this agreement ends or the mandate is lawfully cancelled. A failed collection does not extinguish the amount due.`
+      : ctx.paymentMethod === "EFT"
+        ? `The Licensee selects electronic funds transfer and must use the Stor24 account and payment reference supplied at checkout. The unit and access remain subject to cleared funds. Proof of payment alone does not constitute cleared payment.`
+        : `The Licensee selects card payment through Stor24's authorised payment provider. Card details are processed by the payment provider and are not stored in this agreement. The unit and access remain subject to successful payment authorisation.`,
+  },
 ];
 
 export const LEASE_CLAUSE_KEYS = CLAUSE_DEFINITIONS.map((clause) => clause.key) as LeaseClauseKey[];
@@ -90,6 +103,7 @@ export function renderLeaseDocument(ctx: LeaseClauseContext) {
     `Licensee: ${ctx.customerName}`,
     `Monthly rate: ${formatRate(ctx.monthlyRate)} (excl. applicable tax)`,
     `Commencement date: ${formatDate(ctx.startDate)}`,
+    `Selected payment method: ${ctx.paymentMethod.replaceAll("_", " ")}`,
     "",
     ...clauses.flatMap((clause) => [clause.title, clause.body, ""]),
     "By initialling each clause above and signing below, the Licensee confirms they have read, understood and agree to be bound by each clause of this agreement.",
