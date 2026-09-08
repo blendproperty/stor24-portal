@@ -429,11 +429,34 @@ model Reservation {
   convertedTenancyId String?           @unique
   convertedTenancy   Tenancy?          @relation(fields: [convertedTenancyId], references: [id])
   publicPaymentSessions PublicPaymentSession[]
+  publicLease        PublicReservationLease?
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 
   @@index([facilityId, status, holdExpiresAt])
   @@index([journey, viewingAt])
+}
+
+model PublicReservationLease {
+  id                 String      @id @default(cuid())
+  reservationId      String      @unique
+  reservation        Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  status             String      @default("READY")
+  version            String
+  content            String
+  clauses            Json
+  sha256              String
+  signingToken       String      @unique
+  expiresAt          DateTime
+  signerName         String?
+  signerIp           String?
+  signerUserAgent    String?
+  initials           Json?
+  signedAt           DateTime?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  @@index([status, expiresAt])
 }
 
 model PublicPaymentSession {
