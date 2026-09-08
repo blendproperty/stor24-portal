@@ -3,6 +3,13 @@ import { createOnceOffCheckout } from "@/lib/payments/netcash-service";
 
 export const NETCASH_SANDBOX_PAYMENT_AMOUNT_ZAR = 10;
 
+export function publicNetcashPaymentStatus(status: string, failureCode: string | null) {
+  if (status === "FAILED" && failureCode && /\bcancell?(?:ed|ation)\b/i.test(failureCode)) {
+    return "CANCELLED" as const;
+  }
+  return status;
+}
+
 export async function startPublicNetcashSandboxPayment(reference: string, idempotencyKey: string) {
   const reservation = await db.reservation.findUnique({
     where: { publicReference: reference },
@@ -92,7 +99,7 @@ export async function getPublicNetcashSandboxPayment(reference: string, paymentI
   return {
     ok: true as const,
     paymentId: payment.id,
-    status: payment.status,
+    status: publicNetcashPaymentStatus(payment.status, payment.failureCode),
     amountZar: Number(payment.amount),
     currency: payment.currency,
     failureCode: payment.failureCode,
