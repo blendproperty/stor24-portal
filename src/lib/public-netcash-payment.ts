@@ -107,3 +107,50 @@ export async function getPublicNetcashSandboxPayment(reference: string, paymentI
     reservationStatus: reservation.status,
   };
 }
+
+export async function cancelPublicNetcashSandboxPayment(reference: string, paymentId: string) {
+  const reservation = await db.reservation.findUnique({
+    where: { publicReference: reference },
+    select: { id: true, facilityId: true, customer: { select: { organisationId: true } } },
+  });
+  if (!reservation) return { ok: false as const, code: "PAYMENT_UNAVAILABLE" };
+
+  const account = await db.account.findUnique({
+    where: { accountNumber: `ST24-T-${reservation.id}` },
+    select: {
+      payments: {
+        where: { id: paymentId, provider: "NETCASH", method: "PAY_NOW" },
+        select: { id: true, status: true },
+        take: 1,
+      },
+    },
+  });
+  const payment = account?.payments[0];
+  if (!payment) return { ok: false as const, code: "PAYMENT_UNAVAILABLE" };
+
+  if (payment.status === "PENDING") {
+    await db.$transaction(async (tx) => {
+      const changed = await tx.payment.updateMany({
+        where: { id: payment.id, status: "PENDING" },
+        data: { status: "FAILED", failureCode: "NETCASH_CUSTOMER_CANCELLED", processedAt: new Date() },
+      });
+      if (!changed.count) return;
+      await tx.auditEvent.create({
+        data: {
+          organisationId: reservation.customer.organisationId,
+          facilityId: reservation.facilityId,
+          action: "public_payment.netcash_cancelled",
+          entityType: "Payment",
+          entityId: payment.id,
+          after: { status: "FAILED", failureCode: "NETCASH_CUSTOMER_CANCELLED" },
+        },
+      });
+    });
+  }
+
+  const current = await db.payment.findUnique({ where: { id: payment.id }, select: { status: true, failureCode: true } });
+  return {
+    ok: true as const,
+    status: publicNetcashPaymentStatus(current?.status ?? payment.status, current?.failureCode ?? null),
+  };
+}

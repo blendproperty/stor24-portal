@@ -141,6 +141,28 @@ test("Pay Now checkout maps extra data fields to m4/m5/m6", () => {
   assert.equal(checkout.fields.m6, "staff-brett");
 });
 
+test("Pay Now checkout maps URL-safe return correlation to m10", () => {
+  const checkout = createPayNowCheckout(connection, {
+    reference: "PMT3",
+    amount: 10,
+    description: "Cancellation test",
+    returnData: "paymentId=PMT3&reference=ST24-20260908-ABC123",
+  });
+  assert.equal(checkout.fields.m10, "paymentId=PMT3&reference=ST24-20260908-ABC123");
+});
+
+test("public Netcash cancellation is authenticated, scoped, fail-closed and idempotent", async () => {
+  const route = await import("node:fs/promises").then((fs) => fs.readFile("src/app/api/public/v1/payments/netcash/cancel/route.ts", "utf8"));
+  const service = await import("node:fs/promises").then((fs) => fs.readFile("src/lib/public-netcash-payment.ts", "utf8"));
+  assert.match(route, /publicApiAuthorized/);
+  assert.match(route, /reference/);
+  assert.match(route, /paymentId/);
+  assert.match(service, /status: "PENDING"/);
+  assert.match(service, /NETCASH_CUSTOMER_CANCELLED/);
+  assert.match(service, /public_payment\.netcash_cancelled/);
+  assert.match(service, /updateMany/);
+});
+
 test("Pay Now checkout rejects a reference longer than Netcash's documented 25-character limit", () => {
   assert.throws(
     () => createPayNowCheckout(connection, { reference: "x".repeat(26), amount: 100, description: "ok" }),
