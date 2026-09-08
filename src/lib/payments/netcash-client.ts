@@ -273,6 +273,7 @@ export function createPayNowCheckout(connection: { config: unknown }, params: {
   amount: number; // ZAR
   description: string; // becomes p3 -- max 50 chars
   customerEmail?: string;
+  returnData?: string; // m10: URL-query-safe correlation returned by Netcash
   extra1?: string; // returned verbatim on the Notify postback as Extra1
   extra2?: string;
   extra3?: string;
@@ -291,6 +292,7 @@ export function createPayNowCheckout(connection: { config: unknown }, params: {
     Budget: "Y",
   };
   if (params.customerEmail) fields.m9 = params.customerEmail;
+  if (params.returnData) fields.m10 = params.returnData;
   if (params.extra1) fields.m4 = params.extra1;
   if (params.extra2) fields.m5 = params.extra2;
   if (params.extra3) fields.m6 = params.extra3;

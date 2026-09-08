@@ -182,6 +182,10 @@ export async function createOnceOffCheckout(organisationId: string, facilityId: 
       description: params.description,
       customerEmail: params.customerEmail,
       extra1: params.extra1,
+      returnData: new URLSearchParams({
+        paymentId: payment.id,
+        ...(params.extra1 ? { reference: params.extra1 } : {}),
+      }).toString(),
     });
     // providerRef is the p2 reference we sent (payment.id) -- the Notify
     // postback returns it as Reference, and RequestTrace (Netcash's own
