@@ -7,7 +7,7 @@ import {
   NETCASH_PAY_NOW_ACTION_URL,
 } from "../src/lib/payments/netcash-client";
 import { encryptIntegrationSecret } from "../src/lib/integrations/integration-secret-vault";
-import { NETCASH_SANDBOX_PAYMENT_AMOUNT_ZAR } from "../src/lib/public-netcash-payment";
+import { NETCASH_SANDBOX_PAYMENT_AMOUNT_ZAR, publicNetcashPaymentStatus } from "../src/lib/public-netcash-payment";
 import { reconcileNetcashPayment } from "../src/lib/payments/netcash-reconciliation";
 
 // Confirmed 4 September 2026 against Netcash's Pay Now eCommerce docs
@@ -80,6 +80,13 @@ test("the public Netcash journey is pinned to the bounded R10 sandbox amount", a
   assert.match(source, /ST24-T-\$\{reservation\.id\}/);
   assert.match(source, /provider: "NETCASH"/);
   assert.doesNotMatch(source, /quotedRate/);
+});
+
+test("public Netcash status distinguishes a cancelled checkout from a declined payment", () => {
+  assert.equal(publicNetcashPaymentStatus("FAILED", "Transaction cancelled by cardholder"), "CANCELLED");
+  assert.equal(publicNetcashPaymentStatus("FAILED", "Transaction cancellation"), "CANCELLED");
+  assert.equal(publicNetcashPaymentStatus("FAILED", "Card declined"), "FAILED");
+  assert.equal(publicNetcashPaymentStatus("PENDING", null), "PENDING");
 });
 
 test("public Netcash status is scoped to the reservation-specific account and payment", async () => {
