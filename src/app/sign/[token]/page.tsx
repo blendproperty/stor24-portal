@@ -21,6 +21,7 @@ export default async function SignLeasePage({
     customerName: lease.customerName,
     monthlyRate: lease.monthlyRate,
     startDate: lease.startDate,
+    paymentMethod: lease.paymentMethod,
   });
 
   return (

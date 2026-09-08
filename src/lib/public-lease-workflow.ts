@@ -6,7 +6,9 @@ import {
   LEASE_VERSION,
   renderLeaseDocument,
   type LeaseClauseKey,
+  type PublicLeasePaymentMethod,
 } from "@/lib/lease-agreement-content";
+import { renderSignedLeasePdf } from "@/lib/public-lease-pdf";
 
 const signingWindowMs = 7 * 24 * 60 * 60 * 1000;
 
@@ -19,7 +21,7 @@ function publicLeaseExpiry(holdExpiresAt: Date | null, now = new Date()) {
   return holdExpiresAt && holdExpiresAt < maximum ? holdExpiresAt : maximum;
 }
 
-export async function preparePublicReservationLease(reference: string) {
+export async function preparePublicReservationLease(reference: string, paymentMethod: PublicLeasePaymentMethod) {
   const reservation = await db.reservation.findUnique({
     where: { publicReference: reference },
     include: { customer: true, facility: true, unit: { include: { unitType: true } }, publicLease: true },
@@ -36,6 +38,7 @@ export async function preparePublicReservationLease(reference: string) {
     customerName: customerName(reservation.customer),
     monthlyRate: Number(reservation.quotedRate),
     startDate: reservation.intendedMoveIn,
+    paymentMethod,
   };
   const content = renderLeaseDocument(context);
   const sha256 = createHash("sha256").update(content).digest("hex");
@@ -52,10 +55,11 @@ export async function preparePublicReservationLease(reference: string) {
     : randomBytes(32).toString("base64url");
   const lease = await db.publicReservationLease.upsert({
     where: { reservationId: reservation.id },
-    create: { reservationId: reservation.id, version: LEASE_VERSION, content, clauses, sha256, signingToken: token, expiresAt: publicLeaseExpiry(reservation.holdExpiresAt, now) },
-    update: { status: "READY", version: LEASE_VERSION, content, clauses, sha256, signingToken: token, expiresAt: publicLeaseExpiry(reservation.holdExpiresAt, now), signerName: null, signerIp: null, signerUserAgent: null, initials: undefined, signedAt: null },
+    create: { reservationId: reservation.id, version: LEASE_VERSION, paymentMethod, content, clauses, sha256, signingToken: token, expiresAt: publicLeaseExpiry(reservation.holdExpiresAt, now) },
+    update: { status: "READY", version: LEASE_VERSION, paymentMethod, content, clauses, sha256, signingToken: token, expiresAt: publicLeaseExpiry(reservation.holdExpiresAt, now), signerName: null, signerIp: null, signerUserAgent: null, initials: undefined, signedAt: null, signedPdf: null, signedPdfSha256: null },
   });
-  await db.auditEvent.create({ data: { organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, action: "public_lease.prepared", entityType: "PublicReservationLease", entityId: lease.id, requestId: reservation.idempotencyKey, after: { reservationId: reservation.id, version: lease.version, sha256: lease.sha256, expiresAt: lease.expiresAt.toISOString() } } });
+  await db.reservation.update({ where: { id: reservation.id }, data: { paymentMethod } });
+  await db.auditEvent.create({ data: { organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, action: "public_lease.prepared", entityType: "PublicReservationLease", entityId: lease.id, requestId: reservation.idempotencyKey, after: { reservationId: reservation.id, version: lease.version, paymentMethod, sha256: lease.sha256, expiresAt: lease.expiresAt.toISOString() } } });
   return { ok: true as const, status: "READY" as const, token: lease.signingToken, reference, expiresAt: lease.expiresAt.toISOString() };
 }
 
@@ -83,6 +87,8 @@ export async function getPublicReservationLease(token: string) {
     unitTypeName: lease.reservation.unit.unitType.name,
     monthlyRateZar: Number(lease.reservation.quotedRate),
     intendedMoveIn: lease.reservation.intendedMoveIn?.toISOString() ?? null,
+    paymentMethod: lease.paymentMethod,
+    signedPdfAvailable: Boolean(lease.signedPdf && lease.signedPdfSha256),
   };
 }
 
@@ -96,9 +102,11 @@ export async function completePublicReservationLease(token: string, input: { sig
     if (lease.expiresAt < new Date()) throw new Error("EXPIRED");
     const signedAt = new Date();
     const initials = LEASE_CLAUSE_KEYS.map((clauseKey) => ({ clauseKey, initialedAt: signedAt.toISOString() }));
-    const changed = await tx.publicReservationLease.updateMany({ where: { id: lease.id, status: "READY", signedAt: null }, data: { status: "SIGNED", signerName: input.signerName, signerIp: input.signerIp, signerUserAgent: input.signerUserAgent, initials, signedAt } });
+    const pdf = await renderSignedLeasePdf({ content: lease.content, reference: lease.reservation.publicReference!, paymentMethod: lease.paymentMethod, signerName: input.signerName, signedAt, sha256: lease.sha256 });
+    const signedPdfSha256 = createHash("sha256").update(pdf).digest("hex");
+    const changed = await tx.publicReservationLease.updateMany({ where: { id: lease.id, status: "READY", signedAt: null }, data: { status: "SIGNED", signerName: input.signerName, signerIp: input.signerIp, signerUserAgent: input.signerUserAgent, initials, signedAt, signedPdf: Buffer.from(pdf), signedPdfSha256 } });
     if (!changed.count) throw new Error("CONFLICT");
-    await tx.auditEvent.create({ data: { organisationId: lease.reservation.customer.organisationId, facilityId: lease.reservation.facilityId, action: "public_lease.signed", entityType: "PublicReservationLease", entityId: lease.id, requestId: lease.reservation.idempotencyKey, after: { reservationId: lease.reservationId, version: lease.version, sha256: lease.sha256, signedAt: signedAt.toISOString() } } });
+    await tx.auditEvent.create({ data: { organisationId: lease.reservation.customer.organisationId, facilityId: lease.reservation.facilityId, action: "public_lease.signed", entityType: "PublicReservationLease", entityId: lease.id, requestId: lease.reservation.idempotencyKey, after: { reservationId: lease.reservationId, version: lease.version, paymentMethod: lease.paymentMethod, sha256: lease.sha256, signedPdfSha256, signedAt: signedAt.toISOString() } } });
     return { reference: lease.reservation.publicReference, status: "SIGNED" as const, signedAt: signedAt.toISOString(), idempotent: false };
   });
 }

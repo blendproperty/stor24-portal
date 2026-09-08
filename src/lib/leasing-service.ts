@@ -118,7 +118,7 @@ export async function listLeasing(scope: RequestScope) {
         },
         reservations: {
           where: relatedFacilityWhere,
-          include: { facility: true, unit: true },
+          include: { facility: true, unit: true, publicLease: { select: { id: true, status: true, version: true, paymentMethod: true, signedAt: true, signedPdfSha256: true } } },
           orderBy: { updatedAt: "desc" },
           take: 10,
         },
@@ -934,6 +934,7 @@ export async function getLeaseForSigning(token: string) {
     customerName,
     monthlyRate: Number(occupancy?.monthlyRate ?? 0),
     startDate: document.tenancy.startDate,
+    paymentMethod: document.tenancy.paymentMethod as "CARD" | "EFT" | "DEBIT_ORDER",
   };
 }
 
