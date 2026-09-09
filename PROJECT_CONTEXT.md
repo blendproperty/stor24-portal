@@ -558,8 +558,8 @@ A CRM capability is complete only when it is database-backed, scoped, permission
 ### Unit-ready package administration — 9 September 2026
 
 - **Implementation:** branch `codex/unit-ready-package-admin` extends the Operations centre with staff controls to add facility products, record audited receipts/adjustments/damage/returns, see on-hand/reserved/available stock and reorder state, and build checkout packages from facility products with approved copy, price and unit-size limits.
-- **Testing / validation:** route generation, Prisma generation, TypeScript and ESLint passed; ESLint has zero errors and six unrelated existing warnings. Full automated tests and production build are pending final review.
-- **Commit and push:** not yet performed.
+- **Testing / validation:** route generation, Prisma generation, TypeScript, ESLint, all 201 automated tests and the 75-route production build passed; ESLint has zero errors and six unrelated existing warnings.
+- **Commit and push:** implementation and evidence committed as `d64f3c4` (`feat: add package catalogue controls`) and pushed to canonical `blendproperty/stor24-portal` branch `codex/unit-ready-package-admin`.
 - **Merge:** not performed.
 - **Deployment and configuration:** not performed.
 - **Live production verification:** not performed. Catalogue setup and package checkout UAT remain blocked on approved products, opening stock, names, contents, prices, size bands and fulfilment owner.
