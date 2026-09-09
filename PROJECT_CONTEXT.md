@@ -4,10 +4,10 @@
 
 - Implementation: visible Previous/Next carousel controls, keyboard focus and View all products grid; larger catalogue and form text; minimum-width constraints prevent the carousel stretching its parent. Package editor artwork now carries a live name/badge overlay. Customer-ready package rows show artwork with name overlays. A migration fills empty images for the six starter packages with the established isometric STOR24 hero, preserving uploaded images.
 - Testing: TypeScript and the 76-route production build passed. Existing hero URL returns HTTP 200. This is shared artwork with individual name overlays, not six distinct illustrations.
-- Commit and push: prepared on codex/package-studio-navigation; promotion evidence follows.
-- Merge: pending.
-- Deployment/configuration: pending, including package artwork migration.
-- Live verification: pending desktop/mobile interaction and package data readback. Custom bundle pricing remains implemented in the prior release; end-to-end checkout, payment, stock and fulfilment gates remain open.
+- Commit and push: fdffe3e pushed on codex/package-studio-navigation.
+- Merge: PR #71 merged as e130782.
+- Deployment/configuration: production deployment 34358854933 succeeded; package artwork migration applied.
+- Verification: isolated actual React component browser checks at 1440, 768 and 390 px passed Next scrolling, all 17 products in grid view and selection of the last product. Live public facility readback returns nonempty hero URLs for all six packages; authenticated live merchandise page loads 17 products and six packages. Full live modal interaction remains to be checked. Custom bundle pricing remains implemented in the prior release; end-to-end checkout, payment, stock and fulfilment gates remain open.
 
 > Last reviewed: 9 September 2026. Read this file before planning or changing the repository. Update it whenever a material capability, decision, deployment state, or cross-repository contract changes.
 
