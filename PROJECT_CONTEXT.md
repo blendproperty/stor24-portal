@@ -1,15 +1,15 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
-> Last reviewed: 7 September 2026. Read this file before planning or changing the repository. Update it whenever a material capability, decision, deployment state, or cross-repository contract changes.
+> Last reviewed: 9 September 2026. Read this file before planning or changing the repository. Update it whenever a material capability, decision, deployment state, or cross-repository contract changes.
 
 ## Official invitation email CI correction - 9 September 2026
 
 - **Implementation:** corrects the rejected invitation branding without changing revocation. The logo source is copied byte-for-byte from `blendproperty/blendsign` main `c2f0773`, `public/brand/stor24-logo-email-orange-20260827.svg` (SHA-256 `9263ad3ea65c8991120c988065f85f0d7455df55017df6d0244d9880e8682f57`): outlined lettering and the official orange hexagon, not live text or reconstructed shapes. An 840px PNG is served at a new versioned URL to avoid Gmail caching the rejected image. The template follows `worker/lib/mail.js` used in Brett's approved screenshot: Arial email typography, 34px heading, 210px logo, cream background, dark-green panel, rounded orange button, spacing and 'Space for life in motion' footer. No BlendSign source is modified.
 - **Testing:** focused template/origin tests passed; official PNG visually compared with the supplied reference and desktop/375px previews checked. Full check passed: type checking, lint with zero errors and six pre-existing warnings, all 204 tests and the 75-route production build.
-- **Commit and push:** pending; source, exact logo artwork, rendered PNG, existing test update and this correction record travel together.
-- **Merge:** pending.
-- **Deployment and configuration:** pending; no provider/sender change or email send.
-- **Live production verification / UAT:** pending. New-invitation delivery and Gmail rendering remain Brett's UAT. Previously received emails may retain the rejected logo; fresh emails must use the new asset URL. Revocation, other users and all unrelated programme/provider/training/approval gates are unchanged.
+- **Commit and push:** source, exact logo artwork, rendered PNG, existing test update and initial correction record committed and pushed as `e54b129`.
+- **Merge:** PR #64 passed CI `34337120867` and merged as `f2163d8`.
+- **Deployment and configuration:** merged CI `34337329414` and VPS deployment `34337462039` passed for exact production checkout `f2163d8b9fc0454d21c8d9be6fdfdc0c42f121f2`; running container healthy. No provider/sender change or email send.
+- **Live production verification / UAT:** 9 September 09:58 UTC: health HTTP 200 with application/database `ok`; versioned official PNG HTTP 200 `image/png`, SHA-256 identical to the visually verified local PNG; the running server bundle contains the new versioned logo URL. New-invitation delivery and Gmail rendering remain Brett's UAT. Previously received emails may retain the rejected logo; fresh emails must use the new asset URL. Revocation, other users and all unrelated programme/provider/training/approval gates are unchanged.
 
 ## Invitation revocation and branded email - 9 September 2026
 
