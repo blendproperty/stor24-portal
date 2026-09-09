@@ -196,6 +196,7 @@ model Organisation {
   chargeDefinitions      ChargeDefinition[]
   discountPlans          DiscountPlan[]
   products               Product[]
+  storagePackages        StoragePackage[]
   maintenanceRequests    MaintenanceRequest[]
   unitNotes              UnitNote[]
   dailyCloses            DailyClose[]
@@ -247,6 +248,7 @@ model Facility {
   integrations          IntegrationConnection[]
   configurationProfiles ConfigurationProfile[]
   products              Product[]
+  storagePackages       StoragePackage[]
   maintenanceRequests   MaintenanceRequest[]
   unitNotes             UnitNote[]
   dailyCloses           DailyClose[]
@@ -430,6 +432,7 @@ model Reservation {
   convertedTenancy   Tenancy?          @relation(fields: [convertedTenancyId], references: [id])
   publicPaymentSessions PublicPaymentSession[]
   publicLease        PublicReservationLease?
+  packageSelection   ReservationPackage?
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 
@@ -946,14 +949,73 @@ model Product {
   costPrice      Decimal         @default(0) @db.Decimal(14, 2)
   sellingPrice   Decimal         @db.Decimal(14, 2)
   quantityOnHand Int             @default(0)
+  quantityReserved Int           @default(0)
   reorderPoint   Int             @default(0)
   active         Boolean         @default(true)
   movements      StockMovement[]
+  packageItems   StoragePackageItem[]
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
   @@unique([facilityId, sku])
   @@index([organisationId, facilityId, active])
+}
+
+model StoragePackage {
+  id               String               @id @default(cuid())
+  organisationId   String
+  organisation     Organisation         @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  facilityId       String
+  facility         Facility             @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  code             String
+  name             String
+  description      String
+  badge            String?
+  sellingPrice     Decimal              @db.Decimal(14, 2)
+  minUnitAreaSqM   Decimal?             @db.Decimal(8, 2)
+  maxUnitAreaSqM   Decimal?             @db.Decimal(8, 2)
+  sortOrder        Int                  @default(0)
+  active           Boolean              @default(true)
+  items            StoragePackageItem[]
+  reservations     ReservationPackage[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@unique([facilityId, code])
+  @@index([organisationId, facilityId, active, sortOrder])
+}
+
+model StoragePackageItem {
+  id               String         @id @default(cuid())
+  storagePackageId String
+  storagePackage   StoragePackage @relation(fields: [storagePackageId], references: [id], onDelete: Cascade)
+  productId        String
+  product          Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  quantity         Int
+  createdAt        DateTime       @default(now())
+
+  @@unique([storagePackageId, productId])
+  @@index([productId])
+}
+
+model ReservationPackage {
+  id               String         @id @default(cuid())
+  reservationId    String         @unique
+  reservation      Reservation    @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  storagePackageId String
+  storagePackage   StoragePackage @relation(fields: [storagePackageId], references: [id], onDelete: Restrict)
+  status           String         @default("RESERVED")
+  packageCode      String
+  packageName      String
+  priceSnapshot    Decimal        @db.Decimal(14, 2)
+  itemsSnapshot    Json
+  reservedAt       DateTime       @default(now())
+  releasedAt       DateTime?
+  fulfilledAt      DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([storagePackageId, status])
 }
 
 model StockMovement {

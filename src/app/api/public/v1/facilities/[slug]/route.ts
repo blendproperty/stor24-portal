@@ -76,6 +76,15 @@ export async function GET(
         },
         orderBy: { name: "asc" },
       },
+      storagePackages: {
+        where: { active: true },
+        select: {
+          id: true, code: true, name: true, description: true, badge: true, sellingPrice: true,
+          minUnitAreaSqM: true, maxUnitAreaSqM: true, sortOrder: true,
+          items: { select: { quantity: true, product: { select: { name: true, quantityOnHand: true, quantityReserved: true } } } },
+        },
+        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      },
     },
   });
   if (!facility)
@@ -104,6 +113,18 @@ export async function GET(
     timezone: facility.timezone,
     address: facility.address,
     storeInformation: safeStoreInformation(facility.configurationProfiles[0]?.config),
+    storagePackages: facility.storagePackages.map((pack) => ({
+      id: pack.id,
+      code: pack.code,
+      name: pack.name,
+      description: pack.description,
+      badge: pack.badge,
+      priceZar: Number(pack.sellingPrice.toString()),
+      minUnitAreaSqM: pack.minUnitAreaSqM ? Number(pack.minUnitAreaSqM.toString()) : null,
+      maxUnitAreaSqM: pack.maxUnitAreaSqM ? Number(pack.maxUnitAreaSqM.toString()) : null,
+      available: pack.items.every((item) => item.product.quantityOnHand - item.product.quantityReserved >= item.quantity),
+      items: pack.items.map((item) => ({ name: item.product.name, quantity: item.quantity })),
+    })),
     units: facility.units.map(unitView),
     maps: facility.maps.map((map) => ({
       id: map.id,

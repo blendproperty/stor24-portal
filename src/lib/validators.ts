@@ -367,6 +367,27 @@ export const stockMovementSchema = z.object({
   reference: z.string().trim().max(100).optional(),
 });
 
+export const storagePackageSchema = z.object({
+  facilityId: z.string().cuid(),
+  code: z.string().trim().min(2).max(40).regex(/^[A-Za-z0-9_-]+$/),
+  name: z.string().trim().min(2).max(120),
+  description: z.string().trim().min(10).max(500),
+  badge: z.string().trim().max(50).optional(),
+  sellingPrice: z.number().nonnegative().max(1_000_000),
+  minUnitAreaSqM: z.number().positive().max(10_000).optional(),
+  maxUnitAreaSqM: z.number().positive().max(10_000).optional(),
+  sortOrder: z.number().int().min(0).max(10_000).default(0),
+  active: z.boolean().default(true),
+  items: z.array(z.object({ productId: z.string().cuid(), quantity: z.number().int().positive().max(10_000) })).min(1).max(100),
+}).superRefine((value, context) => {
+  if (value.minUnitAreaSqM && value.maxUnitAreaSqM && value.minUnitAreaSqM > value.maxUnitAreaSqM) {
+    context.addIssue({ code: "custom", path: ["maxUnitAreaSqM"], message: "Maximum unit area must be at least the minimum." });
+  }
+  if (new Set(value.items.map((item) => item.productId)).size !== value.items.length) {
+    context.addIssue({ code: "custom", path: ["items"], message: "A product can appear only once in a package." });
+  }
+});
+
 export const dailyCloseSchema = z.object({
   facilityId: z.string().cuid(),
   businessDate: z.iso.date(),

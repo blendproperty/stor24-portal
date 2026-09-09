@@ -24,7 +24,7 @@ function publicLeaseExpiry(holdExpiresAt: Date | null, now = new Date()) {
 export async function preparePublicReservationLease(reference: string, paymentMethod: PublicLeasePaymentMethod) {
   const reservation = await db.reservation.findUnique({
     where: { publicReference: reference },
-    include: { customer: true, facility: true, unit: { include: { unitType: true } }, publicLease: true },
+    include: { customer: true, facility: true, unit: { include: { unitType: true } }, publicLease: true, packageSelection: true },
   });
   if (!reservation || reservation.status !== "ACTIVE" || reservation.journey !== "RENTAL" || !reservation.contactVerifiedAt || !reservation.customer.emailVerifiedAt) {
     return { ok: false as const, code: "RESERVATION_UNAVAILABLE" };
@@ -39,6 +39,11 @@ export async function preparePublicReservationLease(reference: string, paymentMe
     monthlyRate: Number(reservation.quotedRate),
     startDate: reservation.intendedMoveIn,
     paymentMethod,
+    storagePackage: reservation.packageSelection ? {
+      name: reservation.packageSelection.packageName,
+      priceZar: Number(reservation.packageSelection.priceSnapshot),
+      contents: (reservation.packageSelection.itemsSnapshot as Array<{ name: string; quantity: number }>).map((item) => `${item.quantity} x ${item.name}`).join(", "),
+    } : null,
   };
   const content = renderLeaseDocument(context);
   const sha256 = createHash("sha256").update(content).digest("hex");

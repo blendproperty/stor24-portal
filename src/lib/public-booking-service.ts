@@ -32,6 +32,7 @@ function reservationResult(reservation: {
   quotedRate: { toString(): string };
   unit: { number: string; unitType: { name: string; areaSqMetres: { toString(): string } | null } };
   facility: { name: string; publicSlug: string | null };
+  packageSelection?: { packageName: string; priceSnapshot: { toString(): string }; status: string } | null;
 }) {
   return {
     reference: reservation.publicReference,
@@ -41,6 +42,7 @@ function reservationResult(reservation: {
     viewingAt: reservation.viewingAt?.toISOString() ?? null,
     quotedMonthlyRateZar: Number(reservation.quotedRate.toString()),
     facility: { name: reservation.facility.name, slug: reservation.facility.publicSlug },
+    package: reservation.packageSelection ? { name: reservation.packageSelection.packageName, priceZar: Number(reservation.packageSelection.priceSnapshot.toString()), status: reservation.packageSelection.status } : null,
     unit: {
       number: reservation.unit.number,
       type: reservation.unit.unitType.name,
@@ -54,6 +56,7 @@ function reservationResult(reservation: {
 const reservationInclude = {
   facility: { select: { name: true, publicSlug: true } },
   unit: { select: { number: true, unitType: { select: { name: true, areaSqMetres: true } } } },
+  packageSelection: { select: { packageName: true, priceSnapshot: true, status: true } },
 } satisfies Prisma.ReservationInclude;
 
 function verificationHash(reservationId: string, code: string) {
@@ -151,13 +154,20 @@ async function deliverEmailVerificationCode(input: { code: string; email: string
 export async function releaseExpiredPublicReservations(now = new Date()) {
   const expired = await db.reservation.findMany({
     where: { status: "ACTIVE", source: { in: ["PUBLIC_WEBSITE", "PUBLIC_VIEWING"] }, holdExpiresAt: { lte: now } },
-    select: { id: true, unitId: true },
+    select: { id: true, unitId: true, packageSelection: { select: { id: true, status: true, itemsSnapshot: true } } },
     take: 100,
   });
   for (const item of expired) {
     await db.$transaction(async (tx) => {
       const cancelled = await tx.reservation.updateMany({ where: { id: item.id, status: "ACTIVE", holdExpiresAt: { lte: now } }, data: { status: "CANCELLED", verificationCodeHash: null, verificationExpiresAt: null } });
-      if (cancelled.count === 1) await tx.unit.updateMany({ where: { id: item.unitId, status: "RESERVED" }, data: { status: "AVAILABLE" } });
+      if (cancelled.count === 1) {
+        await tx.unit.updateMany({ where: { id: item.unitId, status: "RESERVED" }, data: { status: "AVAILABLE" } });
+        if (item.packageSelection?.status === "RESERVED") {
+          const lines = item.packageSelection.itemsSnapshot as Array<{ productId: string; quantity: number }>;
+          for (const line of lines) await tx.product.update({ where: { id: line.productId }, data: { quantityReserved: { decrement: line.quantity } } });
+          await tx.reservationPackage.update({ where: { id: item.packageSelection.id }, data: { status: "RELEASED", releasedAt: now } });
+        }
+      }
     });
   }
   return expired.length;
@@ -208,6 +218,15 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
       });
       if (claimed.count !== 1) throw new PublicBookingError("UNIT_UNAVAILABLE", 409);
 
+      const selectedPackage = input.storagePackageId ? await tx.storagePackage.findFirst({
+        where: { id: input.storagePackageId, facilityId: facility.id, active: true },
+        include: { items: { include: { product: true } } },
+      }) : null;
+      if (input.storagePackageId && !selectedPackage) throw new PublicBookingError("UNIT_UNAVAILABLE", 409);
+      if (selectedPackage && selectedPackage.items.some((item) => item.product.quantityOnHand - item.product.quantityReserved < item.quantity)) {
+        throw new PublicBookingError("UNIT_UNAVAILABLE", 409);
+      }
+
       const source = input.journey === "VIEWING" ? "PUBLIC_VIEWING" : "PUBLIC_WEBSITE";
       const consent = {
         ...input.communicationConsent,
@@ -248,6 +267,11 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
         },
         include: reservationInclude,
       });
+      if (selectedPackage) {
+        const itemSnapshot = selectedPackage.items.map((item) => ({ productId: item.productId, sku: item.product.sku, name: item.product.name, quantity: item.quantity, unitPriceZar: Number(item.product.sellingPrice) }));
+        for (const item of selectedPackage.items) await tx.product.update({ where: { id: item.productId }, data: { quantityReserved: { increment: item.quantity } } });
+        await tx.reservationPackage.create({ data: { reservationId: created.id, storagePackageId: selectedPackage.id, packageCode: selectedPackage.code, packageName: selectedPackage.name, priceSnapshot: selectedPackage.sellingPrice, itemsSnapshot: itemSnapshot } });
+      }
       if (verificationEnabled) await tx.reservation.update({ where: { id: created.id }, data: { verificationCodeHash: verificationHash(created.id, verificationCode) } });
       await tx.auditEvent.create({
         data: {
@@ -266,7 +290,10 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
           },
         },
       });
-      return { created, customerId: customer.id };
+      const complete = selectedPackage
+        ? await tx.reservation.findUniqueOrThrow({ where: { id: created.id }, include: reservationInclude })
+        : created;
+      return { created: complete, customerId: customer.id };
     });
 
     const { created, customerId } = reservation;
@@ -277,7 +304,17 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
     }
     const otp = await deliverVerificationCode({ code: verificationCode, phone: input.phone, organisationId: facility.organisationId, facilityId: facility.id, idempotencyKey: `${input.idempotencyKey}:VERIFY` });
     if (!otp.ok) {
-      await db.$transaction([db.reservation.update({ where: { id: created.id }, data: { status: "CANCELLED" } }), db.unit.update({ where: { id: input.unitId }, data: { status: "AVAILABLE" } })]);
+      await db.$transaction(async (tx) => {
+        await tx.reservation.update({ where: { id: created.id }, data: { status: "CANCELLED" } });
+        await tx.unit.update({ where: { id: input.unitId }, data: { status: "AVAILABLE" } });
+        const selection = await tx.reservationPackage.findUnique({ where: { reservationId: created.id } });
+        if (selection?.status === "RESERVED") {
+          for (const line of selection.itemsSnapshot as Array<{ productId: string; quantity: number }>) {
+            await tx.product.update({ where: { id: line.productId }, data: { quantityReserved: { decrement: line.quantity } } });
+          }
+          await tx.reservationPackage.update({ where: { id: selection.id }, data: { status: "RELEASED", releasedAt: new Date() } });
+        }
+      });
       throw new Error("OTP_DELIVERY_FAILED");
     }
     await db.auditEvent.create({ data: { organisationId: facility.organisationId, facilityId: facility.id, action: "public_reservation.verification_sent", entityType: "Reservation", entityId: created.id, requestId: input.idempotencyKey, after: { channel: otp.channel, expiresAt: created.verificationExpiresAt?.toISOString() } } });
