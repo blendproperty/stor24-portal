@@ -8,7 +8,7 @@ const sample = { name: 'Brett <script>alert(1)</script>', invitedByName: 'Owner 
 test('invitation email is branded, escaped and has matching HTML and plain text links', () => {
   const email = invitationEmail(sample);
   assert.match(email.subject, /STOR24/);
-  assert.match(email.html, /stor24-logo-email\.png/);
+  assert.match(email.html, /stor24-logo-official-email-20260909\.png/);
   assert.match(email.html, /#ff5a0a/);
   assert.match(email.html, /Accept invitation/);
   assert.match(email.html, /16 September 2026/);
