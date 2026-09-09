@@ -2244,8 +2244,40 @@ a.module-card:focus-visible {
 .catalogue-product small { color: var(--muted); font-size: 8px; }
 .catalogue-product > svg { color: var(--orange); }
 .catalogue-empty { grid-column: 1/-1; padding: 24px; color: var(--muted); text-align: center; }
+.merchandise-catalogue-panel { grid-column: 1 / -1; overflow: hidden; }
+.merchandise-catalogue-panel .hub-heading { padding: 24px 26px 18px; }
+.merchandise-catalogue-panel .hub-heading h2 { margin: 3px 0; font-size: 24px; }
+.catalogue-toolbar { display: grid; gap: 13px; padding: 15px 26px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: #f7f8f5; }
+.catalogue-toolbar > label { display: flex; max-width: 440px; align-items: center; gap: 8px; padding: 0 12px; border: 1px solid #cbd5d0; border-radius: 11px; background: white; color: var(--muted); }
+.catalogue-toolbar > label input { width: 100%; padding: 10px 0; border: 0; background: transparent; }
+.category-pills,.package-category-pills { display: flex; gap: 7px; overflow-x: auto; scrollbar-width: none; }
+.category-pills button,.package-category-pills button { flex: 0 0 auto; padding: 7px 11px; border: 1px solid #d5ddd9; border-radius: 999px; background: white; color: #52615b; font-size: 9px; font-weight: 800; }
+.category-pills button.active,.package-category-pills button.active { border-color: #ff5a0a; background: #ff5a0a; color: white; }
+.category-pills button span { margin-left: 4px; opacity: .72; }
+.merchandise-table th,.merchandise-table td { padding: 13px 16px; }
+.merchandise-table th:first-child,.merchandise-table td:first-child { width: 72px; }
+.catalogue-table-thumb { display: grid; width: 48px; height: 48px; place-items: center; border-radius: 11px; background: #edf1ee center/cover no-repeat; color: #87968f; }
+.catalogue-table-thumb[style] svg { display: none; }
+.catalogue-price { font-weight: 850; white-space: nowrap; }
+.package-category-pills { padding: 12px 14px 2px; }
+.product-carousel { display: flex; gap: 12px; padding: 13px 14px 17px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-color: #bdc8c3 transparent; }
+.carousel-product-card { position: relative; display: grid; flex: 0 0 168px; overflow: hidden; border: 1px solid #d8e0dc; border-radius: 16px; background: white; scroll-snap-align: start; transition: transform .16s, border-color .16s, box-shadow .16s; }
+.carousel-product-card:hover { transform: translateY(-2px); border-color: #ffb28d; box-shadow: 0 9px 24px rgba(5,31,25,.09); }
+.carousel-product-card.selected { border: 2px solid #ff5a0a; box-shadow: 0 8px 22px rgba(255,90,10,.15); }
+.carousel-product-toggle { display: grid; padding: 0; border: 0; background: white; color: var(--ink); text-align: left; }
+.carousel-product-image { display: grid; height: 118px; place-items: center; background: #eef2ef center/cover no-repeat; color: #829089; }
+.carousel-product-copy { display: grid; gap: 4px; padding: 12px; }
+.carousel-product-copy strong { min-height: 28px; font-size: 11px; line-height: 1.3; }
+.carousel-product-copy small { color: var(--muted); font-size: 8px; }
+.carousel-product-copy b { margin-top: 4px; font-size: 13px; }
+.carousel-product-copy em { color: #0a8256; font-size: 8px; font-style: normal; font-weight: 750; }
+.carousel-check { position: absolute; z-index: 1; top: 9px; right: 9px; display: grid; width: 28px; height: 28px; place-items: center; border: 1px solid #d3dcd8; border-radius: 999px; background: rgba(255,255,255,.94); color: #40534b; box-shadow: 0 3px 10px rgba(5,31,25,.12); }
+.carousel-product-card.selected .carousel-check { border-color: #ff5a0a; background: #ff5a0a; color: white; }
+.carousel-quantity { display: grid; grid-template-columns: 1fr 34px 1fr; align-items: center; margin: 0 10px 10px; overflow: hidden; border: 1px solid #ffbea0; border-radius: 10px; background: #fff5f0; }
+.carousel-quantity button { display: grid; min-height: 30px; place-items: center; border: 0; background: transparent; color: #d54800; }
+.carousel-quantity strong { text-align: center; }
 @media (max-width: 900px) { .package-studio-grid,.merch-editor-layout { grid-template-columns: 1fr; } .package-identity-card { border-right: 0; border-bottom: 1px solid var(--line); } .merch-editor { width: min(760px,calc(100vw - 24px)); } }
-@media (max-width: 620px) { .modal-backdrop { padding: 0; } .merch-editor { width: 100%; max-height: 100vh; border-radius: 0; } .merch-editor-form { max-height: calc(100vh - 120px); } .merch-editor-heading,.merch-editor-layout,.package-identity-card,.package-content-studio { padding-left: 18px; padding-right: 18px; } .merch-sku { display: none; } .catalogue-picker-heading { align-items: stretch; flex-direction: column; } .catalogue-search { width: 100%; } .catalogue-results { grid-template-columns: 1fr; } .selected-product-card { grid-template-columns: 44px minmax(0,1fr) 32px; } .selected-product-card .product-thumb { width: 44px; height: 44px; } .quantity-stepper { grid-column: 2; justify-self: start; } .remove-product { grid-column: 3; grid-row: 1; } .merch-editor-footer > span { display: none; } .merch-editor-footer .button { min-width: 0; flex: 1; } }
+@media (max-width: 620px) { .modal-backdrop { padding: 0; } .merch-editor { width: 100%; max-height: 100vh; border-radius: 0; } .merch-editor-form { max-height: calc(100vh - 120px); } .merch-editor-heading,.merch-editor-layout,.package-identity-card,.package-content-studio { padding-left: 18px; padding-right: 18px; } .merch-sku { display: none; } .catalogue-picker-heading { align-items: stretch; flex-direction: column; } .catalogue-search { width: 100%; } .catalogue-results { grid-template-columns: 1fr; } .selected-product-card { grid-template-columns: 44px minmax(0,1fr) 32px; } .selected-product-card .product-thumb { width: 44px; height: 44px; } .quantity-stepper { grid-column: 2; justify-self: start; } .remove-product { grid-column: 3; grid-row: 1; } .merch-editor-footer > span { display: none; } .merch-editor-footer .button { min-width: 0; flex: 1; } .catalogue-toolbar { padding: 14px 16px; } .merchandise-table th:nth-child(5),.merchandise-table td:nth-child(5) { display: none; } }
 .netcash-payments-panel .data-table td small { margin-top: 5px; line-height: 1.4; }
 .netcash-reconciliation-state { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; border-radius: 999px; font-size: 10px; font-weight: 850; white-space: nowrap; }
 .netcash-reconciliation-state.success { background: #e8f8ee; color: #087443; }
