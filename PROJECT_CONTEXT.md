@@ -563,3 +563,9 @@ A CRM capability is complete only when it is database-backed, scoped, permission
 - **Merge:** not performed.
 - **Deployment and configuration:** not performed.
 - **Live production verification:** not performed. Catalogue setup and package checkout UAT remain blocked on approved products, opening stock, names, contents, prices, size bands and fulfilment owner.
+
+#### Full merchandise-system boundary — 9 September 2026
+
+- Product packages are reusable commercial catalogue records, not promotions and not public-checkout-only constructs. Public booking is one sales channel; the same product/package catalogue must support front-desk and future customer-portal orders.
+- The complete operational chain remains product master and tax -> suppliers and purchase orders -> receiving -> facility stock -> package composition -> customer/walk-in merchandise order -> payment and ledger -> pick/place/collect fulfilment -> return/transfer/stocktake -> valuation, margin and exception reporting.
+- PR #58 is the catalogue and stock-control administration slice only. It must not be represented as the full merchandise system. Issue #55 remains the canonical delivery backlog until every acceptance criterion and production UAT gate passes.
