@@ -79,9 +79,9 @@ export async function GET(
       storagePackages: {
         where: { active: true },
         select: {
-          id: true, code: true, name: true, description: true, badge: true, sellingPrice: true,
+          id: true, code: true, name: true, description: true, badge: true, imageUrl: true, sellingPrice: true,
           minUnitAreaSqM: true, maxUnitAreaSqM: true, sortOrder: true,
-          items: { select: { quantity: true, product: { select: { name: true, quantityOnHand: true, quantityReserved: true } } } },
+          items: { select: { quantity: true, product: { select: { name: true, imageUrl: true, quantityOnHand: true, quantityReserved: true } } } },
         },
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       },
@@ -119,11 +119,12 @@ export async function GET(
       name: pack.name,
       description: pack.description,
       badge: pack.badge,
+      imageUrl: pack.imageUrl,
       priceZar: Number(pack.sellingPrice.toString()),
       minUnitAreaSqM: pack.minUnitAreaSqM ? Number(pack.minUnitAreaSqM.toString()) : null,
       maxUnitAreaSqM: pack.maxUnitAreaSqM ? Number(pack.maxUnitAreaSqM.toString()) : null,
       available: pack.items.every((item) => item.product.quantityOnHand - item.product.quantityReserved >= item.quantity),
-      items: pack.items.map((item) => ({ name: item.product.name, quantity: item.quantity })),
+      items: pack.items.map((item) => ({ name: item.product.name, imageUrl: item.product.imageUrl, quantity: item.quantity })),
     })),
     units: facility.units.map(unitView),
     maps: facility.maps.map((map) => ({
