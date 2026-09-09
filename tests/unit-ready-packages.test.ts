@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { renderLeaseDocument } from "../src/lib/lease-agreement-content";
 import { publicReservationSchema } from "../src/lib/public-booking-contract";
-import { storagePackageSchema } from "../src/lib/validators";
+import { productUpdateSchema, storagePackageSchema } from "../src/lib/validators";
 
 const productId = "cm1234567890123456789012";
 
@@ -18,6 +18,12 @@ test("unit-ready packages require unique facility products and coherent size lim
     items: [{ productId, quantity: 2 }, { productId, quantity: 1 }],
   });
   assert.equal(result.success, false);
+});
+
+test("product detail updates cannot directly rewrite physical stock", () => {
+  assert.equal(productUpdateSchema.safeParse({ sellingPrice: 49.99, reorderPoint: 5 }).success, true);
+  assert.equal(productUpdateSchema.safeParse({ quantityOnHand: 100 }).success, false);
+  assert.equal(productUpdateSchema.safeParse({}).success, false);
 });
 
 test("public reservation accepts an optional package identifier", () => {
