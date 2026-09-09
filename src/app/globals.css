@@ -2184,6 +2184,19 @@ a.module-card:focus-visible {
 .merch-image-picker { display: grid; gap: 12px; }
 .merch-image-preview { display: grid; min-height: 210px; place-items: center; align-content: center; gap: 6px; padding: 20px; border: 1px dashed #aebdb7; border-radius: 18px; background: linear-gradient(145deg,#f6f8f6,#eef1ed); color: #6f7e78; background-position: center; background-size: cover; }
 .merch-image-preview.has-image { border-style: solid; }
+.merch-image-preview { position: relative; overflow: hidden; }
+.package-art-overlay { position: absolute; inset: auto 0 0; display: grid; gap: 4px; padding: 38px 18px 18px; background: linear-gradient(transparent,rgba(5,25,19,.95)); color: white; text-align: left; }
+.package-art-overlay strong { font-size: 24px; line-height: 1.2; }
+.package-list-art { display: flex; align-items: flex-end; width: 240px; height: 150px; border-radius: 14px; overflow: hidden; background-size: cover; background-position: center; }
+.package-list-art strong { width: 100%; padding: 28px 14px 12px; background: linear-gradient(transparent,rgba(5,25,19,.95)); color: white; font-size: 18px; }
+.package-art-overlay small { color: #ffb486; font-size: 12px; }
+.product-browse-controls { display: flex; justify-content: space-between; gap: 8px; padding: 12px 14px 0; }
+.product-browse-controls button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 8px 12px; border: 1px solid #aebdb7; border-radius: 10px; background: white; color: #14362a; font-size: 13px; cursor: pointer; }
+.product-browse-controls button:disabled { opacity: .4; }
+.package-content-studio,.package-identity-card,.catalogue-picker { min-width: 0; }
+.product-carousel.product-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); overflow: visible; }
+.package-core-fields label,.merch-fields .form-grid.two > label,.package-core-fields .form-grid.two > label { font-size: 13px; }
+.package-core-fields .form-grid.two input,.package-core-fields textarea,.merch-fields .form-grid.two input { font-size: 16px; }
 .merch-image-preview span { font-size: 10px; }
 .merch-image-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .merch-image-actions .button { min-height: 38px; padding: 9px 13px; font-size: 11px; cursor: pointer; }
@@ -2217,7 +2230,7 @@ a.module-card:focus-visible {
 .package-identity-card { display: grid; align-content: start; gap: 22px; padding: 28px 30px; border-right: 1px solid var(--line); background: #fbfcfa; }
 .package-identity-card .merch-image-preview { min-height: 230px; }
 .package-core-fields { display: grid; gap: 16px; }
-.package-core-fields label { display: grid; gap: 7px; color: var(--muted); font-size: 10px; font-weight: 750; }
+.package-core-fields label { display: grid; gap: 7px; color: var(--muted); font-size: 13px; font-weight: 750; }
 .package-core-fields label > small { margin-top: -4px; }
 .package-content-studio { display: grid; align-content: start; gap: 18px; padding: 28px 30px; }
 .package-content-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; }
@@ -2273,10 +2286,10 @@ a.module-card:focus-visible {
 .carousel-product-toggle { display: grid; padding: 0; border: 0; background: white; color: var(--ink); text-align: left; }
 .carousel-product-image { display: grid; height: 118px; place-items: center; background: #eef2ef center/cover no-repeat; color: #829089; }
 .carousel-product-copy { display: grid; gap: 4px; padding: 12px; }
-.carousel-product-copy strong { min-height: 28px; font-size: 11px; line-height: 1.3; }
-.carousel-product-copy small { color: var(--muted); font-size: 8px; }
+.carousel-product-copy strong { min-height: 36px; font-size: 14px; line-height: 1.3; }
+.carousel-product-copy small { color: var(--muted); font-size: 12px; }
 .carousel-product-copy b { margin-top: 4px; font-size: 13px; }
-.carousel-product-copy em { color: #0a8256; font-size: 8px; font-style: normal; font-weight: 750; }
+.carousel-product-copy em { color: #0a8256; font-size: 12px; font-style: normal; font-weight: 750; }
 .carousel-check { position: absolute; z-index: 1; top: 9px; right: 9px; display: grid; width: 28px; height: 28px; place-items: center; border: 1px solid #d3dcd8; border-radius: 999px; background: rgba(255,255,255,.94); color: #40534b; box-shadow: 0 3px 10px rgba(5,31,25,.12); }
 .carousel-product-card.selected .carousel-check { border-color: #ff5a0a; background: #ff5a0a; color: white; }
 .carousel-quantity { display: grid; grid-template-columns: 1fr 34px 1fr; align-items: center; margin: 0 10px 10px; overflow: hidden; border: 1px solid #ffbea0; border-radius: 10px; background: #fff5f0; }

@@ -1,5 +1,14 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Package studio navigation and artwork — 9 September 2026
+
+- Implementation: visible Previous/Next carousel controls, keyboard focus and View all products grid; larger catalogue and form text; minimum-width constraints prevent the carousel stretching its parent. Package editor artwork now carries a live name/badge overlay. Customer-ready package rows show artwork with name overlays. A migration fills empty images for the six starter packages with the established isometric STOR24 hero, preserving uploaded images.
+- Testing: TypeScript and the 76-route production build passed. Existing hero URL returns HTTP 200. This is shared artwork with individual name overlays, not six distinct illustrations.
+- Commit and push: prepared on codex/package-studio-navigation; promotion evidence follows.
+- Merge: pending.
+- Deployment/configuration: pending, including package artwork migration.
+- Live verification: pending desktop/mobile interaction and package data readback. Custom bundle pricing remains implemented in the prior release; end-to-end checkout, payment, stock and fulfilment gates remain open.
+
 > Last reviewed: 9 September 2026. Read this file before planning or changing the repository. Update it whenever a material capability, decision, deployment state, or cross-repository contract changes.
 
 ## Official invitation email CI correction - 9 September 2026
