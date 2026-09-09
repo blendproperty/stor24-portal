@@ -367,6 +367,17 @@ export const stockMovementSchema = z.object({
   reference: z.string().trim().max(100).optional(),
 });
 
+export const productUpdateSchema = z.object({
+  sku: z.string().trim().min(1).max(60).optional(),
+  name: z.string().trim().min(2).max(160).optional(),
+  category: z.string().trim().min(1).max(80).optional(),
+  barcode: z.string().trim().max(100).optional(),
+  costPrice: z.number().nonnegative().optional(),
+  sellingPrice: z.number().nonnegative().optional(),
+  reorderPoint: z.number().int().nonnegative().optional(),
+  active: z.boolean().optional(),
+}).strict().refine((value) => Object.keys(value).length > 0, "Provide at least one product change.");
+
 export const storagePackageSchema = z.object({
   facilityId: z.string().cuid(),
   code: z.string().trim().min(2).max(40).regex(/^[A-Za-z0-9_-]+$/),
