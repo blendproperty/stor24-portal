@@ -2,6 +2,15 @@
 
 > Last reviewed: 7 September 2026. Read this file before planning or changing the repository. Update it whenever a material capability, decision, deployment state, or cross-repository contract changes.
 
+## Invitation revocation and branded email - 9 September 2026
+
+- **Implementation:** isolated branch `codex/users-invitation-fix` from verified remote main `c84284a`. Revocation now uses the shared origin guard, accepting configured public APP_URL behind the VPS proxy while rejecting missing/untrusted origins; owner, organisation scope and transaction/audit checks remain. The users page displays failure, in-progress and success feedback and removes successfully revoked invitations from the pending list. Invitation emails use the existing STOR24 logo (email-compatible PNG derived from the canonical SVG), orange/dark-green/cream palette, welcoming copy, role, expiry, acceptance button and plain-text fallback.
+- **Testing:** Prisma generation, type checking, lint (zero errors, six existing warnings), all 204 tests and the 75-route production build passed. New behavioural tests cover configured public origin behind an internal proxy URL, rejection of untrusted/missing origins, HTML escaping, invitation-link parity, expiry and branding. Desktop browser preview visually checked for logo, layout, button, typography and footer. The final progress-label refinement is type-checked before commit.
+- **Commit and push:** source, logo, tests and this context entry are prepared together on the named branch; promotion evidence will be recorded after deployment.
+- **Merge:** pending PR and CI.
+- **Deployment and configuration:** pending. No database migration, provider switch or email send is required by this change.
+- **Live production verification / UAT:** not yet performed. Brett's Gmail test invitation is deliberately left pending for his own revoke-and-reinvite test; Mark's invitation is untouched. Fresh Gmail delivery/rendering and new invitation acceptance/revoked-link rejection remain user UAT gates. All unrelated programme/provider/training/approval gates below remain open.
+
 ## Netcash Pay Now test-card reference — 7 September 2026
 
 - **Implementation:** documentation-only update recording Netcash's published Pay Now eCommerce test cards for the controlled R10 UAT. Successful responses: Visa `4000000000000002`, Mastercard `5200000000000015`. Failed responses: Visa `4000000000000036`, Mastercard `5200000000000049`. For all four, use any future expiry date in `MMYY` format and CVC/CVV `123`. Source: `https://api.netcash.co.za/inbound-payments/pay-now/pay-now-ecommerce/`, “Testing payment methods” / “Test Card Details”. These are public provider test values, not customer card data or Stor24 secrets.
