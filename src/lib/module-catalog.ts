@@ -26,8 +26,8 @@ export const adjustmentsGroups: ModuleGroup[] = [
     title: "Inventory corrections",
     description: "Trace every stock change back to an operator and reason.",
     items: [
-      { title: "Returns", description: "Return merchandise and create the linked financial reversal.", status: "Ready", evidence: "Adjustments / Returns and Inventory Adjustments" },
-      { title: "Stock adjustments", description: "Record damage, shrinkage, receipts and cycle-count corrections.", status: "Ready", evidence: "Adjustments / Returns and Inventory Adjustments" },
+      { title: "Returns", description: "Return merchandise and create the linked financial reversal.", status: "Planned", evidence: "Tracked in GitHub issue #55" },
+      { title: "Stock adjustments", description: "Record damage, shrinkage, receipts and cycle-count corrections.", status: "Planned", evidence: "Tracked in GitHub issue #55" },
     ],
   },
 ];
@@ -40,7 +40,7 @@ export const companyGroups: ModuleGroup[] = [
       { title: "Store information", description: "Address, locale, tax, trading hours and facility contacts.", status: "Configure" },
       { title: "Unit types and units", description: "Types, dimensions, floors, attributes, rates and walk-through order.", status: "Ready" },
       { title: "Price optimisation", description: "Push rates, tenant rate changes and effective-date approvals.", status: "Planned" },
-      { title: "Merchandise", description: "Products, barcodes, tax, stock, order points and pricing.", status: "Ready" },
+      { title: "Merchandise", description: "Products, barcodes, tax, stock, order points and pricing.", status: "Planned", evidence: "Backend foundation exists; operational UI tracked in GitHub issue #55" },
       { title: "Charges and discounts", description: "Fee defaults, discount plans, promotions and approval thresholds.", status: "Ready" },
     ],
   },
@@ -106,7 +106,7 @@ export const reportGroups: ModuleGroup[] = [
     title: "Products and integrations",
     description: "Secondary revenue and service performance.",
     items: [
-      { title: "Merchandise", description: "Sales, margin, stock movement and reorder requirements.", status: "Ready" },
+      { title: "Merchandise", description: "Sales, margin, stock movement and reorder requirements.", status: "Planned", evidence: "Tracked in GitHub issue #55" },
       { title: "Protection plans", description: "Coverage, participation, premium and exception analysis.", status: "Configure" },
       { title: "Autopay performance", description: "Success, decline reasons, retries and recovered revenue.", status: "Configure" },
       { title: "Integration health", description: "Provider uptime, command backlog, delivery and reconciliation.", status: "Ready" },
@@ -131,7 +131,7 @@ export const workflowGroups: ModuleGroup[] = [
     items: [
       { title: "Tenant lookup", description: "Search people, accounts, units, contacts and balances.", status: "Ready" },
       { title: "Lead to lease", description: "Enquiry, quote, reservation, follow-up and conversion.", status: "Ready" },
-      { title: "Merchandise purchase", description: "Barcode cart, discounts, tax, payment and stock posting.", status: "Ready" },
+      { title: "Merchandise purchase", description: "Barcode cart, discounts, tax, payment and stock posting.", status: "Planned", evidence: "Tracked in GitHub issue #55" },
       { title: "Access", description: "Issue, suspend, restore and reconcile facility credentials.", status: "Configure" },
     ],
   },

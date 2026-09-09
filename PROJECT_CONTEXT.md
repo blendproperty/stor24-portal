@@ -545,3 +545,13 @@ A CRM capability is complete only when it is database-backed, scoped, permission
 - **Testing / validation:** Prisma generation, route/TypeScript checks, all 198 automated tests and ESLint passed. Contract assertions cover current, legacy-compatible and invalid reference shapes; ESLint remains at zero errors with six unrelated pre-existing warnings.
 - **Commit and push:** pending follow-up commit on `codex/booking-retry-responsive`.
 - **Merge / deployment / live verification:** not performed. The paired public client reference-durability correction must deploy with this contract change, followed by a fresh mobile and email verification test.
+
+## Merchandise inventory and point-of-sale workstream — 9 September 2026
+
+- **Task:** canonical GitHub issue `blendproperty/stor24-portal#55` tracks the complete operational merchandise workflow for locks, tape, bubble wrap, boxes, trolleys, box cutters and future retail products.
+- **Current implementation evidence:** the deployed codebase contains facility-scoped `Product` and `StockMovement` records, SKU/category/barcode fields, cost and selling prices, quantity on hand, reorder points, receipt/sale/return/adjustment/damage/transfer movement types, permission checks, audit events, negative-stock protection and a read-only operations stock/reorder table.
+- **Outstanding implementation:** product maintenance UI; supplier and purchase-order records; receiving; stock adjustments and stocktake; dispatch/receipt-controlled transfers; barcode/search POS cart; customer or walk-in sale allocation; discounts/VAT/payment/receipt; atomic stock and financial posting; returns/refunds; valuation, movement, reorder, sales, margin and exception reports; responsive staff workflow and production UAT.
+- **Status correction:** `Returns`, `Stock adjustments`, `Merchandise`, merchandise reporting and `Merchandise purchase` are changed from `Ready` to `Planned`. Backend scaffolding must not be represented as an operational system.
+- **Testing / validation:** pending on the documentation/status branch. This workstream is not implemented or live-proven.
+- **Commit and push / merge / deployment:** pending review branch and pull request; no inventory runtime implementation or production configuration is included.
+- **Business and provider gates:** approve product catalogue, VAT treatment, suppliers, payment tenders, discount/approval thresholds, inter-store ownership, accounting/MRI posting and operating procedures before go-live.
