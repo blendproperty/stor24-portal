@@ -79,7 +79,12 @@ export async function startPublicNetcashSandboxPayment(reference: string, idempo
 export async function getPublicNetcashSandboxPayment(reference: string, paymentId: string) {
   const reservation = await db.reservation.findUnique({
     where: { publicReference: reference },
-    select: { id: true, status: true, journey: true },
+    select: {
+      id: true,
+      status: true,
+      journey: true,
+      publicLease: { select: { status: true, signingToken: true, paymentMethod: true } },
+    },
   });
   if (!reservation || reservation.journey !== "RENTAL") {
     return { ok: false as const, code: "PAYMENT_UNAVAILABLE" };
@@ -105,6 +110,8 @@ export async function getPublicNetcashSandboxPayment(reference: string, paymentI
     failureCode: payment.failureCode,
     processedAt: payment.processedAt?.toISOString() ?? null,
     reservationStatus: reservation.status,
+    leaseToken: reservation.publicLease?.status === "SIGNED" ? reservation.publicLease.signingToken : null,
+    paymentMethod: reservation.publicLease?.status === "SIGNED" ? reservation.publicLease.paymentMethod : null,
   };
 }
 

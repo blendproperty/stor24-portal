@@ -46,3 +46,14 @@ test("the new Netcash endpoint fails closed until the reservation lease is signe
   assert.match(route, /startPublicNetcashSandboxPayment/);
   assert.ok(route.indexOf("publicReservationHasSignedLease") < route.lastIndexOf("startPublicNetcashSandboxPayment"));
 });
+
+test("public debit-order setup is idempotent and never submits a collection", async () => {
+  const service = await readFile("src/lib/public-debit-order-request.ts", "utf8");
+  const route = await readFile("src/app/api/public/v1/lease-signing/reservation/[token]/debit-order-request/route.ts", "utf8");
+  assert.match(route, /publicApiAuthorized/);
+  assert.match(service, /lease\.status !== "SIGNED"/);
+  assert.match(service, /lease\.paymentMethod !== "DEBIT_ORDER"/);
+  assert.match(service, /task\.upsert/);
+  assert.match(service, /public_lease\.debit_order_setup_requested/);
+  assert.doesNotMatch(service, /submitStandardDebitOrder|submitDebiCheckMandate|ledgerEntry|occupancy\.update|tenancy\.update/);
+});
