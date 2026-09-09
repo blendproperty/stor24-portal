@@ -588,3 +588,11 @@ A CRM capability is complete only when it is database-backed, scoped, permission
 - **Merge:** not performed; pull-request review remains required.
 - **Deployment and configuration:** not performed for the clickable product detail. The six packages have not been written into production because their customer-facing names, compositions, price/VAT treatment and activation require final review; zero physical stock also means they must remain unavailable.
 - **Live production verification:** not performed. After deployment, confirm row click/keyboard access, audited edit/readback, package construction from multiple products, size filtering for representative units, zero-stock unavailability, receipt-driven availability and signed-agreement snapshot behaviour before activating the offerings.
+
+### Temporary Midpoint merchandise UAT stock — 9 September 2026
+
+- **Implementation / configuration:** recorded one audited `RECEIPT` movement of 100 units against each of the 17 Midpoint starter products, using reference `UAT-STOCK-20260909` and an explicit reason that the quantity exists only for package-selection and availability testing and must be reversed before launch. No supplier cost was asserted.
+- **Testing / validation:** authenticated live Operations readback shows every configured product at 100 on hand, 0 reserved and 100 available; the reorder summary changed from 17 to 0. This proves stock movements drive package availability without bypassing the inventory ledger.
+- **Commit and push:** this configuration evidence is included in a follow-up context commit on `codex/merchandise-product-detail-packages`.
+- **Merge / deployment:** the stock movements are live database configuration and require no deployment. The product-detail application change on the same branch remains pending pull-request creation, merge and deployment.
+- **Live production verification / launch gate:** passed for the temporary quantities only. These numbers are not a physical stock count and must not be used for accounting, valuation or replenishment. Before launch, reverse the remaining UAT quantities with audited negative `ADJUSTMENT` movements, then receive verified physical stock with supplier references and actual unit costs. Package creation, public size filtering, reservation, payment and fulfilment UAT remain outstanding.
