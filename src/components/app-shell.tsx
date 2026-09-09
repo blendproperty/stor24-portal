@@ -24,6 +24,7 @@ import {
   Users,
   Webhook,
   MessagesSquare,
+  PackageOpen,
   Warehouse,
   WifiOff,
 } from "lucide-react";
@@ -43,6 +44,7 @@ const navigation = [
   { href: "/collections", label: "Collections", icon: ShieldAlert },
   { href: "/access", label: "Facial access", icon: ShieldCheck },
   { href: "/operations", label: "Operations", icon: Building2 },
+  { href: "/operations/merchandise", label: "Merchandise", icon: PackageOpen },
   { href: "/insurance", label: "Insurance", icon: ShieldCheck },
   { href: "/adjustments", label: "Adjustments", icon: SlidersHorizontal },
   { href: "/company", label: "Company & setup", icon: Settings },
@@ -97,7 +99,9 @@ export function AppShell({ children, session }: { children: React.ReactNode; ses
           <p className="nav-label">Workspace</p>
           {navigation.map((item) => {
             const active =
-              item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+              item.href === "/" || item.href === "/operations"
+                ? pathname === item.href
+                : pathname.startsWith(item.href);
             return (
               <Link
                 className={clsx("nav-link", active && "nav-link-active")}
