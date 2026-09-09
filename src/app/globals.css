@@ -2194,9 +2194,15 @@ a.module-card:focus-visible {
 .merch-stock-card strong { color: #ff5a0a; font-size: 32px; }
 .merch-stock-card small { color: #d6dfdb; line-height: 1.45; }
 .merch-fields { display: grid; align-content: start; gap: 18px; }
-.money-input { display: flex; align-items: stretch; }
+.merch-fields .form-grid.two,.package-core-fields .form-grid.two { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.merch-fields .form-grid.two > label,.package-core-fields .form-grid.two > label { display: grid; min-width: 0; align-content: start; gap: 7px; color: #43534d; font-size: 10px; font-weight: 800; letter-spacing: .01em; }
+.merch-fields .form-grid.two input,.package-core-fields .form-grid.two input,.package-core-fields textarea { display: block; width: 100%; min-width: 0; min-height: 46px; padding: 10px 12px; border: 1px solid #cbd5d0; border-radius: 11px; background: #fff; color: var(--ink); font: inherit; font-size: 13px; font-weight: 700; box-shadow: 0 1px 0 rgba(5,31,25,.02); }
+.package-core-fields textarea { min-height: 92px; resize: vertical; line-height: 1.45; }
+.merch-fields .form-grid.two input:hover,.package-core-fields .form-grid.two input:hover,.package-core-fields textarea:hover { border-color: #9fb0a9; }
+.merch-fields .form-grid.two input:focus,.package-core-fields .form-grid.two input:focus,.package-core-fields textarea:focus { border-color: var(--orange); outline: 3px solid rgba(255,90,10,.14); box-shadow: none; }
+.money-input { display: flex; width: 100%; min-width: 0; align-items: stretch; }
 .money-input b { display: grid; place-items: center; min-width: 42px; border: 1px solid var(--line); border-right: 0; border-radius: 10px 0 0 10px; background: #f2f3ef; color: #43534d; }
-.money-input input { border-radius: 0 10px 10px 0 !important; }
+.money-input input { flex: 1; border-radius: 0 10px 10px 0 !important; }
 .premium-switch { display: flex !important; align-items: center; gap: 11px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: #fafbf9; cursor: pointer; }
 .premium-switch input { position: absolute; opacity: 0; }
 .premium-switch > span { display: grid; width: 34px; height: 22px; place-items: center; border-radius: 999px; background: #cdd5d1; color: transparent; transition: .2s; }
@@ -2276,7 +2282,8 @@ a.module-card:focus-visible {
 .carousel-quantity { display: grid; grid-template-columns: 1fr 34px 1fr; align-items: center; margin: 0 10px 10px; overflow: hidden; border: 1px solid #ffbea0; border-radius: 10px; background: #fff5f0; }
 .carousel-quantity button { display: grid; min-height: 30px; place-items: center; border: 0; background: transparent; color: #d54800; }
 .carousel-quantity strong { text-align: center; }
-@media (max-width: 900px) { .package-studio-grid,.merch-editor-layout { grid-template-columns: 1fr; } .package-identity-card { border-right: 0; border-bottom: 1px solid var(--line); } .merch-editor { width: min(760px,calc(100vw - 24px)); } }
+@media (max-width: 900px) { .package-studio-grid,.merch-editor-layout { grid-template-columns: 1fr; } .package-identity-card { border-right: 0; border-bottom: 1px solid var(--line); } .merch-editor { width: min(760px,calc(100vw - 24px)); } .merch-product-editor .merch-editor-layout aside { grid-template-columns: minmax(220px,.8fr) minmax(220px,1fr); } }
+@media (max-width: 720px) { .merch-fields .form-grid.two,.package-core-fields .form-grid.two { grid-template-columns: 1fr; } .merch-product-editor .merch-editor-layout aside { grid-template-columns: 1fr; } }
 @media (max-width: 620px) { .modal-backdrop { padding: 0; } .merch-editor { width: 100%; max-height: 100vh; border-radius: 0; } .merch-editor-form { max-height: calc(100vh - 120px); } .merch-editor-heading,.merch-editor-layout,.package-identity-card,.package-content-studio { padding-left: 18px; padding-right: 18px; } .merch-sku { display: none; } .catalogue-picker-heading { align-items: stretch; flex-direction: column; } .catalogue-search { width: 100%; } .catalogue-results { grid-template-columns: 1fr; } .selected-product-card { grid-template-columns: 44px minmax(0,1fr) 32px; } .selected-product-card .product-thumb { width: 44px; height: 44px; } .quantity-stepper { grid-column: 2; justify-self: start; } .remove-product { grid-column: 3; grid-row: 1; } .merch-editor-footer > span { display: none; } .merch-editor-footer .button { min-width: 0; flex: 1; } .catalogue-toolbar { padding: 14px 16px; } .merchandise-table th:nth-child(5),.merchandise-table td:nth-child(5) { display: none; } }
 .netcash-payments-panel .data-table td small { margin-top: 5px; line-height: 1.4; }
 .netcash-reconciliation-state { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; border-radius: 999px; font-size: 10px; font-weight: 850; white-space: nowrap; }

@@ -658,3 +658,12 @@ A CRM capability is complete only when it is database-backed, scoped, permission
 - **Merge:** not performed.
 - **Deployment and configuration:** not performed. Deploy the public image assets before or together with the portal migration so catalogue URLs never point at unavailable files.
 - **Live production verification:** not performed. Required proof is a successful response for all 17 image URLs plus authenticated review of product table thumbnails, product detail, package editor selected items and product carousel at desktop and narrow-screen widths.
+
+### Merchandise editor layout correction — 9 September 2026
+
+- **Implementation:** branch `codex/fix-product-editor-layout` restores the missing grid and form-control styling in both the product editor and package core fields. Product properties now render as balanced labelled controls with visible borders, consistent 46 px interaction height, proper currency prefixes, hover/focus treatment and responsive one-column stacking. The product image and stock cards retain a balanced side-by-side tablet layout before stacking on narrow phones.
+- **Testing / validation:** the focused merchandise suite passes 7 checks, including a new regression guard for the editor grid, visible input sizing and mobile breakpoint. Next route generation, TypeScript and the 76-route production build passed. Live served visual verification remains pending deployment.
+- **Commit and push:** pending after this evidence update on canonical `blendproperty/stor24-portal` branch `codex/fix-product-editor-layout`.
+- **Merge:** not performed.
+- **Deployment and configuration:** not performed; no database migration or environment change is required.
+- **Live production verification:** not performed. After merge and deployment, reopen a product and package at desktop and narrow-screen widths and confirm every label, input, currency prefix, image, stock card and footer action remains readable without collision or clipping.
