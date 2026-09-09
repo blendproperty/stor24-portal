@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { renderLeaseDocument } from "../src/lib/lease-agreement-content";
 import { publicReservationSchema } from "../src/lib/public-booking-contract";
@@ -26,6 +27,13 @@ test("product detail updates cannot directly rewrite physical stock", () => {
   assert.equal(productUpdateSchema.safeParse({ imageUrl: "javascript:alert(1)" }).success, false);
   assert.equal(productUpdateSchema.safeParse({ quantityOnHand: 100 }).success, false);
   assert.equal(productUpdateSchema.safeParse({}).success, false);
+});
+
+test("merchandise editors retain readable responsive form controls", () => {
+  const css = readFileSync(new URL("../src/app/globals.css", import.meta.url), "utf8");
+  assert.match(css, /\.merch-fields \.form-grid\.two[^}]*display:\s*grid/);
+  assert.match(css, /\.merch-fields \.form-grid\.two input[^}]*min-height:\s*46px/);
+  assert.match(css, /@media \(max-width:\s*720px\)[^{]*\{[^}]*\.merch-fields \.form-grid\.two[^}]*grid-template-columns:\s*1fr/);
 });
 
 test("package updates support editable quantities, size rules, ordering and channel status", () => {
