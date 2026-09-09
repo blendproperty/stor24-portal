@@ -6,6 +6,7 @@ import {
   publicAvailability,
   publicElementConfig,
   publicReservationSchema,
+  publicReservationReferenceSchema,
   publicReservationVerificationEnabled,
   publicViewingWindowHours,
   reservationHoldHours,
@@ -72,6 +73,9 @@ test("public map output collapses private status and config details", () => {
 
 test("references are readable and reservation holds are bounded", () => {
   assert.equal(createPublicReference(new Date("2026-08-13T10:00:00.000Z"), "abc123"), "ST24-20260813-ABC123");
+  assert.equal(publicReservationReferenceSchema.safeParse("ST24-20260909-ABC123").success, true);
+  assert.equal(publicReservationReferenceSchema.safeParse("ST24-T-cmtr4f9jx003w01tf6g2olg1k").success, true);
+  assert.equal(publicReservationReferenceSchema.safeParse("not-a-stor24-reference").success, false);
   assert.equal(reservationHoldHours("0"), 1);
   assert.equal(reservationHoldHours("1000"), 168);
   assert.equal(reservationHoldHours("invalid"), 24);

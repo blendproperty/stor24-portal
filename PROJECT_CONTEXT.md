@@ -539,3 +539,10 @@ A CRM capability is complete only when it is database-backed, scoped, permission
 - **Merge:** not performed; paired CRM and public pull requests are required.
 - **Deployment and configuration:** not performed. No database migration or provider configuration is required for the assisted task handoff.
 - **Live production verification:** pending merge/deployment and an end-to-end debit-order UAT that confirms the signed PDF remains downloadable, Pay Now is not opened, one customer-linked CRM task exists and no payment/access state changes. Automated Netcash eMandate/debit-order collection, approved bank-detail capture, legal wording, ownership and business sign-off remain open and must not be represented as complete.
+
+### Email-verification reference compatibility correction — 9 September 2026
+
+- **Implementation:** live Unit 247 UAT reproduced an `Invalid reservation reference.` response before email-code comparison. The public verification contract now accepts a bounded Stor24 identifier (`ST24-`, alphanumerics and hyphens, maximum 100 characters) so current date-based references and previously issued `ST24-T-*` references can reach the authoritative database lookup. Arbitrary/non-Stor24 values remain rejected; existence, lifecycle and expiry checks remain server-side.
+- **Testing / validation:** Prisma generation, route/TypeScript checks, all 198 automated tests and ESLint passed. Contract assertions cover current, legacy-compatible and invalid reference shapes; ESLint remains at zero errors with six unrelated pre-existing warnings.
+- **Commit and push:** pending follow-up commit on `codex/booking-retry-responsive`.
+- **Merge / deployment / live verification:** not performed. The paired public client reference-durability correction must deploy with this contract change, followed by a fresh mobile and email verification test.
