@@ -57,6 +57,8 @@ export function UsersWorkspace() {
   const [facilities, setFacilities] = useState<FacilityOption[]>([]);
   const [invitationSent, setInvitationSent] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [revokingId, setRevokingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [permissionUser, setPermissionUser] = useState<UserRow | null>(null);
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
@@ -115,10 +117,23 @@ export function UsersWorkspace() {
   }
 
   async function revoke(id: string) {
-    const response = await fetch(`/api/v1/invitations/${id}`, {
-      method: "DELETE",
-    });
-    if (response.ok) await load();
+    setError("");
+    setNotice("");
+    setRevokingId(id);
+    try {
+      const response = await fetch(`/api/v1/invitations/${id}`, { method: "DELETE" });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        setError(payload?.error?.message ?? "The invitation could not be revoked. Please try again.");
+        return;
+      }
+      setInvitations((current) => current.filter((invitation) => invitation.id !== id));
+      setNotice("Invitation revoked. The old link no longer works. You can send a fresh invitation to this email.");
+    } catch {
+      setError("Could not connect. Please check your connection and try revoking again.");
+    } finally {
+      setRevokingId(null);
+    }
   }
 
   async function updateUser(
@@ -185,6 +200,8 @@ export function UsersWorkspace() {
           </button>
         }
       />
+      {error && !open && !permissionUser ? <p className="form-error" role="alert">{error}</p> : null}
+      {notice ? <p role="status">{notice}</p> : null}
       <section className="summary-strip">
         {[
           [
@@ -234,9 +251,10 @@ export function UsersWorkspace() {
                     <td>
                       <button
                         className="text-button text-button-danger"
+                        disabled={revokingId !== null}
                         onClick={() => revoke(invitation.id)}
                       >
-                        Revoke
+                        {revokingId === invitation.id ? "Revoking..." : "Revoke"}
                       </button>
                     </td>
                   </tr>

@@ -7,7 +7,8 @@ import {
 } from "@/lib/invitation-service";
 import { createInvitationSchema } from "@/lib/validators";
 import { requireOwner } from "@/lib/auth-guards";
-import { emailProvider, escapeEmailHtml } from "@/lib/email";
+import { emailProvider } from "@/lib/email";
+import { invitationEmail } from "@/lib/invitation-email";
 
 export const dynamic = "force-dynamic";
 
@@ -121,7 +122,7 @@ export async function POST(request: Request) {
   const appUrl = process.env.APP_URL || new URL(request.url).origin;
   const inviteUrl = `${appUrl}/invite/${token}`;
   try {
-    await emailProvider().send({ to: invitation.email, subject: "You are invited to Stor24 CRM", text: `Accept your invitation: ${inviteUrl}`, html: `<p>${escapeEmailHtml(invitation.invitedByName)} invited you to Stor24 CRM.</p><p><a href="${inviteUrl}">Accept invitation</a></p>` });
+    await emailProvider().send({ to: invitation.email, ...invitationEmail({ name: invitation.name, invitedByName: invitation.invitedByName, roleName: invitation.roleName, inviteUrl, expiresAt: invitation.expiresAt }) });
   } catch {
     await db.userInvitation.update({ where: { id: invitation.id }, data: { status: "REVOKED", revokedAt: new Date() } });
     return Response.json({ error: { code: "DELIVERY_FAILED", message: "The invitation email could not be delivered. Check the email provider configuration and retry." } }, { status: 503 });
