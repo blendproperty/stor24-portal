@@ -662,8 +662,8 @@ A CRM capability is complete only when it is database-backed, scoped, permission
 ### Merchandise editor layout correction — 9 September 2026
 
 - **Implementation:** branch `codex/fix-product-editor-layout` restores the missing grid and form-control styling in both the product editor and package core fields. Product properties now render as balanced labelled controls with visible borders, consistent 46 px interaction height, proper currency prefixes, hover/focus treatment and responsive one-column stacking. The product image and stock cards retain a balanced side-by-side tablet layout before stacking on narrow phones.
-- **Testing / validation:** the focused merchandise suite passes 7 checks, including a new regression guard for the editor grid, visible input sizing and mobile breakpoint. Next route generation, TypeScript and the 76-route production build passed. Live served visual verification remains pending deployment.
-- **Commit and push:** pending after this evidence update on canonical `blendproperty/stor24-portal` branch `codex/fix-product-editor-layout`.
+- **Testing / validation:** the focused merchandise suite passes 7 checks, including a new regression guard for the editor grid, visible input sizing and mobile breakpoint. All 207 automated portal tests, Next route generation, TypeScript and the 76-route production build passed. Live served visual verification remains pending deployment.
+- **Commit and push:** implementation and initial evidence committed as `6c9d0b2` (`fix: restore merchandise editor layout`) and pushed to canonical `blendproperty/stor24-portal` branch `codex/fix-product-editor-layout`; this final evidence correction follows on the same branch.
 - **Merge:** not performed.
 - **Deployment and configuration:** not performed; no database migration or environment change is required.
 - **Live production verification:** not performed. After merge and deployment, reopen a product and package at desktop and narrow-screen widths and confirm every label, input, currency prefix, image, stock card and footer action remains readable without collision or clipping.
