@@ -81,11 +81,16 @@ export function publicReservationVerificationEnabled(raw = process.env.PUBLIC_RE
   return raw?.trim().toLowerCase() === "true";
 }
 
+// Current references use ST24-YYYYMMDD-XXXXXX. Older live reservations used a
+// longer ST24-T-* identifier, so verification must validate a bounded Stor24
+// identifier and let the database lookup decide whether it is genuine/active.
+export const publicReservationReferenceSchema = z.string().trim().min(6).max(100).regex(/^ST24-[A-Z0-9-]+$/i);
+
 export const publicReservationVerificationSchema = z.object({
-  reference: z.string().trim().regex(/^ST24-\d{8}-[A-F0-9]{6}$/),
+  reference: publicReservationReferenceSchema,
   code: z.string().trim().regex(/^\d{6}$/),
 });
 
 export const publicReservationResendSchema = z.object({
-  reference: z.string().trim().regex(/^ST24-\d{8}-[A-F0-9]{6}$/),
+  reference: publicReservationReferenceSchema,
 });
