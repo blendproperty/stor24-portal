@@ -22,6 +22,8 @@ test("unit-ready packages require unique facility products and coherent size lim
 
 test("product detail updates cannot directly rewrite physical stock", () => {
   assert.equal(productUpdateSchema.safeParse({ sellingPrice: 49.99, reorderPoint: 5 }).success, true);
+  assert.equal(productUpdateSchema.safeParse({ imageUrl: "data:image/webp;base64,YWJj" }).success, true);
+  assert.equal(productUpdateSchema.safeParse({ imageUrl: "javascript:alert(1)" }).success, false);
   assert.equal(productUpdateSchema.safeParse({ quantityOnHand: 100 }).success, false);
   assert.equal(productUpdateSchema.safeParse({}).success, false);
 });
@@ -32,6 +34,7 @@ test("package updates support editable quantities, size rules, ordering and chan
     name: "Move Ready",
     description: "A revised collection of storage and moving essentials.",
     badge: "Ideal for this size",
+    imageUrl: "https://images.example.com/move-ready.webp",
     sellingPrice: 2199,
     minUnitAreaSqM: 4,
     maxUnitAreaSqM: 10,

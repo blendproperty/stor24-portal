@@ -946,6 +946,7 @@ model Product {
   name           String
   category       String
   barcode        String?
+  imageUrl       String?
   costPrice      Decimal         @default(0) @db.Decimal(14, 2)
   sellingPrice   Decimal         @db.Decimal(14, 2)
   quantityOnHand Int             @default(0)
@@ -971,6 +972,7 @@ model StoragePackage {
   name             String
   description      String
   badge            String?
+  imageUrl         String?
   sellingPrice     Decimal              @db.Decimal(14, 2)
   minUnitAreaSqM   Decimal?             @db.Decimal(8, 2)
   maxUnitAreaSqM   Decimal?             @db.Decimal(8, 2)

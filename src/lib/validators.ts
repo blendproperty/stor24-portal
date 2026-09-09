@@ -336,12 +336,18 @@ export const updateMaintenanceSchema = z.object({
   status: z.enum(["OPEN", "SCHEDULED", "IN_PROGRESS", "BLOCKED", "COMPLETED", "CANCELLED"]),
 });
 
+const catalogueImageSchema = z.string().trim().max(3_000_000).refine(
+  (value) => /^data:image\/(?:jpeg|png|webp);base64,/i.test(value) || /^https:\/\//i.test(value),
+  "Use a JPG, PNG or WebP upload, or a secure image URL.",
+);
+
 export const productSchema = z.object({
   facilityId: z.string().cuid(),
   sku: z.string().trim().min(1).max(60),
   name: z.string().trim().min(2).max(160),
   category: z.string().trim().min(1).max(80),
-  barcode: z.string().trim().max(100).optional(),
+    barcode: z.string().trim().max(100).optional(),
+    imageUrl: catalogueImageSchema.nullable().optional(),
   costPrice: z.number().nonnegative(),
   sellingPrice: z.number().nonnegative(),
   quantityOnHand: z.number().int().nonnegative().default(0),
@@ -371,7 +377,8 @@ export const productUpdateSchema = z.object({
   sku: z.string().trim().min(1).max(60).optional(),
   name: z.string().trim().min(2).max(160).optional(),
   category: z.string().trim().min(1).max(80).optional(),
-  barcode: z.string().trim().max(100).optional(),
+    barcode: z.string().trim().max(100).optional(),
+    imageUrl: catalogueImageSchema.nullable().optional(),
   costPrice: z.number().nonnegative().optional(),
   sellingPrice: z.number().nonnegative().optional(),
   reorderPoint: z.number().int().nonnegative().optional(),
@@ -383,7 +390,8 @@ export const storagePackageSchema = z.object({
   code: z.string().trim().min(2).max(40).regex(/^[A-Za-z0-9_-]+$/),
   name: z.string().trim().min(2).max(120),
   description: z.string().trim().min(10).max(500),
-  badge: z.string().trim().max(50).optional(),
+    badge: z.string().trim().max(50).optional(),
+    imageUrl: catalogueImageSchema.nullable().optional(),
   sellingPrice: z.number().nonnegative().max(1_000_000),
   minUnitAreaSqM: z.number().positive().max(10_000).optional(),
   maxUnitAreaSqM: z.number().positive().max(10_000).optional(),
@@ -403,7 +411,8 @@ export const storagePackageUpdateSchema = z.object({
   code: z.string().trim().min(2).max(40).regex(/^[A-Za-z0-9_-]+$/),
   name: z.string().trim().min(2).max(120),
   description: z.string().trim().min(10).max(500),
-  badge: z.string().trim().max(50).optional(),
+    badge: z.string().trim().max(50).optional(),
+    imageUrl: catalogueImageSchema.nullable().optional(),
   sellingPrice: z.number().nonnegative().max(1_000_000),
   minUnitAreaSqM: z.number().positive().max(10_000).optional(),
   maxUnitAreaSqM: z.number().positive().max(10_000).optional(),
