@@ -85,6 +85,11 @@ export async function GET(
         },
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       },
+      products: {
+        where: { active: true },
+        select: { id: true, sku: true, name: true, category: true, imageUrl: true, sellingPrice: true, quantityOnHand: true, quantityReserved: true },
+        orderBy: [{ category: "asc" }, { name: "asc" }],
+      },
     },
   });
   if (!facility)
@@ -125,6 +130,15 @@ export async function GET(
       maxUnitAreaSqM: pack.maxUnitAreaSqM ? Number(pack.maxUnitAreaSqM.toString()) : null,
       available: pack.items.every((item) => item.product.quantityOnHand - item.product.quantityReserved >= item.quantity),
       items: pack.items.map((item) => ({ name: item.product.name, imageUrl: item.product.imageUrl, quantity: item.quantity })),
+    })),
+    merchandiseProducts: facility.products.map((product) => ({
+      id: product.id,
+      sku: product.sku,
+      name: product.name,
+      category: product.category,
+      imageUrl: product.imageUrl,
+      priceZar: Number(product.sellingPrice.toString()),
+      availableQuantity: Math.max(0, product.quantityOnHand - product.quantityReserved),
     })),
     units: facility.units.map(unitView),
     maps: facility.maps.map((map) => ({

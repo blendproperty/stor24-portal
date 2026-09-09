@@ -5,6 +5,10 @@ export const publicReservationSchema = z.object({
   facilitySlug: z.string().trim().toLowerCase().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(100),
   unitId: z.string().trim().min(1).max(64),
   storagePackageId: z.string().trim().cuid().optional(),
+  customPackageItems: z.array(z.object({
+    productId: z.string().trim().cuid(),
+    quantity: z.number().int().min(1).max(100),
+  })).max(30).optional(),
   firstName: z.string().trim().min(1).max(100),
   lastName: z.string().trim().min(1).max(100),
   email: z.email().transform((value) => value.trim().toLowerCase()),
@@ -22,6 +26,9 @@ export const publicReservationSchema = z.object({
   websitePath: z.string().trim().max(300).optional(),
   honeypot: z.string().max(0).optional(),
 }).superRefine((value, context) => {
+  if (value.storagePackageId && value.customPackageItems?.length) {
+    context.addIssue({ code: "custom", path: ["customPackageItems"], message: "Choose a package or build your own, not both." });
+  }
   if (value.journey === "VIEWING" && !value.viewingAt) {
     context.addIssue({ code: "custom", path: ["viewingAt"], message: "Choose a viewing appointment." });
   }

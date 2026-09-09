@@ -61,6 +61,17 @@ test("public reservation accepts an optional package identifier", () => {
   assert.equal(result.success, true);
 });
 
+test("public reservation accepts a custom priced merchandise bundle", () => {
+  const base = {
+    facilitySlug: "midpoint", unitId: productId, firstName: "Test", lastName: "Customer",
+    email: "test@example.com", phone: "0812345678", journey: "RENTAL" as const,
+    communicationConsent: {}, idempotencyKey: "custom-package-123456",
+  };
+  assert.equal(publicReservationSchema.safeParse({ ...base, customPackageItems: [{ productId, quantity: 3 }] }).success, true);
+  assert.equal(publicReservationSchema.safeParse({ ...base, storagePackageId: productId, customPackageItems: [{ productId, quantity: 3 }] }).success, false);
+  assert.equal(publicReservationSchema.safeParse({ ...base, customPackageItems: [{ productId, quantity: 0 }] }).success, false);
+});
+
 test("the signed agreement snapshot records the selected package and once-off price", () => {
   const content = renderLeaseDocument({
     facilityName: "Midpoint",

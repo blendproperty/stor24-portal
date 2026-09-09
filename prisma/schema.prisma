@@ -1004,8 +1004,8 @@ model ReservationPackage {
   id               String         @id @default(cuid())
   reservationId    String         @unique
   reservation      Reservation    @relation(fields: [reservationId], references: [id], onDelete: Cascade)
-  storagePackageId String
-  storagePackage   StoragePackage @relation(fields: [storagePackageId], references: [id], onDelete: Restrict)
+  storagePackageId String?
+  storagePackage   StoragePackage? @relation(fields: [storagePackageId], references: [id], onDelete: Restrict)
   status           String         @default("RESERVED")
   packageCode      String
   packageName      String
