@@ -6,7 +6,7 @@
 // whenever clause wording changes materially, so historically signed documents remain
 // tied to the exact version of the text the signer actually saw and initialled.
 
-export const LEASE_VERSION = "v2-draft-payment-method-2026-09-08";
+export const LEASE_VERSION = "v3-draft-unit-ready-package-2026-09-09";
 
 export type PublicLeasePaymentMethod = "CARD" | "EFT" | "DEBIT_ORDER";
 
@@ -28,6 +28,7 @@ export type LeaseClauseContext = {
   monthlyRate: number;
   startDate: Date;
   paymentMethod: PublicLeasePaymentMethod;
+  storagePackage?: { name: string; priceZar: number; contents: string } | null;
 };
 
 type ClauseDefinition = { key: LeaseClauseKey; title: string; body: (ctx: LeaseClauseContext) => string };
@@ -104,6 +105,7 @@ export function renderLeaseDocument(ctx: LeaseClauseContext) {
     `Monthly rate: ${formatRate(ctx.monthlyRate)} (excl. applicable tax)`,
     `Commencement date: ${formatDate(ctx.startDate)}`,
     `Selected payment method: ${ctx.paymentMethod.replaceAll("_", " ")}`,
+    ...(ctx.storagePackage ? [`Optional unit-ready package: ${ctx.storagePackage.name} — ${formatRate(ctx.storagePackage.priceZar)} once-off`, `Package contents: ${ctx.storagePackage.contents}`] : ["Optional unit-ready package: None"]),
     "",
     ...clauses.flatMap((clause) => [clause.title, clause.body, ""]),
     "By initialling each clause above and signing below, the Licensee confirms they have read, understood and agree to be bound by each clause of this agreement.",

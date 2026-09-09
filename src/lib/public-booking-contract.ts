@@ -4,6 +4,7 @@ import { z } from "zod";
 export const publicReservationSchema = z.object({
   facilitySlug: z.string().trim().toLowerCase().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(100),
   unitId: z.string().trim().min(1).max(64),
+  storagePackageId: z.string().trim().cuid().optional(),
   firstName: z.string().trim().min(1).max(100),
   lastName: z.string().trim().min(1).max(100),
   email: z.email().transform((value) => value.trim().toLowerCase()),

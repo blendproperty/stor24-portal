@@ -1,16 +1,17 @@
 import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
-import { createTaskSchema, dailyCloseSchema, maintenanceSchema, productSchema, stockMovementSchema, unitNoteSchema } from "@/lib/validators";
+import { createTaskSchema, dailyCloseSchema, maintenanceSchema, productSchema, stockMovementSchema, storagePackageSchema, unitNoteSchema } from "@/lib/validators";
 
 export async function GET() {
   try {
     const { organisationId, allowedFacilityIds } = await requirePermission("operations.view");
     const facilityScope = allowedFacilityIds ? { in: allowedFacilityIds } : undefined;
-    const [tasks, notes, maintenance, products, dailyCloses, facilities] = await Promise.all([
+    const [tasks, notes, maintenance, products, storagePackages, dailyCloses, facilities] = await Promise.all([
       db.task.findMany({ where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { facility: true, assignee: true }, orderBy: [{ status: "asc" }, { dueAt: "asc" }], take: 100 }),
       db.unitNote.findMany({ where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { unit: true, author: true }, orderBy: { createdAt: "desc" }, take: 30 }),
       db.maintenanceRequest.findMany({ where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { facility: true, unit: true, assignedTo: true }, orderBy: [{ status: "asc" }, { dueAt: "asc" }], take: 100 }),
       db.product.findMany({ where: { organisationId, active: true, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { facility: true }, orderBy: { name: "asc" } }),
+      db.storagePackage.findMany({ where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { facility: true, items: { include: { product: true } } }, orderBy: [{ facilityId: "asc" }, { sortOrder: "asc" }, { name: "asc" }] }),
       db.dailyClose.findMany({ where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { facility: true, closedBy: true }, orderBy: { businessDate: "desc" }, take: 30 }),
       db.facility.findMany({
         where: { organisationId, active: true, ...(facilityScope ? { id: facilityScope } : {}) },
@@ -26,14 +27,14 @@ export async function GET() {
         orderBy: { name: "asc" },
       }),
     ]);
-    return Response.json({ data: { tasks, notes, maintenance, products, dailyCloses, facilities } });
+    return Response.json({ data: { tasks, notes, maintenance, products, storagePackages, dailyCloses, facilities } });
   } catch (error) { return authErrorResponse(error); }
 }
 
 export async function POST(request: Request) {
   try {
     const body = await request.json() as { kind?: string; payload?: unknown };
-    const permission = body.kind === "stockMovement" || body.kind === "product" ? "inventory.manage" : body.kind === "dailyClose" ? "daily_close.perform" : "operations.manage";
+    const permission = ["stockMovement", "product", "storagePackage"].includes(body.kind ?? "") ? "inventory.manage" : body.kind === "dailyClose" ? "daily_close.perform" : "operations.manage";
     const { organisationId, user, allowedFacilityIds } = await requirePermission(permission);
     const ensureFacility = async (facilityId: string) => {
       await requirePermission(permission, facilityId);
@@ -88,6 +89,16 @@ export async function POST(request: Request) {
         const movement = await tx.stockMovement.create({ data: { ...input, quantity: delta, createdById: user.id } });
         await tx.product.update({ where: { id: product.id }, data: { quantityOnHand: { increment: delta } } });
         return movement;
+      });
+    } else if (body.kind === "storagePackage") {
+      const input = storagePackageSchema.parse(body.payload);
+      await ensureFacility(input.facilityId);
+      const productCount = await db.product.count({ where: { id: { in: input.items.map((item) => item.productId) }, organisationId, facilityId: input.facilityId, active: true } });
+      if (productCount !== input.items.length) return Response.json({ error: { code: "INVALID_PACKAGE_PRODUCTS", message: "Every package item must be an active product at the selected facility." } }, { status: 422 });
+      const { items, ...packageData } = input;
+      result = await db.storagePackage.create({
+        data: { organisationId, ...packageData, items: { create: items } },
+        include: { items: { include: { product: true } } },
       });
     } else if (body.kind === "dailyClose") {
       const input = dailyCloseSchema.parse(body.payload);
