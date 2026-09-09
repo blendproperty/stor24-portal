@@ -632,3 +632,12 @@ A CRM capability is complete only when it is database-backed, scoped, permission
 - **Merge:** not performed; canonical `blendproperty/stor24-portal` pull-request review is required.
 - **Deployment and configuration:** not performed. The production database migration must run as part of the normal deployment before the new fields are used.
 - **Live production verification:** not performed. Required evidence is desktop and narrow-screen review of product and package editors, image upload/save/readback, catalogue search, add/remove/quantity controls, and public package-image readback. Existing supplier-cost, approved pricing, VAT, charging, fulfilment and temporary-UAT-stock gates remain open.
+
+### Dedicated Merchandise operations workspace — 9 September 2026
+
+- **Implementation:** branch `codex/merchandise-carousel-followup` separates merchandise from the general Operations dashboard into `/operations/merchandise`. Operations remains the parent launch hub and now includes a clear Merchandise workflow card; the primary navigation also exposes Merchandise as its own entry. The dedicated full-width workspace owns product imagery, catalogue search/filtering, audited stock movements and customer-package creation/editing. The general Operations page retains tasks, maintenance, customer-account workflows and end-of-day control instead of squeezing the commerce interface into a dashboard column.
+- **Testing / validation:** Next route generation and TypeScript passed; ESLint completed with zero errors and the same six unrelated existing warnings; all 205 automated tests passed. Production build and served visual UAT remain pending.
+- **Commit and push:** implementation and evidence committed as `880476d` (`feat: separate merchandise operations workspace`) and pushed to canonical `blendproperty/stor24-portal` branch `codex/merchandise-carousel-followup`.
+- **Merge:** not performed; the canonical `blendproperty/stor24-portal` pull request remains required.
+- **Deployment and configuration:** not performed for this routing change. No new migration or environment configuration is introduced by the separation.
+- **Live production verification:** not performed. After merge and deployment, verify that Operations launches Merchandise, only the Merchandise navigation entry is active at `/operations/merchandise`, the workspace spans the available content width, and product/package edit, image and stock controls still save correctly. Existing temporary-stock, approved-price, VAT, charging and fulfilment gates remain open.
