@@ -641,3 +641,12 @@ A CRM capability is complete only when it is database-backed, scoped, permission
 - **Merge:** not performed; the canonical `blendproperty/stor24-portal` pull request remains required.
 - **Deployment and configuration:** not performed for this routing change. No new migration or environment configuration is introduced by the separation.
 - **Live production verification:** not performed. After merge and deployment, verify that Operations launches Merchandise, only the Merchandise navigation entry is active at `/operations/merchandise`, the workspace spans the available content width, and product/package edit, image and stock controls still save correctly. Existing temporary-stock, approved-price, VAT, charging and fulfilment gates remain open.
+
+### Customer-built merchandise packages — 9 September 2026
+
+- **Implementation:** the public facility contract now exposes active facility merchandise with image, catalogue price and available quantity. Reservation creation accepts either one configured package or a bounded custom item list, never both. The server ignores browser totals, re-loads active products inside the facility transaction, verifies stock, recalculates the once-off price from catalogue prices, reserves each quantity and stores `My custom package` with the exact item and unit-price snapshot. `ReservationPackage.storagePackageId` is nullable only for these customer-built snapshots; configured packages remain linked normally. The existing signed-agreement flow includes the custom name, authoritative total and contents.
+- **Testing / validation:** Prisma generation, route generation, TypeScript and the 76-route production build passed. All 206 automated tests passed, including valid custom quantities and rejection of zero quantities or simultaneous fixed/custom selections. Migration and live UAT remain pending.
+- **Commit and push:** pending coordinated portal and public-site commits.
+- **Merge:** not performed.
+- **Deployment and configuration:** not performed. Migration `20260909190000_custom_merchandise_packages` must deploy before the public-site change.
+- **Live production verification:** not performed. Required proof is fixed package selection, custom quantity selection, live browser total, authoritative server total/readback, stock reservation/release and signed-agreement PDF contents. Production charging remains governed by the existing Netcash readiness gates.

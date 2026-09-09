@@ -226,6 +226,12 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
       if (selectedPackage && selectedPackage.items.some((item) => item.product.quantityOnHand - item.product.quantityReserved < item.quantity)) {
         throw new PublicBookingError("UNIT_UNAVAILABLE", 409);
       }
+      const customQuantities = new Map(input.customPackageItems?.map((item) => [item.productId, item.quantity]) ?? []);
+      if (customQuantities.size !== (input.customPackageItems?.length ?? 0)) throw new PublicBookingError("UNIT_UNAVAILABLE", 409);
+      const customProducts = customQuantities.size ? await tx.product.findMany({ where: { id: { in: [...customQuantities.keys()] }, facilityId: facility.id, active: true } }) : [];
+      if (customProducts.length !== customQuantities.size || customProducts.some((product) => product.quantityOnHand - product.quantityReserved < (customQuantities.get(product.id) ?? 0))) {
+        throw new PublicBookingError("UNIT_UNAVAILABLE", 409);
+      }
 
       const source = input.journey === "VIEWING" ? "PUBLIC_VIEWING" : "PUBLIC_WEBSITE";
       const consent = {
@@ -271,6 +277,11 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
         const itemSnapshot = selectedPackage.items.map((item) => ({ productId: item.productId, sku: item.product.sku, name: item.product.name, quantity: item.quantity, unitPriceZar: Number(item.product.sellingPrice) }));
         for (const item of selectedPackage.items) await tx.product.update({ where: { id: item.productId }, data: { quantityReserved: { increment: item.quantity } } });
         await tx.reservationPackage.create({ data: { reservationId: created.id, storagePackageId: selectedPackage.id, packageCode: selectedPackage.code, packageName: selectedPackage.name, priceSnapshot: selectedPackage.sellingPrice, itemsSnapshot: itemSnapshot } });
+      } else if (customProducts.length) {
+        const itemSnapshot = customProducts.map((product) => ({ productId: product.id, sku: product.sku, name: product.name, quantity: customQuantities.get(product.id) ?? 0, unitPriceZar: Number(product.sellingPrice) }));
+        const priceSnapshot = itemSnapshot.reduce((total, item) => total + item.quantity * item.unitPriceZar, 0);
+        for (const product of customProducts) await tx.product.update({ where: { id: product.id }, data: { quantityReserved: { increment: customQuantities.get(product.id) ?? 0 } } });
+        await tx.reservationPackage.create({ data: { reservationId: created.id, storagePackageId: null, packageCode: "CUSTOM", packageName: "My custom package", priceSnapshot, itemsSnapshot: itemSnapshot } });
       }
       if (verificationEnabled) await tx.reservation.update({ where: { id: created.id }, data: { verificationCodeHash: verificationHash(created.id, verificationCode) } });
       await tx.auditEvent.create({
@@ -290,7 +301,7 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
           },
         },
       });
-      const complete = selectedPackage
+      const complete = selectedPackage || customProducts.length
         ? await tx.reservation.findUniqueOrThrow({ where: { id: created.id }, include: reservationInclude })
         : created;
       return { created: complete, customerId: customer.id };
