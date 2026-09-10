@@ -3,9 +3,9 @@
 ## Accounts click-through correction — 10 September 2026
 
 - **Implementation:** user screenshot confirms 25 accounts; earlier empty-state observation was not a reliable account-count conclusion. Existing narrow layout placed selected details beneath the whole list. Selection now opens a dedicated detail view below 980px with Back to accounts, keyboard focus, scroll positioning and row chevrons. Desktop retains a bounded scrollable list beside details. Loading metrics show a dash and explicit loading text rather than false zeros/empty state. No ledger or payment data changed.
-- **Testing:** source regression coverage added for selection/back responsive states and loading copy. Build and live interaction evidence follows promotion.
-- **Commit/push/merge/deployment:** pending on codex/accounts-click-through.
-- **Live verification:** pending actual row selection, return and statement retrieval in current authenticated session. Prior financial/provider/legal and customer self-service gates remain open.
+- **Testing:** production build/typecheck and two source regression tests passed. Branch CI 34472332014 and main CI 34472544612 passed.
+- **Commit/push/merge/deployment:** cb7fa11 pushed on codex/accounts-click-through; PR #83 merged as 0c5d789a02ff83e79a960d530e3d28e4dbe91818. Deployment 34472671533 succeeded; running image verified stor24-crm:0c5d789a.
+- **Live verification:** current authenticated owner session confirms 25 accounts (not zero). At 760px, selecting Unit 106 opened its correct account details, keyboard focus and visible Back button; returning restored the list. At 390px, another account opened directly and its Account statement link retrieved the existing 10 September R10 Netcash payment, opening R0 and closing credit R10, matching the visible account ledger/balance. No records or charges created. Viewport restored. This supersedes the earlier zero-account interpretation; full reconciliation, print, restricted-role, financial/provider/legal and customer self-service gates remain open.
 
 ## Login brand refresh — 10 September 2026
 
