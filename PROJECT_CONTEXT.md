@@ -1,5 +1,13 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Login brand refresh — 10 September 2026
+
+- **Implementation:** shared authentication layout now uses the approved outlined /brand/stor24-logo-official-email-20260909.svg at its native aspect ratio, replacing legacy white/dark wordmarks. Scoped CSS adds a dark-green brand panel, cream sign-in card, readable fields, accessible dark-on-orange button, mobile logo and reduced-motion handling. Shared setup/recovery layout also receives the presentation. No authentication, MFA, account, provider or financial logic changed. Graphify located auth references; current source verified the legacy asset references.
+- **Testing:** production build/typecheck passed. Local browser screenshots inspected at 1440x1000 and 390x844; mobile DOM width and scroll width both 390; both logo instances loaded the approved SVG. Development-only React CSP warning remains in dev mode; production served checks follow promotion. No credentials submitted or sessions changed.
+- **Commit/push:** codex/login-brand-refresh; promotion evidence follows.
+- **Merge/deployment:** pending.
+- **Live verification:** pending. Prior ledger reconciliation, customer portal, provider, legal and UAT gates remain unchanged.
+
 ## Account statement retrieval foundation — 10 September 2026
 
 - **Implementation:** staff Accounts now links to a dated, read-only account statement workspace with opening balance, debit/credit transactions, running/closing balances and browser print/save-as-PDF. A new ledger.view API scopes the account to the authenticated organisation and permitted facilities, disables response caching and uses all ledger history for opening balances (not the Accounts screen's latest-50 subset). Date ranges use South African calendar-day boundaries. Integer-cent calculations handle refunds and referenced reversals; ambiguous reversal data fails closed for accounts review. No charges, emails, provider requests, migrations or customer access links are created.
