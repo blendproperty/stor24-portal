@@ -1,6 +1,8 @@
 import { db } from "@/lib/db";
 import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
 import { buildAccountStatement, statementPeriod, statementAccountScope } from "@/lib/finance/account-statement";
+import { renderAccountStatementPdf } from "@/lib/finance/tenant-document-pdf";
+import { tenantPdf } from "@/lib/tenant-portal-response";
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
@@ -15,6 +17,11 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     });
     if (!account) return Response.json({ error: { message: "Account not found." } }, { status: 404 });
     const statement = buildAccountStatement(account.ledgerEntries.map(entry => ({ ...entry, amount: entry.amount.toString() })), start, endExclusive);
+    if (query.get("format") === "pdf") {
+      const bytes = await renderAccountStatementPdf({ ...statement, from, to, generatedAt: new Date().toISOString(), accountNumber: account.accountNumber, currency: account.currency, customerName: account.customer.companyName || [account.customer.firstName, account.customer.lastName].filter(Boolean).join(" "), facilityName: account.tenancy?.facility.name ?? "STOR24" });
+      await db.auditEvent.create({ data: { organisationId: auth.organisationId, actorId: auth.user.id, action: "account.statement_downloaded", entityType: "Account", entityId: id } });
+      return tenantPdf(bytes, `stor24-statement-${from}-${to}.pdf`);
+    }
     return Response.json({ data: { ...statement, from, to, generatedAt: new Date().toISOString(), accountNumber: account.accountNumber, currency: account.currency, customerName: account.customer.companyName || [account.customer.firstName, account.customer.lastName].filter(Boolean).join(" "), facilityName: account.tenancy?.facility.name ?? "STOR24" } }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     if (error instanceof Error && error.message === "INVALID_PERIOD") return Response.json({ error: { message: "Choose valid start and end dates, in order." } }, { status: 422 });

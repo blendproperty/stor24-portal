@@ -13,6 +13,18 @@ export function AccountStatementWorkspace({ accountId }: { accountId: string }) 
   const [statement, setStatement] = useState<Statement | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  async function emailStatement() {
+    if (!statement || !window.confirm("Email a secure statement link to this customer's verified email address?")) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const response = await fetch(`/api/v1/accounts/${encodeURIComponent(accountId)}/statement/email`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ from: statement.from, to: statement.to }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error?.message ?? "The email could not be sent.");
+      setNotice(result.message);
+    } catch (err) { setError(err instanceof Error ? err.message : "The email could not be sent."); }
+    finally { setBusy(false); }
+  }
   const money = (value: string) => new Intl.NumberFormat("en-ZA", { style: "currency", currency: statement?.currency ?? "ZAR" }).format(Number(value));
   async function load() {
     setBusy(true); setError(""); setStatement(null);
@@ -28,14 +40,17 @@ export function AccountStatementWorkspace({ accountId }: { accountId: string }) 
     <div className="statement-controls">
       <Link href={`/operations/accounts?accountId=${encodeURIComponent(accountId)}`}>← Back to accounts</Link>
       <h1>Everything accounted for.</h1>
-      <p>Pull an account statement for any period. No charges are created and nothing is sent to the customer.</p>
+      <p>View or download a statement without creating charges. Email delivery requires a separate confirmation and uses the customer's verified email.</p>
       <form onSubmit={event => { event.preventDefault(); void load(); }} className="statement-filters">
-        <label>From<input type="date" value={from} required onChange={event => { setFrom(event.target.value); setStatement(null); }} /></label>
-        <label>To<input type="date" value={to} min={from} required onChange={event => { setTo(event.target.value); setStatement(null); }} /></label>
+        <label>From<input type="date" disabled={busy} value={from} required onChange={event => { setFrom(event.target.value); setStatement(null); }} /></label>
+        <label>To<input type="date" disabled={busy} value={to} min={from} required onChange={event => { setTo(event.target.value); setStatement(null); }} /></label>
         <button className="button" disabled={busy}>{busy ? "Preparing…" : "View statement"}</button>
-        {statement && <button type="button" className="button button-secondary" onClick={() => window.print()}>Print / save as PDF</button>}
+        {statement && <a className="button button-secondary" href={`/api/v1/accounts/${encodeURIComponent(accountId)}/statement?${new URLSearchParams({ from: statement.from, to: statement.to, format: "pdf" })}`}>Download PDF</a>}
+        {statement && <button type="button" className="button button-secondary" onClick={() => window.print()}>Print</button>}
+        {statement && <button type="button" disabled={busy} className="button button-secondary" onClick={() => void emailStatement()}>Email secure link</button>}
       </form>
       {error && <p role="alert">{error}</p>}
+      {notice && <p role="status">{notice}</p>}
     </div>
     {statement && <article className="statement-paper">
       <header><strong className="statement-brand">STOR24</strong><span>ACCOUNT STATEMENT</span></header>
