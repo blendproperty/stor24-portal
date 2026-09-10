@@ -25,6 +25,7 @@ services:
         format: raw
     environment:
       NODE_ENV: production
+      TENANT_PORTAL_ORGANISATION_SLUG: ${TENANT_PORTAL_ORGANISATION_SLUG:-stor24}
     ports:
       - "127.0.0.1:${APP_PORT:-3014}:3000"
     labels:

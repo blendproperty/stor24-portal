@@ -6,6 +6,8 @@ const publicPagePrefixes = ["/login", "/forgot-password", "/reset-password/", "/
 const publicApiPrefixes = ["/api/health", "/api/auth/login", "/api/auth/mfa/verify", "/api/auth/setup", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/public/v1/", "/api/webhooks/blendsign", "/api/webhooks/netcash", "/api/webhooks/twilio/", "/api/v1/invitations/accept", "/api/v1/webhooks/inbound/", "/api/v1/billing/run-monthly"];
 
 export function isPublicPathname(pathname: string) {
+  // Tenant APIs enforce separate tenant sessions; never accept the staff cookie as tenant authentication.
+  if (pathname === "/my" || pathname.startsWith("/api/tenant/")) return true;
   return publicPagePrefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix)) ||
     publicApiPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix));
 }

@@ -789,6 +789,31 @@ model RateLimitBucket {
   @@index([resetAt])
 }
 
+// Tenant authentication is intentionally separate from staff sessions/roles.
+model TenantPortalChallenge {
+  id             String   @id
+  organisationId String
+  email          String
+  codeHash       String
+  customerIds    String[]
+  attempts       Int      @default(0)
+  expiresAt      DateTime
+  consumedAt     DateTime?
+  createdAt      DateTime @default(now())
+  @@index([expiresAt])
+}
+
+model TenantPortalSession {
+  tokenHash      String   @id
+  organisationId String
+  email          String
+  customerIds    String[]
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  createdAt      DateTime @default(now())
+  @@index([expiresAt])
+}
+
 model Role {
   id             String           @id @default(cuid())
   organisationId String
