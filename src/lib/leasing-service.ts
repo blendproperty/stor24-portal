@@ -118,7 +118,7 @@ export async function listLeasing(scope: RequestScope) {
         },
         reservations: {
           where: relatedFacilityWhere,
-          include: { facility: true, unit: true, publicLease: { select: { id: true, status: true, version: true, paymentMethod: true, signedAt: true, signedPdfSha256: true } } },
+          include: { facility: true, unit: true, publicLease: { select: { id: true, status: true, version: true, paymentMethod: true, signedAt: true, signedPdfSha256: true, mandate: { select: { status: true, reference: true, signedPdfSha256: true } } } } },
           orderBy: { updatedAt: "desc" },
           take: 10,
         },
