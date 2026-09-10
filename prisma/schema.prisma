@@ -459,6 +459,8 @@ model PublicReservationLease {
   signedAt           DateTime?
   signedPdf          Bytes?
   signedPdfSha256    String?
+  debitOrderPreferences Json?
+  debitOrderRequestedAt DateTime?
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
 
