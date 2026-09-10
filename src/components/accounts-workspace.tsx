@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRightLeft,
+  ArrowLeft,
+  ChevronRight,
   CreditCard,
   DoorOpen,
   Download,
@@ -101,6 +103,8 @@ export function AccountsWorkspace({
 }) {
   const [data, setData] = useState<Data | null>(null);
   const [selectedId, setSelectedId] = useState("");
+  const [detailOpen, setDetailOpen] = useState(Boolean(initialAccountId || initialDocumentId));
+  const detailRef = useRef<HTMLElement>(null);
   const [search, setSearch] = useState("");
   const [dialog, setDialog] = useState<Dialog>(null);
   const [paymentReference, setPaymentReference] = useState("");
@@ -276,11 +280,11 @@ export function AccountsWorkspace({
         ].map(([label, value]) => (
           <div className="summary-cell" key={label}>
             <span>{label}</span>
-            <strong>{value}</strong>
+            <strong>{data ? value : "—"}</strong>
           </div>
         ))}
       </section>
-      <section className="accounts-layout">
+      <section className={`accounts-layout${detailOpen ? " account-open" : ""}`}>
         <aside className="panel accounts-list">
           <label className="toolbar-search">
             <Search size={16} />
@@ -290,7 +294,7 @@ export function AccountsWorkspace({
               onChange={(event) => setSearch(event.target.value)}
             />
           </label>
-          {visible.length ? (
+          {!data ? <p className="empty-cell" role="status">{error || "Loading accounts…"}</p> : visible.length ? (
             visible.map((account) => (
               <button
                 type="button"
@@ -299,7 +303,16 @@ export function AccountsWorkspace({
                     ? "account-list-row active"
                     : "account-list-row"
                 }
-                onClick={() => setSelectedId(account.id)}
+                aria-label={`Open account ${account.accountNumber} for ${customerName(account)}`}
+                aria-controls="selected-account-details"
+                onClick={() => {
+                  setSelectedId(account.id);
+                  setDetailOpen(true);
+                  requestAnimationFrame(() => {
+                    detailRef.current?.focus({ preventScroll: true });
+                    detailRef.current?.scrollIntoView({ block: "start" });
+                  });
+                }}
                 key={account.id}
               >
                 <span>
@@ -312,13 +325,18 @@ export function AccountsWorkspace({
                 <b className={Number(account.balance) > 0 ? "balance-due" : ""}>
                   {money(account.balance)}
                 </b>
+                <ChevronRight size={18} aria-hidden="true" />
               </button>
             ))
           ) : (
             <p className="empty-cell">No accounts found.</p>
           )}
         </aside>
-        <article className="panel panel-spacious account-detail">
+        <article ref={detailRef} id="selected-account-details" tabIndex={-1} aria-label="Selected account details" className="panel panel-spacious account-detail">
+          <button type="button" className="button button-secondary account-back" onClick={() => {
+            setDetailOpen(false);
+            requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(".account-list-row.active")?.focus());
+          }}><ArrowLeft size={16} /> Back to accounts</button>
           {selected ? (
             <>
               <div className="panel-heading">

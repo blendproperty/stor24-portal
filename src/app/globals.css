@@ -2071,9 +2071,13 @@ a.module-card:focus-visible {
 @media (max-width: 1050px) { .operations-account-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .unit-selector-layout { grid-template-columns: 1fr; } .unit-filter-panel { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 700px) { .operations-account-grid, .unit-filter-panel, .unit-toolbar { grid-template-columns: 1fr; } }
 .accounts-layout { display: grid; grid-template-columns: minmax(300px, .75fr) minmax(0, 2fr); gap: 16px; align-items: start; }
-.accounts-list { overflow: hidden; }
+.accounts-list { overflow: auto; max-height: 75vh; }
+.account-back { display: none; }
+.account-detail { scroll-margin-top: 24px; min-width: 0; }
 .accounts-list .toolbar-search { margin: 14px; }
-.account-list-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; width: 100%; padding: 13px 15px; text-align: left; border: 0; border-top: 1px solid var(--border); background: white; }
+.account-list-row { display: grid; grid-template-columns: minmax(0,1fr) auto auto; align-items: center; gap: 12px; width: 100%; padding: 13px 15px; text-align: left; border: 0; border-top: 1px solid var(--border); background: white; cursor: pointer; }
+.account-list-row:hover { background: #fff4ec; }
+.account-list-row:focus-visible { outline: 3px solid var(--orange); outline-offset: -3px; }
 .account-list-row span { display: grid; gap: 3px; min-width: 0; }
 .account-list-row small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .account-list-row.active { background: #eefbf5; box-shadow: inset 3px 0 var(--green); }
@@ -2086,7 +2090,7 @@ a.module-card:focus-visible {
 .account-info-grid div { display: grid; gap: 4px; padding: 13px; background: white; }
 .account-info-grid span { color: var(--muted); font-size: 11px; font-weight: 750; text-transform: uppercase; }
 .credit-amount { color: var(--green); font-weight: 800; }
-@media (max-width: 980px) { .accounts-layout { grid-template-columns: 1fr; } .account-info-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media (max-width: 980px) { .accounts-layout { grid-template-columns: 1fr; } .account-info-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .accounts-list { max-height: none; } .accounts-layout:not(.account-open) .account-detail { display: none; } .accounts-layout.account-open .accounts-list { display: none; } .account-back { display: inline-flex; margin-bottom: 20px; } }
 @media (max-width: 560px) { .account-info-grid { grid-template-columns: 1fr; } .account-detail .panel-heading { align-items: start; } .account-balance { justify-items: start; } }
 .customer-record-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin: 20px 0; }
 .customer-record-grid > section { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }

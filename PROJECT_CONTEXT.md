@@ -1,5 +1,12 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Accounts click-through correction — 10 September 2026
+
+- **Implementation:** user screenshot confirms 25 accounts; earlier empty-state observation was not a reliable account-count conclusion. Existing narrow layout placed selected details beneath the whole list. Selection now opens a dedicated detail view below 980px with Back to accounts, keyboard focus, scroll positioning and row chevrons. Desktop retains a bounded scrollable list beside details. Loading metrics show a dash and explicit loading text rather than false zeros/empty state. No ledger or payment data changed.
+- **Testing:** source regression coverage added for selection/back responsive states and loading copy. Build and live interaction evidence follows promotion.
+- **Commit/push/merge/deployment:** pending on codex/accounts-click-through.
+- **Live verification:** pending actual row selection, return and statement retrieval in current authenticated session. Prior financial/provider/legal and customer self-service gates remain open.
+
 ## Login brand refresh — 10 September 2026
 
 - **Implementation:** shared authentication layout now uses the approved outlined /brand/stor24-logo-official-email-20260909.svg at its native aspect ratio, replacing legacy white/dark wordmarks. Scoped CSS adds a dark-green brand panel, cream sign-in card, readable fields, accessible dark-on-orange button, mobile logo and reduced-motion handling. Shared setup/recovery layout also receives the presentation. No authentication, MFA, account, provider or financial logic changed. Graphify located auth references; current source verified the legacy asset references.
