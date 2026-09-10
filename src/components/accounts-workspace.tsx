@@ -386,6 +386,9 @@ export function AccountsWorkspace({
                   Move out
                 </button>
               </div>
+              <div className="account-actions">
+                <Link className="button button-secondary" href={`/operations/accounts/${selected.id}/statement`}><Download size={16} /> Account statement</Link>
+              </div>
               <div className="account-info-grid">
                 <div>
                   <span>Security status</span>
