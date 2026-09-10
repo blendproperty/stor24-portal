@@ -13,9 +13,12 @@ try {
   for (const width of [1440, 390]) {
     const page = await browser.newPage({ viewport: { width, height: 900 } });
     let signedIn = false;
-    const data = { accounts: [{ id: "sample-own", accountNumber: "SAMPLE-ONLY", balance: "-10.00", currency: "ZAR", tenancy: null }], documents: [], agreements: [], payments: [{ id: "sample-payment", amount: "10.00", currency: "ZAR", processedAt: "2026-09-10T10:00:00Z", account: { accountNumber: "SAMPLE-ONLY" } }], expiresAt: new Date(Date.now() + 1800000).toISOString() };
+    const accounts = Array.from({ length: 25 }, (_, index) => ({ id: `sample-${index}`, accountNumber: `ST24-SAMPLE-LONG-REFERENCE-${index}`, balance: "-10.00", currency: "ZAR", tenancy: index === 24 ? { status: "ACTIVE", facility: { name: "Midpoint" }, occupancies: [{ unit: { number: "106" } }] } : null }));
+    const data = { accounts, documents: [], agreements: [], payments: [{ id: "sample-payment", amount: "10.00", currency: "ZAR", processedAt: "2026-09-10T10:00:00Z", account: { accountNumber: "SAMPLE-ONLY" } }], expiresAt: new Date(Date.now() + 1800000).toISOString() };
+    let statementPath = "";
     await page.route("**/api/tenant/**", async route => {
       const url = new URL(route.request().url());
+      if (url.pathname.endsWith("/statement")) statementPath = url.pathname;
       if (url.pathname.endsWith("/auth/start")) return route.fulfill({ json: { message: "Synthetic code requested. No email sent." } });
       if (url.pathname.endsWith("/auth/verify")) { signedIn = true; return route.fulfill({ json: { ok: true } }); }
       if (url.pathname.endsWith("/auth/logout")) { signedIn = false; return route.fulfill({ json: { ok: true } }); }
@@ -30,15 +33,28 @@ try {
     await page.getByRole("button", { name: "Email me a sign-in code" }).click();
     await page.getByLabel("Your six-digit code").fill("123456");
     await page.getByRole("button", { name: "Open my account" }).click();
-    await page.getByRole("heading", { name: "Everything in its place." }).waitFor();
+    await page.getByRole("heading", { name: "Your space. Sorted." }).waitFor();
+    const selector = page.getByRole("combobox");
+    assert.equal(await selector.inputValue(), "sample-24");
+    assert.equal(await selector.locator("option").count(), 25);
+    assert.equal(await page.locator(".tenant-account-summary").count(), 1);
     await page.getByRole("button", { name: "View statement" }).click();
     await page.getByRole("link", { name: "Download PDF", exact: true }).waitFor();
     assert.match(await page.locator(".tenant-table").innerText(), /Sample payment/);
+    assert.equal(statementPath, "/api/tenant/accounts/sample-24/statement");
+    await selector.selectOption("sample-0");
+    assert.equal(await page.locator(".tenant-table").count(), 0);
+    await page.getByRole("button", { name: "View statement" }).click();
+    await page.getByRole("link", { name: "Download PDF", exact: true }).waitFor();
+    assert.equal(statementPath, "/api/tenant/accounts/sample-0/statement");
     const dimensions = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
     assert.ok(dimensions.scroll <= dimensions.width + 1, `Page overflow at ${width}`);
     await page.getByRole("button", { name: "Email secure link to me" }).click();
     await page.getByRole("status").filter({ hasText: "Synthetic secure link" }).waitFor();
     await page.screenshot({ path: `output/tenant-ui/account-${width}.png`, fullPage: true });
+    await page.goto(`${base}/my?organisation=stor24&account=sample-12`);
+    await page.getByRole("combobox").waitFor();
+    assert.equal(await page.getByRole("combobox").inputValue(), "sample-12");
     await page.getByRole("button", { name: "Sign out" }).click();
     await page.getByRole("button", { name: "Email me a sign-in code" }).waitFor();
     assert.equal(await page.locator(".tenant-table").count(), 0);
