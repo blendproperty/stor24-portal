@@ -1,0 +1,39 @@
+/* Shared authentication presentation only. No authentication behaviour changes. */
+.portal-entry-refreshed { background: #f5f3ea; }
+.portal-entry-refreshed .portal-brand-panel { padding: clamp(32px, 4.6vw, 72px); background: radial-gradient(ellipse at 90% 80%, #214137 0, transparent 58%), #071411; }
+.portal-entry-refreshed .portal-brand-panel::after { width: 580px; height: 580px; right: -240px; bottom: -220px; border-radius: 54px; transform: rotate(-28deg); border-color: #ff5a0a55; box-shadow: 0 0 0 48px #ffffff04, 0 0 0 96px #ffffff04; pointer-events: none; }
+.portal-entry-refreshed .portal-brand-lockup { gap: 24px; font-size: 10px; color: #bac8c1; }
+.portal-logo-plaque { background: #f5f3ea; padding: 18px 22px; border-radius: 16px; flex: none; }
+.portal-entry-refreshed .portal-official-logo { width: 174px; height: auto; object-fit: contain; }
+.portal-entry-refreshed .portal-brand-copy { padding: 60px 0; }
+.portal-entry-refreshed .portal-brand-copy h1 { font-size: clamp(40px, 4.4vw, 68px); line-height: 1.06; font-weight: 760; letter-spacing: -.045em; }
+.portal-orange-dot { color: #ff5a0a; }
+.portal-entry-refreshed .portal-brand-copy > p:first-child { color: #ff874f; font-size: 11px; }
+.portal-entry-refreshed .portal-brand-description { color: #c2cfc8; max-width: 430px; font-size: 16px; }
+.portal-entry-refreshed .portal-feature-row { gap: 18px; flex-wrap: wrap; }
+.portal-entry-refreshed .portal-feature-row span { color: #d6e0da; font-size: 12px; }
+.portal-entry-refreshed .portal-security-note { color: #aabcb1; }
+.portal-entry-refreshed .portal-form-panel { background: #f5f3ea; padding: 48px 32px; }
+.portal-entry-refreshed .portal-form-wrap { width: min(100%, 470px); background: #fffefa; padding: clamp(28px, 3.4vw, 48px); border: 1px solid #e4e5da; border-radius: 24px; box-shadow: 0 24px 64px #0714110b; }
+.portal-entry-refreshed .portal-form-wrap h2 { color: #071411; font-size: clamp(30px, 3vw, 38px); line-height: 1.12; font-weight: 750; }
+.portal-entry-refreshed .portal-eyebrow { color: #b43a00; font-size: 11px; }
+.portal-entry-refreshed .portal-intro { color: #56655e; font-size: 15px; margin-bottom: 28px; }
+.portal-entry-refreshed .portal-auth-form label > span { color: #21372d; font-size: 14px; }
+.portal-entry-refreshed .portal-field { min-height: 56px; border-color: #cdd6cf; border-radius: 10px; }
+.portal-entry-refreshed .portal-field input { font-size: 16px; color: #071411; padding: 14px 0; }
+.portal-entry-refreshed .portal-submit { background: #ff5a0a; color: #071411; font-size: 15px; border-radius: 999px; box-shadow: 0 8px 20px #ff5a0a20; }
+.portal-entry-refreshed .portal-submit:hover { background: #ff7838; }
+.portal-entry-refreshed .portal-auth-footer { margin: 0; text-align: center; }
+.portal-entry-refreshed .portal-auth-footer a { color: #21372d; text-decoration: underline; text-underline-offset: 4px; }
+.portal-entry-refreshed .portal-support { color: #52615b; display: flex; justify-content: center; align-items: center; gap: 7px; padding-top: 22px; border-top: 1px solid #e4e5da; margin: 28px 0 0; }
+.portal-help { text-align: center; color: #52615b; font-size: 12px; line-height: 1.6; margin: 12px 0 0; }
+.portal-entry-refreshed :is(button,a,input):focus-visible { outline: 3px solid #a83e0c; outline-offset: 4px; }
+@media (max-width: 1100px) and (min-width: 901px) { .portal-entry-refreshed .portal-brand-lockup { align-items: flex-start; flex-direction: column; } }
+@media (max-width: 900px) {
+  .portal-entry-refreshed { display: block; }
+  .portal-entry-refreshed .portal-brand-panel { display: none; }
+  .portal-entry-refreshed .portal-form-panel { min-height: 100svh; padding: 32px 20px; background: radial-gradient(ellipse at top, #e0e9df, transparent 65%), #f5f3ea; }
+  .portal-entry-refreshed .portal-mobile-brand { display: block; margin-bottom: 34px; }
+  .portal-entry-refreshed .portal-mobile-brand .portal-official-logo { width: 160px; }
+}
+@media (prefers-reduced-motion: reduce) { .portal-entry-refreshed * { transition: none; } }
