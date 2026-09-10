@@ -1,7 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
 import {
-  buildLeaseClauses,
   LEASE_CLAUSE_KEYS,
   LEASE_VERSION,
   renderLeaseDocument,
@@ -9,6 +8,7 @@ import {
   type PublicLeasePaymentMethod,
 } from "@/lib/lease-agreement-content";
 import { renderSignedLeasePdf } from "@/lib/public-lease-pdf";
+import { buildReviewLeaseClauses, renderReviewLeaseDocument, STORAGE_TERMS_VERSION } from "@/lib/storage-terms";
 
 const signingWindowMs = 7 * 24 * 60 * 60 * 1000;
 
@@ -45,9 +45,13 @@ export async function preparePublicReservationLease(reference: string, paymentMe
       contents: (reservation.packageSelection.itemsSnapshot as Array<{ name: string; quantity: number }>).map((item) => `${item.quantity} x ${item.name}`).join(", "),
     } : null,
   };
-  const content = renderLeaseDocument(context);
+  // Keep historical signed agreements on their original renderer, while still
+  // detecting a changed price, goods selection or payment method.
+  const legacySigned = reservation.publicLease?.status === "SIGNED" && reservation.publicLease.version === LEASE_VERSION;
+  if (reservation.publicLease?.status === "SIGNED" && !legacySigned && reservation.publicLease.version !== STORAGE_TERMS_VERSION) return { ok: false as const, code: "SIGNED_LEASE_CHANGED" };
+  const content = legacySigned ? renderLeaseDocument(context) : renderReviewLeaseDocument(context);
   const sha256 = createHash("sha256").update(content).digest("hex");
-  const clauses = buildLeaseClauses(context);
+  const clauses = buildReviewLeaseClauses(context);
   const now = new Date();
 
   if (reservation.publicLease?.status === "SIGNED") {
@@ -60,8 +64,8 @@ export async function preparePublicReservationLease(reference: string, paymentMe
     : randomBytes(32).toString("base64url");
   const lease = await db.publicReservationLease.upsert({
     where: { reservationId: reservation.id },
-    create: { reservationId: reservation.id, version: LEASE_VERSION, paymentMethod, content, clauses, sha256, signingToken: token, expiresAt: publicLeaseExpiry(reservation.holdExpiresAt, now) },
-    update: { status: "READY", version: LEASE_VERSION, paymentMethod, content, clauses, sha256, signingToken: token, expiresAt: publicLeaseExpiry(reservation.holdExpiresAt, now), signerName: null, signerIp: null, signerUserAgent: null, initials: undefined, signedAt: null, signedPdf: null, signedPdfSha256: null },
+    create: { reservationId: reservation.id, version: STORAGE_TERMS_VERSION, paymentMethod, content, clauses, sha256, signingToken: token, expiresAt: publicLeaseExpiry(reservation.holdExpiresAt, now) },
+    update: { status: "READY", version: STORAGE_TERMS_VERSION, paymentMethod, content, clauses, sha256, signingToken: token, expiresAt: publicLeaseExpiry(reservation.holdExpiresAt, now), signerName: null, signerIp: null, signerUserAgent: null, initials: undefined, signedAt: null, signedPdf: null, signedPdfSha256: null },
   });
   await db.reservation.update({ where: { id: reservation.id }, data: { paymentMethod } });
   await db.auditEvent.create({ data: { organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, action: "public_lease.prepared", entityType: "PublicReservationLease", entityId: lease.id, requestId: reservation.idempotencyKey, after: { reservationId: reservation.id, version: lease.version, paymentMethod, sha256: lease.sha256, expiresAt: lease.expiresAt.toISOString() } } });
@@ -82,6 +86,7 @@ export async function getPublicReservationLease(token: string) {
     version: lease.version,
     sha256: lease.sha256,
     content: lease.content,
+    requiresTermsAcceptance: lease.version === STORAGE_TERMS_VERSION,
     clauses: lease.clauses,
     expiresAt: lease.expiresAt.toISOString(),
     signedAt: lease.signedAt?.toISOString() ?? null,
@@ -100,7 +105,7 @@ export async function getPublicReservationLease(token: string) {
   };
 }
 
-export async function completePublicReservationLease(token: string, input: { signerName: string; initials: LeaseClauseKey[]; signerIp: string | null; signerUserAgent: string | null }) {
+export async function completePublicReservationLease(token: string, input: { signerName: string; initials: LeaseClauseKey[]; signerIp: string | null; signerUserAgent: string | null; termsAccepted?: boolean; acceptedSha256?: string }) {
   if (LEASE_CLAUSE_KEYS.some((key) => !input.initials.includes(key))) throw new Error("VALIDATION_ERROR");
   return db.$transaction(async (tx) => {
     const lease = await tx.publicReservationLease.findUnique({ where: { signingToken: token }, include: { reservation: { include: { customer: true } } } });
@@ -108,8 +113,9 @@ export async function completePublicReservationLease(token: string, input: { sig
     if (lease.status === "SIGNED") return { reference: lease.reservation.publicReference, status: "SIGNED" as const, idempotent: true };
     if (lease.status !== "READY" || lease.reservation.status !== "ACTIVE") throw new Error("NOT_FOUND");
     if (lease.expiresAt < new Date()) throw new Error("EXPIRED");
+    if (lease.version === STORAGE_TERMS_VERSION && (input.termsAccepted !== true || input.acceptedSha256 !== lease.sha256)) throw new Error("VALIDATION_ERROR");
     const signedAt = new Date();
-    const initials = LEASE_CLAUSE_KEYS.map((clauseKey) => ({ clauseKey, initialedAt: signedAt.toISOString() }));
+    const initials = [...LEASE_CLAUSE_KEYS.map((clauseKey) => ({ clauseKey: String(clauseKey), initialedAt: signedAt.toISOString() })), ...(lease.version === STORAGE_TERMS_VERSION ? [{ clauseKey: `full_terms:${lease.version}:${lease.sha256}`, initialedAt: signedAt.toISOString() }] : [])];
     const pdf = await renderSignedLeasePdf({ content: lease.content, reference: lease.reservation.publicReference!, paymentMethod: lease.paymentMethod, signerName: input.signerName, signedAt, sha256: lease.sha256 });
     const signedPdfSha256 = createHash("sha256").update(pdf).digest("hex");
     const changed = await tx.publicReservationLease.updateMany({ where: { id: lease.id, status: "READY", signedAt: null }, data: { status: "SIGNED", signerName: input.signerName, signerIp: input.signerIp, signerUserAgent: input.signerUserAgent, initials, signedAt, signedPdf: Buffer.from(pdf), signedPdfSha256 } });

@@ -1,5 +1,14 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Full storage terms and professional agreement download — 10 September 2026
+
+- **Implementation:** working draft for Brett's legal review. Twenty full terms sections from one CRM source; website /terms and unsigned PDF download, footer link, strengthened eight-clause summary, exact full-text reservation snapshot, separate unchecked acceptance enforced against the displayed SHA-256, and retained acceptance record. Signed downloads contain schedule, full terms and a separately paginated signature record. Existing v3 signed agreements retain their renderer and stored PDF; changed commercial terms still block reuse. Internal BlendSign templates are unchanged. No no-code legal editor is claimed; amendments can be made through this task as a new version.
+- **Testing:** CRM typecheck/build passed; six focused terms tests include real service calls with database stubs for missing/stale acceptance, acceptance recording and legacy resume protection. Seven website Playwright tests passed at 390px/1440px including separate consent and previous booking/payment pacing. Eight-page synthetic sample rendered and every page inspected. Final full-suite, promotion and live checks are recorded separately below.
+- **Commit and push:** pending on codex/full-storage-terms in canonical blendproperty/stor24-portal.
+- **Merge:** pending.
+- **Deployment/configuration:** pending; no database migration, provider configuration, new charge, deposit or VAT uplift.
+- **Live production verification:** pending. Legal must approve wording and proposed 14-calendar-day notice before month-end, reconcile operator identity, VAT and itemised initial charges, deposit/refund obligations and enforcement/privacy processes. This is a review edition for controlled testing, not legal-approved production coverage. Financial, provider, UAT, reconciliation and move-in release gates remain open.
+
 ## Controlled mandate test configuration — 10 September 2026
 
 - **Implementation:** no application code changed. Existing hosted EFT eMandate implementation is now enabled for the configured Blend Property test organisation, not a live merchant. This is not DebiCheck or collection readiness.
