@@ -85,7 +85,7 @@ export function TenantPortal({ organisation, initialAccount, initialFrom, initia
         </div></section>
       </>}
       {error && <p className="tenant-message tenant-error" role="alert">{error}</p>}{notice && <p className="tenant-message" role="status">{notice}</p>}
-      <footer className="tenant-footer"><ShieldCheck size={16} /><span>Private by design. Sessions end after 30 minutes.<br />Need a hand? Contact your STOR24 store.</span></footer>
+      <footer className="tenant-footer"><ShieldCheck size={16} /><span>Private by design. Sessions end after 30 minutes.<br />Need a hand? <a href="https://stor4.srv938083.hstgr.cloud/contact">Contact your STOR24 store.</a></span></footer>
     </div>
   </main>;
 }
