@@ -4,9 +4,9 @@
 
 - **Implementation:** shared authentication layout now uses the approved outlined /brand/stor24-logo-official-email-20260909.svg at its native aspect ratio, replacing legacy white/dark wordmarks. Scoped CSS adds a dark-green brand panel, cream sign-in card, readable fields, accessible dark-on-orange button, mobile logo and reduced-motion handling. Shared setup/recovery layout also receives the presentation. No authentication, MFA, account, provider or financial logic changed. Graphify located auth references; current source verified the legacy asset references.
 - **Testing:** production build/typecheck passed. Local browser screenshots inspected at 1440x1000 and 390x844; mobile DOM width and scroll width both 390; both logo instances loaded the approved SVG. Development-only React CSP warning remains in dev mode; production served checks follow promotion. No credentials submitted or sessions changed.
-- **Commit/push:** codex/login-brand-refresh; promotion evidence follows.
-- **Merge/deployment:** pending.
-- **Live verification:** pending. Prior ledger reconciliation, customer portal, provider, legal and UAT gates remain unchanged.
+- **Commit/push:** a8b604c pushed on codex/login-brand-refresh. Changed-component ESLint also passed.
+- **Merge/deployment:** PR #81 merged as 29b513f4ae2cf2cf11ed62b5020209590e520845. Branch CI 34471246881 and main CI 34471463850 passed. Deployment 34471597883 succeeded; running image verified stor24-crm:29b513f4.
+- **Live verification:** production login renders the refreshed design; desktop screenshot inspected at 1440x1000. Both logo instances loaded the approved SVG. DOM width/scroll width match at 1440 and 390, with mobile fields and recovery link present. Viewport restored; no credentials submitted or MFA/session changes. Local mobile screenshot was visually inspected; final live mobile capture was interrupted by preview-tab cleanup, so no retained live mobile image is claimed. Prior ledger reconciliation, customer portal, provider, legal and UAT gates remain unchanged.
 
 ## Account statement retrieval foundation — 10 September 2026
 
