@@ -676,3 +676,12 @@ A CRM capability is complete only when it is database-backed, scoped, permission
 - **Merge:** not performed.
 - **Deployment and configuration:** not performed; no database migration or environment change is required.
 - **Live production verification:** not performed. After merge and deployment, reopen a product and package at desktop and narrow-screen widths and confirm every label, input, currency prefix, image, stock card and footer action remains readable without collision or clipping.
+## Debit-order journey repair — 10 September 2026
+
+- Implementation: dates are saved on the signed reservation and customer/facility CRM task atomically. Validation rejects invalid dates/days and dates before today/move-in. Signed DEBIT_ORDER, active reservation and expiry gates remain. Website adds explicit accept-all clause selection, editable date preferences, summary/refresh/navigation and removes duplicate PDF prompts. Signed agreement content is unchanged.
+- Testing: both production builds/type checks passed; CRM baseline 207 tests and 7 focused tests passed; 13 public Playwright tests passed with mocked API responses, including desktop/390px persistence, edit, summary, no duplicate download, explicit acceptance and payment/package regressions. Phone screenshot inspected.
+- Commit/push: pending on canonical blendproperty repositories, branch codex/debit-order-journey.
+- Merge: pending.
+- Deployment/configuration: pending; CRM additive migration 20260910110000_debit_order_preferences must deploy first. No credentials, transaction flags or bank configuration changed.
+- Live verification: pending. Actual customer save/readback, signed PDF and payment UAT remain open.
+- Critical unresolved boundary: NOT a full automated mandate implementation. Netcash documents SOAP AddMandate, provider-hosted signing/OTP and a separately configured return; the REST eMandate/DebiCheck scaffold remains unverified. Preferences do not create bank authority, collection, ledger posting, tenancy activation or access. Provider capability, secure callback/reconciliation, approved collection policy/amounts and business sign-off remain required. Official source checked 10 September: https://api.netcash.co.za/inbound-payments/emandate/emandate-synchronous/

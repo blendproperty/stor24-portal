@@ -94,6 +94,9 @@ export async function getPublicReservationLease(token: string) {
     intendedMoveIn: lease.reservation.intendedMoveIn?.toISOString() ?? null,
     paymentMethod: lease.paymentMethod,
     signedPdfAvailable: Boolean(lease.signedPdf && lease.signedPdfSha256),
+    debitOrderPreferences: lease.debitOrderPreferences,
+    debitOrderRequestedAt: lease.debitOrderRequestedAt?.toISOString() ?? null,
+    debitOrderSetupAvailable: lease.reservation.status === "ACTIVE" && lease.expiresAt > new Date(),
   };
 }
 
