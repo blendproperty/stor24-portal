@@ -23,7 +23,19 @@ Operations → Accounts → choose account → Account statement. `ledger.view` 
 - Changing/removing the verified email prevents old sessions from reading that customer's records. Emergency session revocation can set `TenantPortalSession.revokedAt`; no staff self-service revocation screen is included in this release.
 - Ledger opening balances/imports, historical invoices, provider settlement, VAT/legal approval, production charging and staff training remain separate programme gates. This feature does not reconcile accounting data or certify provider settlement.
 
-## Verification
+## Welcome email and resend
+
+After a public agreement is signed, a billing account is created, or a qualifying customer finishes email verification, the application attempts one welcome email per organisation/verified email. Staff move-in simulations do not trigger it. Customers must already have an account or signed public agreement; the email never grants permissions, confirms payment or activates access. There is no bulk backfill on deployment.
+
+In Operations → Accounts → Account statement, use **Send / resend My STOR24 welcome**. It requires `billing.documents.send`, the same account/facility scope as statements, explicit confirmation, and a verified customer email. The recipient cannot be entered or overridden by the browser. A ten-minute database claim/cooldown prevents concurrent and rapid repeat sends. Accepted and failed sends are audited. Failed delivery does not roll back a signed agreement or account; staff can retry after checking the provider. This is not a durable background delivery queue; a process crash or ambiguous provider timeout requires operator review, and exactly-once inbox delivery is not claimed.
+
+Migration `20260910143000_tenant_portal_welcome` adds delivery tracking only. It does not send anything or modify financial records. `scripts/tenant-welcome-preview.ts` renders a synthetic email without sending it.
+
+## Statement branding
+
+Statements are generated from the STOR24 ledger, including recorded Netcash payments; they are not Netcash-issued account statements. Keep STOR24 as the issuer. Netcash's official [logo download centre](https://netcash.co.za/tools/) encourages approved logos on checkout pages, while its [brand guidelines](https://help.netcash.co.za/view-netcash-guidelines/) require external digital marketing assets to receive marketing approval and prohibit unapproved variations. Reviewed 10 September 2026: no published statement-logo requirement was identified. No Netcash logo was added; any proposed statement co-branding needs written confirmation rather than implying Netcash issued or reconciled the statement.
+
+## Verification evidence boundaries
 
 `npm run test` includes cryptographic/scope, OTP single-use/attempt/expiry and session tests. Service tests use isolated database doubles and do not prove live email delivery. `scripts/tenant-portal-browser-check.mjs` exercises synthetic desktop/phone journeys with all tenant API traffic intercepted; supply `TEST_RUNTIME_PACKAGE` for an installed Playwright runtime. The script is localhost-only and sends no email. `scripts/tenant-pdf-preview.ts` generates a synthetic multi-page layout PDF under ignored `output/`.
 

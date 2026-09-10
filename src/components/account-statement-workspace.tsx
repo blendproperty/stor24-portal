@@ -14,6 +14,17 @@ export function AccountStatementWorkspace({ accountId }: { accountId: string }) 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  async function emailWelcome() {
+    if (!window.confirm("Send or resend the My STOR24 welcome email to this customer's verified email address? This does not grant access or confirm payment.")) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const response = await fetch(`/api/v1/accounts/${encodeURIComponent(accountId)}/welcome`, { method: "POST" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error?.message ?? "The welcome email could not be sent.");
+      setNotice(result.message);
+    } catch (err) { setError(err instanceof Error ? err.message : "The welcome email could not be sent."); }
+    finally { setBusy(false); }
+  }
   async function emailStatement() {
     if (!statement || !window.confirm("Email a secure statement link to this customer's verified email address?")) return;
     setBusy(true); setError(""); setNotice("");
@@ -41,6 +52,7 @@ export function AccountStatementWorkspace({ accountId }: { accountId: string }) 
       <Link href={`/operations/accounts?accountId=${encodeURIComponent(accountId)}`}>← Back to accounts</Link>
       <h1>Everything accounted for.</h1>
       <p>View or download a statement without creating charges. Email delivery requires a separate confirmation and uses the customer’s verified email.</p>
+      <button type="button" className="button button-secondary" disabled={busy} onClick={() => void emailWelcome()}>Send / resend My STOR24 welcome</button>
       <form onSubmit={event => { event.preventDefault(); void load(); }} className="statement-filters">
         <label>From<input type="date" disabled={busy} value={from} required onChange={event => { setFrom(event.target.value); setStatement(null); }} /></label>
         <label>To<input type="date" disabled={busy} value={to} min={from} required onChange={event => { setTo(event.target.value); setStatement(null); }} /></label>

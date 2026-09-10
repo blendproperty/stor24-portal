@@ -790,6 +790,17 @@ model RateLimitBucket {
 }
 
 // Tenant authentication is intentionally separate from staff sessions/roles.
+model TenantPortalWelcome {
+  id             String   @id
+  organisationId String
+  email          String
+  sentAt         DateTime?
+  nextAttemptAt  DateTime @default(now())
+  attempts       Int      @default(0)
+  failed         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+}
+
 model TenantPortalChallenge {
   id             String   @id
   organisationId String
