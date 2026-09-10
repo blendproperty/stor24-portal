@@ -40,7 +40,7 @@ export function AccountStatementWorkspace({ accountId }: { accountId: string }) 
     <div className="statement-controls">
       <Link href={`/operations/accounts?accountId=${encodeURIComponent(accountId)}`}>← Back to accounts</Link>
       <h1>Everything accounted for.</h1>
-      <p>View or download a statement without creating charges. Email delivery requires a separate confirmation and uses the customer's verified email.</p>
+      <p>View or download a statement without creating charges. Email delivery requires a separate confirmation and uses the customer’s verified email.</p>
       <form onSubmit={event => { event.preventDefault(); void load(); }} className="statement-filters">
         <label>From<input type="date" disabled={busy} value={from} required onChange={event => { setFrom(event.target.value); setStatement(null); }} /></label>
         <label>To<input type="date" disabled={busy} value={to} min={from} required onChange={event => { setTo(event.target.value); setStatement(null); }} /></label>
