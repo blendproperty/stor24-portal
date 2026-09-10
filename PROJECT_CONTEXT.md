@@ -1,5 +1,15 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## My STOR24 compact account layout — 10 September 2026
+
+- **Implementation:** replaced repeated account cards with one selected-account summary and a native selector retaining every linked account. Valid deep links take precedence; otherwise active/assigned tenancies are preferred. Missing units are explicitly labelled, never invented or silently deleted. Statement state clears on account change. Document library explicitly covers all linked accounts. Responsive controls and high-contrast balance panel; no API, auth, ledger or account mutations.
+- **Testing:** all 251 automated tests passed, typecheck and production build passed, lint zero errors/six existing warnings. Synthetic 25-account browser checks passed at 1440px and 390px: default selection, all 25 options, account switching and scoped statement URL, stale-statement clearing, deep link, email-link action, logout and no page overflow. Screenshots inspected; balance text contrast corrected and browser checks repeated. These fixtures do not prove live authenticated ownership enforcement.
+- **Commit/push:** pending promotion on codex/tenant-account-layout; canonical origin/main confirmed as 5ed25c149b0f7b30588361fce3979196bc3894c1 before changes.
+- **Merge:** pending.
+- **Deployment/configuration:** pending; no migration or configuration changes needed.
+- **Live verification:** pending. User-supplied statement and receipt were rendered and visually inspected: both STOR24-issued, readable, one page; they concern different account references and payment dates (10 September vs 7 September). These are not Netcash-issued statements. Official Netcash branding guidance reviewed; no logo requirement established, no unapproved logo added.
+- **Security/open gates:** My STOR24 uses separate tenant authentication and ownership checks but shares the CRM deployment; not a separate hosted security boundary. Real authenticated tenant cross-account/download/logout UAT, inbox rendering, and all existing legal, provider, financial data, training and approval gates remain open. No financial accounts were merged, removed or relabelled as test accounts.
+
 ## My STOR24 welcome email — 10 September 2026
 
 - **Implementation:** approved STOR24-branded welcome email with secure portal link, passwordless instructions, available-document explanation and store contact. Automatic eligibility checks after committed public signing, verified-email completion and account creation; no bulk backfill. Per-organisation/email delivery tracking and atomic ten-minute cooldown; staff statement screen has explicit send/resend with billing.documents.send and account/facility scope, no arbitrary recipient. Failures are audited and do not roll back business transactions; operator retry remains necessary for crashes/ambiguous provider failure. No payment/activation authority is implied.
