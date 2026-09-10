@@ -1,5 +1,14 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Controlled mandate test configuration — 10 September 2026
+
+- **Implementation:** no application code changed. Existing hosted EFT eMandate implementation is now enabled for the configured Blend Property test organisation, not a live merchant. This is not DebiCheck or collection readiness.
+- **Testing:** user approved proceeding with proposed test-only terms: monthly day 1, 30-day cancellation notice, next ordinary business day, fixed signed monthly rent only; initial rent/deposit/packages separate. Saved first date 2026-10-01 and day 1 on existing signed test booking ST24-20260910-E1C279. Visible customer page and database readback agree; signed monthly rent is R1,000.
+- **Commit and push:** this configuration evidence is promoted on codex/mandate-test-config-evidence. Prior implementation promotion remains recorded below.
+- **Merge:** no new runtime code requires merging; documentation promotion only.
+- **Deployment/configuration:** selected the Netcash test account matching the encrypted CRM merchant configuration. Saved and read back its dedicated Mandate Postback URL as https://stor24-site.srv938083.hstgr.cloud/api/webhooks/netcash/mandate; left Pay Now, ordinary debit and DebiCheck settings unchanged. Backed up the CRM environment securely, added the test-only mandate policy and enabled setup, then recreated only the app using its existing image. Runtime readback confirms the policy and enabled=true; live health/database are ok.
+- **Live production verification:** customer setup displays saved dates and explicit unchecked consent before Prepare my secure mandate. No mandate rows exist yet. User must initiate review and complete bank entry/OTP/signature directly with Netcash. Actual provider creation, return, report verification, separate PDF and failure-path UAT remain pending. No collection, masterfile activation, payment, tenancy or access action was invoked. Test terms are not approved production policy; legal/commercial, provider, reconciliation and move-in release gates remain open.
+
 ## Hosted Netcash EFT mandate integration — 10 September 2026
 
 - **Implementation:** real SOAP AddMandate connector checked against current WSDL; unique reservation-linked mandate session, explicit policy/test-account gates, correlation-only browser return, independent provider report verification, separate server-side mandate-PDF retrieval/storage/hash, scoped customer/staff downloads and first-payment follow-up task. No bank details or keys go to the website; no collection/masterfile/ledger/activation/access operation is enabled. This is standard EFT eMandate, not DebiCheck authentication.
