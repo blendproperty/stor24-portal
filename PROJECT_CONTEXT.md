@@ -1,5 +1,14 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Hosted Netcash EFT mandate integration — 10 September 2026
+
+- **Implementation:** real SOAP AddMandate connector checked against current WSDL; unique reservation-linked mandate session, explicit policy/test-account gates, correlation-only browser return, independent provider report verification, separate server-side mandate-PDF retrieval/storage/hash, scoped customer/staff downloads and first-payment follow-up task. No bank details or keys go to the website; no collection/masterfile/ledger/activation/access operation is enabled. This is standard EFT eMandate, not DebiCheck authentication.
+- **Testing:** all 224 CRM tests pass (11 connector/policy/PDF safety tests and 4 service/return boundary tests added); final type-checked 77-page production build passes. Paired website has 15 passing mocked browser checks at desktop/390px. Focused changed-code lint passes; full local lint found three errors solely in the preserved unrelated untracked `verify-package-ui.cjs` plus six pre-existing warnings. WSDL-read and real test-key report request accepted; immediate asynchronous retrieve returned FILE NOT READY. No real mandate or OTP was created.
+- **Commit and push:** prepared on canonical `blendproperty/stor24-portal`, branch `codex/netcash-hosted-mandate`; promotion evidence follows.
+- **Merge:** not performed at this checkpoint.
+- **Deployment/configuration:** not deployed at this checkpoint. Additive migration `20260910140000_hosted_debit_mandate` required. Mandate setup defaults OFF independently of Pay Now. No provider settings or processing switches were changed.
+- **Live production verification:** NOT complete. Creation, customer OTP/signature, report reconciliation, PDF retrieval/redirect-host compatibility and failure paths require real controlled UAT. Business-approved debit days, cancellation notice, holiday handling and first-payment/deposit/package policy plus Netcash synchronous postback configuration are prerequisites. Current implementation supports individual test-account, fixed monthly rent, same-calendar-year matching first/monthly date, approved days 1–28 only. See `docs/NETCASH_HOSTED_MANDATE_SETUP.md`; existing provider, legal, financial, data, training and activation gates remain open.
+
 ## Package studio navigation and artwork — 9 September 2026
 
 - Implementation: visible Previous/Next carousel controls, keyboard focus and View all products grid; larger catalogue and form text; minimum-width constraints prevent the carousel stretching its parent. Package editor artwork now carries a live name/badge overlay. Customer-ready package rows show artwork with name overlays. A migration fills empty images for the six starter packages with the established isometric STOR24 hero, preserving uploaded images.
