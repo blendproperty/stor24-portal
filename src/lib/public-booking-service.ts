@@ -1,5 +1,6 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { welcomeTenantWhenReady } from "@/lib/tenant-welcome-email";
 import {
   createPublicReference,
   confirmedPublicHoldExpiry,
@@ -412,5 +413,6 @@ export async function verifyPublicReservationEmail(reference: string, code: stri
     db.reservation.update({ where: { id: reservation.id }, data: { verificationCodeHash: null, verificationExpiresAt: null } }),
     db.auditEvent.create({ data: { organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, action: "public_reservation.email_verified", entityType: "Reservation", entityId: reservation.id, requestId: reservation.idempotencyKey, after: { verifiedAt: verifiedAt.toISOString() } } }),
   ]);
+  await welcomeTenantWhenReady(reservation.customerId, reservation.customer.organisationId);
   return { ok: true as const, emailVerifiedAt: verifiedAt.toISOString() };
 }

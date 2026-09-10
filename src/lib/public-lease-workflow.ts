@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
+import { welcomeTenantWhenReady } from "@/lib/tenant-welcome-email";
 import {
   LEASE_CLAUSE_KEYS,
   LEASE_VERSION,
@@ -107,9 +108,11 @@ export async function getPublicReservationLease(token: string) {
 
 export async function completePublicReservationLease(token: string, input: { signerName: string; initials: LeaseClauseKey[]; signerIp: string | null; signerUserAgent: string | null; termsAccepted?: boolean; acceptedSha256?: string }) {
   if (LEASE_CLAUSE_KEYS.some((key) => !input.initials.includes(key))) throw new Error("VALIDATION_ERROR");
-  return db.$transaction(async (tx) => {
+  let recipient: { id: string; organisationId: string } | undefined;
+  const result = await db.$transaction(async (tx) => {
     const lease = await tx.publicReservationLease.findUnique({ where: { signingToken: token }, include: { reservation: { include: { customer: true } } } });
     if (!lease) throw new Error("NOT_FOUND");
+    recipient = lease.reservation.customer;
     if (lease.status === "SIGNED") return { reference: lease.reservation.publicReference, status: "SIGNED" as const, idempotent: true };
     if (lease.status !== "READY" || lease.reservation.status !== "ACTIVE") throw new Error("NOT_FOUND");
     if (lease.expiresAt < new Date()) throw new Error("EXPIRED");
@@ -123,6 +126,8 @@ export async function completePublicReservationLease(token: string, input: { sig
     await tx.auditEvent.create({ data: { organisationId: lease.reservation.customer.organisationId, facilityId: lease.reservation.facilityId, action: "public_lease.signed", entityType: "PublicReservationLease", entityId: lease.id, requestId: lease.reservation.idempotencyKey, after: { reservationId: lease.reservationId, version: lease.version, paymentMethod: lease.paymentMethod, sha256: lease.sha256, signedPdfSha256, signedAt: signedAt.toISOString() } } });
     return { reference: lease.reservation.publicReference, status: "SIGNED" as const, signedAt: signedAt.toISOString(), idempotent: false };
   });
+  if (recipient) await welcomeTenantWhenReady(recipient.id, recipient.organisationId);
+  return result;
 }
 
 export async function publicReservationHasSignedLease(reference: string) {

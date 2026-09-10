@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { welcomeTenantWhenReady } from "@/lib/tenant-welcome-email";
 import { facilityWhere, requireFacility, type RequestScope } from "@/lib/scope";
 import { revokeBiometricAccess } from "@/lib/biometric-access-service";
 import { sendWhatsAppTemplate } from "@/lib/whatsapp";
@@ -590,7 +591,7 @@ export async function moveIn(
   },
 ) {
   await requireFacility(scope, input.facilityId);
-  return db.$transaction(async (tx) => {
+  const result = await db.$transaction(async (tx) => {
     const unit = await tx.unit.findFirst({
       where: {
         id: input.unitId,
@@ -697,6 +698,8 @@ export async function moveIn(
     );
     return { tenancy, document, customer, facility, unit };
   });
+  if (!input.simulation) await welcomeTenantWhenReady(result.customer.id, scope.organisationId);
+  return result;
 }
 
 export type MoveInResult = Awaited<ReturnType<typeof moveIn>>;

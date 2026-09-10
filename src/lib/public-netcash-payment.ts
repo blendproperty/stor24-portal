@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { welcomeTenantWhenReady } from "@/lib/tenant-welcome-email";
 import { createOnceOffCheckout } from "@/lib/payments/netcash-service";
 
 export const NETCASH_SANDBOX_PAYMENT_AMOUNT_ZAR = 10;
@@ -38,6 +39,7 @@ export async function startPublicNetcashSandboxPayment(reference: string, idempo
     update: {},
   });
   if (account.customerId !== reservation.customerId) throw new Error("NETCASH_ACCOUNT_CONFLICT");
+  await welcomeTenantWhenReady(reservation.customerId, reservation.customer.organisationId);
   const checkout = await createOnceOffCheckout(
     reservation.customer.organisationId,
     null,
