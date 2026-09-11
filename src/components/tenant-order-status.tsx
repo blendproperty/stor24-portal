@@ -13,6 +13,19 @@ export function TenantOrderStatus({ orderId }: { orderId: string }) {
   const [order, setOrder] = useState<Order | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(true);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  async function cancel() {
+    if (busy || order?.status !== "AWAITING_PAYMENT") return;
+    setBusy(true);
+    try {
+      const response = await fetch(`/api/tenant/orders/${encodeURIComponent(orderId)}`, { method: "DELETE", cache: "no-store" });
+      const body = await response.json();
+      if (body.data?.status) setOrder(current => current ? { ...current, status: body.data.status } : null);
+      if (!response.ok) throw new Error(body.message || body.error || "Cancellation could not be confirmed. Refresh the order before trying again.");
+      setMessage(body.message); setConfirmCancel(false);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Please refresh the order."); }
+    finally { setBusy(false); }
+  }
   const refresh = useCallback(async () => {
     setBusy(true); setMessage("");
     try {
@@ -32,5 +45,5 @@ export function TenantOrderStatus({ orderId }: { orderId: string }) {
       .finally(() => { if (!controller.signal.aborted) setBusy(false); });
     return () => controller.abort();
   }, [orderId]);
-  return <main className="tenant-shell"><section className="tenant-card"><span className="tenant-eyebrow">MY STOR24 · PACKING SUPPLIES</span><h1>Your order</h1>{order && <><h2>{labels[order.status] || "Contact your store about this order."}</h2><p>{new Intl.NumberFormat("en-ZA", { style: "currency", currency: order.currency }).format(Number(order.total))}</p><ul>{order.items.map((item, index) => <li key={index}>{item.quantity} × {item.name}</li>)}</ul></>}<p role="status">{busy ? "Checking your order…" : message}</p><button disabled={busy} onClick={() => void refresh()}>Refresh order status</button><p><a href="/my">Back to My STOR24 / sign in →</a></p><small>Payment status is confirmed by STOR24, not by the payment return screen. Do not pay again while confirmation is pending.</small></section></main>;
+  return <main className="tenant-shell"><section className="tenant-card"><span className="tenant-eyebrow">MY STOR24 · PACKING SUPPLIES</span><h1>Your order</h1>{order && <><h2>{labels[order.status] || "Contact your store about this order."}</h2><p>{new Intl.NumberFormat("en-ZA", { style: "currency", currency: order.currency }).format(Number(order.total))}</p><ul>{order.items.map((item, index) => <li key={index}>{item.quantity} × {item.name}</li>)}</ul></>}<p role="status">{busy ? "Checking your order…" : message}</p><button disabled={busy} onClick={() => void refresh()}>Refresh order status</button>{order?.status === "AWAITING_PAYMENT" && <div>{confirmCancel ? <><p>Cancel this unpaid order and release its reserved stock? Any payment already in progress will be reviewed if it arrives.</p><button disabled={busy} onClick={() => void cancel()}>Confirm cancellation</button><button disabled={busy} onClick={() => setConfirmCancel(false)}>Keep order</button></> : <button disabled={busy} onClick={() => setConfirmCancel(true)}>Cancel unpaid order</button>}</div>}<p><a href="/my">Back to My STOR24 / sign in →</a></p><small>Payment status is confirmed by STOR24, not by the payment return screen. Do not pay again while confirmation is pending.</small></section></main>;
 }

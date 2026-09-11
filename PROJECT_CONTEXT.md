@@ -2,6 +2,8 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- Recovery PR102 passed checks on0375b4a and merged ase3d9721; main CI/deployment pending. Next increment adds explicit unpaid-order cancellation confirmation on the recovered order page, respecting server-returned status if payment wins the race. No local tests or live cancellation; CI pending and checkout remains disabled.
+
 - Order-recovery increment: pending/review orders now have an owned account-and-unit-scoped endpoint and visible status links on return to the portal, separate from paid purchase history. No browser storage or unsigned payment claims used. Local tests not run; CI pending. This increment is not merged/deployed; existing checkout enablement and provider/UAT gates remain.
 
 ### Promotion update — 11 September 2026
