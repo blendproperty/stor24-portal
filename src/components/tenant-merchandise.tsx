@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 type Product = { id: string; name: string; imageUrl: string | null; category: string; price: string; available: number };
 const money = (value: number) => new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR" }).format(value);
-export function TenantMerchandise({ unitKey, onSaved }: { unitKey: string; onSaved: () => Promise<void> }) {
+export function TenantMerchandise({ unitKey, onSaved, purchaseMode = false }: { unitKey: string; onSaved: () => Promise<void>; purchaseMode?: boolean }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [message, setMessage] = useState("Loading your store’s packing supplies…");
@@ -23,8 +23,9 @@ export function TenantMerchandise({ unitKey, onSaved }: { unitKey: string; onSav
   }, [unitKey]);
   const cents = products.reduce((total, product) => total + Math.round(Number(product.price) * 100) * (quantities[product.id] ?? 0), 0);
   const count = Object.values(quantities).reduce((total, quantity) => total + quantity, 0);
+  if (purchaseMode) return <div className="tenant-purchase-catalogue"><h3>Add products</h3><label>Find packing supplies<input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Boxes, tape, bubble wrap…" /></label><div className="tenant-product-grid">{products.filter(product => `${product.name} ${product.category}`.toLowerCase().includes(search.toLowerCase())).map(product => <article key={product.id}>{product.imageUrl && <Image src={product.imageUrl} width={240} height={180} unoptimized alt={product.name}/>}<h3>{product.name}</h3><p>{money(Number(product.price))}</p><label>Quantity<input type="number" min={0} max={Math.min(100, product.available)} disabled={!product.available} value={quantities[product.id] ?? 0} onChange={event => setQuantities(current => ({ ...current, [product.id]: Math.min(100, product.available, Math.max(0, Math.trunc(Number(event.target.value) || 0))) }))}/></label></article>)}</div><div className="tenant-shop-total"><strong>Your basket · {count} items · {money(cents / 100)}</strong><button disabled>Secure checkout unavailable</button></div><p>Online checkout is not enabled. This basket has not been ordered or charged.</p>{message && <p role="status">{message}</p>}</div>;
   async function submit() {
-    if (busy || submitted || !count) return;
+    if (purchaseMode || busy || submitted || !count) return;
     setBusy(true); setFailed(false); setMessage("");
     requestKey.current ??= crypto.randomUUID();
     try {

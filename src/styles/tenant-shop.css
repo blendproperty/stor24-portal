@@ -12,3 +12,5 @@
 @media(max-width:480px) { .tenant-product-grid { grid-template-columns:1fr; } .tenant-product-grid img { height:190px; } .tenant-shop-total { padding:16px; } .tenant-shop-total button { width:100%; } }
 .tenant-shop > summary { cursor:pointer; font-size:20px; font-weight:800; padding:8px 0; }
 .tenant-shop[open] > summary { margin-bottom:24px; border-bottom:1px solid #dce3dc; padding-bottom:20px; }
+.tenant-purchase-item { display:flex; align-items:center; gap:14px; margin:12px 0; }
+.tenant-purchase-item img { object-fit:contain; border-radius:10px; background:#f5f3ea; }
