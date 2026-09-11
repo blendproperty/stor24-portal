@@ -21,6 +21,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://ci:ci@localhost:5432/merchandise_ci
       MERCHANDISE_DB_TEST: isolated-ci
+      ALLOW_EMPTY_DATABASE_BOOTSTRAP: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,7 +30,5 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run db:generate
-      # Exercise current application transactions independently of the separately
-      # tracked historical migration-order defect. Ephemeral CI database only.
-      - run: npx prisma db push
+      - run: node scripts/bootstrap-empty-database.mjs
       - run: npx tsx --test tests/integration/merchandise-transactions.test.ts
