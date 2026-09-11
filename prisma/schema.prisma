@@ -374,6 +374,7 @@ model Customer {
   tasks                Task[]
   communications       CommunicationLog[]
   biometricEnrollments BiometricEnrollment[]
+  merchandiseRequests  TenantMerchandiseRequest[]
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
@@ -867,6 +868,7 @@ model Task {
   title          String
   description    String?
   status         TaskStatus   @default(OPEN)
+  merchandiseRequest TenantMerchandiseRequest?
   priority       TaskPriority @default(NORMAL)
   dueAt          DateTime?
   completedAt    DateTime?
@@ -994,6 +996,26 @@ model MaintenanceRequest {
 
   @@index([organisationId, facilityId, status, dueAt])
   @@index([unitId, status])
+}
+
+// Customer requests are not payments, invoices or stock reservations.
+// The associated CRM task owns the assisted store follow-up.
+model TenantMerchandiseRequest {
+  id             String   @id @default(cuid())
+  customerId     String
+  customer       Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  unitKey        String
+  unitId         String
+  facilityId     String
+  items          Json
+  total          Decimal  @db.Decimal(14, 2)
+  idempotencyKey  String
+  taskId         String   @unique
+  task           Task     @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  createdAt      DateTime @default(now())
+
+  @@unique([customerId, idempotencyKey])
+  @@index([customerId, unitKey, createdAt])
 }
 
 model Product {

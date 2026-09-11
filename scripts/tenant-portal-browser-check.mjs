@@ -14,7 +14,7 @@ try {
     const page = await browser.newPage({ viewport: { width, height: 900 } });
     let signedIn = false;
     const accounts = Array.from({ length: 25 }, (_, index) => ({ id: `sample-${index}`, accountNumber: `ST24-SAMPLE-LONG-REFERENCE-${index}`, balance: "-10.00", currency: "ZAR", tenancy: index === 24 ? { status: "ACTIVE", facility: { name: "Midpoint" }, occupancies: [{ unit: { number: "106" } }] } : null }));
-    const data = { accounts, documents: [], agreements: [], payments: [{ id: "sample-payment", amount: "10.00", currency: "ZAR", processedAt: "2026-09-10T10:00:00Z", account: { accountNumber: "SAMPLE-ONLY" } }], expiresAt: new Date(Date.now() + 1800000).toISOString() };
+    const data = { accounts, units: [{ key: "account:sample-24", accountId: "sample-24", unitId: "unit-106", number: "106", facilityName: "Midpoint", status: "ACTIVE", reservations: [] }], merchandiseRequests: [], documents: [], agreements: [], payments: [{ id: "sample-payment", accountId: "sample-24", amount: "10.00", currency: "ZAR", processedAt: "2026-09-10T10:00:00Z", account: { accountNumber: "SAMPLE-ONLY" } }], expiresAt: new Date(Date.now() + 1800000).toISOString() };
     let statementPath = "";
     await page.route("**/api/tenant/**", async route => {
       const url = new URL(route.request().url());
@@ -24,6 +24,7 @@ try {
       if (url.pathname.endsWith("/auth/logout")) { signedIn = false; return route.fulfill({ json: { ok: true } }); }
       if (!signedIn) return route.fulfill({ status: 401, json: { error: "Sign in again." } });
       if (url.pathname.endsWith("/accounts")) return route.fulfill({ json: { data } });
+      if (url.pathname.endsWith("/merchandise")) return route.fulfill({ json: { data: { products: [] } } });
       if (url.pathname.endsWith("/statement") && route.request().method() === "POST") return route.fulfill({ json: { message: "Synthetic secure link. No email sent." } });
       if (url.pathname.endsWith("/statement")) return route.fulfill({ json: { data: { accountNumber: "SAMPLE-ONLY", customerName: "Sample Tenant", currency: "ZAR", openingBalance: "0.00", closingBalance: "-10.00", rows: [{ id: "sample", date: "2026-09-10T10:00:00Z", description: "Sample payment", debit: "0.00", credit: "10.00", balance: "-10.00" }] } } });
       return route.fulfill({ status: 404, json: { error: "Fixture not found" } });
@@ -41,15 +42,17 @@ try {
     await page.getByLabel("Your six-digit code").fill("123456");
     await page.getByRole("button", { name: "Open my account" }).click();
     await page.getByRole("heading", { name: "Your space. Sorted." }).waitFor();
-    const selector = page.getByRole("combobox");
-    assert.equal(await selector.inputValue(), "sample-24");
-    assert.equal(await selector.locator("option").count(), 25);
+    const selector = page.getByLabel("My units");
+    assert.equal(await selector.inputValue(), "account:sample-24");
+    assert.equal(await selector.locator("option").count(), 2);
     assert.equal(await page.locator(".tenant-account-summary").count(), 1);
     await page.getByRole("button", { name: "View statement" }).click();
     await page.getByRole("link", { name: "Download PDF", exact: true }).waitFor();
     assert.match(await page.locator(".tenant-table").innerText(), /Sample payment/);
     assert.equal(statementPath, "/api/tenant/accounts/sample-24/statement");
-    await selector.selectOption("sample-0");
+    await selector.selectOption("other");
+    assert.equal(await page.locator(".tenant-account-summary select option").count(), 25);
+    await page.locator(".tenant-account-summary select").selectOption("sample-0");
     assert.equal(await page.locator(".tenant-table").count(), 0);
     await page.getByRole("button", { name: "View statement" }).click();
     await page.getByRole("link", { name: "Download PDF", exact: true }).waitFor();
@@ -60,8 +63,8 @@ try {
     await page.getByRole("status").filter({ hasText: "Synthetic secure link" }).waitFor();
     await page.screenshot({ path: `output/tenant-ui/account-${width}.png`, fullPage: true });
     await page.goto(`${base}/my?organisation=stor24&account=sample-12`);
-    await page.getByRole("combobox").waitFor();
-    assert.equal(await page.getByRole("combobox").inputValue(), "sample-12");
+    await page.locator(".tenant-account-summary select").waitFor();
+    assert.equal(await page.locator(".tenant-account-summary select").inputValue(), "sample-12");
     await page.getByRole("button", { name: "Sign out" }).click();
     await page.getByRole("button", { name: "Email me a sign-in code" }).waitFor();
     assert.equal(await page.locator(".tenant-table").count(), 0);
