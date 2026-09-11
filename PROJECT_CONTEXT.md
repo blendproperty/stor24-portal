@@ -2,6 +2,8 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- Draft main portal replacement after 8185d4a: mounts unit-scoped Your purchases/Buy more supplies catalogue and removes the old request-entry control. Earlier booking selections/requests remain in a collapsed history section explicitly not represented as paid orders. New checkout remains server-disabled; no production config changed. CI pending, no local tests/merge/deployment. Provider return routing, reload recovery, worker configuration and full UAT remain gates.
+
 - CI recovery confirmed: cd1134f passed 34586460881. Staff merchandise workspace now mounts the paid-order fulfilment queue in a separate collection/delivery panel, backed by inventory.manage/facility-scoped API. No actual fulfilment executed. New increment CI pending; no local tests, merge/deployment or config change. Customer top-level replacement/provider returns and integrated verification remain outstanding.
 
 - CI 34585861763 failed on 8b64674: React effect-state lint errors in the new queue/status controls. Corrected initial loading to asynchronous fetch callbacks with abort cleanup rather than calling state-mutating refresh functions directly from effects. Replacement CI pending; no local tests, merge, deployment or live mutation. Staff queue mounting deferred until checks pass.
