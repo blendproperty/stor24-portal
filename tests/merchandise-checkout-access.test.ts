@@ -10,6 +10,14 @@ const config = {
   TENANT_MERCHANDISE_TEST_EMAIL: "tester@example.com",
   TENANT_MERCHANDISE_TEST_EXPIRES_AT: "2026-09-11T18:00:00Z",
 };
+test("known pre-checkout failures unlock the basket without clearing retry protection", () => {
+  const client = readFileSync("src/components/tenant-checkout.tsx", "utf8");
+  const route = readFileSync("src/app/api/tenant/orders/route.ts", "utf8");
+  assert.ok(client.includes("body.checkoutNotStarted === true"));
+  assert.ok(client.includes("!body.data?.orderId"));
+  assert.ok(route.includes("checkoutNotStarted: true"));
+  assert.ok(client.includes("attempt.current?.basket !== basket"));
+});
 test("checkout is off by default; global approval remains explicit", () => {
   assert.equal(merchandiseCheckoutEnabled(session, {}, now), false);
   assert.equal(merchandiseCheckoutEnabled(session, { TENANT_MERCHANDISE_CHECKOUT_ENABLED: "false" }, now), false);
