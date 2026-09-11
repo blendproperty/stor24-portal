@@ -3,16 +3,16 @@
 ## Merchandise readiness reconciliation — 11 September 2026
 
 - Implementation: reconciled old PR #56 with later product/package editing and audited stock movement implementation. Retains existing catalogue/stock capabilities; corrects full financial returns, retail reporting and counter POS labels to Planned. These are status corrections, not implementation of those workflows. Canonical issue #55 remains the operational inventory backlog.
-- Testing: source inspection only; no new local tests at user request. Required CI and customer/operator verification remain pending.
-- Commit/push: prepared on codex/merchandise-readiness-reconcile from origin/main fbe70926949e14825b581f01e19c41ef8e5b5367. Merge/deployment: pending. Live verification: not performed.
+- Testing: no new local tests at user request. Branch CI 34565710219 and main CI 34566007075 passed. Customer/operator verification remains pending.
+- Commit/push: 2cb0b1ee04c87dba8c38c53f02076ad4430e0754 pushed on codex/merchandise-readiness-reconcile. PR #95 merged as a4ac309e9c468f34ce48df3b711b86dbd0c66c01; deployment 34566099902 succeeded. Live verification: not performed; workflow success is not UAT. PR #56 is superseded by this reconciliation, not proof of complete POS implementation; issue #55 remains open.
 - Open gates: supplier/receiving/stocktake/transfer controls, full POS and linked financial returns/reporting must not be inferred complete from catalogue functionality. Existing tax, provider, accounting, policy, training and UAT approvals remain required. No stock, customer or financial records changed.
 
 ## Remaining admin updates — 11 September 2026
 
 - Implementation: carries forward the still-missing changes from existing PRs #22 and #23 onto current main: bounded production-health retries with non-cancelling concurrency, and owner-only staff MFA enrollment visibility. Health response criteria unchanged; only enabledAt is selected for MFA, no secrets or enrollment mutation. Older merchandise tracking PR #56 is not blindly merged because subsequent merchandise implementation supersedes parts of its status claims.
 - Testing: no additional local tests at the user's explicit request. Required GitHub CI remains the promotion gate; live monitor-cycle observation and staff UI UAT pending.
-- Commit/push: prepared on codex/remaining-admin-updates from current origin/main f9d9bbdd16c6a692bd385a3010f20c9159a6491b; promotion evidence follows.
-- Merge: pending CI. Deployment/configuration: pending; no schema or secrets changes.
+- Commit/push: da51daf pushed on codex/remaining-admin-updates; required branch checks passed before merge.
+- Merge: PR #94 merged as fbe70926949e14825b581f01e19c41ef8e5b5367. Main CI 34565417095 and deployment 34565516171 succeeded. No schema or secrets changes. Superseded PRs #22/#23 closed with this evidence on 11 September.
 - Live verification: not performed. All previous financial/provider/legal/data/training/UAT gates remain open. This does not claim the full backlog complete.
 
 ## My STOR24 branded sign-in — 11 September 2026
