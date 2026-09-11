@@ -2,6 +2,8 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- Payment verification increment, 11 September 2026: isolated database checks added for unverified/reference/amount/currency mismatch rejection without posting, pending-to-success transitions, preservation of an existing account balance, and later decline/cancellation not undoing a paid order. CI pending; no live provider call, charge or customer stock mutation. This is internal settlement verification, not end-to-end Netcash proof. Receipt authorisation, fulfilment concurrency and authenticated/provider UAT remain open; checkout stays disabled. Branch starts from current main to avoid the previous squash-merge conflict.
+
 - Verification evidence, 11 September 2026: PR112 head3f4f32f passed migration-backed transactions103258290614 and standard validate103258290546. All new expiry scenarios below passed in isolated PostgreSQL CI. Implementation/test commit pushed; merge and deployment pending at this record. This is database verification, not provider or authenticated customer UAT, and changes no runtime/configuration. Existing live checkout remains disabled; all outstanding launch gates preserved.
 
 - Promotion note, 11 September 2026: PR112 merged as ffb7ff2. PR113 reconciled with latest main by merging history and preserving both evidence entries; no runtime changes. This evidence-only promotion awaits CI/merge/deployment. Future follow-ups start from current main rather than reusing squash-merged branches. All provider/UAT/configuration gates above remain unchanged.

@@ -23,6 +23,35 @@ test("isolated PostgreSQL merchandise settlement and cancellation", async t => {
     return { account, product, order, payment, session: { organisationId: org.id, email: customer.email!, customerIds: [customer.id] }, verified: { verified: true, accepted: true, reference: payment.id, amount: "20.00", currency: "ZAR" } };
   }
   try {
+    await t.test("unverified or mismatched payment cannot post money or change stock", async () => {
+      const f = await fixture();
+      for (const invalid of [
+        { ...f.verified, verified: false },
+        { ...f.verified, reference: "another-payment" },
+        { ...f.verified, amount: "19.99" },
+        { ...f.verified, currency: "USD" },
+      ]) await assert.rejects(settleVerifiedMerchandisePayment(f.payment.id, invalid), /MERCHANDISE_PAYMENT_MISMATCH/);
+      assert.equal(await db.ledgerEntry.count({ where: { accountId: f.account.id } }), 0);
+      assert.equal((await db.payment.findUniqueOrThrow({ where: { id: f.payment.id } })).status, "PENDING");
+      assert.equal((await db.merchandiseOrder.findUniqueOrThrow({ where: { id: f.order.id } })).status, "AWAITING_PAYMENT");
+      assert.equal((await db.product.findUniqueOrThrow({ where: { id: f.product.id } })).quantityReserved, 2);
+    });
+    await t.test("pending confirmation then success preserves existing balance and posts once", async () => {
+      const f = await fixture();
+      await db.account.update({ where: { id: f.account.id }, data: { balance: "125.00" } });
+      await settleVerifiedMerchandisePayment(f.payment.id, { ...f.verified, accepted: false });
+      assert.equal(await db.ledgerEntry.count({ where: { accountId: f.account.id } }), 0);
+      assert.equal((await db.payment.findUniqueOrThrow({ where: { id: f.payment.id } })).status, "PENDING");
+      await settleVerifiedMerchandisePayment(f.payment.id, f.verified);
+      // Later non-success and cancellation must not undo a verified successful payment.
+      await settleVerifiedMerchandisePayment(f.payment.id, { ...f.verified, accepted: false });
+      await cancelTenantMerchandise(f.session, f.order.id);
+      assert.equal((await db.account.findUniqueOrThrow({ where: { id: f.account.id } })).balance.toFixed(2), "125.00");
+      assert.equal(await db.ledgerEntry.count({ where: { accountId: f.account.id } }), 2);
+      assert.equal((await db.payment.findUniqueOrThrow({ where: { id: f.payment.id } })).status, "SUCCEEDED");
+      assert.equal((await db.merchandiseOrder.findUniqueOrThrow({ where: { id: f.order.id } })).status, "PAID");
+      assert.equal((await db.product.findUniqueOrThrow({ where: { id: f.product.id } })).quantityReserved, 2);
+    });
     await t.test("concurrent expiry releases a hold exactly once and late payment becomes credit", async () => {
       const f = await fixture();
       const now = new Date("2020-01-02T00:00:00Z");
