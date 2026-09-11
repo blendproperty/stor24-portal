@@ -47,7 +47,7 @@ test("PDF renderer produces a branded paginated document", async () => {
   assert.match(pdf.getTitle()!, /STOR24/);
 });
 test("all tenant data routes authenticate and apply customer scope", () => {
-  for (const file of ["accounts/route.ts", "accounts/[id]/statement/route.ts", "documents/[kind]/[id]/route.ts"]) {
+  for (const file of ["accounts/route.ts", "accounts/[id]/statement/route.ts", "documents/[kind]/[id]/route.ts", "merchandise/route.ts"]) {
     const source = readFileSync(`src/app/api/tenant/${file}`, "utf8");
     assert.match(source, /await requireTenantSession\(\)/);
     assert.match(source, /tenantCustomerScope\(session\)/);

@@ -10,3 +10,5 @@
 .tenant-portal a[href="#tenant-shop"] { display:inline-block; color:#a73600; font-weight:800; padding:12px 0; }
 .tenant-portal button:disabled { cursor:not-allowed; }
 @media(max-width:480px) { .tenant-product-grid { grid-template-columns:1fr; } .tenant-product-grid img { height:190px; } .tenant-shop-total { padding:16px; } .tenant-shop-total button { width:100%; } }
+.tenant-shop > summary { cursor:pointer; font-size:20px; font-weight:800; padding:8px 0; }
+.tenant-shop[open] > summary { margin-bottom:24px; border-bottom:1px solid #dce3dc; padding-bottom:20px; }
