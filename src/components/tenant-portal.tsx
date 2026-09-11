@@ -59,8 +59,14 @@ export function TenantPortal({ organisation, initialAccount, initialFrom, initia
   return <main className="tenant-portal">
     <header className="tenant-header"><Image src="/brand/stor24-logo-official-email-20260909.svg" width={183} height={48} alt="STOR24" priority unoptimized /><span>MY STOR24</span>{data && <button onClick={() => void act(async () => { await request("/api/tenant/auth/logout", {}); setData(null); setStatement(null); setCodeSent(false); setCode(""); })} disabled={busy}><LogOut size={16} /> Sign out</button>}</header>
     <div className="tenant-body">
-      {checking ? <p role="status">Opening your secure space…</p> : !data ? <section className="tenant-login tenant-card">
-        <span className="tenant-eyebrow">A little less admin.</span><h1>Your space.<br />Your account.</h1><p>Statements, payment receipts and agreements. All in one secure place.</p>
+      {checking ? <p role="status">Opening your secure space…</p> : !data ? <div className="tenant-entry">
+        <section className="tenant-entry-story" aria-label="Welcome to My STOR24">
+          <div className="tenant-entry-copy"><span className="tenant-eyebrow">LIFE HAPPENS. WE’VE GOT ROOM.</span><h1>Your space.<br /><span>Less admin.</span><br />More living.</h1><p>Everything for your STOR24 account, neatly packed into one place.</p></div>
+          <Image className="tenant-entry-art" src="/brand/stor24-storage-unit-hero.png" width={1536} height={1024} alt="STOR24 storage unit with an orange door and neatly packed moving boxes" priority />
+          <div className="tenant-entry-caption"><span>SPACE FOR LIFE IN MOTION.</span><span>MY STOR24 ↗</span></div>
+        </section>
+        <section className="tenant-login tenant-card">
+        <span className="tenant-eyebrow">YOUR PERSONAL STOR24 SPACE</span><h2>{codeSent ? "Check your inbox." : "Welcome back."}</h2><p>{codeSent ? "Pop in your six-digit code and you’re in." : "Let’s get you sorted. Sign in to find your statements, receipts and agreements."}</p>
         {!organisation ? <p role="alert">Please use the My STOR24 link supplied by your store. It identifies the organisation your account belongs to.</p> : <form onSubmit={event => { event.preventDefault(); void act(async () => {
           if (!codeSent) { const result = await request("/api/tenant/auth/start", { organisation, email }); setNotice(result.message); setCodeSent(true); }
           else { await request("/api/tenant/auth/verify", { code }); const result = await request("/api/tenant/accounts"); setData(result.data); setAccountId(preferredTenantAccount(result.data.accounts, initialAccount)); setCode(""); }
@@ -71,7 +77,8 @@ export function TenantPortal({ organisation, initialAccount, initialFrom, initia
           {codeSent && <button type="button" disabled={busy} onClick={() => { setCodeSent(false); setCode(""); setNotice(""); }}>Use another email / request a new code</button>}
         </form>}
         <p className="tenant-security"><ShieldCheck size={17} /> Your code expires in 10 minutes. Never share it.</p>
-      </section> : <>
+        <div className="tenant-entry-benefits"><span><FileText size={18} /> Statements, without the paperwork.</span><span><Download size={18} /> Your documents, ready when you are.</span><span><ShieldCheck size={18} /> Your account. Your eyes only.</span></div>
+      </section></div> : <>
         <div className="tenant-welcome"><span className="tenant-eyebrow">Welcome to your space</span><h1>Your space. Sorted.</h1><p>Your account, statements and documents. A little less admin.</p></div>
         {selectedAccount && <section className="tenant-account-summary" aria-label="Selected account">
           <div className="tenant-account-main"><span className="tenant-eyebrow">YOUR STOR24 ACCOUNT</span><h2>{tenantAccountLabel(selectedAccount)}</h2><p className="tenant-account-reference">Account reference · {selectedAccount.accountNumber}</p>

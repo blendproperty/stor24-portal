@@ -1,5 +1,14 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## My STOR24 branded sign-in — 11 September 2026
+
+- Implementation: dark-green/orange welcome panel with existing STOR24 storage-unit artwork, warmer welcome/code-entry copy, document benefits and compact mobile composition. Tenant authentication and financial APIs unchanged.
+- Testing: initial 1440px/390px synthetic browser checks passed and screenshots were inspected before the last mobile refinement. 251 tests and typecheck passed on 10 September; production build and final mobile rerun were interrupted. User requested push without further local tests on 11 September. Final mobile/build validation and live customer UAT remain outstanding; do not treat this as fully verified.
+- Commit/push: prepared on codex/tenant-welcome-design against confirmed origin/main 89013cde4812aae776d3e2a902d2033e7691c64a; promotion evidence follows.
+- Merge: pending required release checks.
+- Deployment/configuration: pending; no migration or configuration changes.
+- Live production verification: not performed for this redesign. Existing authentication, financial, provider, legal, data, training and approval gates remain open. No emails, bookings or financial changes made by this slice.
+
 ## My STOR24 compact account layout — 10 September 2026
 
 - **Implementation:** replaced repeated account cards with one selected-account summary and a native selector retaining every linked account. Valid deep links take precedence; otherwise active/assigned tenancies are preferred. Missing units are explicitly labelled, never invented or silently deleted. Statement state clears on account change. Document library explicitly covers all linked accounts. Responsive controls and high-contrast balance panel; no API, auth, ledger or account mutations.

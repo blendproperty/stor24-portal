@@ -30,7 +30,14 @@ try {
     });
     await page.goto(`${base}/my?organisation=stor24`);
     await page.getByLabel("Email on your STOR24 account").fill("sample@example.invalid");
+    await page.getByRole("heading", { name: "Welcome back." }).waitFor();
+    await page.locator(".tenant-entry-art").evaluate(image => image.decode());
+    assert.ok(await page.locator(".tenant-entry-art").evaluate(image => image.naturalWidth > 0));
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
+    await page.screenshot({ path: `output/tenant-ui/login-${width}.png`, fullPage: true });
     await page.getByRole("button", { name: "Email me a sign-in code" }).click();
+    await page.getByRole("heading", { name: "Check your inbox." }).waitFor();
+    await page.screenshot({ path: `output/tenant-ui/code-${width}.png`, fullPage: true });
     await page.getByLabel("Your six-digit code").fill("123456");
     await page.getByRole("button", { name: "Open my account" }).click();
     await page.getByRole("heading", { name: "Your space. Sorted." }).waitFor();
