@@ -2,6 +2,8 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- Draft increment after 7cea2a6: added owned order-status GET and same-origin, rate-limited cancellation DELETE. Status is read from persisted orders, never browser payment-return claims; paid/fulfilled orders cannot be cancelled here. Responses expose only order summary fields and remain private/no-store. Local tests not run; CI pending. PR100 remains unmerged and undeployed, checkout UI/payment-form linkage still outstanding, production charging unchanged.
+
 - Draft continuation: added dedicated-secret authenticated stock-expiry worker endpoint and explicit operator/release-gate documentation. It does not install a scheduler or set credentials, and remains usable for existing holds if new checkout is disabled. No local tests, production configuration, merge, deployment or live order changes; CI pending for this increment. Full tenant checkout/return routing and mounted purchase UI remain unfinished. See docs/merchandise-checkout-release-gates.md.
 
 - Next checkout slice on codex/tenant-merchandise-checkout: pure order/payment state rules and tests prepared. Exact verified amount/currency/reference required; duplicate or later declined events cannot regress paid state; late payments after stock release enter review, never automatic fulfilment. This is an unwired foundation, NOT an available checkout. Persistent order/stock transactions, verified webhook integration, returns, staff fulfilment and tenant checkout UI remain to implement. Local tests not run; CI pending. No deployment or charging changes for this slice.
