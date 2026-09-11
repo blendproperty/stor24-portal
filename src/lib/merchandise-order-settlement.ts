@@ -34,7 +34,9 @@ export async function settleVerifiedMerchandisePayment(paymentId: string, verifi
 export async function expireMerchandiseOrders(now = new Date()) {
   const expired = await db.merchandiseOrder.findMany({ where: { status: "AWAITING_PAYMENT", expiresAt: { lte: now } }, select: { id: true }, orderBy: { expiresAt: "asc" }, take: 100 });
   let count = 0;
+  let failures = 0;
   for (const candidate of expired) {
+    try {
     const changed = await db.$transaction(async tx => {
       await tx.$queryRaw`SELECT "id" FROM "MerchandiseOrder" WHERE "id" = ${candidate.id} FOR UPDATE`;
       const order = await tx.merchandiseOrder.findUniqueOrThrow({ where: { id: candidate.id }, include: { items: true } });
@@ -48,6 +50,13 @@ export async function expireMerchandiseOrders(now = new Date()) {
       return true;
     });
     if (changed) count++;
+    } catch {
+      // A single inconsistent order must not keep every later valid hold reserved.
+      // Its transaction rolls back; leave it unchanged for investigation/retry.
+      failures++;
+      console.error("Merchandise expiry requires review", { orderId: candidate.id });
+    }
   }
+  if (failures) throw new Error("MERCHANDISE_EXPIRY_PARTIAL_FAILURE");
   return count;
 }
