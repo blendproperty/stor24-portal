@@ -8,7 +8,7 @@ export async function GET() {
     const session = await requireTenantSession();
     const customer = tenantCustomerScope(session);
     const accounts = await db.account.findMany({ where: { customer }, select: {
-      id: true, accountNumber: true, balance: true, currency: true,
+      id: true, customerId: true, accountNumber: true, balance: true, currency: true,
       tenancy: { select: { id: true, status: true, facility: { select: { name: true } }, occupancies: { where: { status: { in: ["PENDING", "ACTIVE", "NOTICE_GIVEN"] } }, orderBy: { startDate: "desc" }, take: 1, select: { unit: { select: { id: true, number: true } } } } } },
     }, orderBy: { createdAt: "desc" } });
     const documents = await db.document.findMany({ where: { tenancy: { customer }, OR: [{ type: "LEASE_AGREEMENT", provider: "BLENDSIGN", status: "SIGNED", externalId: { not: null } }, { type: { in: ["INVOICE", "STATEMENT"] }, status: "SENT", content: { not: null } }] }, select: { id: true, type: true, createdAt: true, tenancy: { select: { accountId: true } } }, orderBy: { createdAt: "desc" }, take: 200 });
@@ -16,7 +16,7 @@ export async function GET() {
     const payments = await db.payment.findMany({ where: { account: { customer }, status: "SUCCEEDED" }, select: { id: true, accountId: true, amount: true, currency: true, processedAt: true, createdAt: true, account: { select: { accountNumber: true } } }, orderBy: { createdAt: "desc" }, take: 200 });
     const reservations = await db.reservation.findMany({
       where: { customer, OR: [{ publicLease: { status: "SIGNED" } }, { convertedTenancyId: { not: null } }] },
-      select: { id: true, status: true, publicReference: true, unitId: true, unit: { select: { number: true } }, facility: { select: { name: true } }, convertedTenancy: { select: { accountId: true } }, packageSelection: { select: { packageName: true, status: true, priceSnapshot: true, itemsSnapshot: true, fulfilledAt: true } } },
+      select: { id: true, customerId: true, status: true, publicReference: true, unitId: true, unit: { select: { number: true } }, facility: { select: { name: true } }, convertedTenancy: { select: { accountId: true } }, packageSelection: { select: { packageName: true, status: true, priceSnapshot: true, itemsSnapshot: true, fulfilledAt: true } } },
       orderBy: { createdAt: "desc" },
     });
     // Contract keys avoid mixing two different tenancies that reused the same physical unit.
@@ -28,7 +28,9 @@ export async function GET() {
     }] : []);
     const bookingUnits = reservations.filter(reservation => !units.some(unit => unit.accountId === reservation.convertedTenancy?.accountId)).map(reservation => ({
       key: `reservation:${reservation.id}`, unitId: reservation.unitId, number: reservation.unit.number,
-      facilityName: reservation.facility.name, accountId: reservation.convertedTenancy?.accountId ?? null,
+      // The public Netcash service creates this exact reservation-bound account number.
+      // Match both customer and reference; do not infer links from names or amounts.
+      facilityName: reservation.facility.name, accountId: reservation.convertedTenancy?.accountId ?? accounts.find(account => !account.tenancy && account.customerId === reservation.customerId && account.accountNumber === `ST24-T-${reservation.id}`)?.id ?? null,
       status: reservation.status, reservations: [reservation],
     }));
     const merchandiseRequests = await db.tenantMerchandiseRequest.findMany({ where: { customer }, select: { id: true, unitKey: true, unitId: true, items: true, total: true, createdAt: true, task: { select: { status: true } } }, orderBy: { createdAt: "desc" }, take: 200 });
