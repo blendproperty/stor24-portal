@@ -2,6 +2,8 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- Order-recovery increment: pending/review orders now have an owned account-and-unit-scoped endpoint and visible status links on return to the portal, separate from paid purchase history. No browser storage or unsigned payment claims used. Local tests not run; CI pending. This increment is not merged/deployed; existing checkout enablement and provider/UAT gates remain.
+
 - Cross-repository continuation: public stor24 branch codex/merchandise-payment-returns pushed 2cd8959, wiring marked accept/decline navigation to the fixed CRM order page and skipping booking cancellation for merchandise. Public context updated. Both changes remain draft, unmerged and undeployed; required CI/UAT, worker configuration and reload/payment recovery still outstanding. No live charging or customer-data changes.
 
 - Return-route inspection found public accept/decline still target booking result logic. Added merchandise navigation marker to form and recorded exact cross-repository routing gate; no public-repository edit or production configuration change. Marker is not payment proof. New draft increment CI pending, no local tests/merge/deploy; do not enable before public return integration and UAT.
