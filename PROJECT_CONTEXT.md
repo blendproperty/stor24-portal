@@ -4,9 +4,9 @@
 
 - Implementation: dark-green/orange welcome panel with existing STOR24 storage-unit artwork, warmer welcome/code-entry copy, document benefits and compact mobile composition. Tenant authentication and financial APIs unchanged.
 - Testing: initial 1440px/390px synthetic browser checks passed and screenshots were inspected before the last mobile refinement. 251 tests and typecheck passed on 10 September; production build and final mobile rerun were interrupted. User requested push without further local tests on 11 September. Final mobile/build validation and live customer UAT remain outstanding; do not treat this as fully verified.
-- Commit/push: prepared on codex/tenant-welcome-design against confirmed origin/main 89013cde4812aae776d3e2a902d2033e7691c64a; promotion evidence follows.
-- Merge: pending required release checks.
-- Deployment/configuration: pending; no migration or configuration changes.
+- Commit/push: 33f96113235e4d9afdada2ac9460add7dd750dd5 pushed on codex/tenant-welcome-design. Branch CI 34555550664 succeeded; no additional local tests run at user request.
+- Merge: PR #92 merged as 7dbfc736ec3dea90a867c242e36ba5e33dd135c5 after successful branch checks. Main CI 34555928988 succeeded, including required build validation; final mobile visual/UAT checks remain outstanding.
+- Deployment/configuration: deployment 34556002167 succeeded on 11 September 2026. No migration or configuration changes. This is workflow evidence, not live browser verification.
 - Live production verification: not performed for this redesign. Existing authentication, financial, provider, legal, data, training and approval gates remain open. No emails, bookings or financial changes made by this slice.
 
 ## My STOR24 compact account layout — 10 September 2026
