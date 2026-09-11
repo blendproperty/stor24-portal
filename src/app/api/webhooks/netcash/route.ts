@@ -21,6 +21,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { enqueueMriExport } from "@/lib/finance/mri-export";
 import { checkPayNowTransactionStatus } from "@/lib/payments/netcash-client";
+import { settleVerifiedMerchandisePayment } from "@/lib/merchandise-order-settlement";
 
 export async function POST(request: Request) {
   const rawBody = await request.text();
@@ -58,7 +59,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true, matched: false }, { status: 202 });
   }
 
-  const inbox = await db.webhookInbox.create({
+  const merchandiseOrder = await db.merchandiseOrder.findUnique({ where: { paymentId: payment.id }, select: { id: true } });
+  let inbox = await db.webhookInbox.create({
     data: {
       organisationId: account.customer.organisationId,
       provider: "NETCASH",
@@ -77,7 +79,10 @@ export async function POST(request: Request) {
   // A repeated Netcash delivery is already represented by the original inbox
   // row and must not post the payment or ledger a second time.
   if (!inbox) {
-    return NextResponse.json({ received: true, matched: true, duplicate: true });
+    // Failed merchandise verification/settlement can be retried; order locks and
+    // unique ledger references prevent double posting on concurrent deliveries.
+    if (merchandiseOrder) inbox = await db.webhookInbox.findFirst({ where: { organisationId: account.customer.organisationId, provider: "NETCASH", externalEventId, status: { in: ["PENDING", "FAILED"] } } });
+    if (!inbox) return NextResponse.json({ received: true, matched: true, duplicate: true });
   }
 
   if (!requestTrace) {
@@ -113,6 +118,23 @@ export async function POST(request: Request) {
       },
     });
     return NextResponse.json({ received: true, matched: true, verified: false });
+  }
+
+  if (merchandiseOrder) {
+    try {
+      // Pay Now's documented p4 contract is ZAR-only; its status response has
+      // no currency field. Both stored order and Payment must also be ZAR.
+      // https://api.netcash.co.za/inbound-payments/pay-now/pay-now-ecommerce/
+      await settleVerifiedMerchandisePayment(payment.id, { verified: true, reference: verified.reference!, amount: String(verified.amount), currency: "ZAR", accepted: verified.accepted });
+      // False may be an asynchronous EFT still pending; allow later accepted
+      // notification with the same RequestTrace to be verified and settled.
+      await db.webhookInbox.update({ where: { id: inbox.id }, data: { status: verified.accepted ? "SUCCEEDED" : "PENDING", processedAt: verified.accepted ? new Date() : null } });
+      if (verified.accepted) await enqueueMriExport(payment.id).catch(() => undefined);
+      return NextResponse.json({ received: true, matched: true, verified: true, accepted: verified.accepted });
+    } catch {
+      await db.webhookInbox.update({ where: { id: inbox.id }, data: { status: "FAILED", failureCode: "MERCHANDISE_SETTLEMENT_REVIEW", failureMessage: "Verified payment could not be settled against its merchandise order. Retry/reconciliation required." } });
+      return NextResponse.json({ received: true, matched: true, verified: true, settled: false }, { status: 503 });
+    }
   }
 
   if (verified.accepted) {

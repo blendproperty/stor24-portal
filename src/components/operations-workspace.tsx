@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, ClipboardList, PackageCheck, Plus, RefreshCw, Search, Wrench } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
+import { MerchandiseOrderQueue } from "@/components/merchandise-order-queue";
 import { StatusPill } from "@/components/status-pill";
 import Link from "next/link";
 import { formatSouthAfricaDate, formatSouthAfricaDateTime } from "@/lib/south-africa-time";
@@ -166,6 +167,7 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
   </>;
 
   if (view === "merchandise") return <div className="page-stack">
+    <details className="panel"><summary>Customer purchases · collection and delivery</summary><MerchandiseOrderQueue /></details>
     <PageHeader eyebrow="Operations · Merchandise" title="Merchandise" description="A dedicated catalogue, stock and package workspace for everything sold alongside a Stor24 unit." action={<span className="inline-actions"><button className="button button-secondary" onClick={() => setShowStock(true)}>Move stock</button><button className="button button-primary" onClick={() => setShowProduct(true)}><Plus size={16}/> Add product</button></span>} />
     {error ? <p className="form-error">{error}</p> : null}
     <section className="summary-strip">
