@@ -1,10 +1,11 @@
 "use client";
+import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 
-type Order = { status: string; total: string; currency: string; items: { name: string; quantity: number }[] };
+type Order = { receiptId?: string | null; status: string; total: string; currency: string; items: { name: string; quantity: number }[] };
 const labels: Record<string, string> = {
   AWAITING_PAYMENT: "Waiting for payment confirmation",
-  PAID: "Paid. Your packing supplies are being prepared.",
+  PAID: "Paid. Your supplies are awaiting handover.",
   FULFILLED: "Your supplies have been collected or supplied.",
   PAYMENT_REVIEW: "Payment received. Your store is reviewing this order.",
   CANCELLED: "This order was cancelled.", EXPIRED: "This unpaid order has expired.",
@@ -45,5 +46,5 @@ export function TenantOrderStatus({ orderId }: { orderId: string }) {
       .finally(() => { if (!controller.signal.aborted) setBusy(false); });
     return () => controller.abort();
   }, [orderId]);
-  return <main className="tenant-shell"><section className="tenant-card"><span className="tenant-eyebrow">MY STOR24 · PACKING SUPPLIES</span><h1>Your order</h1>{order && <><h2>{labels[order.status] || "Contact your store about this order."}</h2><p>{new Intl.NumberFormat("en-ZA", { style: "currency", currency: order.currency }).format(Number(order.total))}</p><ul>{order.items.map((item, index) => <li key={index}>{item.quantity} × {item.name}</li>)}</ul></>}<p role="status">{busy ? "Checking your order…" : message}</p><button disabled={busy} onClick={() => void refresh()}>Refresh order status</button>{order?.status === "AWAITING_PAYMENT" && <div>{confirmCancel ? <><p>Cancel this unpaid order and release its reserved stock? Any payment already in progress will be reviewed if it arrives.</p><button disabled={busy} onClick={() => void cancel()}>Confirm cancellation</button><button disabled={busy} onClick={() => setConfirmCancel(false)}>Keep order</button></> : <button disabled={busy} onClick={() => setConfirmCancel(true)}>Cancel unpaid order</button>}</div>}<p><a href="/my">Back to My STOR24 / sign in →</a></p><small>Payment status is confirmed by STOR24, not by the payment return screen. Do not pay again while confirmation is pending.</small></section></main>;
+  return <div className="tenant-portal"><header className="tenant-header"><Image src="/brand/stor24-logo-official-email-20260909.svg" width={183} height={48} alt="STOR24" priority unoptimized /><span>MY STOR24</span></header><main className="tenant-body"><section className="tenant-card"><span className="tenant-eyebrow">MY STOR24 · PACKING SUPPLIES</span><h1>Your order</h1>{order && <><h2>{labels[order.status] || "Contact your store about this order."}</h2><p>{new Intl.NumberFormat("en-ZA", { style: "currency", currency: order.currency }).format(Number(order.total))}</p><ul>{order.items.map((item, index) => <li key={index}>{item.quantity} × {item.name}</li>)}</ul></>}<p role="status">{busy ? "Checking your order…" : message}</p><button className="tenant-primary" disabled={busy} onClick={() => void refresh()}>Refresh order status</button>{order?.status === "AWAITING_PAYMENT" && <div>{confirmCancel ? <><p>Cancel this unpaid order and release its reserved stock? Any payment already in progress will be reviewed if it arrives.</p><button disabled={busy} onClick={() => void cancel()}>Confirm cancellation</button><button disabled={busy} onClick={() => setConfirmCancel(false)}>Keep order</button></> : <button disabled={busy} onClick={() => setConfirmCancel(true)}>Cancel unpaid order</button>}</div>}{order?.receiptId && <div className="tenant-downloads"><a href={`/api/tenant/documents/receipt/${encodeURIComponent(order.receiptId)}`}>Download payment receipt ↓</a></div>}<p><a href="/my">Back to My STOR24 / sign in →</a></p><small>Payment status is confirmed by STOR24, not by the payment return screen. Do not pay again while confirmation is pending.</small></section></main></div>;
 }

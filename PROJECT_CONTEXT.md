@@ -2,6 +2,8 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- 15:00 SAST test preparation, 11 September 2026: PR116 merged2951968; its implementation6195ebd passed validate103266229593/transactions103266220987. Added tenant-styled/branded order shell, successful-payment receipt link, and server-side unit filtering before purchase-history limit (retaining account ownership filter). Added source-contract regression checks; these are not browser/ownership integration proof. New CI pending; not yet merged/deployed. No live charging or stock edits. UAT_CHECKLIST.md is the test agenda and checkout remains disabled pending provider/financial approval.
+
 - Post-purchase view, 11 September 2026: added explicit paid/awaiting-handover copy, recorded fulfilment date, direct order-status and receipt actions, and manual refresh with aborted stale requests. Uses existing scoped purchase data and protected document routes; no automatic payment, stock mutation or collection promise. CI pending; desktop/mobile and authenticated UAT remain open in UAT_CHECKLIST.md. Not yet merged/deployed; checkout stays disabled.
 
 - Fulfilment evidence, 11 September 2026: implementation6d92194 in PR115 passed validate103264362175 and migration-backed transactions103264361916. Concurrent fulfilment produced one sale/audit and one stock decrement; unpaid/wrong-scope rejection and insufficient-stock rollback passed. These are isolated CI fixtures, not live staff/customer or provider acceptance. Code and checklist pushed; merge/deployment/live verification remain pending. UAT_CHECKLIST.md retains all human acceptance tasks as open; checkout stays disabled.
