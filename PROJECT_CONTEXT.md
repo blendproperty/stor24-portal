@@ -2,6 +2,8 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- Stock race verification: PR109 head34b4940 passed migration-backed transactions103250897332 and standard validate103250896412. Concurrent identical checkout returned one order/one stock hold; altered retry rejected; two competing baskets could not oversell. Tests use isolated CI fixtures, not production customer orders. PR109 merged after checks; no production configuration/charging changed, authenticated/provider UAT and worker credential activation remain open.
+
 - PR108 deployment confirmed: merged3dae2a8, main CI34595338054/deployment34595463286/production monitor34595528729 succeeded. Worker credential setup is deployed code, not proof credentials or schedule enabled. Added isolated CI cases for duplicate checkout holding once, changed-basket retry rejection and competing stock reservations; enablement applies only to the ephemeral CI job. No live charging/config changes. New checks pending.
 
 - Added manual production-environment workflow for installing only the dedicated expiry authentication digest, preserving checkout settings and current app image, then checking health. It uses existing SSH secrets and a separate worker key; no credential configured or workflow executed yet. CI pending; runtime expiry verification still required before enablement.
