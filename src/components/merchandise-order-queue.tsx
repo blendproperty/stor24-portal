@@ -13,7 +13,14 @@ export function MerchandiseOrderQueue() {
     if (!response.ok) throw new Error(body.error?.message || "Orders unavailable.");
     setOrders(body.data);
   }, []);
-  useEffect(() => { void refresh().catch(error => setMessage(error.message)); }, [refresh]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/v1/operations/merchandise-orders", { cache: "no-store", signal: controller.signal })
+      .then(async response => { const body = await response.json(); if (!response.ok) throw new Error(body.error?.message || "Orders unavailable."); return body.data; })
+      .then(data => { if (!controller.signal.aborted) setOrders(data); })
+      .catch(error => { if (!controller.signal.aborted) setMessage(error.message); });
+    return () => controller.abort();
+  }, []);
   async function fulfil(id: string) {
     if (busy) return;
     setBusy(true); setMessage("");
