@@ -2,6 +2,8 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- PR108 deployment confirmed: merged3dae2a8, main CI34595338054/deployment34595463286/production monitor34595528729 succeeded. Worker credential setup is deployed code, not proof credentials or schedule enabled. Added isolated CI cases for duplicate checkout holding once, changed-basket retry rejection and competing stock reservations; enablement applies only to the ephemeral CI job. No live charging/config changes. New checks pending.
+
 - Added manual production-environment workflow for installing only the dedicated expiry authentication digest, preserving checkout settings and current app image, then checking health. It uses existing SSH secrets and a separate worker key; no credential configured or workflow executed yet. CI pending; runtime expiry verification still required before enablement.
 
 - Fresh-database work: added explicit-opt-in empty-schema bootstrap that refuses populated databases, recognises only the known artwork/prerequisite ordering failure, applies the original prerequisite SQL and uses Prisma resolve before replaying remaining migrations. Historical migration files/checksums unchanged; no production execution. Transaction CI now uses this migration-backed bootstrap instead of db push. Results pending; this is not yet verified recovery tooling.

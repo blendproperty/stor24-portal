@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
 import { db } from "../../src/lib/db";
-import { cancelTenantMerchandise } from "../../src/lib/merchandise-order-service";
+import { cancelTenantMerchandise, holdTenantMerchandise } from "../../src/lib/merchandise-order-service";
 import { settleVerifiedMerchandisePayment } from "../../src/lib/merchandise-order-settlement";
 
 test("isolated PostgreSQL merchandise settlement and cancellation", async t => {
@@ -14,12 +14,31 @@ test("isolated PostgreSQL merchandise settlement and cancellation", async t => {
     const facility = await db.facility.create({ data: { organisationId: org.id, name: "CI store", code: key } });
     const customer = await db.customer.create({ data: { organisationId: org.id, email: `${key}@example.invalid`, emailVerifiedAt: new Date() } });
     const account = await db.account.create({ data: { customerId: customer.id, accountNumber: key } });
+    const unitType = await db.unitType.create({ data: { facilityId: facility.id, name: key, features: [] } });
+    const unit = await db.unit.create({ data: { facilityId: facility.id, unitTypeId: unitType.id, number: key, monthlyRate: "100.00" } });
+    await db.tenancy.create({ data: { facilityId: facility.id, customerId: customer.id, accountId: account.id, status: "ACTIVE", startDate: new Date(), occupancies: { create: { unitId: unit.id, status: "ACTIVE", startDate: new Date(), monthlyRate: "100.00" } } } });
     const product = await db.product.create({ data: { organisationId: org.id, facilityId: facility.id, sku: key, name: "Box", category: "Boxes", sellingPrice: "10.00", quantityOnHand: 10, quantityReserved: 2 } });
     const payment = await db.payment.create({ data: { accountId: account.id, amount: "20.00", currency: "ZAR", method: "PAY_NOW", provider: "NETCASH", status: "PENDING", idempotencyKey: key } });
     const order = await db.merchandiseOrder.create({ data: { accountId: account.id, organisationId: org.id, facilityId: facility.id, unitId: "ci-unit", total: "20.00", paymentId: payment.id, idempotencyKey: key, expiresAt: new Date(Date.now() + 60000), items: { create: { productId: product.id, name: "Box", sku: key, quantity: 2, unitPrice: "10.00" } } } });
     return { account, product, order, payment, session: { organisationId: org.id, email: customer.email!, customerIds: [customer.id] }, verified: { verified: true, accepted: true, reference: payment.id, amount: "20.00", currency: "ZAR" } };
   }
   try {
+    await t.test("concurrent duplicate checkout holds stock once", async () => {
+      const f = await fixture();
+      const input = { unit: `account:${f.account.id}`, idempotencyKey: randomUUID(), items: [{ productId: f.product.id, quantity: 3 }] };
+      const [first, retry] = await Promise.all([holdTenantMerchandise(f.session, input), holdTenantMerchandise(f.session, input)]);
+      assert.equal(first.id, retry.id);
+      assert.equal((await db.product.findUniqueOrThrow({ where: { id: f.product.id } })).quantityReserved, 5);
+      await assert.rejects(holdTenantMerchandise(f.session, { ...input, items: [{ productId: f.product.id, quantity: 4 }] }), /RETRY_CONFLICT/);
+    });
+    await t.test("competing baskets cannot reserve more stock than is available", async () => {
+      const f = await fixture();
+      const input = { unit: `account:${f.account.id}`, items: [{ productId: f.product.id, quantity: 6 }] };
+      const results = await Promise.allSettled([holdTenantMerchandise(f.session, { ...input, idempotencyKey: randomUUID() }), holdTenantMerchandise(f.session, { ...input, idempotencyKey: randomUUID() })]);
+      assert.equal(results.filter(result => result.status === "fulfilled").length, 1);
+      assert.equal(results.filter(result => result.status === "rejected").length, 1);
+      assert.equal((await db.product.findUniqueOrThrow({ where: { id: f.product.id } })).quantityReserved, 8);
+    });
     await t.test("concurrent duplicate success posts exactly one charge and payment", async () => {
       const f = await fixture();
       await Promise.all([settleVerifiedMerchandisePayment(f.payment.id, f.verified), settleVerifiedMerchandisePayment(f.payment.id, f.verified)]);
