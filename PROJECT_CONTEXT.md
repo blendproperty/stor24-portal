@@ -2,6 +2,8 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- Draft catalogue now uses TenantCheckout in purchase mode, with the authenticated catalogue exposing only the checkout-enabled boolean and server enforcement unchanged. Stock labels and accessible quantity names included. No live flag changed; top-level replacement, provider returns, recovery and integration UAT remain incomplete. Increment CI pending, no local tests, merge or deployment.
+
 - Draft unit-switch refinement after 0e724bf: purchase view is keyed by unit/account identity so previous purchases, errors and basket state reset synchronously when switching units. Still unmounted in the production portal; no local tests or live verification. CI pending for increment; no merge/deployment/configuration changes.
 
 - CI 34578614798 passed on 25d6b3a. Added owned order-status page at /my/orders/[id] with server-read status, explicit pending/paid/review labels and sign-in navigation; no browser return claims change payment state. Provider redirect routing to it is still unwired. New increment CI pending, no local tests or deployment. Gate remains off and draft PR100 is not ready to merge.

@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     const session = await requireTenantSession();
     const unit = await resolveUnit(new URL(request.url).searchParams.get("unit") ?? "", tenantCustomerScope(session));
     const products = await db.product.findMany({ where: { facilityId: unit.facilityId, organisationId: session.organisationId, active: true }, select: { id: true, name: true, imageUrl: true, category: true, sellingPrice: true, quantityOnHand: true, quantityReserved: true }, orderBy: { name: "asc" } });
-    return Response.json({ data: { products: products.map(product => ({ id: product.id, name: product.name, imageUrl: product.imageUrl, category: product.category, price: product.sellingPrice, available: Math.max(0, product.quantityOnHand - product.quantityReserved) })) } }, { headers: tenantPrivateHeaders });
+    return Response.json({ data: { checkoutEnabled: process.env.TENANT_MERCHANDISE_CHECKOUT_ENABLED === "true", products: products.map(product => ({ id: product.id, name: product.name, imageUrl: product.imageUrl, category: product.category, price: product.sellingPrice, available: Math.max(0, product.quantityOnHand - product.quantityReserved) })) } }, { headers: tenantPrivateHeaders });
   } catch (error) { return tenantError(error); }
 }
 export async function POST(request: Request) {
