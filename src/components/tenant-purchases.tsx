@@ -4,7 +4,12 @@ import Image from "next/image";
 import { TenantMerchandise } from "@/components/tenant-merchandise";
 import { formatSouthAfricaDate } from "@/lib/south-africa-time";
 type Purchase = { id: string; unitId: string; status: string; total: string; currency: string; paymentId: string | null; createdAt: string; fulfilledAt: string | null; items: { name: string; quantity: number; unitPrice: string; product: { imageUrl: string | null } }[] };
-export function TenantPurchases({ unitKey, unitId, unitNumber, accountId, canShop }: { unitKey: string; unitId: string; unitNumber: string; accountId: string | null; canShop: boolean }) {
+type PurchaseProps = { unitKey: string; unitId: string; unitNumber: string; accountId: string | null; canShop: boolean };
+export function TenantPurchases(props: PurchaseProps) {
+  // Reset the whole purchase/basket state synchronously on unit/account changes.
+  return <UnitPurchases key={`${props.unitKey}:${props.unitId}:${props.accountId ?? "none"}`} {...props} />;
+}
+function UnitPurchases({ unitKey, unitId, unitNumber, accountId, canShop }: PurchaseProps) {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(!!accountId);
   const [error, setError] = useState("");
