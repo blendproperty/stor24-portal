@@ -2,6 +2,8 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- Draft staff queue component prepared after 54454a5: paid/review/supplied labels, item quantities, explicit handover confirmation and permission-protected fulfil API. Not mounted yet and no stock movement performed. Local tests not run; CI pending. Draft remains unmerged/undeployed, with provider routing and full customer/staff UAT still outstanding.
+
 - Draft basket consistency correction after 20cb9b6: quantities lock on checkout submission and remain locked for an issued/uncertain order; confirmed cancellation/expiry unlocks them. This prevents editing the displayed basket while payment refers to the prior snapshot. No local tests, live orders, configuration, merge or deployment. CI pending; full return/reload recovery and mounted journey remain gates.
 
 - Draft catalogue now uses TenantCheckout in purchase mode, with the authenticated catalogue exposing only the checkout-enabled boolean and server enforcement unchanged. Stock labels and accessible quantity names included. No live flag changed; top-level replacement, provider returns, recovery and integration UAT remain incomplete. Increment CI pending, no local tests, merge or deployment.
