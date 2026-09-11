@@ -2,6 +2,8 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- Post-purchase evidence, 11 September 2026: PR116 implementation6195ebd passed validate103266229593 and isolated transactions103266220987. Evidence committed/pushed with the feature branch. Merge/deployment not yet verified; authenticated desktop/mobile appearance, refresh, receipt download and provider UAT remain open. No live configuration/payment/stock changes; checkout remains disabled.
+
 - Post-purchase view, 11 September 2026: added explicit paid/awaiting-handover copy, recorded fulfilment date, direct order-status and receipt actions, and manual refresh with aborted stale requests. Uses existing scoped purchase data and protected document routes; no automatic payment, stock mutation or collection promise. CI pending; desktop/mobile and authenticated UAT remain open in UAT_CHECKLIST.md. Not yet merged/deployed; checkout stays disabled.
 
 - Fulfilment evidence, 11 September 2026: implementation6d92194 in PR115 passed validate103264362175 and migration-backed transactions103264361916. Concurrent fulfilment produced one sale/audit and one stock decrement; unpaid/wrong-scope rejection and insufficient-stock rollback passed. These are isolated CI fixtures, not live staff/customer or provider acceptance. Code and checklist pushed; merge/deployment/live verification remain pending. UAT_CHECKLIST.md retains all human acceptance tasks as open; checkout stays disabled.
