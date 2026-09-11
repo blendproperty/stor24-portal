@@ -652,6 +652,7 @@ model Account {
   tenancy       Tenancy?
   ledgerEntries LedgerEntry[]
   payments      Payment[]
+  merchandiseOrders MerchandiseOrder[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -691,6 +692,7 @@ model Payment {
   idempotencyKey String        @unique
   failureCode    String?
   processedAt    DateTime?
+  merchandiseOrder MerchandiseOrder?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -1018,6 +1020,44 @@ model TenantMerchandiseRequest {
   @@index([customerId, unitKey, createdAt])
 }
 
+model MerchandiseOrder {
+  id             String @id @default(cuid())
+  accountId      String
+  account        Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  organisationId String
+  facilityId     String
+  unitId         String
+  status         String @default("AWAITING_PAYMENT")
+  total          Decimal @db.Decimal(14, 2)
+  currency       String @default("ZAR")
+  stockHeld      Boolean @default(true)
+  paymentId      String? @unique
+  payment        Payment? @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  idempotencyKey String
+  expiresAt      DateTime
+  fulfilledAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  items          MerchandiseOrderItem[]
+
+  @@unique([accountId, idempotencyKey])
+  @@index([organisationId, facilityId, status, expiresAt])
+}
+
+model MerchandiseOrderItem {
+  id        String @id @default(cuid())
+  orderId   String
+  order     MerchandiseOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  name      String
+  sku       String
+  quantity  Int
+  unitPrice Decimal @db.Decimal(14, 2)
+
+  @@unique([orderId, productId])
+}
+
 model Product {
   id             String          @id @default(cuid())
   organisationId String
@@ -1037,6 +1077,7 @@ model Product {
   active         Boolean         @default(true)
   movements      StockMovement[]
   packageItems   StoragePackageItem[]
+  orderItems     MerchandiseOrderItem[]
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
