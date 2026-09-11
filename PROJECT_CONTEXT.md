@@ -2,6 +2,9 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- Verification evidence, 11 September 2026: PR112 head3f4f32f passed migration-backed transactions103258290614 and standard validate103258290546. All new expiry scenarios below passed in isolated PostgreSQL CI. Implementation/test commit pushed; merge and deployment pending at this record. This is database verification, not provider or authenticated customer UAT, and changes no runtime/configuration. Existing live checkout remains disabled; all outstanding launch gates preserved.
+
+- Promotion note, 11 September 2026: PR112 merged as ffb7ff2. PR113 reconciled with latest main by merging history and preserving both evidence entries; no runtime changes. This evidence-only promotion awaits CI/merge/deployment. Future follow-ups start from current main rather than reusing squash-merged branches. All provider/UAT/configuration gates above remain unchanged.
 - Expiry transaction verification increment: PR111 evidence merged as227c026. Added isolated PostgreSQL checks for concurrent expiry releasing once, late payment after expiry becoming review/credit, paid and unexpired holds remaining intact, and an inconsistent order failing independently while later valid holds release and retry recovers. No local tests or production fixture/stock/payment changes. CI pending; this increment is not yet merged/deployed. Checkout remains disabled; provider/UAT/financial, recurring monitoring, training and approval gates remain open.
 
 ### Worker activation verified — 11 September 2026
