@@ -1,5 +1,12 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Merchandise readiness reconciliation — 11 September 2026
+
+- Implementation: reconciled old PR #56 with later product/package editing and audited stock movement implementation. Retains existing catalogue/stock capabilities; corrects full financial returns, retail reporting and counter POS labels to Planned. These are status corrections, not implementation of those workflows. Canonical issue #55 remains the operational inventory backlog.
+- Testing: source inspection only; no new local tests at user request. Required CI and customer/operator verification remain pending.
+- Commit/push: prepared on codex/merchandise-readiness-reconcile from origin/main fbe70926949e14825b581f01e19c41ef8e5b5367. Merge/deployment: pending. Live verification: not performed.
+- Open gates: supplier/receiving/stocktake/transfer controls, full POS and linked financial returns/reporting must not be inferred complete from catalogue functionality. Existing tax, provider, accounting, policy, training and UAT approvals remain required. No stock, customer or financial records changed.
+
 ## Remaining admin updates — 11 September 2026
 
 - Implementation: carries forward the still-missing changes from existing PRs #22 and #23 onto current main: bounded production-health retries with non-cancelling concurrency, and owner-only staff MFA enrollment visibility. Health response criteria unchanged; only enabledAt is selected for MFA, no secrets or enrollment mutation. Older merchandise tracking PR #56 is not blindly merged because subsequent merchandise implementation supersedes parts of its status claims.
