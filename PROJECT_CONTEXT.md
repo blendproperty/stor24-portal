@@ -2,6 +2,24 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+### Controlled merchandise checkout access — 11 September 2026
+
+- Implementation: one shared server-side gate for catalogue, stock hold and provider form. Global checkout remains opt-in; a separately configured exact organisation/verified-session email can test until a mandatory expiry. Test access does not change the provider environment, full basket amount, ownership, stock or settlement safeguards. UI explicitly warns this is not a simulated payment.
+- Testing: new pure gate and source-contract checks added for default-off, identity/organisation mismatch, expiry and shared enforcement. CI pending; no local test or customer payment submitted.
+- Initial CI b2e2f7c found a TypeScript environment-shape mismatch before tests; added the string-indexed environment type and documented the configuration. Replacement CI pending; failed revision not deployed.
+- Read-only production configuration check found Netcash is organisation-wide, not store-specific. Merchandise now explicitly opts into same-organisation default fallback only when no store-specific connection exists; other callers retain previous behaviour. No credentials changed or exposed. Added source-contract regression; provider UAT remains open.
+- Commit/push/merge/deployment/configuration: pending for this increment. Intended configuration is Brett's existing verified account only, with time-limited access; general tenant checkout remains disabled.
+- Live verification and open gates: pending authenticated catalogue/button readback. Actual Netcash checkout, provider-approved testing, settlement, receipt and fulfilment UAT remain open; this enablement is not launch approval.
+
+### 15:00 SAST test-session handoff — 11 September 2026
+
+- Implementation: PR117 includes branded tenant order shell without staff navigation, confirmed-payment receipt action, unit filtering before purchase limit, and bounded expiry-worker network retries. No live checkout enablement.
+- Testing: final PR head a409320 passed validate103268170166 and transactions103268170169; main CI34601242501 passed. Source-contract checks and isolated DB tests do not replace authenticated/browser/provider acceptance.
+- Commit/push/merge: PR117 merged as e4a907919295e9a0436b2680860a76f27c015000. Runtime and UAT_CHECKLIST.md are on main. This post-deployment evidence is saved on a fresh branch for consolidation with subsequent work, not an additional deployed runtime change.
+- Deployment/configuration: deployment34601407732 succeeded. SSH confirmed e4a9079, healthy app and CHECKOUT_DISABLED. Release frozen ahead of the 15:00 session.
+- Live verification: order shell200; tenant order API401 without session. Fresh browser page shows STOR24 logo, My STOR24, expired-session message and sign-in link, with no staff sidebar. An initial request during replacement briefly returned404, then fresh checks returned200 after deployment completion. Worker dispatch34601546260 succeeded and reported zero expired orders. Earlier dispatch34600855568 failed network connection timeout; scheduled cadence still unobserved/unverified.
+- Open gates: signed-in desktop/mobile journey, real provider-approved payment/mandate tests, receipt/PDF and account-unit isolation UAT, stock/fulfilment operational acceptance, scheduled-worker reliability, legal/financial/data/training and launch approval. Customer charging remains disabled. Use UAT_CHECKLIST.md; no live test purchase or customer stock mutation was performed during preparation.
+
 - Pre-UAT browser check found /my/orders/test-readiness displayed the staff navigation shell despite independent tenant API authentication. Extended the existing My STOR24 layout exclusion to child paths; proxy/API authorisation unchanged. Added regression contract. New revision requires CI and production browser recheck before claiming resolved.
 
 - Pre-UAT evidence, 11 September 2026: PR117 implementation192fde6 passed validate103267373775 and transactions103267373644. PR116 deployment34600778064 succeeded. Live unauthenticated tenant orders/receipts/staff orders return401; approved logo200. Worker dispatch34600855568 failed GitHub-to-host connection timeout, while endpoint remains reachable locally and rejects absent credentials. Added bounded worker retries for transient connection/HTTP failures; idempotent expiry prevents double release. No scheduled run yet observed, so cadence remains unverified. Latest change CI and promotion pending; no provider/customer UAT or checkout enablement.

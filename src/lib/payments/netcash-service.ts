@@ -9,7 +9,7 @@
 import { db } from "@/lib/db";
 import { randomUUID } from "node:crypto";
 import { tenantCustomerScope } from "@/lib/tenant-portal-security";
-import { assertMerchandiseCheckoutEnabled } from "@/lib/merchandise-order-service";
+import { assertMerchandiseCheckoutEnabled } from "@/lib/merchandise-checkout-access";
 import {
   getNetcashConnection,
   createEMandateSync,
@@ -32,10 +32,10 @@ async function recordHealth(connectionId: string, ok: boolean, failureCode?: str
 
 /** Draft checkout: persist the link before any provider form can leave the server. */
 export async function createMerchandiseCheckout(session: Parameters<typeof tenantCustomerScope>[0], orderId: string) {
-  assertMerchandiseCheckoutEnabled();
+  assertMerchandiseCheckoutEnabled(session);
   const owned = await db.merchandiseOrder.findFirst({ where: { id: orderId, organisationId: session.organisationId, account: { customer: tenantCustomerScope(session) } }, select: { facilityId: true } });
   if (!owned) throw new Error("TENANT_NOT_FOUND");
-  const connection = await getNetcashConnection(session.organisationId, owned.facilityId);
+  const connection = await getNetcashConnection(session.organisationId, owned.facilityId, true);
   return db.$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "MerchandiseOrder" WHERE "id" = ${orderId} FOR UPDATE`;
     const order = await tx.merchandiseOrder.findFirst({ where: { id: orderId, organisationId: session.organisationId, account: { customer: tenantCustomerScope(session) } } });
