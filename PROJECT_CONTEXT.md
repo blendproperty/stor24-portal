@@ -2,6 +2,8 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- Isolated CI exposed existing fresh-database migration failure: 20260909160000_package_hero_artwork references StoragePackage.imageUrl before 20260909170000_merchandise_images adds it (PostgreSQL42703/P3018). No applied production migration modified. Transaction CI now creates current schema in ephemeral localhost database via db push; this does NOT validate migration replay or SQL-only constraints. Fresh-install migration recovery remains explicitly open. Transaction results still pending.
+
 - User-requested background continuation schedule removed; work continues directly. Added isolated PostgreSQL CI tests for duplicate concurrent settlement, ownership rejection and cancelled-order late-payment credit/stock handling. Synthetic fixtures are limited to localhost CI database; not run locally or against production. Results pending; no claim of passing integration validation. Live checkout remains disabled.
 
 - PR104 production evidence: main CI34591602135/deployment34591732155 succeeded for b3dd847. PR105 scheduler now open; worker validates response shape/count rather than treating any HTTP200 as success. No scheduler secret/variable configured, no execution or live stock changes. New CI pending; operational and financial/UAT gates unchanged.
