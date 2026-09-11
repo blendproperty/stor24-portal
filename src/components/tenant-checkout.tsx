@@ -1,7 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 
-export function TenantCheckout({ unitKey, items, disabled = false }: { unitKey: string; items: { productId: string; quantity: number }[]; disabled?: boolean }) {
+export function TenantCheckout({ unitKey, items, disabled = false, onLocked }: { unitKey: string; items: { productId: string; quantity: number }[]; disabled?: boolean; onLocked?: (locked: boolean) => void }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -9,14 +9,17 @@ export function TenantCheckout({ unitKey, items, disabled = false }: { unitKey: 
   const sending = useRef(false);
   async function checkout() {
     if (sending.current || disabled || !items.length || orderId) return;
-    sending.current = true; setBusy(true); setMessage("");
+    sending.current = true; setBusy(true); setMessage(""); onLocked?.(true);
     const basket = JSON.stringify({ unitKey, items });
     if (attempt.current?.basket !== basket) attempt.current = { basket, key: crypto.randomUUID() };
     try {
       const response = await fetch("/api/tenant/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ unit: unitKey, items, idempotencyKey: attempt.current.key }) });
       const body = await response.json();
       if (body.data?.orderId) setOrderId(body.data.orderId);
-      if (!response.ok) throw new Error(body.error || "Checkout could not be opened.");
+      if (!response.ok) {
+        if (!body.data?.orderId && response.status < 500) onLocked?.(false);
+        throw new Error(body.error || "Checkout could not be opened.");
+      }
       const formData = body.data.checkout;
       if (formData.actionUrl !== "https://paynow.netcash.co.za/site/paynow.aspx" || formData.method !== "POST") throw new Error("Payment destination could not be verified.");
       const form = document.createElement("form");
@@ -39,7 +42,7 @@ export function TenantCheckout({ unitKey, items, disabled = false }: { unitKey: 
       if (!response.ok) throw new Error(body.message || body.error || "Order unavailable.");
       const labels: Record<string, string> = { AWAITING_PAYMENT: "Awaiting payment confirmation", PAID: "Paid · awaiting supply", FULFILLED: "Collected / supplied", PAYMENT_REVIEW: "Payment received · your store is reviewing it", CANCELLED: "Cancelled", EXPIRED: "Expired" };
       setMessage(body.message || labels[body.data.status] || "Please contact your store.");
-      if (["CANCELLED", "EXPIRED"].includes(body.data.status)) { setOrderId(null); attempt.current = null; }
+      if (["CANCELLED", "EXPIRED"].includes(body.data.status)) { setOrderId(null); attempt.current = null; onLocked?.(false); }
     } catch (error) { setMessage(error instanceof Error ? error.message : "Order unavailable."); }
     finally { sending.current = false; setBusy(false); }
   }

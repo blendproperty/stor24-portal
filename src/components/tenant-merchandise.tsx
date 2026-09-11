@@ -7,6 +7,7 @@ const money = (value: number) => new Intl.NumberFormat("en-ZA", { style: "curren
 export function TenantMerchandise({ unitKey, onSaved, purchaseMode = false }: { unitKey: string; onSaved: () => Promise<void>; purchaseMode?: boolean }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [checkoutEnabled, setCheckoutEnabled] = useState(false);
+  const [basketLocked, setBasketLocked] = useState(false);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [message, setMessage] = useState("Loading your store’s packing supplies…");
   const [search, setSearch] = useState("");
@@ -31,10 +32,11 @@ export function TenantMerchandise({ unitKey, onSaved, purchaseMode = false }: { 
     <div className="tenant-product-grid">{products.filter(product => `${product.name} ${product.category}`.toLowerCase().includes(search.toLowerCase())).map(product => <article key={product.id}>
       {product.imageUrl && <Image src={product.imageUrl} width={240} height={180} unoptimized alt={product.name}/>}
       <h3>{product.name}</h3><p>{money(Number(product.price))} · {product.available ? `${product.available} available` : "Out of stock"}</p>
-      <label>Quantity<input aria-label={`Quantity for ${product.name}`} type="number" min={0} max={Math.min(100, product.available)} disabled={!product.available} value={quantities[product.id] ?? 0} onChange={event => setQuantities(current => ({ ...current, [product.id]: Math.min(100, product.available, Math.max(0, Math.trunc(Number(event.target.value) || 0))) }))}/></label>
+      <label>Quantity<input aria-label={`Quantity for ${product.name}`} type="number" min={0} max={Math.min(100, product.available)} disabled={basketLocked || !product.available} value={quantities[product.id] ?? 0} onChange={event => setQuantities(current => ({ ...current, [product.id]: Math.min(100, product.available, Math.max(0, Math.trunc(Number(event.target.value) || 0))) }))}/></label>
     </article>)}</div>
     <div className="tenant-shop-total"><strong>Your basket · {count} items · {money(cents / 100)}</strong></div>
-    <TenantCheckout unitKey={unitKey} disabled={!checkoutEnabled} items={products.filter(product => quantities[product.id] > 0).map(product => ({ productId: product.id, quantity: quantities[product.id] }))}/>
+    <TenantCheckout unitKey={unitKey} disabled={!checkoutEnabled} onLocked={setBasketLocked} items={products.filter(product => quantities[product.id] > 0).map(product => ({ productId: product.id, quantity: quantities[product.id] }))}/>
+    {basketLocked && <p>Your basket is locked while checkout is in progress. Check or cancel the unpaid order before changing quantities.</p>}
     <p>{checkoutEnabled ? "Payment confirms your purchase. Stock and prices are checked again at checkout." : "Online checkout is not enabled. This basket has not been ordered or charged."}</p>
     {message && <p role="status">{message}</p>}
   </div>;
