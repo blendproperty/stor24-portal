@@ -27,7 +27,7 @@ const SOUTH_AFRICAN_LOCATIONS = {
 } satisfies Record<string, [string, string][]>;
 const RELATIONSHIPS = ["Spouse", "Partner", "Parent", "Child", "Sibling", "Relative", "Friend", "Colleague", "Employer", "Employee", "Guardian", "Other"];
 
-export function CustomerOperationsWorkspace() {
+export function CustomerOperationsWorkspace({ initialCustomerId = "" }: { initialCustomerId?: string }) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [search, setSearch] = useState("");
@@ -36,7 +36,7 @@ export function CustomerOperationsWorkspace() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const load = useCallback(async () => { const response = await fetch("/api/v1/leasing/customers", { cache: "no-store" }); const payload = await response.json(); if (!response.ok) { setError(payload.error?.message ?? "Customer records could not be loaded."); return; } setCustomers(payload.data); setSelectedId((current) => current || payload.data[0]?.id || ""); }, []);
-  useEffect(() => { let cancelled = false; fetch("/api/v1/leasing/customers", { cache: "no-store" }).then(async (response) => ({ response, payload: await response.json() })).then(({ response, payload }) => { if (cancelled) return; if (!response.ok) setError(payload.error?.message ?? "Customer records could not be loaded."); else { setCustomers(payload.data); setSelectedId(payload.data[0]?.id || ""); } }); return () => { cancelled = true; }; }, []);
+  useEffect(() => { let cancelled = false; fetch("/api/v1/leasing/customers", { cache: "no-store" }).then(async (response) => ({ response, payload: await response.json() })).then(({ response, payload }) => { if (cancelled) return; if (!response.ok) setError(payload.error?.message ?? "Customer records could not be loaded."); else { setCustomers(payload.data); setSelectedId(initialCustomerId || payload.data[0]?.id || ""); } }); return () => { cancelled = true; }; }, [initialCustomerId]);
   const selected = customers.find((customer) => customer.id === selectedId) ?? null;
   const visible = useMemo(() => customers.filter((customer) => `${nameOf(customer)} ${customer.email ?? ""} ${customer.phone ?? ""} ${customer.identityRef ?? ""}`.toLowerCase().includes(search.toLowerCase())), [customers, search]);
   const activeTenants = customers.filter((customer) => customer.tenancies.some((tenancy) => ["ACTIVE", "NOTICE_GIVEN"].includes(tenancy.status))).length;

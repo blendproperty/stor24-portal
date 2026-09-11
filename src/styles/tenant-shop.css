@@ -1,0 +1,14 @@
+.tenant-product-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:18px; margin:24px 0; }
+.tenant-product-grid article { min-width:0; border:1px solid #dce3dc; border-radius:16px; overflow:hidden; padding:16px; background:#fff; }
+.tenant-product-grid img { width:100%; height:160px; object-fit:contain; border-radius:10px; background:#f5f3ea; }
+.tenant-product-grid h3 { font-size:17px; line-height:1.35; min-height:46px; margin:14px 0 8px; }
+.tenant-product-grid p { font-size:14px; }
+.tenant-product-placeholder { height:160px; display:grid; place-items:center; text-align:center; background:#f5f3ea; color:#52615b; border-radius:10px; }
+.tenant-shop-total { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; padding:20px; border-radius:16px; background:#e9eee8; }
+.tenant-shop-total strong { font-size:22px; }
+.tenant-request { border-top:1px solid #dce3dc; padding:20px 0; overflow-wrap:anywhere; }
+.tenant-portal a[href="#tenant-shop"] { display:inline-block; color:#a73600; font-weight:800; padding:12px 0; }
+.tenant-portal button:disabled { cursor:not-allowed; }
+@media(max-width:480px) { .tenant-product-grid { grid-template-columns:1fr; } .tenant-product-grid img { height:190px; } .tenant-shop-total { padding:16px; } .tenant-shop-total button { width:100%; } }
+.tenant-shop > summary { cursor:pointer; font-size:20px; font-weight:800; padding:8px 0; }
+.tenant-shop[open] > summary { margin-bottom:24px; border-bottom:1px solid #dce3dc; padding-bottom:20px; }

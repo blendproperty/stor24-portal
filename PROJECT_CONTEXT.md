@@ -1,5 +1,12 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Unit-first tenant portal — in progress, 11 September 2026
+
+- User-authorised scope: unit selector with only that unit's statements/payments/agreements and merchandise history; allow additional merchandise purchases linked to selected unit. Preserve unassigned records separately. Do not mark a merchandise request as a paid order.
+- Implementation: unit-first selector includes signed reservations without billing accounts; documents match exact reservation/account links, statement state clears on switching, Other account records retains unassigned accounts. Immutable package snapshots display quantities and truthful status. Searchable responsive store catalogue lets customers send priced additional-supply requests for the selected unit. Requests are saved with an atomic CRM task/audit, server pricing, ownership/facility scope, CSRF/rate limits and unique retry keys. This is assisted purchasing, NOT online paid checkout. No ledger charge, stock reservation or payment is generated.
+- Provider boundary: existing controlled R10 booking checkout is not an existing-tenant merchandise checkout. Real online purchase/payment/stock fulfilment integration remains outstanding and must not be inferred from a request or a completed CRM task. Existing historical account-level records cannot be retroactively assigned to a previous physical unit without provenance; they remain account records.
+- Testing: new pricing/input/snapshot tests and updated synthetic browser fixture prepared, not run locally per user instruction. Diff hygiene checked. Required CI pending before promotion. Commit/push/merge/deployment: pending for this slice. Live verification: pending. Customer authenticated UAT and the full paid-merchandise flow are not claimed complete. Existing auth, financial, provider, legal and data approvals remain intact.
+
 ## Merchandise readiness reconciliation — 11 September 2026
 
 - Implementation: reconciled old PR #56 with later product/package editing and audited stock movement implementation. Retains existing catalogue/stock capabilities; corrects full financial returns, retail reporting and counter POS labels to Planned. These are status corrections, not implementation of those workflows. Canonical issue #55 remains the operational inventory backlog.
