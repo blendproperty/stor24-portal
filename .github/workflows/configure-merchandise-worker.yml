@@ -1,0 +1,55 @@
+name: Configure merchandise expiry authentication
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: stor24-crm-production
+  cancel-in-progress: false
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 8
+    steps:
+      - name: Install dedicated worker digest without enabling checkout
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          MERCHANDISE_CRON_KEY: ${{ secrets.MERCHANDISE_CRON_KEY }}
+        run: |
+          set -eu
+          test -n "$VPS_HOST"; test -n "$VPS_USER"; test -n "$VPS_KNOWN_HOSTS"; test -n "$VPS_SSH_KEY"
+          test "${#MERCHANDISE_CRON_KEY}" -ge 32
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/stor24_crm
+          chmod 600 ~/.ssh/known_hosts ~/.ssh/stor24_crm
+          digest=$(printf '%s' "$MERCHANDISE_CRON_KEY" | sha256sum | cut -d' ' -f1)
+          printf '%s\n' "$digest" | ssh -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" '
+            set -eu
+            cd /opt/stor24-crm
+            IFS= read -r worker_digest
+            test "${#worker_digest}" -eq 64
+            case "$worker_digest" in *[!0-9a-f]*) exit 1 ;; esac
+            umask 077
+            env_tmp=$(mktemp .env.merchandise.XXXXXX)
+            grep -v "^MERCHANDISE_CRON_SECRET_SHA256=" .env > "$env_tmp" || true
+            printf "MERCHANDISE_CRON_SECRET_SHA256=%s\n" "$worker_digest" >> "$env_tmp"
+            chmod 600 "$env_tmp"
+            mv "$env_tmp" .env
+            container=$(docker compose --env-file .env -f compose.prod.yml ps -q app)
+            current_image=$(docker inspect --format "{{.Config.Image}}" "$container")
+            image_tag=${current_image##*:}
+            test -n "$image_tag"
+            IMAGE_TAG="$image_tag" docker compose --env-file .env -f compose.prod.yml up -d --no-deps --force-recreate app
+            container=$(docker compose --env-file .env -f compose.prod.yml ps -q app)
+            for attempt in $(seq 1 40); do
+              state=$(docker inspect --format "{{.State.Health.Status}}" "$container")
+              test "$state" = healthy && break
+              sleep 2
+            done
+            test "$(docker inspect --format "{{.State.Health.Status}}" "$container")" = healthy
+          '
