@@ -2,6 +2,8 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- Cross-repository continuation: public stor24 branch codex/merchandise-payment-returns pushed 2cd8959, wiring marked accept/decline navigation to the fixed CRM order page and skipping booking cancellation for merchandise. Public context updated. Both changes remain draft, unmerged and undeployed; required CI/UAT, worker configuration and reload/payment recovery still outstanding. No live charging or customer-data changes.
+
 - Return-route inspection found public accept/decline still target booking result logic. Added merchandise navigation marker to form and recorded exact cross-repository routing gate; no public-repository edit or production configuration change. Marker is not payment proof. New draft increment CI pending, no local tests/merge/deploy; do not enable before public return integration and UAT.
 
 - Draft main portal replacement after 8185d4a: mounts unit-scoped Your purchases/Buy more supplies catalogue and removes the old request-entry control. Earlier booking selections/requests remain in a collapsed history section explicitly not represented as paid orders. New checkout remains server-disabled; no production config changed. CI pending, no local tests/merge/deployment. Provider return routing, reload recovery, worker configuration and full UAT remain gates.
