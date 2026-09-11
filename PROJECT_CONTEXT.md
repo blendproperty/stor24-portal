@@ -2,6 +2,8 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- Expiry transaction verification increment: PR111 evidence merged as227c026. Added isolated PostgreSQL checks for concurrent expiry releasing once, late payment after expiry becoming review/credit, paid and unexpired holds remaining intact, and an inconsistent order failing independently while later valid holds release and retry recovers. No local tests or production fixture/stock/payment changes. CI pending; this increment is not yet merged/deployed. Checkout remains disabled; provider/UAT/financial, recurring monitoring, training and approval gates remain open.
+
 ### Worker activation verified — 11 September 2026
 
 - Implementation/testing: exact-path worker proxy exemption and tenant order-shell routing regression tests passed both PR110 checks on ee38cf4. Main CI34596935236 succeeded. Database tests are isolated fixtures; no real customer transaction was created.
