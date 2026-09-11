@@ -8,6 +8,7 @@ export function TenantMerchandise({ unitKey, onSaved, purchaseMode = false }: { 
   const [products, setProducts] = useState<Product[]>([]);
   const [checkoutEnabled, setCheckoutEnabled] = useState(false);
   const [testAccess, setTestAccess] = useState(false);
+  const [r10Test, setR10Test] = useState(false);
   const [basketLocked, setBasketLocked] = useState(false);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [message, setMessage] = useState("Loading your store’s packing supplies…");
@@ -21,7 +22,7 @@ export function TenantMerchandise({ unitKey, onSaved, purchaseMode = false }: { 
     fetch(`/api/tenant/merchandise?unit=${encodeURIComponent(unitKey)}`, { cache: "no-store" }).then(async response => {
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Catalogue unavailable.");
-      if (!disposed) { setCheckoutEnabled(body.data.checkoutEnabled === true); setTestAccess(body.data.testAccess === true); setProducts(body.data.products); setMessage(body.data.products.length ? "" : "Your store has no products available online at the moment."); }
+      if (!disposed) { setCheckoutEnabled(body.data.checkoutEnabled === true); setR10Test(body.data.r10Test === true); setTestAccess(body.data.testAccess === true); setProducts(body.data.products); setMessage(body.data.products.length ? "" : "Your store has no products available online at the moment."); }
     }).catch(error => { if (!disposed) setMessage(error.message); });
     return () => { disposed = true; };
   }, [unitKey]);
@@ -36,10 +37,10 @@ export function TenantMerchandise({ unitKey, onSaved, purchaseMode = false }: { 
       <label>Quantity<input aria-label={`Quantity for ${product.name}`} type="number" min={0} max={Math.min(100, product.available)} disabled={basketLocked || !product.available} value={quantities[product.id] ?? 0} onChange={event => setQuantities(current => ({ ...current, [product.id]: Math.min(100, product.available, Math.max(0, Math.trunc(Number(event.target.value) || 0))) }))}/></label>
     </article>)}</div>
     <div className="tenant-shop-total"><strong>Your basket · {count} items · {money(cents / 100)}</strong></div>
-    {testAccess && <p role="status">Controlled checkout access is enabled for your account. This is not a simulated payment: checkout uses the full basket total shown above. Only complete payment using your approved testing arrangement.</p>}
+    {r10Test ? <p role="status"><strong>R10 test checkout.</strong> The basket value above is retained, but only R10 is sent to Netcash for this test. This will not pay for the merchandise, change your account balance or authorise collection. Use the approved test card only.</p> : testAccess && <p role="status">Controlled checkout access is enabled for your account. This is not a simulated payment: checkout uses the full basket total shown above. Only complete payment using your approved testing arrangement.</p>}
     <TenantCheckout unitKey={unitKey} disabled={!checkoutEnabled} onLocked={setBasketLocked} items={products.filter(product => quantities[product.id] > 0).map(product => ({ productId: product.id, quantity: quantities[product.id] }))}/>
     {basketLocked && <p>Your basket is locked while checkout is in progress. Check or cancel the unpaid order before changing quantities.</p>}
-    <p>{checkoutEnabled ? "Payment confirms your purchase. Stock and prices are checked again at checkout." : "Online checkout is not enabled. This basket has not been ordered or charged."}</p>
+    <p>{r10Test ? "Test results are kept separate from purchases. No merchandise will be supplied for the R10 test." : checkoutEnabled ? "Payment confirms your purchase. Stock and prices are checked again at checkout." : "Online checkout is not enabled. This basket has not been ordered or charged."}</p>
     {message && <p role="status">{message}</p>}
   </div>;
   async function submit() {

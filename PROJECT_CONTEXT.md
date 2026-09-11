@@ -2,7 +2,18 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+### R10 merchandise journey test — 11 September 2026
+
+- User approved R10 testing while retaining actual basket value. Implementation: immutable isTest order marker, separately opted-in scoped/expiring identity gate, sandbox-config requirement, fixed R10 form amount and explicit test copy. Existing full-value orders are not converted to tests.
+- Test settlements use TEST_PENDING/TEST_SUCCEEDED payment states, never financial SUCCEEDED. Independently verified R10 success releases the reservation only, closes the test order, writes an audit result and posts no ledger/credit/MRI export/receipt/stock sale. Basket total remains unchanged; no fulfilment eligibility. Pending/unknown provider results are not success.
+- Added additive migration and isolated duplicate-settlement regression proving unchanged balance, no ledger/sale and retained basket value. CI pending. Commit/push/merge/deployment/configuration/live provider verification pending. Real settlement/fulfilment/return UAT and launch gates remain open.
+- Release evidence: PR122 pushed; 5dd00fc passed validate but fresh-database CI exposed migration ordering before MerchandiseOrder creation. Renamed the new, undeployed migration to 20260911190000; 237585b passes PostgreSQL transactions job103284415743. Validation/merge/deployment still pending. VPS opt-in flag TENANT_MERCHANDISE_R10_TEST=true saved for the existing verified test identity only, expiring 18:00 UTC; runtime remains unchanged until deployment. No payment submitted.
+
 ### Reservation checkout correction — 11 September 2026
+
+- Handoff follow-up: PR121 implementation18d2d0a passed validate103278448094 and transactions103278448427, merged4abbcfb. Exact-ref deployment34604353698 succeeded; running image4abbcfbe healthy. The blocked unpaid test order was cancelled through tenant UI; read-only DB confirms CANCELLED, stockHeld=false, total1355.92.
+- Live browser proof after refreshed CSP: restored Unit107 basket (8 items/R1355.92), clicked Continue to secure payment and reached https://paynow.netcash.co.za/site/paynow.aspx. Provider page displays Netcash Test - Blend Property, STOR24 packing supplies, exact R1355.92 total, and explicitly states the payment window is in test mode. Left the provider page open for user testing; no payment option chosen, credentials entered or payment completed. The new order is awaiting payment with its normal timed stock hold. Successful payment/return/settlement/receipt/fulfilment remain unverified UAT, not implied by this handoff success.
+- Documentation: this post-deployment evidence is pushed on codex/netcash-handoff-verification for consolidation with the next change. Runtime fixes and earlier canonical context are on main; this evidence-only branch is not a further deployment.
 
 - User UAT exposed a missed branch: Unit107 is a signed reservation with an exact reservation-bound account, not a converted tenancy. The UI allowed shopping but holdTenantMerchandise rejected every reservation key, producing generic503 and a locked basket. The previous enabled-button check was not successful checkout proof.
 - Implementation: resolve signed ACTIVE unconverted reservations to their exact same-customer ST24-T reservation account, retaining verified organisation/customer scope, server pricing, stock and idempotency safeguards. Does not convert bookings or grant access. Explicit known pre-checkout failures unlock the basket; ambiguous network failures retain safe retry/idempotency handling.

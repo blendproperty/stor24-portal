@@ -87,6 +87,8 @@ enum LedgerEntryType {
 }
 
 enum PaymentStatus {
+  TEST_PENDING
+  TEST_SUCCEEDED
   PENDING
   SUCCEEDED
   FAILED
@@ -1021,6 +1023,7 @@ model TenantMerchandiseRequest {
 }
 
 model MerchandiseOrder {
+  isTest         Boolean @default(false)
   id             String @id @default(cuid())
   accountId      String
   account        Account @relation(fields: [accountId], references: [id], onDelete: Restrict)

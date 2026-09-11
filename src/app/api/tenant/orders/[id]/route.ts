@@ -13,14 +13,14 @@ export async function GET(_request: Request, context: Context) {
     const { id } = await context.params;
     const order = await db.merchandiseOrder.findFirst({
       where: { id, organisationId: session.organisationId, account: { customer: tenantCustomerScope(session) } },
-      select: { id: true, unitId: true, status: true, total: true, currency: true, expiresAt: true, fulfilledAt: true, payment: { select: { id: true, status: true } },
+      select: { id: true, isTest: true, unitId: true, status: true, total: true, currency: true, expiresAt: true, fulfilledAt: true, payment: { select: { id: true, status: true } },
         items: { select: { name: true, quantity: true, unitPrice: true } } },
     });
     if (!order) throw new Error("TENANT_NOT_FOUND");
     // Browser return parameters never determine payment status.
     const { payment, ...details } = order;
     const receiptId = payment?.status === "SUCCEEDED" ? payment.id : null;
-    return Response.json({ data: { ...details, receiptId } }, { headers: tenantPrivateHeaders });
+    return Response.json({ data: { ...details, receiptId: order.isTest ? null : receiptId, testSucceeded: order.isTest && payment?.status === "TEST_SUCCEEDED" } }, { headers: tenantPrivateHeaders });
   } catch (error) { return tenantError(error); }
 }
 

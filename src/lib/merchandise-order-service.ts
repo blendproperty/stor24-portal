@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { tenantCustomerScope } from "@/lib/tenant-portal-security";
 import { merchandiseRequestSchema, priceMerchandise } from "@/lib/tenant-merchandise";
-import { assertMerchandiseCheckoutEnabled } from "@/lib/merchandise-checkout-access";
+import { assertMerchandiseCheckoutEnabled, merchandiseCheckoutTestMode } from "@/lib/merchandise-checkout-access";
 
 /** No caller accepts a client price, facility, customer or payment amount. */
 export async function holdTenantMerchandise(session: Parameters<typeof tenantCustomerScope>[0], raw: unknown) {
@@ -42,7 +42,7 @@ export async function holdTenantMerchandise(session: Parameters<typeof tenantCus
       const changed = await tx.$executeRaw`UPDATE "Product" SET "quantityReserved" = "quantityReserved" + ${item.quantity}, "updatedAt" = NOW() WHERE "id" = ${item.productId} AND "organisationId" = ${session.organisationId} AND "facilityId" = ${facilityId} AND "active" = true AND "sellingPrice" = ${item.unitPriceZar}::decimal AND "quantityOnHand" - "quantityReserved" >= ${item.quantity}`;
       if (changed !== 1) throw new Error("MERCHANDISE_UNAVAILABLE");
     }
-    const order = await tx.merchandiseOrder.create({ data: { accountId, organisationId: session.organisationId, facilityId, unitId, total: priced.total, idempotencyKey: input.idempotencyKey, expiresAt: new Date(Date.now() + 20 * 60000), items: { create: priced.items.map(item => ({ productId: item.productId, name: item.name, sku: item.sku, quantity: item.quantity, unitPrice: item.unitPriceZar })) } }, include: { items: true } });
+    const order = await tx.merchandiseOrder.create({ data: { isTest: merchandiseCheckoutTestMode(session), accountId, organisationId: session.organisationId, facilityId, unitId, total: priced.total, idempotencyKey: input.idempotencyKey, expiresAt: new Date(Date.now() + 20 * 60000), items: { create: priced.items.map(item => ({ productId: item.productId, name: item.name, sku: item.sku, quantity: item.quantity, unitPrice: item.unitPriceZar })) } }, include: { items: true } });
     await tx.auditEvent.create({ data: { organisationId: session.organisationId, facilityId, action: "merchandise_order.stock_held", entityType: "MerchandiseOrder", entityId: order.id } });
     return order;
   });

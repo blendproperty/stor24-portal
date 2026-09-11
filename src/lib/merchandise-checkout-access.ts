@@ -23,3 +23,8 @@ export function merchandiseCheckoutEnabled(session: CheckoutSession, config: Che
 export function assertMerchandiseCheckoutEnabled(session: CheckoutSession) {
   if (!merchandiseCheckoutEnabled(session)) throw new Error("MERCHANDISE_CHECKOUT_DISABLED");
 }
+
+/** R10 is available only to the explicitly scoped, unexpired test identity. */
+export function merchandiseCheckoutTestMode(session: CheckoutSession, config: CheckoutConfig = process.env, now = Date.now()) {
+  return config.TENANT_MERCHANDISE_R10_TEST === "true" && merchandiseCheckoutEnabled(session, { ...config, TENANT_MERCHANDISE_CHECKOUT_ENABLED: "false" }, now);
+}
