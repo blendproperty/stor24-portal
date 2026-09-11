@@ -1,0 +1,35 @@
+name: Merchandise transaction checks
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  transactions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: merchandise_ci
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/merchandise_ci
+      MERCHANDISE_DB_TEST: isolated-ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run db:generate
+      # Exercise current application transactions independently of the separately
+      # tracked historical migration-order defect. Ephemeral CI database only.
+      - run: npx prisma db push
+      - run: npx tsx --test tests/integration/merchandise-transactions.test.ts

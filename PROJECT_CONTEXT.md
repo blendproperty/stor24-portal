@@ -2,6 +2,14 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- Isolated CI exposed existing fresh-database migration failure: 20260909160000_package_hero_artwork references StoragePackage.imageUrl before 20260909170000_merchandise_images adds it (PostgreSQL42703/P3018). No applied production migration modified. Transaction CI now creates current schema in ephemeral localhost database via db push; this does NOT validate migration replay or SQL-only constraints. Fresh-install migration recovery remains explicitly open. Transaction results still pending.
+
+- User-requested background continuation schedule removed; work continues directly. Added isolated PostgreSQL CI tests for duplicate concurrent settlement, ownership rejection and cancelled-order late-payment credit/stock handling. Synthetic fixtures are limited to localhost CI database; not run locally or against production. Results pending; no claim of passing integration validation. Live checkout remains disabled.
+
+- PR104 production evidence: main CI34591602135/deployment34591732155 succeeded for b3dd847. PR105 scheduler now open; worker validates response shape/count rather than treating any HTTP200 as success. No scheduler secret/variable configured, no execution or live stock changes. New CI pending; operational and financial/UAT gates unchanged.
+
+- PR104 passed CI onf341846 and merged b3dd847; deployment pending. Added scheduled expiry workflow gated by a repository variable plus dedicated secret; neither configured or enabled. This is scheduler implementation, not operational proof. No local tests/stock mutations; CI and manual/scheduled verification remain pending, checkout disabled.
+
 - Cancellation deployment verified by workflow: main CI34590574113/deployment34590724873 succeeded for9906df1. Added pure transition tests for pending EFT across all states and both payment/cancellation orderings; these are not database-concurrency proof. PR104 expiry resilience now open; tests execute in CI only. Checkout/configuration/UAT gates remain unchanged.
 
 - Recovery deployment evidence: PR102 merged e3d9721, main CI34590014502 and deployment34590154036 succeeded. PR103 cancellation passed checks on75b32c1 and merged9906df1; its deployment pending. No authenticated cancellation UAT or live transaction performed.
