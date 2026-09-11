@@ -3,7 +3,7 @@ import test from "node:test";
 import { randomUUID } from "node:crypto";
 import { db } from "../../src/lib/db";
 import { cancelTenantMerchandise, holdTenantMerchandise } from "../../src/lib/merchandise-order-service";
-import { settleVerifiedMerchandisePayment } from "../../src/lib/merchandise-order-settlement";
+import { expireMerchandiseOrders, settleVerifiedMerchandisePayment } from "../../src/lib/merchandise-order-settlement";
 
 test("isolated PostgreSQL merchandise settlement and cancellation", async t => {
   assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci");
@@ -23,6 +23,52 @@ test("isolated PostgreSQL merchandise settlement and cancellation", async t => {
     return { account, product, order, payment, session: { organisationId: org.id, email: customer.email!, customerIds: [customer.id] }, verified: { verified: true, accepted: true, reference: payment.id, amount: "20.00", currency: "ZAR" } };
   }
   try {
+    await t.test("concurrent expiry releases a hold exactly once and late payment becomes credit", async () => {
+      const f = await fixture();
+      const now = new Date("2020-01-02T00:00:00Z");
+      await db.merchandiseOrder.update({ where: { id: f.order.id }, data: { expiresAt: new Date("2020-01-01T00:00:00Z") } });
+      const counts = await Promise.all([expireMerchandiseOrders(now), expireMerchandiseOrders(now)]);
+      assert.equal(counts.reduce((sum, count) => sum + count, 0), 1);
+      assert.equal((await db.product.findUniqueOrThrow({ where: { id: f.product.id } })).quantityReserved, 0);
+      assert.equal((await db.product.findUniqueOrThrow({ where: { id: f.product.id } })).quantityOnHand, 10);
+      const expired = await db.merchandiseOrder.findUniqueOrThrow({ where: { id: f.order.id } });
+      assert.equal(expired.status, "EXPIRED");
+      assert.equal(expired.stockHeld, false);
+      assert.equal(await db.auditEvent.count({ where: { entityId: f.order.id, action: "merchandise_order.expired" } }), 1);
+      await settleVerifiedMerchandisePayment(f.payment.id, f.verified);
+      assert.equal((await db.merchandiseOrder.findUniqueOrThrow({ where: { id: f.order.id } })).status, "PAYMENT_REVIEW");
+      assert.equal((await db.account.findUniqueOrThrow({ where: { id: f.account.id } })).balance.toFixed(2), "-20.00");
+      assert.equal(await db.ledgerEntry.count({ where: { accountId: f.account.id } }), 1);
+      assert.equal((await db.product.findUniqueOrThrow({ where: { id: f.product.id } })).quantityReserved, 0);
+    });
+    await t.test("expiry leaves paid orders and unexpired holds untouched", async () => {
+      const paid = await fixture();
+      const pending = await fixture();
+      await settleVerifiedMerchandisePayment(paid.payment.id, paid.verified);
+      await db.merchandiseOrder.update({ where: { id: paid.order.id }, data: { expiresAt: new Date("2020-01-01T00:00:00Z") } });
+      assert.equal(await expireMerchandiseOrders(new Date("2020-01-02T00:00:00Z")), 0);
+      for (const f of [paid, pending]) {
+        assert.equal((await db.product.findUniqueOrThrow({ where: { id: f.product.id } })).quantityReserved, 2);
+        assert.equal((await db.merchandiseOrder.findUniqueOrThrow({ where: { id: f.order.id } })).stockHeld, true);
+      }
+    });
+    await t.test("inconsistent stock reports failure but does not block later valid holds", async () => {
+      const bad = await fixture();
+      const good = await fixture();
+      const now = new Date("2020-01-03T00:00:00Z");
+      await db.product.update({ where: { id: bad.product.id }, data: { quantityReserved: 0 } });
+      await db.merchandiseOrder.update({ where: { id: bad.order.id }, data: { expiresAt: new Date("2020-01-01T00:00:00Z") } });
+      await db.merchandiseOrder.update({ where: { id: good.order.id }, data: { expiresAt: new Date("2020-01-02T00:00:00Z") } });
+      await assert.rejects(expireMerchandiseOrders(now), /MERCHANDISE_EXPIRY_PARTIAL_FAILURE/);
+      assert.equal((await db.merchandiseOrder.findUniqueOrThrow({ where: { id: bad.order.id } })).status, "AWAITING_PAYMENT");
+      assert.equal(await db.auditEvent.count({ where: { entityId: bad.order.id, action: "merchandise_order.expired" } }), 0);
+      assert.equal((await db.merchandiseOrder.findUniqueOrThrow({ where: { id: good.order.id } })).status, "EXPIRED");
+      assert.equal((await db.product.findUniqueOrThrow({ where: { id: good.product.id } })).quantityReserved, 0);
+      // Repair only this isolated fixture, then prove retry succeeds without releasing good twice.
+      await db.product.update({ where: { id: bad.product.id }, data: { quantityReserved: 2 } });
+      assert.equal(await expireMerchandiseOrders(now), 1);
+      assert.equal(await expireMerchandiseOrders(now), 0);
+    });
     await t.test("concurrent duplicate checkout holds stock once", async () => {
       const f = await fixture();
       const input = { unit: `account:${f.account.id}`, idempotencyKey: randomUUID(), items: [{ productId: f.product.id, quantity: 3 }] };
