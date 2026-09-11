@@ -1,5 +1,13 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Remaining admin updates — 11 September 2026
+
+- Implementation: carries forward the still-missing changes from existing PRs #22 and #23 onto current main: bounded production-health retries with non-cancelling concurrency, and owner-only staff MFA enrollment visibility. Health response criteria unchanged; only enabledAt is selected for MFA, no secrets or enrollment mutation. Older merchandise tracking PR #56 is not blindly merged because subsequent merchandise implementation supersedes parts of its status claims.
+- Testing: no additional local tests at the user's explicit request. Required GitHub CI remains the promotion gate; live monitor-cycle observation and staff UI UAT pending.
+- Commit/push: prepared on codex/remaining-admin-updates from current origin/main f9d9bbdd16c6a692bd385a3010f20c9159a6491b; promotion evidence follows.
+- Merge: pending CI. Deployment/configuration: pending; no schema or secrets changes.
+- Live verification: not performed. All previous financial/provider/legal/data/training/UAT gates remain open. This does not claim the full backlog complete.
+
 ## My STOR24 branded sign-in — 11 September 2026
 
 - Implementation: dark-green/orange welcome panel with existing STOR24 storage-unit artwork, warmer welcome/code-entry copy, document benefits and compact mobile composition. Tenant authentication and financial APIs unchanged.
