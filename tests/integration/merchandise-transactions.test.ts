@@ -42,6 +42,7 @@ test("isolated PostgreSQL merchandise settlement and cancellation", async t => {
       assert.equal(product.quantityOnHand, 10);
       assert.equal(product.quantityReserved, 0);
       assert.equal(await db.stockMovement.count({ where: { reference: f.order.id } }), 0);
+      await assert.rejects(fulfilMerchandiseOrder(f.order.id, { organisationId: f.order.organisationId, facilityId: f.order.facilityId, user: { id: "ci-not-used" } }), /MERCHANDISE_NOT_FULFILLABLE/);
     });
     await t.test("signed reservation purchases use the exact booking account without conversion", async () => {
       const f = await fixture();

@@ -6,7 +6,7 @@ export async function fulfilMerchandiseOrder(orderId: string, scope: { organisat
   return db.$transaction(async tx => {
       await tx.$queryRaw`SELECT "id" FROM "MerchandiseOrder" WHERE "id" = ${orderId} FOR UPDATE`;
       const order = await tx.merchandiseOrder.findUniqueOrThrow({ where: { id: orderId }, include: { items: true, payment: { select: { id: true, status: true, accountId: true, amount: true, currency: true } } } });
-      if (order.organisationId !== scope.organisationId || order.facilityId !== scope.facilityId) throw new Error("MERCHANDISE_NOT_FULFILLABLE");
+      if (order.isTest || order.organisationId !== scope.organisationId || order.facilityId !== scope.facilityId) throw new Error("MERCHANDISE_NOT_FULFILLABLE");
       if (order.status === "FULFILLED") return { id: order.id, status: order.status, fulfilledAt: order.fulfilledAt };
       assertMerchandiseFulfillable({ status: order.status as MerchandiseOrderStatus, paymentReference: order.paymentId ?? "", total: order.total.toString(), currency: order.currency, stockHeld: order.stockHeld });
       if (!order.payment || order.payment.status !== "SUCCEEDED" || order.payment.accountId !== order.accountId || !order.payment.amount.equals(order.total) || order.payment.currency !== order.currency) throw new Error("MERCHANDISE_NOT_FULFILLABLE");
