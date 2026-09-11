@@ -2,6 +2,10 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- Deployment confirmed 11 September: main CI34592847512 and deployment34592957745 succeeded for ae6301d24e562ff69c7bed3f05e697fceeffba39. Direct server checkout readback matches that SHA; container healthy. Unauthenticated orders GET returns401/private-no-store. Checkout/worker enablement unchanged; this is deployment/health evidence, not completed customer/provider UAT. Fresh-database migration replay defect remains open.
+
+- Transaction verification: bbd9f71 passed standard validate check103241336298 and isolated PostgreSQL transactions check103241335991. Duplicate concurrent success produced one charge/payment pair, non-owner cancellation rejected, and cancellation then late success retained released stock and posted review credit. These tests use db-push schema, not historical migration replay or real Netcash. PR105 merged ae6301d; main CI/deployment pending. Worker/checkout still not configured or enabled; fresh-install migration issue and end-to-end UAT remain open. The Codex continuation schedule was deleted at the user's request and has not been recreated.
+
 - Isolated CI exposed existing fresh-database migration failure: 20260909160000_package_hero_artwork references StoragePackage.imageUrl before 20260909170000_merchandise_images adds it (PostgreSQL42703/P3018). No applied production migration modified. Transaction CI now creates current schema in ephemeral localhost database via db push; this does NOT validate migration replay or SQL-only constraints. Fresh-install migration recovery remains explicitly open. Transaction results still pending.
 
 - User-requested background continuation schedule removed; work continues directly. Added isolated PostgreSQL CI tests for duplicate concurrent settlement, ownership rejection and cancelled-order late-payment credit/stock handling. Synthetic fixtures are limited to localhost CI database; not run locally or against production. Results pending; no claim of passing integration validation. Live checkout remains disabled.
