@@ -2,6 +2,8 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- CI 34578614798 passed on 25d6b3a. Added owned order-status page at /my/orders/[id] with server-read status, explicit pending/paid/review labels and sign-in navigation; no browser return claims change payment state. Provider redirect routing to it is still unwired. New increment CI pending, no local tests or deployment. Gate remains off and draft PR100 is not ready to merge.
+
 - Draft customer checkout control added after 42ac4ef: stable basket retry key, duplicate-click guard, fixed Netcash form destination, owned status/cancellation recovery and truthful unpaid/review messaging. Component is not mounted yet; no browser/payment action executed. Local tests not run, CI pending. No merge/deploy/config change; full catalogue integration and provider return/UAT gates remain.
 
 - Draft retry correction after ccf1632: an existing checkout idempotency key now requires the same physical unit and exact product quantities; changed baskets receive a conflict rather than the old order. No local tests; new CI pending. Not merged/deployed/enabled. The complete purchase UI and provider return path remain outstanding.
