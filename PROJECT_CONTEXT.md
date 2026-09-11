@@ -2,6 +2,8 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- Cancellation deployment verified by workflow: main CI34590574113/deployment34590724873 succeeded for9906df1. Added pure transition tests for pending EFT across all states and both payment/cancellation orderings; these are not database-concurrency proof. PR104 expiry resilience now open; tests execute in CI only. Checkout/configuration/UAT gates remain unchanged.
+
 - Recovery deployment evidence: PR102 merged e3d9721, main CI34590014502 and deployment34590154036 succeeded. PR103 cancellation passed checks on75b32c1 and merged9906df1; its deployment pending. No authenticated cancellation UAT or live transaction performed.
 - Next expiry resilience increment: a failed order release rolls back independently while later candidates in the batch continue; any failure still reports non-success for operator monitoring/retry. No stock corrected or released in production. Local tests not run; CI pending. Scheduler configuration, backlog monitoring and integrated financial checks remain gates; checkout stays disabled.
 
