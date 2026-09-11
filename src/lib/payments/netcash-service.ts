@@ -45,7 +45,7 @@ export async function createMerchandiseCheckout(session: Parameters<typeof tenan
     // A lost response requires cancellation/status recovery, not a second charge attempt.
     if (order.paymentId) throw new Error("MERCHANDISE_CHECKOUT_ALREADY_STARTED");
     const payment = await tx.payment.create({ data: { accountId: order.accountId, status: "PENDING", amount: order.total, currency: order.currency, method: "PAY_NOW", provider: "NETCASH", idempotencyKey: `merchandise:${order.id}` } });
-    const checkout = createPayNowCheckout(connection, { reference: payment.id, amount: Number(order.total.toFixed(2)), description: "STOR24 packing supplies", customerEmail: session.email, returnData: new URLSearchParams({ paymentId: payment.id, merchandiseOrderId: order.id }).toString(), extra1: order.id });
+    const checkout = createPayNowCheckout(connection, { reference: payment.id, amount: Number(order.total.toFixed(2)), description: "STOR24 packing supplies", customerEmail: session.email, returnData: new URLSearchParams({ paymentId: payment.id, merchandiseOrderId: order.id }).toString(), extra1: order.id, extra2: "merchandise" });
     await tx.payment.update({ where: { id: payment.id }, data: { providerRef: payment.id } });
     await tx.merchandiseOrder.update({ where: { id: order.id }, data: { paymentId: payment.id } });
     await tx.auditEvent.create({ data: { organisationId: order.organisationId, facilityId: order.facilityId, action: "merchandise_order.checkout_started", entityType: "MerchandiseOrder", entityId: order.id, after: { paymentId: payment.id } } });

@@ -12,6 +12,8 @@ Disabling `TENANT_MERCHANDISE_CHECKOUT_ENABLED` must stop new checkouts without 
 
 ## Remaining promotion gates
 
+Return-route inspection: the public repository currently routes both Netcash accept and decline to `/pay/netcash/return`, and decline invokes the booking cancellation endpoint. Merchandise forms now include `Extra2=merchandise` as a navigation hint only. Public routing must branch to the fixed CRM `/my/orders/<orderId>` destination and skip booking cancellation for this flow. Neither the marker nor browser return is payment/ownership evidence: CRM session-scoped order lookup and verified webhook remain authoritative. This cross-repository change is not implemented yet; enablement stays blocked pending it.
+
 - Link a unique payment to its order before returning any Netcash form.
 - Complete tenant checkout, authenticated return/cancel/status handling and staff fulfilment UI.
 - Mount the single purchases/catalogue/basket journey; remove duplicate request sections without mislabelling old requests as purchases.
