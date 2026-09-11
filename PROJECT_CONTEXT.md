@@ -2,14 +2,23 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+### Reservation checkout correction — 11 September 2026
+
+- User UAT exposed a missed branch: Unit107 is a signed reservation with an exact reservation-bound account, not a converted tenancy. The UI allowed shopping but holdTenantMerchandise rejected every reservation key, producing generic503 and a locked basket. The previous enabled-button check was not successful checkout proof.
+- Implementation: resolve signed ACTIVE unconverted reservations to their exact same-customer ST24-T reservation account, retaining verified organisation/customer scope, server pricing, stock and idempotency safeguards. Does not convert bookings or grant access. Explicit known pre-checkout failures unlock the basket; ambiguous network failures retain safe retry/idempotency handling.
+- Testing: added isolated DB coverage for signed reservation purchases, unsigned/cancelled/wrong-owner/wrong-organisation denial, duplicate stock hold and no tenancy conversion. CI pending; no production financial/data mutation for diagnosis.
+- Commit/push/merge/deployment/live verification: pending this correction. Existing scoped test enablement and expiry unchanged. Provider completion, payment settlement, receipt and fulfilment UAT remain open.
+
 ### Controlled merchandise checkout access — 11 September 2026
 
 - Implementation: one shared server-side gate for catalogue, stock hold and provider form. Global checkout remains opt-in; a separately configured exact organisation/verified-session email can test until a mandatory expiry. Test access does not change the provider environment, full basket amount, ownership, stock or settlement safeguards. UI explicitly warns this is not a simulated payment.
-- Testing: new pure gate and source-contract checks added for default-off, identity/organisation mismatch, expiry and shared enforcement. CI pending; no local test or customer payment submitted.
+- Testing: final implementation dc873ea passed validate103274039698 (types/lint/tests/schema/build) and isolated PostgreSQL transactions103274040071. Pure gate/source-contract checks cover default-off, identity/organisation mismatch, expiry and shared enforcement. No local test or customer payment submitted; source contracts are not provider proof.
 - Initial CI b2e2f7c found a TypeScript environment-shape mismatch before tests; added the string-indexed environment type and documented the configuration. Replacement CI pending; failed revision not deployed.
 - Read-only production configuration check found Netcash is organisation-wide, not store-specific. Merchandise now explicitly opts into same-organisation default fallback only when no store-specific connection exists; other callers retain previous behaviour. No credentials changed or exposed. Added source-contract regression; provider UAT remains open.
-- Commit/push/merge/deployment/configuration: pending for this increment. Intended configuration is Brett's existing verified account only, with time-limited access; general tenant checkout remains disabled.
-- Live verification and open gates: pending authenticated catalogue/button readback. Actual Netcash checkout, provider-approved testing, settlement, receipt and fulfilment UAT remain open; this enablement is not launch approval.
+- Commit/push/merge: implementation pushed and PR118 merged as7f29759b4a9413a544c9cee6211db0784f384604 after both checks passed. Earlier 15:00 session evidence is consolidated on main in this release.
+- Deployment/configuration: manual deployment34603055946 succeeded for exact verified merge7f29759; SSH confirms stor24-crm:7f29759 healthy. Running-container readback confirms global checkout false, exact intended test identity configured, expiry2026-09-11T18:00:00Z (20:00 SAST). Provider keys/processing settings unchanged.
+- Live verification: authenticated browser refreshed successfully; selected Unit107 and restored the user's original basket (one disc padlock, one archive box, three large moving boxes, three pallet wraps), eight items/R1355.92. Controlled-access notice visible and Continue to secure payment enabled. Unauthenticated tenant orders endpoint returns401. No checkout submission, payment, order or stock mutation performed; only local basket quantities restored.
+- Open gates: actual Netcash checkout, provider-approved testing, settlement, receipt and fulfilment UAT remain open; this enablement is not launch approval. Other tenants remain disabled by configuration, backed by identity/organisation/expiry unit tests; no second real tenant session impersonated for verification.
 
 ### 15:00 SAST test-session handoff — 11 September 2026
 

@@ -29,9 +29,12 @@ export async function POST(request: Request) {
     }
   } catch (error) {
     if (error instanceof Error && error.message === "MERCHANDISE_RETRY_CONFLICT") return Response.json({ error: "This basket has changed. Start a new basket before checking out." }, { status: 409, headers: tenantPrivateHeaders });
-    if (error instanceof Error && error.message === "MERCHANDISE_CHECKOUT_DISABLED") return Response.json({ error: "Online purchases are not available yet." }, { status: 503, headers: tenantPrivateHeaders });
+    if (error instanceof Error && error.message === "MERCHANDISE_CHECKOUT_DISABLED") return Response.json({ error: "Online purchases are not available yet.", checkoutNotStarted: true }, { status: 503, headers: tenantPrivateHeaders });
     if (error instanceof Error && error.message === "MERCHANDISE_UNAVAILABLE") return Response.json({ error: "Stock or prices changed. Refresh the catalogue and choose again." }, { status: 409, headers: tenantPrivateHeaders });
-    return tenantError(error);
+    // No provider form is returned from this outer failure path. Preserve the
+    // idempotency key on the client, but allow correcting the basket.
+    const response = tenantError(error);
+    return Response.json({ ...(await response.json()), checkoutNotStarted: true }, { status: response.status, headers: tenantPrivateHeaders });
   }
 }
 
