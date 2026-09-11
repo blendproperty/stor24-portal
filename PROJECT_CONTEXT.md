@@ -2,6 +2,8 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- Fresh-install verification: 03448a8 passed standard validate103247888394 and migration-backed PostgreSQL transactions103247888111. Original migrations now complete through the explicit empty-database bootstrap, followed by transaction checks; no historical migration files modified. PR107 merged0f25e60; main CI/deployment pending. Production database bootstrap was not executed. Normal pristine migrate-deploy still encounters the historical ordering defect; new installations must use the guarded bootstrap. Checkout/provider/UAT gates remain open.
+
 - Fresh-database work: added explicit-opt-in empty-schema bootstrap that refuses populated databases, recognises only the known artwork/prerequisite ordering failure, applies the original prerequisite SQL and uses Prisma resolve before replaying remaining migrations. Historical migration files/checksums unchanged; no production execution. Transaction CI now uses this migration-backed bootstrap instead of db push. Results pending; this is not yet verified recovery tooling.
 
 - Isolated CI exposed existing fresh-database migration failure: 20260909160000_package_hero_artwork references StoragePackage.imageUrl before 20260909170000_merchandise_images adds it (PostgreSQL42703/P3018). No applied production migration modified. Transaction CI now creates current schema in ephemeral localhost database via db push; this does NOT validate migration replay or SQL-only constraints. Fresh-install migration recovery remains explicitly open. Transaction results still pending.
