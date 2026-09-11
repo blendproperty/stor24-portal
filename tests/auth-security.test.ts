@@ -4,6 +4,19 @@ import { permissionGranted } from "../src/lib/permissions.ts";
 import { createResetToken, hashResetToken } from "../src/lib/password-reset.ts";
 import { isPublicPathname } from "../src/proxy.ts";
 
+test("dedicated merchandise worker reaches its credential handler without exposing staff APIs", () => {
+  assert.equal(isPublicPathname("/api/v1/operations/merchandise-orders/expire"), true);
+  for (const path of ["/api/v1/operations/merchandise-orders", "/api/v1/operations/merchandise-orders/expire/extra", "/api/v1/operations/merchandise-orders/expired", "/operations/merchandise"]) {
+    assert.equal(isPublicPathname(path), false);
+  }
+});
+
+test("tenant order shell uses tenant API authentication rather than staff login", () => {
+  assert.equal(isPublicPathname("/my/orders/test-order_1"), true);
+  assert.equal(isPublicPathname("/my/orders/test-order_1/admin"), false);
+  assert.equal(isPublicPathname("/my/admin"), false);
+});
+
 test("session proxy allows only the HMAC-authenticated BlendSign webhook path", () => {
   assert.equal(isPublicPathname("/api/webhooks/blendsign"), true);
   assert.equal(isPublicPathname("/api/webhooks/blendsign/anything"), true);
