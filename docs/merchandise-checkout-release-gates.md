@@ -4,6 +4,8 @@
 
 ## Stock expiry worker
 
+The repository includes a five-minute GitHub Actions worker, gated by repository variable `MERCHANDISE_EXPIRY_WORKER_ENABLED=true`. Its dedicated secret `MERCHANDISE_CRON_KEY` must correspond to the app's configured digest. Neither secret nor enablement variable has been set by this change. GitHub schedules can be delayed; expiry is not an exact-time SLA. Verify successful manual dispatch and recurring runs, then backlog drainage, before allowing customer checkout. Keep the worker enabled when disabling new checkouts so existing holds still expire.
+
 The authenticated POST `/api/v1/operations/merchandise-orders/expire` processes at most 100 expired unpaid orders per call. Configure a dedicated high-entropy credential outside source control; only its SHA-256 hex digest belongs in `MERCHANDISE_CRON_SECRET_SHA256`. The scheduler presents the raw credential in `x-cron-key`. Do not reuse a tenant session, staff password or billing worker credential.
 
 Before checkout enablement, an operator must install and verify a recurring worker, monitor non-2xx responses, and ensure the backlog drains. The route is implemented, but no production credential or schedule has been installed. A stock inconsistency fails the current batch and needs investigation; it must not be cleared by blindly adjusting inventory. Order locks make retries safe against payment/cancellation, but transactional integration evidence remains outstanding.
