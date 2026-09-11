@@ -4,6 +4,8 @@
 
 ### Promotion update — 11 September 2026
 
+- Final deployment evidence: main CI34589177812 and deployment34589286052 succeeded. Direct SSH readback confirms f3115cdadda134c6588188cb5b6af75b93edc33f and healthy container. Unauthenticated /api/tenant/orders returned 401 with private/no-store headers. Public deployment34589210724 succeeded. This verifies release/unauthenticated boundary only, not authenticated financial UAT; live checkout remains disabled and all stated gates persist.
+
 - Implementation: unit purchases/catalogue/checkout controls, staff fulfilment queue, persistent orders/stock holds, verified settlement and expiry endpoint merged as a gated increment, not a completed paid-purchasing release.
 - Testing: PR head 387a0eb passed CI 34588772504. No new local tests at user request. Integrated financial/concurrency and authenticated customer UAT remain outstanding.
 - Commit/push/merge: PR100 merged as f3115cdadda134c6588188cb5b6af75b93edc33f. Companion public PR55 merged as 71f0e1337474ded0695fd2f0d9151a6c38779240 after CI 34588989401 passed.
