@@ -2,6 +2,14 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+### Promotion update — 11 September 2026
+
+- Implementation: unit purchases/catalogue/checkout controls, staff fulfilment queue, persistent orders/stock holds, verified settlement and expiry endpoint merged as a gated increment, not a completed paid-purchasing release.
+- Testing: PR head 387a0eb passed CI 34588772504. No new local tests at user request. Integrated financial/concurrency and authenticated customer UAT remain outstanding.
+- Commit/push/merge: PR100 merged as f3115cdadda134c6588188cb5b6af75b93edc33f. Companion public PR55 merged as 71f0e1337474ded0695fd2f0d9151a6c38779240 after CI 34588989401 passed.
+- Deployment: main CI 34589177812 running; automatic deployment awaits success. Public deployment 34589210724 running. Do not infer deployment from merge.
+- Configuration/live: production checkout enablement variable was absent on read-only check; no configuration changed, no orders/payments/stock mutations performed. Checkout must remain disabled pending expiry-worker setup, return/reload recovery and end-to-end verification. No authenticated live verification; session needs user sign-in.
+
 - Cross-repository continuation: public stor24 branch codex/merchandise-payment-returns pushed 2cd8959, wiring marked accept/decline navigation to the fixed CRM order page and skipping booking cancellation for merchandise. Public context updated. Both changes remain draft, unmerged and undeployed; required CI/UAT, worker configuration and reload/payment recovery still outstanding. No live charging or customer-data changes.
 
 - Return-route inspection found public accept/decline still target booking result logic. Added merchandise navigation marker to form and recorded exact cross-repository routing gate; no public-repository edit or production configuration change. Marker is not payment proof. New draft increment CI pending, no local tests/merge/deploy; do not enable before public return integration and UAT.
