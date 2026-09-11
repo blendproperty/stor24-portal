@@ -1,15 +1,11 @@
 import { db } from "@/lib/db";
 import { tenantCustomerScope } from "@/lib/tenant-portal-security";
 import { merchandiseRequestSchema, priceMerchandise } from "@/lib/tenant-merchandise";
-
-/** Deliberately off until the complete checkout/provider/fulfilment path is approved. */
-export function assertMerchandiseCheckoutEnabled() {
-  if (process.env.TENANT_MERCHANDISE_CHECKOUT_ENABLED !== "true") throw new Error("MERCHANDISE_CHECKOUT_DISABLED");
-}
+import { assertMerchandiseCheckoutEnabled } from "@/lib/merchandise-checkout-access";
 
 /** No caller accepts a client price, facility, customer or payment amount. */
 export async function holdTenantMerchandise(session: Parameters<typeof tenantCustomerScope>[0], raw: unknown) {
-  assertMerchandiseCheckoutEnabled();
+  assertMerchandiseCheckoutEnabled(session);
   const input = merchandiseRequestSchema.parse(raw);
   if (!input.unit.startsWith("account:")) throw new Error("MERCHANDISE_ACTIVE_TENANCY_REQUIRED");
   const accountId = input.unit.slice(8);

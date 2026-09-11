@@ -2,6 +2,13 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+### Controlled merchandise checkout access — 11 September 2026
+
+- Implementation: one shared server-side gate for catalogue, stock hold and provider form. Global checkout remains opt-in; a separately configured exact organisation/verified-session email can test until a mandatory expiry. Test access does not change the provider environment, full basket amount, ownership, stock or settlement safeguards. UI explicitly warns this is not a simulated payment.
+- Testing: new pure gate and source-contract checks added for default-off, identity/organisation mismatch, expiry and shared enforcement. CI pending; no local test or customer payment submitted.
+- Commit/push/merge/deployment/configuration: pending for this increment. Intended configuration is Brett's existing verified account only, with time-limited access; general tenant checkout remains disabled.
+- Live verification and open gates: pending authenticated catalogue/button readback. Actual Netcash checkout, provider-approved testing, settlement, receipt and fulfilment UAT remain open; this enablement is not launch approval.
+
 ### 15:00 SAST test-session handoff — 11 September 2026
 
 - Implementation: PR117 includes branded tenant order shell without staff navigation, confirmed-payment receipt action, unit filtering before purchase limit, and bounded expiry-worker network retries. No live checkout enablement.
