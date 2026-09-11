@@ -3,6 +3,24 @@ import test from "node:test";
 import { amountInCents, assertMerchandiseFulfillable, merchandiseCancellationDecision, merchandisePaymentDecision, type MerchandiseOrderSnapshot } from "../src/lib/merchandise-order-policy";
 const order: MerchandiseOrderSnapshot = { status: "AWAITING_PAYMENT", paymentReference: "payment-one", total: "125.97", currency: "ZAR", stockHeld: true };
 const payment = { verified: true, accepted: true, reference: "payment-one", amount: "125.97", currency: "ZAR" };
+
+test("pending EFT notifications never release stock or post a payment", () => {
+  for (const status of ["AWAITING_PAYMENT", "PAID", "FULFILLED", "PAYMENT_REVIEW", "CANCELLED", "EXPIRED"] as const) {
+    for (const stockHeld of [true, false]) {
+      assert.deepEqual(merchandisePaymentDecision({ ...order, status, stockHeld }, { ...payment, accepted: false }), { status, postPayment: false, releaseStock: false });
+    }
+  }
+});
+
+test("payment and cancellation ordering cannot authorise released-stock fulfilment", () => {
+  const cancelled = merchandiseCancellationDecision(order);
+  const afterCancel = { ...order, status: cancelled.status, stockHeld: !cancelled.releaseStock };
+  const latePayment = merchandisePaymentDecision(afterCancel, payment);
+  assert.equal(latePayment.status, "PAYMENT_REVIEW");
+  assert.throws(() => assertMerchandiseFulfillable({ ...afterCancel, status: latePayment.status }));
+  const paid = { ...order, status: merchandisePaymentDecision(order, payment).status };
+  assert.deepEqual(merchandiseCancellationDecision(paid), { status: "PAID", releaseStock: false });
+});
 test("merchandise requires verified matching reference, exact total and currency", () => {
   assert.deepEqual(merchandisePaymentDecision(order, payment), { status: "PAID", postPayment: true, releaseStock: false });
   for (const change of [{ verified: false }, { reference: "other" }, { amount: "10.00" }, { currency: "USD" }]) assert.throws(() => merchandisePaymentDecision(order, { ...payment, ...change }), /MISMATCH/);

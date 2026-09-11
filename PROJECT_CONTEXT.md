@@ -2,6 +2,11 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- Cancellation deployment verified by workflow: main CI34590574113/deployment34590724873 succeeded for9906df1. Added pure transition tests for pending EFT across all states and both payment/cancellation orderings; these are not database-concurrency proof. PR104 expiry resilience now open; tests execute in CI only. Checkout/configuration/UAT gates remain unchanged.
+
+- Recovery deployment evidence: PR102 merged e3d9721, main CI34590014502 and deployment34590154036 succeeded. PR103 cancellation passed checks on75b32c1 and merged9906df1; its deployment pending. No authenticated cancellation UAT or live transaction performed.
+- Next expiry resilience increment: a failed order release rolls back independently while later candidates in the batch continue; any failure still reports non-success for operator monitoring/retry. No stock corrected or released in production. Local tests not run; CI pending. Scheduler configuration, backlog monitoring and integrated financial checks remain gates; checkout stays disabled.
+
 - Recovery PR102 passed checks on0375b4a and merged ase3d9721; main CI/deployment pending. Next increment adds explicit unpaid-order cancellation confirmation on the recovered order page, respecting server-returned status if payment wins the race. No local tests or live cancellation; CI pending and checkout remains disabled.
 
 - Order-recovery increment: pending/review orders now have an owned account-and-unit-scoped endpoint and visible status links on return to the portal, separate from paid purchase history. No browser storage or unsigned payment claims used. Local tests not run; CI pending. This increment is not merged/deployed; existing checkout enablement and provider/UAT gates remain.
