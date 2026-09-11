@@ -23,7 +23,7 @@ function UnitPurchases({ unitKey, unitId, unitNumber, accountId, canShop }: Purc
     if (!accountId) return;
     let disposed = false;
     const controller = new AbortController();
-    fetch(`/api/tenant/orders?account=${encodeURIComponent(accountId)}`, { cache: "no-store", signal: controller.signal }).then(async response => {
+    fetch(`/api/tenant/orders?account=${encodeURIComponent(accountId)}&unit=${encodeURIComponent(unitId)}`, { cache: "no-store", signal: controller.signal }).then(async response => {
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Your purchases could not be loaded.");
       if (!disposed) setPurchases(body.data.filter((order: Purchase) => order.unitId === unitId));

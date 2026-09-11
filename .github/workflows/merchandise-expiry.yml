@@ -19,7 +19,7 @@ jobs:
           MERCHANDISE_CRON_KEY: ${{ secrets.MERCHANDISE_CRON_KEY }}
         run: |
           test -n "$MERCHANDISE_CRON_KEY"
-          response="$(curl --fail --silent --show-error --max-time 120 --connect-timeout 10 \
+          response="$(curl --fail --silent --show-error --max-time 40 --connect-timeout 10 --retry 2 --retry-delay 3 --retry-max-time 100 --retry-connrefused \
             --request POST \
             --header "x-cron-key: $MERCHANDISE_CRON_KEY" \
             'https://stor24-site.srv938083.hstgr.cloud/api/v1/operations/merchandise-orders/expire')"
