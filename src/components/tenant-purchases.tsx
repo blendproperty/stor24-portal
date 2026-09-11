@@ -2,12 +2,16 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { TenantMerchandise } from "@/components/tenant-merchandise";
+import { TenantPendingOrders } from "@/components/tenant-pending-orders";
 import { formatSouthAfricaDate } from "@/lib/south-africa-time";
 type Purchase = { id: string; unitId: string; status: string; total: string; currency: string; paymentId: string | null; createdAt: string; fulfilledAt: string | null; items: { name: string; quantity: number; unitPrice: string; product: { imageUrl: string | null } }[] };
 type PurchaseProps = { unitKey: string; unitId: string; unitNumber: string; accountId: string | null; canShop: boolean };
 export function TenantPurchases(props: PurchaseProps) {
   // Reset the whole purchase/basket state synchronously on unit/account changes.
-  return <UnitPurchases key={`${props.unitKey}:${props.unitId}:${props.accountId ?? "none"}`} {...props} />;
+  return <div key={`${props.unitKey}:${props.unitId}:${props.accountId ?? "none"}`}>
+    {props.accountId && <TenantPendingOrders accountId={props.accountId} unitId={props.unitId} />}
+    <UnitPurchases {...props} />
+  </div>;
 }
 function UnitPurchases({ unitKey, unitId, unitNumber, accountId, canShop }: PurchaseProps) {
   const [purchases, setPurchases] = useState<Purchase[]>([]);

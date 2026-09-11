@@ -2,6 +2,8 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- Order-recovery increment: pending/review orders now have an owned account-and-unit-scoped endpoint and visible status links on return to the portal, separate from paid purchase history. No browser storage or unsigned payment claims used. Local tests not run; CI pending. This increment is not merged/deployed; existing checkout enablement and provider/UAT gates remain.
+
 ### Promotion update — 11 September 2026
 
 - Final deployment evidence: main CI34589177812 and deployment34589286052 succeeded. Direct SSH readback confirms f3115cdadda134c6588188cb5b6af75b93edc33f and healthy container. Unauthenticated /api/tenant/orders returned 401 with private/no-store headers. Public deployment34589210724 succeeded. This verifies release/unauthenticated boundary only, not authenticated financial UAT; live checkout remains disabled and all stated gates persist.
