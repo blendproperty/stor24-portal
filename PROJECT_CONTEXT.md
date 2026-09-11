@@ -2,6 +2,8 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- Payment verification evidence, 11 September 2026: PR114 implementation b94413e passed isolated PostgreSQL transactions103262020471 and standard validate103262020328. Receipt route inspection confirms successful-payment and tenant-owner filters; this is source inspection, not authenticated PDF UAT. Evidence update pushed on the same unmerged branch; merge/deployment still pending. No runtime or production configuration changed. Fulfilment concurrency, provider-backed payment, receipt/download and full tenant journey UAT remain open; checkout remains disabled.
+
 - Payment verification increment, 11 September 2026: isolated database checks added for unverified/reference/amount/currency mismatch rejection without posting, pending-to-success transitions, preservation of an existing account balance, and later decline/cancellation not undoing a paid order. CI pending; no live provider call, charge or customer stock mutation. This is internal settlement verification, not end-to-end Netcash proof. Receipt authorisation, fulfilment concurrency and authenticated/provider UAT remain open; checkout stays disabled. Branch starts from current main to avoid the previous squash-merge conflict.
 
 - Verification evidence, 11 September 2026: PR112 head3f4f32f passed migration-backed transactions103258290614 and standard validate103258290546. All new expiry scenarios below passed in isolated PostgreSQL CI. Implementation/test commit pushed; merge and deployment pending at this record. This is database verification, not provider or authenticated customer UAT, and changes no runtime/configuration. Existing live checkout remains disabled; all outstanding launch gates preserved.
