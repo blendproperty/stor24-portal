@@ -24,6 +24,28 @@ test("isolated PostgreSQL merchandise settlement and cancellation", async t => {
     return { account, product, order, payment, session: { organisationId: org.id, email: customer.email!, customerIds: [customer.id] }, verified: { verified: true, accepted: true, reference: payment.id, amount: "20.00", currency: "ZAR" } };
   }
   try {
+    await t.test("signed reservation purchases use the exact booking account without conversion", async () => {
+      const f = await fixture();
+      const unit = await db.unit.findFirstOrThrow({ where: { facilityId: f.product.facilityId } });
+      const reservation = await db.reservation.create({ data: { facilityId: f.product.facilityId, unitId: unit.id, customerId: f.session.customerIds[0], quotedRate: "100.00", publicLease: { create: { status: "READY", version: "ci", paymentMethod: "CARD", content: "CI only", clauses: [], sha256: "ci", signingToken: randomUUID(), expiresAt: new Date(Date.now() + 60000) } } } });
+      const account = await db.account.create({ data: { customerId: f.session.customerIds[0], accountNumber: `ST24-T-${reservation.id}` } });
+      const input = { unit: `reservation:${reservation.id}`, idempotencyKey: randomUUID(), items: [{ productId: f.product.id, quantity: 1 }] };
+      await assert.rejects(holdTenantMerchandise(f.session, input), /TENANT_NOT_FOUND/);
+      await db.publicReservationLease.update({ where: { reservationId: reservation.id }, data: { status: "SIGNED" } });
+      await assert.rejects(holdTenantMerchandise({ ...f.session, customerIds: [] }, input), /TENANT_NOT_FOUND/);
+      await assert.rejects(holdTenantMerchandise({ ...f.session, organisationId: "wrong" }, input), /TENANT_NOT_FOUND/);
+      await db.reservation.update({ where: { id: reservation.id }, data: { status: "CANCELLED" } });
+      await assert.rejects(holdTenantMerchandise(f.session, input), /TENANT_NOT_FOUND/);
+      await db.reservation.update({ where: { id: reservation.id }, data: { status: "ACTIVE" } });
+      const [first, retry] = await Promise.all([holdTenantMerchandise(f.session, input), holdTenantMerchandise(f.session, input)]);
+      assert.equal(first.id, retry.id);
+      assert.equal(first.accountId, account.id);
+      assert.equal(first.unitId, unit.id);
+      assert.equal(first.total.toFixed(2), "10.00");
+      assert.equal((await db.product.findUniqueOrThrow({ where: { id: f.product.id } })).quantityReserved, 3);
+      assert.equal((await db.reservation.findUniqueOrThrow({ where: { id: reservation.id } })).convertedTenancyId, null);
+      assert.equal(await db.tenancy.count({ where: { accountId: account.id } }), 0);
+    });
     await t.test("staff fulfilment deducts stock once under concurrent requests", async () => {
       const f = await fixture();
       const user = await db.user.create({ data: { organisationId: f.order.organisationId, email: `${randomUUID()}@example.invalid`, name: "CI staff" } });

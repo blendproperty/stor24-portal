@@ -2,6 +2,13 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+### Reservation checkout correction — 11 September 2026
+
+- User UAT exposed a missed branch: Unit107 is a signed reservation with an exact reservation-bound account, not a converted tenancy. The UI allowed shopping but holdTenantMerchandise rejected every reservation key, producing generic503 and a locked basket. The previous enabled-button check was not successful checkout proof.
+- Implementation: resolve signed ACTIVE unconverted reservations to their exact same-customer ST24-T reservation account, retaining verified organisation/customer scope, server pricing, stock and idempotency safeguards. Does not convert bookings or grant access. Explicit known pre-checkout failures unlock the basket; ambiguous network failures retain safe retry/idempotency handling.
+- Testing: added isolated DB coverage for signed reservation purchases, unsigned/cancelled/wrong-owner/wrong-organisation denial, duplicate stock hold and no tenancy conversion. CI pending; no production financial/data mutation for diagnosis.
+- Commit/push/merge/deployment/live verification: pending this correction. Existing scoped test enablement and expiry unchanged. Provider completion, payment settlement, receipt and fulfilment UAT remain open.
+
 ### Controlled merchandise checkout access — 11 September 2026
 
 - Implementation: one shared server-side gate for catalogue, stock hold and provider form. Global checkout remains opt-in; a separately configured exact organisation/verified-session email can test until a mandatory expiry. Test access does not change the provider environment, full basket amount, ownership, stock or settlement safeguards. UI explicitly warns this is not a simulated payment.

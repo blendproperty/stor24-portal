@@ -17,7 +17,7 @@ export function TenantCheckout({ unitKey, items, disabled = false, onLocked }: {
       const body = await response.json();
       if (body.data?.orderId) setOrderId(body.data.orderId);
       if (!response.ok) {
-        if (!body.data?.orderId && response.status < 500) onLocked?.(false);
+        if (!body.data?.orderId && (response.status < 500 || body.checkoutNotStarted === true)) onLocked?.(false);
         throw new Error(body.error || "Checkout could not be opened.");
       }
       const formData = body.data.checkout;
