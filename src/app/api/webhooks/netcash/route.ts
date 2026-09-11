@@ -126,7 +126,9 @@ export async function POST(request: Request) {
       // no currency field. Both stored order and Payment must also be ZAR.
       // https://api.netcash.co.za/inbound-payments/pay-now/pay-now-ecommerce/
       await settleVerifiedMerchandisePayment(payment.id, { verified: true, reference: verified.reference!, amount: String(verified.amount), currency: "ZAR", accepted: verified.accepted });
-      await db.webhookInbox.update({ where: { id: inbox.id }, data: { status: "SUCCEEDED", processedAt: new Date() } });
+      // False may be an asynchronous EFT still pending; allow later accepted
+      // notification with the same RequestTrace to be verified and settled.
+      await db.webhookInbox.update({ where: { id: inbox.id }, data: { status: verified.accepted ? "SUCCEEDED" : "PENDING", processedAt: verified.accepted ? new Date() : null } });
       if (verified.accepted) await enqueueMriExport(payment.id).catch(() => undefined);
       return NextResponse.json({ received: true, matched: true, verified: true, accepted: verified.accepted });
     } catch {
