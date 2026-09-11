@@ -4,6 +4,11 @@ import { readFileSync } from "node:fs";
 import { merchandiseCheckoutEnabled } from "../src/lib/merchandise-checkout-access";
 
 const session = { organisationId: "org-test", email: "tester@example.com" };
+test("CSP permits the fixed Netcash form destination without allowing arbitrary hosts", () => {
+  const config = readFileSync("next.config.ts", "utf8");
+  assert.ok(config.includes("form-action 'self' https://paynow.netcash.co.za"));
+  assert.equal(config.includes("form-action *"), false);
+});
 const now = Date.parse("2026-09-11T13:00:00Z");
 const config = {
   TENANT_MERCHANDISE_TEST_ORGANISATION_ID: "org-test",

@@ -6,8 +6,9 @@
 
 - User UAT exposed a missed branch: Unit107 is a signed reservation with an exact reservation-bound account, not a converted tenancy. The UI allowed shopping but holdTenantMerchandise rejected every reservation key, producing generic503 and a locked basket. The previous enabled-button check was not successful checkout proof.
 - Implementation: resolve signed ACTIVE unconverted reservations to their exact same-customer ST24-T reservation account, retaining verified organisation/customer scope, server pricing, stock and idempotency safeguards. Does not convert bookings or grant access. Explicit known pre-checkout failures unlock the basket; ambiguous network failures retain safe retry/idempotency handling.
-- Testing: added isolated DB coverage for signed reservation purchases, unsigned/cancelled/wrong-owner/wrong-organisation denial, duplicate stock hold and no tenancy conversion. CI pending; no production financial/data mutation for diagnosis.
-- Commit/push/merge/deployment/live verification: pending this correction. Existing scoped test enablement and expiry unchanged. Provider completion, payment settlement, receipt and fulfilment UAT remain open.
+- Testing: final02f0cea passed validate103277003186 and transactions103277002831, including signed reservation purchases, unsigned/cancelled/wrong-owner/wrong-organisation denial, duplicate stock hold and no tenancy conversion.
+- Commit/push/merge/deployment: PR120 merged2e74ff6; deployment34603918157 succeeded and runtime2e74ff6 healthy. PR119 documentation consolidated here and duplicate PR closed. Scoped test enablement/expiry unchanged.
+- Live verification: read-only diagnosis confirmed Unit107 ACTIVE reservation/SIGNED lease, no converted tenancy and zero orders before retry. Authorised UI retry now creates an unpaid order and shows status/cancel controls, but does not reach Netcash: next.config.ts still restricts form-action to self. No payment submitted. Adding only the fixed Netcash payment host to form-action plus regression test; CI/deployment pending. The pending test order will be cancelled through normal UI before retry. Provider completion, settlement, receipt and fulfilment UAT remain open.
 
 ### Controlled merchandise checkout access — 11 September 2026
 
