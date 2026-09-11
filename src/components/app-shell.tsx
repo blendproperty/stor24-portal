@@ -65,7 +65,7 @@ export function AppShell({ children, session }: { children: React.ReactNode; ses
   const pathname = usePathname();
   const router = useRouter();
   const publicPage = pathname === "/login" || pathname === "/forgot-password" || pathname.startsWith("/reset-password/") || pathname.startsWith("/invite/") || pathname.startsWith("/setup/");
-  if (publicPage || pathname === "/my") return children;
+  if (publicPage || pathname === "/my" || pathname.startsWith("/my/")) return children;
 
   async function signOut() {
     await fetch("/api/auth/logout", { method: "POST" });

@@ -13,6 +13,8 @@ test("purchase requests include selected unit and server filtering precedes the 
 });
 
 test("order view uses tenant branding and receipts require a successful payment", () => {
+  const shell = readFileSync("src/components/app-shell.tsx", "utf8");
+  assert.ok(shell.includes('pathname.startsWith("/my/")'));
   const client = readFileSync("src/components/tenant-order-status.tsx", "utf8");
   const route = readFileSync("src/app/api/tenant/orders/[id]/route.ts", "utf8");
   assert.ok(client.includes('className="tenant-portal"'));
