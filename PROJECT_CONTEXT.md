@@ -2,6 +2,8 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- CI recovery confirmed: cd1134f passed 34586460881. Staff merchandise workspace now mounts the paid-order fulfilment queue in a separate collection/delivery panel, backed by inventory.manage/facility-scoped API. No actual fulfilment executed. New increment CI pending; no local tests, merge/deployment or config change. Customer top-level replacement/provider returns and integrated verification remain outstanding.
+
 - CI 34585861763 failed on 8b64674: React effect-state lint errors in the new queue/status controls. Corrected initial loading to asynchronous fetch callbacks with abort cleanup rather than calling state-mutating refresh functions directly from effects. Replacement CI pending; no local tests, merge, deployment or live mutation. Staff queue mounting deferred until checks pass.
 
 - Draft staff queue component prepared after 54454a5: paid/review/supplied labels, item quantities, explicit handover confirmation and permission-protected fulfil API. Not mounted yet and no stock movement performed. Local tests not run; CI pending. Draft remains unmerged/undeployed, with provider routing and full customer/staff UAT still outstanding.
