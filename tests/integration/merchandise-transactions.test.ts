@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
+import { fulfilMerchandiseOrder } from "../../src/lib/merchandise-order-fulfilment";
 import { db } from "../../src/lib/db";
 import { cancelTenantMerchandise, holdTenantMerchandise } from "../../src/lib/merchandise-order-service";
 import { expireMerchandiseOrders, settleVerifiedMerchandisePayment } from "../../src/lib/merchandise-order-settlement";
@@ -23,6 +24,36 @@ test("isolated PostgreSQL merchandise settlement and cancellation", async t => {
     return { account, product, order, payment, session: { organisationId: org.id, email: customer.email!, customerIds: [customer.id] }, verified: { verified: true, accepted: true, reference: payment.id, amount: "20.00", currency: "ZAR" } };
   }
   try {
+    await t.test("staff fulfilment deducts stock once under concurrent requests", async () => {
+      const f = await fixture();
+      const user = await db.user.create({ data: { organisationId: f.order.organisationId, email: `${randomUUID()}@example.invalid`, name: "CI staff" } });
+      const scope = { organisationId: f.order.organisationId, facilityId: f.order.facilityId, user };
+      await assert.rejects(fulfilMerchandiseOrder(f.order.id, scope), /MERCHANDISE_NOT_FULFILLABLE/);
+      await settleVerifiedMerchandisePayment(f.payment.id, f.verified);
+      await assert.rejects(fulfilMerchandiseOrder(f.order.id, { ...scope, facilityId: "wrong-store" }), /MERCHANDISE_NOT_FULFILLABLE/);
+      await assert.rejects(fulfilMerchandiseOrder(f.order.id, { ...scope, organisationId: "wrong-org" }), /MERCHANDISE_NOT_FULFILLABLE/);
+      await Promise.all([fulfilMerchandiseOrder(f.order.id, scope), fulfilMerchandiseOrder(f.order.id, scope)]);
+      const product = await db.product.findUniqueOrThrow({ where: { id: f.product.id } });
+      assert.equal(product.quantityOnHand, 8);
+      assert.equal(product.quantityReserved, 0);
+      assert.equal(await db.stockMovement.count({ where: { reference: f.order.id, type: "SALE" } }), 1);
+      assert.equal(await db.auditEvent.count({ where: { entityId: f.order.id, action: "merchandise_order.fulfilled" } }), 1);
+      const order = await db.merchandiseOrder.findUniqueOrThrow({ where: { id: f.order.id } });
+      assert.equal(order.status, "FULFILLED");
+      assert.equal(order.stockHeld, false);
+      assert.ok(order.fulfilledAt);
+      assert.equal(await db.ledgerEntry.count({ where: { accountId: f.account.id } }), 2);
+    });
+    await t.test("insufficient stock rolls back fulfilment without a sale or status change", async () => {
+      const f = await fixture();
+      const user = await db.user.create({ data: { organisationId: f.order.organisationId, email: `${randomUUID()}@example.invalid`, name: "CI staff" } });
+      await settleVerifiedMerchandisePayment(f.payment.id, f.verified);
+      await db.product.update({ where: { id: f.product.id }, data: { quantityOnHand: 1 } });
+      await assert.rejects(fulfilMerchandiseOrder(f.order.id, { organisationId: f.order.organisationId, facilityId: f.order.facilityId, user }), /MERCHANDISE_STOCK_REVIEW_REQUIRED/);
+      assert.equal((await db.merchandiseOrder.findUniqueOrThrow({ where: { id: f.order.id } })).status, "PAID");
+      assert.equal((await db.product.findUniqueOrThrow({ where: { id: f.product.id } })).quantityReserved, 2);
+      assert.equal(await db.stockMovement.count({ where: { reference: f.order.id } }), 0);
+    });
     await t.test("unverified or mismatched payment cannot post money or change stock", async () => {
       const f = await fixture();
       for (const invalid of [
