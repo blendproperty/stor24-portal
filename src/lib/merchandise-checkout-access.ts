@@ -1,5 +1,6 @@
 type CheckoutSession = { organisationId: string; email: string };
 type CheckoutConfig = {
+  [key: string]: string | undefined;
   TENANT_MERCHANDISE_CHECKOUT_ENABLED?: string;
   TENANT_MERCHANDISE_TEST_ORGANISATION_ID?: string;
   TENANT_MERCHANDISE_TEST_EMAIL?: string;
