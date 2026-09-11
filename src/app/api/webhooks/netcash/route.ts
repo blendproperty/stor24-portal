@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true, matched: false }, { status: 202 });
   }
 
-  const merchandiseOrder = await db.merchandiseOrder.findUnique({ where: { paymentId: payment.id }, select: { id: true } });
+  const merchandiseOrder = await db.merchandiseOrder.findUnique({ where: { paymentId: payment.id }, select: { id: true, isTest: true } });
   let inbox = await db.webhookInbox.create({
     data: {
       organisationId: account.customer.organisationId,
@@ -129,7 +129,7 @@ export async function POST(request: Request) {
       // False may be an asynchronous EFT still pending; allow later accepted
       // notification with the same RequestTrace to be verified and settled.
       await db.webhookInbox.update({ where: { id: inbox.id }, data: { status: verified.accepted ? "SUCCEEDED" : "PENDING", processedAt: verified.accepted ? new Date() : null } });
-      if (verified.accepted) await enqueueMriExport(payment.id).catch(() => undefined);
+      if (verified.accepted && !merchandiseOrder.isTest) await enqueueMriExport(payment.id).catch(() => undefined);
       return NextResponse.json({ received: true, matched: true, verified: true, accepted: verified.accepted });
     } catch {
       await db.webhookInbox.update({ where: { id: inbox.id }, data: { status: "FAILED", failureCode: "MERCHANDISE_SETTLEMENT_REVIEW", failureMessage: "Verified payment could not be settled against its merchandise order. Retry/reconciliation required." } });

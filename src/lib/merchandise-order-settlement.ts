@@ -8,8 +8,22 @@ export async function settleVerifiedMerchandisePayment(paymentId: string, verifi
     if (!linked) throw new Error("MERCHANDISE_ORDER_NOT_FOUND");
     // Same lock as cancellation/expiry: a late payment cannot resurrect released stock.
     await tx.$queryRaw`SELECT "id" FROM "MerchandiseOrder" WHERE "id" = ${linked.id} FOR UPDATE`;
-    const order = await tx.merchandiseOrder.findUniqueOrThrow({ where: { id: linked.id }, include: { payment: true } });
+    const order = await tx.merchandiseOrder.findUniqueOrThrow({ where: { id: linked.id }, include: { payment: true, items: true } });
     const payment = order.payment;
+    if (order.isTest) {
+      if (!payment || payment.accountId !== order.accountId || payment.provider !== "NETCASH" || payment.currency !== "ZAR" || order.currency !== "ZAR" || payment.amount.toFixed(2) !== "10.00" || !["TEST_PENDING", "TEST_SUCCEEDED"].includes(payment.status) || !verified.verified || verified.reference !== payment.id || verified.currency !== "ZAR" || Number(verified.amount) !== 10) throw new Error("MERCHANDISE_PAYMENT_MISMATCH");
+      if (!verified.accepted || payment.status === "TEST_SUCCEEDED") return order;
+      // Tests never post a ledger credit/charge, produce a paid receipt, export
+      // to finance or become fulfilment-eligible, including late callbacks.
+      if (order.stockHeld) for (const item of [...order.items].sort((a, b) => a.productId.localeCompare(b.productId))) {
+        const released = await tx.product.updateMany({ where: { id: item.productId, quantityReserved: { gte: item.quantity } }, data: { quantityReserved: { decrement: item.quantity } } });
+        if (released.count !== 1) throw new Error("MERCHANDISE_STOCK_REVIEW_REQUIRED");
+      }
+      await tx.payment.update({ where: { id: payment.id }, data: { status: "TEST_SUCCEEDED", processedAt: new Date() } });
+      const result = await tx.merchandiseOrder.update({ where: { id: order.id }, data: { status: "CANCELLED", stockHeld: false } });
+      await tx.auditEvent.create({ data: { organisationId: order.organisationId, facilityId: order.facilityId, action: "merchandise_order.test_verified", entityType: "MerchandiseOrder", entityId: order.id, after: { paymentId: payment.id, testAmount: "10.00", basketTotal: order.total.toFixed(2) } } });
+      return result;
+    }
     if (!payment || payment.accountId !== order.accountId || payment.provider !== "NETCASH" || payment.currency !== order.currency || payment.amount.toString() !== order.total.toString()) throw new Error("MERCHANDISE_PAYMENT_MISMATCH");
     const decision = merchandisePaymentDecision({ status: order.status as MerchandiseOrderStatus, paymentReference: payment.id, total: order.total.toFixed(2), currency: order.currency, stockHeld: order.stockHeld }, verified);
     if (!decision.postPayment) return order;

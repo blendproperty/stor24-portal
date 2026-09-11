@@ -2,6 +2,12 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+### R10 merchandise journey test — 11 September 2026
+
+- User approved R10 testing while retaining actual basket value. Implementation: immutable isTest order marker, separately opted-in scoped/expiring identity gate, sandbox-config requirement, fixed R10 form amount and explicit test copy. Existing full-value orders are not converted to tests.
+- Test settlements use TEST_PENDING/TEST_SUCCEEDED payment states, never financial SUCCEEDED. Independently verified R10 success releases the reservation only, closes the test order, writes an audit result and posts no ledger/credit/MRI export/receipt/stock sale. Basket total remains unchanged; no fulfilment eligibility. Pending/unknown provider results are not success.
+- Added additive migration and isolated duplicate-settlement regression proving unchanged balance, no ledger/sale and retained basket value. CI pending. Commit/push/merge/deployment/configuration/live provider verification pending. Real settlement/fulfilment/return UAT and launch gates remain open.
+
 ### Reservation checkout correction — 11 September 2026
 
 - Handoff follow-up: PR121 implementation18d2d0a passed validate103278448094 and transactions103278448427, merged4abbcfb. Exact-ref deployment34604353698 succeeded; running image4abbcfbe healthy. The blocked unpaid test order was cancelled through tenant UI; read-only DB confirms CANCELLED, stockHeld=false, total1355.92.

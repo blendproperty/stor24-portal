@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
-import { merchandiseCheckoutEnabled } from "../src/lib/merchandise-checkout-access";
+import { merchandiseCheckoutEnabled, merchandiseCheckoutTestMode } from "../src/lib/merchandise-checkout-access";
 
 const session = { organisationId: "org-test", email: "tester@example.com" };
 test("CSP permits the fixed Netcash form destination without allowing arbitrary hosts", () => {
@@ -15,6 +15,11 @@ const config = {
   TENANT_MERCHANDISE_TEST_EMAIL: "tester@example.com",
   TENANT_MERCHANDISE_TEST_EXPIRES_AT: "2026-09-11T18:00:00Z",
 };
+test("R10 test requires separate opt-in and matching unexpired test identity, even with global checkout on", () => {
+  assert.equal(merchandiseCheckoutTestMode(session, config, now), false);
+  assert.equal(merchandiseCheckoutTestMode(session, { ...config, TENANT_MERCHANDISE_R10_TEST: "true" }, now), true);
+  assert.equal(merchandiseCheckoutTestMode({ ...session, email: "other@example.com" }, { ...config, TENANT_MERCHANDISE_R10_TEST: "true", TENANT_MERCHANDISE_CHECKOUT_ENABLED: "true" }, now), false);
+});
 test("known pre-checkout failures unlock the basket without clearing retry protection", () => {
   const client = readFileSync("src/components/tenant-checkout.tsx", "utf8");
   const route = readFileSync("src/app/api/tenant/orders/route.ts", "utf8");

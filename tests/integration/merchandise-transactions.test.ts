@@ -24,6 +24,25 @@ test("isolated PostgreSQL merchandise settlement and cancellation", async t => {
     return { account, product, order, payment, session: { organisationId: org.id, email: customer.email!, customerIds: [customer.id] }, verified: { verified: true, accepted: true, reference: payment.id, amount: "20.00", currency: "ZAR" } };
   }
   try {
+    await t.test("R10 test success is idempotent and cannot settle basket, credit balance or release goods", async () => {
+      const f = await fixture();
+      await db.merchandiseOrder.update({ where: { id: f.order.id }, data: { isTest: true } });
+      await db.payment.update({ where: { id: f.payment.id }, data: { amount: "10.00", status: "TEST_PENDING" } });
+      await assert.rejects(settleVerifiedMerchandisePayment(f.payment.id, f.verified), /MERCHANDISE_PAYMENT_MISMATCH/);
+      const verified = { ...f.verified, amount: "10.00" };
+      await Promise.all([settleVerifiedMerchandisePayment(f.payment.id, verified), settleVerifiedMerchandisePayment(f.payment.id, verified)]);
+      const order = await db.merchandiseOrder.findUniqueOrThrow({ where: { id: f.order.id } });
+      assert.equal(order.total.toFixed(2), "20.00");
+      assert.equal(order.status, "CANCELLED");
+      assert.equal(order.stockHeld, false);
+      assert.equal((await db.payment.findUniqueOrThrow({ where: { id: f.payment.id } })).status, "TEST_SUCCEEDED");
+      assert.equal(await db.ledgerEntry.count({ where: { accountId: f.account.id } }), 0);
+      assert.equal((await db.account.findUniqueOrThrow({ where: { id: f.account.id } })).balance.toFixed(2), "0.00");
+      const product = await db.product.findUniqueOrThrow({ where: { id: f.product.id } });
+      assert.equal(product.quantityOnHand, 10);
+      assert.equal(product.quantityReserved, 0);
+      assert.equal(await db.stockMovement.count({ where: { reference: f.order.id } }), 0);
+    });
     await t.test("signed reservation purchases use the exact booking account without conversion", async () => {
       const f = await fixture();
       const unit = await db.unit.findFirstOrThrow({ where: { facilityId: f.product.facilityId } });

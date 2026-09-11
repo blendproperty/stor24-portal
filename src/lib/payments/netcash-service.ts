@@ -9,7 +9,7 @@
 import { db } from "@/lib/db";
 import { randomUUID } from "node:crypto";
 import { tenantCustomerScope } from "@/lib/tenant-portal-security";
-import { assertMerchandiseCheckoutEnabled } from "@/lib/merchandise-checkout-access";
+import { assertMerchandiseCheckoutEnabled, merchandiseCheckoutTestMode } from "@/lib/merchandise-checkout-access";
 import {
   getNetcashConnection,
   createEMandateSync,
@@ -44,8 +44,10 @@ export async function createMerchandiseCheckout(session: Parameters<typeof tenan
     // Never issue a second form for a single-use reference or reset a pending payment.
     // A lost response requires cancellation/status recovery, not a second charge attempt.
     if (order.paymentId) throw new Error("MERCHANDISE_CHECKOUT_ALREADY_STARTED");
-    const payment = await tx.payment.create({ data: { accountId: order.accountId, status: "PENDING", amount: order.total, currency: order.currency, method: "PAY_NOW", provider: "NETCASH", idempotencyKey: `merchandise:${order.id}` } });
-    const checkout = createPayNowCheckout(connection, { reference: payment.id, amount: Number(order.total.toFixed(2)), description: "STOR24 packing supplies", customerEmail: session.email, returnData: new URLSearchParams({ paymentId: payment.id, merchandiseOrderId: order.id }).toString(), extra1: order.id, extra2: "merchandise" });
+    if (order.isTest && (!merchandiseCheckoutTestMode(session) || connection.config.environment !== "sandbox")) throw new Error("MERCHANDISE_TEST_DISABLED");
+    const amount = order.isTest ? 10 : Number(order.total.toFixed(2));
+    const payment = await tx.payment.create({ data: { accountId: order.accountId, status: order.isTest ? "TEST_PENDING" : "PENDING", amount, currency: order.currency, method: "PAY_NOW", provider: "NETCASH", idempotencyKey: `merchandise:${order.id}` } });
+    const checkout = createPayNowCheckout(connection, { reference: payment.id, amount, description: order.isTest ? "STOR24 R10 test - not a merchandise purchase" : "STOR24 packing supplies", customerEmail: session.email, returnData: new URLSearchParams({ paymentId: payment.id, merchandiseOrderId: order.id }).toString(), extra1: order.id, extra2: "merchandise" });
     await tx.payment.update({ where: { id: payment.id }, data: { providerRef: payment.id } });
     await tx.merchandiseOrder.update({ where: { id: order.id }, data: { paymentId: payment.id } });
     await tx.auditEvent.create({ data: { organisationId: order.organisationId, facilityId: order.facilityId, action: "merchandise_order.checkout_started", entityType: "MerchandiseOrder", entityId: order.id, after: { paymentId: payment.id } } });
