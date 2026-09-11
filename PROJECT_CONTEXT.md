@@ -2,6 +2,8 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- Draft payment-form orchestration added after e3a4914: owner-scoped, locked payable-order check; exact stored ZAR total; atomic Payment creation/order linkage before returning a Netcash form; repeat form issuance refused for single-use references. Still not called by a tenant checkout endpoint. No provider call, real payment, environment change, merge or deployment. Local tests not run; CI pending; return routing, recovery UX, mounted basket and end-to-end validation remain gates.
+
 - Draft increment after 7cea2a6: added owned order-status GET and same-origin, rate-limited cancellation DELETE. Status is read from persisted orders, never browser payment-return claims; paid/fulfilled orders cannot be cancelled here. Responses expose only order summary fields and remain private/no-store. Local tests not run; CI pending. PR100 remains unmerged and undeployed, checkout UI/payment-form linkage still outstanding, production charging unchanged.
 
 - Draft continuation: added dedicated-secret authenticated stock-expiry worker endpoint and explicit operator/release-gate documentation. It does not install a scheduler or set credentials, and remains usable for existing holds if new checkout is disabled. No local tests, production configuration, merge, deployment or live order changes; CI pending for this increment. Full tenant checkout/return routing and mounted purchase UI remain unfinished. See docs/merchandise-checkout-release-gates.md.

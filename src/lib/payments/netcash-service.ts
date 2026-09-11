@@ -8,6 +8,8 @@
  */
 import { db } from "@/lib/db";
 import { randomUUID } from "node:crypto";
+import { tenantCustomerScope } from "@/lib/tenant-portal-security";
+import { assertMerchandiseCheckoutEnabled } from "@/lib/merchandise-order-service";
 import {
   getNetcashConnection,
   createEMandateSync,
@@ -25,6 +27,30 @@ async function recordHealth(connectionId: string, ok: boolean, failureCode?: str
     data: ok
       ? { status: "HEALTHY", lastHealthAt: new Date(), lastSuccessAt: new Date(), consecutiveFailures: 0, failureCode: null, failureMessage: null }
       : { status: "DEGRADED", lastHealthAt: new Date(), lastFailureAt: new Date(), consecutiveFailures: { increment: 1 }, failureCode, failureMessage },
+  });
+}
+
+/** Draft checkout: persist the link before any provider form can leave the server. */
+export async function createMerchandiseCheckout(session: Parameters<typeof tenantCustomerScope>[0], orderId: string) {
+  assertMerchandiseCheckoutEnabled();
+  const owned = await db.merchandiseOrder.findFirst({ where: { id: orderId, organisationId: session.organisationId, account: { customer: tenantCustomerScope(session) } }, select: { facilityId: true } });
+  if (!owned) throw new Error("TENANT_NOT_FOUND");
+  const connection = await getNetcashConnection(session.organisationId, owned.facilityId);
+  return db.$transaction(async tx => {
+    await tx.$queryRaw`SELECT "id" FROM "MerchandiseOrder" WHERE "id" = ${orderId} FOR UPDATE`;
+    const order = await tx.merchandiseOrder.findFirst({ where: { id: orderId, organisationId: session.organisationId, account: { customer: tenantCustomerScope(session) } } });
+    if (!order) throw new Error("TENANT_NOT_FOUND");
+    if (order.status !== "AWAITING_PAYMENT" || !order.stockHeld || order.expiresAt <= new Date() || order.currency !== "ZAR") throw new Error("MERCHANDISE_ORDER_NOT_PAYABLE");
+    // Never issue a second form for a single-use reference or reset a pending payment.
+    // A lost response requires cancellation/status recovery, not a second charge attempt.
+    if (order.paymentId) throw new Error("MERCHANDISE_CHECKOUT_ALREADY_STARTED");
+    const payment = await tx.payment.create({ data: { accountId: order.accountId, status: "PENDING", amount: order.total, currency: order.currency, method: "PAY_NOW", provider: "NETCASH", idempotencyKey: `merchandise:${order.id}` } });
+    const checkout = createPayNowCheckout(connection, { reference: payment.id, amount: Number(order.total.toFixed(2)), description: "STOR24 packing supplies", customerEmail: session.email, returnData: new URLSearchParams({ paymentId: payment.id, merchandiseOrderId: order.id }).toString(), extra1: order.id });
+    await tx.payment.update({ where: { id: payment.id }, data: { providerRef: payment.id } });
+    await tx.merchandiseOrder.update({ where: { id: order.id }, data: { paymentId: payment.id } });
+    await tx.auditEvent.create({ data: { organisationId: order.organisationId, facilityId: order.facilityId, action: "merchandise_order.checkout_started", entityType: "MerchandiseOrder", entityId: order.id, after: { paymentId: payment.id } } });
+    // Form construction is not a provider health check or proof of payment.
+    return { orderId: order.id, paymentId: payment.id, checkout };
   });
 }
 
