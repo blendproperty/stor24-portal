@@ -19,7 +19,13 @@ export async function holdTenantMerchandise(session: Parameters<typeof tenantCus
     // Serialize same-account retries before creating stock holds; no duplicate order.
     await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${accountId} FOR UPDATE`;
     const existing = await tx.merchandiseOrder.findUnique({ where: { accountId_idempotencyKey: { accountId, idempotencyKey: input.idempotencyKey } }, include: { items: true } });
-    if (existing) return existing;
+    if (existing) {
+      const requested = new Map(input.items.map(item => [item.productId, item.quantity]));
+      if (existing.unitId !== account.tenancy.occupancies[0].unitId || existing.items.length !== requested.size || existing.items.some(item => requested.get(item.productId) !== item.quantity)) {
+        throw new Error("MERCHANDISE_RETRY_CONFLICT");
+      }
+      return existing;
+    }
     const facilityId = account.tenancy.facilityId;
     const products = await tx.product.findMany({ where: { id: { in: input.items.map(item => item.productId) }, organisationId: session.organisationId, facilityId, active: true } });
     const priced = priceMerchandise(input.items, products);

@@ -2,6 +2,8 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- Draft retry correction after ccf1632: an existing checkout idempotency key now requires the same physical unit and exact product quantities; changed baskets receive a conflict rather than the old order. No local tests; new CI pending. Not merged/deployed/enabled. The complete purchase UI and provider return path remain outstanding.
+
 - CI evidence: 645e1c7 passed workflow 34577038740; earlier e3a4914 and 7cea2a6 passed 34576531683 and 34575793858. Added gated tenant checkout POST with session/CSRF/rate/schema checks and server-priced holds followed by atomic payment-form linking. Errors return an owned order identifier for status/cancellation, never raw provider exceptions. This new increment awaits CI; no local tests. PR100 remains draft/unmerged/undeployed, live checkout off. Customer UI, return routing, worker configuration and integrated UAT remain outstanding.
 
 - Draft payment-form orchestration added after e3a4914: owner-scoped, locked payable-order check; exact stored ZAR total; atomic Payment creation/order linkage before returning a Netcash form; repeat form issuance refused for single-use references. Still not called by a tenant checkout endpoint. No provider call, real payment, environment change, merge or deployment. Local tests not run; CI pending; return routing, recovery UX, mounted basket and end-to-end validation remain gates.
