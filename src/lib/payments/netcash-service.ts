@@ -35,7 +35,7 @@ export async function createMerchandiseCheckout(session: Parameters<typeof tenan
   assertMerchandiseCheckoutEnabled(session);
   const owned = await db.merchandiseOrder.findFirst({ where: { id: orderId, organisationId: session.organisationId, account: { customer: tenantCustomerScope(session) } }, select: { facilityId: true } });
   if (!owned) throw new Error("TENANT_NOT_FOUND");
-  const connection = await getNetcashConnection(session.organisationId, owned.facilityId);
+  const connection = await getNetcashConnection(session.organisationId, owned.facilityId, true);
   return db.$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "MerchandiseOrder" WHERE "id" = ${orderId} FOR UPDATE`;
     const order = await tx.merchandiseOrder.findFirst({ where: { id: orderId, organisationId: session.organisationId, account: { customer: tenantCustomerScope(session) } } });

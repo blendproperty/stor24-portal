@@ -34,3 +34,11 @@ test("catalogue, stock hold and payment form use the same authenticated-session 
   assert.ok(catalogue.includes("await requireTenantSession()"));
   assert.ok(catalogue.includes("merchandiseCheckoutEnabled(session)"));
 });
+
+test("merchandise can use its organisation default provider without crossing stores or organisations", () => {
+  const service = readFileSync("src/lib/payments/netcash-service.ts", "utf8");
+  const client = readFileSync("src/lib/payments/netcash-client.ts", "utf8");
+  assert.ok(service.includes("getNetcashConnection(session.organisationId, owned.facilityId, true)"));
+  assert.ok(client.includes("!connection && facilityId && allowOrganisationDefault"));
+  assert.ok(client.includes('where: { organisationId, facilityId: null, category: "PAYMENTS", provider: "NETCASH" }'));
+});
