@@ -19,7 +19,15 @@ jobs:
           MERCHANDISE_CRON_KEY: ${{ secrets.MERCHANDISE_CRON_KEY }}
         run: |
           test -n "$MERCHANDISE_CRON_KEY"
-          curl --fail --silent --show-error --max-time 120 --connect-timeout 10 \
+          response="$(curl --fail --silent --show-error --max-time 120 --connect-timeout 10 \
             --request POST \
             --header "x-cron-key: $MERCHANDISE_CRON_KEY" \
-            'https://stor24-site.srv938083.hstgr.cloud/api/v1/operations/merchandise-orders/expire'
+            'https://stor24-site.srv938083.hstgr.cloud/api/v1/operations/merchandise-orders/expire')"
+          node -e '
+            const result = JSON.parse(process.argv[1]);
+            const count = result?.data?.expired;
+            if (!Number.isInteger(count) || count < 0 || count > 100) {
+              throw new Error("Unexpected merchandise expiry response");
+            }
+            console.log(`Expired unpaid orders released: ${count}`);
+          ' "$response"

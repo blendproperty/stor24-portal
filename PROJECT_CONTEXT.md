@@ -2,6 +2,8 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
+- PR104 production evidence: main CI34591602135/deployment34591732155 succeeded for b3dd847. PR105 scheduler now open; worker validates response shape/count rather than treating any HTTP200 as success. No scheduler secret/variable configured, no execution or live stock changes. New CI pending; operational and financial/UAT gates unchanged.
+
 - PR104 passed CI onf341846 and merged b3dd847; deployment pending. Added scheduled expiry workflow gated by a repository variable plus dedicated secret; neither configured or enabled. This is scheduler implementation, not operational proof. No local tests/stock mutations; CI and manual/scheduled verification remain pending, checkout disabled.
 
 - Cancellation deployment verified by workflow: main CI34590574113/deployment34590724873 succeeded for9906df1. Added pure transition tests for pending EFT across all states and both payment/cancellation orderings; these are not database-concurrency proof. PR104 expiry resilience now open; tests execute in CI only. Checkout/configuration/UAT gates remain unchanged.
