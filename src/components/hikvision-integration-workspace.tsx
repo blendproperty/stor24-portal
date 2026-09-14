@@ -6,7 +6,7 @@ import { CheckCircle2, KeyRound, Link2, LockKeyhole, RefreshCw, ShieldCheck } fr
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 
-type CompanyConfiguration = { endpoint: string; appKeyConfigured: boolean; appSecretConfigured: boolean; status: string; lastHealthAt: string | null; lastSuccessAt: string | null; failureMessage: string | null };
+type CompanyConfiguration = { endpoint: string; appKeyConfigured: boolean; appSecretConfigured: boolean; pinnedCertSha256Fingerprint: string; status: string; lastHealthAt: string | null; lastSuccessAt: string | null; failureMessage: string | null };
 type FacilityConfiguration = { id: string; name: string; code: string; organisationIndexCode: string; doorIndexCodes: string[]; status: string; lastHealthAt: string | null; lastSuccessAt: string | null; failureMessage: string | null };
 type Configuration = { encryptionReady: boolean; company: CompanyConfiguration; facilities: FacilityConfiguration[] };
 
@@ -44,7 +44,8 @@ export function HikvisionIntegrationWorkspace() {
   }
 
   function saveCredentials(formData: FormData) {
-    void call("PUT", { action: "save-credentials", payload: { endpoint: String(formData.get("endpoint") ?? ""), appKey: String(formData.get("appKey") ?? "") || undefined, appSecret: String(formData.get("appSecret") ?? "") || undefined } }, "HikCentral credentials saved securely. Test a facility connection next.");
+    const pinnedCertSha256Fingerprint = String(formData.get("pinnedCertSha256Fingerprint") ?? "").trim();
+    void call("PUT", { action: "save-credentials", payload: { endpoint: String(formData.get("endpoint") ?? ""), appKey: String(formData.get("appKey") ?? "") || undefined, appSecret: String(formData.get("appSecret") ?? "") || undefined, pinnedCertSha256Fingerprint: pinnedCertSha256Fingerprint || undefined } }, "HikCentral credentials saved securely. Test a facility connection next.");
   }
 
   function saveMapping(formData: FormData) {
@@ -69,8 +70,10 @@ export function HikvisionIntegrationWorkspace() {
           <label>HikCentral server address<input name="endpoint" type="url" required placeholder="https://hikcentral.example.co.za" defaultValue={configuration?.company.endpoint ?? ""} disabled={!canManage}/></label>
           <label>App Key<input name="appKey" type="password" autoComplete="new-password" placeholder={configuration?.company.appKeyConfigured ? "Saved — leave blank to keep" : "Enter App Key"} disabled={!canManage}/></label>
           <label>App Secret<input name="appSecret" type="password" autoComplete="new-password" placeholder={configuration?.company.appSecretConfigured ? "Saved — leave blank to keep" : "Enter App Secret"} disabled={!canManage}/></label>
+          <label>TLS certificate pin (SHA-256 fingerprint) — optional<input name="pinnedCertSha256Fingerprint" type="text" spellCheck={false} placeholder="AA:BB:CC:...(32 byte pairs)" defaultValue={configuration?.company.pinnedCertSha256Fingerprint ?? ""} disabled={!canManage}/></label>
         </div>
         <p className="safe-config-note"><ShieldCheck size={17}/>Saving replacement credentials automatically removes the previous usable values. Audit records contain only the endpoint and whether credentials are configured.</p>
+        <p className="field-help">Only needed when the HikCentral server uses a self-signed certificate that can&apos;t be validated normally (for example, issued to an internal address rather than its public one). Enter the exact SHA-256 fingerprint of that certificate, confirmed from a trusted source such as the server itself — this pins the connection to that specific certificate instead of doing normal hostname validation. It is not a secret. Leave blank if the server has a certificate from a recognised authority.</p>
         <div className="form-footer"><button className="button button-primary" disabled={!canManage || !configuration?.encryptionReady || busy === "save-credentials"}>{busy === "save-credentials" ? "Saving…" : "Save credentials"}</button></div>
       </form>
       <form action={saveMapping} className="panel panel-spacious company-form" key={facility?.id ?? "none"}>

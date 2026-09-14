@@ -13,6 +13,14 @@ const credentialsSchema = z.object({
   endpoint: z.url().max(500),
   appKey: z.string().trim().min(1).max(500).optional(),
   appSecret: z.string().trim().min(1).max(1000).optional(),
+  // Not a secret: identifies a specific TLS certificate so we can pin to it when the
+  // HikCentral gateway presents a self-signed certificate that cannot pass normal
+  // hostname validation (e.g. issued to 127.0.0.1 rather than the gateway's real address).
+  pinnedCertSha256Fingerprint: z
+    .string()
+    .trim()
+    .regex(/^([0-9A-Fa-f]{2}:){31}[0-9A-Fa-f]{2}$/, "Enter the SHA-256 fingerprint as 32 colon-separated hex byte pairs.")
+    .optional(),
 });
 
 const mappingSchema = z.object({
@@ -21,7 +29,7 @@ const mappingSchema = z.object({
   doorIndexCodes: z.array(z.string().trim().min(1).max(200)).min(1).max(200).transform((items) => [...new Set(items)]),
 });
 
-type StoredCredentials = { endpoint?: unknown; appKeyEncrypted?: unknown; appSecretEncrypted?: unknown };
+type StoredCredentials = { endpoint?: unknown; appKeyEncrypted?: unknown; appSecretEncrypted?: unknown; pinnedCertSha256Fingerprint?: unknown };
 type StoredMapping = { organisationIndexCode?: unknown; doorIndexCodes?: unknown };
 
 function safeEndpoint(value: string) {
@@ -52,6 +60,7 @@ export async function listHikCentralConfiguration(scope: RequestScope) {
       endpoint: configuredString(credentials.endpoint) ? credentials.endpoint : "",
       appKeyConfigured: configuredString(credentials.appKeyEncrypted),
       appSecretConfigured: configuredString(credentials.appSecretEncrypted),
+      pinnedCertSha256Fingerprint: configuredString(credentials.pinnedCertSha256Fingerprint) ? credentials.pinnedCertSha256Fingerprint : "",
       status: company?.status ?? "DISCONNECTED",
       lastHealthAt: company?.lastHealthAt?.toISOString() ?? null,
       lastSuccessAt: company?.lastSuccessAt?.toISOString() ?? null,
@@ -82,10 +91,14 @@ export async function saveHikCentralCredentials(scope: RequestScope, input: unkn
   const appSecretEncrypted = parsed.appSecret ? encryptIntegrationSecret(parsed.appSecret) : oldConfig.appSecretEncrypted;
   if (!configuredString(appKeyEncrypted) || !configuredString(appSecretEncrypted)) throw new Error("HIKCENTRAL_CREDENTIALS_REQUIRED");
   const endpoint = safeEndpoint(parsed.endpoint);
+  const pinnedCertSha256Fingerprint = parsed.pinnedCertSha256Fingerprint
+    ? parsed.pinnedCertSha256Fingerprint.toUpperCase()
+    : configuredString(oldConfig.pinnedCertSha256Fingerprint) ? oldConfig.pinnedCertSha256Fingerprint : undefined;
+  const config = { endpoint, appKeyEncrypted, appSecretEncrypted, ...(pinnedCertSha256Fingerprint ? { pinnedCertSha256Fingerprint } : {}) };
   const connection = existing
-    ? await db.integrationConnection.update({ where: { id: existing.id }, data: { status: "CONFIGURED", config: { endpoint, appKeyEncrypted, appSecretEncrypted }, failureCode: null, failureMessage: null } })
-    : await db.integrationConnection.create({ data: { organisationId: scope.organisationId, category: HIKCENTRAL_CATEGORY, provider: HIKCENTRAL_PROVIDER, status: "CONFIGURED", config: { endpoint, appKeyEncrypted, appSecretEncrypted } } });
-  await db.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "integration.hikcentral.credentials.updated", entityType: "IntegrationConnection", entityId: connection.id, before: existing ? { endpoint: (oldConfig.endpoint as string | undefined) ?? null, credentialsConfigured: true } : undefined, after: { endpoint, credentialsConfigured: true } } });
+    ? await db.integrationConnection.update({ where: { id: existing.id }, data: { status: "CONFIGURED", config, failureCode: null, failureMessage: null } })
+    : await db.integrationConnection.create({ data: { organisationId: scope.organisationId, category: HIKCENTRAL_CATEGORY, provider: HIKCENTRAL_PROVIDER, status: "CONFIGURED", config } });
+  await db.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "integration.hikcentral.credentials.updated", entityType: "IntegrationConnection", entityId: connection.id, before: existing ? { endpoint: (oldConfig.endpoint as string | undefined) ?? null, credentialsConfigured: true, pinnedCertConfigured: configuredString(oldConfig.pinnedCertSha256Fingerprint) } : undefined, after: { endpoint, credentialsConfigured: true, pinnedCertConfigured: Boolean(pinnedCertSha256Fingerprint) } } });
   return connection;
 }
 
@@ -116,6 +129,7 @@ export async function loadHikCentralRuntimeConfiguration(organisationId: string,
     appKey: decryptIntegrationSecret(credentials.appKeyEncrypted),
     appSecret: decryptIntegrationSecret(credentials.appSecretEncrypted),
     facilities: { [facilityId]: { organisationIndexCode: facility.organisationIndexCode, doorIndexCodes: facility.doorIndexCodes.filter(configuredString) } },
+    ...(configuredString(credentials.pinnedCertSha256Fingerprint) ? { pinnedCertSha256: credentials.pinnedCertSha256Fingerprint } : {}),
   };
 }
 
