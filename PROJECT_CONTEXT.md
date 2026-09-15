@@ -14,4 +14,4 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
-NOTE: This branch update is being completed in stages due to the file's size (~230KB). The remainder of the historical content (matching current production `main`) follows in a subsequent commit on this same branch before the PR is opened. Do not merge this commit alone — it is an intermediate checkpoint.
+NOTE TO NEXT EDITOR: this branch (docs/hikcentral-project-context-2026-09-15) is mid-assembly across multiple commits due to this file's size (~230KB). Part 2 of this restoration follows in the next commit on this same branch, appending the remainder of the historical log that matches production `main` as of 15 September 2026. Do not open or merge the PR until part 2 lands.
