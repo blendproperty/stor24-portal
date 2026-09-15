@@ -9,6 +9,11 @@ type FetchLike = typeof fetch;
 type FacilityAccessConfig = { organisationIndexCode: string; doorIndexCodes: string[] };
 type HikCentralJsonResponse = { code?: string | number; msg?: string; data?: Record<string, unknown> };
 
+/** HikCentral's documented constant for "the root of the region tree" — used to scope a
+ * region-aware query (such as the door search below) across the whole installation when
+ * no more specific region has been configured. */
+const HIKCENTRAL_ROOT_REGION_INDEX_CODE = "root000000";
+
 export type HikCentralProviderConfiguration = {
   baseUrl: string;
   appKey: string;
@@ -23,6 +28,14 @@ export type HikCentralProviderConfiguration = {
    * value is not a secret; it identifies a public certificate, not a credential.
    */
   pinnedCertSha256?: string;
+  /**
+   * Optional region index code(s) to scope region-aware Artemis queries (such as the
+   * acsDoorList health check) to. HikCentral's "advance" resource-search endpoints require
+   * a `regionIndexCodes` array and reject the request without one. Defaults to the
+   * documented root-region constant when not configured, which searches the whole
+   * installation. Not a secret.
+   */
+  regionIndexCodes?: string[];
 };
 
 export type HikCentralEnrollmentInput = {
@@ -151,6 +164,10 @@ export class HikCentralAccessProvider {
     return config;
   }
 
+  private regionIndexCodes() {
+    return this.configuration?.regionIndexCodes?.length ? this.configuration.regionIndexCodes : [HIKCENTRAL_ROOT_REGION_INDEX_CODE];
+  }
+
   private async post(path: string, payload: Record<string, unknown>) {
     const baseUrl = (this.configuration?.baseUrl ?? required("HIKCENTRAL_BASE_URL")).replace(/\/$/, "");
     const appKey = this.configuration?.appKey ?? required("HIKCENTRAL_APP_KEY");
@@ -186,7 +203,11 @@ export class HikCentralAccessProvider {
   async health(): Promise<ProviderResult<{ latencyMs: number }>> {
     const started = Date.now();
     try {
-      await this.post(process.env.HIKCENTRAL_DOOR_SEARCH_PATH ?? "/artemis/api/resource/v1/acsDoor/advance/acsDoorList", { pageNo: 1, pageSize: 1 });
+      await this.post(process.env.HIKCENTRAL_DOOR_SEARCH_PATH ?? "/artemis/api/resource/v1/acsDoor/advance/acsDoorList", {
+        pageNo: 1,
+        pageSize: 1,
+        regionIndexCodes: this.regionIndexCodes(),
+      });
       return { ok: true, providerReference: "hikcentral", data: { latencyMs: Date.now() - started } };
     } catch (error) { return providerFailure(error); }
   }
