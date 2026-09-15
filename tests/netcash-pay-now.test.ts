@@ -7,7 +7,7 @@ import {
   NETCASH_PAY_NOW_ACTION_URL,
 } from "../src/lib/payments/netcash-client";
 import { encryptIntegrationSecret } from "../src/lib/integrations/integration-secret-vault";
-import { NETCASH_SANDBOX_PAYMENT_AMOUNT_ZAR, publicNetcashPaymentStatus } from "../src/lib/public-netcash-payment";
+import { publicNetcashPaymentStatus } from "../src/lib/public-netcash-payment";
 import { reconcileNetcashPayment } from "../src/lib/payments/netcash-reconciliation";
 
 // Confirmed 4 September 2026 against Netcash's Pay Now eCommerce docs
@@ -67,9 +67,20 @@ test("missing encrypted credentials stay absent and processing remains disabled 
   });
 });
 
-test("the public Netcash journey is pinned to the bounded R10 sandbox amount", async () => {
-  assert.equal(NETCASH_SANDBOX_PAYMENT_AMOUNT_ZAR, 10);
+test("the public Netcash journey sends the reservation's real quoted amount, gated on the connection genuinely being sandbox", async () => {
   const source = await import("node:fs/promises").then((fs) => fs.readFile("src/lib/public-netcash-payment.ts", "utf8"));
+  // The whole point of this test payment is to prove Netcash works for what
+  // a customer would actually pay -- so it must use the real quoted rate,
+  // not a fixed token amount.
+  assert.match(source, /Number\(reservation\.quotedRate\)/);
+  // That's only safe because it's paired with an explicit environment check
+  // -- getNetcashConnection doesn't enforce sandbox on its own, and there's
+  // no invoicing/ledger path behind this endpoint for a real charge to land
+  // in, so a misconfigured "live" connection must be refused outright
+  // rather than silently charging the full amount for real.
+  assert.match(source, /getNetcashConnection\(/);
+  assert.match(source, /connection\.config\.environment !== "sandbox"/);
+  assert.match(source, /NETCASH_LIVE_ENVIRONMENT_BLOCKED/);
   assert.match(source, /contactVerifiedAt/);
   assert.match(source, /customer\.emailVerifiedAt/);
   assert.match(source, /netcash-public-test-/);
@@ -77,9 +88,7 @@ test("the public Netcash journey is pinned to the bounded R10 sandbox amount", a
   assert.match(source, /ST24-T-\$\{reservation\.id\}/);
   assert.match(source, /public_payment\.netcash_sandbox_started/);
   assert.match(source, /extra1: reference/);
-  assert.match(source, /ST24-T-\$\{reservation\.id\}/);
   assert.match(source, /provider: "NETCASH"/);
-  assert.doesNotMatch(source, /quotedRate/);
 });
 
 test("public Netcash status distinguishes a cancelled checkout from a declined payment", () => {
