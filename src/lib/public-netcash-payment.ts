@@ -1,8 +1,7 @@
 import { db } from "@/lib/db";
 import { welcomeTenantWhenReady } from "@/lib/tenant-welcome-email";
 import { createOnceOffCheckout } from "@/lib/payments/netcash-service";
-
-export const NETCASH_SANDBOX_PAYMENT_AMOUNT_ZAR = 10;
+import { getNetcashConnection } from "@/lib/payments/netcash-client";
 
 export function publicNetcashPaymentStatus(status: string, failureCode: string | null) {
   if (status === "FAILED" && failureCode && /\bcancell?(?:ed|ation)\b/i.test(failureCode)) {
@@ -30,6 +29,24 @@ export async function startPublicNetcashSandboxPayment(reference: string, idempo
     return { ok: false as const, code: "RESERVATION_UNAVAILABLE" };
   }
 
+  // This sends the reservation's real quoted rate to Netcash so a completed
+  // transaction here is a true proof the integration handles what a
+  // customer would actually pay -- not a token amount that always
+  // "succeeds" regardless of what's really being charged. That is only
+  // safe to do because this code path is only ever reachable through a
+  // Netcash connection explicitly configured as "sandbox": nothing in the
+  // Netcash client enforces that on its own (getNetcashConnection returns
+  // whatever environment the organisation's connection is set to), and
+  // there is no invoicing/ledger integration behind this endpoint (see
+  // claude/invoicing-statements-scope.md) for a charge to land safely in
+  // if it were ever real money. So we check the environment ourselves,
+  // before it ever reaches Netcash, and refuse outright rather than
+  // silently falling back to a smaller "safe" amount.
+  const connection = await getNetcashConnection(reservation.customer.organisationId, null);
+  if (connection.config.environment !== "sandbox") {
+    return { ok: false as const, code: "NETCASH_LIVE_ENVIRONMENT_BLOCKED" };
+  }
+
   const account = await db.account.upsert({
     where: { accountNumber: `ST24-T-${reservation.id}` },
     create: {
@@ -40,12 +57,13 @@ export async function startPublicNetcashSandboxPayment(reference: string, idempo
   });
   if (account.customerId !== reservation.customerId) throw new Error("NETCASH_ACCOUNT_CONFLICT");
   await welcomeTenantWhenReady(reservation.customerId, reservation.customer.organisationId);
+  const amount = Number(reservation.quotedRate);
   const checkout = await createOnceOffCheckout(
     reservation.customer.organisationId,
     null,
     {
       accountId: account.id,
-      amount: NETCASH_SANDBOX_PAYMENT_AMOUNT_ZAR,
+      amount,
       description: `STOR24 test - Unit ${reservation.unit.number}`,
       customerEmail: reservation.customer.email ?? undefined,
       extra1: reference,
@@ -62,7 +80,7 @@ export async function startPublicNetcashSandboxPayment(reference: string, idempo
       requestId: idempotencyKey,
       after: {
         reservationId: reservation.id,
-        amount: NETCASH_SANDBOX_PAYMENT_AMOUNT_ZAR,
+        amount,
         environment: "sandbox",
       },
     },
@@ -70,7 +88,7 @@ export async function startPublicNetcashSandboxPayment(reference: string, idempo
   return {
     ok: true as const,
     paymentId: checkout.payment.id,
-    amountZar: NETCASH_SANDBOX_PAYMENT_AMOUNT_ZAR,
+    amountZar: amount,
     currency: checkout.payment.currency,
     facilityName: reservation.facility.name,
     unitNumber: reservation.unit.number,
