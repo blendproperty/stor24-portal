@@ -171,6 +171,35 @@ enum ReportRunStatus {
   EXPIRED
 }
 
+// --- MEL / HikCentral integration boundary (proposed, disabled by default) ---
+// See docs/MEL_INTEGRATION_OWNERSHIP_MATRIX.md and docs/MEL_PROVIDER_HANDOVER.md.
+// These models are additive foundations only: no live MEL connector exists yet,
+// and STOR24 remains the sole authority for granting or restoring storage access
+// until a provider agreement says otherwise (see src/lib/access-decision-service.ts).
+
+enum IdentityLinkStatus {
+  PENDING
+  ACTIVE
+  DUPLICATE_SUSPECTED
+  MANUALLY_RESOLVED
+  SUPERSEDED
+}
+
+enum AccessDecisionAction {
+  ACTIVATE
+  SUSPEND
+  RESTORE
+  REVOKE
+}
+
+enum AccessDecisionState {
+  DESIRED
+  PENDING
+  CONFIRMED
+  FAILED
+  RECONCILIATION_REQUIRED
+}
+
 model Organisation {
   id                     String                  @id @default(cuid())
   name                   String
@@ -203,6 +232,8 @@ model Organisation {
   unitNotes              UnitNote[]
   dailyCloses            DailyClose[]
   passwordResetTokens    PasswordResetToken[]
+  integrationIdentityLinks IntegrationIdentityLink[]
+  accessDecisions        AccessDecision[]
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
 }
@@ -263,6 +294,7 @@ model Facility {
   biometricEnrollments  BiometricEnrollment[]
   insurancePlans        InsurancePlan[]
   insuranceEnrollments  InsuranceEnrollment[]
+  accessDecisions       AccessDecision[]
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
 
@@ -377,6 +409,7 @@ model Customer {
   communications       CommunicationLog[]
   biometricEnrollments BiometricEnrollment[]
   merchandiseRequests  TenantMerchandiseRequest[]
+  integrationIdentityLink IntegrationIdentityLink?
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
@@ -553,6 +586,7 @@ model Occupancy {
   monthlyRate Decimal         @db.Decimal(12, 2)
   accessState String          @default("PENDING")
   biometricEnrollments BiometricEnrollment[]
+  accessDecisions AccessDecision[]
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
@@ -590,6 +624,71 @@ model BiometricEnrollment {
   @@unique([occupancyId, purpose])
   @@index([organisationId, facilityId, status])
   @@index([customerId, status])
+}
+
+// Organisation-scoped identity mapping between the STOR24 customer, a proposed
+// MEL IntegrationLinkID and the HikCentral person identifier. One row per customer:
+// a customer's HikCentral person and MEL link are shared across all of that
+// customer's occupancies/units, so ending one tenancy must not be inferred to
+// remove an identity link still justified by another active tenancy elsewhere.
+// Never matched/merged by name, email or mobile number alone (per Brendon Whelan's
+// 15 September 2026 email) -- matching happens only through this persistent link.
+model IntegrationIdentityLink {
+  id                   String             @id @default(cuid())
+  organisationId       String
+  organisation         Organisation       @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  customerId           String             @unique
+  customer             Customer           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  melIntegrationLinkId String?
+  hikCentralPersonId   String?
+  status               IdentityLinkStatus @default(PENDING)
+  linkedAt             DateTime?
+  duplicateOfLinkId    String?
+  resolutionNotes      String?
+  resolvedById         String?
+  resolvedBy           User?              @relation(fields: [resolvedById], references: [id], onDelete: SetNull)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@unique([organisationId, melIntegrationLinkId])
+  @@index([organisationId, status])
+  @@index([hikCentralPersonId])
+}
+
+// Central, provider-independent record of an access decision. Deliberately
+// separate from the HikCentral/MEL provider calls that carry it out: `state`
+// tracks STOR24's own desired -> pending -> confirmed/failed lifecycle, so a
+// UI must never present access as active/restored/synced from `state` alone
+// without a CONFIRMED result. See src/lib/access-decision-service.ts for the
+// guards that must run before a decision is allowed to reach DESIRED (e.g. MEL
+// cannot request ACTIVATE/RESTORE; a merchandise-only or R10 test payment
+// cannot drive ACTIVATE/RESTORE).
+model AccessDecision {
+  id             String               @id @default(cuid())
+  organisationId String
+  organisation   Organisation         @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  facilityId     String
+  facility       Facility             @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  occupancyId    String
+  occupancy      Occupancy            @relation(fields: [occupancyId], references: [id], onDelete: Cascade)
+  action         AccessDecisionAction
+  source         String
+  reason         String
+  requestedById  String?
+  requestedBy    User?                @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+  state          AccessDecisionState  @default(DESIRED)
+  correlationId  String               @unique
+  attempts       Int                  @default(0)
+  lastAttemptAt  DateTime?
+  confirmedAt    DateTime?
+  failureCode    String?
+  failureMessage String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([organisationId, facilityId, createdAt])
+  @@index([occupancyId, state, createdAt])
+  @@index([state, lastAttemptAt])
 }
 
 model InsurancePlan {
@@ -753,6 +852,8 @@ model User {
   passwordResetTokens PasswordResetToken[]
   reportRuns          ReportRun[]
   mfaCredential       MfaCredential?
+  integrationIdentityLinks IntegrationIdentityLink[]
+  accessDecisions     AccessDecision[]
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 
