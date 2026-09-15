@@ -58,7 +58,11 @@ test("HikCentral provider uses saved runtime credentials without environment sec
   const result = await provider.health();
   assert.equal(result.ok, true);
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, "https://hikcentral.example.test/artemis/api/resource/v1/acsDoor/advance/acsDoorList");
+  // Verified against a live HikCentral installation: the region-scoped "advance" search
+  // requires real, install-specific region codes with no universal default, so the health
+  // check uses the plain (non-"advance") door list endpoint instead, which needs no region
+  // scoping at all.
+  assert.equal(calls[0].url, "https://hikcentral.example.test/artemis/api/resource/v1/acsDoor/acsDoorList");
   assert.equal(calls[0].headers.get("x-ca-key"), "saved-key");
   assert.ok(calls[0].headers.get("x-ca-signature"));
 });

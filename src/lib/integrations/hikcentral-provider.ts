@@ -9,11 +9,6 @@ type FetchLike = typeof fetch;
 type FacilityAccessConfig = { organisationIndexCode: string; doorIndexCodes: string[] };
 type HikCentralJsonResponse = { code?: string | number; msg?: string; data?: Record<string, unknown> };
 
-/** HikCentral's documented constant for "the root of the region tree" — used to scope a
- * region-aware query (such as the door search below) across the whole installation when
- * no more specific region has been configured. */
-const HIKCENTRAL_ROOT_REGION_INDEX_CODE = "root000000";
-
 export type HikCentralProviderConfiguration = {
   baseUrl: string;
   appKey: string;
@@ -29,11 +24,10 @@ export type HikCentralProviderConfiguration = {
    */
   pinnedCertSha256?: string;
   /**
-   * Optional region index code(s) to scope region-aware Artemis queries (such as the
-   * acsDoorList health check) to. HikCentral's "advance" resource-search endpoints require
-   * a `regionIndexCodes` array and reject the request without one. Defaults to the
-   * documented root-region constant when not configured, which searches the whole
-   * installation. Not a secret.
+   * Optional region index code(s) to scope a region-aware Artemis query to. Not used by
+   * the health check (see note on `health()` below) — kept here in case a future call
+   * genuinely needs region scoping on an installation where regions are meaningfully
+   * organised. Not a secret.
    */
   regionIndexCodes?: string[];
 };
@@ -164,10 +158,6 @@ export class HikCentralAccessProvider {
     return config;
   }
 
-  private regionIndexCodes() {
-    return this.configuration?.regionIndexCodes?.length ? this.configuration.regionIndexCodes : [HIKCENTRAL_ROOT_REGION_INDEX_CODE];
-  }
-
   private async post(path: string, payload: Record<string, unknown>) {
     const baseUrl = (this.configuration?.baseUrl ?? required("HIKCENTRAL_BASE_URL")).replace(/\/$/, "");
     const appKey = this.configuration?.appKey ?? required("HIKCENTRAL_APP_KEY");
@@ -200,13 +190,25 @@ export class HikCentralAccessProvider {
     return json.data ?? {};
   }
 
+  /**
+   * Verified directly against a live HikCentral Professional installation (not just
+   * against the docs): the region-scoped "advance" door search
+   * (`/artemis/api/resource/v1/acsDoor/advance/acsDoorList`) requires a `regionIndexCodes`
+   * array whose values must be real region codes on that installation — there is no
+   * universal "root region" constant that works everywhere (a commonly-cited doc example,
+   * "root000000", is only a placeholder and is rejected as an invalid region on at least
+   * one real installation). Rather than depend on guessing a region code, the health check
+   * uses the plain (non-"advance") door list endpoint instead, which this and other
+   * Artemis-compatible installations accept with just `pageNo`/`pageSize` — no region
+   * scoping required. This was confirmed with a direct request/response probe against the
+   * gateway, not assumed from documentation.
+   */
   async health(): Promise<ProviderResult<{ latencyMs: number }>> {
     const started = Date.now();
     try {
-      await this.post(process.env.HIKCENTRAL_DOOR_SEARCH_PATH ?? "/artemis/api/resource/v1/acsDoor/advance/acsDoorList", {
+      await this.post(process.env.HIKCENTRAL_DOOR_SEARCH_PATH ?? "/artemis/api/resource/v1/acsDoor/acsDoorList", {
         pageNo: 1,
         pageSize: 1,
-        regionIndexCodes: this.regionIndexCodes(),
       });
       return { ok: true, providerReference: "hikcentral", data: { latencyMs: Date.now() - started } };
     } catch (error) { return providerFailure(error); }
