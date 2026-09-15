@@ -91,6 +91,18 @@ test("the public Netcash journey sends the reservation's real quoted amount, gat
   assert.match(source, /provider: "NETCASH"/);
 });
 
+test("the public Netcash journey's total includes any storage/merchandise package price, not just the unit's quoted rate", async () => {
+  const source = await import("node:fs/promises").then((fs) => fs.readFile("src/lib/public-netcash-payment.ts", "utf8"));
+  // Reservation.quotedRate (the unit's monthly rate) and
+  // ReservationPackage.priceSnapshot (an optional merchandise/storage
+  // package selected during booking) are two separate monetary fields --
+  // a reservation with a package attached must send Netcash their sum, or
+  // the sandbox checkout undercharges relative to what was actually booked.
+  assert.match(source, /packageSelection:\s*\{\s*select:\s*\{\s*priceSnapshot:\s*true\s*\}\s*\}/);
+  assert.match(source, /reservation\.packageSelection\?\.priceSnapshot/);
+  assert.match(source, /quotedRate\s*\+\s*packageAmount/);
+});
+
 test("public Netcash status distinguishes a cancelled checkout from a declined payment", () => {
   assert.equal(publicNetcashPaymentStatus("FAILED", "Transaction cancelled by cardholder"), "CANCELLED");
   assert.equal(publicNetcashPaymentStatus("FAILED", "Transaction cancellation"), "CANCELLED");

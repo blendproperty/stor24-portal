@@ -17,6 +17,7 @@ export async function startPublicNetcashSandboxPayment(reference: string, idempo
       facility: { select: { name: true } },
       unit: { select: { number: true } },
       customer: true,
+      packageSelection: { select: { priceSnapshot: true } },
     },
   });
   if (
@@ -57,7 +58,14 @@ export async function startPublicNetcashSandboxPayment(reference: string, idempo
   });
   if (account.customerId !== reservation.customerId) throw new Error("NETCASH_ACCOUNT_CONFLICT");
   await welcomeTenantWhenReady(reservation.customerId, reservation.customer.organisationId);
-  const amount = Number(reservation.quotedRate);
+  // The unit's monthly rate and any storage/merchandise package selected
+  // during booking are priced separately (Reservation.quotedRate vs.
+  // ReservationPackage.priceSnapshot) -- both have to be summed here or a
+  // reservation with a package attached sends Netcash a total that's short
+  // of what the customer actually booked.
+  const quotedRate = Number(reservation.quotedRate);
+  const packageAmount = Number(reservation.packageSelection?.priceSnapshot ?? 0);
+  const amount = quotedRate + packageAmount;
   const checkout = await createOnceOffCheckout(
     reservation.customer.organisationId,
     null,
@@ -81,6 +89,8 @@ export async function startPublicNetcashSandboxPayment(reference: string, idempo
       after: {
         reservationId: reservation.id,
         amount,
+        quotedRate,
+        packageAmount,
         environment: "sandbox",
       },
     },
