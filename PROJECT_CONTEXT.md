@@ -14,4 +14,4 @@
 
 ## Unit-first tenant portal — in progress, 11 September 2026
 
-Placeholder — see remote main for full historical content; this push is being verified byte-for-byte and will be corrected if hash mismatch is detected.
+NOTE: This branch update is being completed in stages due to the file's size (~230KB). The remainder of the historical content (matching current production `main`) follows in a subsequent commit on this same branch before the PR is opened. Do not merge this commit alone — it is an intermediate checkpoint.
