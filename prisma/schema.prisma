@@ -220,6 +220,7 @@ model Organisation {
   webhookInbox           WebhookInbox[]
   webhookOutbox          WebhookOutbox[]
   biometricEnrollments   BiometricEnrollment[]
+  facialPhotoSubmissions FacialPhotoSubmission[]
   insurancePlans         InsurancePlan[]
   insuranceEnrollments   InsuranceEnrollment[]
   invitations            UserInvitation[]
@@ -292,6 +293,7 @@ model Facility {
   webhookInbox          WebhookInbox[]
   webhookOutbox          WebhookOutbox[]
   biometricEnrollments  BiometricEnrollment[]
+  facialPhotoSubmissions FacialPhotoSubmission[]
   insurancePlans        InsurancePlan[]
   insuranceEnrollments  InsuranceEnrollment[]
   accessDecisions       AccessDecision[]
@@ -408,6 +410,7 @@ model Customer {
   tasks                Task[]
   communications       CommunicationLog[]
   biometricEnrollments BiometricEnrollment[]
+  facialPhotoSubmissions FacialPhotoSubmission[]
   merchandiseRequests  TenantMerchandiseRequest[]
   integrationIdentityLink IntegrationIdentityLink?
   createdAt            DateTime           @default(now())
@@ -469,6 +472,7 @@ model Reservation {
   publicPaymentSessions PublicPaymentSession[]
   publicLease        PublicReservationLease?
   packageSelection   ReservationPackage?
+  facialPhotoSubmissions FacialPhotoSubmission[]
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 
@@ -624,6 +628,51 @@ model BiometricEnrollment {
   @@unique([occupancyId, purpose])
   @@index([organisationId, facilityId, status])
   @@index([customerId, status])
+}
+
+// STOR24 "Option 1" self-service facial access (Mark Corbishley's decision,
+// recorded 16 September 2026): a verified, agreement-signed, paid public
+// customer submits a consented facial photo bound to their Reservation, before
+// any tenancy/occupancy exists. No HikCentral call happens on submission -- an
+// authorised staff member must separately approve it in the existing /access
+// workspace, and only once the resulting occupancy is ACTIVE (see
+// facial-access-service.ts). Consent here belongs to the customer, not a staff
+// attestation, unlike the pre-existing manual biometric-access-service.ts flow.
+// Raw image bytes exist only to survive the submission-to-approval gap; final
+// retention/deletion policy remains an explicit open owner decision.
+model FacialPhotoSubmission {
+  id                   String                 @id @default(cuid())
+  organisationId       String
+  organisation         Organisation           @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  facilityId           String
+  facility             Facility               @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  reservationId        String
+  reservation          Reservation            @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  customerId           String
+  customer             Customer               @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  status               FacialSubmissionStatus @default(AWAITING_STAFF)
+  imageData            Bytes
+  imageSha256          String
+  imageMimeType        String
+  consentPolicyVersion String
+  consentAt            DateTime
+  submitterIpHash      String?
+  reviewedById         String?
+  reviewedAt           DateTime?
+  rejectionReason      String?
+  enrollmentId         String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  @@index([organisationId, facilityId, status])
+  @@index([reservationId, status])
+}
+
+enum FacialSubmissionStatus {
+  AWAITING_STAFF
+  APPROVED
+  REJECTED
+  SUPERSEDED
 }
 
 // Organisation-scoped identity mapping between the STOR24 customer, a proposed
