@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   createPublicReference,
@@ -12,6 +13,8 @@ import {
   reservationHoldHours,
   secureKeyMatches,
 } from "../src/lib/public-booking-contract.ts";
+
+const servicePath = new URL("../src/lib/public-booking-service.ts", import.meta.url);
 
 test("public API keys fail closed and use exact matching", () => {
   const configured = "a-secure-test-key-that-is-at-least-32-characters";
@@ -85,4 +88,49 @@ test("references are readable and reservation holds are bounded", () => {
   assert.equal(publicViewingWindowHours("0"), 1);
   assert.equal(publicViewingWindowHours("100"), 72);
   assert.equal(publicViewingWindowHours("invalid"), 24);
+});
+
+// STOR24_OUTSTANDING_TASKS.md item #8 calls for a two-device race proof on the
+// same available unit. Until now that invariant was only checked for the
+// OFFLINE_PWA path (tests/offline-reservation-outbox.test.ts) — the public,
+// customer-facing website path (`createPublicReservation`, the one Pinny and
+// Feeza's UAT actually exercises) had no equivalent coverage at all. This is a
+// source-contract + logic-invariant check, not a live-database proof: it
+// confirms the real service still does the conditional-updateMany-under-
+// transaction claim (which is what makes the claim atomic under PostgreSQL's
+// default READ COMMITTED — the UPDATE re-evaluates its WHERE clause after
+// acquiring the row lock, so a loser sees `count: 0` instead of overwriting
+// the winner), and it exercises the same claim/loser logic concurrently in
+// isolation. It does not replace running two real, simultaneous public
+// bookings against the same unit on a real database, which remains open UAT.
+test("public booking service atomically claims a unit before any other work", async () => {
+  const service = await readFile(servicePath, "utf8");
+  assert.match(service, /db\.\$transaction/);
+  assert.match(service, /unit\.status !== "AVAILABLE"/);
+  assert.match(service, /tx\.unit\.updateMany/);
+  assert.match(service, /where: \{ id: unit\.id, facilityId: facility\.id, status: "AVAILABLE" \}/);
+  assert.match(service, /data: \{ status: "RESERVED" \}/);
+  assert.match(service, /claimed\.count !== 1/);
+  assert.match(service, /throw new PublicBookingError\("UNIT_UNAVAILABLE", 409\)/);
+});
+
+test("two simultaneous public bookings for the same unit allow exactly one atomic claim", async () => {
+  // Models the exact guarantee `tx.unit.updateMany({ where: { ..., status: "AVAILABLE" }, data: { status: "RESERVED" } })`
+  // gives under PostgreSQL: the second UPDATE to reach the row blocks until the
+  // first transaction commits, then re-checks `status: "AVAILABLE"` against the
+  // now-committed row and affects zero rows instead of clobbering the winner.
+  let status: "AVAILABLE" | "RESERVED" = "AVAILABLE";
+  let claimQueue: Promise<{ label: string; count: number }> = Promise.resolve({ label: "", count: 0 });
+  const claim = (label: string) =>
+    (claimQueue = claimQueue.then(async () => {
+      await new Promise((resolve) => setImmediate(resolve));
+      if (status !== "AVAILABLE") return { label, count: 0 };
+      status = "RESERVED";
+      return { label, count: 1 };
+    }));
+  const [a, b] = await Promise.all([claim("Pinny"), claim("Feeza")]);
+  const results = [a, b];
+  assert.deepEqual(results.map((r) => r.count).sort(), [0, 1]);
+  assert.equal(results.filter((r) => r.count === 1).length, 1);
+  assert.equal(status, "RESERVED");
 });
