@@ -958,4 +958,4 @@ A CRM capability is complete only when it is database-backed, scoped, permission
 - Commit and push: this entry accompanies the documentation-only branch commit. Remote presence must be checked after push; no claim of mainline promotion is made here.
 - Merge: not performed. Deployment/configuration: not performed. Live production verification: no new enrolment, Move In, payment or door test. Historical connection/addendum evidence is not fresh production proof.
 - Open gates: approved consent/retention/deletion and alternative-access process; actual facility/door mapping; payment/agreement conversion rules; provider readback and controlled live enrol/revoke/physical-door UAT; staff training, operational coverage and launch approval. No tracker status changed.
-
+- Publication evidence: initial documentation commits CRM b935100 and public add822b were pushed successfully to the named documentation branches on 16 September 2026. This follow-up records that evidence; branches remain unmerged and undeployed.
