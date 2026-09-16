@@ -51,7 +51,7 @@ export function MelIntegrationStatus({
 }) {
   return (
     <div className="page-stack">
-      <section className="panel">
+      <section className="panel panel-spacious">
         <div className="panel-heading">
           <div>
             <h2>MEL identity links</h2>
@@ -105,7 +105,7 @@ export function MelIntegrationStatus({
           </table>
         </div>
       </section>
-      <section className="panel">
+      <section className="panel panel-spacious">
         <div className="panel-heading">
           <div>
             <h2>Access decisions</h2>
