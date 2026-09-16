@@ -13,19 +13,24 @@ Scope: Brendon Whelan's 15 September 2026 email ("Re: FINAL: Stor24 / MEL / Hikv
 Integration – Data and Access Flow") asked for the MEL bolt-on integration to
 proceed in safe stages, without inventing provider contracts and without allowing
 MEL and STOR24 to become dual writers over the same access decisions. This entry
-covers Stage 1 (ownership matrix) and part of Stages 2–4 (identity-mapping schema,
+covers Stage 1 (ownership matrix), Stages 2–4 (identity-mapping schema,
 provider-independent access-decision state machine, and a disabled draft MEL
-adapter) of that brief. Stages 5–7 (wiring status changes into live payment/
-biometric flows, extending the operational workspace UI, and the full regression
-suite) are explicitly **not** done in this change and remain open — see below.
+adapter), and now Stage 6 (read-only workspace UI). Stage 5 (wiring status
+changes into live payment/biometric flows) and Stage 7 (the full regression
+suite covering that wiring) are explicitly **not** done in this change and
+remain open — see below.
 
-- **Verification before changing anything:** re-confirmed CRM `main` HEAD was still
-  `550ee74605f963f9752a286fe8685babc5a6fe92` (unchanged since the prior HikCentral
-  fix session) before branching. Confirmed no MEL-related code existed anywhere in
-  `src/lib/integrations/` prior to this change, and that
-  `docs/STOR24_OUTSTANDING_TASKS.md` (dated 2 September 2026) predates MEL and does
-  not mention it — that register's HikCentral item 2 remains **BLOCKED** exactly as
-  written and is unaffected by this change.
+- **Verification before changing anything:** re-confirmed CRM `main` HEAD was
+  `aee532257fc504e1ed24b388bb14dc31bc0595c2` (`Netcash test payment now includes
+  the merchandise/storage package price`, PR #130) before branching for Stage 6.
+  Confirmed via `git diff main FETCH_HEAD --stat` after PR #128 merged that all
+  eight files from the original Stage 1–4 slice (`docs/MEL_INTEGRATION_OWNERSHIP_MATRIX.md`,
+  `docs/MEL_PROVIDER_HANDOVER.md`, this status file, `prisma/schema.prisma`,
+  `src/lib/access-decision-service.ts`, `src/lib/integrations/mel-provider.ts`,
+  `tests/access-decision-service.test.ts`, `tests/mel-provider.test.ts`) are
+  genuinely present on `main`, closing out the silent-drop incident recorded
+  below. `docs/STOR24_OUTSTANDING_TASKS.md`'s HikCentral item 2 remains
+  **BLOCKED** exactly as written and is unaffected by this change.
 - **Implementation:**
   - `docs/MEL_INTEGRATION_OWNERSHIP_MATRIX.md` — the Stage 1 ownership matrix across
     the ten functional areas the brief specified (customer records, identity
@@ -62,21 +67,41 @@ suite) are explicitly **not** done in this change and remain open — see below.
   - `docs/MEL_PROVIDER_HANDOVER.md`: the outstanding-question list for MEL/Camryn/
     Active Motion, by owner, plus six controlled pilot scenarios (none yet run) and
     the rollback/reconciliation approach.
+  - **Stage 6, new this entry:** `src/lib/mel-integration-status-service.ts` adds
+    two read-only Prisma queries (`listIdentityLinks`, `listAccessDecisions`),
+    organisation/facility-scoped exactly like the existing `listBiometricAccess`.
+    `src/app/api/v1/access/mel-status/route.ts` exposes them as a single
+    `GET`-only API route behind `requirePermissionScope("access.view")` — there is
+    deliberately no `POST`/`PUT`/`DELETE`, since nothing in Stage 6 may create,
+    approve or execute a MEL status change or access decision.
+    `src/components/mel-integration-status.tsx` renders both as read-only tables
+    (`MelIntegrationStatus`), following the existing `BiometricAccessWorkspace`
+    conventions (`page-stack`/`panel`/`data-table`/`empty-cell`, `StatusPill` for
+    state colouring). `src/app/access/page.tsx` now fetches both lists
+    server-side (same pattern as its existing `listBiometricAccess` call) and
+    mounts the new panel directly below the existing HikCentral enrolment
+    workspace on the same `/access` page — no new navigation entry, no change to
+    the existing enrol/revoke form or its API route. Because nothing yet writes an
+    `AccessDecision` row and no real MEL identity-linking flow exists, both tables
+    are expected to render empty until Stage 5 wiring and a real MEL identity-link
+    flow land; the UI states this honestly instead of implying a fault.
 - **Testing:** `tests/access-decision-service.test.ts` (9 tests) and
-  `tests/mel-provider.test.ts` (6 tests) — both pure-logic, in-memory-store tests
-  requiring no database, run directly with `tsx --test` in this session: 15/15
-  passed. The two new source files were also isolated-type-checked (a scoped
-  `tsc --noEmit` covering exactly these files and their direct dependency,
-  `providers.ts`, since the full repository `typecheck`/`prisma generate` could not
-  run in this environment — its engine-download step is blocked by the sandbox's
-  network allowlist, the same limitation already documented under "Working rules
-  for any AI assistant" above) and linted (`eslint`) with zero errors. The
-  Prisma schema change itself could not be validated with `prisma validate` in
-  this environment for the same network-allowlist reason; it was written and
-  reviewed by hand against the existing model conventions in the same file
-  (naming, `@@index`/`@@unique` patterns, `onDelete` behaviour) and should be
-  validated with `npx prisma validate` / `npx prisma generate` in an environment
-  with normal network access before merge.
+  `tests/mel-provider.test.ts` (6 tests) are unchanged and still pass 15/15
+  (pure-logic, in-memory-store tests requiring no database, run directly with
+  `tsx --test`). The Stage 6 files cannot be exercised the same way because they
+  import the Prisma client (`@/lib/db`) directly, and this environment still
+  cannot generate the Prisma client (`prisma generate`'s engine-download step is
+  blocked by the sandbox's network allowlist, the same limitation already
+  documented under "Working rules for any AI assistant" above) or run the
+  database-backed integration suite. In its place: `eslint` passes with zero
+  errors on all four new/changed files; a full-repository `tsc --noEmit` run
+  was compared before and after the change (246 pre-existing errors on `main`
+  without Stage 6, all of the same "Prisma client not generated" shape, versus
+  248 with Stage 6 — exactly the two new `.map()` calls added to
+  `src/app/access/page.tsx`, the same implicit-any symptom as the two pre-existing
+  `.map()` calls already in that file, not a new class of error). No new
+  migration is required: this slice only reads the `IntegrationIdentityLink` and
+  `AccessDecision` tables already added by the original Stage 1–4 migration.
 - **Commit and push / merge / deployment:** PR #127 merged to `main`, but a fault in
   this session's GitHub-push tooling silently dropped every file from that PR except
   `prisma/schema.prisma` — the merge commit on `main` (`63a8006`) contains only the
@@ -84,13 +109,13 @@ suite) are explicitly **not** done in this change and remain open — see below.
   and all three of these docs never actually reached `main` despite the PR
   description claiming otherwise. This was caught by re-diffing `main` after the
   merge and comparing it against the local commit that was originally pushed. The
-  missing files are being restored via a follow-up branch/PR
-  (`codex/mel-integration-missing-files`) pushed file-by-file after the bulk-push
-  tool was shown to be unreliable for this repository. Treat the original PR #127
-  description's "genuinely built and tested" claims as accurate for what the code
-  says, but not as proof those files were ever live on `main` until the follow-up
-  PR is merged — check `git show origin/main:src/lib/access-decision-service.ts`
-  (or the equivalent for each file) rather than trusting the earlier PR merge alone.
+  missing files were restored via PR #128 (`codex/mel-integration-missing-files`),
+  pushed file-by-file after the bulk-push tool was shown to be unreliable for this
+  repository, and PR #128 has since been merged — `git diff main FETCH_HEAD --stat`
+  confirms all eight original files are genuinely on `main`. This Stage 6 slice is
+  on branch `codex/mel-integration-stage6-ui`, pushed file-by-file for the same
+  reason, and is not yet merged at the time of this entry — see the pull request
+  for merge status.
 - **Outstanding (explicitly not done here, per the brief's own staging and safety
   requirements):**
   1. Wiring `access-decision-service.ts` into the live biometric enroll/revoke and
@@ -99,10 +124,11 @@ suite) are explicitly **not** done in this change and remain open — see below.
      duplicate events, concurrent suspend/reactivate, provider timeout/retry,
      R10/merchandise not granting access, etc.) — only the pure state-machine
      guards are tested so far, not their integration into real payment/biometric
-     code paths.
-  2. Extending the existing HikCentral integration/access workspace UI to surface
-     identity links, decision state, pending/failed/conflicting changes and a safe
-     retry/reconciliation control (Stage 6).
+     code paths. This is also why the new Stage 6 tables are expected to render
+     empty in production today.
+  2. A safe retry/reconciliation control for `RECONCILIATION_REQUIRED`/`FAILED`
+     access decisions was explicitly out of scope for this Stage 6 slice (it
+     would be a write path) and remains open, to be built alongside Stage 5.
   3. Any real MEL endpoint, credential, authentication, payload or error contract —
      all of Stage 4's live-call surface remains unimplemented by design, pending
      MEL/Camryn's answers in `docs/MEL_PROVIDER_HANDOVER.md`.
@@ -112,3 +138,8 @@ suite) are explicitly **not** done in this change and remain open — see below.
   5. No provider agreement, ownership-matrix sign-off, legal/POPIA review, or
      external communication with MEL/Active Motion has occurred. No email was
      sent as part of this work.
+  6. Live/production verification of the Stage 6 screen (an authenticated
+     `access.view`-permitted staff member opening `/access` and seeing both new
+     tables, correctly empty, with no change to the existing HikCentral
+     enrol/revoke behaviour above them) has not been performed and requires this
+     branch to be merged and deployed first.
