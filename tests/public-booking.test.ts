@@ -1,1 +1,136 @@
-aW1wb3J0IGFzc2VydCBmcm9tICJub2RlOmFzc2VydC9zdHJpY3QiOwppbXBvcnQgeyByZWFkRmlsZSB9IGZyb20gIm5vZGU6ZnMvcHJvbWlzZXMiOwppbXBvcnQgdGVzdCBmcm9tICJub2RlOnRlc3QiOwppbXBvcnQgewogIGNyZWF0ZVB1YmxpY1JlZmVyZW5jZSwKICBjb25maXJtZWRQdWJsaWNIb2xkRXhwaXJ5LAogIHB1YmxpY0F2YWlsYWJpbGl0eSwKICBwdWJsaWNFbGVtZW50Q29uZmlnLAogIHB1YmxpY1Jlc2VydmF0aW9uU2NoZW1hLAogIHB1YmxpY1Jlc2VydmF0aW9uUmVmZXJlbmNlU2NoZW1hLAogIHB1YmxpY1Jlc2VydmF0aW9uVmVyaWZpY2F0aW9uRW5hYmxlZCwKICBwdWJsaWNWaWV3aW5nV2luZG93SG91cnMsCiAgcmVzZXJ2YXRpb25Ib2xkSG91cnMsCiAgc2VjdXJlS2V5TWF0Y2hlcywKfSBmcm9tICIuLi9zcmMvbGliL3B1YmxpYy1ib29raW5nLWNvbnRyYWN0LnRzIjsKCmNvbnN0IHNlcnZpY2VQYXRoID0gbmV3IFVSTCgiLi4vc3JjL2xpYi9wdWJsaWMtYm9va2luZy1zZXJ2aWNlLnRzIiwgaW1wb3J0Lm1ldGEudXJsKTsKCnRlc3QoInB1YmxpYyBBUEkga2V5cyBmYWlsIGNsb3NlZCBhbmQgdXNlIGV4YWN0IG1hdGNoaW5nIiwgKCkgPT4gewogIGNvbnN0IGNvbmZpZ3VyZWQgPSAiYS1zZWN1cmUtdGVzdC1rZXktdGhhdC1pcy1hdC1sZWFzdC0zMi1jaGFyYWN0ZXJzIjsKICBhc3NlcnQuZXF1YWwoc2VjdXJlS2V5TWF0Y2hlcyhjb25maWd1cmVkLCBjb25maWd1cmVkKSwgdHJ1ZSk7CiAgYXNzZXJ0LmVxdWFsKHNlY3VyZUtleU1hdGNoZXMoYCR7Y29uZmlndXJlZH0td3JvbmdgLCBjb25maWd1cmVkKSwgZmFsc2UpOwogIGFzc2VydC5lcXVhbChzZWN1cmVLZXlNYXRjaGVzKG51bGwsIGNvbmZpZ3VyZWQpLCBmYWxzZSk7CiAgYXNzZXJ0LmVxdWFsKHNlY3VyZUtleU1hdGNoZXMoY29uZmlndXJlZCwgdW5kZWZpbmVkKSwgZmFsc2UpOwogIGFzc2VydC5lcXVhbChzZWN1cmVLZXlNYXRjaGVzKCJzaG9ydCIsICJzaG9ydCIpLCBmYWxzZSk7Cn0pOwoKdGVzdCgicHVibGljIHJlc2VydmF0aW9ucyB2YWxpZGF0ZSBpZGVudGl0eSwgY29uc2VudCBhbmQgaWRlbXBvdGVuY3kiLCAoKSA9PiB7CiAgY29uc3QgcGFyc2VkID0gcHVibGljUmVzZXJ2YXRpb25TY2hlbWEuc2FmZVBhcnNlKHsKICAgIGZhY2lsaXR5U2x1ZzogIm1pZHBvaW50IiwKICAgIHVuaXRJZDogInVuaXQtMTAxIiwKICAgIGZpcnN0TmFtZTogIlRlc3QiLAogICAgbGFzdE5hbWU6ICJDdXN0b21lciIsCiAgICBlbWFpbDogIlRFU1RARVhBTVBMRS5URVNUIiwKICAgIHBob25lOiAiKzI3IDEwIDAwMCAwMDAwIiwKICAgIGNvbW11bmljYXRpb25Db25zZW50OiB7IGVtYWlsOiB0cnVlLCBzbXM6IGZhbHNlLCBwaG9uZTogZmFsc2UgfSwKICAgIGlkZW1wb3RlbmN5S2V5OiAid2Vic2l0ZS10ZXN0LXJlcXVlc3QtMDAwMSIsCiAgICBob25leXBvdDogIiIsCiAgfSk7CiAgYXNzZXJ0LmVxdWFsKHBhcnNlZC5zdWNjZXNzLCB0cnVlKTsKICBpZiAocGFyc2VkLnN1Y2Nlc3MpIGFzc2VydC5lcXVhbChwYXJzZWQuZGF0YS5lbWFpbCwgInRlc3RAZXhhbXBsZS50ZXN0Iik7CiAgYXNzZXJ0LmVxdWFsKHB1YmxpY1Jlc2VydmF0aW9uU2NoZW1hLnNhZmVQYXJzZSh7IGZhY2lsaXR5U2x1ZzogIm1pZHBvaW50IiwgaG9uZXlwb3Q6ICJzcGFtIiB9KS5zdWNjZXNzLCBmYWxzZSk7Cn0pOwoKdGVzdCgicmVzZXJ2ZS10by12aWV3IHJlcXVpcmVzIGEgdmlld2luZyBhcHBvaW50bWVudCIsICgpID0+IHsKICBjb25zdCBiYXNlID0gewogICAgZmFjaWxpdHlTbHVnOiAibWlkcG9pbnQiLCB1bml0SWQ6ICJ1bml0LTE2OSIsIGZpcnN0TmFtZTogIlZpZXciLCBsYXN0TmFtZTogIkN1c3RvbWVyIiwKICAgIGVtYWlsOiAidmlld0BleGFtcGxlLnRlc3QiLCBwaG9uZTogIisyNzgxNzA4ODEyMCIsIGlkZW1wb3RlbmN5S2V5OiAidmlld2luZy10ZXN0LXJlcXVlc3QtMDAwMSIsCiAgfTsKICBhc3NlcnQuZXF1YWwocHVibGljUmVzZXJ2YXRpb25TY2hlbWEuc2FmZVBhcnNlKHsgLi4uYmFzZSwgam91cm5leTogIlZJRVdJTkciIH0pLnN1Y2Nlc3MsIGZhbHNlKTsKICBhc3NlcnQuZXF1YWwocHVibGljUmVzZXJ2YXRpb25TY2hlbWEuc2FmZVBhcnNlKHsgLi4uYmFzZSwgam91cm5leTogIlZJRVdJTkciLCB2aWV3aW5nQXQ6ICIyMDI2LTA4LTI3VDA4OjAwOjAwLjAwMFoiIH0pLnN1Y2Nlc3MsIHRydWUpOwogIGFzc2VydC5lcXVhbChwdWJsaWNSZXNlcnZhdGlvblNjaGVtYS5wYXJzZShiYXNlKS5qb3VybmV5LCAiUkVOVEFMIik7Cn0pOwoKdGVzdCgidmlld2luZyBob2xkcyBjb3ZlciBhIGxhdGVyIG9mZmljZS1ob3VycyBhcHBvaW50bWVudCIsICgpID0+IHsKICBjb25zdCB2ZXJpZmllZCA9IG5ldyBEYXRlKCIyMDI2LTA4LTI5VDA4OjAwOjAwLjAwMFoiKTsKICBjb25zdCBtb25kYXlWaWV3aW5nID0gbmV3IERhdGUoIjIwMjYtMDgtMzFUMDg6MDA6MDAuMDAwWiIpOwogIGFzc2VydC5lcXVhbChjb25maXJtZWRQdWJsaWNIb2xkRXhwaXJ5KHZlcmlmaWVkLCAiVklFV0lORyIsIG1vbmRheVZpZXdpbmcsIDI0KS50b0lTT1N0cmluZygpLCAiMjAyNi0wOC0zMVQwOTowMDowMC4wMDBaIik7Cn0pOwoKdGVzdCgidmlld2luZyBob2xkcyByZXRhaW4gdGhlIG5vcm1hbCAyNC1ob3VyIG1pbmltdW0iLCAoKSA9PiB7CiAgY29uc3QgdmVyaWZpZWQgPSBuZXcgRGF0ZSgiMjAyNi0wOC0yNlQxMzowMDowMC4wMDBaIik7CiAgY29uc3QgbmV4dE1vcm5pbmcgPSBuZXcgRGF0ZSgiMjAyNi0wOC0yN1QwODowMDowMC4wMDBaIik7CiAgYXNzZXJ0LmVxdWFsKGNvbmZpcm1lZFB1YmxpY0hvbGRFeHBpcnkodmVyaWZpZWQsICJWSUVXSU5HIiwgbmV4dE1vcm5pbmcsIDI0KS50b0lTT1N0cmluZygpLCAiMjAyNi0wOC0yN1QxMzowMDowMC4wMDBaIik7Cn0pOwoKdGVzdCgicHVibGljIG1hcCBvdXRwdXQgY29sbGFwc2VzIHByaXZhdGUgc3RhdHVzIGFuZCBjb25maWcgZGV0YWlscyIsICgpID0+IHsKICBhc3NlcnQuZXF1YWwocHVibGljQXZhaWxhYmlsaXR5KCJBVkFJTEFCTEUiKSwgIkFWQUlMQUJMRSIpOwogIGFzc2VydC5lcXVhbChwdWJsaWNBdmFpbGFiaWxpdHkoIk9DQ1VQSUVEIiksICJVTkFWQUlMQUJMRSIpOwogIGFzc2VydC5kZWVwRXF1YWwocHVibGljRWxlbWVudENvbmZpZyh7IG1pcnJvcmVkOiB0cnVlLCBmbGlwcGVkVmVydGljYWw6IGZhbHNlLCB2YXJpYW50OiAicmV0dXJuIiwgaW50ZXJuYWxOb3RlOiAicHJpdmF0ZSIgfSksIHsKICAgIG1pcnJvcmVkOiB0cnVlLAogICAgZmxpcHBlZFZlcnRpY2FsOiBmYWxzZSwKICAgIHZhcmlhbnQ6ICJyZXR1cm4iLAogIH0pOwp9KTsKCnRlc3QoInJlZmVyZW5jZXMgYXJlIHJlYWRhYmxlIGFuZCByZXNlcnZhdGlvbiBob2xkcyBhcmUgYm91bmRlZCIsICgpID0+IHsKICBhc3NlcnQuZXF1YWwoY3JlYXRlUHVibGljUmVmZXJlbmNlKG5ldyBEYXRlKCIyMDI2LTA4LTEzVDEwOjAwOjAwLjAwMFoiKSwgImFiYzEyMyIpLCAiU1QyNC0yMDI2MDgxMy1BQkMxMjMiKTsKICBhc3NlcnQuZXF1YWwocHVibGljUmVzZXJ2YXRpb25SZWZlcmVuY2VTY2hlbWEuc2FmZVBhcnNlKCJTVDI0LTIwMjYwOTA5LUFCQzEyMyIpLnN1Y2Nlc3MsIHRydWUpOwogIGFzc2VydC5lcXVhbChwdWJsaWNSZXNlcnZhdGlvblJlZmVyZW5jZVNjaGVtYS5zYWZlUGFyc2UoIlNUMjQtVC1jbXRyNGY5angwMDN3MDF0ZjZnMm9sZzFrIikuc3VjY2VzcywgdHJ1ZSk7CiAgYXNzZXJ0LmVxdWFsKHB1YmxpY1Jlc2VydmF0aW9uUmVmZXJlbmNlU2NoZW1hLnNhZmVQYXJzZSgibm90LWEtc3RvcjI0LXJlZmVyZW5jZSIpLnN1Y2Nlc3MsIGZhbHNlKTsKICBhc3NlcnQuZXF1YWwocmVzZXJ2YXRpb25Ib2xkSG91cnMoIjAiKSwgMSk7CiAgYXNzZXJ0LmVxdWFsKHJlc2VydmF0aW9uSG9sZEhvdXJzKCIxMDAwIiksIDE2OCk7CiAgYXNzZXJ0LmVxdWFsKHJlc2VydmF0aW9uSG9sZEhvdXJzKCJpbnZhbGlkIiksIDI0KTsKICBhc3NlcnQuZXF1YWwocHVibGljUmVzZXJ2YXRpb25WZXJpZmljYXRpb25FbmFibGVkKHVuZGVmaW5lZCksIGZhbHNlKTsKICBhc3NlcnQuZXF1YWwocHVibGljUmVzZXJ2YXRpb25WZXJpZmljYXRpb25FbmFibGVkKCJmYWxzZSIpLCBmYWxzZSk7CiAgYXNzZXJ0LmVxdWFsKHB1YmxpY1Jlc2VydmF0aW9uVmVyaWZpY2F0aW9uRW5hYmxlZCgiVFJVRSIpLCB0cnVlKTsKICBhc3NlcnQuZXF1YWwocHVibGljVmlld2luZ1dpbmRvd0hvdXJzKCIwIiksIDEpOwogIGFzc2VydC5lcXVhbChwdWJsaWNWaWV3aW5nV2luZG93SG91cnMoIjEwMCIpLCA3Mik7CiAgYXNzZXJ0LmVxdWFsKHB1YmxpY1ZpZXdpbmdXaW5kb3dIb3VycygiaW52YWxpZCIpLCAyNCk7Cn0pOwoKLy8gU1RPUjI0X09VVFNUQU5ESU5HX1RBU0tTLm1kIGl0ZW0gIzggY2FsbHMgZm9yIGEgdHdvLWRldmljZSByYWNlIHByb29mIG9uIHRoZQovLyBzYW1lIGF2YWlsYWJsZSB1bml0LiBVbnRpbCBub3cgdGhhdCBpbnZhcmlhbnQgd2FzIG9ubHkgY2hlY2tlZCBmb3IgdGhlCi8vIE9GRkxJTkVfUFdBIHBhdGggKHRlc3RzL29mZmxpbmUtcmVzZXJ2YXRpb24tb3V0Ym94LnRlc3QudHMpIOKAlCB0aGUgcHVibGljLAovLyBjdXN0b21lci1mYWNpbmcgd2Vic2l0ZSBwYXRoIChgY3JlYXRlUHVibGljUmVzZXJ2YXRpb25gLCB0aGUgb25lIFBpbm55IGFuZAovLyBGZWV6YSdzIFVBVCBhY3R1YWxseSBleGVyY2lzZXMpIGhhZCBubyBlcXVpdmFsZW50IGNvdmVyYWdlIGF0IGFsbC4gVGhpcyBpcyBhCi8vIHNvdXJjZS1jb250cmFjdCArIGxvZ2ljLWludmFyaWFudCBjaGVjaywgbm90IGEgbGl2ZS1kYXRhYmFzZSBwcm9vZjogaXQKLy8gY29uZmlybXMgdGhlIHJlYWwgc2VydmljZSBzdGlsbCBkb2VzIHRoZSBjb25kaXRpb25hbC11cGRhdGVNYW55LXVuZGVyLQovLyB0cmFuc2FjdGlvbiBjbGFpbSAod2hpY2ggaXMgd2hhdCBtYWtlcyB0aGUgY2xhaW0gYXRvbWljIHVuZGVyIFBvc3RncmVTUUwncwovLyBkZWZhdWx0IFJFQUQgQ09NTUlUVEVEIOKAlCB0aGUgVVBEQVRFIHJlLWV2YWx1YXRlcyBpdHMgV0hFUkUgY2xhdXNlIGFmdGVyCi8vIGFjcXVpcmluZyB0aGUgcm93IGxvY2ssIHNvIGEgbG9zZXIgc2VlcyBgY291bnQ6IDBgIGluc3RlYWQgb2Ygb3ZlcndyaXRpbmcKLy8gdGhlIHdpbm5lciksIGFuZCBpdCBleGVyY2lzZXMgdGhlIHNhbWUgY2xhaW0vbG9zZXIgbG9naWMgY29uY3VycmVudGx5IGluCi8vIGlzb2xhdGlvbi4gSXQgZG9lcyBub3QgcmVwbGFjZSBydW5uaW5nIHR3byByZWFsLCBzaW11bHRhbmVvdXMgcHVibGljCi8vIGJvb2tpbmdzIGFnYWluc3QgdGhlIHNhbWUgdW5pdCBvbiBhIHJlYWwgZGF0YWJhc2UsIHdoaWNoIHJlbWFpbnMgb3BlbiBVQVQuCnRlc3QoInB1YmxpYyBib29raW5nIHNlcnZpY2UgYXRvbWljYWxseSBjbGFpbXMgYSB1bml0IGJlZm9yZSBhbnkgb3RoZXIgd29yayIsIGFzeW5jICgpID0+IHsKICBjb25zdCBzZXJ2aWNlID0gYXdhaXQgcmVhZEZpbGUoc2VydmljZVBhdGgsICJ1dGY4Iik7CiAgYXNzZXJ0Lm1hdGNoKHNlcnZpY2UsIC9kYlxcLlxcJHRyYW5zYWN0aW9uLyk7CiAgYXNzZXJ0Lm1hdGNoKHNlcnZpY2UsIC91bml0XFwuc3RhdHVzICE9PSAiQVZBSUxBQkxFIi8pOwogIGFzc2VydC5tYXRjaChzZXJ2aWNlLCAvdHhcXC51bml0XFwudXBkYXRlTWFueS8pOwogIGFzc2VydC5tYXRjaChzZXJ2aWNlLCAvd2hlcmU6IFxceyBpZDogdW5pdFxcLmlkLCBmYWNpbGl0eUlkOiBmYWNpbGl0eVxcLmlkLCBzdGF0dXM6ICJBVkFJTEFCTEUiIFxcfS8pOwogIGFzc2VydC5tYXRjaChzZXJ2aWNlLCAvZGF0YTogXFx7IHN0YXR1czogIlJFU0VSVkVEIiBcXH0vKTsKICBhc3NlcnQubWF0Y2goc2VydmljZSwgL2NsYWltZWRcXC5jb3VudCAhPT0gMS8pOwogIGFzc2VydC5tYXRjaChzZXJ2aWNlLCAvdGhyb3cgbmV3IFB1YmxpY0Jvb2tpbmdFcnJvclxcKCJVTklUX1VOQVZBSUxBQkxFIiwgNDA5XFwpLyk7Cn0pOwoKdGVzdCgidHdvIHNpbXVsdGFuZW91cyBwdWJsaWMgYm9va2luZ3MgZm9yIHRoZSBzYW1lIHVuaXQgYWxsb3cgZXhhY3RseSBvbmUgYXRvbWljIGNsYWltIiwgYXN5bmMgKCkgPT4gewogIC8vIE1vZGVscyB0aGUgZXhhY3QgZ3VhcmFudGVlIGB0eC51bml0LnVwZGF0ZU1hbnkoeyB3aGVyZTogeyAuLi4sIHN0YXR1czogIkFWQUlMQUJMRSIgfSwgZGF0YTogeyBzdGF0dXM6ICJSRVNFUlZFRCIgfSB9KWAKICAvLyBnaXZlcyB1bmRlciBQb3N0Z3JlU1FMOiB0aGUgc2Vjb25kIFVQREFURSB0byByZWFjaCB0aGUgcm93IGJsb2NrcyB1bnRpbCB0aGUKICAvLyBmaXJzdCB0cmFuc2FjdGlvbiBjb21taXRzLCB0aGVuIHJlLWNoZWNrcyBgc3RhdHVzOiAiQVZBSUxBQkxFImAgYWdhaW5zdCB0aGUKICAvLyBub3ctY29tbWl0dGVkIHJvdyBhbmQgYWZmZWN0cyB6ZXJvIHJvd3MgaW5zdGVhZCBvZiBjbG9iYmVyaW5nIHRoZSB3aW5uZXIuCiAgbGV0IHN0YXR1czogIkFWQUlMQUJMRSIgfCAiUkVTRVJWRUQiID0gIkFWQUlMQUJMRSI7CiAgbGV0IGNsYWltUXVldWU6IFByb21pc2U8eyBsYWJlbDogc3RyaW5nOyBjb3VudDogbnVtYmVyIH0+ID0gUHJvbWlzZS5yZXNvbHZlKHsgbGFiZWw6ICIiLCBjb3VudDogMCB9KTsKICBjb25zdCBjbGFpbSA9IChsYWJlbDogc3RyaW5nKSA9PgogICAgKGNsYWltUXVldWUgPSBjbGFpbVF1ZXVlLnRoZW4oYXN5bmMgKCkgPT4gewogICAgICBhd2FpdCBuZXcgUHJvbWlzZSgocmVzb2x2ZSkgPT4gc2V0SW1tZWRpYXRlKHJlc29sdmUpKTsKICAgICAgaWYgKHN0YXR1cyAhPT0gIkFWQUlMQUJMRSIpIHJldHVybiB7IGxhYmVsLCBjb3VudDogMCB9OwogICAgICBzdGF0dXMgPSAiUkVTRVJWRUQiOwogICAgICByZXR1cm4geyBsYWJlbCwgY291bnQ6IDEgfTsKICAgIH0pKTsKICBjb25zdCBbYSwgYl0gPSBhd2FpdCBQcm9taXNlLmFsbChbY2xhaW0oIlBpbm55IiksIGNsYWltKCJGZWV6YSIpXSk7CiAgY29uc3QgcmVzdWx0cyA9IFthLCBiXTsKICBhc3NlcnQuZGVlcEVxdWFsKHJlc3VsdHMubWFwKChyKSA9PiByLmNvdW50KS5zb3J0KCksIFswLCAxXSk7CiAgYXNzZXJ0LmVxdWFsKHJlc3VsdHMuZmlsdGVyKChyKSA9PiByLmNvdW50ID09PSAxKS5sZW5ndGgsIDEpOwogIGFzc2VydC5lcXVhbChzdGF0dXMsICJSRVNFUlZFRCIpOwp9KTsK
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+import {
+  createPublicReference,
+  confirmedPublicHoldExpiry,
+  publicAvailability,
+  publicElementConfig,
+  publicReservationSchema,
+  publicReservationReferenceSchema,
+  publicReservationVerificationEnabled,
+  publicViewingWindowHours,
+  reservationHoldHours,
+  secureKeyMatches,
+} from "../src/lib/public-booking-contract.ts";
+
+const servicePath = new URL("../src/lib/public-booking-service.ts", import.meta.url);
+
+test("public API keys fail closed and use exact matching", () => {
+  const configured = "a-secure-test-key-that-is-at-least-32-characters";
+  assert.equal(secureKeyMatches(configured, configured), true);
+  assert.equal(secureKeyMatches(`${configured}-wrong`, configured), false);
+  assert.equal(secureKeyMatches(null, configured), false);
+  assert.equal(secureKeyMatches(configured, undefined), false);
+  assert.equal(secureKeyMatches("short", "short"), false);
+});
+
+test("public reservations validate identity, consent and idempotency", () => {
+  const parsed = publicReservationSchema.safeParse({
+    facilitySlug: "midpoint",
+    unitId: "unit-101",
+    firstName: "Test",
+    lastName: "Customer",
+    email: "TEST@EXAMPLE.TEST",
+    phone: "+27 10 000 0000",
+    communicationConsent: { email: true, sms: false, phone: false },
+    idempotencyKey: "website-test-request-0001",
+    honeypot: "",
+  });
+  assert.equal(parsed.success, true);
+  if (parsed.success) assert.equal(parsed.data.email, "test@example.test");
+  assert.equal(publicReservationSchema.safeParse({ facilitySlug: "midpoint", honeypot: "spam" }).success, false);
+});
+
+test("reserve-to-view requires a viewing appointment", () => {
+  const base = {
+    facilitySlug: "midpoint", unitId: "unit-169", firstName: "View", lastName: "Customer",
+    email: "view@example.test", phone: "+27817088120", idempotencyKey: "viewing-test-request-0001",
+  };
+  assert.equal(publicReservationSchema.safeParse({ ...base, journey: "VIEWING" }).success, false);
+  assert.equal(publicReservationSchema.safeParse({ ...base, journey: "VIEWING", viewingAt: "2026-08-27T08:00:00.000Z" }).success, true);
+  assert.equal(publicReservationSchema.parse(base).journey, "RENTAL");
+});
+
+test("viewing holds cover a later office-hours appointment", () => {
+  const verified = new Date("2026-08-29T08:00:00.000Z");
+  const mondayViewing = new Date("2026-08-31T08:00:00.000Z");
+  assert.equal(confirmedPublicHoldExpiry(verified, "VIEWING", mondayViewing, 24).toISOString(), "2026-08-31T09:00:00.000Z");
+});
+
+test("viewing holds retain the normal 24-hour minimum", () => {
+  const verified = new Date("2026-08-26T13:00:00.000Z");
+  const nextMorning = new Date("2026-08-27T08:00:00.000Z");
+  assert.equal(confirmedPublicHoldExpiry(verified, "VIEWING", nextMorning, 24).toISOString(), "2026-08-27T13:00:00.000Z");
+});
+
+test("public map output collapses private status and config details", () => {
+  assert.equal(publicAvailability("AVAILABLE"), "AVAILABLE");
+  assert.equal(publicAvailability("OCCUPIED"), "UNAVAILABLE");
+  assert.deepEqual(publicElementConfig({ mirrored: true, flippedVertical: false, variant: "return", internalNote: "private" }), {
+    mirrored: true,
+    flippedVertical: false,
+    variant: "return",
+  });
+});
+
+test("references are readable and reservation holds are bounded", () => {
+  assert.equal(createPublicReference(new Date("2026-08-13T10:00:00.000Z"), "abc123"), "ST24-20260813-ABC123");
+  assert.equal(publicReservationReferenceSchema.safeParse("ST24-20260909-ABC123").success, true);
+  assert.equal(publicReservationReferenceSchema.safeParse("ST24-T-cmtr4f9jx003w01tf6g2olg1k").success, true);
+  assert.equal(publicReservationReferenceSchema.safeParse("not-a-stor24-reference").success, false);
+  assert.equal(reservationHoldHours("0"), 1);
+  assert.equal(reservationHoldHours("1000"), 168);
+  assert.equal(reservationHoldHours("invalid"), 24);
+  assert.equal(publicReservationVerificationEnabled(undefined), false);
+  assert.equal(publicReservationVerificationEnabled("false"), false);
+  assert.equal(publicReservationVerificationEnabled("TRUE"), true);
+  assert.equal(publicViewingWindowHours("0"), 1);
+  assert.equal(publicViewingWindowHours("100"), 72);
+  assert.equal(publicViewingWindowHours("invalid"), 24);
+});
+
+// STOR24_OUTSTANDING_TASKS.md item #8 calls for a two-device race proof on the
+// same available unit. Until now that invariant was only checked for the
+// OFFLINE_PWA path (tests/offline-reservation-outbox.test.ts) — the public,
+// customer-facing website path (`createPublicReservation`, the one Pinny and
+// Feeza's UAT actually exercises) had no equivalent coverage at all. This is a
+// source-contract + logic-invariant check, not a live-database proof: it
+// confirms the real service still does the conditional-updateMany-under-
+// transaction claim (which is what makes the claim atomic under PostgreSQL's
+// default READ COMMITTED — the UPDATE re-evaluates its WHERE clause after
+// acquiring the row lock, so a loser sees `count: 0` instead of overwriting
+// the winner), and it exercises the same claim/loser logic concurrently in
+// isolation. It does not replace running two real, simultaneous public
+// bookings against the same unit on a real database, which remains open UAT.
+test("public booking service atomically claims a unit before any other work", async () => {
+  const service = await readFile(servicePath, "utf8");
+  assert.match(service, /db\.\$transaction/);
+  assert.match(service, /unit\.status !== "AVAILABLE"/);
+  assert.match(service, /tx\.unit\.updateMany/);
+  assert.match(service, /where: \{ id: unit\.id, facilityId: facility\.id, status: "AVAILABLE" \}/);
+  assert.match(service, /data: \{ status: "RESERVED" \}/);
+  assert.match(service, /claimed\.count !== 1/);
+  assert.match(service, /throw new PublicBookingError\("UNIT_UNAVAILABLE", 409\)/);
+});
+
+test("two simultaneous public bookings for the same unit allow exactly one atomic claim", async () => {
+  // Models the exact guarantee `tx.unit.updateMany({ where: { ..., status: "AVAILABLE" }, data: { status: "RESERVED" } })`
+  // gives under PostgreSQL: the second UPDATE to reach the row blocks until the
+  // first transaction commits, then re-checks `status: "AVAILABLE"` against the
+  // now-committed row and affects zero rows instead of clobbering the winner.
+  let status: "AVAILABLE" | "RESERVED" = "AVAILABLE";
+  let claimQueue: Promise<{ label: string; count: number }> = Promise.resolve({ label: "", count: 0 });
+  const claim = (label: string) =>
+    (claimQueue = claimQueue.then(async () => {
+      await new Promise((resolve) => setImmediate(resolve));
+      if (status !== "AVAILABLE") return { label, count: 0 };
+      status = "RESERVED";
+      return { label, count: 1 };
+    }));
+  const [a, b] = await Promise.all([claim("Pinny"), claim("Feeza")]);
+  const results = [a, b];
+  assert.deepEqual(results.map((r) => r.count).sort(), [0, 1]);
+  assert.equal(results.filter((r) => r.count === 1).length, 1);
+  assert.equal(status, "RESERVED");
+});
