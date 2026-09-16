@@ -135,7 +135,7 @@ export function BiometricAccessWorkspace({
         </form>
         {message ? <p className="safe-config-note">{message}</p> : null}
       </section>
-      <section className="panel">
+      <section className="panel panel-spacious">
         <div className="panel-heading">
           <div>
             <h2>Biometric access register</h2>
