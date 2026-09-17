@@ -457,3 +457,103 @@ The accelerated operational target is Thursday 3 September 2026. Financial-provi
 Current production evidence:
 
 - Public `/book` is accessible and displays Store 1 - Midpoint with live inventory. The live calculator recommends specific units, distinguishes unavailable units and displays the selected unit's current monthly rate. The hold form exposes separate Email, SMS, WhatsApp and Phone service-contact preferences and states that they are not marketing consent.
+- The historical live reserve/cancel proof is reconciled and closed in Asana: reservation `cmsy96mu6000501o0mcgrxm2i` moved unit 104 from Reserved to Vacant after a `200/CANCELLED` response, with inventory restored. A newer public CAPTCHA/mobile-code end-to-end run remains outstanding and must be completed by a human; automation must not bypass CAPTCHA or OTP.
+- Commit `8be2f37` adds permission-scoped, reason-required reservation extension and overdue expiry. Extensions must be later than the current deadline and in the future. Expiry atomically claims only an active overdue reservation, clears verification secrets, audits the decision and releases the unit only if no other active reservation or pending/active occupancy protects it. CI #275 and VPS deployment #260 passed. Controlled production UAT passed 31 August 2026: reservation `cmtcqu8f3000301ptxu5m5vcp` for Premium UAT 2808 / Unit 246 extended to 2 September 2026 at 23:59 SAST and remained `ACTIVE`; overdue reservation `cmtcmkj6x001501pjonpz4lsb` for Offline Conflict UAT 2808-03 / Unit 56 changed to `EXPIRED`, returned `unitReleased: true`, increased available inventory from 519 to 520 and left Unit 56 `AVAILABLE` at R1,000. Audit recorded `reservation.extended` and `reservation.expired` at 10:44 SAST with Brett Dovey as actor. The reservation extension/expiry lifecycle is production-proven.
+- Real-time availability across the operational lifecycle is production-proven and closed 31 August 2026. Evidence covers reservation hold/release (including the Unit 56 expiry above), BlendSign-completed lease activation and occupancy, maintenance Unit 107 `AVAILABLE -> SERVICE -> AVAILABLE`, transfer Unit 105 release plus atomic Unit 106 destination claim, and move-out Unit 106 return to `AVAILABLE`. Atomic transfer guard `f0588f2` is an ancestor of deployed move-out release `9225c85` and current `main`; live health at `2026-08-31T08:47:07.113Z` returned application and database `ok`. Each lifecycle produced its corresponding audit evidence, so Asana task `1217529662315349` can be closed without another production mutation.
+- Commit `09e8ca5` makes South African time explicit across operational screens and reporting boundaries. CI #273 and VPS deployment #258 passed; live `/audit` displays SAST-formatted events. Do not rely on the VPS host timezone for business dates.
+- Facility/ownership isolation fixes are deployed (`95e372b`) and the corresponding security tasks are closed. Live dashboard, calendar, move-in handoff, facility-scoped tasks, BlendSign exception actions, insurance operations, reports, database-aware health monitoring and migration validation are deployed through commits `426f270`, `69c4c56`, `9fb7e5c`, `7b6be71`, `e6ad99e`, `2e844a2`, `bc8d94b`, `db4bcbd` and `f10ba5c`.
+- Insurance is structurally operational but cannot be commercially configured until the business supplies the approved provider, product, cover, premium, excess and policy wording. No values may be invented.
+- Reporting uses scoped production data and no longer exposes the inactive scheduling control. `/api/health` checks database readiness and the production monitor runs every ten minutes.
+- `docs/OPERATIONAL_UAT_AND_TRAINING.md` and `docs/PRODUCTION_READINESS_CHECKLIST.md` are the release evidence and training pack. CI #274 passed at `9c0b831` with 149 tests; the later reservation lifecycle release passed 151 tests locally and in CI.
+
+Current Step 2 build awaiting promotion:
+
+- Unit-linked maintenance now has an operator workflow in `/operations`: staff can create, start, complete or cancel a request. Creation atomically changes only an `AVAILABLE` unit to `SERVICE`, immediately removing it from public and staff availability. Completion/cancellation releases a `SERVICE` unit only when no other active maintenance request, active reservation or pending/active occupancy protects it. Creation and status changes are facility-scoped and audited. Local gates passed on 28 August 2026: typecheck, production build, lint with 0 errors and the 4 pre-existing warnings, and 155 tests. Do not call this production-live until CI, VPS deployment and controlled unit lifecycle UAT pass.
+
+Immediate human-owned gates:
+
+1. Complete the live public booking CAPTCHA and mobile/email verification, then confirm the resulting CRM reservation before cancelling the approved test record.
+2. Supply an approved consenting WhatsApp UAT number.
+3. Approve the exact BlendSign controlled retry/resend and named recipient immediately before sending.
+4. Supply approved insurance commercial values and policy wording.
+5. Supply an authorised operational legacy export for the migration rehearsal. Never commit populated exports or paste customer data into Asana.
+
+Do not close the overall readiness work merely because code, CI or deployment is green. Each external or state-changing workflow needs refreshed, database-backed production evidence and named business sign-off.
+
+## Claude takeover handover — 27 August 2026
+
+Before changing anything, Claude must read the current `PROJECT_CONTEXT.md` from all three canonical GitHub repositories, then inspect the current remote branch, working tree, recent commits and relevant implementation. Do not rely on conversation history alone.
+
+1. CRM/operations: `blendproperty/stor24-portal` — this file — production branch `main`.
+2. Public booking site: `blendproperty/stor24` — production branch `master`.
+3. E-signing: `blendproperty/blendsign` — production branch `main`.
+
+Current CRM handover state:
+
+- Remote `main` and the reviewed branch `codex/verified-24h-hold-crm` both point to `e04803c` (`Do not misreport queued BlendSign leases`).
+- The CRM owns customers, units, reservations, holds, occupancies, payment-method selection, communication evidence and the server-to-server BlendSign request. The public site must not create leases or choose BlendSign templates directly.
+- Implemented flows include verified 24-hour holds, office-hours-aware reserve-to-view, WhatsApp mobile verification, separate email verification before Pay Now, a UAT-only payment simulator, payment-method routing for card/EFT/debit order, independently recorded confirmation and lease-delivery outcomes, and safe idempotent recovery when post-payment follow-up fails.
+- Payment-method routing selects the standard lease for card/EFT and the debit-order lease for debit order. Debit-order merge fields were aligned in `b6845c4`.
+- BlendSign lease creation and invitation delivery were implemented through `25eabba`, `d8e1ad1`, `c326d1e` and later reliability corrections. `e04803c` prevents a queued/failed lease request from being presented to the public site as successfully delivered.
+- UAT cleanup tools now release orphaned/cancelled holds and remove linked test customer, reservation, tenancy, occupancy, lease and simulated-payment data through explicit preview and confirmation. These are destructive UAT controls; do not broaden them to production customers.
+- Customer emails for verification and reservation holds use the Stor24 visual identity. WhatsApp and email verification are distinct channels and must remain visually and semantically clear.
+- Store/company data is now passed into lease merge fields (`eb8b592`). Verify the configured facility/company record rather than hard-coding owner details.
+- No real Netcash transaction exists yet. The payment simulator must remain clearly labelled UAT-only and must not create real `Payment` or `LedgerEntry` records. Real payment work requires Netcash sandbox credentials, signed callbacks, reconciliation, duplicate-callback handling and failure/timeout tests.
+- General WhatsApp lifecycle automation must remain consent-based and gated. Do not infer marketing consent from operational booking preferences.
+
+Next recommended work:
+
+1. Run one clean end-to-end debit-order UAT and one card/EFT UAT using new test customers; verify mobile code, email code, payment method, reservation state, WhatsApp confirmation, lease template, BlendSign invitation, signer-editable fields, completion email and signed PDF.
+2. Record the reservation/payment/communication/lease IDs and verify audit evidence in the CRM instead of relying only on screenshots.
+3. Confirm the two active BlendSign templates and their merge-field mappings against the current API before changing either workflow.
+4. Keep the simulator gated until Netcash is implemented; then replace only the hosted payment step while preserving the verified identity, reservation and lease orchestration.
+5. Investigate any post-payment result that disagrees with actual lease delivery; the UI must reflect recorded channel outcomes, not timing assumptions.
+
+> Last reviewed: 27 August 2026. Read this file before planning or changing the repository. Update it whenever a material capability, decision, deployment state, or cross-repository contract changes.
+
+## Product identity and non-negotiable boundary
+
+This is **STOR 24**, not SiteLink. It is a purpose-built CRM, operations, leasing, reservation, reporting and integration platform. Other products supplied research evidence only and must not appear as the product identity.
+
+Official CI is documented in `docs/STOR24_BRAND_CI.md`. Use the approved logo files in `public/brand/`, ink `#071411`, cream `#F5F3EA`, orange `#FF5A0A`, and Satoshi typography.
+
+## Repository role
+
+This repository is the internal STOR 24 CRM and operations portal. Despite the GitHub repository name `stor24-portal`, it is not the public marketing website. It owns staff-facing operational truth and exposes a narrowly sanitised public-booking API to the website.
+
+- Repository: `blendproperty/stor24-portal`
+- Primary branch: `main`
+- Stack: Next.js 16, React 19, TypeScript, Prisma 7 and PostgreSQL
+- Canonical transactional schema: `prisma/schema.prisma`
+- Architecture: multi-organisation, multi-facility modular monolith
+
+## Branching policy
+
+Branches exist only as short-lived rollback/review points before merging into `main`. Open a branch, get it reviewed and merged, then delete it immediately.
+
+## Netcash payment provider scaffold — 20 August 2026
+
+Brett supplied links to Netcash's developer docs (eMandate synchronous, DebiCheck, Netcash statement, Pay Now, standard debit orders, AVS) and asked for this to be scaffolded as the payment solution that reconciles and sends to MRI.
+
+**What was built, all on `main`:**
+
+- `src/lib/payments/netcash-client.ts` — low-level REST client covering all six Netcash products Brett linked: eMandate (synchronous), DebiCheck (mandate + collection), standard debit orders, Pay Now (hosted checkout), AVS (bank account verification), and statement retrieval. Reads credentials from an `IntegrationConnection` row (`category: "PAYMENTS"`, `provider: "NETCASH"`) rather than raw env vars — matches how every other external provider in this repo is configured, so no schema change was needed.
+- `src/lib/payments/netcash-service.ts` — orchestration layer billing-service.ts and staff UI should call: `verifyCustomerBankAccount`, `setUpRecurringCollection` (DebiCheck mandate), `collectMonthlyRent` (submits a collection against an existing mandate, idempotent per account+date), `createOnceOffCheckout` (Pay Now, for deposits/arrears/ad-hoc charges), `submitFallbackDebitOrder` (standard debit order for accounts not on DebiCheck), `getNetcashStatementForReconciliation`. Every call writes/updates a `Payment` row (`provider: "NETCASH"`) and tracks `IntegrationConnection` health (`lastSuccessAt`/`lastFailureAt`/`consecutiveFailures`) the same way other providers are tracked here.
+- `src/app/api/webhooks/netcash/route.ts` — inbound notify/callback endpoint. Persists every inbound call verbatim to `WebhookInbox` first (so nothing is lost even if processing throws), matches by `providerRef` to a `Payment`, and on success creates the corresponding `LedgerEntry` (type `PAYMENT`) and enqueues an MRI export. On failure, marks the `Payment` `FAILED`.
+- `src/lib/finance/mri-export.ts` — **generic scaffold only, not a real MRI integration.** The MRI decision pack (API vs SFTP file drop vs manual CSV import, exact field mapping, chart-of-accounts mapping) is still open — see Priority next work. This module reuses `WebhookOutbox` as a durable, retryable "ready to export to finance" queue (`destination: "mri://pending-integration-decision"`, a placeholder) so that once the actual MRI integration method is decided, a worker can be pointed at this queue without touching billing-service.ts or the Netcash integration again.
+
+**Deliberately reused existing schema — no migration required.** `Payment`, `LedgerEntry`, `IntegrationConnection`, `WebhookInbox` and `WebhookOutbox` already existed and already cover everything this integration needs (provider/providerRef tracking, idempotency keys, health tracking, durable retryable queues). Nothing new was added to `prisma/schema.prisma`.
+
+**NOT YET LIVE — explicit gaps, in priority order:**
+
+1. **No real Netcash credentials exist anywhere.** No `IntegrationConnection` row has been created for `provider: "NETCASH"` in any environment; every call will throw `NETCASH_NOT_CONFIGURED` until one is created (with real service keys) via whatever admin flow ends up managing `IntegrationConnection` rows.
+2. **Endpoint paths and field names in `netcash-client.ts` are best-effort, not confirmed.** The six Netcash docs pages Brett linked were too large to fully read in this environment (each exceeded the fetch tool's output limit); only partial content was captured (e.g. confirmed `ServiceKey` and `BankAccountNumber#` field names for one product). The rest of the field names (`Reference`, `AccountHolderName`, `CollectionAmount`, etc.) and every endpoint path are inferred from Netcash's general API conventions, not verified against the actual docs. **Every endpoint path and payload shape must be checked against Netcash's live documentation (or a sandbox account) before this is used for a real transaction.**
+3. **Webhook signature verification is a stub.** `src/app/api/webhooks/netcash/route.ts` has a `// TODO: verify authenticity` comment where Netcash's actual callback signing/hash scheme needs to go. Right now anyone who knows the webhook URL could POST a fake "payment succeeded" event. This must be fixed before going live — it is the single most important gap for security, not just correctness.
+4. **No sandbox testing has been done at all.** None of the six functions in `netcash-service.ts` have been exercised against Netcash's sandbox or production, by this assistant or (as far as recorded here) by Brett.
+5. **MRI export is a queue with nowhere to go yet** — by design, per the still-open MRI decision pack. `mri-export.ts` needs a real destination (API client, SFTP writer, or scheduled CSV export) once that decision is made.
+
+## Sign-in security hardening — 19 August 2026
+
+Brett asked for a security audit of sign-in/auth across all three repositories ("harden and secure the website for sign-in and prevent hacking"). Full audit findings and fixes below; this repository (the CRM, highest-privilege sign-in surface) was already the most solidly built of the three.
+
+**What was already solid here, confirmed by direct code review (not assumed):**
