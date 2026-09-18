@@ -7,6 +7,9 @@ import { dispatchBlendSignLease } from "@/lib/blendsign-lease-service";
 import { requireScope } from "@/lib/scope";
 import { customerSchema, facilitySchema, leadSchema, moveInSchema, moveOutSchema, noticeSchema, reservationSchema, transferSchema, unitSchema, unitTypeSchema } from "@/lib/validators";
 import { requirePermission } from "@/lib/auth-guards";
+import { confirmReservationMoveIn } from "@/lib/reservation-move-in";
+import { db } from "@/lib/db";
+import { facilityWhere, requirePermissionScope } from "@/lib/scope";
 
 const text = (data: FormData, key: string) => String(data.get(key) ?? "").trim() || undefined;
 const number = (data: FormData, key: string) => text(data, key) ? Number(text(data, key)) : undefined;
@@ -51,6 +54,26 @@ export async function moveInAction(data: FormData) {
   const result = await moveIn(scope, parsed);
   await dispatchBlendSignLease(scope, result, parsed);
   revalidatePath("/tenants"); revalidatePath("/operations/accounts"); redirect("/operations/accounts");
+}
+
+export async function confirmReservationMoveInAction(data: FormData): Promise<{ error: string } | undefined> {
+  const reservationId = text(data, "reservationId");
+  if (!reservationId || data.get("handoverConfirmed") !== "on") return { error: "Confirm the customer's identity and key handover before continuing." };
+  const visible = await requireScope();
+  const reservation = await db.reservation.findFirst({ where: { id: reservationId, facility: facilityWhere(visible) }, select: { facilityId: true } });
+  if (!reservation) return { error: "This booking is unavailable. Refresh and select it again." };
+  const scope = await requirePermissionScope("move_in.create", reservation.facilityId);
+  try {
+    await confirmReservationMoveIn(scope, reservationId);
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "";
+    if (["MOVE_IN_NOT_READY", "MOVE_IN_REVIEW_REQUIRED", "MOVE_IN_DOCUMENT_REVIEW", "CONFLICT"].includes(code)) {
+      return { error: "The booking cannot be moved in yet. Refresh to check the signed agreement, cleared payment, move-in date and unit availability. No handover was recorded." };
+    }
+    throw error;
+  }
+  for (const path of ["/tenants", "/units", "/reservations", "/operations/accounts", "/operations/move-in", "/my"]) revalidatePath(path);
+  redirect("/operations/accounts");
 }
 export async function transferAction(data: FormData) { await requirePermission("operations.manage"); const parsed = transferSchema.parse({ tenancyId: text(data, "tenancyId"), toUnitId: text(data, "toUnitId"), effectiveAt: text(data, "effectiveAt"), monthlyRate: number(data, "monthlyRate") }); await transfer(await requireScope(), parsed); revalidatePath("/tenants"); }
 export async function noticeAction(data: FormData) { await requirePermission("collections.manage"); const parsed = noticeSchema.parse({ tenancyId: text(data, "tenancyId"), noticeDate: text(data, "noticeDate"), plannedMoveOut: text(data, "plannedMoveOut") }); await giveNotice(await requireScope(), parsed); revalidatePath("/tenants"); }

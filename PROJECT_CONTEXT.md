@@ -1,5 +1,16 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Signed booking move-in correction — 18 September 2026
+
+- Implementation: branch `codex/signed-paid-move-in`, based on canonical `blendproperty/stor24-portal` main `4df6aae`. Unit selection links its existing reservation; signed bookings display the original PDF, verified booking payment, agreed date and staff key-handover action instead of another signature form. Server rechecks scope, immutable signed document hashes, exact booking account, sufficient eligible posted receipts, date, reservation and occupancy. Confirmation is transactional and idempotent, preserves account/ledger/payment/document history, creates an active tenancy and occupancy, and records the staff handover. Facial access remains PENDING and no provider provisioning, payment, charge or email is performed. Legacy direct move-in cannot bypass the signed-booking path.
+- Testing: local Prisma generation, TypeScript and 86-route production build passed. Two rendered-screen tests and six offline reservation handoff tests passed; changed-file ESLint passed after correcting three text-escaping errors. Full test rerun and isolated PostgreSQL CI handover/concurrency suite pending. Existing six unrelated lint warnings retained. No live booking or key handover changed.
+- Commit and push: preparing implementation and this canonical context update on the named branch.
+- Merge: pending review and passing CI.
+- Deployment and configuration: pending; no migration, provider settings or checkout enablement changed.
+- Live production verification: pending. Existing authenticated Unit107 screen reproduced the misleading new-lease form. After deployment verify selecting Unit107 recognises its signed booking, document link and exact blockers without sending a lease or changing occupancy.
+- Preserved gates: current public booking Netcash route is sandbox-only; `netcash-public-test-*`, simulated/test receipts, merchandise-only payments and ambiguous provider provenance cannot clear real key collection. Netcash live payment provenance must be recorded with a verified posted receipt before it can qualify; current legacy receipts lack this provenance and remain for reconciliation. Staff-recorded receipts require their matching audited ledger entry. Legal agreement approval, financial/prorata/deposit rules, live provider settlement and eMandate, identity/physical-key handover UAT, HikCentral enrol/revoke and physical-door UAT, data, staff training and launch approval remain open. This change does not authorise a real handover for existing sandbox bookings.
+
+
 ## Unit-first tenant portal — in progress, 11 September 2026
 
 ### R10 merchandise journey test — 11 September 2026

@@ -1,0 +1,103 @@
+import { createHash } from "node:crypto";
+import { db } from "@/lib/db";
+import type { Prisma } from "@/generated/prisma/client";
+import { facilityWhere, type RequestScope } from "@/lib/scope";
+import { southAfricaDateKey } from "@/lib/south-africa-time";
+
+type Database = Prisma.TransactionClient;
+const reservationInclude = {
+  publicLease: { select: { id: true, status: true, signedAt: true, signedPdfSha256: true, paymentMethod: true } },
+  packageSelection: { select: { priceSnapshot: true } },
+  unit: { select: { status: true, occupancies: { where: { status: { in: ["PENDING", "ACTIVE", "NOTICE_GIVEN", "TRANSFERRING"] } }, select: { id: true } } } },
+} satisfies Prisma.ReservationInclude;
+
+/** Use the exact booking account. Shopping, test receipts and another unit's payments cannot clear a move-in. */
+async function readiness(database: Database, scope: RequestScope, reservationId: string) {
+  const reservation = await database.reservation.findFirst({
+    where: { id: reservationId, facility: facilityWhere(scope), customer: { organisationId: scope.organisationId } },
+    include: reservationInclude,
+  });
+  if (!reservation) throw new Error("NOT_FOUND");
+  const account = await database.account.findFirst({
+    where: { accountNumber: `ST24-T-${reservation.id}`, customerId: reservation.customerId },
+    include: { payments: { include: { merchandiseOrder: { select: { id: true } } } }, ledgerEntries: true, tenancy: { select: { id: true } } },
+  });
+  const requiredCents = Math.round(Number(reservation.quotedRate) * 100) + Math.round(Number(reservation.packageSelection?.priceSnapshot ?? 0) * 100);
+  const receipts = account?.payments.filter(payment => {
+    if (payment.status !== "SUCCEEDED" || payment.currency !== "ZAR" || !payment.processedAt || payment.merchandiseOrder) return false;
+    if (/test|simulat|sandbox/i.test(`${payment.idempotencyKey} ${payment.provider ?? ""}`)) return false;
+    return account.ledgerEntries.some(entry => {
+      const metadata = entry.metadata as { paymentId?: string; verifiedStatus?: unknown; environment?: string } | null;
+      const matches = payment.provider === "NETCASH"
+        ? metadata?.paymentId === payment.id && Boolean(metadata.verifiedStatus) && metadata.environment === "live"
+        : !payment.provider && entry.externalRef === payment.idempotencyKey && Boolean(entry.createdById);
+      return matches && entry.type === "PAYMENT" && entry.amount.equals(payment.amount) &&
+        !account.ledgerEntries.some(reversal => reversal.reversalOfId === entry.id);
+    });
+  }) ?? [];
+  const paidCents = receipts.reduce((sum, payment) => sum + Math.round(Number(payment.amount) * 100), 0);
+  const testPayment = account?.payments.some(payment => /test|simulat|sandbox/i.test(`${payment.status} ${payment.idempotencyKey} ${payment.provider ?? ""}`)) ?? false;
+  const signed = reservation.publicLease?.status === "SIGNED" && Boolean(reservation.publicLease.signedAt && reservation.publicLease.signedPdfSha256);
+  const startDate = reservation.intendedMoveIn ? southAfricaDateKey(reservation.intendedMoveIn) : null;
+  const blockers: string[] = [];
+  if (reservation.status !== "ACTIVE" || reservation.convertedTenancyId) blockers.push("This reservation is no longer awaiting move-in. Refresh to view its current account.");
+  if (reservation.journey !== "RENTAL") blockers.push("Convert the viewing enquiry to a rental booking before move-in.");
+  if (reservation.unit.status !== "RESERVED" || reservation.unit.occupancies.length) blockers.push("The unit's availability needs review before key collection.");
+  if (!signed) blockers.push("The signed agreement and completed document must be on this booking.");
+  if (!startDate) blockers.push("The agreed move-in date is missing. Review the booking.");
+  else if (startDate > southAfricaDateKey(new Date())) blockers.push(`Key collection starts on ${startDate}.`);
+  if (!account || account.tenancy) blockers.push("The booking account needs reconciliation before move-in.");
+  if (requiredCents <= 0 || paidCents < requiredCents) blockers.push(testPayment
+    ? "A test payment is recorded. It does not clear the real booking for key collection."
+    : "The required booking payment has not been verified in full on this account.");
+  if (account?.ledgerEntries.some(entry => entry.type === "REFUND" || entry.type === "REVERSAL")) blockers.push("A refund or reversal requires account review before key collection.");
+  return { reservation, account, receipts, view: {
+    signed, leaseId: reservation.publicLease?.id ?? null, signedAt: reservation.publicLease?.signedAt?.toISOString() ?? null,
+    requiredAmount: requiredCents / 100, paidAmount: paidCents / 100,
+    paymentVerified: requiredCents > 0 && paidCents >= requiredCents,
+    testPayment, startDate, ready: blockers.length === 0, blockers,
+  } };
+}
+
+export type ReservationMoveInReadiness = Awaited<ReturnType<typeof readiness>>["view"];
+
+export async function getReservationMoveInReadiness(scope: RequestScope, reservationId: string) {
+  return (await readiness(db, scope, reservationId)).view;
+}
+
+/** Caller authorises move_in.create for this facility. No signing dispatch, payment posting or door provisioning. */
+export async function confirmReservationMoveIn(scope: RequestScope, reservationId: string) {
+  return db.$transaction(async tx => {
+    const target = await tx.reservation.findFirst({ where: { id: reservationId, facility: facilityWhere(scope), customer: { organisationId: scope.organisationId } }, select: { unitId: true } });
+    if (!target) throw new Error("NOT_FOUND");
+    await tx.$queryRaw`SELECT "id" FROM "Unit" WHERE "id" = ${target.unitId} FOR UPDATE`;
+    await tx.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id" = ${reservationId} FOR UPDATE`;
+    const existing = await tx.reservation.findUniqueOrThrow({ where: { id: reservationId } });
+    if (existing.status === "CONVERTED" && existing.convertedTenancyId) {
+      const handover = await tx.auditEvent.findFirst({ where: { entityId: existing.convertedTenancyId, action: "tenancy.key_handover_confirmed", organisationId: scope.organisationId } });
+      if (handover) return { tenancyId: existing.convertedTenancyId, idempotent: true };
+      throw new Error("MOVE_IN_REVIEW_REQUIRED");
+    }
+    const accountNumber = `ST24-T-${reservationId}`;
+    await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "accountNumber" = ${accountNumber} FOR UPDATE`;
+    const state = await readiness(tx, scope, reservationId);
+    if (!state.view.ready || !state.account || !state.reservation.intendedMoveIn) throw new Error("MOVE_IN_NOT_READY");
+    const unit = await tx.unit.findUniqueOrThrow({ where: { id: target.unitId } });
+    const occupied = await tx.occupancy.count({ where: { unitId: unit.id, status: { in: ["PENDING", "ACTIVE", "NOTICE_GIVEN", "TRANSFERRING"] } } });
+    const otherReservation = await tx.reservation.count({ where: { unitId: unit.id, status: "ACTIVE", id: { not: reservationId } } });
+    if (unit.status !== "RESERVED" || occupied || otherReservation) throw new Error("MOVE_IN_REVIEW_REQUIRED");
+    const lease = await tx.publicReservationLease.findUniqueOrThrow({ where: { reservationId } });
+    if (!lease.signedPdf || createHash("sha256").update(lease.signedPdf).digest("hex") !== lease.signedPdfSha256 || createHash("sha256").update(lease.content).digest("hex") !== lease.sha256) throw new Error("MOVE_IN_DOCUMENT_REVIEW");
+    const tenancy = await tx.tenancy.create({ data: {
+      facilityId: existing.facilityId, customerId: existing.customerId, accountId: state.account.id,
+      status: "ACTIVE", startDate: state.reservation.intendedMoveIn, paymentMethod: lease.paymentMethod,
+      occupancies: { create: { unitId: unit.id, status: "ACTIVE", startDate: state.reservation.intendedMoveIn, monthlyRate: existing.quotedRate, accessState: "PENDING" } },
+      documents: { create: { type: "LEASE_AGREEMENT", provider: "PUBLIC_RESERVATION", externalId: lease.id, storageKey: `public-reservation:${lease.id}`, status: "SIGNED", content: lease.content, sha256: lease.sha256, signerName: lease.signerName, signerIp: lease.signerIp, signerUserAgent: lease.signerUserAgent, clauseVersion: lease.version, signedAt: lease.signedAt, idempotencyKey: `reservation-lease:${lease.id}` } },
+    } });
+    const claimed = await tx.reservation.updateMany({ where: { id: reservationId, status: "ACTIVE", convertedTenancyId: null }, data: { status: "CONVERTED", convertedTenancyId: tenancy.id } });
+    if (claimed.count !== 1) throw new Error("CONFLICT");
+    await tx.unit.update({ where: { id: unit.id }, data: { status: "OCCUPIED" } });
+    await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: existing.facilityId, actorId: scope.userId, action: "tenancy.key_handover_confirmed", entityType: "Tenancy", entityId: tenancy.id, after: { reservationId, accountId: state.account.id, leaseId: lease.id, paymentIds: state.receipts.map(payment => payment.id), requiredAmount: state.view.requiredAmount, paidAmount: state.view.paidAmount, accessState: "PENDING" } } });
+    return { tenancyId: tenancy.id, idempotent: false };
+  });
+}
