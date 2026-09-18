@@ -104,7 +104,7 @@ async function nextDocumentNumber(organisationId: string, type: "INVOICE" | "STA
 
 type SendResult =
   | { ok: true; documentId: string; communicationLogId: string }
-  | { ok: false; code: "ACCOUNT_NOT_FOUND" | "NO_LEDGER_ENTRIES" | "NO_CUSTOMER_EMAIL" | "EMAIL_FAILED"; message?: string };
+  | { ok: false; code: "ACCOUNT_NOT_FOUND" | "NO_LEDGER_ENTRIES" | "NO_CUSTOMER_EMAIL" | "EMAIL_FAILED" | "TEST_PAYMENT_RECONCILIATION_REQUIRED"; message?: string };
 
 export async function sendInvoiceEmail(input: { accountId: string; organisationId: string; ledgerEntryIds: string[]; actorId: string; payNowUrl?: string }): Promise<SendResult> {
   const context = await getAccountBillingContext(input.accountId, input.organisationId);
