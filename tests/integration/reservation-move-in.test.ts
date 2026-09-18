@@ -200,6 +200,8 @@ test("isolated PostgreSQL signed reservation handover", async t => {
       const other = await fixture();
       await db.payment.update({ where: { id: other.payment.id }, data: { provider: "NETCASH", providerRef: other.payment.id, status: "PENDING" } });
       await assert.rejects(settleVerifiedBookingPayment(other.payment.id, { ...evidence, reference: other.payment.id }), /ENVIRONMENT_REVIEW/);
+      await db.payment.update({ where: { id: other.payment.id }, data: { status: "SUCCEEDED" } });
+      await assert.rejects(settleVerifiedBookingPayment(other.payment.id, { ...evidence, reference: other.payment.id }), /ENVIRONMENT_REVIEW/);
     });
   } finally { await db.$disconnect(); }
 });
