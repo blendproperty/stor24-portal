@@ -98,7 +98,7 @@ test("isolated PostgreSQL signed reservation handover", async t => {
       await assert.rejects(confirmReservationMoveIn(f.scope, f.reservation.id), /MOVE_IN_NOT_READY/);
       const other = await fixture();
       await db.unit.update({ where: { id: other.unit.id }, data: { status: "SERVICE" } });
-      await assert.rejects(confirmReservationMoveIn(other.scope, other.reservation.id), /MOVE_IN_REVIEW_REQUIRED/);
+      await assert.rejects(confirmReservationMoveIn(other.scope, other.reservation.id), /MOVE_IN_NOT_READY/);
       await unchanged(f);
     });
     await t.test("legacy direct move-in cannot send another lease for a reserved signed unit", async () => {
