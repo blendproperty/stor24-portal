@@ -1,5 +1,16 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Move-in interface readability and layout — 18 September 2026
+
+- Implementation: `codex/move-in-interface-polish` from canonical main `0ca24e9`. Signed-booking confirmation now has three status cards, a clear blocker panel, a collapsed receipt disclosure, separately spaced attestation/actions and a single-column mobile layout. Dates are readable and SAST-stable. Agreement, receipt and handover server actions and eligibility gates are preserved. The misleading saved-agreement note is conditional on an actual signature.
+- Typography: the legacy Satoshi-Variable.ttf has OS/2 weight 900 and no variable-font axis. The handover screen now uses separate, unmodified official Satoshi 400/500/700 WOFF2 files (source and ITF credits recorded in public/brand/SATOSHI-CREDITS.md); other screens retain their existing typography.
+- Testing: local typecheck and two existing signed-booking screen regression tests passed. Actual-component static previews visually inspected in Edge at 1440px and 390px, including expanded payment fields, disabled handover, and ready-for-collection state; no mobile horizontal overflow. Preview is rendering evidence, not live payment/handover UAT. Full CI and release verification pending below.
+- Commit and push: pending for this interface change.
+- Merge: pending for this interface change.
+- Deployment and configuration: pending; no migrations or provider/configuration changes required.
+- Live production verification: pending; no customer/payment/key-handover records changed during visual verification. User acceptance of the revised appearance remains open.
+- Preserved gates: all legal, finance-rule approval, real provider settlement/eMandate, historical reconciliation, tenant/real-receipt/handover UAT, facial-photo consent/retention, HikCentral and physical-door proof, staff training and launch approval gates listed below remain open.
+
 ## Booking workflow integrity for Pinny and Faeez UAT — 18 September 2026
 
 - Implementation: `codex/booking-workflow-integrity` from canonical main `afa88ff`. Payment environment is captured at checkout with an additive nullable column; legacy test keys remain identifiable without rewriting history. Verified sandbox booking callbacks produce TEST_SUCCEEDED with no ledger, balance or MRI export; account-locked settlement is idempotent and late non-success cannot undo success. Failed/pending callbacks can retry server verification. Unknown environment is held for review. Non-test merchandise checkout requires live configuration; the explicit R10 merchandise test remains separate.

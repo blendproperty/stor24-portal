@@ -2,6 +2,7 @@
 
 import { ReservationPaymentForm } from "./reservation-payment-form";
 import { useState } from "react";
+import { FileCheck2, Wallet, CalendarDays, ArrowUpRight, CircleAlert, KeyRound, Check } from "lucide-react";
 import type { ReservationMoveInReadiness } from "@/lib/reservation-move-in";
 import { confirmReservationMoveInAction } from "@/app/actions/leasing";
 
@@ -11,27 +12,30 @@ export function ReservationMoveInConfirmation({ reservationId, customerName, uni
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const money = (amount: number) => `R ${amount.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`;
-  return <section className="panel panel-spacious">
-    <h2>{readiness.ready ? "Ready for key collection" : "Move-in checks"}</h2>
-    <p>{customerName} · Unit {unitNumber}</p>
-    <div className="move-in-form">
-      <section><h3>Agreement signed</h3><p>The existing signed agreement is saved. No new signature is required.</p>{readiness.leaseId && <a href={`/api/v1/public-leases/${readiness.leaseId}/signed-pdf`}>View signed agreement</a>}</section>
-      <section><h3>{readiness.paymentVerified ? "Payment verified" : "Payment confirmation needed"}</h3><p>{money(readiness.paidAmount)} cleared towards the {money(readiness.requiredAmount)} booking amount.</p></section>
-      <section><h3>Agreed move-in date</h3><p>{readiness.startDate ?? "Not recorded"}</p></section>
-      <section><h3>Key handover</h3><p>Check the customer identity and unit, then record the key handover at the guard house. Facial access is managed separately.</p></section>
+  const moveInDate = readiness.startDate ? new Intl.DateTimeFormat("en-ZA", { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Johannesburg" }).format(new Date(`${readiness.startDate}T12:00:00+02:00`)) : "Not recorded";
+  return <section className="handover-workspace" aria-label="Booking handover checks">
+    <header className="handover-heading">
+      <div><p className="handover-eyebrow">BOOKING HANDOVER</p><h2>{readiness.ready ? "Ready for key collection" : "Move-in checks"}</h2><p className="handover-customer">{customerName}<span>Unit {unitNumber}</span></p></div>
+      <span className={`handover-status ${readiness.ready ? "is-ready" : "is-pending"}`}>{readiness.ready ? <Check size={15} aria-hidden="true" /> : <CircleAlert size={15} aria-hidden="true" />}{readiness.ready ? "Ready to move in" : "Action required"}</span>
+    </header>
+    <div className="handover-checks">
+      <section className="handover-check"><div className="handover-check-label"><FileCheck2 size={19} aria-hidden="true" /><span>01 · Agreement</span></div><h3>{readiness.signed ? "Agreement signed" : "Agreement needs review"}</h3><p>{readiness.signed ? "Your signed document is saved. No new signature is required." : "Review the agreement before handing over keys."}</p>{readiness.leaseId && readiness.signed && <a className="handover-document" href={`/api/v1/public-leases/${readiness.leaseId}/signed-pdf`}>View signed agreement <ArrowUpRight size={15} aria-hidden="true" /></a>}</section>
+      <section className="handover-check"><div className="handover-check-label"><Wallet size={19} aria-hidden="true" /><span>02 · Payment</span></div><h3>{readiness.paymentVerified ? "Payment verified" : "Payment confirmation needed"}</h3><p className="handover-amount">{money(readiness.paidAmount)} <span>verified</span></p><p>of {money(readiness.requiredAmount)} required for this booking</p>{readiness.testPayment && <span className="handover-test-label">Sandbox payment on file</span>}</section>
+      <section className="handover-check"><div className="handover-check-label"><CalendarDays size={19} aria-hidden="true" /><span>03 · Move-in date</span></div><h3>{moveInDate}</h3><p>Key collection is available from the agreed start date, once all checks are complete.</p></section>
     </div>
-    {readiness.mandateStatus && <p><strong>Debit-order mandate: {readiness.mandateStatus.replaceAll("_", " ")}</strong>. A signed mandate is not a payment. Collections are not enabled; the first payment must be verified separately.</p>}
+    {readiness.blockers.length > 0 && <aside className="handover-notice" role="status"><CircleAlert size={20} aria-hidden="true" /><div><h3>Before keys can be released</h3><ul>{readiness.blockers.map(blocker => <li key={blocker}>{blocker.replace(/\b\d{4}-\d{2}-\d{2}\b/g, value => new Intl.DateTimeFormat("en-ZA", { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Johannesburg" }).format(new Date(`${value}T12:00:00+02:00`)))}</li>)}</ul>{readiness.signed && <p>Your signed agreement stays on file.</p>}</div></aside>}
+    {readiness.mandateStatus && <div className="handover-mandate"><h3>Debit-order mandate <span>{readiness.mandateStatus.replaceAll("_", " ")}</span></h3><p>A mandate is not a payment. Collections are not enabled; verify the first payment separately.</p></div>}
     {canRecordPayment && !readiness.paymentVerified && <ReservationPaymentForm reservationId={reservationId} />}
-    {readiness.blockers.length > 0 && <div role="status"><ul>{readiness.blockers.map(blocker => <li key={blocker}>{blocker}</li>)}</ul><p>The signed agreement remains on file while these checks are resolved.</p></div>}
+    <div className="handover-key-note"><KeyRound size={20} aria-hidden="true" /><div><h3>Key handover at the guard house</h3><p>Check the customer’s identity and unit before recording collection. Facial access is managed separately.</p></div></div>
     <form action={async data => {
       setBusy(true); setError("");
       try { const result = await confirmReservationMoveInAction(data); if (result?.error) setError(result.error); }
       finally { setBusy(false); }
     }}>
       <input type="hidden" name="reservationId" value={reservationId} />
-      {readiness.ready && <label><input type="checkbox" name="handoverConfirmed" required disabled={busy} /> I have checked the customer identity and am handing over the keys for this unit.</label>}
+      {readiness.ready && <label className="handover-attestation"><input type="checkbox" name="handoverConfirmed" required disabled={busy} /> I have checked the customer identity and am handing over the keys for this unit.</label>}
       {error && <p className="form-error" role="alert">{error}</p>}
-      <div className="form-actions">
+      <div className="handover-actions">
         <button type="button" className="button button-secondary" onClick={onBack} disabled={busy}>Back</button>
         <button type="button" className="button button-secondary" onClick={() => window.location.reload()} disabled={busy}>Refresh checks</button>
         <button className="button button-primary" disabled={!readiness.ready || busy}>{busy ? "Recording handover…" : "Confirm move-in / key handover"}</button>
