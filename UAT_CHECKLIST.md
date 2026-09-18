@@ -36,6 +36,11 @@ Created 11 September 2026. Owner: Brett with implementation support. All boxes b
 
 ## Operations and financial controls
 
+- [ ] Signed booking handover (18 September correction): selecting the unit or opening its reservation recognises the original signed PDF, correct account, agreed date and payment evidence; never sends a second lease.
+  - Partial live evidence on 18 September: Unit107 selection automatically showed the signed agreement and original PDF link, R0 eligible cleared/R2199 required, date 30 September, test-payment blocker and disabled handover; no duplicate-signature action. Broader reservation-entry and real-paid handover UAT remain open.
+- [ ] With an authorised real, sufficiently paid booking, confirm customer identity and physical key handover; verify one active tenancy/occupancy, original account/PDF/payment/ledger preservation and staff audit. Repeated confirmation must not duplicate records. Automated database tests do not close this live UAT.
+- [ ] Test/sandbox/merchandise-only payments, future dates, unavailable units and insufficient or ambiguous receipts block real handover. Current public Netcash remains sandbox-only; production provenance and reservation-account receipt reconciliation remain financial/provider launch gates. No test receipt may be relabelled as real to pass this check.
+- [ ] Facial access stays pending after key handover until the separately authorised enrolment/provider readback and physical-door tests pass.
 - [ ] Only permitted organisation/store staff can fulfil. Double-click/retry/concurrent fulfilment deducts held/on-hand stock once and records one sale/audit.
 - [ ] Unpaid/review orders cannot be fulfilled. Insufficient stock gives clear error with no partial sale or status change.
 - [ ] Scheduled expiry runs reliably; eligible unpaid holds release, paid orders remain intact, failures alert and retries recover.
