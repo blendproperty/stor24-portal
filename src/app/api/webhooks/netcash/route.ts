@@ -105,7 +105,7 @@ export async function POST(request: Request) {
         data: { status: "FAILED", failureMessage: err instanceof Error ? err.message.slice(0, 500) : String(err) },
       }).catch(() => undefined);
     }
-    return NextResponse.json({ received: true, matched: true, verified: false });
+    return NextResponse.json({ received: true, matched: true, verified: false }, { status: 503 });
   }
 
   const amountMatches = verified.amount !== undefined && Number(verified.amount) === Number(payment.amount);
