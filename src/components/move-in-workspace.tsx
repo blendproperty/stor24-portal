@@ -5,6 +5,8 @@ import { ArrowLeft, ArrowRight, Plus, Search, X } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { southAfricaDateKey } from "@/lib/south-africa-time";
+import type { ReservationMoveInReadiness } from "@/lib/reservation-move-in";
+import { ReservationMoveInConfirmation } from "@/components/reservation-move-in-confirmation";
 
 type Unit = {
   id: string;
@@ -31,6 +33,7 @@ type Reservation = {
   paymentMethod: string | null;
   intendedMoveIn: string | null;
   quotedRate: number;
+  readiness: ReservationMoveInReadiness | null;
 };
 
 export function MoveInWorkspace({
@@ -67,6 +70,18 @@ export function MoveInWorkspace({
   const [customerId, setCustomerId] = useState(
     initialReservation?.customerId ?? "",
   );
+  const [reservationId, setReservationId] = useState(initialReservation?.id ?? "");
+  const selectedReservation = reservations.find(item => item.id === reservationId && item.unitId === selectedId);
+  function selectReservation(id: string) {
+    setReservationId(id);
+    const reservation = reservations.find(item => item.id === id);
+    if (reservation) setCustomerId(reservation.customerId);
+  }
+  function selectUnit(id: string) {
+    setSelectedId(id);
+    const matches = reservations.filter(item => item.unitId === id);
+    selectReservation(matches.length === 1 ? matches[0].id : "");
+  }
   const [showCustomer, setShowCustomer] = useState(false);
   const [customerBusy, setCustomerBusy] = useState(false);
   const [customerError, setCustomerError] = useState("");
@@ -201,7 +216,9 @@ export function MoveInWorkspace({
         description={
           step === 1
             ? "Select an available unit using size or floor-area availability."
-            : "Complete the customer and account details, then send the lease agreement for the customer to review and sign."
+            : selectedReservation?.readiness
+              ? "Review the existing signed agreement, payment and move-in date before recording key handover."
+              : "Complete the booking details, then send the lease agreement for review and signature."
         }
       />
       <div className="move-in-steps">
@@ -218,7 +235,7 @@ export function MoveInWorkspace({
                   value={facilityId}
                   onChange={(event) => {
                     setFacilityId(event.target.value);
-                    setSelectedId("");
+                    selectUnit("");
                     setFilterKey("ALL");
                     setFloorFilter("ALL");
                   }}
@@ -294,14 +311,14 @@ export function MoveInWorkspace({
                     <tr
                       key={unit.id}
                       className={selectedId === unit.id ? "selected" : ""}
-                      onClick={() => setSelectedId(unit.id)}
+                      onClick={() => selectUnit(unit.id)}
                     >
                       <td>
                         <input
                           aria-label={`Select unit ${unit.number}`}
                           type="radio"
                           checked={selectedId === unit.id}
-                          onChange={() => setSelectedId(unit.id)}
+                          onChange={() => selectUnit(unit.id)}
                         />{" "}
                         <strong>{unit.number}</strong>
                       </td>
@@ -405,9 +422,13 @@ export function MoveInWorkspace({
             </section>
           </aside>
         </section>
+      ) : selectedReservation?.readiness ? (
+        <ReservationMoveInConfirmation key={selectedReservation.id} reservationId={selectedReservation.id}
+          customerName={selectedCustomer?.name ?? selectedReservation.label} unitNumber={selected?.number ?? ""}
+          readiness={selectedReservation.readiness} onBack={() => setStep(1)} />
       ) : (
         <section className="panel panel-spacious">
-          <form action={action} className="move-in-form">
+          <form key={`${selectedId}:${reservationId}`} action={action} className="move-in-form">
             <input
               type="hidden"
               name="facilityId"
@@ -432,6 +453,7 @@ export function MoveInWorkspace({
                 required
                 value={customerId}
                 onChange={(event) => setCustomerId(event.target.value)}
+                disabled={Boolean(selectedReservation)}
               >
                 <option value="">Select customer</option>
                 {customerOptions.map((customer) => (
@@ -440,6 +462,7 @@ export function MoveInWorkspace({
                   </option>
                 ))}
               </select>
+              {selectedReservation && <input type="hidden" name="customerId" value={customerId} />}
               <button
                 type="button"
                 className="text-button move-in-add-customer"
@@ -453,12 +476,14 @@ export function MoveInWorkspace({
               </button>
             </label>
             <label>
-              Reservation (optional)
+              Reservation
               <select
                 name="reservationId"
-                defaultValue={initialReservation?.id ?? ""}
+                value={reservationId}
+                onChange={event => selectReservation(event.target.value)}
+                required={selected?.status === "RESERVED"}
               >
-                <option value="">Direct move-in</option>
+                <option value="">{selected?.status === "RESERVED" ? "Select the existing booking" : "Direct move-in"}</option>
                 {reservations
                   .filter((item) => item.unitId === selectedId)
                   .map((item) => (
@@ -474,7 +499,7 @@ export function MoveInWorkspace({
                 name="startDate"
                 type="date"
                 defaultValue={
-                  initialReservation?.intendedMoveIn ??
+                  selectedReservation?.intendedMoveIn ??
                   southAfricaDateKey(new Date())
                 }
                 required
@@ -487,7 +512,7 @@ export function MoveInWorkspace({
                 type="number"
                 step=".01"
                 defaultValue={
-                  initialReservation?.quotedRate ?? selected?.monthlyRate
+                  selectedReservation?.quotedRate ?? selected?.monthlyRate
                 }
               />
             </label>
@@ -508,9 +533,9 @@ export function MoveInWorkspace({
               <select
                 name="paymentMethod"
                 defaultValue={
-                  initialReservation?.paymentMethod === "UNDECIDED"
+                  selectedReservation?.paymentMethod === "UNDECIDED"
                     ? ""
-                    : (initialReservation?.paymentMethod ?? "")
+                    : (selectedReservation?.paymentMethod ?? "")
                 }
                 required
               >
@@ -521,7 +546,7 @@ export function MoveInWorkspace({
                 <option value="OTHER">Other</option>
               </select>
               <small>
-                {initialReservation?.paymentMethod === "UNDECIDED"
+                {selectedReservation?.paymentMethod === "UNDECIDED"
                   ? "The customer had not decided offline. Confirm this before sending."
                   : "Prefilled from the reservation. Confirm it before BlendSign selects the matching lease."}
               </small>
@@ -529,10 +554,11 @@ export function MoveInWorkspace({
             <section className="lease-sign-panel">
               <h3>Lease agreement</h3>
               <p className="lease-summary" style={{ fontStyle: "italic" }}>
-                Draft agreement — pending attorney review. The customer will
+                No signed agreement is linked to this booking. The customer will
                 receive an emailed link to review every clause, initial each one
                 and sign — the unit stays held (not occupied) until they do.
               </p>
+              <small>Agreement wording remains subject to legal approval. This is separate from the customer signing status.</small>
             </section>
             {!selectedCustomer?.email && customerId ? (
               <p className="form-error">

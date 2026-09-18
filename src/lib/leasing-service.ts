@@ -150,7 +150,7 @@ export async function listLeasing(scope: RequestScope) {
     }),
     db.reservation.findMany({
       where: { facilityId: { in: facilityIds } },
-      include: { customer: true, unit: true, facility: true },
+      include: { customer: true, unit: true, facility: true, publicLease: { select: { status: true } } },
       orderBy: { updatedAt: "desc" },
     }),
     db.tenancy.findMany({
@@ -592,6 +592,12 @@ export async function moveIn(
 ) {
   await requireFacility(scope, input.facilityId);
   const result = await db.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "Unit" WHERE "id" = ${input.unitId} FOR UPDATE`;
+    const blockingOccupancy = await tx.occupancy.count({ where: { unitId: input.unitId, status: { in: ["PENDING", "ACTIVE", "NOTICE_GIVEN", "TRANSFERRING"] } } });
+    const activeReservations = await tx.reservation.findMany({ where: { unitId: input.unitId, status: "ACTIVE" }, select: { id: true, publicLease: { select: { status: true } } } });
+    if (blockingOccupancy || activeReservations.some(reservation => reservation.id !== input.reservationId)) throw new Error("CONFLICT");
+    // A signed online booking must use the guarded handover, never a second signing envelope.
+    if (activeReservations.some(reservation => reservation.publicLease?.status === "SIGNED")) throw new Error("SIGNED_RESERVATION_REQUIRES_HANDOVER");
     const unit = await tx.unit.findFirst({
       where: {
         id: input.unitId,

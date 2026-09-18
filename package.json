@@ -14,7 +14,7 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:seed:demo": "tsx prisma/seed-demo.ts",
     "migration:validate": "node scripts/validate-migration-export.mjs",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "tsx --test tests/*.test.ts tests/*.test.tsx",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build"
   },
   "dependencies": {

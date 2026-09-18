@@ -50,7 +50,7 @@ type Account = {
     status: string;
     facilityId: string;
     facility: { name: string };
-    documents: { id: string; status: string; signedAt: string | null }[];
+    documents: { id: string; status: string; signedAt: string | null; provider?: string | null; externalId?: string | null }[];
     occupancies: {
       status: string;
       unit: { number: string; unitType: { name: string } };
@@ -443,18 +443,18 @@ export function AccountsWorkspace({
                       <span className="account-actions" key={document.id}>
                         <a
                           className="button button-secondary"
-                          href={`/api/v1/documents/${document.id}/signed`}
+                          href={document.provider === "PUBLIC_RESERVATION" ? `/api/v1/public-leases/${document.externalId}/signed-pdf` : `/api/v1/documents/${document.id}/signed`}
                         >
                           <Download size={16} />
                           Completed lease
                         </a>
-                        <a
+                        {document.provider !== "PUBLIC_RESERVATION" && <a
                           className="button button-secondary"
                           href={`/api/v1/documents/${document.id}/certificate`}
                         >
                           <FileCheck2 size={16} />
                           Completion certificate
-                        </a>
+                        </a>}
                       </span>
                     ))}
                 </div>
