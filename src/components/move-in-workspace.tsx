@@ -224,7 +224,7 @@ export function MoveInWorkspace({
       />
       <div className="move-in-steps">
         <span className="active">1 Select unit</span>
-        <span className={step === 2 ? "active" : ""}>2 Account details</span>
+        <span className={step === 2 ? "active" : ""} aria-current={step === 2 ? "step" : undefined}>2 {selectedReservation?.readiness ? "Key handover" : "Account details"}</span>
       </div>
       {step === 1 ? (
         <section className="unit-selector-layout">
