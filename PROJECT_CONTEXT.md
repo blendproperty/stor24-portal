@@ -1,5 +1,17 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Six month marketing planning review — 18 September 2026
+
+- **Implementation:** documentation/planning only. Added `docs/marketing/STOR24_SIX_MONTH_MARKETING_PLAN_2026-09-18.md`, covering the proposed 21 September 2026–20 March 2027 programme for Midpoint park tenants and nearby residents, six monthly campaigns, 26-week calendar, proposed R240,000 budget, conditional 330-enquiry/66-customer model, ownership, content, local outreach, reporting and a bounded technical backlog. No marketing spend, external sends, campaigns or runtime changes were performed. Budgets, dates, targets and named responsibilities remain proposed, not approved.
+- **Testing / validation:** supplied Word and 27-slide PowerPoint strategy reviewed including embedded graphics; fresh website master `5399c3b` and CRM main `4df6aae` source/context reviewed; budget and target arithmetic checked. The 23-page Word/PDF deliverable was rendered using native Word plus the bundled document rasterizer and visually inspected. No application tests were needed for this documentation-only slice, and no new provider/customer-journey UAT is claimed.
+- **Commit and push:** the plan and this context entry are published together on `codex/marketing-plan-20260918` in the canonical website and CRM repositories. Final handoff verifies each local commit against the corresponding remote branch and reads back PROJECT_CONTEXT.md.
+- **Merge:** not merged into website master or CRM main; this is a planning-review branch, not approval to implement the proposed backlog.
+- **Deployment and configuration:** none. No DNS, provider setting, tracking tag, budget, consent configuration or production data changed.
+- **Live production verification:** read-only HTTP on 18 September found `https://stor24.co.za` serving Launching Soon; the hosting-domain contact page served Midpoint address and contact details; `/book` served the unit-finder shell. These checks do not prove live inventory loading, enquiry delivery, payment or access. Phone answering and mailbox receipt were not tested.
+- **Source findings and open gates:** the website quote route awaits n8n but starts CRM capture without awaiting it; quote contract/source fields do not carry explicit campaign attribution; calculator analytics hooks do not prove configured collection; service communication consent is not promotional consent. Resolve branded destination, reliable lead capture and response ownership before conversion scaling. All opening, inventory/rate/terms, legal/privacy, supplier, finance/provider/reconciliation, access-control/physical-door UAT, training, data and approval gates remain open as previously recorded. Asana/tracker updates were outside this planning request.
+- **Artifact provenance:** identical Markdown plan SHA-256 `e3c0aa6815dc7fb68a296b64602cc5e81bffd986ef0096bd5d0f30be8c3dcdae` is recorded in both repositories; editable Word and PDF copies are retained in the task output folder.
+
+
 ## Unit-first tenant portal — in progress, 11 September 2026
 
 ### R10 merchandise journey test — 11 September 2026
