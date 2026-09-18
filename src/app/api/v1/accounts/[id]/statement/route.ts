@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { testPaymentReviewAccounts } from "@/lib/payments/test-payment-review";
 import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
 import { buildAccountStatement, statementPeriod, statementAccountScope } from "@/lib/finance/account-statement";
 import { renderAccountStatementPdf } from "@/lib/finance/tenant-document-pdf";
@@ -16,6 +17,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       select: { accountNumber: true, currency: true, customer: { select: { firstName: true, lastName: true, companyName: true } }, tenancy: { select: { facility: { select: { name: true } } } }, ledgerEntries: { orderBy: [{ effectiveAt: "asc" }, { createdAt: "asc" }, { id: "asc" }], select: { id: true, type: true, amount: true, description: true, effectiveAt: true, reversalOfId: true } } },
     });
     if (!account) return Response.json({ error: { message: "Account not found." } }, { status: 404 });
+    if ((await testPaymentReviewAccounts([id])).has(id)) return Response.json({ error: { message: "Historical test entries need financial reconciliation before a statement can be issued." } }, { status: 409, headers: { "Cache-Control": "private, no-store" } });
     const statement = buildAccountStatement(account.ledgerEntries.map(entry => ({ ...entry, amount: entry.amount.toString() })), start, endExclusive);
     if (query.get("format") === "pdf") {
       const bytes = await renderAccountStatementPdf({ ...statement, from, to, generatedAt: new Date().toISOString(), accountNumber: account.accountNumber, currency: account.currency, customerName: account.customer.companyName || [account.customer.firstName, account.customer.lastName].filter(Boolean).join(" "), facilityName: account.tenancy?.facility.name ?? "STOR24" });

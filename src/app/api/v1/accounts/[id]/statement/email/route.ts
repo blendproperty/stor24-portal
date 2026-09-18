@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { testPaymentReviewAccounts } from "@/lib/payments/test-payment-review";
 import { requirePermission, authErrorResponse } from "@/lib/auth-guards";
 import { statementAccountScope, statementPeriod } from "@/lib/finance/account-statement";
 import { emailProvider, escapeEmailHtml } from "@/lib/email";
@@ -16,6 +17,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     statementPeriod(input.from, input.to);
     const account = await db.account.findFirst({ where: statementAccountScope(id, auth.organisationId, auth.allowedFacilityIds), select: { customer: { select: { email: true, emailVerifiedAt: true, organisation: { select: { slug: true } } } } } });
     if (!account) return Response.json({ error: { message: "Account not found." } }, { status: 404 });
+    if ((await testPaymentReviewAccounts([id])).has(id)) return Response.json({ error: { message: "Historical test entries need financial reconciliation before a statement can be issued." } }, { status: 409, headers: tenantPrivateHeaders });
     if (!account.customer.email || !account.customer.emailVerifiedAt) return Response.json({ error: { message: "The customer must verify their email before secure statement delivery is available." } }, { status: 409 });
     if (await tenantRateLimit(`tenant:staff-mail:${privacyHash(account.customer.email)}`, 5, 3600000)) return Response.json({ error: { message: "Delivery limit reached for this customer. Please try again later." } }, { status: 429 });
     if (!process.env.APP_URL) throw new Error("PORTAL_URL_UNCONFIGURED");
