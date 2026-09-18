@@ -44,6 +44,7 @@ import { emailProvider } from "@/lib/email";
 import { getBillingDocumentCompanyDetails } from "@/lib/finance/billing-document-config";
 import { renderInvoiceHtml, type InvoiceLedgerLine } from "@/lib/finance/invoice-renderer";
 import { renderStatementHtml, type StatementLedgerLine } from "@/lib/finance/statement-renderer";
+import { testPaymentReviewAccounts } from "@/lib/payments/test-payment-review";
 
 type AccountBillingContext = {
   account: { id: string; accountNumber: string; balance: unknown; currency: string };
@@ -103,7 +104,7 @@ async function nextDocumentNumber(organisationId: string, type: "INVOICE" | "STA
 
 type SendResult =
   | { ok: true; documentId: string; communicationLogId: string }
-  | { ok: false; code: "ACCOUNT_NOT_FOUND" | "NO_LEDGER_ENTRIES" | "NO_CUSTOMER_EMAIL" | "EMAIL_FAILED"; message?: string };
+  | { ok: false; code: "ACCOUNT_NOT_FOUND" | "NO_LEDGER_ENTRIES" | "NO_CUSTOMER_EMAIL" | "EMAIL_FAILED" | "TEST_PAYMENT_RECONCILIATION_REQUIRED"; message?: string };
 
 export async function sendInvoiceEmail(input: { accountId: string; organisationId: string; ledgerEntryIds: string[]; actorId: string; payNowUrl?: string }): Promise<SendResult> {
   const context = await getAccountBillingContext(input.accountId, input.organisationId);
@@ -182,6 +183,7 @@ export async function sendInvoiceEmail(input: { accountId: string; organisationI
 export async function sendStatementEmail(input: { accountId: string; organisationId: string; from?: Date; to: Date; actorId: string; payNowUrl?: string }): Promise<SendResult> {
   const context = await getAccountBillingContext(input.accountId, input.organisationId);
   if (!context) return { ok: false, code: "ACCOUNT_NOT_FOUND" };
+  if ((await testPaymentReviewAccounts([context.account.id])).has(context.account.id)) return { ok: false, code: "TEST_PAYMENT_RECONCILIATION_REQUIRED", message: "Historical sandbox entries must be reconciled before a financial statement can be issued." };
   if (!context.customer.email) return { ok: false, code: "NO_CUSTOMER_EMAIL" };
 
   // Default range start: since the last statement sent for this tenancy, or

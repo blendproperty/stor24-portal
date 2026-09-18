@@ -1,9 +1,11 @@
+import { isTestPayment } from "@/lib/payments/payment-evidence";
 import { db } from "@/lib/db";
 import { welcomeTenantWhenReady } from "@/lib/tenant-welcome-email";
 import { createOnceOffCheckout } from "@/lib/payments/netcash-service";
 import { getNetcashConnection } from "@/lib/payments/netcash-client";
 
 export function publicNetcashPaymentStatus(status: string, failureCode: string | null) {
+  if (status === "TEST_PENDING") return "PENDING";
   if (status === "FAILED" && failureCode && /\bcancell?(?:ed|ation)\b/i.test(failureCode)) {
     return "CANCELLED" as const;
   }
@@ -124,7 +126,7 @@ export async function getPublicNetcashSandboxPayment(reference: string, paymentI
     select: {
       payments: {
         where: { id: paymentId, provider: "NETCASH", method: "PAY_NOW" },
-        select: { id: true, status: true, amount: true, currency: true, failureCode: true, processedAt: true },
+        select: { id: true, status: true, environment: true, idempotencyKey: true, amount: true, currency: true, failureCode: true, processedAt: true },
         take: 1,
       },
     },
@@ -134,7 +136,8 @@ export async function getPublicNetcashSandboxPayment(reference: string, paymentI
   return {
     ok: true as const,
     paymentId: payment.id,
-    status: publicNetcashPaymentStatus(payment.status, payment.failureCode),
+    status: publicNetcashPaymentStatus(isTestPayment(payment) && payment.status === "SUCCEEDED" ? "TEST_SUCCEEDED" : payment.status, payment.failureCode),
+    isTest: isTestPayment(payment),
     amountZar: Number(payment.amount),
     currency: payment.currency,
     failureCode: payment.failureCode,
@@ -165,10 +168,10 @@ export async function cancelPublicNetcashSandboxPayment(reference: string, payme
   const payment = account?.payments[0];
   if (!payment) return { ok: false as const, code: "PAYMENT_UNAVAILABLE" };
 
-  if (payment.status === "PENDING") {
+  if (["PENDING", "TEST_PENDING"].includes(payment.status)) {
     await db.$transaction(async (tx) => {
       const changed = await tx.payment.updateMany({
-        where: { id: payment.id, status: "PENDING" },
+        where: { id: payment.id, status: { in: ["PENDING", "TEST_PENDING"] } },
         data: { status: "FAILED", failureCode: "NETCASH_CUSTOMER_CANCELLED", processedAt: new Date() },
       });
       if (!changed.count) return;

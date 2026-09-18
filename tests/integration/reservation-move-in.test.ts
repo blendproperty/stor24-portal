@@ -4,6 +4,9 @@ import { createHash, randomUUID } from "node:crypto";
 import { db } from "../../src/lib/db";
 import { confirmReservationMoveIn, getReservationMoveInReadiness } from "../../src/lib/reservation-move-in";
 import { moveIn } from "../../src/lib/leasing-service";
+import { recordReservationReceipt } from "../../src/lib/reservation-payment";
+import { settleVerifiedBookingPayment } from "../../src/lib/payments/booking-payment-settlement";
+import { testPaymentReviewAccounts } from "../../src/lib/payments/test-payment-review";
 
 test("isolated PostgreSQL signed reservation handover", async t => {
   assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci");
@@ -139,6 +142,66 @@ test("isolated PostgreSQL signed reservation handover", async t => {
       await db.ledgerEntry.update({ where: { id: f.receipt.id }, data: { metadata: { paymentId: f.payment.id, verifiedStatus: { accepted: true }, environment: "live" } } });
       assert.equal((await getReservationMoveInReadiness(f.scope, f.reservation.id)).ready, true);
       await confirmReservationMoveIn(f.scope, f.reservation.id);
+    });
+    await t.test("pre-tenancy receipt posts once under concurrency and clears only its own booking", async () => {
+      const f = await fixture();
+      await db.ledgerEntry.delete({ where: { id: f.receipt.id } });
+      await db.payment.delete({ where: { id: f.payment.id } });
+      await db.account.update({ where: { id: f.account.id }, data: { balance: 0 } });
+      const input = { reservationId: f.reservation.id, requestId: randomUUID(), amount: 100, method: "EFT" as const, reference: "CI bank receipt", receivedAt: new Date(Date.now() - 10000), realPaymentConfirmed: true as const };
+      const [a, b] = await Promise.all([recordReservationReceipt(f.scope, input), recordReservationReceipt(f.scope, input)]);
+      assert.equal(a.paymentId, b.paymentId);
+      assert.equal(await db.payment.count({ where: { accountId: f.account.id } }), 1);
+      assert.equal(await db.ledgerEntry.count({ where: { accountId: f.account.id } }), 1);
+      assert.equal((await db.account.findUniqueOrThrow({ where: { id: f.account.id } })).balance.toString(), "-100");
+      await assert.rejects(recordReservationReceipt(f.scope, { ...input, requestId: randomUUID() }), /REFERENCE_EXISTS/);
+      await assert.rejects(recordReservationReceipt(f.scope, { ...input, amount: 101 }), /CONFLICT/);
+      await assert.rejects(recordReservationReceipt({ ...f.scope, facilityIds: [] }, input), /UNAVAILABLE/);
+      assert.equal((await getReservationMoveInReadiness(f.scope, f.reservation.id)).ready, true);
+      await confirmReservationMoveIn(f.scope, f.reservation.id);
+      assert.equal((await recordReservationReceipt(f.scope, input)).idempotent, true);
+    });
+    await t.test("sandbox callbacks never post financial records, even with repeated success and decline", async () => {
+      const f = await fixture();
+      await db.ledgerEntry.delete({ where: { id: f.receipt.id } });
+      await db.account.update({ where: { id: f.account.id }, data: { balance: 0 } });
+      await db.payment.update({ where: { id: f.payment.id }, data: { provider: "NETCASH", providerRef: f.payment.id, status: "TEST_PENDING", environment: "sandbox" } });
+      const evidence = { reference: f.payment.id, amount: 100, accepted: true, requestTrace: randomUUID() };
+      await Promise.all([settleVerifiedBookingPayment(f.payment.id, evidence), settleVerifiedBookingPayment(f.payment.id, evidence)]);
+      await settleVerifiedBookingPayment(f.payment.id, { ...evidence, accepted: false });
+      assert.equal((await db.payment.findUniqueOrThrow({ where: { id: f.payment.id } })).status, "TEST_SUCCEEDED");
+      assert.equal(await db.ledgerEntry.count({ where: { accountId: f.account.id } }), 0);
+      assert.equal((await db.account.findUniqueOrThrow({ where: { id: f.account.id } })).balance.toString(), "0");
+      assert.equal((await getReservationMoveInReadiness(f.scope, f.reservation.id)).ready, false);
+      assert.equal((await testPaymentReviewAccounts([f.account.id])).size, 0);
+    });
+    await t.test("verified live callbacks post once, tolerate pending EFT and retain success", async () => {
+      const f = await fixture();
+      await db.ledgerEntry.delete({ where: { id: f.receipt.id } });
+      await db.account.update({ where: { id: f.account.id }, data: { balance: 0 } });
+      await db.payment.update({ where: { id: f.payment.id }, data: { provider: "NETCASH", providerRef: f.payment.id, status: "PENDING", environment: "live" } });
+      const evidence = { reference: f.payment.id, amount: 100, accepted: false, requestTrace: randomUUID() };
+      assert.equal((await settleVerifiedBookingPayment(f.payment.id, evidence)).terminal, false);
+      await assert.rejects(settleVerifiedBookingPayment(f.payment.id, { ...evidence, amount: 99, accepted: true }), /MISMATCH/);
+      await Promise.all([settleVerifiedBookingPayment(f.payment.id, { ...evidence, accepted: true }), settleVerifiedBookingPayment(f.payment.id, { ...evidence, accepted: true })]);
+      await settleVerifiedBookingPayment(f.payment.id, evidence);
+      assert.equal(await db.ledgerEntry.count({ where: { accountId: f.account.id } }), 1);
+      assert.equal((await db.account.findUniqueOrThrow({ where: { id: f.account.id } })).balance.toString(), "-100");
+      assert.equal((await getReservationMoveInReadiness(f.scope, f.reservation.id)).ready, true);
+    });
+    await t.test("legacy test balances are flagged without editing history; unknown provenance is held", async () => {
+      const f = await fixture();
+      await db.payment.update({ where: { id: f.payment.id }, data: { provider: "NETCASH", providerRef: f.payment.id, idempotencyKey: `netcash-public-test-${randomUUID()}` } });
+      await db.ledgerEntry.update({ where: { id: f.receipt.id }, data: { metadata: { paymentId: f.payment.id } } });
+      assert.equal((await testPaymentReviewAccounts([f.account.id])).has(f.account.id), true);
+      const evidence = { reference: f.payment.id, amount: 100, accepted: true, requestTrace: randomUUID() };
+      assert.equal((await settleVerifiedBookingPayment(f.payment.id, evidence)).financial, false);
+      assert.equal(await db.ledgerEntry.count({ where: { accountId: f.account.id } }), 1);
+      const other = await fixture();
+      await db.payment.update({ where: { id: other.payment.id }, data: { provider: "NETCASH", providerRef: other.payment.id, status: "PENDING" } });
+      await assert.rejects(settleVerifiedBookingPayment(other.payment.id, { ...evidence, reference: other.payment.id }), /ENVIRONMENT_REVIEW/);
+      await db.payment.update({ where: { id: other.payment.id }, data: { status: "SUCCEEDED" } });
+      await assert.rejects(settleVerifiedBookingPayment(other.payment.id, { ...evidence, reference: other.payment.id }), /ENVIRONMENT_REVIEW/);
     });
   } finally { await db.$disconnect(); }
 });

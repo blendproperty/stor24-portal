@@ -178,7 +178,7 @@ test("public Netcash cancellation is authenticated, scoped, fail-closed and idem
   assert.match(route, /publicApiAuthorized/);
   assert.match(route, /reference/);
   assert.match(route, /paymentId/);
-  assert.match(service, /status: "PENDING"/);
+  assert.match(service, /status: \{ in: \["PENDING", "TEST_PENDING"\] \}/);
   assert.match(service, /NETCASH_CUSTOMER_CANCELLED/);
   assert.match(service, /public_payment\.netcash_cancelled/);
   assert.match(service, /updateMany/);
@@ -273,9 +273,7 @@ test("Netcash webhook is idempotent and posts the account balance once", async (
   const source = await import("node:fs/promises").then((fs) => fs.readFile("src/app/api/webhooks/netcash/route.ts", "utf8"));
   assert.match(source, /if \(!inbox\)/);
   assert.match(source, /duplicate: true/);
-  assert.match(source, /status: \{ not: "SUCCEEDED" \}/);
-  assert.match(source, /balance: \{ decrement: payment\.amount \}/);
-  assert.match(source, /paymentId: payment\.id/);
+  assert.match(source, /settleVerifiedBookingPayment\(payment.id/);
   assert.match(source, /verified\.reference !== providerRef/);
   assert.match(source, /Number\(verified\.amount\) === Number\(payment\.amount\)/);
   assert.match(source, /NETCASH_VERIFICATION_MISMATCH/);

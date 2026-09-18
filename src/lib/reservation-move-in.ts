@@ -1,3 +1,4 @@
+import { isTestPayment } from "@/lib/payments/payment-evidence";
 import { createHash } from "node:crypto";
 import { db } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
@@ -6,7 +7,7 @@ import { southAfricaDateKey } from "@/lib/south-africa-time";
 
 type Database = Prisma.TransactionClient;
 const reservationInclude = {
-  publicLease: { select: { id: true, status: true, signedAt: true, signedPdfSha256: true, paymentMethod: true } },
+  publicLease: { select: { id: true, status: true, signedAt: true, signedPdfSha256: true, paymentMethod: true, mandate: { select: { status: true } } } },
   packageSelection: { select: { priceSnapshot: true } },
   unit: { select: { status: true, occupancies: { where: { status: { in: ["PENDING", "ACTIVE", "NOTICE_GIVEN", "TRANSFERRING"] } }, select: { id: true } } } },
 } satisfies Prisma.ReservationInclude;
@@ -25,7 +26,7 @@ async function readiness(database: Database, scope: RequestScope, reservationId:
   const requiredCents = Math.round(Number(reservation.quotedRate) * 100) + Math.round(Number(reservation.packageSelection?.priceSnapshot ?? 0) * 100);
   const receipts = account?.payments.filter(payment => {
     if (payment.status !== "SUCCEEDED" || payment.currency !== "ZAR" || !payment.processedAt || payment.merchandiseOrder) return false;
-    if (/test|simulat|sandbox/i.test(`${payment.idempotencyKey} ${payment.provider ?? ""}`)) return false;
+    if (isTestPayment(payment)) return false;
     return account.ledgerEntries.some(entry => {
       const metadata = entry.metadata as { paymentId?: string; verifiedStatus?: unknown; environment?: string } | null;
       const matches = payment.provider === "NETCASH"
@@ -36,7 +37,7 @@ async function readiness(database: Database, scope: RequestScope, reservationId:
     });
   }) ?? [];
   const paidCents = receipts.reduce((sum, payment) => sum + Math.round(Number(payment.amount) * 100), 0);
-  const testPayment = account?.payments.some(payment => /test|simulat|sandbox/i.test(`${payment.status} ${payment.idempotencyKey} ${payment.provider ?? ""}`)) ?? false;
+  const testPayment = account?.payments.some(isTestPayment) ?? false;
   const signed = reservation.publicLease?.status === "SIGNED" && Boolean(reservation.publicLease.signedAt && reservation.publicLease.signedPdfSha256);
   const startDate = reservation.intendedMoveIn ? southAfricaDateKey(reservation.intendedMoveIn) : null;
   const blockers: string[] = [];
@@ -52,6 +53,7 @@ async function readiness(database: Database, scope: RequestScope, reservationId:
     : "The required booking payment has not been verified in full on this account.");
   if (account?.ledgerEntries.some(entry => entry.type === "REFUND" || entry.type === "REVERSAL")) blockers.push("A refund or reversal requires account review before key collection.");
   return { reservation, account, receipts, view: {
+    mandateStatus: reservation.publicLease?.paymentMethod === "DEBIT_ORDER" ? reservation.publicLease.mandate?.status ?? "NOT_STARTED" : null,
     signed, leaseId: reservation.publicLease?.id ?? null, signedAt: reservation.publicLease?.signedAt?.toISOString() ?? null,
     requiredAmount: requiredCents / 100, paidAmount: paidCents / 100,
     paymentVerified: requiredCents > 0 && paidCents >= requiredCents,

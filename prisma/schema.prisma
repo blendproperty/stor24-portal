@@ -789,6 +789,7 @@ model Payment {
   currency       String        @default("ZAR")
   method         String
   provider       String?
+  environment    String?
   providerRef    String?
   idempotencyKey String        @unique
   failureCode    String?

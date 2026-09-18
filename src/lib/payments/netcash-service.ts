@@ -6,6 +6,7 @@
  * billing-service.ts / staff UI should call -- nothing should call
  * netcash-client.ts directly outside this file and the webhook handler.
  */
+import { isTestPayment } from "./payment-evidence";
 import { db } from "@/lib/db";
 import { randomUUID } from "node:crypto";
 import { tenantCustomerScope } from "@/lib/tenant-portal-security";
@@ -45,8 +46,9 @@ export async function createMerchandiseCheckout(session: Parameters<typeof tenan
     // A lost response requires cancellation/status recovery, not a second charge attempt.
     if (order.paymentId) throw new Error("MERCHANDISE_CHECKOUT_ALREADY_STARTED");
     if (order.isTest && (!merchandiseCheckoutTestMode(session) || connection.config.environment !== "sandbox")) throw new Error("MERCHANDISE_TEST_DISABLED");
+    if (!order.isTest && connection.config.environment !== "live") throw new Error("MERCHANDISE_LIVE_PAYMENT_REQUIRED");
     const amount = order.isTest ? 10 : Number(order.total.toFixed(2));
-    const payment = await tx.payment.create({ data: { accountId: order.accountId, status: order.isTest ? "TEST_PENDING" : "PENDING", amount, currency: order.currency, method: "PAY_NOW", provider: "NETCASH", idempotencyKey: `merchandise:${order.id}` } });
+    const payment = await tx.payment.create({ data: { accountId: order.accountId, status: order.isTest ? "TEST_PENDING" : "PENDING", environment: connection.config.environment, amount, currency: order.currency, method: "PAY_NOW", provider: "NETCASH", idempotencyKey: `merchandise:${order.id}` } });
     const checkout = createPayNowCheckout(connection, { reference: payment.id, amount, description: order.isTest ? "STOR24 R10 test - not a merchandise purchase" : "STOR24 packing supplies", customerEmail: session.email, returnData: new URLSearchParams({ paymentId: payment.id, merchandiseOrderId: order.id }).toString(), extra1: order.id, extra2: "merchandise" });
     await tx.payment.update({ where: { id: payment.id }, data: { providerRef: payment.id } });
     await tx.merchandiseOrder.update({ where: { id: order.id }, data: { paymentId: payment.id } });
@@ -131,7 +133,8 @@ export async function collectMonthlyRent(organisationId: string, facilityId: str
   const payment = await db.payment.create({
     data: {
       accountId: params.accountId,
-      status: "PENDING",
+      status: connection.config.environment === "sandbox" ? "TEST_PENDING" : "PENDING",
+      environment: connection.config.environment,
       amount: params.amount,
       method: "DEBICHECK",
       provider: "NETCASH",
@@ -185,7 +188,8 @@ export async function createOnceOffCheckout(organisationId: string, facilityId: 
     where: { idempotencyKey },
     create: {
       accountId: params.accountId,
-      status: "PENDING",
+      status: connection.config.environment === "sandbox" ? "TEST_PENDING" : "PENDING",
+      environment: connection.config.environment,
       amount: params.amount,
       method: "PAY_NOW",
       provider: "NETCASH",
@@ -196,11 +200,13 @@ export async function createOnceOffCheckout(organisationId: string, facilityId: 
   if (payment.accountId !== params.accountId || Number(payment.amount) !== params.amount || payment.method !== "PAY_NOW" || payment.provider !== "NETCASH") {
     throw new Error("NETCASH_IDEMPOTENCY_CONFLICT");
   }
-  if (payment.status === "SUCCEEDED") throw new Error("NETCASH_PAYMENT_ALREADY_SUCCEEDED");
+  if (payment.environment && payment.environment !== connection.config.environment) throw new Error("NETCASH_ENVIRONMENT_CHANGED");
+  if (!payment.environment && !(isTestPayment(payment) && connection.config.environment === "sandbox")) throw new Error("PAYMENT_ENVIRONMENT_REVIEW_REQUIRED");
+  if (payment.status === "SUCCEEDED" || payment.status === "TEST_SUCCEEDED") throw new Error("NETCASH_PAYMENT_ALREADY_SUCCEEDED");
   if (payment.status === "FAILED") {
     payment = await db.payment.update({
       where: { id: payment.id },
-      data: { status: "PENDING", failureCode: null },
+      data: { status: isTestPayment(payment) ? "TEST_PENDING" : "PENDING", failureCode: null },
     });
   }
   try {

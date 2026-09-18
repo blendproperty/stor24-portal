@@ -4,6 +4,7 @@ export function tenantError(error: unknown) {
   if (code === "TENANT_RATE_LIMITED") return Response.json({ error: "Please wait a minute before downloading more documents." }, { status: 429, headers: tenantPrivateHeaders });
   if (code === "TENANT_UNAUTHENTICATED") return Response.json({ error: "Your session has expired. Please sign in again." }, { status: 401, headers: tenantPrivateHeaders });
   if (code === "TENANT_NOT_FOUND") return Response.json({ error: "This item is not available for your account." }, { status: 404, headers: tenantPrivateHeaders });
+  if (code === "TEST_PAYMENT_RECONCILIATION_REQUIRED") return Response.json({ error: "This account contains historical test entries. STOR24 must reconcile them before issuing a financial statement." }, { status: 409, headers: tenantPrivateHeaders });
   if (code === "INVALID_PERIOD") return Response.json({ error: "Choose valid statement dates in order." }, { status: 422, headers: tenantPrivateHeaders });
   return Response.json({ error: "This item is temporarily unavailable. Please contact STOR24 if it continues." }, { status: 503, headers: tenantPrivateHeaders });
 }

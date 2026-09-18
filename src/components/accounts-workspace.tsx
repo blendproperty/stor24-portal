@@ -34,6 +34,7 @@ type Payment = {
   createdAt: string;
 };
 type Account = {
+  financialReviewRequired?: boolean;
   id: string;
   accountNumber: string;
   balance: string;
@@ -323,7 +324,7 @@ export function AccountsWorkspace({
                   </small>
                 </span>
                 <b className={Number(account.balance) > 0 ? "balance-due" : ""}>
-                  {money(account.balance)}
+                  {account.financialReviewRequired ? "Review test entries" : money(account.balance)}
                 </b>
                 <ChevronRight size={18} aria-hidden="true" />
               </button>
@@ -353,11 +354,11 @@ export function AccountsWorkspace({
                 </div>
                 <div className="account-balance">
                   <span>Balance</span>
-                  <strong>{money(selected.balance)}</strong>
+                  <strong>{selected.financialReviewRequired ? "Reconciliation required" : money(selected.balance)}</strong>
                   <StatusPill
                     tone={Number(selected.balance) > 0 ? "warning" : "positive"}
                   >
-                    {Number(selected.balance) > 0 ? "Amount due" : "Paid"}
+                    {selected.financialReviewRequired ? "Historical test entries" : Number(selected.balance) > 0 ? "Amount due" : "No amount due"}
                   </StatusPill>
                 </div>
               </div>
@@ -459,6 +460,7 @@ export function AccountsWorkspace({
                     ))}
                 </div>
               ) : null}
+              {selected.financialReviewRequired && <p role="status">Historical sandbox entries appear in this ledger. They are not cleared rent. Finance must reconcile them before using the balance or issuing a statement; the original audit history is preserved.</p>}
               <div className="table-wrap">
                 <table className="data-table">
                   <thead>

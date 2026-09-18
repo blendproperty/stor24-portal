@@ -1,3 +1,5 @@
+import { requireSession } from "@/lib/auth-guards";
+import { hasPermission } from "@/lib/permissions";
 import { moveInAction } from "@/app/actions/leasing";
 import { MoveInWorkspace } from "@/components/move-in-workspace";
 import { listLeasing } from "@/lib/leasing-service";
@@ -11,7 +13,9 @@ export default async function MoveInPage({ searchParams }: { searchParams: Promi
   const { reservation: initialReservationId } = await searchParams;
   const scope = await requireScope();
   const data = await listLeasing(scope);
+  const auth = await requireSession();
   const reservations = await Promise.all(data.reservations.filter(reservation => reservation.status === "ACTIVE").map(async reservation => ({
+    canRecordPayment: auth.role === "Organisation owner" || auth.user.roleAssignments.some(a => (!a.facilityId || a.facilityId === reservation.facilityId) && hasPermission(a.role.permissions, "payments.manage")),
     id: reservation.id, facilityId: reservation.facilityId, customerId: reservation.customerId, unitId: reservation.unitId,
     label: `${reservation.unit.number} · ${reservation.customer.companyName || reservation.customer.firstName || "Customer"}`,
     paymentMethod: reservation.paymentMethod, intendedMoveIn: reservation.intendedMoveIn ? southAfricaDateKey(reservation.intendedMoveIn) : null,

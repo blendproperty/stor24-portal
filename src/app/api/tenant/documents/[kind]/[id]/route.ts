@@ -1,3 +1,4 @@
+import { isFinancialReceipt } from "@/lib/payments/payment-evidence";
 import { db } from "@/lib/db";
 import { requireTenantSession, tenantRateLimit } from "@/lib/tenant-portal-auth";
 import { tenantCustomerScope } from "@/lib/tenant-portal-security";
@@ -17,8 +18,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ kin
       if (!lease?.signedPdf) throw new Error("TENANT_NOT_FOUND");
       response = tenantPdf(lease.signedPdf, "stor24-signed-agreement.pdf");
     } else if (kind === "receipt") {
-      const payment = await db.payment.findFirst({ where: { id, status: "SUCCEEDED", account: { customer } }, select: { amount: true, currency: true, method: true, processedAt: true, createdAt: true, account: { select: { accountNumber: true, customer: { select: { firstName: true, lastName: true, companyName: true } } } } } });
-      if (!payment) throw new Error("TENANT_NOT_FOUND");
+      const payment = await db.payment.findFirst({ where: { id, status: "SUCCEEDED", account: { customer } }, select: { status: true, environment: true, idempotencyKey: true, amount: true, currency: true, method: true, processedAt: true, createdAt: true, account: { select: { accountNumber: true, customer: { select: { firstName: true, lastName: true, companyName: true } } } } } });
+      if (!payment || !isFinancialReceipt(payment)) throw new Error("TENANT_NOT_FOUND");
       const owner = payment.account.customer;
       response = tenantPdf(await renderTenantDocumentPdf({ title: "Payment receipt", reference: id, customerName: owner.companyName || [owner.firstName, owner.lastName].filter(Boolean).join(" "), subtitle: payment.account.accountNumber, columns: ["Detail", "Recorded value"], rows: [["Date", formatSouthAfricaDate(payment.processedAt ?? payment.createdAt)], ["Amount", `${payment.currency} ${payment.amount.toFixed(2)}`], ["Method", payment.method]], notes: ["Receipt for a successful payment recorded in STOR24. This is not a tax invoice or independent bank settlement confirmation."] }), "stor24-payment-receipt.pdf");
     } else if (kind === "issued") {

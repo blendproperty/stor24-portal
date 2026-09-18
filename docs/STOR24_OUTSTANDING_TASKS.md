@@ -1,5 +1,11 @@
 # STOR 24 Outstanding Tasks
 
+## Current workflow correction — 18 September 2026
+
+The register below is historical (2 September) and must not be used to re-open shipped work or request approval already recorded on 16 September. Pinny and Faeez are now testing, per Brett's instruction. The signed-reservation duplicate-signing fix is deployed (PR137); payment integrity, pre-tenancy receipts and aligned customer/staff status changes are in implementation on `codex/booking-workflow-integrity`, not yet production-verified. Follow PROJECT_CONTEXT.md for exact promotion evidence.
+
+Remaining implementation/acceptance gates are distinct: test payment isolation and genuine receipt recording require the new regression/live UI evidence; real Netcash collections remain disabled; old sandbox accounting entries need controlled reconciliation; legal/financial rules and the private facial-photo queue remain open; provider physical-entry/revocation and end-to-end tester acceptance are not closed by a build. The controlled UAT approval is in `2026-09-16-public-booking-uat-approval.md`; no new OTP, payment or biometric action is authorised by this status note.
+
 > Status date: 2 September 2026  
 > Canonical programme repository: `blendproperty/stor24-portal`  
 > Production branches: CRM `main`; public site `master`; CMS `main`; BlendSign `main`
