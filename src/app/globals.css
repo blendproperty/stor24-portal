@@ -2464,3 +2464,68 @@ a.module-card:focus-visible {
 @media (max-width: 1050px) { .map-editor-shell { grid-template-columns: 130px minmax(0,1fr); } .map-properties { position: static; grid-column: 1 / -1; } }
 @media (max-width: 700px) { .map-editor-header { align-items: stretch; flex-direction: column; } .map-editor-header label { min-width: 0; } .map-save-state { margin-left: 0; } .map-editor-shell { grid-template-columns: 1fr; } .map-toolbox { position: static; display: grid; grid-template-columns: repeat(3,1fr); } .map-toolbox h2, .map-toolbox hr { grid-column: 1 / -1; } .map-tool-link { grid-column: 1 / -1; } .map-properties { grid-column: auto; } }
 @media (max-width: 900px) { .map-editor-expanded { left: 0; } }
+
+/* Signed booking handover: scoped presentation, shared financial checks unchanged. */
+.handover-workspace { padding:32px; border:1px solid var(--line); border-radius:22px; background:white; color:var(--ink); font-size:14px; font-weight:400; line-height:1.6; box-shadow:0 12px 40px rgba(7,20,17,.035); }
+.handover-workspace p,.handover-workspace h2,.handover-workspace h3 { margin:0; }
+.handover-heading { display:flex; justify-content:space-between; align-items:flex-start; gap:24px; padding-bottom:26px; border-bottom:1px solid var(--line); }
+.handover-workspace .handover-eyebrow { margin-bottom:8px; color:#687770; font-size:10px; letter-spacing:.15em; font-weight:700; }
+.handover-heading h2 { font-size:28px; line-height:1.2; font-weight:750; letter-spacing:-.035em; }
+.handover-workspace .handover-customer { display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin-top:12px; font-size:15px; color:#53645b; }
+.handover-customer span { border:1px solid var(--line); border-radius:7px; padding:3px 9px; font-size:12px; color:var(--ink); font-weight:650; background:#f7f8f5; }
+.handover-status { display:inline-flex; align-items:center; gap:7px; flex-shrink:0; padding:7px 11px; border-radius:999px; font-size:12px; font-weight:650; }
+.handover-status.is-pending { color:#88500d; background:#fff4df; }
+.handover-status.is-ready { color:#16633e; background:#eaf6ef; }
+.handover-checks { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; margin:26px 0; }
+.handover-check { min-width:0; padding:22px; border:1px solid #e4e9e5; border-radius:14px; background:#fafbf9; }
+.handover-check-label { display:flex; align-items:center; gap:9px; margin-bottom:18px; color:#66766d; font-size:12px; font-weight:600; }
+.handover-check h3 { font-size:16px; line-height:1.4; font-weight:700; letter-spacing:-.015em; }
+.handover-check p { margin-top:9px; color:#607066; font-size:13px; font-weight:400; line-height:1.65; }
+.handover-document { display:inline-flex; align-items:center; gap:5px; margin-top:16px; color:#225b43; font-size:12px; font-weight:650; text-decoration:underline; text-underline-offset:4px; }
+.handover-check .handover-amount { margin-top:10px; color:var(--ink); font-size:24px; font-weight:700; letter-spacing:-.025em; line-height:1.3; }
+.handover-amount span { font-size:12px; font-weight:400; color:#607066; letter-spacing:0; }
+.handover-test-label { display:inline-block; margin-top:12px; font-size:11px; font-weight:600; color:#876023; }
+.handover-notice { display:flex; gap:13px; align-items:flex-start; padding:20px 22px; border:1px solid #eee0bf; border-radius:13px; background:#fffbf1; color:#775720; }
+.handover-notice > svg { flex-shrink:0; margin-top:2px; }
+.handover-notice h3 { font-size:14px; font-weight:700; }
+.handover-notice ul { margin:8px 0; padding-left:18px; list-style:disc; font-size:13px; line-height:1.75; font-weight:400; }
+.handover-notice p { font-size:12px; color:#806e4b; font-weight:400; }
+.handover-mandate { margin-top:20px; padding:18px 20px; background:#f6f8f6; border-radius:12px; }
+.handover-mandate h3 { font-size:14px; font-weight:650; }
+.handover-mandate h3 span { display:inline-block; margin-left:8px; color:#64736d; font-size:11px; }
+.handover-mandate p { margin-top:7px; color:#607066; font-size:13px; }
+.handover-receipt { margin-top:24px; border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+.handover-receipt summary { display:flex; align-items:center; gap:14px; padding:20px; cursor:pointer; list-style:none; }
+.handover-receipt summary::-webkit-details-marker { display:none; }
+.handover-receipt summary strong { display:block; font-size:14px; font-weight:650; }
+.handover-receipt summary small { display:block; margin-top:3px; font-size:12px; font-weight:400; color:#607066; }
+.handover-receipt-icon { display:grid; place-items:center; flex:0 0 40px; height:40px; border-radius:10px; background:#f2f5f1; color:#466153; }
+.handover-chevron { margin-left:auto; flex-shrink:0; transition:transform .15s; }
+.handover-receipt[open] .handover-chevron { transform:rotate(180deg); }
+.handover-receipt[open] summary { border-bottom:1px solid var(--line); }
+.handover-receipt-body { padding:22px; }
+.handover-receipt-body > p { color:#607066; font-size:13px; font-weight:400; }
+.handover-receipt-body .handover-receipt-warning { margin-top:8px; color:#875522; font-size:12px; }
+.handover-receipt-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; margin:24px 0; }
+.handover-receipt-fields label { display:grid; gap:8px; color:#43584c; font-size:12px; font-weight:600; }
+.handover-receipt-fields input,.handover-receipt-fields select { width:100%; min-width:0; min-height:46px; border:1px solid #d6dfd8; border-radius:9px; padding:10px 12px; background:#fff; color:var(--ink); font-size:14px; font-weight:400; }
+.handover-workspace .handover-attestation { display:flex; align-items:flex-start; gap:11px; padding:14px 16px; border-radius:9px; background:#f6f8f5; color:#526459; font-size:13px; font-weight:400; line-height:1.6; }
+.handover-attestation input { appearance:auto; flex:0 0 17px; width:17px; height:17px; margin-top:3px; accent-color:#246e4e; }
+.handover-receipt-submit { display:flex; justify-content:flex-end; margin-top:20px; }
+.handover-key-note { display:flex; align-items:flex-start; gap:12px; margin:26px 0; color:#607066; }
+.handover-key-note > svg { margin-top:2px; flex-shrink:0; }
+.handover-key-note h3 { font-size:13px; font-weight:650; color:#364e40; }
+.handover-key-note p { margin-top:4px; font-size:12px; font-weight:400; }
+.handover-actions { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:10px; border-top:1px solid var(--line); padding-top:24px; margin-top:22px; }
+.handover-actions > :first-child { margin-right:auto; }
+.handover-workspace .button { min-height:44px; font-size:12px; font-weight:650; }
+.handover-workspace .button:disabled { background:#edf0ec; border:1px solid #dfe5df; color:#77847b; box-shadow:none; opacity:1; cursor:not-allowed; }
+.handover-workspace :is(button,a,summary,input,select):focus-visible { outline:3px solid #a7cbb6; outline-offset:3px; }
+@media(max-width:1050px) { .handover-workspace { padding:24px; } .handover-checks { gap:12px; } .handover-check { padding:17px; } }
+@media(max-width:700px) { .handover-workspace { padding:20px; border-radius:16px; } .handover-heading { flex-direction:column; gap:16px; } .handover-heading h2 { font-size:25px; } .handover-checks,.handover-receipt-fields { grid-template-columns:1fr; } .handover-check-label { margin-bottom:12px; } .handover-notice { padding:17px; } .handover-receipt summary { padding:16px; gap:10px; } .handover-receipt-body { padding:17px; } .handover-actions { display:grid; grid-template-columns:1fr 1fr; } .handover-actions > :first-child { margin:0; } .handover-actions > :last-child { grid-column:1/-1; } .handover-receipt-submit .button { width:100%; } }
+
+/* Correct static weights: the legacy brand file contains only a heavy face. */
+@font-face { font-family: "Satoshi Handover"; src: url("/brand/Satoshi-Handover-400.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Satoshi Handover"; src: url("/brand/Satoshi-Handover-500.woff2") format("woff2"); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: "Satoshi Handover"; src: url("/brand/Satoshi-Handover-700.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: swap; }
+.handover-workspace { font-family: "Satoshi Handover", Arial, sans-serif; }
