@@ -48,7 +48,9 @@ test("isolated PostgreSQL signed reservation handover", async t => {
       assert.equal(tenancy.documents.length, 1);
       assert.equal(tenancy.documents[0].provider, "PUBLIC_RESERVATION");
       assert.equal(tenancy.documents[0].status, "SIGNED");
-      assert.equal((await db.publicReservationLease.findUniqueOrThrow({ where: { reservationId: f.reservation.id } })).signedPdf?.toString(), f.pdf.toString());
+      const storedPdf = (await db.publicReservationLease.findUniqueOrThrow({ where: { reservationId: f.reservation.id } })).signedPdf;
+      assert.ok(storedPdf);
+      assert.deepEqual(Buffer.from(storedPdf), f.pdf);
       assert.equal(await db.account.count({ where: { customerId: f.customer.id } }), 1);
       assert.equal(await db.payment.count({ where: { accountId: f.account.id } }), 1);
       assert.equal(await db.ledgerEntry.count({ where: { accountId: f.account.id } }), 1);
