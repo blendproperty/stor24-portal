@@ -10,6 +10,10 @@ Created 11 September 2026. Owner: Brett with implementation support. All boxes b
 
 ## Booking and agreements
 
+- [ ] Pinny/Faeez regression (18 September): full booking amount is shown as a sandbox test; successful test has no rent receipt, ledger posting, balance change or key authorisation. Retry/return/cancellation preserve the signed agreement and correctly distinguish pending, failed and test success.
+- [ ] With approved genuine funds only, payment-authorised staff can record the receipt from signed-booking checks before a tenancy exists; duplicate submission/reference does not post twice. Unauthorised store users are rejected. No sandbox receipt is entered as genuine money to unblock testing.
+- [ ] Staff and tenant see consistent readiness/date/payment/mandate/facial-access states. Historical test-ledger entries show review and cannot issue misleading financial statements. Preserve all existing tester records.
+
 - [ ] Desktop/mobile booking: choose store/unit, see package recommendation without automatic charge, browse all products, customise quantities and verify total.
 - [ ] Check package/product images, readable fields, scrolling, navigation and empty/out-of-stock states.
 - [ ] Read linked full terms; explicitly accept clauses/terms and sign. Preserve accepted terms version and signed record.

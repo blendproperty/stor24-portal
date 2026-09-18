@@ -1,4 +1,4 @@
-export type TenantAccount = { id: string; accountNumber: string; balance: string; currency: string; tenancy: null | { status: string; facility: { name: string }; occupancies: { unit: { number: string } }[] } };
+export type TenantAccount = { id: string; accountNumber: string; balance: string | null; currency: string; tenancy: null | { status: string; facility: { name: string }; occupancies: { unit: { number: string } }[] } };
 
 export function preferredTenantAccount(accounts: TenantAccount[], requested?: string) {
   return accounts.find(account => account.id === requested)?.id

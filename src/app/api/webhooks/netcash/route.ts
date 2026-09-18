@@ -17,6 +17,7 @@
  * WebhookInbox, then processed idempotently by externalEventId (RequestTrace).
  * Unattributable callbacks are acknowledged without inventing a tenant id.
  */
+import { settleVerifiedBookingPayment } from "@/lib/payments/booking-payment-settlement";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { enqueueMriExport } from "@/lib/finance/mri-export";
@@ -81,7 +82,7 @@ export async function POST(request: Request) {
   if (!inbox) {
     // Failed merchandise verification/settlement can be retried; order locks and
     // unique ledger references prevent double posting on concurrent deliveries.
-    if (merchandiseOrder) inbox = await db.webhookInbox.findFirst({ where: { organisationId: account.customer.organisationId, provider: "NETCASH", externalEventId, status: { in: ["PENDING", "FAILED"] } } });
+    inbox = await db.webhookInbox.findFirst({ where: { organisationId: account.customer.organisationId, provider: "NETCASH", externalEventId, status: { in: ["PENDING", "FAILED"] } } });
     if (!inbox) return NextResponse.json({ received: true, matched: true, duplicate: true });
   }
 
@@ -137,38 +138,13 @@ export async function POST(request: Request) {
     }
   }
 
-  if (verified.accepted) {
-    await db.$transaction(async (tx) => {
-      const transitioned = await tx.payment.updateMany({
-        where: { id: payment.id, status: { not: "SUCCEEDED" } },
-        // Keep providerRef as the p2/reference sent to Netcash. RequestTrace is
-        // Netcash's transaction id and is stored on the ledger/inbox instead.
-        data: { status: "SUCCEEDED", processedAt: new Date(), failureCode: null },
-      });
-      if (!transitioned.count) return;
-      await tx.ledgerEntry.create({
-        data: {
-          accountId: payment.accountId,
-          type: "PAYMENT",
-          amount: payment.amount,
-          description: `Netcash payment received (${payment.method})`,
-          effectiveAt: new Date(),
-          externalRef: requestTrace,
-          metadata: { provider: "NETCASH", paymentId: payment.id, requestTrace, verifiedStatus: verified.raw, postedPayload: payload },
-        },
-      });
-      await tx.account.update({ where: { id: payment.accountId }, data: { balance: { decrement: payment.amount } } });
-    });
-    await enqueueMriExport(payment.id).catch(() => undefined); // MRI export is best-effort, not payment-blocking
-  } else {
-    await db.payment.update({
-      where: { id: payment.id },
-      data: { status: "FAILED", failureCode: verified.reason?.slice(0, 120) || "NETCASH_TRANSACTION_NOT_ACCEPTED" },
-    });
-  }
-
-  if (inbox) {
-    await db.webhookInbox.update({ where: { id: inbox.id }, data: { status: "SUCCEEDED", processedAt: new Date() } });
+  try {
+    const result = await settleVerifiedBookingPayment(payment.id, { reference: verified.reference!, amount: Number(verified.amount), accepted: verified.accepted, requestTrace });
+    if (result.financial && verified.accepted) await enqueueMriExport(payment.id).catch(() => undefined);
+    await db.webhookInbox.update({ where: { id: inbox.id }, data: { status: result.terminal ? "SUCCEEDED" : "PENDING", processedAt: result.terminal ? new Date() : null } });
+  } catch {
+    await db.webhookInbox.update({ where: { id: inbox.id }, data: { status: "FAILED", failureCode: "BOOKING_SETTLEMENT_REVIEW", failureMessage: "Verified payment needs environment or account reconciliation. No unverified financial posting was made." } });
+    return NextResponse.json({ received: true, matched: true, verified: true, settled: false }, { status: 503 });
   }
 
   return NextResponse.json({ received: true, matched: true, verified: true, accepted: verified.accepted });

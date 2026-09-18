@@ -14,6 +14,7 @@
  * ("mri://pending-integration-decision") rather than a real URL -- update
  * once MRI's actual import mechanism is confirmed.
  */
+import { isFinancialReceipt } from "@/lib/payments/payment-evidence";
 import { db } from "@/lib/db";
 
 export async function enqueueMriExport(paymentId: string) {
@@ -22,6 +23,7 @@ export async function enqueueMriExport(paymentId: string) {
     include: { account: { include: { customer: true, tenancy: { include: { facility: true } } } } },
   });
   if (!payment) throw new Error("PAYMENT_NOT_FOUND");
+  if (!isFinancialReceipt(payment)) throw new Error("PAYMENT_NOT_FINANCIAL");
 
   const organisationId = payment.account.customer.organisationId;
   const facilityId = payment.account.tenancy?.facilityId ?? null;

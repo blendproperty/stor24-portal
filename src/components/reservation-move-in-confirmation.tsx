@@ -1,11 +1,12 @@
 "use client";
 
+import { ReservationPaymentForm } from "./reservation-payment-form";
 import { useState } from "react";
 import type { ReservationMoveInReadiness } from "@/lib/reservation-move-in";
 import { confirmReservationMoveInAction } from "@/app/actions/leasing";
 
-export function ReservationMoveInConfirmation({ reservationId, customerName, unitNumber, readiness, onBack }: {
-  reservationId: string; customerName: string; unitNumber: string; readiness: ReservationMoveInReadiness; onBack: () => void;
+export function ReservationMoveInConfirmation({ reservationId, customerName, unitNumber, readiness, canRecordPayment = false, onBack }: {
+  canRecordPayment?: boolean; reservationId: string; customerName: string; unitNumber: string; readiness: ReservationMoveInReadiness; onBack: () => void;
 }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -19,6 +20,8 @@ export function ReservationMoveInConfirmation({ reservationId, customerName, uni
       <section><h3>Agreed move-in date</h3><p>{readiness.startDate ?? "Not recorded"}</p></section>
       <section><h3>Key handover</h3><p>Check the customer identity and unit, then record the key handover at the guard house. Facial access is managed separately.</p></section>
     </div>
+    {readiness.mandateStatus && <p><strong>Debit-order mandate: {readiness.mandateStatus.replaceAll("_", " ")}</strong>. A signed mandate is not a payment. Collections are not enabled; the first payment must be verified separately.</p>}
+    {canRecordPayment && !readiness.paymentVerified && <ReservationPaymentForm reservationId={reservationId} />}
     {readiness.blockers.length > 0 && <div role="status"><ul>{readiness.blockers.map(blocker => <li key={blocker}>{blocker}</li>)}</ul><p>The signed agreement remains on file while these checks are resolved.</p></div>}
     <form action={async data => {
       setBusy(true); setError("");
