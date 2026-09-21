@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { requirePermissionScope } from "@/lib/scope";
-import { sameOrigin } from "@/lib/request-security";
+import { sameOrigin, rateLimit } from "@/lib/request-security";
 import { boundedBody } from "@/lib/payments/netcash-mandate";
-import { mriConfiguration, mriSourceReview, saveMriConfiguration } from "@/lib/mri-service";
+import { checkMriConnection, mriConfiguration, mriSourceReview, saveMriConfiguration } from "@/lib/mri-service";
 
 export const dynamic = "force-dynamic";
 const messages: Record<string, string> = {
@@ -14,6 +14,7 @@ const messages: Record<string, string> = {
   MRI_SOURCE_LIMIT: "This month exceeds the 10,000-movement review limit. A larger-volume review is required before proceeding.",
   MRI_CONFIG_VERSION: "The saved MRI configuration needs a reviewed migration. It has not been overwritten.",
   MRI_DUPLICATE_CONFIG: "Multiple MRI configurations require administrator review.",
+  MRI_DATABASE_SELECTION: "Choose a database from the latest connection check, without replacing credentials or entering a second identifier in the same save.",
 };
 function failure(error: unknown) {
   const code = error instanceof Error ? error.message : "";
@@ -40,6 +41,12 @@ export async function POST(request: Request) {
     if (!sameOrigin(request)) throw new Error("FORBIDDEN");
     const scope = await requirePermissionScope("mri.manage");
     const input = JSON.parse((await boundedBody(new Response(request.body), 8000)).toString());
+    if (input.action === "check") {
+      const check = z.object({ action: z.literal("check"), revision: z.string().datetime() }).strict().parse(input);
+      if (!scope.unrestrictedFacilities) throw new Error("MRI_ORG_PERMISSION");
+      if (await rateLimit(`mri-check:${scope.organisationId}`, 3, 300000)) return Response.json({ error: "Wait five minutes before another MRI sign-in check." }, { status: 429, headers });
+      return Response.json({ configuration: await checkMriConnection(scope, check.revision) }, { headers });
+    }
     return Response.json({ configuration: await saveMriConfiguration(scope, input) }, { headers });
   } catch (error) { return failure(error); }
 }

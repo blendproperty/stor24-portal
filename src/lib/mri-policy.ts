@@ -10,6 +10,7 @@ export const mriSettingsSchema = z.object({
   login: z.string().trim().max(254).optional(),
   password: z.string().max(1000).optional(),
   databaseIdentifier: z.string().trim().max(200).optional(),
+  databaseKey: z.string().max(64).optional(),
 }).strict().superRefine((value, ctx) => {
   if (Boolean(value.login) !== Boolean(value.password)) ctx.addIssue({ code: "custom", message: "Replace the login and password together." });
 });

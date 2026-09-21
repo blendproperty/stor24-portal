@@ -14,13 +14,14 @@ await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
 const browser = await chromium.launch(process.env.PLAYWRIGHT_CHANNEL ? { channel: process.env.PLAYWRIGHT_CHANNEL } : {});
 const errors = [], writes = [];
 let canManage = true, failSave = false;
-let configuration = { revision:null, databaseLabel:"", environment:"unknown", credentialsStored:false, databaseIdentifierStored:false, encryptionReady:true, authenticated:false, postingEnabled:false };
+let configuration = { revision:null, databaseLabel:"", environment:"unknown", credentialsStored:false, databaseIdentifierStored:false, encryptionReady:true, authenticated:false, databaseReadable:false, databases:[], checkedAt:null, failureCode:null, discoveryAvailable:false, propertyCount:null, postingEnabled:false };
 try {
   const page = await browser.newPage({ viewport:{ width:1440,height:1000 } }); page.on("pageerror", e => errors.push(e.message));
   await page.route("**/api/v1/billing/mri**", async route => {
     const request = route.request(), url = new URL(request.url());
     if (request.method() === "POST") {
       writes.push(request.postDataJSON());
+      if (writes.at(-1).action === "check") { configuration = { ...configuration, authenticated:true, discoveryAvailable:true, checkedAt:"2026-09-21T00:00:00.000Z", databases:[{key:"ci-key",label:"CI Blend"}] }; return route.fulfill({ json:{configuration} }); }
       if (failSave) return route.fulfill({ status:409, json:{ error:"The settings changed. Reload before saving again." } });
       configuration = { ...configuration, revision:"2026-09-21T00:00:00.000Z", databaseLabel:writes.at(-1).databaseLabel, credentialsStored:true };
       return route.fulfill({ json:{ configuration } });
@@ -34,8 +35,11 @@ try {
   await page.getByLabel("API login", { exact:true }).fill("ci@example.invalid");
   await page.getByLabel("API password", { exact:true }).fill("ci-password-only");
   await page.getByRole("button", { name:"Save encrypted settings" }).click();
-  await expect(page.getByRole("status")).toContainText("has not been tested");
+  await expect(page.getByRole("status")).toContainText("Run the read-only check");
   await expect(page.getByLabel("API password", { exact:true })).toHaveValue("");
+  await page.getByRole("button", {name:"Check API sign-in and database read"}).click();
+  await expect(page.getByRole("status")).toContainText("API sign-in succeeded");
+  await expect(page.getByLabel("Databases returned by MRI")).toBeVisible();
   failSave = true;
   await page.getByLabel("API login", { exact:true }).fill("ci@example.invalid");
   await page.getByLabel("API password", { exact:true }).fill("ci-password-again");
@@ -57,6 +61,6 @@ try {
   canManage = false; await page.reload();
   await expect(page.getByText("You have read-only access to MRI preparation.")).toBeVisible();
   await expect(page.getByRole("button", { name:"Save encrypted settings" })).toHaveCount(0);
-  assert.equal(writes.length, 2); assert.equal(errors.length, 0);
+  assert.equal(writes.length, 3); assert.equal(errors.length, 0);
   console.log("MRI browser checks passed: secret clearing on success/failure, stale-save feedback, month invalidation, view-only controls, desktop/mobile bounds; no journal submission controls.");
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
