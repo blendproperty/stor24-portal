@@ -1,14 +1,12 @@
 /**
  * MRI Property Central export -- GENERIC SCAFFOLD ONLY.
  *
- * The MRI decision pack (exact integration method -- API vs SFTP file drop
- * vs manual CSV import, exact field mapping, chart-of-accounts mapping) is
- * still open as of this writing (see PROJECT_CONTEXT.md "Priority next
- * work"). This module intentionally does NOT call any MRI API. It reuses
- * the existing WebhookOutbox table as a durable, retryable queue of
- * "payments ready to export to finance" so that once the MRI integration
- * method is decided, a worker can be pointed at this queue without needing
- * to touch billing-service.ts or the Netcash integration at all.
+ * API access was provisioned in September 2026. The agreed model is
+ * consolidated journals, not per-payment export. Authentication, journal
+ * contract, finance mappings and provider reconciliation remain unresolved.
+ * These legacy markers MUST NOT be replayed as journals or treated as
+ * approved financial source evidence. See docs/MRI_INTEGRATION.md.
+ * This module intentionally does NOT call any MRI API.
  *
  * `destination` is left as a placeholder finance-export marker
  * ("mri://pending-integration-decision") rather than a real URL -- update

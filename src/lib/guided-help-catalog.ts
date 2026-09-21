@@ -11,6 +11,12 @@ function guide(id: string, title: string, category: string, route: string, scree
 }
 
 export const extendedGuides: WorkflowGuide[] = [
+  guide("mri", "Prepare the MRI accounting connection", "Money and accounts", "/billing/mri", "MRI accounting preparation", "Store connection details and review source movements while provider and finance checks remain open.", [
+    ["Check the posting boundary", "This screen prepares the integration. Saving credentials does not test MRI sign-in, create journals or authorise posting. The API reference and a verified database connection are still needed.", ".mri-workspace"],
+    ["Store connection details securely", "An organisation-wide MRI manager can save the supplied login and password together. Stored secrets are never displayed. Changing the database label or environment clears the old identifier unless a replacement is supplied.", ".mri-workspace form"],
+    ["Review a month of source movements", "Choose a current or past month and review the ledger by store and movement type. Test-payment history and unsupported currencies exclude entire accounts. These are source totals, not balanced journals or approved revenue.", ".mri-controls"],
+    ["Resolve finance and provider requirements", "Obtain the authorised test database, authentication and journal specification. Finance must approve the dedicated property, entity, transaction codes, GL accounts and tax treatment. Complete duplicate handling and MRI reconciliation before live posting can be enabled.", ".mri-workspace"],
+  ]),
   guide("settlements", "Reconcile merchant statements and bank payouts", "Money and accounts", "/billing/settlements", "Settlement reconciliation", "Import complete evidence, resolve each movement and obtain independent review.", [
     ["Understand the review boundary", "Organisation-wide finance permission is required because merchant statements may include several stores. Reviewed means evidenced statement movements, not that all funds reached the bank. This workspace never posts receipts, sends refunds or releases held funds.", ".settlement-boundary"],
     ["Import the complete daily source", "Choose the merchant, environment and past day. Request the daily statement from Netcash and check the file when ready, or preview the original full tab-separated export. Confirm the source before import. Opening balance plus signed movements must equal closing balance.", ".settlement-import"],

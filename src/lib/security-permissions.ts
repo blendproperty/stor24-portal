@@ -3,6 +3,7 @@ export const securityPermissionGroups = [
     ["leads.*", "Manage leads"], ["reservations.*", "Manage reservations"], ["move_in.create", "Process move-ins"], ["operations.view", "View tenant operations"],
   ] },
   { label: "Payments and adjustments", permissions: [
+    ["mri.view", "Review MRI accounting preparation"], ["mri.manage", "Manage encrypted MRI connection settings"],
     ["settlements.view", "View merchant settlement statements"], ["settlements.import", "Import settlement and bank evidence"], ["settlements.manage", "Match and reopen settlement reviews"], ["settlements.approve", "Independently review settlements"], ["settlements.export", "Export settlement reviews"],
     ["adjustments.view", "View adjustment requests and records"], ["adjustments.request", "Request or withdraw adjustments"], ["adjustments.approve", "Independently approve adjustments"], ["adjustments.record_refund", "Record externally completed refunds"],
     ["billing.view", "View monthly billing and invoices"], ["billing.manage", "Post approved monthly billing"],
