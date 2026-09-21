@@ -29,6 +29,8 @@ try{
  });
  await page.goto(`http://127.0.0.1:${server.address().port}`);
  await expect(page.getByRole("button",{name:"Review CI-102",exact:true})).toBeVisible();
+ await page.getByLabel("As of (South Africa)").fill("");
+ await expect(page.getByRole("button",{name:"Review CI-102",exact:true})).toBeVisible();
  await page.getByRole("button",{name:"Open next follow-up"}).click();assert.equal(calls.length,0);
  await expect(page.getByRole("heading",{name:"CI-101 · Training tenant"})).toBeVisible();
  await expect(page.getByRole("button",{name:"Save follow-up",exact:true})).toBeDisabled();
