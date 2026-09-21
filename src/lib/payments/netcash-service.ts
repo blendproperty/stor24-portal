@@ -202,7 +202,7 @@ export async function createOnceOffCheckout(organisationId: string, facilityId: 
   }
   if (payment.environment && payment.environment !== connection.config.environment) throw new Error("NETCASH_ENVIRONMENT_CHANGED");
   if (!payment.environment && !(isTestPayment(payment) && connection.config.environment === "sandbox")) throw new Error("PAYMENT_ENVIRONMENT_REVIEW_REQUIRED");
-  if (payment.status === "SUCCEEDED" || payment.status === "TEST_SUCCEEDED") throw new Error("NETCASH_PAYMENT_ALREADY_SUCCEEDED");
+  if (["SUCCEEDED", "TEST_SUCCEEDED", "REVERSED", "REFUNDED", "PARTIALLY_REFUNDED"].includes(payment.status)) throw new Error("NETCASH_PAYMENT_ALREADY_SUCCEEDED");
   if (payment.status === "FAILED") {
     payment = await db.payment.update({
       where: { id: payment.id },

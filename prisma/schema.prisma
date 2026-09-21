@@ -757,11 +757,49 @@ model Account {
   ledgerEntries LedgerEntry[]
   payments      Payment[]
   debitInstructions DebitOrderInstruction[]
+  adjustments FinancialAdjustment[]
   merchandiseOrders MerchandiseOrder[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
   @@index([customerId])
+}
+
+model FinancialAdjustment {
+  id String @id @default(cuid())
+  organisationId String
+  facilityId String
+  accountId String
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  requestKey String
+  kind String
+  status String @default("PENDING_APPROVAL")
+  amount Decimal @db.Decimal(14, 2)
+  taxAmount Decimal @db.Decimal(14, 2)
+  sourceEntryId String?
+  paymentId String?
+  reason String
+  evidenceReference String
+  snapshot Json
+  fingerprint String
+  requestedById String
+  reviewedById String?
+  reviewReference String?
+  reviewedAt DateTime?
+  postedById String?
+  postedAt DateTime?
+  ledgerEntryId String? @unique
+  documentId String? @unique
+  payoutReference String?
+  payoutDate String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organisationId, requestKey])
+  @@unique([organisationId, payoutReference])
+  @@index([organisationId, facilityId, createdAt])
+  @@index([accountId, status])
+  @@index([sourceEntryId])
 }
 
 model DebitOrderRun {

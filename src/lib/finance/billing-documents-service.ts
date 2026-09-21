@@ -196,17 +196,14 @@ export async function sendStatementEmail(input: { accountId: string; organisatio
     from = lastStatement?.createdAt ?? tenancy?.startDate ?? input.to;
   }
 
-  const [priorEntries, rangeEntries] = await Promise.all([
-    db.ledgerEntry.findMany({ where: { accountId: context.account.id, effectiveAt: { lt: from } } }),
-    db.ledgerEntry.findMany({ where: { accountId: context.account.id, effectiveAt: { gte: from, lte: input.to } }, orderBy: { effectiveAt: "asc" } }),
-  ]);
-  const DEBIT_TYPES = new Set(["CHARGE", "REVERSAL"]);
-  const openingBalance = priorEntries.reduce((sum, entry) => sum + (DEBIT_TYPES.has(entry.type) ? Number(entry.amount) : -Number(entry.amount)), 0);
-  const closingBalance = rangeEntries.reduce((sum, entry) => sum + (DEBIT_TYPES.has(entry.type) ? Number(entry.amount) : -Number(entry.amount)), openingBalance);
+  const entries = await db.ledgerEntry.findMany({ where: { accountId: context.account.id }, orderBy: [{ effectiveAt: "asc" }, { id: "asc" }] });
+  const { buildAccountStatement } = await import("@/lib/finance/account-statement");
+  const statement = buildAccountStatement(entries.map(entry => ({ ...entry, amount: entry.amount.toString() })), from, new Date(input.to.getTime() + 1));
+  const openingBalance = Number(statement.openingBalance), closingBalance = Number(statement.closingBalance);
 
   const company = await getBillingDocumentCompanyDetails(context.organisationId, context.facilityId);
   const statementNumber = await nextDocumentNumber(context.organisationId, "STATEMENT");
-  const lines: StatementLedgerLine[] = rangeEntries.map((entry) => ({ id: entry.id, type: entry.type, description: entry.description, effectiveAt: entry.effectiveAt, amount: entry.amount.toString() }));
+  const lines: StatementLedgerLine[] = statement.rows.map(row => ({ id: row.id, type: row.type as StatementLedgerLine["type"], description: row.description, effectiveAt: new Date(row.date), amount: Math.abs(Number(row.debit) - Number(row.credit)), signedAmount: Number(row.debit) - Number(row.credit) }));
 
   const html = renderStatementHtml({
     statementNumber,

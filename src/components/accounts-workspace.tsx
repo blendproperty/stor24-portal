@@ -482,10 +482,10 @@ export function AccountsWorkspace({
                           <td>{entry.type}</td>
                           <td
                             className={
-                              entry.type === "PAYMENT" ? "credit-amount" : ""
+                              ["PAYMENT", "CREDIT", "WRITE_OFF"].includes(entry.type) ? "credit-amount" : ""
                             }
                           >
-                            {entry.type === "PAYMENT" ? "− " : ""}
+                            {["PAYMENT", "CREDIT", "WRITE_OFF"].includes(entry.type) ? "− " : ""}
                             {money(entry.amount)}
                           </td>
                         </tr>

@@ -20,6 +20,8 @@ export type StatementLedgerLine = {
   description: string;
   effectiveAt: Date;
   amount: number | string;
+  /** Authoritative sign resolved against the original ledger, including reversals. */
+  signedAmount?: number;
 };
 
 export type StatementRenderInput = {
@@ -38,7 +40,7 @@ export type StatementRenderInput = {
   payNowUrl?: string;
 };
 
-const DEBIT_TYPES = new Set(["CHARGE", "REVERSAL"]);
+const DEBIT_TYPES = new Set(["CHARGE", "REFUND"]);
 
 function formatDate(date: Date) {
   return date.toLocaleDateString("en-ZA", { year: "numeric", month: "long", day: "numeric" });
@@ -47,7 +49,8 @@ function formatDate(date: Date) {
 export function renderStatementHtml(input: StatementRenderInput): string {
   let running = Number(input.openingBalance);
   const rows = input.lines.map((line) => {
-    const signedAmount = DEBIT_TYPES.has(line.type) ? Number(line.amount) : -Number(line.amount);
+    if (line.type === "REVERSAL" && line.signedAmount === undefined) throw new Error("INVALID_REVERSAL");
+    const signedAmount = line.signedAmount ?? (DEBIT_TYPES.has(line.type) ? Number(line.amount) : -Number(line.amount));
     running += signedAmount;
     return `
       <tr>

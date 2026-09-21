@@ -1,4 +1,5 @@
 const messages: Record<string, string> = {
+  DEBIT_ADJUSTMENT_PENDING: "An adjustment or refund is awaiting completion on this account.",
   DEBIT_PLAN_REQUIRED: "Collection terms have not been approved.",
   DEBIT_PLAN_PAUSED: "Collection is paused for this account.",
   DEBIT_BEFORE_APPROVED_START: "This month is before the approved collection start.",

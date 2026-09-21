@@ -87,6 +87,7 @@ async function preview(client: Client, scope: RequestScope, facilityId: string, 
     try {
       const { tenancy, mandate } = await accountContext(client, scope, account.id);
       if (tenancy.reservation?.publicLease?.status !== "SIGNED" || tenancy.reservation.customerId !== account.customerId) throw new Error("DEBIT_SIGNED_MANDATE_REQUIRED");
+      if (await client.financialAdjustment.count({ where: { accountId: account.id, status: { in: ["PENDING_APPROVAL", "APPROVED"] } } })) throw new Error("DEBIT_ADJUSTMENT_PENDING");
       const profile = await client.configurationProfile.findFirst({ where: { organisationId: scope.organisationId, facilityId, domain: DOMAIN, name: account.id } });
       if (!profile) throw new Error("DEBIT_PLAN_REQUIRED");
       const plan = debitPlanSchema.parse(profile.config);
