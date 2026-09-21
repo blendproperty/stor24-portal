@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { PDFDocument } from "pdf-lib";
 import { db } from "@/lib/db";
+import { debitConnectionFingerprint } from "./payments/netcash-debit-batch";
 import { preparePublicReservationLease } from "@/lib/public-lease-workflow";
 import { getNetcashConnection } from "@/lib/payments/netcash-client";
 import { mandatePolicy } from "@/lib/payments/netcash-mandate-policy";
@@ -48,7 +49,7 @@ export async function startHostedMandate(token: string) {
   const m = await db.$transaction(async tx => {
     const claim = await tx.publicReservationLease.updateMany({ where: { id: lease.id, mandate: { is: null }, debitOrderPreferences: { equals: lease.debitOrderPreferences! } }, data: { debitOrderRequestedAt: lease.debitOrderRequestedAt ?? new Date() } });
     if (!claim.count) throw new Error("MANDATE_DETAILS_CHANGED");
-    const created = await tx.publicDebitMandate.create({ data: { leaseId: lease.id, reference: terms.reference, correlation: terms.correlation, terms } });
+    const created = await tx.publicDebitMandate.create({ data: { leaseId: lease.id, reference: terms.reference, correlation: terms.correlation, terms, environment: connection.config.environment, connectionId: connection.id, connectionFingerprint: debitConnectionFingerprint(connection.config) } });
     await tx.auditEvent.create({ data: { organisationId: customer.organisationId, facilityId: lease.reservation.facilityId, action: "public_mandate.creation_started", entityType: "PublicDebitMandate", entityId: created.id, after: { reference: terms.reference, amount: terms.amount, approvedBy: policy.approvedBy, collectionEnabled: false } } });
     return created;
   });
@@ -71,6 +72,14 @@ export async function refreshHostedMandate(token: string) {
   const connection = await getNetcashConnection(lease.reservation.customer.organisationId);
   const key = connection.config.debitOrderServiceKey;
   if (!key) throw new Error("MANDATE_CONFIGURATION_REQUIRED");
+  const legacyProvenance = !m.connectionId && !m.connectionFingerprint && !m.environment;
+  if (legacyProvenance) {
+    // Preserve the existing pending test mandate's signing/readback flow. Do not
+    // infer provenance from a migration or browser return: only a newly matched
+    // signed provider report below can establish its merchant and environment.
+    const stored = await db.integrationConnection.findUniqueOrThrow({ where: { id: connection.id }, select: { config: true } });
+    if ((stored.config as { environment?: unknown } | null)?.environment !== "test" || connection.config.environment !== "sandbox") throw new Error("MANDATE_CONFIGURATION_CHANGED");
+  } else if (m.connectionId !== connection.id || m.connectionFingerprint !== debitConnectionFingerprint(connection.config) || m.environment !== connection.config.environment) throw new Error("MANDATE_CONFIGURATION_CHANGED");
   if (m.status === "SIGNED" && !m.signedPdf) {
     if (!m.pdfToken) {
       const date = new Date().toISOString().slice(0, 10).replaceAll("-", "");
@@ -93,7 +102,8 @@ export async function refreshHostedMandate(token: string) {
   const status = verifyMandateReport(report, m.terms as MandateTerms);
   // The raw account-wide report is neither persisted nor returned to the customer.
   return db.$transaction(async tx => {
-    const updated = await tx.publicDebitMandate.update({ where: { id: m.id }, data: { status, reportToken: null, verifiedAt: status === "SIGNED" ? new Date() : null } });
+    const updated = await tx.publicDebitMandate.update({ where: { id: m.id }, data: { status, reportToken: null, verifiedAt: status === "SIGNED" ? new Date() : null, ...(status === "SIGNED" && legacyProvenance ? { environment: connection.config.environment, connectionId: connection.id, connectionFingerprint: debitConnectionFingerprint(connection.config) } : {}) } });
+    if (status === "SIGNED" && legacyProvenance) await tx.auditEvent.create({ data: { organisationId: lease.reservation.customer.organisationId, facilityId: lease.reservation.facilityId, action: "public_mandate.provenance_verified", entityType: "PublicDebitMandate", entityId: m.id, after: { environment: connection.config.environment, connectionId: connection.id, evidence: "matched signed provider report", collectionEnabled: false } } });
     if (status !== m.status) {
       await tx.auditEvent.create({ data: { organisationId: lease.reservation.customer.organisationId, facilityId: lease.reservation.facilityId, action: "public_mandate.provider_status_verified", entityType: "PublicDebitMandate", entityId: m.id, after: { status, reference: m.reference, collectionEnabled: false } } });
       await tx.task.updateMany({ where: { id: `public-debit-order-${lease.id}`, customerId: lease.reservation.customerId }, data: { title: status === "SIGNED" ? `Confirm first payment and move-in ${lease.reservation.publicReference}` : `Review mandate ${lease.reservation.publicReference}`, description: `Netcash mandate ${m.reference}: ${status}, independently checked with the provider. No collection has been submitted. Confirm the initial payment, any deposit/package charges and move-in readiness separately. Do not request bank details by email.`, priority: "HIGH" } });

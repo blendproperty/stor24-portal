@@ -506,6 +506,9 @@ model PublicReservationLease {
 
 model PublicDebitMandate {
   id             String @id @default(cuid())
+  environment    String?
+  connectionId   String?
+  connectionFingerprint String?
   leaseId        String @unique
   lease          PublicReservationLease @relation(fields: [leaseId], references: [id], onDelete: Cascade)
   reference      String @unique
@@ -753,11 +756,55 @@ model Account {
   tenancy       Tenancy?
   ledgerEntries LedgerEntry[]
   payments      Payment[]
+  debitInstructions DebitOrderInstruction[]
   merchandiseOrders MerchandiseOrder[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
   @@index([customerId])
+}
+
+model DebitOrderRun {
+  id String @id @default(cuid())
+  organisationId String
+  facilityId String
+  period String
+  actionDate String
+  environment String
+  connectionId String
+  connectionFingerprint String
+  batchName String @unique
+  status String @default("PREPARED")
+  fingerprint String
+  snapshot Json
+  total Decimal @db.Decimal(14, 2)
+  providerToken String?
+  reportHash String?
+  failureCode String?
+  createdById String
+  submittedAt DateTime?
+  checkedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  instructions DebitOrderInstruction[]
+
+  @@index([organisationId, facilityId, createdAt])
+}
+
+model DebitOrderInstruction {
+  id String @id @default(cuid())
+  runId String
+  run DebitOrderRun @relation(fields: [runId], references: [id], onDelete: Restrict)
+  accountId String
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  period String
+  invoiceId String
+  mandateId String
+  reference String
+  amount Decimal @db.Decimal(14, 2)
+
+  @@unique([accountId, period])
+  @@index([runId])
 }
 
 model LedgerEntry {
