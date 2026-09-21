@@ -1,3 +1,5 @@
+import { netCollectionTotal } from "@/lib/finance/collection-total";
+import { requirePermissionScope, facilityWhere } from "@/lib/scope";
 import { Banknote, CreditCard, FileText, Receipt, RefreshCcw, WalletCards } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
@@ -22,17 +24,18 @@ function formatCurrency(value: number) {
 }
 
 export default async function BillingPage() {
+  const scope = await requirePermissionScope("billing.view");
   const now = new Date();
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 
   const [balanceAgg, paymentsAgg, activeTenancyCount] = await Promise.all([
-    db.account.aggregate({ _sum: { balance: true } }),
-    db.payment.aggregate({ _sum: { amount: true }, where: { status: "SUCCEEDED", processedAt: { gte: monthStart } } }),
-    db.tenancy.count({ where: { status: "ACTIVE" } }),
+    db.account.aggregate({ _sum: { balance: true }, where: { customer: { organisationId: scope.organisationId }, tenancy: { facility: facilityWhere(scope) } } }),
+    netCollectionTotal(scope, monthStart),
+    db.tenancy.count({ where: { status: "ACTIVE", facility: facilityWhere(scope) } }),
   ]);
 
   const outstandingBalance = Number(balanceAgg._sum.balance ?? 0);
-  const collectedThisMonth = Number(paymentsAgg._sum.amount ?? 0);
+  const collectedThisMonth = paymentsAgg;
 
   return (
     <div className="page-stack">
@@ -44,7 +47,7 @@ export default async function BillingPage() {
       />
       <section className="summary-strip">
         {[
-          ["Collected this month", formatCurrency(collectedThisMonth), "/operations/accounts"],
+          ["Net collected this month", formatCurrency(collectedThisMonth), "/operations/accounts"],
           ["Outstanding balance", formatCurrency(outstandingBalance), "/collections"],
           ["Active tenancies billed", String(activeTenancyCount), "/tenants"],
         ].map(([label, value, href]) => (

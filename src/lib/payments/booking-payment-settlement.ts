@@ -10,6 +10,7 @@ export async function settleVerifiedBookingPayment(paymentId: string, evidence: 
     if (payment.provider !== "NETCASH" || payment.providerRef !== evidence.reference || payment.currency !== "ZAR" || Number(payment.amount) !== evidence.amount) throw new Error("PAYMENT_VERIFICATION_MISMATCH");
     const test = isTestPayment(payment);
     if (!test && payment.environment !== "live") throw new Error("PAYMENT_ENVIRONMENT_REVIEW_REQUIRED");
+    if (["REVERSED", "REFUNDED", "PARTIALLY_REFUNDED"].includes(payment.status)) return { financial: false, terminal: true }; // Original success cannot undo a later approved correction.
     if (payment.status === "SUCCEEDED" || payment.status === "TEST_SUCCEEDED") return { financial: !test, terminal: true };
     if (!evidence.accepted) return { financial: false, terminal: false }; // May be asynchronous EFT; never downgrade success.
     await tx.payment.update({ where: { id: paymentId }, data: { status: test ? "TEST_SUCCEEDED" : "SUCCEEDED", processedAt: new Date(), failureCode: null } });

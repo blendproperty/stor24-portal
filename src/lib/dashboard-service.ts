@@ -1,3 +1,4 @@
+import { netCollectionTotal } from "@/lib/finance/collection-total";
 import { db } from "@/lib/db";
 import { facilityWhere, type RequestScope } from "@/lib/scope";
 import { SOUTH_AFRICA_TIME_ZONE, southAfricaDateKey } from "@/lib/south-africa-time";
@@ -82,16 +83,13 @@ export async function getDashboardKpis(scope: RequestScope): Promise<DashboardKp
       _sum: { amount: true },
       where: { type: "CHARGE", effectiveAt: { gte: monthStart }, account: { tenancy: { facility: facilityWhere(scope) } } },
     }),
-    db.payment.aggregate({
-      _sum: { amount: true },
-      where: { status: "SUCCEEDED", processedAt: { gte: monthStart }, account: { tenancy: { facility: facilityWhere(scope) } } },
-    }),
+    netCollectionTotal(scope, monthStart),
     db.lead.count({ where: { facility: facilityWhere(scope), createdAt: { gte: monthStart } } }),
     db.lead.count({ where: { facility: facilityWhere(scope), stage: "WON", updatedAt: { gte: monthStart } } }),
   ]);
 
   const monthToDateBilled = Number(billedAgg._sum.amount ?? 0);
-  const monthToDateCollected = Number(collectedAgg._sum.amount ?? 0);
+  const monthToDateCollected = collectedAgg;
 
   return {
     newLeadsThisWeek,
@@ -179,12 +177,9 @@ export async function getRevenueTrend(scope: RequestScope): Promise<{ label: str
           _sum: { amount: true },
           where: { type: "CHARGE", effectiveAt: { gte: m.start, lt: m.end }, account: { tenancy: { facility: facilityWhere(scope) } } },
         }),
-        db.payment.aggregate({
-          _sum: { amount: true },
-          where: { status: "SUCCEEDED", processedAt: { gte: m.start, lt: m.end }, account: { tenancy: { facility: facilityWhere(scope) } } },
-        }),
+        netCollectionTotal(scope, m.start, m.end),
       ]);
-      return { label: m.label, billed: Number(billedAgg._sum.amount ?? 0), collected: Number(collectedAgg._sum.amount ?? 0) };
+      return { label: m.label, billed: Number(billedAgg._sum.amount ?? 0), collected: collectedAgg };
     }),
   );
   return results;
