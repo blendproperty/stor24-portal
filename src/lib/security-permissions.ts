@@ -3,6 +3,7 @@ export const securityPermissionGroups = [
     ["leads.*", "Manage leads"], ["reservations.*", "Manage reservations"], ["move_in.create", "Process move-ins"], ["operations.view", "View tenant operations"],
   ] },
   { label: "Payments and adjustments", permissions: [
+    ["billing.view", "View monthly billing and invoices"], ["billing.manage", "Post approved monthly billing"],
     ["ledger.*", "Manage tenant ledgers"], ["payments.*", "Take and reverse payments"], ["collections.*", "Manage collections"], ["access.view", "View physical access"], ["access.manage", "Enrol and revoke physical access"], ["access.suspend", "Suspend access"], ["access.restore", "Restore access"],
   ] },
   { label: "Store operations", permissions: [

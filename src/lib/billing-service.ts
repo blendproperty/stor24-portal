@@ -1,86 +1,30 @@
 import { db } from "@/lib/db";
+import { billingPeriodSchema } from "./monthly-billing-policy";
+import { postMonthlyBilling, previewMonthlyBilling } from "./monthly-billing-service";
+import { runLegacyMonthlyBilling } from "./legacy-monthly-billing";
 
-/**
- * Automated recurring monthly rent billing.
- *
- * Scope note: this posts base rent from Occupancy.monthlyRate only. It does
- * NOT read ChargeDefinition (recurring fee templates) or DiscountPlan
- * (discount rules) — those exist in the schema but layering them into the
- * monthly charge amount is explicitly follow-up work, not in scope here.
- */
-
-export type MonthlyBillingSummary = {
-  period: string;
-  charged: number;
-  skipped: number;
-  totalAmount: string;
-  occupanciesConsidered: number;
-};
-
-const PERIOD_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
-
-function billingExternalRef(period: string) {
-  return `RENT-${period}`;
-}
-
-function isUniqueConstraintError(error: unknown) {
-  return typeof error === "object" && error !== null && "code" in error && (error as { code?: unknown }).code === "P2002";
-}
-
-/**
- * Idempotently charges one month of rent to every actively-occupied unit's
- * account. Safe to re-run for the same period any number of times — a
- * period that has already been billed for a given account is skipped, not
- * double-charged.
- *
- * @param period "YYYY-MM", e.g. "2026-08"
- */
+export type MonthlyBillingSummary = { period: string; charged: number; skipped: number; totalAmount: string; occupanciesConsidered: number; exceptions: { accountId: string; code: string }[] };
+/** Explicit opt-in only. Uses the same approved plans and atomic posting as staff. */
 export async function runMonthlyBilling(period: string): Promise<MonthlyBillingSummary> {
-  if (!PERIOD_PATTERN.test(period)) throw new Error("INVALID_PERIOD");
-
-  const [year, month] = period.split("-").map(Number);
-  const effectiveAt = new Date(Date.UTC(year, month - 1, 1));
-  const externalRef = billingExternalRef(period);
-
-  const occupancies = await db.occupancy.findMany({
-    where: { status: "ACTIVE", tenancy: { status: "ACTIVE" } },
-    include: { tenancy: { include: { account: true } } },
-  });
-
-  let charged = 0;
-  let skipped = 0;
-  let totalAmount = 0;
-
-  for (const occupancy of occupancies) {
-    const account = occupancy.tenancy.account;
-    if (!account) { skipped++; continue; }
-
-    const alreadyBilled = await db.ledgerEntry.findFirst({ where: { accountId: account.id, externalRef } });
-    if (alreadyBilled) { skipped++; continue; }
-
+  if (!billingPeriodSchema.safeParse(period).success) throw new Error("INVALID_PERIOD");
+  if (process.env.MONTHLY_BILLING_PAUSED === "true") throw new Error("BILLING_AUTOMATION_DISABLED");
+  // Preserve the existing live schedule until an explicit, approved cut-over.
+  if (process.env.MONTHLY_BILLING_AUTOMATION_ENABLED !== "true") return { ...await runLegacyMonthlyBilling(period), exceptions: [] };
+  const accounts = await db.account.findMany({ where: { tenancy: { status: { in: ["ACTIVE", "NOTICE_GIVEN"] } } }, include: { customer: { select: { organisationId: true } }, tenancy: { select: { facilityId: true } } } });
+  const summary: MonthlyBillingSummary = { period, charged: 0, skipped: 0, totalAmount: "0.00", occupanciesConsidered: accounts.length, exceptions: [] };
+  let cents = 0;
+  for (const account of accounts) {
+    const scope = { organisationId: account.customer.organisationId, userId: "", facilityIds: [account.tenancy!.facilityId], unrestrictedFacilities: false };
     try {
-      await db.$transaction(async (tx) => {
-        await tx.ledgerEntry.create({
-          data: {
-            accountId: account.id,
-            type: "CHARGE",
-            amount: occupancy.monthlyRate,
-            description: `Monthly rent — ${period}`,
-            effectiveAt,
-            externalRef,
-          },
-        });
-        await tx.account.update({ where: { id: account.id }, data: { balance: { increment: occupancy.monthlyRate } } });
-      });
-      charged++;
-      totalAmount += Number(occupancy.monthlyRate);
+      const preview = await previewMonthlyBilling(scope, account.id, period);
+      const result = await postMonthlyBilling(scope, account.id, period, preview.fingerprint, null);
+      summary.charged++; cents += Math.round(result.total * 100);
     } catch (error) {
-      // Unique (accountId, externalRef) constraint tripped by a concurrent
-      // run for the same period — treat as already billed, not a failure.
-      if (isUniqueConstraintError(error)) { skipped++; continue; }
-      throw error;
+      summary.skipped++;
+      const code = error instanceof Error && error.message.startsWith("BILLING_") ? error.message : "BILLING_RETRY_REVIEW_REQUIRED";
+      if (code !== "BILLING_ALREADY_POSTED") summary.exceptions.push({ accountId: account.id, code });
     }
   }
-
-  return { period, charged, skipped, totalAmount: totalAmount.toFixed(2), occupanciesConsidered: occupancies.length };
+  summary.totalAmount = (cents / 100).toFixed(2);
+  return summary;
 }
