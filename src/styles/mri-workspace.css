@@ -1,0 +1,120 @@
+/* Scope the real regular/medium/bold brand weights to this workspace. */
+.mri-workspace { max-width: 1280px; display: grid; gap: 24px; font-family: "Satoshi Handover", Arial, sans-serif; font-weight: 400; color: #172b25; font-size: 14px; line-height: 1.5; }
+.mri-workspace :is(h1,h2,h3,p,dl,dd) { margin: 0; }
+.mri-workspace :is(button,input,select) { font: inherit; }
+.mri-workspace button { cursor: pointer; }
+.mri-workspace button:disabled { cursor: not-allowed; opacity: .5; }
+.mri-workspace :is(button,input,select,summary,[tabindex]):focus-visible { outline: 3px solid #da681f; outline-offset: 4px; }
+.mri-heading { display:flex; justify-content:space-between; align-items:center; gap:24px; padding:2px 0 5px; }
+.mri-workspace .mri-eyebrow { color:#65736d; font-size:12px; font-weight:500; margin-bottom:10px; }
+.mri-heading h1 { font-size:34px; letter-spacing:-1.1px; line-height:1.15; font-weight:700; }
+.mri-workspace .mri-subtitle { color:#65736d; margin-top:10px; font-size:15px; }
+.mri-mode { display:inline-flex; align-items:center; gap:8px; color:#65736d; font-size:12px; white-space:nowrap; }
+.mri-connection,.mri-review { min-width:0; background:#fff; border:1px solid #dfe5e0; border-radius:16px; box-shadow:0 3px 12px #172b2503; }
+.mri-connection-overview { display:flex; align-items:center; gap:16px; padding:26px 28px 22px; }
+.mri-connection-icon { width:48px; height:48px; border:1px solid #dfe5e0; border-radius:13px; display:grid; place-items:center; color:#64736d; flex:0 0 auto; background:#f5f7f5; }
+.mri-connection-icon.is-verified { color:#207151; background:#edf6f0; border-color:#dbece1; }
+.mri-connection-copy { flex:1; min-width:0; }
+.mri-title-line { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.mri-workspace h2 { font-size:20px; line-height:1.3; letter-spacing:-.35px; font-weight:700; }
+.mri-connection-copy > p { color:#6b7872; font-size:12px; margin-top:7px; }
+.mri-badge { display:inline-flex; align-items:center; gap:5px; border-radius:6px; padding:4px 8px; font-size:11px; font-weight:500; line-height:1.4; white-space:nowrap; }
+.mri-badge-green { color:#216a49; background:#edf7f0; }
+.mri-badge-neutral { color:#5b6962; background:#f1f4f1; }
+.mri-badge-amber { color:#86561a; background:#fcf0dc; }
+.mri-button { display:inline-flex; justify-content:center; align-items:center; gap:8px; border-radius:8px; min-height:42px; padding:10px 16px; font-size:13px !important; font-weight:500 !important; border:1px solid transparent; white-space:nowrap; transition:background .15s,border-color .15s; }
+.mri-button-primary { background:#c94d0a; border-color:#c94d0a; color:#fff; }
+.mri-button-primary:hover:not(:disabled) { background:#b64005; border-color:#b64005; }
+.mri-button-secondary { background:#fff; color:#263d33; border-color:#dbe1dc; }
+.mri-button-secondary:hover:not(:disabled) { background:#f4f7f4; border-color:#bcc9c0; }
+.mri-connection-facts { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); padding:0 28px 23px; gap:20px; }
+.mri-connection-facts dt { color:#738078; font-size:11px; margin-bottom:5px; }
+.mri-connection-facts dd { font-size:13px; font-weight:500; overflow-wrap:anywhere; }
+.mri-property-note { display:flex; gap:9px; align-items:baseline; padding:13px 28px; color:#795728; font-size:12px; background:#fffaf1; border-top:1px solid #f4ecdc; }
+.mri-note-dot { width:5px; height:5px; flex:0 0 5px; border-radius:50%; background:#bb873a; }
+.mri-settings-bar { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 28px; border-top:1px solid #edf0ec; }
+.mri-settings-bar p { display:flex; gap:7px; align-items:center; color:#64736b; font-size:11px; }
+.mri-settings-toggle { display:inline-flex; gap:8px; align-items:center; background:transparent; border:0; padding:8px 0; color:#3a5145; font-size:12px !important; font-weight:500 !important; }
+.mri-rotate { transform:rotate(180deg); }
+.mri-readonly { color:#6a7770; font-size:12px; }
+.mri-settings { padding:25px 28px 28px; border-top:1px solid #e5ebe5; background:#fafcf9; border-radius:0 0 16px 16px; }
+.mri-section-heading { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; }
+.mri-section-heading p { margin-top:7px; font-size:13px; color:#738078; }
+.mri-section-heading > svg { color:#95a299; margin-top:5px; }
+.mri-workspace h3 { font-size:14px; font-weight:500; }
+.mri-workspace fieldset { border:0; margin:0; padding:0; min-width:0; }
+.mri-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:19px 22px; margin-top:24px; }
+.mri-field-wide { grid-column:1/-1; }
+.mri-workspace label { display:grid; gap:7px; color:#465a4e; font-size:12px; font-weight:500; min-width:0; }
+.mri-workspace :is(input,select) { width:100%; min-width:0; height:43px; padding:10px 12px; border:1px solid #d9e1da; border-radius:7px; color:#253b30; background:#fff; font-size:13px; font-weight:400; }
+.mri-workspace input::placeholder { color:#88928b; opacity:1; }
+.mri-workspace small { color:#64736b; font-size:11px; font-weight:400; }
+.mri-manual { margin-top:20px; }
+.mri-manual summary { display:flex; align-items:center; gap:8px; color:#566c5d; font-size:12px; cursor:pointer; list-style:none; }
+.mri-manual label { max-width:530px; margin-top:14px; }
+.mri-workspace .mri-field-help { margin-top:18px; max-width:760px; color:#768177; font-size:12px; line-height:1.6; }
+.mri-save-row { display:flex; align-items:center; gap:16px; margin-top:22px; }
+.mri-save-row span { font-size:12px; color:#64736b; }
+.mri-main-grid { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:24px; align-items:start; }
+.mri-review { padding:26px 28px; }
+.mri-workspace .mri-kicker { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1.1px; color:#64736b; margin-bottom:8px; }
+.mri-controls { display:flex; gap:12px; align-items:end; padding:22px 0; }
+.mri-controls label { flex:1; max-width:210px; }
+.mri-empty { border-top:1px solid #edf0ec; padding:35px 12px 20px; text-align:center; }
+.mri-empty > span { width:52px; height:52px; border-radius:50%; display:grid; place-items:center; background:#f5f7f3; color:#809386; margin:0 auto 13px; }
+.mri-empty h3 { font-size:15px; }
+.mri-empty p { max-width:320px; margin:8px auto 0; color:#64736b; font-size:13px; line-height:1.65; }
+.mri-review-label { display:flex; align-items:center; justify-content:space-between; gap:12px; border-top:1px solid #edf0ec; padding-top:22px; }
+.mri-review-label h3 { font-size:15px; font-weight:500; }
+.mri-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:18px 0 24px !important; }
+.mri-metrics > div { padding:14px 14px 12px; background:#f7f9f5; border-radius:9px; }
+.mri-metrics dt { font-size:12px; color:#64736b; margin-bottom:6px; }
+.mri-metrics dd { font-size:25px; line-height:1.2; letter-spacing:-.6px; font-weight:500; font-variant-numeric:tabular-nums; }
+.mri-table { overflow:auto; margin:0 -6px; }
+.mri-table table { width:100%; min-width:500px; border-collapse:collapse; font-size:13px; }
+.mri-table th,.mri-table td { text-align:left; border-bottom:1px solid #e9eee8; padding:14px 8px; }
+.mri-table thead th { color:#64736b; font-size:12px; font-weight:500; white-space:nowrap; }
+.mri-table tbody th { font-weight:500; min-width:130px; max-width:240px; }
+.mri-table .mri-number { text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.mri-movement-type { padding:4px 6px; background:#f3f5f1; border-radius:4px; font-size:11px; color:#617265; white-space:nowrap; }
+.mri-table .mri-no-rows { padding:30px 8px; text-align:center; color:#77877b; }
+.mri-workspace .mri-review-caption { color:#64736b; font-size:11px; margin:13px 0 23px; }
+.mri-details { border-top:1px solid #e9eee8; }
+.mri-details summary { display:flex; justify-content:space-between; gap:12px; cursor:pointer; padding:13px 0; list-style:none; color:#52695a; font-size:12px; font-weight:500; }
+.mri-workspace summary::-webkit-details-marker { display:none; }
+.mri-workspace details[open] > summary > svg { transform:rotate(180deg); }
+.mri-details > div { padding:0 0 14px; display:grid; gap:10px; font-size:12px; color:#64736b; line-height:1.7; }
+.mri-fingerprint { overflow-wrap:anywhere; }
+.mri-readiness { border:1px solid #dedfd3; border-radius:16px; padding:25px 24px; background:#efefe5; }
+.mri-readiness-heading { display:flex; justify-content:space-between; gap:8px; align-items:center; margin-bottom:16px; }
+.mri-readiness-heading .mri-kicker { margin:0; font-size:10px; }
+.mri-readiness h2 { font-size:21px; line-height:1.35; }
+.mri-readiness > p { margin-top:10px; color:#64736b; font-size:13px; line-height:1.65; }
+.mri-checklist { list-style:none; padding:0; margin:23px 0; display:grid; gap:22px; }
+.mri-checklist li { display:flex; gap:12px; align-items:baseline; }
+.mri-checklist li > span { flex:0 0 21px; font-size:12px; color:#64736b; font-variant-numeric:tabular-nums; }
+.mri-checklist h3 { color:#344c3c; font-size:13px; }
+.mri-checklist p { margin-top:5px; font-size:13px; color:#64736b; line-height:1.65; }
+.mri-readiness-footer { border-top:1px solid #dddfd2; padding-top:17px; display:flex; gap:9px; color:#6a7768; }
+.mri-readiness-footer svg { flex-shrink:0; margin-top:2px; }
+.mri-readiness-footer p { font-size:12px; line-height:1.65; }
+.mri-message { padding:13px 17px; border:1px solid #d4e7d9; border-radius:9px; background:#f0f8f2; color:#356446; font-size:13px; }
+.mri-connection > .mri-message { margin:0 28px 20px; }
+.mri-message-error { border-color:#edceca; color:#963d37; background:#fff5f3; }
+.mri-loading { padding:32px; border:1px solid #dfe5e0; border-radius:16px; background:#fff; color:#6e7c71; }
+@media(max-width:1100px) { .mri-main-grid { grid-template-columns:minmax(0,1fr); } .mri-checklist { grid-template-columns:repeat(3,minmax(0,1fr)); } .mri-readiness h2 { font-size:20px; } }
+@media(max-width:650px) { .mri-workspace { gap:18px; } .mri-heading { align-items:flex-start; flex-direction:column; gap:13px; } .mri-heading h1 { font-size:29px; } .mri-connection-overview { flex-wrap:wrap; gap:12px; padding:20px; } .mri-connection-copy { flex-basis:calc(100% - 65px); } .mri-connection-overview > button { width:100%; margin-top:5px; } .mri-title-line { gap:7px; } .mri-title-line h2 { font-size:18px; } .mri-connection-facts { grid-template-columns:repeat(2,minmax(0,1fr)); padding:0 20px 20px; } .mri-property-note { padding:12px 20px; } .mri-settings-bar { padding:10px 20px; flex-direction:column; align-items:flex-start; gap:5px; } .mri-settings,.mri-review,.mri-readiness { padding:20px; } .mri-fields { grid-template-columns:1fr; } .mri-save-row { align-items:flex-start; flex-direction:column; gap:10px; } .mri-section-heading > .mri-badge { display:none; } .mri-controls { flex-wrap:wrap; } .mri-controls label { max-width:none; min-width:160px; } .mri-controls button { flex:1; } .mri-metrics { gap:7px; } .mri-metrics > div { padding:12px 9px; } .mri-metrics dt { font-size:10px; } .mri-metrics dd { font-size:23px; } .mri-checklist { grid-template-columns:1fr; gap:19px; } .mri-review-label { flex-wrap:wrap; } }
+
+@media(max-width:650px) {
+  .mri-table { margin:0; overflow:visible; }
+  .mri-table table { min-width:0; }
+  .mri-table thead { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+  .mri-table tbody { display:block; }
+  .mri-table tbody tr { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); padding:14px 0 18px; border-bottom:1px solid #e9eee8; row-gap:7px; }
+  .mri-table tbody th { grid-column:1/-1; max-width:none; min-width:0; padding:0; border:0; }
+  .mri-table td { border:0; padding:0; }
+  .mri-table td:nth-child(2) { grid-column:1/-1; padding:1px 0 7px; }
+  .mri-table .mri-number { text-align:left; font-size:15px; }
+  .mri-table .mri-number::before { content:attr(data-label); display:block; margin-bottom:5px; color:#66756c; font-size:11px; font-weight:400; }
+  .mri-table .mri-no-rows { grid-column:1/-1; }
+}
