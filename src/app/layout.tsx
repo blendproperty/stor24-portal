@@ -6,6 +6,7 @@ import { ServiceWorkerRegistration } from "@/components/service-worker-registrat
 import "./globals.css";
 import "../styles/stor24-brand.css";
 import "../styles/guided-help.css";
+import "../styles/mri-workspace.css";
 
 const satoshi = localFont({
   src: "../../public/brand/Satoshi-Variable.ttf",

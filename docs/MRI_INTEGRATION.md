@@ -25,6 +25,10 @@ The approved direction from the August correspondence is consolidated journals t
 - A subsequent controlled diagnostic from the production server authenticated successfully (HTTP200/Bearer token) with the activation email and supplied password; the short username had returned HTTP400 invalid_grant. Read-only discovery returned Blend and BlendTest with identifiers. Tokens and identifiers were not printed. Store/use the activation email for this account. App-route verification is tracked separately in PROJECT_CONTEXT.md.
 - The Swagger browser form did not produce a verified sign-in result. Its legacy UI also logged a missing-input JavaScript error. The server-side connection check provides a controlled, tested alternative using the published contract.
 
+## Workspace layout
+
+The MRI accounting screen presents the saved connection and last-check result first. Connection settings opens the encrypted settings form; manual identifier entry is inside that form. Review movements loads the selected month. Exclusions and audit evidence expand beneath the source table. Journal readiness remains visible separately, with posting off. Changing settings still invalidates prior connection proof; opening or closing settings never calls MRI.
+
 ## Preparation behaviour
 
 - Explicit `mri.view` and `mri.manage` permissions require organisation-wide scope. No role grants are changed by this release.

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { PageHeader } from "@/components/page-header";
+import { Check, ChevronDown, Database, FileText, LockKeyhole, RefreshCw, Settings2 } from "lucide-react";
 import type { mriConfiguration, mriSourceReview } from "@/lib/mri-service";
 
 type Configuration = Awaited<ReturnType<typeof mriConfiguration>>;
@@ -17,6 +17,7 @@ export function MriWorkspace() {
   const [notice, setNotice] = useState("");
   const [month, setMonth] = useState(monthNow);
   const [review, setReview] = useState<Review | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const form = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -31,6 +32,7 @@ export function MriWorkspace() {
 
   async function save(data: FormData) {
     if (!config) return;
+    setSettingsOpen(true);
     setBusy(true); setError(""); setNotice("");
     try {
       const response = await fetch(endpoint, {
@@ -40,7 +42,7 @@ export function MriWorkspace() {
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Unable to save MRI settings.");
       setConfig(body.configuration);
-      setNotice("Settings stored securely. Run the read-only check for these settings. Journal posting remains disabled.");
+      setNotice("Settings saved. Check the connection to verify your changes.");
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to save. Reload to check the saved state."); }
     finally {
       // Credentials are write-only; never retain them in React state or local storage.
@@ -60,7 +62,8 @@ export function MriWorkspace() {
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Unable to check the connection.");
       setConfig(body.configuration);
-      setNotice(body.configuration.databaseReadable ? "API sign-in and a read-only property query succeeded. Journal posting remains disabled." : body.configuration.authenticated ? "API sign-in succeeded. Select or enter the database identifier, save, then check again." : "The connection check did not succeed. Review the result below before retrying.");
+      if (body.configuration.authenticated && !body.configuration.databaseIdentifierStored) setSettingsOpen(true);
+      setNotice(body.configuration.databaseReadable ? "Connection verified. Sign-in and database read both succeeded." : body.configuration.authenticated ? "Sign-in verified. Select a database in Connection settings, save and check again." : "Connection could not be verified. Review the result below.");
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to check the connection."); }
     finally { setBusy(false); }
   }
@@ -76,80 +79,89 @@ export function MriWorkspace() {
     finally { setBusy(false); }
   }
 
-  return <div className="page-stack mri-workspace">
-    <PageHeader eyebrow="Finance connections" title="MRI accounting preparation" description="Prepare consolidated monthly journals for MRI Property Central. Tenant-level detail stays in STOR24." />
-    <section className="panel">
-      <h2>Posting is not yet available</h2>
-      <p>API access has been provisioned and the authentication reference is available. Verify the database connection and agree the journal method and accounting mappings before journals can be built and sent.</p>
-      <ol>
-        <li>Check API sign-in, then confirm the approved journal method with MRI.</li>
-        <li>Verify the database identifier and access to an authorised test database.</li>
-        <li>Finance selects the dedicated property, entity, transaction codes, GL accounts and tax treatment.</li>
-        <li>Build balanced journals, check duplicate handling, and reconcile a test batch in MRI before approving live use.</li>
-      </ol>
-    </section>
-    {error && <p role="alert" className="form-error">{error}</p>}
-    {notice && <p role="status">{notice}</p>}
-    {!config && !error && <p>Loading MRI settings…</p>}
-    {config && <section className="panel">
-      <h2>Connection details</h2>
-      <p>API sign-in: <strong>{config.authenticated ? "Verified at last check" : config.credentialsStored ? "Stored; not verified" : "Credentials not stored"}</strong>. Database query: <strong>{config.databaseReadable ? "Read succeeded at last check" : config.databaseIdentifierStored ? "Identifier stored; read not verified" : "Identifier required"}</strong>.</p>
-      {config.checkedAt && <p>Last check: {new Date(config.checkedAt).toLocaleString("en-ZA", { timeZone: "Africa/Johannesburg" })} SAST. A successful read does not prove the intended finance property, test environment or journal permissions.</p>}
-      {config.failureCode && !["MRI_CHECK_REQUIRED", "MRI_DATABASE_REQUIRED", "MRI_JOURNAL_NOT_ENABLED"].includes(config.failureCode) && <p role="alert">{({ MRI_AUTH_REJECTED: "MRI rejected the sign-in or database access. Check the supplied login and account permissions before retrying.", MRI_NETWORK: "MRI could not be reached securely. No automatic retry was attempted.", MRI_RESPONSE_INVALID: "MRI returned an unexpected response; the connection is not verified.", MRI_PROVIDER_UNAVAILABLE: "MRI could not complete the check. Try again after the provider issue is resolved.", MRI_CREDENTIALS_UNREADABLE: "Stored credentials could not be opened. Review secure storage configuration." } as Record<string, string>)[config.failureCode] ?? "Run a new connection check to verify the saved settings."}</p>}
-      {!config.encryptionReady && <p role="alert">Secure storage must be configured on the server before saving credentials.</p>}
-      {canManage ? <form ref={form} action={save}>
-        <fieldset disabled={busy || !config.encryptionReady}>
-          <div className="mri-fields">
-            <label>Database label<input key={config.databaseLabel} name="databaseLabel" required maxLength={100} defaultValue={config.databaseLabel} placeholder="Name supplied by MRI" /></label>
-            <label>Database environment<select name="environment" defaultValue={config.environment}><option value="unknown">Not confirmed</option><option value="test">Test</option><option value="live">Live</option></select></label>
-            <label>API login<input name="login" autoComplete="off" maxLength={254} required={!config.credentialsStored} placeholder={config.credentialsStored ? "Leave blank to keep stored login" : "API activation email supplied by MRI"} /></label>
-            <label>API password<input name="password" type="password" autoComplete="new-password" maxLength={1000} required={!config.credentialsStored} placeholder={config.credentialsStored ? "Leave blank to keep stored password" : "API password"} /></label>
-            <label>Database identifier<input name="databaseIdentifier" type="password" autoComplete="off" maxLength={200} placeholder={config.databaseIdentifierStored ? "Leave blank to keep stored identifier" : "Optional until supplied by MRI"} /></label>
-            {config.databases?.length > 0 && <label>Databases returned by MRI<select name="databaseKey" defaultValue=""><option value="">Keep current selection / enter identifier manually</option>{config.databases.map(d => <option key={d.key} value={d.key}>{d.label}</option>)}</select></label>}
+  const verified = Boolean(config?.authenticated && config?.databaseReadable);
+  const showSettings = settingsOpen || Boolean(config && !config.credentialsStored);
+  const checkedAt = config?.checkedAt ? new Intl.DateTimeFormat("en-ZA", {
+    timeZone: "Africa/Johannesburg", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).format(new Date(config.checkedAt)) : null;
+  const connectionTitle = verified ? `Connected to ${config?.databaseLabel || "MRI"}` : config?.authenticated ? "Select your database" : config?.credentialsStored ? "Connection needs a check" : "Connect to MRI";
+  const failure = config?.failureCode && ({
+    MRI_AUTH_REJECTED: "MRI rejected the sign-in or database access. Check the login and account permissions in Connection settings.",
+    MRI_NETWORK: "MRI could not be reached. Check again when the service is available.",
+    MRI_RESPONSE_INVALID: "MRI returned an unexpected response. The connection has not been verified.",
+    MRI_PROVIDER_UNAVAILABLE: "MRI could not complete the check. Please try again later.",
+    MRI_CREDENTIALS_UNREADABLE: "Stored credentials could not be opened. Contact your system administrator.",
+  } as Record<string, string>)[config.failureCode];
+  const movementName = (value: string) => value.toLowerCase().replaceAll("_", " ").replace(/^./, char => char.toUpperCase());
+
+  return <div className="mri-workspace">
+    <header className="mri-heading">
+      <div><p className="mri-eyebrow">Finance / Integrations</p><h1>MRI accounting</h1><p className="mri-subtitle">Your accounting connection and monthly ledger review.</p></div>
+      <span className="mri-mode"><LockKeyhole size={14} aria-hidden="true" /> Read-only workspace</span>
+    </header>
+    {error && <p role="alert" className="mri-message mri-message-error">{error}</p>}
+    {notice && <p role="status" className="mri-message">{notice}</p>}
+    {!config && !error && <div className="mri-loading" role="status">Loading your MRI connection…</div>}
+    {config && <>
+      <section className="mri-connection" aria-labelledby="mri-connection-title">
+        <div className="mri-connection-overview">
+          <span className={`mri-connection-icon ${verified ? "is-verified" : ""}`}><Database size={24} strokeWidth={1.6} aria-hidden="true" /></span>
+          <div className="mri-connection-copy">
+            <div className="mri-title-line"><h2 id="mri-connection-title">{connectionTitle}</h2><span className={`mri-badge ${verified ? "mri-badge-green" : "mri-badge-neutral"}`}>{verified ? <><Check size={13} aria-hidden="true" /> Read access verified</> : "Setup in progress"}</span></div>
+            <p>{checkedAt ? `Last checked ${checkedAt} SAST` : "Save your MRI details, then run a connection check."}</p>
           </div>
-          <p>Changing the database label or environment clears the stored identifier unless you enter it again. Replace the login and password together.</p>
-          <button type="submit" className="button button-primary">{busy ? "Working…" : "Save encrypted settings"}</button>
-        </fieldset>
-      </form> : <p>You have read-only access to MRI preparation.</p>}
-      {canManage && <p><button type="button" className="button button-secondary" disabled={busy || !config.credentialsStored || !config.encryptionReady} onClick={checkConnection}>Check API sign-in and database read</button></p>}
-      <p>This check signs in using the saved settings, requests the database list if permitted, and reads one property when an identifier is stored. It does not create or post any MRI record.</p>
-      {config.authenticated && !config.discoveryAvailable && <p>MRI did not supply a database list for this API user. Enter the identifier supplied by MRI; do not guess it from the database name.</p>}
-    </section>}
-    {config && <section className="panel">
-      <h2>Monthly source review</h2>
-      <p>Review ledger movements by store and type before agreeing the accounting mappings. These totals are not balanced journals, approved revenue, a trial balance or an MRI import file.</p>
-      <div className="mri-controls">
-        <label>Month<input type="month" value={month} max={monthNow()} disabled={busy} onChange={e => { setMonth(e.target.value); setReview(null); }} /></label>
-        <button className="button button-secondary" disabled={busy || !month} onClick={loadReview}>Review source movements</button>
+          {canManage && <button type="button" className="mri-button mri-button-secondary" disabled={busy || !config.credentialsStored || !config.encryptionReady} onClick={checkConnection}><RefreshCw size={15} aria-hidden="true" /> Check connection</button>}
+        </div>
+        <dl className="mri-connection-facts">
+          <div><dt>Database</dt><dd>{config.databaseLabel || "Not selected"}</dd></div>
+          <div><dt>Environment</dt><dd>{config.environment === "live" ? "Live" : config.environment === "test" ? "Test" : "Awaiting confirmation"}</dd></div>
+          <div><dt>MRI sign-in</dt><dd>{config.authenticated ? "Verified" : config.credentialsStored ? "Ready to check" : "Not configured"}</dd></div>
+          <div><dt>Database read</dt><dd>{config.databaseReadable ? "Verified" : config.databaseIdentifierStored ? "Ready to check" : "Database required"}</dd></div>
+        </dl>
+        {failure && <p role="alert" className="mri-message mri-message-error">{failure}</p>}
+        {!config.encryptionReady && <p role="alert" className="mri-message mri-message-error">Secure storage must be configured before credentials can be saved.</p>}
+        {config.databaseReadable && config.propertyCount === 0 && <p className="mri-property-note"><span className="mri-note-dot" />No properties returned by MRI. Confirm that the STOR24 finance property is assigned to this account.</p>}
+        <div className="mri-settings-bar"><p><LockKeyhole size={14} aria-hidden="true" /> Checks use saved settings and do not change MRI records.</p>{canManage ? <button className="mri-settings-toggle" type="button" aria-expanded={showSettings} aria-controls="mri-connection-settings" onClick={() => setSettingsOpen(!settingsOpen)} disabled={busy || !config.credentialsStored}><Settings2 size={15} aria-hidden="true" />Connection settings<ChevronDown size={14} className={showSettings ? "mri-rotate" : ""} aria-hidden="true" /></button> : <span className="mri-readonly">Read-only access</span>}</div>
+        {canManage && showSettings && <div id="mri-connection-settings" className="mri-settings">
+          <div className="mri-section-heading"><div><h3>Connection settings</h3><p>Stored credentials stay private. Leave a field blank to keep its saved value.</p></div><span className="mri-badge mri-badge-neutral">Encrypted storage</span></div>
+          <form ref={form} action={save}>
+            <fieldset disabled={busy || !config.encryptionReady}>
+              <div className="mri-fields">
+                <label>Database label<input key={config.databaseLabel} name="databaseLabel" required maxLength={100} defaultValue={config.databaseLabel} placeholder="Name supplied by MRI" /></label>
+                <label>Database environment<select name="environment" defaultValue={config.environment}><option value="unknown">Not confirmed</option><option value="test">Test</option><option value="live">Live</option></select></label>
+                {config.databases?.length > 0 && <label className="mri-field-wide">Databases returned by MRI<select name="databaseKey" defaultValue=""><option value="">Keep saved database</option>{config.databases.map(d => <option key={d.key} value={d.key}>{d.label}</option>)}</select><small>Selecting a database also saves its identifier.</small></label>}
+                <label>API login<input name="login" autoComplete="off" maxLength={254} required={!config.credentialsStored} placeholder={config.credentialsStored ? "Saved login · leave blank to keep" : "API activation email"} /></label>
+                <label>API password<input name="password" type="password" autoComplete="new-password" maxLength={1000} required={!config.credentialsStored} placeholder={config.credentialsStored ? "Saved password · leave blank to keep" : "API password"} /></label>
+              </div>
+              <details className="mri-manual"><summary>Enter a database identifier manually<ChevronDown size={14} aria-hidden="true" /></summary><label>Database identifier<input name="databaseIdentifier" type="password" autoComplete="off" maxLength={200} placeholder={config.databaseIdentifierStored ? "Saved identifier · leave blank to keep" : "Identifier supplied by MRI"} /></label></details>
+              <p className="mri-field-help">Replace login and password together. Changing the database label or environment clears its saved identifier unless you select or enter one again.</p>
+              <div className="mri-save-row"><button type="submit" className="mri-button mri-button-primary" disabled={busy}>{busy ? "Please wait…" : "Save settings"}</button><span>Check the connection again after saving.</span></div>
+            </fieldset>
+          </form>
+          {config.authenticated && !config.discoveryAvailable && <p className="mri-field-help">MRI did not return a database list. Use the identifier supplied by MRI.</p>}
+        </div>}
+      </section>
+      <div className="mri-main-grid">
+        <section className="mri-review" aria-labelledby="mri-review-title">
+          <div className="mri-section-heading"><div><p className="mri-kicker">Ledger review</p><h2 id="mri-review-title">Monthly movements</h2><p>Review source entries by store before preparing journals.</p></div><FileText size={21} strokeWidth={1.5} aria-hidden="true" /></div>
+          <div className="mri-controls"><label>Month<input type="month" value={month} max={monthNow()} disabled={busy} onChange={e => { setMonth(e.target.value); setReview(null); }} /></label><button type="button" className="mri-button mri-button-primary" disabled={busy || !month} onClick={loadReview}>Review movements</button></div>
+          {!review && <div className="mri-empty"><span><FileText size={26} strokeWidth={1.3} aria-hidden="true" /></span><h3>Choose a month to review</h3><p>See ledger movements, exclusions and recorded amounts. Nothing is sent to MRI.</p></div>}
+          {review && <div aria-live="polite">
+            <div className="mri-review-label"><h3>{new Intl.DateTimeFormat("en-ZA", {month:"long",year:"numeric",timeZone:"UTC"}).format(new Date(`${review.month}-01T12:00:00Z`))}</h3>{review.partial && <span className="mri-badge mri-badge-amber">Month still open</span>}</div>
+            <dl className="mri-metrics"><div><dt>Ledger movements</dt><dd>{review.rowCount}</dd></div><div><dt>Excluded</dt><dd>{review.excluded}</dd></div><div><dt>Without a store</dt><dd>{review.unassigned}</dd></div></dl>
+            <div className="mri-table" role="region" aria-label="Monthly ledger movements" tabIndex={0}><table><thead><tr><th scope="col">Store</th><th scope="col">Movement</th><th scope="col" className="mri-number">Entries</th><th scope="col" className="mri-number">Amount (R)</th><th scope="col" className="mri-number">Tax (R)</th></tr></thead><tbody>{review.groups.map((g, i) => <tr key={i}><th scope="row">{g.facility}</th><td><span className="mri-movement-type">{movementName(g.type)}</span></td><td className="mri-number" data-label="Entries">{g.count}</td><td className="mri-number" data-label="Amount (R)">{g.amount}</td><td className="mri-number" data-label="Tax (R)">{g.tax}</td></tr>)}{!review.groups.length && <tr><td colSpan={5} className="mri-no-rows">No included movements for this month.</td></tr>}</tbody></table></div>
+            <p className="mri-review-caption">Recorded ledger amounts only. This is not an approved journal or revenue total.</p>
+            <details className="mri-details"><summary>Exclusions & review notes<ChevronDown size={15} aria-hidden="true" /></summary><div><p>{review.quarantinedAccounts} accounts are excluded in full because they contain test-payment history or payments in another currency. Included movements still require finance checks.</p><p>This review excludes bank fees, payouts, merchandise and other non-ledger sources. Amount and tax are shown separately as stored; no debit/credit or net/gross treatment has been applied.</p><p>{review.legacyQueue} historical payment queue records remain held. They are not journal batches and will not be sent automatically.</p></div></details>
+            <details className="mri-details"><summary>Review evidence<ChevronDown size={15} aria-hidden="true" /></summary><div><p>Generated: {review.generatedAt}</p><p className="mri-fingerprint">Source fingerprint: {review.fingerprint}</p><p>This is a fresh read, not a saved or approved batch. New or corrected movements require a new review.</p></div></details>
+          </div>}
+        </section>
+        <aside className="mri-readiness" aria-labelledby="mri-readiness-title">
+          <div className="mri-readiness-heading"><span className="mri-kicker">Journal readiness</span><span className="mri-badge mri-badge-amber">Posting off</span></div>
+          <h2 id="mri-readiness-title">Before journals can be sent</h2><p>The connection is the first step. These requirements are still open.</p>
+          <ol className="mri-checklist"><li><span>01</span><div><h3>Finance property</h3><p>Confirm the dedicated STOR24 property and entity in MRI.</p></div></li><li><span>02</span><div><h3>Journal method & mappings</h3><p>Agree the supported import method, accounts, transaction codes and tax treatment.</p></div></li><li><span>03</span><div><h3>Test & reconcile</h3><p>Build balanced journals, prove duplicate handling and reconcile an authorised test batch before live approval.</p></div></li></ol>
+          <div className="mri-readiness-footer"><LockKeyhole size={16} aria-hidden="true" /><p>Journal posting is not yet available. No financial entries are sent from this screen.</p></div>
+        </aside>
       </div>
-      {review && <div aria-live="polite">
-        <p><strong>{review.month}{review.partial ? " — month still open" : ""}</strong> · {review.rowCount} ledger movements · {review.excluded} excluded · {review.unassigned} without a store</p>
-        <p>Accounts with any test-payment history or a payment in another currency are excluded in full ({review.quarantinedAccounts} accounts). Remaining movements still need receipt, balance, mapping and finance checks. Bank fees, payouts, merchandise and other sources are not added by this ledger-only review.</p>
-        <div className="mri-table"><table><thead><tr><th>Store</th><th>Movement</th><th>Count</th><th>Recorded amount (R)</th><th>Recorded tax (R)</th></tr></thead><tbody>
-          {review.groups.map((g, i) => <tr key={i}><td>{g.facility}</td><td>{g.type.replaceAll("_", " ")}</td><td>{g.count}</td><td>{g.amount}</td><td>{g.tax}</td></tr>)}
-          {!review.groups.length && <tr><td colSpan={5}>No included movements for this month.</td></tr>}
-        </tbody></table></div>
-        <p>Amounts and tax are shown separately as stored. No debit/credit or net/gross interpretation has been applied.</p>
-        <p>{review.legacyQueue} historical payment queue records remain held. They are not journal batches and will not be sent automatically.</p>
-        <details><summary>Review evidence</summary><p>Generated: {review.generatedAt}</p><p className="mri-fingerprint">Source fingerprint: {review.fingerprint}</p><p>This is a fresh read, not a saved or approved batch. New or corrected movements require a new review.</p></details>
-      </div>}
-    </section>}
-    <style jsx>{`
-      .mri-workspace { max-width: 1200px; }
-      .panel { padding: 24px; }
-      h2 { margin-bottom: 12px; }
-      p, li { line-height: 1.6; }
-      ol { padding-left: 24px; margin-top: 16px; }
-      fieldset { border: 0; padding: 0; min-width: 0; }
-      .mri-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 20px; }
-      label { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
-      input, select { width: 100%; min-width: 0; padding: 11px; border: 1px solid #d9dee5; border-radius: 8px; background: white; color: #182332; font: inherit; }
-      .mri-controls { display: flex; align-items: end; flex-wrap: wrap; gap: 16px; margin: 20px 0; }
-      .mri-table { overflow-x: auto; margin: 20px 0; }
-      table { width: 100%; min-width: 660px; border-collapse: collapse; }
-      th, td { text-align: left; padding: 12px; border-bottom: 1px solid #e1e5eb; }
-      .mri-fingerprint { overflow-wrap: anywhere; }
-      @media (max-width: 600px) { .mri-fields { grid-template-columns: 1fr; } .panel { padding: 16px; } }
-    `}</style>
+    </>}
   </div>;
 }
