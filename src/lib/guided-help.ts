@@ -1,3 +1,4 @@
+import { extendedGuides, extendedPageHelp } from "./guided-help-catalog";
 /** Editorial guidance only. Progress records reading, never operational completion. */
 export type GuideStep = {
   id: string;
@@ -8,6 +9,8 @@ export type GuideStep = {
   target: string;
   missing: string;
   caution?: string;
+  selector?: string;
+  routePattern?: string;
 };
 
 export type WorkflowGuide = {
@@ -16,6 +19,7 @@ export type WorkflowGuide = {
   description: string;
   duration: string;
   steps: GuideStep[];
+  category?: string;
 };
 
 export const workflowGuides: WorkflowGuide[] = [
@@ -87,31 +91,33 @@ export const workflowGuides: WorkflowGuide[] = [
         missing: "You can finish reading this guide without changing any booking." },
     ],
   },
+  ...extendedGuides,
 ];
 
-export const pageHelp = [
+export type PageHelp = { route: string; title: string; body: string; guideId?: string };
+export const pageHelp: PageHelp[] = [
+  ...extendedPageHelp,
   { route: "/operations/move-in", title: "Move in", body: "Start from the correct reservation. Signed bookings use the original agreement, verified payment and date checks before physical key handover.", guideId: "move-in" },
   { route: "/reservations", title: "Reservations & holds", body: "Filter by store and status, check hold dates, then use the reservation's Move in link to carry its details forward.", guideId: "reservations" },
   { route: "/", title: "Your operational overview", body: "Review portfolio metrics and the priority work queue, then open the records that need attention.", guideId: "orientation" },
-  { route: "/leads", title: "Lead to lease", body: "Review enquiries and follow-ups. Confirm the customer and requirements before progressing into a reservation." },
-  { route: "/tenants", title: "Tenants", body: "Find the correct customer and review their units, documents and account. Check the customer and store before changing a record." },
-  { route: "/billing", title: "Billing & payments", body: "Review the account and recorded payment evidence. Pending, test and unverified payments must not be treated as cleared real funds." },
-  { route: "/collections", title: "Collections", body: "Review the account balance, payment history and prior contact before taking an approved collections action." },
-  { route: "/access", title: "Facial access", body: "Review the customer's access requirements separately from payment and occupancy. A saved record or request does not prove enrolment or working physical access." },
-  { route: "/operations/merchandise", title: "Merchandise", body: "Review products, packages and facility stock. Use the appropriate recorded stock movement for a physical quantity change." },
-  { route: "/operations", title: "Operations", body: "Choose the workflow for the task you are doing. Check its customer, unit and facility, and review the outcome after saving." },
-  { route: "/units", title: "Units & rates", body: "Check the store, unit and status before adjusting inventory or rates. Availability and occupancy changes must follow the relevant workflow." },
-  { route: "/reports", title: "Reports", body: "Check the report, facility, period and filters. Review the result before relying on it or sharing an export." },
-  { route: "/integrations", title: "Integrations", body: "Connection status and configuration are not proof that an entire workflow works. Escalate provider errors and retain the required test and approval steps." },
-  { route: "/communications", title: "Communications", body: "Check the recipient, customer, channel and message before sending. Delivery status should be checked after a real send." },
-  { route: "/users", title: "Users & permissions", body: "Confirm the person's role and store scope. Grant only the access needed for their responsibilities." },
 ];
 
-export function helpForPath(pathname: string) {
+export function helpForPath(pathname: string): PageHelp {
+  if (/^\/operations\/accounts\/[^/]+\/statement$/.test(pathname)) return extendedPageHelp.find(page => page.guideId === "statements")!;
   return pageHelp.find((page) => page.route === pathname) ??
     pageHelp.filter((page) => page.route !== "/").sort((a, b) => b.route.length - a.route.length)
       .find((page) => pathname.startsWith(`${page.route}/`)) ??
     { route: pathname, title: "Help with this page", body: "Review this page's heading and instructions, and check the facility and record before saving. For customer booking tasks, use a workflow guide below. Ask your administrator if an action is unavailable." };
+}
+
+export function stepMatchesPath(step: GuideStep, pathname: string) {
+  return step.routePattern ? new RegExp(step.routePattern).test(pathname) : step.route === pathname;
+}
+
+export function filterGuides(query: string, category = "All") {
+  const words = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  return workflowGuides.filter(guide => (category === "All" || (guide.category ?? "Customer journey") === category) && words.every(word =>
+    [guide.title, guide.description, guide.category, ...guide.steps.map(step => `${step.title} ${step.body}`)].join(" ").toLowerCase().includes(word)));
 }
 
 export type GuideProgress = { step: number; reviewed: string[] };
