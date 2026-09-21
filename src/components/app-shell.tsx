@@ -32,6 +32,7 @@ import { clsx } from "clsx";
 import { useRouter } from "next/navigation";
 import type { SessionPayload } from "@/lib/session";
 import { ConnectivityStatus } from "@/components/connectivity-status";
+import { GuidedHelp } from "@/components/guided-help";
 
 const navigation = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -95,7 +96,7 @@ export function AppShell({ children, session }: { children: React.ReactNode; ses
             width={153}
           />
         </Link>
-        <nav className="nav" aria-label="Primary navigation">
+        <nav className="nav" aria-label="Primary navigation" data-guide="workspace-navigation">
           <p className="nav-label">Workspace</p>
           {navigation.map((item) => {
             const active =
@@ -145,6 +146,7 @@ export function AppShell({ children, session }: { children: React.ReactNode; ses
             />
           </label>
           <div className="top-actions">
+            {session && <GuidedHelp key={session.userId} userId={session.userId} />}
             <button className="icon-button" type="button" aria-label="Notifications">
               <Bell size={18} />
             </button>

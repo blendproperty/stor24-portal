@@ -247,6 +247,7 @@ export function ReservationsWorkspace() {
         action={
           <button
             className="button button-primary"
+            data-guide="reservation-create"
             onClick={() => {
               setDialog(true);
               setError("");
@@ -289,7 +290,7 @@ export function ReservationsWorkspace() {
           </div>
         ))}
       </section>
-      <section className="panel reservation-toolbar">
+      <section className="panel reservation-toolbar" data-guide="reservation-filters">
         <label>
           Store
           <select
@@ -330,7 +331,7 @@ export function ReservationsWorkspace() {
           </span>
         </label>
       </section>
-      <section className="panel">
+      <section className="panel" data-guide="reservation-list">
         <div className="table-wrap">
           <table className="data-table">
             <thead>

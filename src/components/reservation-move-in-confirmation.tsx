@@ -18,8 +18,8 @@ export function ReservationMoveInConfirmation({ reservationId, customerName, uni
       <div><p className="handover-eyebrow">BOOKING HANDOVER</p><h2>{readiness.ready ? "Ready for key collection" : "Move-in checks"}</h2><p className="handover-customer">{customerName}<span>Unit {unitNumber}</span></p></div>
       <span className={`handover-status ${readiness.ready ? "is-ready" : "is-pending"}`}>{readiness.ready ? <Check size={15} aria-hidden="true" /> : <CircleAlert size={15} aria-hidden="true" />}{readiness.ready ? "Ready to move in" : "Action required"}</span>
     </header>
-    <div className="handover-checks">
-      <section className="handover-check"><div className="handover-check-label"><FileCheck2 size={19} aria-hidden="true" /><span>01 · Agreement</span></div><h3>{readiness.signed ? "Agreement signed" : "Agreement needs review"}</h3><p>{readiness.signed ? "Your signed document is saved. No new signature is required." : "Review the agreement before handing over keys."}</p>{readiness.leaseId && readiness.signed && <a className="handover-document" href={`/api/v1/public-leases/${readiness.leaseId}/signed-pdf`}>View signed agreement <ArrowUpRight size={15} aria-hidden="true" /></a>}</section>
+    <div className="handover-checks" data-guide="handover-checks">
+      <section className="handover-check" data-guide="handover-agreement"><div className="handover-check-label"><FileCheck2 size={19} aria-hidden="true" /><span>01 · Agreement</span></div><h3>{readiness.signed ? "Agreement signed" : "Agreement needs review"}</h3><p>{readiness.signed ? "Your signed document is saved. No new signature is required." : "Review the agreement before handing over keys."}</p>{readiness.leaseId && readiness.signed && <a className="handover-document" href={`/api/v1/public-leases/${readiness.leaseId}/signed-pdf`}>View signed agreement <ArrowUpRight size={15} aria-hidden="true" /></a>}</section>
       <section className="handover-check"><div className="handover-check-label"><Wallet size={19} aria-hidden="true" /><span>02 · Payment</span></div><h3>{readiness.paymentVerified ? "Payment verified" : "Payment confirmation needed"}</h3><p className="handover-amount">{money(readiness.paidAmount)} <span>verified</span></p><p>of {money(readiness.requiredAmount)} required for this booking</p>{readiness.testPayment && <span className="handover-test-label">Sandbox payment on file</span>}</section>
       <section className="handover-check"><div className="handover-check-label"><CalendarDays size={19} aria-hidden="true" /><span>03 · Move-in date</span></div><h3>{moveInDate}</h3><p>Key collection is available from the agreed start date, once all checks are complete.</p></section>
     </div>
@@ -35,7 +35,7 @@ export function ReservationMoveInConfirmation({ reservationId, customerName, uni
       <input type="hidden" name="reservationId" value={reservationId} />
       {readiness.ready && <label className="handover-attestation"><input type="checkbox" name="handoverConfirmed" required disabled={busy} /> I have checked the customer identity and am handing over the keys for this unit.</label>}
       {error && <p className="form-error" role="alert">{error}</p>}
-      <div className="handover-actions">
+      <div className="handover-actions" data-guide="handover-actions">
         <button type="button" className="button button-secondary" onClick={onBack} disabled={busy}>Back</button>
         <button type="button" className="button button-secondary" onClick={() => window.location.reload()} disabled={busy}>Refresh checks</button>
         <button className="button button-primary" disabled={!readiness.ready || busy}>{busy ? "Recording handover…" : "Confirm move-in / key handover"}</button>
