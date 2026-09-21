@@ -207,11 +207,11 @@ export default async function IntegrationsPage() {
     ],
     [
       "Accounting",
-      "MRI export queue",
-      "Partial",
-      "Integration method and chart mapping awaiting approval",
+      "MRI Property Central",
+      "Preparation only",
+      "API access provisioned; authentication, journal contract and finance mappings unverified",
       "warning",
-      null,
+      "/billing/mri",
     ],
   ] as const;
 
