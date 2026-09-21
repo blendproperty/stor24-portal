@@ -23,7 +23,7 @@ function paragraph(value: string) { const element = document.createElement("p");
 function render(focus = true) {
   clearHighlight(); panel.replaceChildren();
   const closeButton = button("Close", close); closeButton.className = "offline-guide-close"; panel.append(closeButton);
-  const heading = document.createElement("h2"); heading.textContent = "Offline workflow guide"; heading.tabIndex = -1; panel.append(heading);
+  const heading = document.createElement("h2"); heading.textContent = "Offline help"; heading.tabIndex = -1; panel.append(heading);
   const mode = button(`Guide mode ${state.enabled ? "on" : "off"}`, () => { state.enabled = !state.enabled; save(); render(); });
   mode.setAttribute("role", "switch"); mode.setAttribute("aria-checked", String(state.enabled)); mode.setAttribute("aria-label", "Offline guide mode"); panel.append(mode);
   if (state.enabled) {
