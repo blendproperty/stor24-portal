@@ -11,6 +11,12 @@ function guide(id: string, title: string, category: string, route: string, scree
 }
 
 export const extendedGuides: WorkflowGuide[] = [
+  guide("debit-orders", "Prepare and track debit-order runs", "Money and accounts", "/billing/debit-orders", "Debit-order runs", "Review mandate readiness, prepare a test batch and distinguish upload from payment.", [
+    ["Choose the collection date", "Choose the store, invoice month and signed collection date. This release supports controlled test runs only. Holiday changes and provider cut-off dates require review; the screen does not move dates automatically.", ".debit-run-controls"],
+    ["Review every account", "Preview the run and read each exclusion. Accounts need approved collection terms, a recently verified signed mandate with its PDF, a matching monthly invoice and an unambiguous balance. The signed fixed amount must match the invoice.", ".debit-order-workspace"],
+    ["Save before submitting", "Confirm the ready accounts and save the prepared run. Saving reserves each account and month but does not contact Netcash. Only an unsent run may be cancelled here. Already uploaded batches require provider-side review.", ".debit-order-workspace"],
+    ["Track the provider outcome", "Test submission requires separately enabled accounts and dates and the typed batch name. Check the upload report after submission. Accepted means the file loaded, not that money was collected or paid out. Uncertain or partial results remain reserved; do not create a duplicate batch.", ".debit-run-history"],
+  ]),
   guide("monthly-billing", "Review and post monthly billing", "Money and accounts", "/billing/monthly", "Monthly billing", "Approve account terms, preview charges and create the monthly invoice.", [
     ["Choose the account and month", "Choose the intended customer account and billing month. The list is restricted to your permitted stores. Future months are blocked; select the correct current or historical unbilled period before proceeding.", ".monthly-billing"],
     ["Save approved account terms", "Set the first unbilled month, agreed calendar-day or full-month proration, tax treatment, recurring charges and discount dates. Insurance uses the recorded enrollment premium. Enter the actual approval reference; saving records a real billing policy.", ".monthly-plan", undefined, "Do not approve invented fees or tax treatment. These terms can affect real customer balances."],

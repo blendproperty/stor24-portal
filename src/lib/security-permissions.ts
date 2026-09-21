@@ -4,6 +4,7 @@ export const securityPermissionGroups = [
   ] },
   { label: "Payments and adjustments", permissions: [
     ["billing.view", "View monthly billing and invoices"], ["billing.manage", "Post approved monthly billing"],
+    ["debit_orders.view", "View debit-order runs"], ["debit_orders.manage", "Prepare and review debit-order runs"], ["debit_orders.submit", "Submit approved test debit-order runs"],
     ["ledger.*", "Manage tenant ledgers"], ["payments.*", "Take and reverse payments"], ["collections.*", "Manage collections"], ["access.view", "View physical access"], ["access.manage", "Enrol and revoke physical access"], ["access.suspend", "Suspend access"], ["access.restore", "Restore access"],
   ] },
   { label: "Store operations", permissions: [
