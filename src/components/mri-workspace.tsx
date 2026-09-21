@@ -35,12 +35,12 @@ export function MriWorkspace() {
     try {
       const response = await fetch(endpoint, {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ revision: config.revision, databaseLabel: data.get("databaseLabel"), environment: data.get("environment"), login: data.get("login"), password: data.get("password"), databaseIdentifier: data.get("databaseIdentifier") }),
+        body: JSON.stringify({ revision: config.revision, databaseLabel: data.get("databaseLabel"), environment: data.get("environment"), login: data.get("login"), password: data.get("password"), databaseIdentifier: data.get("databaseIdentifier"), databaseKey: String(data.get("databaseKey") ?? "") }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Unable to save MRI settings.");
       setConfig(body.configuration);
-      setNotice("Settings stored securely. MRI sign-in has not been tested. Journal posting remains disabled.");
+      setNotice("Settings stored securely. Run the read-only check for these settings. Journal posting remains disabled.");
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to save. Reload to check the saved state."); }
     finally {
       // Credentials are write-only; never retain them in React state or local storage.
@@ -50,6 +50,19 @@ export function MriWorkspace() {
       }
       setBusy(false);
     }
+  }
+
+  async function checkConnection() {
+    if (!config?.revision) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const response = await fetch(endpoint, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "check", revision: config.revision }) });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "Unable to check the connection.");
+      setConfig(body.configuration);
+      setNotice(body.configuration.databaseReadable ? "API sign-in and a read-only property query succeeded. Journal posting remains disabled." : body.configuration.authenticated ? "API sign-in succeeded. Select or enter the database identifier, save, then check again." : "The connection check did not succeed. Review the result below before retrying.");
+    } catch (e) { setError(e instanceof Error ? e.message : "Unable to check the connection."); }
+    finally { setBusy(false); }
   }
 
   async function loadReview() {
@@ -67,9 +80,9 @@ export function MriWorkspace() {
     <PageHeader eyebrow="Finance connections" title="MRI accounting preparation" description="Prepare consolidated monthly journals for MRI Property Central. Tenant-level detail stays in STOR24." />
     <section className="panel">
       <h2>Posting is not yet available</h2>
-      <p>API access has been provisioned. The API reference, database connection and accounting mappings still need verification before journals can be built and sent.</p>
+      <p>API access has been provisioned and the authentication reference is available. Verify the database connection and agree the journal method and accounting mappings before journals can be built and sent.</p>
       <ol>
-        <li>Confirm the API authentication and journal instructions with MRI.</li>
+        <li>Check API sign-in, then confirm the approved journal method with MRI.</li>
         <li>Verify the database identifier and access to an authorised test database.</li>
         <li>Finance selects the dedicated property, entity, transaction codes, GL accounts and tax treatment.</li>
         <li>Build balanced journals, check duplicate handling, and reconcile a test batch in MRI before approving live use.</li>
@@ -80,21 +93,27 @@ export function MriWorkspace() {
     {!config && !error && <p>Loading MRI settings…</p>}
     {config && <section className="panel">
       <h2>Connection details</h2>
-      <p>Credentials: <strong>{config.credentialsStored ? "Stored; unverified" : "Not stored"}</strong>. Database identifier: <strong>{config.databaseIdentifierStored ? "Stored; unverified" : "Required from MRI"}</strong>.</p>
+      <p>API sign-in: <strong>{config.authenticated ? "Verified at last check" : config.credentialsStored ? "Stored; not verified" : "Credentials not stored"}</strong>. Database query: <strong>{config.databaseReadable ? "Read succeeded at last check" : config.databaseIdentifierStored ? "Identifier stored; read not verified" : "Identifier required"}</strong>.</p>
+      {config.checkedAt && <p>Last check: {new Date(config.checkedAt).toLocaleString("en-ZA", { timeZone: "Africa/Johannesburg" })} SAST. A successful read does not prove the intended finance property, test environment or journal permissions.</p>}
+      {config.failureCode && !["MRI_CHECK_REQUIRED", "MRI_DATABASE_REQUIRED", "MRI_JOURNAL_NOT_ENABLED"].includes(config.failureCode) && <p role="alert">{({ MRI_AUTH_REJECTED: "MRI rejected the sign-in or database access. Check the supplied login and account permissions before retrying.", MRI_NETWORK: "MRI could not be reached securely. No automatic retry was attempted.", MRI_RESPONSE_INVALID: "MRI returned an unexpected response; the connection is not verified.", MRI_PROVIDER_UNAVAILABLE: "MRI could not complete the check. Try again after the provider issue is resolved.", MRI_CREDENTIALS_UNREADABLE: "Stored credentials could not be opened. Review secure storage configuration." } as Record<string, string>)[config.failureCode] ?? "Run a new connection check to verify the saved settings."}</p>}
       {!config.encryptionReady && <p role="alert">Secure storage must be configured on the server before saving credentials.</p>}
       {canManage ? <form ref={form} action={save}>
         <fieldset disabled={busy || !config.encryptionReady}>
           <div className="mri-fields">
-            <label>Database label<input name="databaseLabel" required maxLength={100} defaultValue={config.databaseLabel} placeholder="Name supplied by MRI" /></label>
+            <label>Database label<input key={config.databaseLabel} name="databaseLabel" required maxLength={100} defaultValue={config.databaseLabel} placeholder="Name supplied by MRI" /></label>
             <label>Database environment<select name="environment" defaultValue={config.environment}><option value="unknown">Not confirmed</option><option value="test">Test</option><option value="live">Live</option></select></label>
-            <label>API login<input name="login" autoComplete="off" maxLength={254} required={!config.credentialsStored} placeholder={config.credentialsStored ? "Leave blank to keep stored login" : "API login supplied by MRI"} /></label>
+            <label>API login<input name="login" autoComplete="off" maxLength={254} required={!config.credentialsStored} placeholder={config.credentialsStored ? "Leave blank to keep stored login" : "API activation email supplied by MRI"} /></label>
             <label>API password<input name="password" type="password" autoComplete="new-password" maxLength={1000} required={!config.credentialsStored} placeholder={config.credentialsStored ? "Leave blank to keep stored password" : "API password"} /></label>
             <label>Database identifier<input name="databaseIdentifier" type="password" autoComplete="off" maxLength={200} placeholder={config.databaseIdentifierStored ? "Leave blank to keep stored identifier" : "Optional until supplied by MRI"} /></label>
+            {config.databases?.length > 0 && <label>Databases returned by MRI<select name="databaseKey" defaultValue=""><option value="">Keep current selection / enter identifier manually</option>{config.databases.map(d => <option key={d.key} value={d.key}>{d.label}</option>)}</select></label>}
           </div>
           <p>Changing the database label or environment clears the stored identifier unless you enter it again. Replace the login and password together.</p>
           <button type="submit" className="button button-primary">{busy ? "Working…" : "Save encrypted settings"}</button>
         </fieldset>
       </form> : <p>You have read-only access to MRI preparation.</p>}
+      {canManage && <p><button type="button" className="button button-secondary" disabled={busy || !config.credentialsStored || !config.encryptionReady} onClick={checkConnection}>Check API sign-in and database read</button></p>}
+      <p>This check signs in using the saved settings, requests the database list if permitted, and reads one property when an identifier is stored. It does not create or post any MRI record.</p>
+      {config.authenticated && !config.discoveryAvailable && <p>MRI did not supply a database list for this API user. Enter the identifier supplied by MRI; do not guess it from the database name.</p>}
     </section>}
     {config && <section className="panel">
       <h2>Monthly source review</h2>

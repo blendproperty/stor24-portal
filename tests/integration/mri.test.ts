@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
 import { db } from "../../src/lib/db";
-import { mriConfiguration, mriSourceReview, saveMriConfiguration } from "../../src/lib/mri-service";
+import { checkMriConnection, mriConfiguration, mriSourceReview, saveMriConfiguration } from "../../src/lib/mri-service";
 import { decryptIntegrationSecret } from "../../src/lib/integrations/integration-secret-vault";
 
 test("isolated MRI preparation: secrets, scope, concurrency and read-only source review", async t => {
@@ -17,6 +17,34 @@ test("isolated MRI preparation: secrets, scope, concurrency and read-only source
   const nativeFetch = globalThis.fetch;
   globalThis.fetch = async () => { throw new Error("Unexpected provider network call"); };
   try {
+    await t.test("connection proof is scoped, revision-bound, redacted and reset after edits", async () => {
+      const scope = await fixture(), saved = await saveMriConfiguration(scope, { ...input, databaseIdentifier: "" });
+      const fake: typeof fetch = async url => String(url).endsWith("/Token") ? Response.json({access_token:"ci-never-save-this-token",token_type:"bearer"}) : String(url).endsWith("GetDatabaseAccessList") ? Response.json([{DatabaseName:"CI Blend",DatabaseIdentifier:"ci-discovered-identifier"}]) : Response.json({ResultCount:2,ResultSet:[{Id:1}]});
+      const check = await checkMriConnection(scope, saved.revision!, fake);
+      assert.equal(check.authenticated,true); assert.equal(check.databaseReadable,false); assert.equal(check.databases.length,1);
+      assert.ok(!JSON.stringify(check).includes("ci-discovered-identifier"));
+      const picked = await saveMriConfiguration(scope,{revision:check.revision,databaseLabel:"ignored user label",environment:"unknown",databaseKey:check.databases[0].key});
+      assert.equal(picked.databaseLabel,"CI Blend"); assert.equal(picked.authenticated,false); assert.equal(picked.databaseIdentifierStored,true);
+      const verified = await checkMriConnection(scope,picked.revision!,fake);
+      assert.equal(verified.databaseReadable,true); assert.equal(verified.postingEnabled,false);
+      const row=await db.integrationConnection.findUniqueOrThrow({where:{id:`mri:${scope.organisationId}`}});
+      const audits=await db.auditEvent.findMany({where:{organisationId:scope.organisationId}});
+      assert.ok(!JSON.stringify([row,audits]).includes("ci-never-save-this-token"));
+      await assert.rejects(checkMriConnection({...scope,unrestrictedFacilities:false},verified.revision!,fake),/MRI_ORG_PERMISSION/);
+      await assert.rejects(checkMriConnection(scope,picked.revision!,fake),/MRI_CHANGED/);
+      let altered=false;
+      await assert.rejects(checkMriConnection(scope,verified.revision!,async (...args)=>{
+        if(!altered){altered=true;await saveMriConfiguration(scope,{...input,revision:verified.revision,databaseLabel:"CI changed mid-check"});}
+        return fake(...args);
+      }),/MRI_CHANGED/);
+      assert.equal((await mriConfiguration(scope)).authenticated,false);
+    });
+    await t.test("provider failure does not retain stale successful connection evidence", async () => {
+      const scope=await fixture(),saved=await saveMriConfiguration(scope,input);
+      const failed=await checkMriConnection(scope,saved.revision!,async()=>new Response("sensitive-provider-error",{status:401}));
+      assert.equal(failed.authenticated,false);assert.equal(failed.databaseReadable,false);assert.equal(failed.failureCode,"MRI_AUTH_REJECTED");
+      assert.ok(!JSON.stringify(failed).includes("sensitive-provider-error"));
+    });
     await t.test("encrypted secrets, safe readback and audit; saving never enables posting", async () => {
       const scope = await fixture(), result = await saveMriConfiguration(scope, input);
       assert.equal(result.credentialsStored, true); assert.equal(result.authenticated, false); assert.equal(result.postingEnabled, false);

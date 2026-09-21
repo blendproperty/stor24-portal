@@ -20,7 +20,7 @@ This is the consolidated outstanding-work register for the STOR 24 programme. It
 | 2 | Hikvision / HikCentral access control | **Blocked — pending API information** | Obtain approved OpenAPI details and mappings; resolve the untrusted TLS chain and POPIA/responsibility boundary. |
 | 3 | Public booking end-to-end UAT | **Ready with approval** | Brett must approve a controlled CAPTCHA/OTP test and provide a consenting test recipient. |
 | 4 | Unit-transfer signing document | **Blocked — Legal approval** | Legal must approve the document type, clauses, payment-mandate treatment and signature rules. |
-| 5 | MRI Property Central finance integration | **Preparation built; provider connection unverified** | API access is provisioned. Obtain the database identifier and API reference, verify test access, then implement approved journals and reconciliation. See the 21 September MRI section below. |
+| 5 | MRI Property Central finance integration | **Preparation built; provider connection unverified** | API access is provisioned. The official v2 reference is located. Verify authentication/database access and authorised test access, then implement approved journals and reconciliation. See the 21 September MRI section below. |
 | 6 | WhatsApp lifecycle automation | **Implemented but deliberately disabled** | Complete controlled delivery/callback/opt-out/failure UAT before any enablement decision. |
 | 7 | Operational readiness and cut-over | **Open** | Complete migration rehearsal, staff training, monitoring/recovery, support ownership and business sign-off. |
 | 8 | Security and residual product QA | **Open** | CMS MFA, dependency remediation, two-device offline UAT and public 3D residual checks remain. |
@@ -111,11 +111,11 @@ After approval:
 
 ## 5. MRI/MDA finance integration
 
-**Status (21 September): API access provisioned; encrypted setup and monthly ledger review implemented. Authentication, journal posting and reconciliation remain unimplemented/unverified.**
+**Status (21 September): API access provisioned; encrypted setup and monthly ledger review implemented. Documented v2 authentication and read-only checks are implemented; live verification, journal posting and reconciliation remain open.**
 
 - [x] MRI Property Central is the destination, using consolidated monthly journals; tenant detail stays in STOR24.
 - [x] Web API access provisioned, API-only credentials supplied, and Blend selected in the 16 September correspondence.
-- [ ] Obtain the database identifier and Web API Reference, verify authentication and authorised test-database access. The API database-access route returned HTTP 401 on 21 September and is reachable; credentials have not been tested. The host-root HTTP 503 does not establish an outage.
+- [ ] Use the located v2 API reference to verify authentication, discover or obtain the database identifier, and confirm authorised test access. The API database-access route returned HTTP 401 on 21 September and is reachable; credentials have not been tested. The host-root HTTP 503 does not establish an outage.
 - [ ] Finance/MRI confirm the dedicated property/entity, transaction codes, charge/payment/tax/deposit/GL mappings and completeness across ledger, merchandise and settlement sources.
 - [ ] Define posting timing, period controls, batching and source identifiers.
 - [ ] Define reconciliation, duplicate prevention, correction, reversal and replay rules.
@@ -123,7 +123,7 @@ After approval:
 - [ ] Replace the deliberate `mri://pending-integration-decision` placeholder only after the contract is approved.
 - [ ] Prove a non-production export/import and reconcile totals and individual records before live activation.
 
-The preparation workspace at `/billing/mri` stores credentials encrypted and reviews aggregate ledger source movements, with full-account test-history quarantine. It never connects to MRI or posts journals. See `docs/MRI_INTEGRATION.md` and canonical `PROJECT_CONTEXT.md` for exact implementation, validation and promotion evidence; this item remains open.
+The preparation workspace at `/billing/mri` stores credentials encrypted and reviews aggregate ledger source movements, with full-account test-history quarantine. A manual check authenticates with MRI and performs read-only discovery/property lookup. It never posts journals. The older v1 special-journal operation needs compatibility confirmation for the v2 account. See `docs/MRI_INTEGRATION.md` and canonical `PROJECT_CONTEXT.md` for exact implementation, validation and promotion evidence; this item remains open.
 
 ## 6. WhatsApp lifecycle automation
 
