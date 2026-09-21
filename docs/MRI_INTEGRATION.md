@@ -37,7 +37,7 @@ The approved direction from the August correspondence is consolidated journals t
 
 ## Required next implementation
 
-1. Use the located v2 reference to verify API-user authentication and database access. Discover the Blend identifier if permitted; otherwise obtain it from MRI. Confirm the intended database identity and reference mappings before any financial use.
+1. Production-server authentication, discovery and a bounded property read against Blend were verified on 21 September, all HTTP200. The API account sees zero properties. Complete the app-screen check and save the discovered Blend selection after the expired staff session is renewed; confirm the intended finance property and its assignment before financial use.
 2. Obtain explicit test-database access/authority. Do not treat Blend as a test database or create example transactions in it.
 3. Finance/MRI confirm the dedicated property/entity, GL and transaction codes, tax/deposit treatment, opening balances, timing, currencies and period controls. Define completeness across tenancy ledger, merchandise, fees and adjustments.
 4. Implement the documented journal contract with balanced, immutable source snapshots; mapping versions; independent approval; unique source/batch identity; and a durable submission state machine.
@@ -46,4 +46,13 @@ The approved direction from the August correspondence is consolidated journals t
 
 ## Validation
 
-`tests/mri.test.ts`, `tests/mri-provider.test.ts`, `tests/integration/mri.test.ts` and `scripts/test-mri.mjs` cover preparation only, with invented isolated fixtures. They cannot establish successful MRI authentication, accepted journals or end-to-end accounting reconciliation. See canonical `PROJECT_CONTEXT.md` for commit, CI, merge, deployment, configuration and production evidence separately.
+`tests/mri.test.ts`, `tests/mri-provider.test.ts`, `tests/integration/mri.test.ts` and `scripts/test-mri.mjs` cover connection and preparation behaviour with invented isolated fixtures. They cannot establish successful MRI authentication, accepted journals or end-to-end accounting reconciliation. See canonical `PROJECT_CONTEXT.md` for commit, CI, merge, deployment, configuration and production evidence separately.
+
+## Questions for the allocated MRI consultant and finance owner
+
+Muhammad Ismail is the allocated MRI consultant; correspondence includes 20 non-billable consultancy hours and one business day's scheduling notice. This document is a handoff record, not a sent meeting request.
+
+- Which consolidated GL/special-journal import and posting operations are enabled for this API-only v2 account? If the v1 import is required, provide its supported authentication and confirm whether it only creates an unposted batch.
+- Which supported read operation retrieves a submitted batch by our unique external reference after a timeout, and which operation verifies its final posting status and totals? Confirm duplicate rejection, reversal/correction and closed-period behaviour.
+- Confirm authority to create and reverse an identified test batch in BlendTest, plus the dedicated STOR24 property/entity and approved GL, transaction, tax and deposit mappings. Access to a database alone does not provide these accounting decisions.
+- Finance must identify included source types and opening balances, approve the balancing rules and nominate an independent reviewer and reconciliation owner before live posting can be activated.

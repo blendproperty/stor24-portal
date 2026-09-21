@@ -20,7 +20,7 @@ This is the consolidated outstanding-work register for the STOR 24 programme. It
 | 2 | Hikvision / HikCentral access control | **Blocked — pending API information** | Obtain approved OpenAPI details and mappings; resolve the untrusted TLS chain and POPIA/responsibility boundary. |
 | 3 | Public booking end-to-end UAT | **Ready with approval** | Brett must approve a controlled CAPTCHA/OTP test and provide a consenting test recipient. |
 | 4 | Unit-transfer signing document | **Blocked — Legal approval** | Legal must approve the document type, clauses, payment-mandate treatment and signature rules. |
-| 5 | MRI Property Central finance integration | **Preparation built; provider connection unverified** | API access is provisioned. The official v2 reference is located. Verify authentication/database access and authorised test access, then implement approved journals and reconciliation. See the 21 September MRI section below. |
+| 5 | MRI Property Central finance integration | **Connection deployed; journal integration open** | Production-server authentication and Blend database read verified. Finish app-screen configuration after staff sign-in; confirm the finance property and approved journal contract/mappings, then implement posting and reconciliation. See the 21 September MRI section below. |
 | 6 | WhatsApp lifecycle automation | **Implemented but deliberately disabled** | Complete controlled delivery/callback/opt-out/failure UAT before any enablement decision. |
 | 7 | Operational readiness and cut-over | **Open** | Complete migration rehearsal, staff training, monitoring/recovery, support ownership and business sign-off. |
 | 8 | Security and residual product QA | **Open** | CMS MFA, dependency remediation, two-device offline UAT and public 3D residual checks remain. |
@@ -111,11 +111,12 @@ After approval:
 
 ## 5. MRI/MDA finance integration
 
-**Status (21 September): API access provisioned; encrypted setup and monthly ledger review implemented. Documented v2 authentication and read-only checks are implemented; live verification, journal posting and reconciliation remain open.**
+**Status (21 September): encrypted setup, monthly ledger review and v2 connection checks deployed. Production-server authentication/discovery/Blend property read passed (HTTP200, zero visible properties). Staff session renewal is needed for final app-screen setup. Journal posting and reconciliation remain open.**
 
 - [x] MRI Property Central is the destination, using consolidated monthly journals; tenant detail stays in STOR24.
 - [x] Web API access provisioned, API-only credentials supplied, and Blend selected in the 16 September correspondence.
-- [ ] Use the located v2 API reference to verify authentication, discover or obtain the database identifier, and confirm authorised test access. The API database-access route returned HTTP 401 on 21 September and is reachable; credentials have not been tested. The host-root HTTP 503 does not establish an outage.
+- [x] Located the official v2 reference; verified activation-email authentication, Blend/BlendTest discovery and read-only Blend property access from the production server. Tokens and identifiers are not exposed. Zero properties are visible to this account; property setup/access still needs confirmation.
+- [ ] Renew the expired staff session, save the discovered Blend selection and verify the deployed app check. Confirm authorised test use separately.
 - [ ] Finance/MRI confirm the dedicated property/entity, transaction codes, charge/payment/tax/deposit/GL mappings and completeness across ledger, merchandise and settlement sources.
 - [ ] Define posting timing, period controls, batching and source identifiers.
 - [ ] Define reconciliation, duplicate prevention, correction, reversal and replay rules.
