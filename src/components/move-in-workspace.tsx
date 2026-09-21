@@ -210,7 +210,7 @@ export function MoveInWorkspace({
   }
 
   return (
-    <div className="page-stack">
+    <div className="page-stack" data-guide="move-in-workspace">
       <PageHeader
         eyebrow="Operations centre · Accounts"
         title="Move in"

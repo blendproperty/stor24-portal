@@ -5,6 +5,7 @@ import { getSession } from "@/lib/session";
 import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 import "./globals.css";
 import "../styles/stor24-brand.css";
+import "../styles/guided-help.css";
 
 const satoshi = localFont({
   src: "../../public/brand/Satoshi-Variable.ttf",
