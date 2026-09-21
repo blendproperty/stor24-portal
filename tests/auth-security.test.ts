@@ -4,6 +4,11 @@ import { permissionGranted } from "../src/lib/permissions.ts";
 import { createResetToken, hashResetToken } from "../src/lib/password-reset.ts";
 import { isPublicPathname } from "../src/proxy.ts";
 
+test("offline tutorial exposes only its two static assets, not business routes or descendants", () => {
+  for (const path of ["/offline-guided-help.js", "/offline-guided-help.css"]) assert.equal(isPublicPathname(path), true);
+  for (const path of ["/offline-guided-help.js/private", "/offline-guided-help.css-extra", "/api/v1/offline/snapshot", "/api/v1/offline/leads", "/api/v1/offline/reservations", "/operations/accounts"]) assert.equal(isPublicPathname(path), false);
+});
+
 test("dedicated merchandise worker reaches its credential handler without exposing staff APIs", () => {
   assert.equal(isPublicPathname("/api/v1/operations/merchandise-orders/expire"), true);
   for (const path of ["/api/v1/operations/merchandise-orders", "/api/v1/operations/merchandise-orders/expire/extra", "/api/v1/operations/merchandise-orders/expired", "/operations/merchandise"]) {
