@@ -7,6 +7,7 @@
  * netcash-client.ts directly outside this file and the webhook handler.
  */
 import { isTestPayment } from "./payment-evidence";
+import { merchantIdentity } from "./netcash-statement";
 import { db } from "@/lib/db";
 import { randomUUID } from "node:crypto";
 import { tenantCustomerScope } from "@/lib/tenant-portal-security";
@@ -48,7 +49,7 @@ export async function createMerchandiseCheckout(session: Parameters<typeof tenan
     if (order.isTest && (!merchandiseCheckoutTestMode(session) || connection.config.environment !== "sandbox")) throw new Error("MERCHANDISE_TEST_DISABLED");
     if (!order.isTest && connection.config.environment !== "live") throw new Error("MERCHANDISE_LIVE_PAYMENT_REQUIRED");
     const amount = order.isTest ? 10 : Number(order.total.toFixed(2));
-    const payment = await tx.payment.create({ data: { accountId: order.accountId, status: order.isTest ? "TEST_PENDING" : "PENDING", environment: connection.config.environment, amount, currency: order.currency, method: "PAY_NOW", provider: "NETCASH", idempotencyKey: `merchandise:${order.id}` } });
+    const payment = await tx.payment.create({ data: { accountId: order.accountId, status: order.isTest ? "TEST_PENDING" : "PENDING", environment: connection.config.environment, providerMerchantKey: connection.config.merchantAccount ? merchantIdentity(session.organisationId, connection.config.environment, connection.config.merchantAccount) : null, amount, currency: order.currency, method: "PAY_NOW", provider: "NETCASH", idempotencyKey: `merchandise:${order.id}` } });
     const checkout = createPayNowCheckout(connection, { reference: payment.id, amount, description: order.isTest ? "STOR24 R10 test - not a merchandise purchase" : "STOR24 packing supplies", customerEmail: session.email, returnData: new URLSearchParams({ paymentId: payment.id, merchandiseOrderId: order.id }).toString(), extra1: order.id, extra2: "merchandise" });
     await tx.payment.update({ where: { id: payment.id }, data: { providerRef: payment.id } });
     await tx.merchandiseOrder.update({ where: { id: order.id }, data: { paymentId: payment.id } });
@@ -135,6 +136,7 @@ export async function collectMonthlyRent(organisationId: string, facilityId: str
       accountId: params.accountId,
       status: connection.config.environment === "sandbox" ? "TEST_PENDING" : "PENDING",
       environment: connection.config.environment,
+      providerMerchantKey: connection.config.merchantAccount ? merchantIdentity(organisationId, connection.config.environment, connection.config.merchantAccount) : null,
       amount: params.amount,
       method: "DEBICHECK",
       provider: "NETCASH",
@@ -184,9 +186,11 @@ export async function createOnceOffCheckout(organisationId: string, facilityId: 
 }) {
   const connection = await getNetcashConnection(organisationId, facilityId);
   const idempotencyKey = params.idempotencyKey ?? `netcash-paynow-${params.accountId}-${randomUUID()}`;
+  const providerMerchantKey = connection.config.merchantAccount ? merchantIdentity(organisationId, connection.config.environment, connection.config.merchantAccount) : null;
   let payment = await db.payment.upsert({
     where: { idempotencyKey },
     create: {
+      providerMerchantKey,
       accountId: params.accountId,
       status: connection.config.environment === "sandbox" ? "TEST_PENDING" : "PENDING",
       environment: connection.config.environment,
@@ -201,6 +205,7 @@ export async function createOnceOffCheckout(organisationId: string, facilityId: 
     throw new Error("NETCASH_IDEMPOTENCY_CONFLICT");
   }
   if (payment.environment && payment.environment !== connection.config.environment) throw new Error("NETCASH_ENVIRONMENT_CHANGED");
+  if (payment.providerMerchantKey && payment.providerMerchantKey !== providerMerchantKey) throw new Error("NETCASH_MERCHANT_CHANGED");
   if (!payment.environment && !(isTestPayment(payment) && connection.config.environment === "sandbox")) throw new Error("PAYMENT_ENVIRONMENT_REVIEW_REQUIRED");
   if (["SUCCEEDED", "TEST_SUCCEEDED", "REVERSED", "REFUNDED", "PARTIALLY_REFUNDED"].includes(payment.status)) throw new Error("NETCASH_PAYMENT_ALREADY_SUCCEEDED");
   if (payment.status === "FAILED") {

@@ -920,6 +920,7 @@ model Payment {
   provider       String?
   environment    String?
   providerRef    String?
+  providerMerchantKey String?
   idempotencyKey String        @unique
   failureCode    String?
   processedAt    DateTime?
@@ -929,6 +930,102 @@ model Payment {
 
   @@unique([provider, providerRef])
   @@index([accountId, status, createdAt])
+}
+
+model SettlementStatement {
+  id String @id @default(cuid())
+  organisationId String
+  connectionId String
+  merchantKey String
+  merchantLabel String
+  environment String
+  date String
+  source String
+  sourceReference String
+  rawEncrypted String
+  sha256 String
+  opening Decimal @db.Decimal(18,4)
+  closing Decimal @db.Decimal(18,4)
+  status String @default("DRAFT")
+  revision Int @default(0)
+  importedById String
+  editedById String
+  approvedById String?
+  approvedAt DateTime?
+  approvalReference String?
+  lines SettlementLine[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([organisationId, date])
+}
+
+model SettlementLine {
+  id String @id @default(cuid())
+  statementId String
+  statement SettlementStatement @relation(fields: [statementId], references: [id], onDelete: Restrict)
+  merchantKey String
+  active Boolean @default(true)
+  transactionId String
+  date String
+  code String
+  description String
+  amount Decimal @db.Decimal(18,4)
+  vat Decimal @db.Decimal(18,4)
+  extras Json
+  kind String
+  paymentId String?
+  adjustmentId String?
+  bankEntryId String?
+  reference String?
+  resolutionSnapshot Json?
+  resolutionHash String?
+  resolvedById String?
+  requestKey String?
+  @@unique([statementId, transactionId])
+}
+
+model SettlementBankImport {
+  id String @id @default(cuid())
+  organisationId String
+  bankKey String
+  alias String
+  environment String
+  sourceReference String
+  rawEncrypted String
+  sha256 String
+  status String @default("ACTIVE")
+  importedById String
+  entries SettlementBankEntry[]
+  createdAt DateTime @default(now())
+  @@index([organisationId, createdAt])
+}
+
+model SettlementBankEntry {
+  id String @id @default(cuid())
+  importId String
+  import SettlementBankImport @relation(fields: [importId], references: [id], onDelete: Restrict)
+  bankKey String
+  active Boolean @default(true)
+  transactionId String
+  date String
+  amount Decimal @db.Decimal(18,4)
+  reference String
+  @@index([importId])
+}
+
+model SettlementBalanceObservation {
+  id String @id @default(cuid())
+  organisationId String
+  merchantKey String
+  merchantLabel String
+  environment String
+  observedDate String
+  current Decimal @db.Decimal(18,4)
+  available Decimal @db.Decimal(18,4)
+  reference String
+  recordedById String
+  createdAt DateTime @default(now())
+  @@index([organisationId, createdAt])
 }
 
 model Document {

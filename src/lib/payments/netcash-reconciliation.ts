@@ -1,8 +1,11 @@
+import { isTestPayment } from "./payment-evidence";
 type PaymentLike = {
   id: string;
   status: string;
   amount: unknown;
   providerRef: string | null;
+  environment?: string | null;
+  idempotencyKey?: string;
 };
 
 type LedgerLike = {
@@ -13,7 +16,7 @@ type LedgerLike = {
   metadata: unknown;
 };
 
-export type NetcashReconciliationState = "MATCHED" | "MISSING_LEDGER" | "DUPLICATE_LEDGER" | "PENDING" | "FAILED";
+export type NetcashReconciliationState = "MATCHED" | "MISSING_LEDGER" | "DUPLICATE_LEDGER" | "PENDING" | "FAILED" | "TEST" | "CORRECTED";
 
 function metadataPaymentId(metadata: unknown) {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
@@ -28,13 +31,15 @@ function metadataPaymentId(metadata: unknown) {
 }
 
 export function reconcileNetcashPayment(payment: PaymentLike, ledgerEntries: LedgerLike[]) {
+  if (isTestPayment({ ...payment, idempotencyKey: payment.idempotencyKey ?? "" })) return { state: "TEST" as const, ledgerEntryId: null };
+  if (["REVERSED", "REFUNDED", "PARTIALLY_REFUNDED"].includes(payment.status)) return { state: "CORRECTED" as const, ledgerEntryId: null };
   if (payment.status === "PENDING") return { state: "PENDING" as const, ledgerEntryId: null };
   if (payment.status !== "SUCCEEDED") return { state: "FAILED" as const, ledgerEntryId: null };
 
   const matches = ledgerEntries.filter((entry) =>
     entry.type === "PAYMENT"
     && Number(entry.amount) === Number(payment.amount)
-    && (metadataPaymentId(entry.metadata) === payment.id || entry.externalRef === payment.providerRef),
+    && (metadataPaymentId(entry.metadata) === payment.id || (payment.providerRef && entry.externalRef === payment.providerRef)),
   );
   if (matches.length === 0) return { state: "MISSING_LEDGER" as const, ledgerEntryId: null };
   if (matches.length > 1) return { state: "DUPLICATE_LEDGER" as const, ledgerEntryId: matches[0].id };

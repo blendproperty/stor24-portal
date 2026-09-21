@@ -356,18 +356,13 @@ export async function verifyBankAccount(connection: { config: unknown }, params:
   );
 }
 
-/** Netcash account statement -- used for reconciliation against what we expect to have been collected. */
+/** Legacy range-shaped caller retained, but guessed REST requests are prohibited.
+ * The daily request/retrieve flow is implemented in netcash-statement.ts.
+ */
 export async function fetchNetcashStatement(connection: { config: unknown }, params: {
   fromDate: string;
   toDate: string;
 }) {
-  const cfg = config(connection);
-  return netcashRequest<{ lines: unknown[]; raw: unknown }>(
-    "/standard-integration/netcash-statement/query",
-    {
-      ServiceKey: cfg.statementServiceKey,
-      FromDate: params.fromDate,
-      ToDate: params.toDate,
-    },
-  );
+  void connection; void params;
+  throw new Error("NETCASH_USE_DAILY_STATEMENT_WORKFLOW");
 }

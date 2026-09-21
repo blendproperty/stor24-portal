@@ -14,20 +14,20 @@ Guidance never submits a reservation, receipt, agreement, message, configuration
 
 ## Coverage
 
-40 tutorials contain 192 reading steps across every current staff page and the standalone offline workspace:
+43 tutorials contain 204 reading steps across every current staff page and the standalone offline workspace:
 
 | Work area | Tutorials |
 | --- | --- |
 | Customer journey | Orientation; customer records and consent; lead capture; reservations; signed-booking move-in checks; unsigned agreement preparation; transfers; move-out |
-| Money and accounts | Account reading; received payments; statements and portal invitations; billing/reconciliation/daily close; collections; adjustments/reversals/refunds; Netcash outcomes; proration preview |
+| Money and accounts | Account reading; received payments; statements and portal invitations; billing/reconciliation/daily close; monthly billing; debit-order runs; settlement reconciliation; collections; adjustments/reversals/refunds; Netcash outcomes; proration preview |
 | Facility operations | Tasks and maintenance; units/types/rates/renumbering/batch tools; facility maps; merchandise and stock; packages; paid-order supply; insurance; facial access; calendar |
 | Reports and oversight | Report parameters and CSV exports; portfolio graphs; system audit |
 | Administration | Store setup/public visibility; tenant defaults; all 18 Program defaults groups; employees/invitations/permissions; settings/password/MFA/recovery; communications; integration health and signing reconciliation; HikCentral; Netcash test configuration; phone integration |
 | Offline work | Device-readiness register; preparation/unlock/capture/unit requests/sync/conflicts/refresh/erasure |
 
-All 31 staff Next pages (including the dynamic account statement) and `/offline-workspace.html` have contextual help. Authentication and customer-facing pages are not staff tutorial surfaces; sign-in/recovery and staff handling of customer portal invitations are explained from the appropriate staff guide.
+All 34 staff Next pages (including the dynamic account statement) and `/offline-workspace.html` have contextual help. Authentication and customer-facing pages are not staff tutorial surfaces; sign-in/recovery and staff handling of customer portal invitations are explained from the appropriate staff guide.
 
-The content distinguishes implemented controls from unfinished screens: Collections call queue/export buttons, the Adjustments information hub, the Phone configuration shell and saved-but-unverified automation/defaults are explicitly explained. The calculator's fixed 31-day assumption is stated. Test payments, mandates, internal ledger matching, insurer records and saved access configuration are not represented as real settlement, completed handover, accepted insurance or working doors.
+The content distinguishes implemented controls from unfinished screens: Collections queue selection without contact, controlled Adjustments and externally completed refunds, the Phone configuration shell and saved-but-unverified automation/defaults are explicitly explained. The calculator's fixed 31-day assumption is stated. Test payments, mandates, internal ledger matching, insurer records and saved access configuration are not represented as real settlement, completed handover, accepted insurance or working doors.
 
 ## Offline tutorial
 
