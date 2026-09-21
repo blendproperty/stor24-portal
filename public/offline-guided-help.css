@@ -1,4 +1,6 @@
 #offline-guide-toggle{background:#ff5a0a;color:#fff;border:0;border-radius:8px;padding:10px 14px;font:inherit;cursor:pointer}
+#setup-panel .form-grid>label{min-width:0}
+#setup-panel select,#setup-panel input{min-width:0;max-width:100%;width:100%;box-sizing:border-box}
 #offline-guide{position:fixed;z-index:90;right:16px;bottom:16px;width:360px;max-width:calc(100vw - 32px);max-height:70dvh;overflow:auto;box-sizing:border-box;padding:22px;background:#fffdf6;color:#183d32;border:1px solid #bbc8c1;border-radius:18px;box-shadow:0 12px 40px #07141140}
 #offline-guide h2{font-size:23px}#offline-guide h3{font-size:19px}#offline-guide p{line-height:1.6;font-size:14px}#offline-guide button{margin:4px;padding:9px 12px;font:inherit;white-space:normal}
 .offline-guide-highlight{outline:3px solid #ff5a0a;outline-offset:3px}
