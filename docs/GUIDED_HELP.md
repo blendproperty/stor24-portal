@@ -1,36 +1,54 @@
 # Staff guided help
 
-First release: 21 September 2026.
+Expanded across the staff backend on 21 September 2026. The earlier three-guide release was an initial increment, not the full requested scope.
 
 ## Using it
 
-Choose **Guide me** in the staff toolbar. The panel explains the current page and offers three workflows:
+Choose **Guide me** in the staff toolbar. **Help with this page** starts its main tutorial; **Also on this screen** exposes additional workflows such as payment, transfer, move-out, statements, packages and setup. Search matches titles, descriptions and step text. Work area filters the library. Clear filters restores every guide.
 
-1. Find your way around: dashboard metrics, priorities, navigation and activity.
-2. Manage a reservation: filters, hold review, creation, maintenance and move-in handoff.
-3. Prepare a move-in: existing reservation, signed versus unsigned agreement path, eligible payment/date checks and physical key handover.
+Starting a tutorial turns **Guide mode** on. **Show me on this page** outlines the relevant visible area without operating it. **Read & next** records reading only. Back, the checklist, Restart, Pause and Close remain available. Escape closes the guide unless a business modal owns the interaction. Modal forms remain above the tutorial. Switching off removes highlights and returns to the library; it does not erase reading progress. Reloading does not automatically reopen a guide.
 
-Starting a guide turns **Guide mode** on. **Show me on this page** outlines the relevant area; it does not operate it. **Read & next** records reading progress. Back, the checklist, Restart, Pause and Close remain available. Escape closes the guide unless a business modal is open. A business modal remains above the tutorial.
+Preferences are scoped to the signed-in staff user in this browser, with cross-tab synchronisation. No customer IDs, financial information or form values are stored. There is no cross-device progress or training certification. Storage denial leaves temporary guidance available with a visible warning. Normal permissions and transaction gates remain authoritative; the library describes features but never grants access to them.
 
-Turning Guide mode off removes highlights and returns to the guide library. Guide me remains available to turn it back on. Closing or reloading does not automatically reopen a tutorial. Select Continue where you left off to resume. New users start with the mode off; no automatic tour interrupts their work.
+Guidance never submits a reservation, receipt, agreement, message, configuration, stock change or access action. Opening another screen is deliberate. A selected statement uses its real account URL; the guide never invents or selects an account. Missing targets explain which screen, tab, selection or readiness condition is needed.
 
-Preferences and reading progress are stored in this browser, under a key scoped to the signed-in user. They do not synchronise between devices. No customer details, reservation identifiers, payment information or form values are stored by this feature. Storage denial is handled with temporary in-memory progress and a visible persistence notice. Changes synchronise between tabs for the same user.
+## Coverage
 
-The checklist measures **reading**, not operational completion. It cannot create a reservation, send an agreement, record a receipt, confirm handover or grant access. Opening another screen is an explicit action; a same-screen tutorial does not change the URL or drop a selected reservation. Normal server permissions and operational gates remain authoritative. Missing or hidden targets produce guidance rather than clicking a substitute control.
+40 tutorials contain 192 reading steps across every current staff page and the standalone offline workspace:
+
+| Work area | Tutorials |
+| --- | --- |
+| Customer journey | Orientation; customer records and consent; lead capture; reservations; signed-booking move-in checks; unsigned agreement preparation; transfers; move-out |
+| Money and accounts | Account reading; received payments; statements and portal invitations; billing/reconciliation/daily close; collections; adjustments/reversals/refunds; Netcash outcomes; proration preview |
+| Facility operations | Tasks and maintenance; units/types/rates/renumbering/batch tools; facility maps; merchandise and stock; packages; paid-order supply; insurance; facial access; calendar |
+| Reports and oversight | Report parameters and CSV exports; portfolio graphs; system audit |
+| Administration | Store setup/public visibility; tenant defaults; all 18 Program defaults groups; employees/invitations/permissions; settings/password/MFA/recovery; communications; integration health and signing reconciliation; HikCentral; Netcash test configuration; phone integration |
+| Offline work | Device-readiness register; preparation/unlock/capture/unit requests/sync/conflicts/refresh/erasure |
+
+All 31 staff Next pages (including the dynamic account statement) and `/offline-workspace.html` have contextual help. Authentication and customer-facing pages are not staff tutorial surfaces; sign-in/recovery and staff handling of customer portal invitations are explained from the appropriate staff guide.
+
+The content distinguishes implemented controls from unfinished screens: Collections call queue/export buttons, the Adjustments information hub, the Phone configuration shell and saved-but-unverified automation/defaults are explicitly explained. The calculator's fixed 31-day assumption is stated. Test payments, mandates, internal ledger matching, insurer records and saved access configuration are not represented as real settlement, completed handover, accepted insurance or working doors.
+
+## Offline tutorial
+
+The standalone page has its own Guide me panel and on/off switch, Back/Next, Restart, Pause, visible-area highlight and missing-target instructions. It uses the same authored offline lesson as the staff library. The small browser controller never opens the encrypted operational database or calls business APIs. Its preference and reading position are device-level, separate from the staff-user progress.
+
+Load the updated site online so its service worker can cache the offline page, script and stylesheet. The tutorial can then be used during an outage. A server readiness row still does not prove the local snapshot exists, is current or can be unlocked. Tutorial testing never prepares/erases a snapshot or submits an offline enquiry.
 
 ## Maintenance
 
-- Editorial content: `src/lib/guided-help.ts`. Use plain staff language, actual current labels, fixed read-only routes and stable `data-guide` target names.
-- Controller: `src/components/guided-help.tsx`, mounted only in the authenticated staff shell. Auth and tenant pages retain their existing shell exclusions.
-- Presentation: `src/styles/guided-help.css`. Desktop side panel; scrollable bottom panel at narrow widths; non-modal with no keyboard trap. Highlights do not intercept clicks. Respect reduced-motion preferences.
-- Keep step IDs stable when correcting wording. When a workflow materially changes, introduce new step IDs or deliberately version the stored preferences so old reading progress is not misleading.
-- Add page context in `pageHelp`; use longest route matching for child screens. Unsupported pages get general guidance, not an invented complete workflow.
-- Broader guided workflows (billing, collections, move-out and role-specific curricula), cross-device storage, administrative training reports and a demo-data training mode are outside this release.
+- Existing booking lessons and preference logic: `src/lib/guided-help.ts`; expanded catalogue: `src/lib/guided-help-catalog.ts`.
+- Staff panel: `src/components/guided-help.tsx`; stylesheet: `src/styles/guided-help.css`.
+- Offline controller: `src/pwa/offline-guided-help.ts`; build: `scripts/build-offline-guide.mjs`; style: `public/offline-guided-help.css`.
+- `prebuild` and `predev` generate the offline bundle. It is ignored by Git and lint; its TypeScript source is checked. The production Docker builder includes the generated asset in the final public directory.
+- Editorial selectors are fixed constants, scoped to the staff content area. Keep labels and selectors aligned with the actual screen. Never use guide navigation to execute a business action or invent a record ID.
+- Keep stable IDs for wording corrections; change step IDs when their meaning materially changes so prior reading is not credited for different work.
+- Add every staff page and navigation destination to contextual coverage. The route test derives current pages from the filesystem and fails on an uncovered addition. Program-default tab coverage is checked against the actual component.
 
-## Verification
+## Verification and acceptance boundaries
 
-`npm test` covers corrupt/obsolete state, step bounds, deduplication, skipped-step honesty, per-user keys and route matching. `npm run test:guides` builds the actual client shell/reservations/move-in components against invented fixtures with all server actions stubbed to reject. It checks desktop and 390/768/1280px layouts, highlights, preferences, resume/restart, cross-page continuity, missing targets, cross-tab switch-off, unavailable storage and zero operational submissions. Screenshots are saved under `output/guided-help/` and uploaded by CI.
+`npm test` checks corrupt storage, per-user isolation, progress bounds, skipped-step honesty, route coverage, dynamic statements, search/category matching, all Program defaults tabs and offline asset/no-write boundaries.
 
-Install Chromium with `npx playwright install chromium`; Windows can also run with `PLAYWRIGHT_CHANNEL=msedge`. These are isolated component browser checks, not database/provider or live staff acceptance tests.
+`npm run test:guides` exercises the real staff tutorial, shell, reservations and move-in components against invented fixtures, then reads every step of every tutorial. It checks search, category/empty states, highlights, reload/resume, restart/completion, switch-off, cross-tab state, storage denial and 390/768/1280px bounds. It also loads the actual standalone offline page and tests the tutorial during simulated network loss, without unlocking or changing business data. The fixture does not simulate every business module and does not prove provider, payment, database or physical operations. All non-GET requests are rejected and recorded; the expected count is zero. CI retains screenshots.
 
-After deployment, verify with a normal staff session: open Guide me, read a dashboard step, toggle off/on, reload and resume, follow an existing reservation into move-in, check signed/unsigned target guidance, and pause/close at desktop and phone widths. Do not submit a receipt, agreement or key handover to test this feature. Preserve all legal, provider, payment, access, data, training and launch-approval gates in PROJECT_CONTEXT.md.
+After deployment, verify the expanded library and contextual starts on the real signed-in staff pages, plus search, settings-tab explanations, account context, offline help and narrow-screen behaviour. Do not trigger sends, configuration changes or transactions to test a tutorial. Staff training acceptance and the existing finance, provider, legal, data, physical handover/door and launch-approval gates remain separate in `PROJECT_CONTEXT.md`.

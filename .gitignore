@@ -20,6 +20,7 @@
 /.next/
 /out/
 /public/sw.js
+/public/offline-guided-help.js
 
 # production
 /build

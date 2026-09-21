@@ -11,6 +11,8 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
+    "output/**",
+    "public/offline-guided-help.js",
     "next-env.d.ts",
     "src/generated/prisma/**",
     "graphify-out/**",

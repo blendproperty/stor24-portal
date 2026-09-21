@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "test:guides": "node scripts/test-guided-help.mjs",
-    "prebuild": "node scripts/generate-pwa-service-worker.mjs",
+    "test:guides": "node scripts/build-offline-guide.mjs && node scripts/test-guided-help.mjs",
+    "predev": "node scripts/build-offline-guide.mjs",
+    "prebuild": "node scripts/build-offline-guide.mjs && node scripts/generate-pwa-service-worker.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

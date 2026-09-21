@@ -7,6 +7,8 @@ import path from "node:path";
 import assert from "node:assert/strict";
 
 const root = process.cwd();
+const catalogueBundle = await build({ entryPoints: ["src/lib/guided-help.ts"], bundle: true, write: false, format: "esm", platform: "node" });
+const { workflowGuides } = await import(`data:text/javascript;base64,${Buffer.from(catalogueBundle.outputFiles[0].text).toString("base64")}`);
 const navigation = `import React, {useSyncExternalStore} from 'react';
 const subscribe = cb => { window.addEventListener('popstate', cb); return () => window.removeEventListener('popstate', cb); };
 const read = () => window.location.pathname + window.location.search;
@@ -28,6 +30,11 @@ const writes = [];
 const server = createServer(async (req, res) => {
   if (req.method !== "GET") { writes.push(`${req.method} ${req.url}`); res.writeHead(405); res.end(); return; }
   const url = new URL(req.url, "http://localhost");
+  if (["/offline-workspace.html", "/offline-workspace.css", "/offline-workspace.js", "/offline-guided-help.js", "/offline-guided-help.css"].includes(url.pathname)) {
+    res.setHeader("content-type", url.pathname.endsWith(".js") ? "text/javascript" : url.pathname.endsWith(".css") ? "text/css" : "text/html");
+    res.end(await readFile(path.join(root, "public", url.pathname))); return;
+  }
+  if (url.pathname === "/api/v1/offline/snapshot") { res.setHeader("content-type", "application/json"); res.end(JSON.stringify({ data: { facilities: [] } })); return; }
   if (url.pathname === "/fixture.js") { res.setHeader("content-type", "text/javascript"); res.end(bundle.outputFiles[0].text); return; }
   if (url.pathname === "/fixture.css") { res.setHeader("content-type", "text/css"); res.end(style); return; }
   if (url.pathname === "/api/v1/reservations") { res.setHeader("content-type", "application/json"); res.end(JSON.stringify({data})); return; }
@@ -156,11 +163,72 @@ try {
   await deniedPage.goto(base);
   await deniedPage.getByRole("button", {name: /Guide me/}).click();
   await deniedPage.locator(".guide-card").first().click();
-  await expect(deniedPage.getByRole("status")).toContainText("Browser storage is unavailable");
+  await expect(deniedPage.getByText(/Browser storage is unavailable/)).toBeVisible();
   await deniedPage.getByRole("button", {name: "Read & next"}).click();
   await expect(deniedPage.getByRole("heading", {name: "Work through what needs attention"})).toBeVisible();
   await denied.close();
   results.push("Storage denial leaves guidance functional with an honest persistence notice");
+
+  await page.setViewportSize({width: 1440, height: 1000});
+  await page.goto(`${base}/?user=catalogue-reader`);
+  await page.getByRole("button", {name: /Guide me/}).click();
+  await panel.getByLabel("Search guides").fill("deposit refund");
+  await expect(panel.locator(".guide-card").filter({hasText: "Complete a move-out"})).toBeVisible();
+  await panel.getByLabel("Work area").selectOption("Offline work");
+  await expect(panel.getByText("No matching guides.", {exact: false})).toBeVisible();
+  await panel.getByRole("button", {name: "Clear filters"}).click();
+  await expect(panel.locator(".guide-card")).toHaveCount(workflowGuides.length);
+  await page.screenshot({path: "output/guided-help/expanded-library.png"});
+  // Walk every authored step through the real tutorial UI. Business screens remain fixtures.
+  for (const guide of workflowGuides) {
+    await panel.getByLabel("Search guides").fill(guide.title);
+    await panel.locator(".guide-card").filter({has: page.getByText(guide.title, {exact: true})}).click();
+    for (let index = 0; index < guide.steps.length; index++) {
+      await expect(panel.locator(".guide-step h3")).toHaveText(guide.steps[index].title);
+      await panel.getByRole("button", {name: index === guide.steps.length - 1 ? "Finish reading" : "Read & next"}).click();
+    }
+    await expect(panel.getByRole("heading", {name: "You’ve read every step."})).toBeVisible();
+    await panel.getByRole("button", {name: "Explore another guide"}).click();
+  }
+  results.push(`Search, category, empty state and all ${workflowGuides.length} guides / ${workflowGuides.reduce((n, g) => n + g.steps.length, 0)} steps rendered and completed`);
+
+  await page.goto(`${base}/operations/accounts/example/statement`);
+  await page.getByRole("button", {name: /Guide me/}).click();
+  await panel.getByRole("button", {name: "Guide me through this"}).click();
+  await panel.getByRole("button", {name: "Read & next"}).click();
+  await expect(panel.getByRole("button", {name: "Show me on this page"})).toBeVisible();
+  await panel.getByRole("button", {name: "Show me on this page"}).click();
+  await expect(panel.getByRole("status")).toContainText("Account statement");
+  results.push("Dynamic account statement uses the real URL and handles an absent selected-record target");
+
+  await page.goto(`${base}/offline-workspace.html`);
+  const offlinePanel = page.locator("#offline-guide");
+  await page.getByRole("button", {name: "Guide me", exact: true}).click();
+  await page.getByRole("switch", {name: "Offline guide mode"}).click();
+  await offlinePanel.getByRole("button", {name: "Show me on this page"}).click();
+  await expect(page.locator("#setup-panel")).toHaveClass(/offline-guide-highlight/);
+  await offlinePanel.getByRole("button", {name: "Read & next"}).click();
+  await page.reload();
+  await page.getByRole("button", {name: "Guide me", exact: true}).click();
+  await expect(offlinePanel.getByRole("heading", {name: "Unlock and inspect the snapshot"})).toBeVisible();
+  // Simulated network loss: cached/read assets are already loaded. No snapshot unlocked or changed.
+  await context.setOffline(true);
+  await offlinePanel.getByRole("button", {name: "Read & next"}).click();
+  await offlinePanel.getByRole("button", {name: "Show me on this page"}).click();
+  await expect(offlinePanel.getByRole("status")).toContainText("Unlock the snapshot");
+  await page.setViewportSize({width: 390, height: 844});
+  const offlineBox = await offlinePanel.boundingBox();
+  assert.ok(offlineBox.x >= 0 && offlineBox.x + offlineBox.width <= 390);
+  await page.screenshot({path: "output/guided-help/offline-mobile.png"});
+  await page.keyboard.press("Escape");
+  await expect(offlinePanel).toBeHidden();
+  await page.getByRole("button", {name: "Guide me", exact: true}).click();
+  await page.getByRole("switch", {name: "Offline guide mode"}).click();
+  await context.setOffline(false);
+  await page.reload();
+  await page.getByRole("button", {name: "Guide me", exact: true}).click();
+  await expect(page.getByRole("switch", {name: "Offline guide mode"})).toHaveAttribute("aria-checked", "false");
+  results.push("Actual offline page: highlights, pause, reload/resume, switch persistence, hidden-target guidance, network loss and 390px bounds");
 
   assert.deepEqual(writes, [], "Guidance did not submit any operational request");
   assert.deepEqual(errors, [], "No browser runtime errors");

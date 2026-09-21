@@ -6,6 +6,8 @@ const SHELL_ASSETS = [
   "/offline-workspace.html",
   "/offline-workspace.css",
   "/offline-workspace.js",
+  "/offline-guided-help.js",
+  "/offline-guided-help.css",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
