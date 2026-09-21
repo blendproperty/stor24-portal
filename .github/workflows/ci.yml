@@ -24,6 +24,7 @@ jobs:
       - run: node scripts/test-monthly-billing.mjs
       - run: node scripts/test-debit-orders.mjs
       - run: node scripts/test-adjustments.mjs
+      - run: node scripts/test-collections.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -33,6 +34,7 @@ jobs:
             output/monthly-billing/
             output/debit-orders/
             output/adjustments/
+            output/collections/
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 20

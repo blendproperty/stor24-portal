@@ -6,7 +6,7 @@ export const securityPermissionGroups = [
     ["adjustments.view", "View adjustment requests and records"], ["adjustments.request", "Request or withdraw adjustments"], ["adjustments.approve", "Independently approve adjustments"], ["adjustments.record_refund", "Record externally completed refunds"],
     ["billing.view", "View monthly billing and invoices"], ["billing.manage", "Post approved monthly billing"],
     ["debit_orders.view", "View debit-order runs"], ["debit_orders.manage", "Prepare and review debit-order runs"], ["debit_orders.submit", "Submit approved test debit-order runs"],
-    ["ledger.*", "Manage tenant ledgers"], ["payments.*", "Take and reverse payments"], ["collections.*", "Manage collections"], ["access.view", "View physical access"], ["access.manage", "Enrol and revoke physical access"], ["access.suspend", "Suspend access"], ["access.restore", "Restore access"],
+    ["ledger.*", "Manage tenant ledgers"], ["payments.*", "Take and reverse payments"], ["collections.*", "Manage collections"], ["collections.view", "View aged collections"], ["collections.manage", "Record collection follow-ups"], ["collections.policy", "Record approved collection terms"], ["collections.export", "Export aged collections"], ["access.view", "View physical access"], ["access.manage", "Enrol and revoke physical access"], ["access.suspend", "Suspend access"], ["access.restore", "Restore access"],
   ] },
   { label: "Store operations", permissions: [
     ["facility.*", "Manage store setup"], ["inventory.*", "Manage units and inventory"], ["daily_close.*", "Perform daily close"], ["facility_map.view", "View facility map"], ["phone.view", "Use phone workspace"],

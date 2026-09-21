@@ -758,11 +758,55 @@ model Account {
   payments      Payment[]
   debitInstructions DebitOrderInstruction[]
   adjustments FinancialAdjustment[]
+  collectionCase CollectionCase?
   merchandiseOrders MerchandiseOrder[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
   @@index([customerId])
+}
+
+model CollectionCase {
+  id String @id @default(cuid())
+  accountId String @unique
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  ownerId String?
+  nextFollowUp String?
+  disputed Boolean @default(false)
+  disputeReason String?
+  terms Json?
+  revision Int @default(0)
+  activities CollectionActivity[]
+  promises CollectionPromise[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CollectionActivity {
+  id String @id @default(cuid())
+  caseId String
+  case CollectionCase @relation(fields: [caseId], references: [id], onDelete: Restrict)
+  requestKey String
+  actorId String
+  action String
+  note String
+  payload Json
+  createdAt DateTime @default(now())
+  @@unique([caseId, requestKey])
+  @@index([caseId, createdAt])
+}
+
+model CollectionPromise {
+  id String @id @default(cuid())
+  caseId String
+  case CollectionCase @relation(fields: [caseId], references: [id], onDelete: Restrict)
+  amount Decimal @db.Decimal(14, 2)
+  dueDate String
+  status String @default("OPEN")
+  createdById String
+  createdAt DateTime @default(now())
+  closedAt DateTime?
+  @@index([caseId, createdAt])
 }
 
 model FinancialAdjustment {
