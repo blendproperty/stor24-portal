@@ -34,7 +34,7 @@ const server = createServer(async (req, res) => {
     res.setHeader("content-type", url.pathname.endsWith(".js") ? "text/javascript" : url.pathname.endsWith(".css") ? "text/css" : "text/html");
     res.end(await readFile(path.join(root, "public", url.pathname))); return;
   }
-  if (url.pathname === "/api/v1/offline/snapshot") { res.setHeader("content-type", "application/json"); res.end(JSON.stringify({ data: { facilities: [] } })); return; }
+  if (url.pathname === "/api/v1/offline/snapshot") { res.setHeader("content-type", "application/json"); res.end(JSON.stringify({ data: { facilities: [{id: "fixture-store", name: "Training facility with a deliberately long location name", code: "LONG-TRAINING-STORE"}] } })); return; }
   if (url.pathname === "/fixture.js") { res.setHeader("content-type", "text/javascript"); res.end(bundle.outputFiles[0].text); return; }
   if (url.pathname === "/fixture.css") { res.setHeader("content-type", "text/css"); res.end(style); return; }
   if (url.pathname === "/api/v1/reservations") { res.setHeader("content-type", "application/json"); res.end(JSON.stringify({data})); return; }
@@ -219,6 +219,7 @@ try {
   await page.setViewportSize({width: 390, height: 844});
   const offlineBox = await offlinePanel.boundingBox();
   assert.ok(offlineBox.x >= 0 && offlineBox.x + offlineBox.width <= 390);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, "Long facility names must not overflow the offline mobile page");
   await page.screenshot({path: "output/guided-help/offline-mobile.png"});
   await page.keyboard.press("Escape");
   await expect(offlinePanel).toBeHidden();
