@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { runMonthlyBilling } from "@/lib/billing-service";
+import { currentBillingPeriod } from "@/lib/monthly-billing-policy";
 
 // Triggered by an external cron job on the VPS (day 1 of each month), not
 // by a logged-in staff member — so this authenticates via a shared secret
@@ -24,8 +25,7 @@ function secureEqual(left: string, right: string) {
 }
 
 function currentPeriod() {
-  const now = new Date();
-  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+  return currentBillingPeriod();
 }
 
 export async function POST(request: Request) {
@@ -49,10 +49,10 @@ export async function POST(request: Request) {
 
   try {
     const summary = await runMonthlyBilling(period ?? currentPeriod());
-    return Response.json({ data: summary }, { status: 200 });
+    return Response.json({ data: summary }, { status: summary.exceptions.length ? 409 : 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "INTERNAL_ERROR";
-    const status = message === "INVALID_PERIOD" ? 422 : 500;
+    const status = message === "INVALID_PERIOD" ? 422 : message === "BILLING_AUTOMATION_DISABLED" ? 409 : 500;
     return Response.json({ error: { code: message, message: status === 500 ? "The request could not be completed." : message } }, { status });
   }
 }

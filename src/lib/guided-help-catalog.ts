@@ -11,6 +11,12 @@ function guide(id: string, title: string, category: string, route: string, scree
 }
 
 export const extendedGuides: WorkflowGuide[] = [
+  guide("monthly-billing", "Review and post monthly billing", "Money and accounts", "/billing/monthly", "Monthly billing", "Approve account terms, preview charges and create the monthly invoice.", [
+    ["Choose the account and month", "Choose the intended customer account and billing month. The list is restricted to your permitted stores. Future months are blocked; select the correct current or historical unbilled period before proceeding.", ".monthly-billing"],
+    ["Save approved account terms", "Set the first unbilled month, agreed calendar-day or full-month proration, tax treatment, recurring charges and discount dates. Insurance uses the recorded enrollment premium. Enter the actual approval reference; saving records a real billing policy.", ".monthly-plan", undefined, "Do not approve invented fees or tax treatment. These terms can affect real customer balances."],
+    ["Review the invoice preview", "Preview monthly invoice calculates each charge, credit and included tax. Review existing-charge, transfer and historical test-payment warnings. A blocked account requires investigation; changing the month to evade a blocker can create an incorrect bill.", ".monthly-billing"],
+    ["Post once and retain the invoice", "After checking the period and amounts, confirm the review and post. Charges, balance, invoice and audit are saved together. Changed records require a new preview. Open the saved invoice to review or print it; no email or collection is triggered.", ".monthly-preview", undefined, "Posting changes the account ledger. Tutorial reading never posts a bill."],
+  ]),
   guide("tenants", "Customer records and consent", "Customer journey", "/tenants", "Tenants", "Create or find a customer, maintain contacts and locate signed documents.", [
     ["Find the existing customer first", "Search name, contact or ID in the left list. Select the matching person or business and confirm contact details. A customer record can exist before any tenancy; avoid creating a second record for the same customer.", ".accounts-list"],
     ["Add or edit the right details", "Add customer opens the customer form; Edit details updates the selected record. Choose Individual or Business, then enter names, company where relevant, phone, email and the required identity details. Complete the primary address, alternate contact, emergency and work sections before saving.", ".page-header"],

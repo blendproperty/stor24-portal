@@ -34,3 +34,4 @@ jobs:
       - run: node scripts/bootstrap-empty-database.mjs
       - run: npx tsx --test tests/integration/merchandise-transactions.test.ts
       - run: npx tsx --test tests/integration/reservation-move-in.test.ts
+      - run: npx tsx --test tests/integration/monthly-billing.test.ts

@@ -21,11 +21,14 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run test:guides
+      - run: node scripts/test-monthly-billing.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: guided-help-browser-evidence
-          path: output/guided-help/
+          path: |
+            output/guided-help/
+            output/monthly-billing/
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 20

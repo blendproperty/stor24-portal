@@ -2529,3 +2529,14 @@ a.module-card:focus-visible {
 @font-face { font-family: "Satoshi Handover"; src: url("/brand/Satoshi-Handover-500.woff2") format("woff2"); font-weight: 500; font-style: normal; font-display: swap; }
 @font-face { font-family: "Satoshi Handover"; src: url("/brand/Satoshi-Handover-700.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: swap; }
 .handover-workspace { font-family: "Satoshi Handover", Arial, sans-serif; }
+.monthly-billing { font-family: "Satoshi Handover", Arial, sans-serif; }
+.monthly-billing .panel { padding:24px; display:grid; gap:18px; min-width:0; }
+.monthly-billing .form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.monthly-billing label { display:grid; gap:8px; min-width:0; font-size:14px; }
+.monthly-billing label:has(input[type=checkbox]) { display:flex; align-items:center; gap:10px; }
+.monthly-billing input:not([type=checkbox]), .monthly-billing select { width:100%; min-width:0; min-height:44px; border:1px solid var(--line,#ddd); border-radius:8px; padding:10px 12px; background:white; color:#171717; }
+.monthly-billing button { justify-self:start; }
+.monthly-billing fieldset { border:1px solid var(--line,#ddd); }
+.monthly-billing legend { padding:0 8px; font-weight:700; }
+.monthly-billing p { margin:0; line-height:1.6; }
+@media(max-width:640px) { .monthly-billing .form-grid { grid-template-columns:1fr; } .monthly-billing .panel { padding:16px; } .monthly-billing button { width:100%; white-space:normal; } }

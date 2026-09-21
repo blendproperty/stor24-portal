@@ -59,7 +59,7 @@ export type InvoiceRenderInput = {
 };
 
 function formatDate(date: Date) {
-  return date.toLocaleDateString("en-ZA", { year: "numeric", month: "long", day: "numeric" });
+  return date.toLocaleDateString("en-ZA", { timeZone: "Africa/Johannesburg", year: "numeric", month: "long", day: "numeric" });
 }
 
 export function renderInvoiceHtml(input: InvoiceRenderInput): string {
