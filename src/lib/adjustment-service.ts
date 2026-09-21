@@ -176,4 +176,3 @@ export async function adjustmentDocument(scope: RequestScope, id: string) {
   if (!doc.content || createHash("sha256").update(doc.content).digest("hex") !== doc.sha256) throw new Error("ADJUSTMENT_RECONCILIATION");
   return doc.content;
 }
-
