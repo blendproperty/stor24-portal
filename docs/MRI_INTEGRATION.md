@@ -37,7 +37,7 @@ The approved direction from the August correspondence is consolidated journals t
 
 ## Required next implementation
 
-1. Production-server authentication, discovery and a bounded property read against Blend were verified on 21 September, all HTTP200. The API account sees zero properties. Complete the app-screen check and save the discovered Blend selection after the expired staff session is renewed; confirm the intended finance property and its assignment before financial use.
+1. Production-server authentication, discovery and a bounded property read against Blend were verified on 21 September, all HTTP200. The API account sees zero properties. The signed-in owner saved the discovered Blend selection and the deployed app verified sign-in and property read at 14:31:23 SAST; both success states persisted after reload. Confirm the intended finance property and its assignment before financial use.
 2. Obtain explicit test-database access/authority. Do not treat Blend as a test database or create example transactions in it.
 3. Finance/MRI confirm the dedicated property/entity, GL and transaction codes, tax/deposit treatment, opening balances, timing, currencies and period controls. Define completeness across tenancy ledger, merchandise, fees and adjustments.
 4. Implement the documented journal contract with balanced, immutable source snapshots; mapping versions; independent approval; unique source/batch identity; and a durable submission state machine.
