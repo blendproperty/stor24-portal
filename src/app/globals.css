@@ -2570,3 +2570,23 @@ a.module-card:focus-visible {
 .adjustments-workspace h2,.adjustments-workspace h3 { margin:0; overflow-wrap:anywhere; }
 @media(max-width:640px) { .adjustments-workspace .monthly-grid { grid-template-columns:1fr; } .adjustments-workspace .monthly-card { padding:18px; } }
 .adjustment-record { display:grid; gap:12px; }
+
+/* Aged collections: long names and notes stay within the selected viewport. */
+.collections-workspace { min-width: 0; }
+.collections-workspace .monthly-grid > label { min-width: 0; }
+.collections-workspace input, .collections-workspace select, .collections-workspace textarea { min-width: 0; max-width: 100%; }
+.collections-workspace textarea { width: 100%; min-height: 90px; }
+.collections-workspace .monthly-card { overflow-wrap: anywhere; min-width: 0; }
+.collections-workspace .table-wrap { max-width: 100%; overflow-x: auto; }
+.collections-workspace details { margin: 16px 0; }
+.collections-workspace summary { cursor: pointer; font-weight: 700; }
+.collections-workspace .collection-warning { border-left: 3px solid #d59227; padding: 12px; background: #fff7e9; color: #604009; }
+.collections-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 700px) { .collections-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } .collections-workspace .monthly-grid { grid-template-columns: minmax(0, 1fr); } .collections-workspace .button { white-space: normal; } }
+.collections-workspace { display: grid; gap: 24px; }
+.collections-workspace .monthly-card { display: grid; gap: 18px; padding: 24px; border: 1px solid var(--line,#ddd); border-radius: 20px; background: white; }
+.collections-workspace .monthly-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; }
+.collections-workspace .data-table { min-width: 820px; overflow-wrap: normal; }
+.collections-workspace .data-table td { min-width: 100px; max-width: 260px; overflow-wrap: break-word; }
+.collections-workspace textarea { padding: 12px; border: 1px solid var(--line,#ddd); border-radius: 10px; font: inherit; }
+@media(max-width:700px) { .collections-workspace .monthly-card { padding:18px; } .collections-workspace .monthly-grid { grid-template-columns: minmax(0,1fr); } }

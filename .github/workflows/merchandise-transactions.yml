@@ -37,3 +37,4 @@ jobs:
       - run: npx tsx --test tests/integration/monthly-billing.test.ts
       - run: npx tsx --test tests/integration/debit-order-runs.test.ts
       - run: npx tsx --test tests/integration/adjustments.test.ts
+      - run: npx tsx --test tests/integration/collections.test.ts
