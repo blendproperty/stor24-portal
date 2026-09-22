@@ -36,6 +36,16 @@ test("ID policy is absent by default, strictly validated, and applies only from 
   assert.throws(() => identityPolicy("org"), /ID_POLICY_UNAVAILABLE/);
   delete process.env.IDENTITY_DOCUMENT_POLICIES_JSON;
 });
+test("tenancy retention is explicit and cannot be combined with a fixed expiry", () => {
+  const policy = { enabled: true, fullCopyApproved: true, effectiveFrom: "2026-01-01T00:00:00Z", version: "tenancy", approvalReference: "synthetic", notice: "Synthetic tenancy retention fixture, not a real customer notice.", acknowledgementLabel: "Synthetic acknowledgement only", acceptedTypes: ["PASSPORT"], alternativeContact: "Training store" };
+  for (const retention of [{}, { retentionMode: "TENANCY", retentionHours: 24 }, { retentionMode: "FOREVER" }]) {
+    process.env.IDENTITY_DOCUMENT_POLICIES_JSON = JSON.stringify({ org: { ...policy, ...retention } });
+    assert.throws(() => identityPolicy("org"), /ID_POLICY_UNAVAILABLE/);
+  }
+  process.env.IDENTITY_DOCUMENT_POLICIES_JSON = JSON.stringify({ org: { ...policy, retentionMode: "TENANCY" } });
+  assert.equal(identityPolicy("org")!.retentionMode, "TENANCY");
+  delete process.env.IDENTITY_DOCUMENT_POLICIES_JSON;
+});
 test("ID grants expire, are unpredictable, and never accept booking references", () => {
   const grant = newIdentityAccess();
   assert.ok(identityAccessMatches(grant.token, grant.identityAccessHash, grant.identityAccessExpiresAt));

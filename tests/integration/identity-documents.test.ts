@@ -93,8 +93,14 @@ test("isolated PostgreSQL private identity workflow", async t => {
       await assert.rejects(reviewIdentity(f.scope, document.id, 1, "ACCEPT"), /ID_CHANGED/);
       await assert.rejects(submitIdentity(f.reference, f.token, input), /ID_POLICY_UNAVAILABLE/);
     });
-    await t.test("upload before signing, both page previews, staff acceptance and handover gate", async () => {
+    for (const [retentionMode, endStatus] of [["FIXED_PERIOD", "CLOSED"], ["TENANCY", "CLOSED"], ["TENANCY", "CANCELLED"]] as const) await t.test(`upload, actual handover and ${retentionMode} retention until ${endStatus}`, async () => {
       const f = await fixture();
+      if (retentionMode === "TENANCY") {
+        const policies = JSON.parse(process.env.IDENTITY_DOCUMENT_POLICIES_JSON!);
+        policies[f.org.id].retentionMode = "TENANCY"; delete policies[f.org.id].retentionHours;
+        process.env.IDENTITY_DOCUMENT_POLICIES_JSON = JSON.stringify(policies);
+        f.input.policyHash = identityPolicy(f.org.id)!.hash;
+      }
       assert.equal(await identityGate(db, f.org.id, f.booking.id, f.booking.createdAt, "SIGN"), false);
       const blocked = await preparePublicReservationLease(f.reference, "EFT");
       assert.equal(blocked.ok, false); if (!blocked.ok) assert.equal(blocked.code, "IDENTITY_REQUIRED");
@@ -120,9 +126,45 @@ test("isolated PostgreSQL private identity workflow", async t => {
       await previewIdentity(f.scope, document.id, 1, 1);
       await reviewIdentity(f.scope, document.id, 1, "ACCEPT");
       assert.equal(await identityGate(db, f.org.id, f.booking.id, f.booking.createdAt, "HANDOVER"), true);
-      assert.ok((await confirmReservationMoveIn(f.scope, f.booking.id)).tenancyId);
+      const moved = await confirmReservationMoveIn(f.scope, f.booking.id); assert.ok(moved.tenancyId);
+      await expireIdentityDocuments();
+      const retained = await db.identityDocument.findUniqueOrThrow({ where: { id: document.id } });
+      if (retentionMode === "FIXED_PERIOD") { assert.equal(retained.encryptedPages, null); return; }
+      assert.equal(retained.retentionMode, "TENANCY"); assert.equal(retained.expiresAt, null); assert.ok(retained.encryptedPages);
+      assert.ok((await previewIdentity(f.scope, document.id, 1, 0)).length > 100);
+      await assert.rejects(reviewIdentity(f.scope, document.id, 1, "REPLACE", "Document is incomplete"), /ID_CHANGED/);
+      await db.tenancy.update({ where: { id: moved.tenancyId }, data: { status: "NOTICE_GIVEN", endDate: new Date(0) } });
+      await db.identityDocument.update({ where: { id: document.id }, data: { acknowledgedAt: new Date(0) } });
+      await expireIdentityDocuments();
+      assert.ok((await db.identityDocument.findUniqueOrThrow({ where: { id: document.id } })).encryptedPages);
+      assert.ok((await previewIdentity(f.scope, document.id, 1, 0)).length > 100);
+      const other = await fixture(); await assert.rejects(previewIdentity(other.scope, document.id, 1, 0), /NOT_FOUND/);
+      await db.tenancy.update({ where: { id: moved.tenancyId }, data: { status: endStatus } });
+      await assert.rejects(previewIdentity(f.scope, document.id, 1, 0), /ID_CHANGED/);
+      await expireIdentityDocuments();
+      const erased = await db.identityDocument.findUniqueOrThrow({ where: { id: document.id } });
+      assert.equal(erased.encryptedPages, null); assert.ok(erased.erasedAt); assert.equal(erased.status, "ACCEPTED");
+    });
+    await t.test("tenancy copies expire for cancelled and abandoned bookings, old copies are never extended", async () => {
+      for (const cancelled of [true, false]) {
+        const f = await fixture();
+        const policies = JSON.parse(process.env.IDENTITY_DOCUMENT_POLICIES_JSON!);
+        policies[f.org.id].retentionMode = "TENANCY"; delete policies[f.org.id].retentionHours;
+        process.env.IDENTITY_DOCUMENT_POLICIES_JSON = JSON.stringify(policies);
+        const document = await submitIdentity(f.reference, f.token, { ...f.input, policyHash: identityPolicy(f.org.id)!.hash });
+        assert.equal(document.expiresAt, null); assert.equal((await identityStatus(f.reference, f.token)).canContinue, true);
+        await db.reservation.update({ where: { id: f.booking.id }, data: cancelled ? { status: "CANCELLED" } : { holdExpiresAt: new Date(0) } });
+        await expireIdentityDocuments();
+        assert.equal((await db.identityDocument.findUniqueOrThrow({ where: { id: document.id } })).encryptedPages, null);
+      }
+      const f = await fixture(), document = await submitIdentity(f.reference, f.token, f.input);
+      const policies = JSON.parse(process.env.IDENTITY_DOCUMENT_POLICIES_JSON!);
+      policies[f.org.id].retentionMode = "TENANCY"; delete policies[f.org.id].retentionHours;
+      process.env.IDENTITY_DOCUMENT_POLICIES_JSON = JSON.stringify(policies);
+      await db.identityDocument.update({ where: { id: document.id }, data: { expiresAt: new Date(0) } });
       await expireIdentityDocuments();
       assert.equal((await db.identityDocument.findUniqueOrThrow({ where: { id: document.id } })).encryptedPages, null);
+      await assert.rejects(db.identityDocument.update({ where: { id: document.id }, data: { expiresAt: null } }));
     });
     await t.test("an already prepared signing link cannot bypass a withdrawn ID", async () => {
       const f = await fixture(); await submitIdentity(f.reference, f.token, f.input);

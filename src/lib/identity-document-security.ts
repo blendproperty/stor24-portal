@@ -9,11 +9,13 @@ const policySchema = z.object({
   enabled: z.literal(true), fullCopyApproved: z.literal(true), version: z.string().min(1).max(100),
   effectiveFrom: z.iso.datetime(), approvalReference: z.string().min(1).max(300),
   notice: z.string().min(40).max(12000), acknowledgementLabel: z.string().min(15).max(1000),
-  retentionHours: z.number().int().min(1).max(2160), alternativeContact: z.string().min(1).max(500),
+  retentionMode: z.enum(["FIXED_PERIOD", "TENANCY"]).optional(),
+  retentionHours: z.number().int().min(1).max(2160).optional(), alternativeContact: z.string().min(1).max(500),
   acceptedTypes: z.array(z.enum(identityTypes)).min(1).max(3),
   reservationIds: z.array(z.string().min(1).max(100)).min(1).max(20).optional(),
   customerEmailHashes: z.array(z.string().regex(/^[a-f0-9]{64}$/)).min(1).max(20).optional(),
-}).refine(policy => !(policy.reservationIds && policy.customerEmailHashes), "Choose one pilot scope");
+}).refine(policy => !(policy.reservationIds && policy.customerEmailHashes), "Choose one customer scope")
+  .refine(policy => policy.retentionMode === "TENANCY" ? policy.retentionHours === undefined : policy.retentionHours !== undefined, "Choose tenancy retention or a fixed expiry");
 export function identityPolicy(organisationId: string) {
   if (!process.env.IDENTITY_DOCUMENT_POLICIES_JSON) return null;
   try {
