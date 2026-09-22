@@ -1,5 +1,14 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Editable booking email in My STOR24 — 22 September 2026
+
+- **Implementation:** consume a validated browser-fragment email hint, remove it from the address bar immediately, and prefill the normal editable email field after the existing session check. Explain that the customer can change it before requesting a code. The existing explicit request, code verification, changed-email reset and authenticated booking selection remain. No email query parameter, public email lookup or authentication bypass. Companion public site retains only matching checkout context and carries the hint from signed/payment pages.
+- **Testing:** TypeScript and focused unit validation passed. Actual-component browser tests at 1440/390px passed editable prefill, fragment removal/query preservation, no automatic OTP, changed email in intercepted request, clearing the old code and absent/invalid hint. Focused lint and git diff checks passed. APIs are synthetic/intercepted; no email was sent. Full exact-head CI/build pending promotion.
+- **Commit and push:** prepared on codex/my-stor24-email-prefill-20260922 from canonical main 64e2f1a; commit/push pending this checkpoint.
+- **Merge:** pending exact-head checks. **Deployment/configuration:** pending; no database/provider/configuration changes. Deploy CRM receiver before public sender. **Live production verification:** pending. No real signature, payment, upload or authentication operation performed.
+- **Open gates:** this is browser continuity only; a device without the booking context still asks for an email. Live Netcash setup remains deferred by Brett. All prior legal, financial, ID retention/backup, provider/physical access, data, training and customer end-to-end UAT gates remain.
+
+
 ## Booking-to-payment wording verification — 22 September 2026
 
 - **Scope / implementation:** read-only customer-wording audit requested by Brett. No application copy, agreement content, signing behaviour or payment configuration changed. Both canonical repositories inspected; code identifiers/routes were distinguished from customer-visible wording.
