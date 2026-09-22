@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 import { readFile, mkdir } from "node:fs/promises";
 import assert from "node:assert/strict";
 const bundle=await build({entryPoints:["tests/browser/tenant-login-fixture.jsx"],bundle:true,define:{"process.env":"{}"},write:false,loader:{".css":"empty"},format:"esm",jsx:"automatic"});
-const css=await readFile("src/styles/tenant-portal.css","utf8");
+const css=await readFile("src/styles/facial-access.css","utf8")+await readFile("src/styles/tenant-portal.css","utf8");
 const server=createServer(async(req,res)=>{
  if(req.url==="/fixture.js"){res.setHeader("Content-Type","text/javascript");return res.end(bundle.outputFiles[0].text);}
  const url=new URL(req.url,"http://localhost");
@@ -43,5 +43,34 @@ try {
   await page.goto(base);await expect(input).toHaveValue("");assert.equal(starts.length,2);assert.deepEqual(errors,[]);
   await page.close();
  }
+
+ for(const width of [1440,390,320]){
+  const page=await browser.newPage({viewport:{width,height:1100}}), errors=[];
+  page.on("pageerror",error=>errors.push(error.message));
+  let accessState="PENDING";
+  const reservation={id:"booking-preview",publicReference:"ST24-PREVIEW",packageSelection:null};
+  await page.route("**/api/**",route=>{
+   assert.equal(route.request().method(),"GET","move-in review must not create an operational write");
+   if(route.request().url().includes("/access-photo"))return route.fulfill({json:{data:{available:false,policy:null,photo:null}}});
+   return route.fulfill({json:{data:{accounts:[],documents:[],agreements:[],payments:[],merchandiseRequests:[],expiresAt:new Date(Date.now()+1800000).toISOString(),units:[{key:"reservation:booking-preview",unitId:"unit-preview",number:"168",facilityName:"Training store",accountId:null,status:"ACTIVE",accessState,reservations:[reservation]}],onboarding:[{reservationId:reservation.id,ready:false,paidAmount:0,requiredAmount:2099,startDate:"2026-09-30",mandateStatus:null,blockers:["The identity document needs staff acceptance before key handover. Open Identity review.","A test payment is recorded. It does not clear the real booking for key collection."]}]}}});
+  });
+  await page.goto(`http://127.0.0.1:${server.address().port}/my`);
+  const moveIn=page.getByRole("region",{name:"Your move-in",exact:true});
+  await expect(moveIn).toHaveCount(1);
+  await expect(moveIn.getByText("Photo collection isn’t open yet",{exact:true})).toBeVisible();
+  await expect(moveIn.getByText("Your photo will be uploaded and added",{exact:false})).toBeVisible();
+  await expect(moveIn.getByText("Not yet active.",{exact:false})).toBeVisible();
+  await expect(page.getByRole("heading",{name:"Facial access",exact:true})).toHaveCount(0);
+  await expect(page.getByText("Facial access is confirmed separately.",{exact:false})).toHaveCount(0);
+  await expect(page.getByText("Open Identity review.",{exact:false})).toHaveCount(0);
+  await expect(moveIn.getByText("A test payment is recorded.",{exact:false})).toBeVisible();
+  await expect(page.locator('input[type=file]')).toHaveCount(0);
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await moveIn.screenshot({path:`output/email-prefill/move-in-${width}.png`});
+  accessState="ACTIVE";await page.reload();await expect(moveIn.getByText("Recorded as active.",{exact:false})).toBeVisible();
+  accessState="REVOKED";await page.reload();await expect(moveIn.getByText("Not active. Contact your store",{exact:false})).toBeVisible();
+  assert.deepEqual(errors,[]);await page.close();
+ }
+ console.log("PASS move-in: single section at desktop/390/320px, precinct purpose, held upload, staff-only link removed, payment blocker preserved, active/revoked states");
  console.log("PASS desktop/mobile: editable prefill, fragment removed, no automatic OTP, changed email payload, code reset, invalid/no hint and no overflow");
 } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}

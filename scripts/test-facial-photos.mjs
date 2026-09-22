@@ -39,7 +39,7 @@ try {
   await page.getByRole("button",{name:"Approve photo"}).click();await expect(page.getByText("This photograph has changed or expired. Refresh before continuing.")).toBeVisible();
   await expect(page.getByRole("img")).toHaveCount(0);assert.equal(writes.length,1);
   await page.goto(`${base}?photo&readonly`);await expect(page.getByRole("button",{name:"View privately"})).toHaveCount(0);
-  await page.goto(`${base}?tenant`);await expect(page.getByText("Facial access is being prepared.",{exact:false})).toBeVisible();await expect(page.locator('input[type="file"]')).toHaveCount(0);
+  await page.goto(`${base}?tenant`);await expect(page.getByText("Your store will arrange this step with you as part of your move-in.",{exact:false})).toBeVisible();await expect(page.locator('input[type="file"]')).toHaveCount(0);
   await page.screenshot({path:'output/facial-access/tenant-redesign-held.png',fullPage:true});
   available=true;await page.reload();await expect(page.locator('input[type="checkbox"]')).not.toBeChecked();
   await expect(page.locator('input[name="policyHash"]')).toHaveValue("ci-hash");

@@ -36,9 +36,9 @@ export function TenantFacePhoto({ reservationId }: { reservationId: string }) {
   }
   return <section className="tenant-card face-tenant">
     <header className="face-customer-heading">
-      <span className="face-customer-eyebrow">BEFORE YOU ARRIVE</span>
-      <h2>One photo. A smoother move-in.</h2>
-      <p>Prepare your access photograph now. Our team will check it before welcoming you on site.</p>
+      <span className="face-customer-eyebrow">PART OF YOUR MOVE-IN</span>
+      <h2>Your photograph for precinct access.</h2>
+      <p>Your photo will be uploaded and added to the precinct’s facial recognition system as part of your move-in, so you can enter the precinct.</p>
     </header>
     <div className="face-customer-layout">
     <aside className="face-photo-guide">
@@ -46,12 +46,12 @@ export function TenantFacePhoto({ reservationId }: { reservationId: string }) {
       <h3>A clear view of you.</h3>
       <p>Look straight at the camera, with your whole face in good light.</p>
       <ul><li><Check size={15} aria-hidden="true" /> Face the camera</li><li><Check size={15} aria-hidden="true" /> Keep your face unobstructed</li><li><Check size={15} aria-hidden="true" /> Use a plain background</li></ul>
-      <div className="face-guide-next"><span>WHAT HAPPENS NEXT</span><p>We review your photo. At key handover, staff check your identity and confirm your move-in before access can be activated.</p></div>
+      <div className="face-guide-next"><span>WHAT HAPPENS NEXT</span><p>Our team reviews your photo and arranges your enrolment. At move-in, staff check your identity, hand over your keys and confirm that your precinct access is active.</p></div>
     </aside>
     <div className="face-customer-form">
     <div className="face-form-title"><h3>Your access photograph</h3><span><ShieldCheck size={14} aria-hidden="true" /> Private upload</span></div>
     {state?.photo && <p className="face-status" role="status">{labels[state.photo.status] ?? "Staff review required"}</p>}
-    {state && !state.available && <div className="face-collection-hold"><Clock3 size={24} aria-hidden="true" /><h4>Photo collection isn’t open yet</h4><p>{state.policy ? "Uploads are currently unavailable for this booking. Contact your store to arrange access." : "Facial access is being prepared. Your store will confirm how to access your unit."}</p></div>}
+    {state && !state.available && <div className="face-collection-hold"><Clock3 size={24} aria-hidden="true" /><h4>Photo collection isn’t open yet</h4><p>{state.policy ? "Uploads are currently unavailable for this booking. Contact your store to arrange access." : "Photo upload is not available yet. Your store will arrange this step with you as part of your move-in."}</p></div>}
     {!state && !error && <p role="status">Checking your photo status…</p>}
     {state?.available && state.policy && <form key={`${state.photo?.version ?? 0}:${state.policy.hash}`} onSubmit={event => { event.preventDefault(); void upload(event.currentTarget); }}>
       <input type="hidden" name="reservationId" value={reservationId} /><input type="hidden" name="version" value={state.photo?.version ?? 0} /><input type="hidden" name="policyHash" value={state.policy.hash} />
@@ -66,7 +66,7 @@ export function TenantFacePhoto({ reservationId }: { reservationId: string }) {
       <details><summary>How we use your photograph<ChevronDown size={17} aria-hidden="true" /></summary><p className="face-consent">{state.policy.notice}</p><p>Available for staff review for up to {state.policy.retentionHours} hours. The notice explains the deletion arrangements.</p><p>{state.policy.alternativeContact}</p></details>
       <label className="face-checkbox"><input name="consent" type="checkbox" required disabled={busy} /><span>{state.policy.consentLabel}</span></label>
       <button className="face-submit" disabled={busy}>{busy ? "Saving securely…" : state.photo ? "Replace my photograph" : "Submit photograph"}<ArrowRight size={18} aria-hidden="true" /></button>
-      <p className="face-activation-note">Submitting a photo does not activate entry.</p>
+      <p className="face-activation-note">Our team will confirm when your precinct access is active.</p>
     </form>}
     {state?.photo && ["WAITING_REVIEW", "APPROVED", "PENDING_PROVIDER"].includes(state.photo.status) && <button className="face-text-button" disabled={busy} onClick={async () => {
       setBusy(true); setError("");

@@ -1,5 +1,13 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Unified move-in and precinct photo wording — 22 September 2026
+
+- **Implementation:** Brett clarified that photo enrolment for precinct access is part of move-in. Consolidated key-collection readiness, precinct status and the existing photo component under one Your move-in section; removed the separate Facial access card and the wording confirmed separately. Photo introduction now explicitly describes upload/addition to the precinct facial recognition system for entry; staff review, identity check, handover and activation are explained as one process. Removed the staff-only Open Identity review instruction from customer blocker text. Active and revoked states remain distinct; pending access is not presented as enabled. Upload policy, consent, authentication and payment gates are unchanged.
+- **Testing:** TypeScript, focused ESLint and diff checks passed. Actual-component checks passed at 1440/390/320px for one section, precinct purpose, no separate access card, no staff-only instruction, preserved payment blocker, held upload, active/revoked states and no horizontal overflow. Existing desktop/mobile login continuity and photo queue/consent/stale-review checks passed. Desktop/mobile move-in screenshots inspected. APIs were synthetic/intercepted; no real photo or provider action occurred. Exact-head CI/build pending.
+- **Commit/push:** prepared on codex/move-in-precinct-copy-20260922 from main db92dff; pending this checkpoint. **Merge:** pending checks. **Deployment/configuration:** pending; no schema, policy or provider configuration change. **Live production verification:** pending.
+- **Open gates:** this is a customer presentation correction. Photo collection is still held by existing policy; provider enrolment and actual precinct entry require their existing verification. Live Netcash setup remains explicitly deferred. Prior legal/consent/retention, ID review, physical access, finance/MRI, data, training and full customer UAT gates remain.
+
+
 ## Email prefill release evidence — 22 September 2026
 
 This supersedes the pending promotion checkpoint below for the email handoff only.
