@@ -3,7 +3,8 @@ import test from "node:test";
 import { createHash } from "node:crypto";
 import { PDFDocument } from "pdf-lib";
 import { readFile } from "node:fs/promises";
-import { STORAGE_TERMS, STORAGE_TERMS_VERSION, buildReviewLeaseClauses, renderReviewLeaseDocument } from "../src/lib/storage-terms";
+import { STORAGE_TERMS, STORAGE_TERMS_INTRODUCTION, STORAGE_TERMS_VERSION, PREVIOUS_STORAGE_TERMS_VERSION, buildReviewLeaseClauses, renderReviewLeaseDocument, renderStorageTermsEdition, requiresFullTermsAcceptance } from "../src/lib/storage-terms";
+import { renderReviewLeaseDocument as renderPreviousEdition } from "../src/lib/storage-terms-2026-09-10";
 import { renderLeaseDocument, LEASE_VERSION } from "../src/lib/lease-agreement-content";
 import { renderSignedLeasePdf } from "../src/lib/public-lease-pdf";
 import { db } from "../src/lib/db";
@@ -14,7 +15,7 @@ const context = { facilityName: "Store 1 - Midpoint", unitNumber: "TEST-001", un
 
 test("full review edition includes schedule, every terms section and all eight summaries", () => {
   const content = renderReviewLeaseDocument(context);
-  assert.equal(STORAGE_TERMS.length, 20);
+  assert.equal(STORAGE_TERMS.length, 28);
   assert.equal(buildReviewLeaseClauses(context).length, 8);
   for (const section of STORAGE_TERMS) { assert.ok(content.includes(section.title)); assert.ok(content.includes(section.body)); }
   for (const expected of [STORAGE_TERMS_VERSION, "Review Customer", "TEST-001", "Moving essentials", "5 x Small Moving Box", "14 calendar days", "no additional charge authorised"]) assert.ok(content.includes(expected), expected);
@@ -29,6 +30,16 @@ test("historical renderer remains unchanged and commercial changes alter the fin
   assert.notEqual(original, hash(renderReviewLeaseDocument({ ...context, monthlyRate: 1600 })));
   assert.notEqual(original, hash(renderReviewLeaseDocument({ ...context, storagePackage: null })));
   assert.notEqual(original, hash(renderReviewLeaseDocument({ ...context, paymentMethod: "CARD" })));
+});
+
+test("published terms match the delivered Word document extraction including its introduction", async () => {
+  const expected = JSON.parse(await readFile("docs/legal/2026-09-22/terms.json", "utf8"));
+  assert.deepEqual(STORAGE_TERMS, expected.sections);
+  assert.deepEqual(STORAGE_TERMS_INTRODUCTION, expected.introduction);
+  assert.equal(renderStorageTermsEdition(context, PREVIOUS_STORAGE_TERMS_VERSION), renderPreviousEdition(context));
+  assert.equal(renderStorageTermsEdition(context, "unknown-edition"), null);
+  assert.ok(requiresFullTermsAcceptance(PREVIOUS_STORAGE_TERMS_VERSION));
+  assert.ok(requiresFullTermsAcceptance(STORAGE_TERMS_VERSION));
 });
 
 test("complete review PDF is multipage with signature record and page furniture", async () => {
@@ -64,6 +75,37 @@ test("server refuses missing or stale terms consent and saves exact accepted edi
     assert.match(JSON.stringify(saved), new RegExp(`full_terms:${STORAGE_TERMS_VERSION}`));
     assert.equal(audits, 1);
   } finally { Reflect.set(db, "$transaction", original); }
+});
+
+test("an unsigned previous edition still requires its own complete terms consent after publication", async () => {
+  const original = Reflect.get(db, "$transaction");
+  let writes = 0;
+  const tx = { publicReservationLease: {
+    findUnique: async () => ({ status: "READY", version: PREVIOUS_STORAGE_TERMS_VERSION, sha256: "a".repeat(64), expiresAt: new Date(Date.now() + 60000), reservation: { status: "ACTIVE", customer: { organisationId: "sample" } } }),
+    updateMany: async () => { writes++; return { count: 1 }; },
+  } };
+  Reflect.set(db, "$transaction", async (callback: (value: typeof tx) => unknown) => callback(tx));
+  const input = { signerName: "Sample", initials: LEASE_CLAUSE_KEYS, signerIp: null, signerUserAgent: null };
+  try {
+    await assert.rejects(completePublicReservationLease("sample", input), /VALIDATION_ERROR/);
+    await assert.rejects(completePublicReservationLease("sample", { ...input, termsAccepted: true, acceptedSha256: "b".repeat(64) }), /VALIDATION_ERROR/);
+    assert.equal(writes, 0);
+  } finally { Reflect.set(db, "$transaction", original); }
+});
+
+test("the previous signed review edition resumes unchanged and rejects repricing without being rewritten", async () => {
+  const original = Reflect.get(db.reservation, "findUnique");
+  const previousContext = { ...context, storagePackage: null };
+  const reservation = { status: "ACTIVE", journey: "RENTAL", contactVerifiedAt: new Date(), intendedMoveIn: context.startDate, quotedRate: context.monthlyRate,
+    customer: { companyName: context.customerName, emailVerifiedAt: new Date() }, facility: { name: context.facilityName }, unit: { number: context.unitNumber, unitType: { name: context.unitTypeName } },
+    publicLease: { status: "SIGNED", version: PREVIOUS_STORAGE_TERMS_VERSION, signingToken: "previous-token", sha256: createHash("sha256").update(renderPreviousEdition(previousContext)).digest("hex") } };
+  Reflect.set(db.reservation, "findUnique", async () => reservation);
+  try {
+    assert.equal((await preparePublicReservationLease("SAMPLE", "DEBIT_ORDER")).ok, true);
+    reservation.quotedRate = 1600;
+    assert.deepEqual(await preparePublicReservationLease("SAMPLE", "DEBIT_ORDER"), { ok: false, code: "SIGNED_LEASE_CHANGED" });
+    assert.equal(reservation.publicLease.version, PREVIOUS_STORAGE_TERMS_VERSION);
+  } finally { Reflect.set(db.reservation, "findUnique", original); }
 });
 
 test("historical signed reservation can resume but changed commercial terms cannot", async () => {

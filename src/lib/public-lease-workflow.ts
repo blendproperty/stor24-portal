@@ -11,7 +11,7 @@ import {
   type PublicLeasePaymentMethod,
 } from "@/lib/lease-agreement-content";
 import { renderSignedLeasePdf } from "@/lib/public-lease-pdf";
-import { buildReviewLeaseClauses, renderReviewLeaseDocument, STORAGE_TERMS_VERSION } from "@/lib/storage-terms";
+import { buildReviewLeaseClauses, renderStorageTermsEdition, requiresFullTermsAcceptance, STORAGE_TERMS_VERSION } from "@/lib/storage-terms";
 
 const signingWindowMs = 7 * 24 * 60 * 60 * 1000;
 
@@ -52,8 +52,9 @@ export async function preparePublicReservationLease(reference: string, paymentMe
   // Keep historical signed agreements on their original renderer, while still
   // detecting a changed price, goods selection or payment method.
   const legacySigned = reservation.publicLease?.status === "SIGNED" && reservation.publicLease.version === LEASE_VERSION;
-  if (reservation.publicLease?.status === "SIGNED" && !legacySigned && reservation.publicLease.version !== STORAGE_TERMS_VERSION) return { ok: false as const, code: "SIGNED_LEASE_CHANGED" };
-  const content = legacySigned ? renderLeaseDocument(context) : renderReviewLeaseDocument(context);
+  const edition = reservation.publicLease?.status === "SIGNED" ? reservation.publicLease.version : STORAGE_TERMS_VERSION;
+  const content = legacySigned ? renderLeaseDocument(context) : renderStorageTermsEdition(context, edition);
+  if (!content) return { ok: false as const, code: "SIGNED_LEASE_CHANGED" };
   const sha256 = createHash("sha256").update(content).digest("hex");
   const clauses = buildReviewLeaseClauses(context);
   const now = new Date();
@@ -90,7 +91,7 @@ export async function getPublicReservationLease(token: string) {
     version: lease.version,
     sha256: lease.sha256,
     content: lease.content,
-    requiresTermsAcceptance: lease.version === STORAGE_TERMS_VERSION,
+    requiresTermsAcceptance: requiresFullTermsAcceptance(lease.version),
     clauses: lease.clauses,
     expiresAt: lease.expiresAt.toISOString(),
     signedAt: lease.signedAt?.toISOString() ?? null,
@@ -121,9 +122,9 @@ export async function completePublicReservationLease(token: string, input: { sig
     if (lease.expiresAt < new Date()) throw new Error("EXPIRED");
     if (identityRequired(lease.reservation.customer.organisationId, lease.reservation.createdAt)) await tx.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id" = ${lease.reservationId} FOR UPDATE`;
     if (!(await identityGate(tx, lease.reservation.customer.organisationId, lease.reservationId, lease.reservation.createdAt, "SIGN"))) throw new Error("IDENTITY_REQUIRED");
-    if (lease.version === STORAGE_TERMS_VERSION && (input.termsAccepted !== true || input.acceptedSha256 !== lease.sha256)) throw new Error("VALIDATION_ERROR");
+    if (requiresFullTermsAcceptance(lease.version) && (input.termsAccepted !== true || input.acceptedSha256 !== lease.sha256)) throw new Error("VALIDATION_ERROR");
     const signedAt = new Date();
-    const initials = [...LEASE_CLAUSE_KEYS.map((clauseKey) => ({ clauseKey: String(clauseKey), initialedAt: signedAt.toISOString() })), ...(lease.version === STORAGE_TERMS_VERSION ? [{ clauseKey: `full_terms:${lease.version}:${lease.sha256}`, initialedAt: signedAt.toISOString() }] : [])];
+    const initials = [...LEASE_CLAUSE_KEYS.map((clauseKey) => ({ clauseKey: String(clauseKey), initialedAt: signedAt.toISOString() })), ...(requiresFullTermsAcceptance(lease.version) ? [{ clauseKey: `full_terms:${lease.version}:${lease.sha256}`, initialedAt: signedAt.toISOString() }] : [])];
     const pdf = await renderSignedLeasePdf({ content: lease.content, reference: lease.reservation.publicReference!, paymentMethod: lease.paymentMethod, signerName: input.signerName, signedAt, sha256: lease.sha256 });
     const signedPdfSha256 = createHash("sha256").update(pdf).digest("hex");
     const changed = await tx.publicReservationLease.updateMany({ where: { id: lease.id, status: "READY", signedAt: null }, data: { status: "SIGNED", signerName: input.signerName, signerIp: input.signerIp, signerUserAgent: input.signerUserAgent, initials, signedAt, signedPdf: Buffer.from(pdf), signedPdfSha256 } });
