@@ -24,7 +24,7 @@ async function collectionReady(database: Database) {
 }
 export async function identityStatus(reference: string, token: string) {
   const booking = await publicBooking(db, reference, token);
-  const policy = identityRequired(booking.customer.organisationId, booking.createdAt);
+  const policy = identityRequired(booking.customer.organisationId, booking.createdAt, booking.id);
   const document = await db.identityDocument.findUnique({ where: { reservationId: booking.id }, select: { ...identitySummary, policyHash: true } });
   let available = false;
   if (policy) { try { await collectionReady(db); available = true; } catch { /* Fail closed for new uploads, retain readable status. */ } }
@@ -36,7 +36,7 @@ export async function identityStatus(reference: string, token: string) {
 }
 export async function submitIdentity(reference: string, token: string, input: { expectedVersion: number; policyHash: string; acknowledged: boolean; documentType: string; pages: File[] }) {
   const booking = await publicBooking(db, reference, token);
-  const policy = identityRequired(booking.customer.organisationId, booking.createdAt);
+  const policy = identityRequired(booking.customer.organisationId, booking.createdAt, booking.id);
   if (!policy) throw new Error("ID_POLICY_UNAVAILABLE");
   if (!input.acknowledged || policy.hash !== input.policyHash) throw new Error("ID_NOTICE_REQUIRED");
   if (!policy.acceptedTypes.some(type => type === input.documentType) || input.pages.length !== (input.documentType === "ID_CARD" ? 2 : 1)) throw new Error("ID_INVALID");
@@ -48,7 +48,7 @@ export async function submitIdentity(reference: string, token: string, input: { 
     return await db.$transaction(async tx => {
       await lock(tx, booking.id);
       const currentBooking = await publicBooking(tx, reference, token);
-      const currentPolicy = identityRequired(currentBooking.customer.organisationId, currentBooking.createdAt);
+      const currentPolicy = identityRequired(currentBooking.customer.organisationId, currentBooking.createdAt, currentBooking.id);
       if (!currentPolicy || currentPolicy.hash !== input.policyHash) throw new Error("ID_NOTICE_REQUIRED");
       await collectionReady(tx);
       const previous = await tx.identityDocument.findUnique({ where: { reservationId: booking.id } });
@@ -74,7 +74,7 @@ export async function withdrawIdentity(reference: string, token: string, version
   });
 }
 export async function identityGate(database: Database, organisationId: string, reservationId: string, createdAt: Date, stage: "SIGN" | "HANDOVER") {
-  const policy = identityRequired(organisationId, createdAt);
+  const policy = identityRequired(organisationId, createdAt, reservationId);
   if (!policy) return true;
   const booking = await database.reservation.findUnique({ where: { id: reservationId }, select: { publicReference: true } });
   if (!booking?.publicReference) return true; // This policy applies to online bookings; assisted intake is a separate workflow.
@@ -89,7 +89,7 @@ async function scopedDocument(database: Database, scope: RequestScope, id: strin
   if (!initial) throw new Error("NOT_FOUND");
   await lock(database, initial.reservationId);
   const document = await database.identityDocument.findUniqueOrThrow({ where: { id }, include: { reservation: true } });
-  const policy = identityRequired(scope.organisationId, document.reservation.createdAt);
+  const policy = identityRequired(scope.organisationId, document.reservation.createdAt, document.reservationId);
   if (document.version !== version || !pending.includes(document.status) || document.expiresAt <= new Date() || !document.encryptedPages || document.reservation.status !== "ACTIVE" || !policy || policy.hash !== document.policyHash) throw new Error("ID_CHANGED");
   return document;
 }
