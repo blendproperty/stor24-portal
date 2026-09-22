@@ -20,7 +20,7 @@ const server=createServer(async(req,res)=>{
 await new Promise(resolve=>server.listen(0,"127.0.0.1",resolve));
 const browser=await chromium.launch(); const page=await browser.newPage(), errors=[];page.on("pageerror",error=>errors.push(error.message));
 let documents=[], writes=0;
-const document={id:"synthetic",version:1,status:"AWAITING_REVIEW",documentType:"ID_CARD",pageCount:2,expiresAt:"2099-01-01T00:00:00Z",erasedAt:null,reservation:{publicReference:"ST24-PREVIEW",facility:{name:"Training store"},unit:{number:"106"},customer:{firstName:"Sample",lastName:"Customer",companyName:null}}};
+const document={id:"synthetic",version:1,status:"AWAITING_REVIEW",documentType:"ID_CARD",pageCount:2,retentionMode:"TENANCY",expiresAt:null,erasedAt:null,reservation:{publicReference:"ST24-PREVIEW",facility:{name:"Training store"},unit:{number:"106"},customer:{firstName:"Sample",lastName:"Customer",companyName:null}}};
 try {
  await page.route("**/api/v1/identity-documents**",route=>{
   if(route.request().method()==="POST"){writes++;return route.fulfill({status:409,json:{error:{message:"This document changed. Refresh before continuing."}}});}
@@ -43,5 +43,12 @@ try {
  await page.screenshot({path:"output/identity/staff-review-mobile.png",fullPage:true});
  await page.getByRole("button",{name:"Accept document",exact:true}).click();await expect(page.getByRole("alert")).toBeVisible();await expect(page.getByRole("img")).toHaveCount(0);assert.equal(writes,1);
  await expect(page.getByRole("button",{name:"Accept document",exact:true})).toBeDisabled();assert.deepEqual(errors,[]);
+ documents=[{...document,status:"ACCEPTED",reservation:{...document.reservation,status:"CONVERTED"}}];
+ await page.goto(base+"?enabled");await page.getByRole("button",{name:/Sample Customer/}).click();
+ await expect(page.getByText("Retained for the tenancy. Each private view is recorded.")).toBeVisible();
+ await expect(page.getByRole("button",{name:"Accept document",exact:true})).toHaveCount(0);
+ await expect(page.getByRole("button",{name:"Request replacement",exact:true})).toHaveCount(0);
+ await page.getByRole("button",{name:"Open front",exact:true}).click();await expect(page.getByRole("img")).toBeVisible();
+ assert.equal(writes,1);assert.deepEqual(errors,[]);
  console.log("Identity review browser: held state, responsive bounds, private two-page preview, stale approval and cleared preview passed.");
 } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}

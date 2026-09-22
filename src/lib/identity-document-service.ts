@@ -5,9 +5,12 @@ import { integrationEncryptionConfigured } from "@/lib/integrations/integration-
 import { decryptIdentity, encryptIdentity, identityAccessMatches, identityPolicy, identityRequired, normaliseIdentityPage } from "@/lib/identity-document-security";
 
 type Database = Prisma.TransactionClient;
-export const identitySummary = { id: true, reservationId: true, version: true, status: true, documentType: true, pageCount: true, acknowledgedAt: true, expiresAt: true, reviewedAt: true, erasedAt: true, replacementReason: true } as const;
+export const identitySummary = { id: true, reservationId: true, version: true, status: true, documentType: true, pageCount: true, acknowledgedAt: true, retentionMode: true, expiresAt: true, reviewedAt: true, erasedAt: true, replacementReason: true } as const;
 const binding = (id: string, version: number) => `reservation:${id}:identity:${version}`;
 const pending = ["AWAITING_REVIEW", "ACCEPTED"];
+function copyWithinRetention(document: { retentionMode: string; expiresAt: Date | null }) {
+  return document.retentionMode === "TENANCY" ? document.expiresAt === null : Boolean(document.expiresAt && document.expiresAt > new Date());
+}
 async function lock(database: Database, id: string) {
   await database.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id" = ${id} FOR UPDATE`;
 }
@@ -28,11 +31,11 @@ export async function identityStatus(reference: string, token: string) {
   const document = await db.identityDocument.findUnique({ where: { reservationId: booking.id }, select: { ...identitySummary, policyHash: true } });
   let available = false;
   if (policy) { try { await collectionReady(db); available = true; } catch { /* Fail closed for new uploads, retain readable status. */ } }
-  const valid = document && policy && document.policyHash === policy.hash && (document.status === "ACCEPTED" || (document.status === "AWAITING_REVIEW" && document.expiresAt > new Date()));
+  const valid = document && policy && document.policyHash === policy.hash && (document.status === "ACCEPTED" || (document.status === "AWAITING_REVIEW" && copyWithinRetention(document)));
   const lease = await db.publicReservationLease.findUnique({ where: { reservationId: booking.id }, select: { signingToken: true } });
   return { agreementToken: lease?.signingToken ?? null, required: Boolean(policy), available, canContinue: !policy || Boolean(valid),
     policy: policy ? { hash: policy.hash, notice: policy.notice, acknowledgementLabel: policy.acknowledgementLabel, acceptedTypes: policy.acceptedTypes, alternativeContact: policy.alternativeContact } : null,
-    document: document ? { ...document, status: document.status === "AWAITING_REVIEW" && document.expiresAt <= new Date() ? "EXPIRED" : document.status } : null };
+    document: document ? { ...document, status: document.status === "AWAITING_REVIEW" && !copyWithinRetention(document) ? "EXPIRED" : document.status } : null };
 }
 export async function submitIdentity(reference: string, token: string, input: { expectedVersion: number; policyHash: string; acknowledged: boolean; documentType: string; pages: File[] }) {
   const booking = await publicBooking(db, reference, token);
@@ -56,9 +59,9 @@ export async function submitIdentity(reference: string, token: string, input: { 
       const version = (previous?.version ?? 0) + 1, now = new Date();
       const values = { version, status: "AWAITING_REVIEW", documentType: input.documentType, pageCount: pages.length,
         encryptedPages: encryptIdentity(payload!, binding(booking.id, version)), policyHash: currentPolicy.hash, policySnapshot: JSON.stringify(currentPolicy),
-        acknowledgedAt: now, expiresAt: new Date(now.getTime() + currentPolicy.retentionHours * 3600000), reviewedAt: null, reviewedById: null, erasedAt: null, replacementReason: null };
+        acknowledgedAt: now, retentionMode: currentPolicy.retentionMode ?? "FIXED_PERIOD", expiresAt: currentPolicy.retentionMode === "TENANCY" ? null : new Date(now.getTime() + currentPolicy.retentionHours! * 3600000), reviewedAt: null, reviewedById: null, erasedAt: null, replacementReason: null };
       const document = await tx.identityDocument.upsert({ where: { reservationId: booking.id }, create: { reservationId: booking.id, ...values }, update: values, select: identitySummary });
-      await tx.auditEvent.create({ data: { organisationId: booking.customer.organisationId, facilityId: booking.facilityId, action: "identity_document.submitted", entityType: "IdentityDocument", entityId: document.id, after: { version, approvedPolicy: currentPolicy, expiresAt: values.expiresAt.toISOString() } } });
+      await tx.auditEvent.create({ data: { organisationId: booking.customer.organisationId, facilityId: booking.facilityId, action: "identity_document.submitted", entityType: "IdentityDocument", entityId: document.id, after: { version, approvedPolicy: currentPolicy, expiresAt: values.expiresAt?.toISOString() ?? null } } });
       return document;
     });
   } finally { pages.forEach(page => page.fill(0)); payload?.fill(0); }
@@ -80,18 +83,20 @@ export async function identityGate(database: Database, organisationId: string, r
   if (!policy) return true;
   if (!booking?.publicReference) return true; // This policy applies to online bookings; assisted intake is a separate workflow.
   const document = await database.identityDocument.findUnique({ where: { reservationId } });
-  return Boolean(document && document.policyHash === policy.hash && (document.status === "ACCEPTED" || (stage === "SIGN" && document.status === "AWAITING_REVIEW" && document.encryptedPages && document.expiresAt > new Date())));
+  return Boolean(document && document.policyHash === policy.hash && (document.status === "ACCEPTED" || (stage === "SIGN" && document.status === "AWAITING_REVIEW" && document.encryptedPages && copyWithinRetention(document))));
 }
 export async function listIdentityDocuments(scope: RequestScope) {
-  return db.identityDocument.findMany({ where: { reservation: { facility: facilityWhere(scope), customer: { organisationId: scope.organisationId } } }, select: { ...identitySummary, reservation: { select: { facilityId: true, publicReference: true, facility: { select: { name: true } }, unit: { select: { number: true } }, customer: { select: { firstName: true, lastName: true, companyName: true } } } } }, orderBy: { acknowledgedAt: "desc" }, take: 200 });
+  return db.identityDocument.findMany({ where: { reservation: { facility: facilityWhere(scope), customer: { organisationId: scope.organisationId } } }, select: { ...identitySummary, reservation: { select: { status: true, facilityId: true, publicReference: true, facility: { select: { name: true } }, unit: { select: { number: true } }, customer: { select: { firstName: true, lastName: true, companyName: true } } } } }, orderBy: { acknowledgedAt: "desc" }, take: 200 });
 }
 async function scopedDocument(database: Database, scope: RequestScope, id: string, version: number) {
   const initial = await database.identityDocument.findFirst({ where: { id, reservation: { facility: facilityWhere(scope), customer: { organisationId: scope.organisationId } } }, select: { reservationId: true } });
   if (!initial) throw new Error("NOT_FOUND");
   await lock(database, initial.reservationId);
-  const document = await database.identityDocument.findUniqueOrThrow({ where: { id }, include: { reservation: { include: { customer: { select: { email: true } } } } } });
+  const document = await database.identityDocument.findUniqueOrThrow({ where: { id }, include: { reservation: { include: { customer: { select: { email: true } }, convertedTenancy: { select: { status: true, customerId: true, facilityId: true } } } } } });
   const policy = identityRequired(scope.organisationId, document.reservation.createdAt, document.reservationId, document.reservation.customer.email);
-  if (document.version !== version || !pending.includes(document.status) || document.expiresAt <= new Date() || !document.encryptedPages || document.reservation.status !== "ACTIVE" || !policy || policy.hash !== document.policyHash) throw new Error("ID_CHANGED");
+  const tenancy = document.reservation.convertedTenancy;
+  const retainedTenancy = document.retentionMode === "TENANCY" && document.reservation.status === "CONVERTED" && tenancy && ["ACTIVE", "NOTICE_GIVEN"].includes(tenancy.status) && tenancy.customerId === document.reservation.customerId && tenancy.facilityId === document.reservation.facilityId;
+  if (document.version !== version || !pending.includes(document.status) || !copyWithinRetention(document) || !document.encryptedPages || (document.reservation.status !== "ACTIVE" && !retainedTenancy) || !policy || policy.hash !== document.policyHash) throw new Error("ID_CHANGED");
   return document;
 }
 export async function previewIdentity(scope: RequestScope, id: string, version: number, page: number) {
@@ -110,6 +115,8 @@ export const replacementReasons = ["Image is not clear enough", "Document is inc
 export async function reviewIdentity(scope: RequestScope, id: string, version: number, decision: "ACCEPT" | "REPLACE", reason?: string) {
   return db.$transaction(async tx => {
     const document = await scopedDocument(tx, scope, id, version);
+    // A handed-over identity remains readable to authorised staff, not mutable through onboarding review.
+    if (document.reservation.status !== "ACTIVE") throw new Error("ID_CHANGED");
     if (decision === "ACCEPT") {
       for (let page = 0; page < document.pageCount; page++) {
         const preview = await tx.auditEvent.findFirst({ where: { actorId: scope.userId, entityId: id, action: "identity_document.previewed", AND: [{ after: { path: ["version"], equals: version } }, { after: { path: ["page"], equals: page } }] } });
@@ -122,7 +129,13 @@ export async function reviewIdentity(scope: RequestScope, id: string, version: n
 }
 export async function expireIdentityDocuments() {
   const now = new Date();
-  const due: Prisma.IdentityDocumentWhereInput = { encryptedPages: { not: null }, OR: [{ expiresAt: { lte: now } }, { reservation: { status: { in: ["CANCELLED", "EXPIRED", "CONVERTED"] } } }, { reservation: { holdExpiresAt: { lte: now }, publicLease: { isNot: { status: "SIGNED" } } } }] };
+  // Use the retention mode recorded at upload, never today's policy: a new policy cannot extend an old acknowledgement.
+  const due: Prisma.IdentityDocumentWhereInput = { encryptedPages: { not: null }, OR: [
+    { retentionMode: "FIXED_PERIOD", OR: [{ expiresAt: { lte: now } }, { reservation: { status: "CONVERTED" } }] },
+    { reservation: { status: { in: ["CANCELLED", "EXPIRED"] } } },
+    { reservation: { status: "ACTIVE", holdExpiresAt: { lte: now }, publicLease: { isNot: { status: "SIGNED" } } } },
+    { retentionMode: "TENANCY", reservation: { status: "CONVERTED", OR: [{ convertedTenancyId: null }, { convertedTenancy: { status: { in: ["CLOSED", "CANCELLED"] } } }] } },
+  ] };
   const documents = await db.identityDocument.findMany({ where: due, select: { id: true, reservationId: true }, take: 100 });
   let erased = 0;
   for (const item of documents) {

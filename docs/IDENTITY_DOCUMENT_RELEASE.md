@@ -12,6 +12,14 @@ Documents are AES-256-GCM encrypted with a separate identity namespace and reser
 
 Replacement increments the version and invalidates review; stale writes fail. Rejection and customer removal erase the current encrypted copy. Privacy-policy changes require fresh acknowledgement. A current awaiting-review upload permits signing; acceptance is enforced in the staff handover transaction. The original document/person, signed agreement and real verified payment still require the existing staff handover process. Acceptance never activates access. An old signing link cannot bypass a withdrawn, rejected or expired pending ID.
 
+## Real customer retention decision — 22 September 2026
+
+Brett rejected the sample-only journey and instructed actual ID collection, selecting retention throughout the tenancy. The scoped real customer release supersedes the pilot-only restriction below for his existing verified-email scope. See `IDENTITY_DOCUMENT_CUSTOMER_NOTICE.md` for the actual notice and precise boundary; do not keep describing the authorised customer as a tester or his upload as a sample.
+
+`retentionMode: TENANCY` is mutually exclusive with `retentionHours`. The document row snapshots this choice, with null expiry only for tenancy mode. Fixed-period rows preserve their existing expiry and policy hash. Tenancy-mode copies survive handover and ACTIVE/NOTICE_GIVEN tenancy states; actual CLOSED/CANCELLED states trigger scheduled erasure. Cancelled/expired/abandoned bookings still erase copies. Authorised staff can preview retained copies after handover but cannot mutate them through onboarding review. Closure immediately blocks preview. A migration adds the mode and a database constraint enforcing mode/expiry consistency. Do not roll back to a pre-tenancy-retention binary while tenancy-mode copies exist; remove collection and deploy a compatible forward fix instead.
+
+The earlier legal/readiness checklist remains relevant to wider rollout and must not be treated as a request to repeat Brett's already given collection/retention instruction. Separate backup/audit policy and provider/financial launch acceptance are not proved by this release.
+
 ## Legal activation and retention
 
 ### Controlled production test

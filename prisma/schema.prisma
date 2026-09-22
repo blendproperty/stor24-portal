@@ -1744,7 +1744,8 @@ model IdentityDocument {
   policyHash String
   policySnapshot String @db.Text
   acknowledgedAt DateTime
-  expiresAt DateTime
+  retentionMode String @default("FIXED_PERIOD")
+  expiresAt DateTime?
   reviewedAt DateTime?
   reviewedById String?
   replacementReason String?
