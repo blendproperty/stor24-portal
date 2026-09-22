@@ -1,4 +1,10 @@
-.face-workspace,.face-tenant { font-family:"Satoshi Handover",Arial,sans-serif; font-weight:400; }
+.face-page,.face-workspace,.face-tenant { font-family:"Satoshi Handover",Arial,sans-serif; font-weight:400; }
+.face-page .page-header h1 { font-size:38px; font-weight:700; }
+.face-page .page-header p,.face-page .panel-subtitle { font-weight:400; }
+.face-provider-records { background:#fff; border:1px solid #dfe5e0; border-radius:14px; padding:20px 24px; }
+.face-provider-records summary { font-size:14px; font-weight:500; cursor:pointer; }
+.face-provider-records summary span { display:block; color:#627267; font-size:12px; font-weight:400; margin-top:4px; }
+.face-provider-records[open] summary { margin-bottom:22px; }
 .face-workspace { background:#fff; border:1px solid #dfe5e0; border-radius:20px; padding:32px; color:#13291f; line-height:1.6; }
 .face-workspace h2,.face-workspace h3,.face-workspace h4,.face-workspace p { margin:0; }
 .face-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; }

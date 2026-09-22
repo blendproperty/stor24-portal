@@ -56,11 +56,8 @@ export function MelIntegrationStatus({
           <div>
             <h2>MEL identity links</h2>
             <p className="panel-subtitle">
-              Maps each customer to a proposed MEL IntegrationLinkID and HikCentral
-              person, per docs/MEL_INTEGRATION_OWNERSHIP_MATRIX.md. No live MEL
-              provider is connected yet, so this register only fills in once a
-              real identity-linking flow is agreed and built — an empty table here
-              is expected, not a fault.
+              Links between STOR24 customers and their access-provider records
+              will appear here once identity linking is enabled and verified.
             </p>
           </div>
         </div>
@@ -97,7 +94,7 @@ export function MelIntegrationStatus({
               ) : (
                 <tr>
                   <td colSpan={6} className="empty-cell">
-                    No MEL identity links yet — no provider agreement is in place.
+                    No verified identity links yet.
                   </td>
                 </tr>
               )}
@@ -110,12 +107,9 @@ export function MelIntegrationStatus({
           <div>
             <h2>Access decisions</h2>
             <p className="panel-subtitle">
-              STOR24&apos;s own desired/pending/confirmed access-governance log
-              (src/lib/access-decision-service.ts). This service is not yet wired
-              into the live enrol/revoke or payment flows, so no rows are created
-              by normal use today — this table exists so the workspace is ready
-              the moment that wiring lands, without any change to how the
-              existing HikCentral enrolment above behaves.
+              Activation, suspension, restoration and removal requests will
+              appear here once the provider workflow is enabled. A recorded
+              request does not confirm that access changed at the gate.
             </p>
           </div>
         </div>
@@ -157,8 +151,7 @@ export function MelIntegrationStatus({
               ) : (
                 <tr>
                   <td colSpan={7} className="empty-cell">
-                    No access decisions recorded yet — this log fills in once
-                    Stage 5 wiring is approved and built.
+                    No provider access decisions recorded yet.
                   </td>
                 </tr>
               )}
