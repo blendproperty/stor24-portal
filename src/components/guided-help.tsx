@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, BookOpen, Check, CheckCircle2, Compass, LocateFixed, Pause, RotateCcw, X } from "lucide-react";
-import { filterGuides, guideStorageKey, helpForPath, parseGuidePreferences, reviewGuideStep, stepMatchesPath, workflowGuides, type GuidePreferences, type GuideStep } from "@/lib/guided-help";
+import { filterGuides, guideStorageKey, helpForPath, parseGuidePreferences, reviewGuideStep, stepMatchesPath, type GuideCatalogue, type WorkflowGuide, type GuidePreferences, type GuideStep } from "@/lib/guided-help-state";
 
 const preferenceEvent = "stor24-guided-help-change";
 const unsavedPreferences = new Map<string, string>();
@@ -19,13 +19,13 @@ function subscribe(callback: () => void) {
 }
 const serverSnapshot = () => null;
 
-function useGuidePreferences(userId: string) {
+function useGuidePreferences(userId: string, workflowGuides: WorkflowGuide[]) {
   const key = guideStorageKey(userId);
   const snapshot = useCallback(() => readPreferences(key), [key]);
   const raw = useSyncExternalStore(subscribe, snapshot, serverSnapshot);
-  const preferences = useMemo(() => parseGuidePreferences(raw), [raw]);
+  const preferences = useMemo(() => parseGuidePreferences(raw, workflowGuides), [raw, workflowGuides]);
   const save = (next: GuidePreferences) => {
-    const value = JSON.stringify(next);
+    const value = JSON.stringify({ ...next, progress: Object.fromEntries(Object.entries(next.progress).map(([id, progress]) => [id, { ...progress, stepId: workflowGuides.find(guide => guide.id === id)?.steps[progress.step]?.id }])) });
     let saved = true;
     try { window.localStorage.setItem(key, value); unsavedPreferences.delete(key); }
     catch { unsavedPreferences.set(key, value); saved = false; }
@@ -74,7 +74,23 @@ function GuideHighlight({ step }: { step: GuideStep }) {
 export function GuidedHelp({ userId }: { userId: string }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { preferences, save } = useGuidePreferences(userId);
+  const [catalogue, setCatalogue] = useState<GuideCatalogue | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const workflowGuides = useMemo(() => catalogue?.guides ?? [], [catalogue]);
+  const { preferences, save } = useGuidePreferences(userId, workflowGuides);
+  const requestId = useRef(0);
+  const loadCatalogue = useCallback(() => {
+    const request = ++requestId.current;
+    return fetch("/api/v1/guided-help", { cache: "no-store" }).then(async response => {
+      if (!response.ok) throw new Error("Guide access unavailable");
+      return response.json() as Promise<{ data: GuideCatalogue }>;
+    }).then(result => {
+      if (request === requestId.current) { setCatalogue(result.data); setLoadFailed(false); }
+    }).catch(() => {
+      if (request === requestId.current) { setCatalogue(null); setLoadFailed(true); }
+    });
+  }, []);
+  const cancelLoad = useCallback(() => { requestId.current++; }, []);
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"library" | "guide" | "finished">("library");
   const [saveFailed, setSaveFailed] = useState(false);
@@ -87,16 +103,16 @@ export function GuidedHelp({ userId }: { userId: string }) {
   const progress = guide ? preferences.progress[guide.id] : undefined;
   const index = progress?.step ?? 0;
   const step = guide?.steps[index];
-  const help = helpForPath(pathname);
+  const help = helpForPath(pathname, catalogue?.pages ?? []);
   const screenView = view !== "library" && (!preferences.enabled || !guide) ? "library" : view;
   const active = open && screenView === "guide" && guide && step;
   const onStepPage = step && stepMatchesPath(step, pathname);
-  const visibleGuides = filterGuides(query, category);
+  const visibleGuides = filterGuides(query, category, workflowGuides);
   const relatedGuides = workflowGuides.filter(item => item.id !== ("guideId" in help ? help.guideId : null) && item.steps.some(itemStep => stepMatchesPath(itemStep, pathname)));
 
   function persist(next: GuidePreferences) { setSaveFailed(!save(next)); }
   function close() { setOpen(false); setLocateMessage(""); trigger.current?.focus(); }
-  function showLibrary() { setView("library"); setLocateMessage(""); setOpen(true); }
+  function showLibrary() { setView("library"); setLocateMessage(""); setCatalogue(null); setLoadFailed(false); setOpen(true); if (open) void loadCatalogue(); }
   function start(id: string, restart = false) {
     const selected = workflowGuides.find(item => item.id === id);
     if (!selected) return;
@@ -114,7 +130,7 @@ export function GuidedHelp({ userId }: { userId: string }) {
   }
   function next() {
     if (!guide) return;
-    const updated = reviewGuideStep(preferences, guide.id, index);
+    const updated = reviewGuideStep(preferences, guide.id, index, workflowGuides);
     persist(updated); setLocateMessage("");
     if (index === guide.steps.length - 1) setView("finished");
   }
@@ -125,6 +141,17 @@ export function GuidedHelp({ userId }: { userId: string }) {
     target.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start", inline: "nearest" });
     setLocateMessage("The relevant area is outlined in orange. You can use the page normally, or pause the guide for more room.");
   }
+
+  useEffect(() => {
+    if (!open) return;
+    const refresh = () => { setCatalogue(null); setLoadFailed(false); void loadCatalogue(); };
+    // Recheck fresh database permissions on navigation, focus and while help stays open.
+    // Failure closes access to previously loaded guides; private responses are never cached.
+    const timer = window.setInterval(() => { void loadCatalogue(); }, 30000);
+    window.addEventListener("focus", refresh);
+    void loadCatalogue();
+    return () => { clearInterval(timer); window.removeEventListener("focus", refresh); cancelLoad(); };
+  }, [open, pathname, userId, loadCatalogue, cancelLoad]);
 
   useEffect(() => {
     if (!open) return;
@@ -150,12 +177,13 @@ export function GuidedHelp({ userId }: { userId: string }) {
         <div className="guide-panel-header"><span><Compass size={19} aria-hidden="true" /> YOUR WORKFLOW COMPANION</span><button type="button" className="guide-icon" aria-label="Close guided help" onClick={close}><X size={20} /></button></div>
         <div className="guide-panel-scroll">
           <div className="guide-intro"><p className="guide-eyebrow">STOR24 · LEARN AS YOU GO</p><h2 ref={heading} tabIndex={-1}>{screenView === "library" ? "A little guidance.\nA clearer next step." : screenView === "finished" ? "Reading complete." : guide?.title ?? "Your workflow guides"}</h2>
-            {screenView === "library" && <p>Short guides to help you find your way and understand what happens next.</p>}
+            {screenView === "library" && <p>Guides matched to your current permissions and the tasks available to you.</p>}
           </div>
-          <div className="guide-mode"><div><strong>Guide mode</strong><small>{preferences.enabled ? "On · highlights available" : "Off · work without highlights"}</small></div><button type="button" role="switch" aria-checked={preferences.enabled} aria-label="Guide mode" className="guide-switch" onClick={() => { persist({ ...preferences, enabled: !preferences.enabled }); setView("library"); setLocateMessage(""); }}><span /></button></div>
+          <div className="guide-mode"><div><strong>Guide mode</strong><small>{preferences.enabled ? "On · highlights available" : "Off · work without highlights"}</small></div><button type="button" role="switch" disabled={!catalogue} aria-checked={preferences.enabled} aria-label="Guide mode" className="guide-switch" onClick={() => { persist({ ...preferences, enabled: !preferences.enabled }); setView("library"); setLocateMessage(""); }}><span /></button></div>
           {saveFailed && <p role="status" className="guide-notice">Browser storage is unavailable. You can still use the guides, but your preference and progress may be lost when you leave.</p>}
 
-          {screenView === "library" && <>
+          {!catalogue && <p role="status" className="guide-notice">{loadFailed ? "We could not confirm your tutorial access. Reopen Guide me when you are signed in and online." : "Checking the guides available to your account…"}</p>}
+          {catalogue && screenView === "library" && <>
             <section className="guide-page-help"><span className="guide-eyebrow">HELP WITH THIS PAGE</span><h3>{help.title}</h3><p>{help.body}</p>{"guideId" in help && help.guideId && <button type="button" className="guide-text-action" onClick={() => start(help.guideId!)}>Guide me through this <ArrowRight size={16} /></button>}</section>
             {relatedGuides.length > 0 && <div className="guide-related"><strong>Also on this screen</strong>{relatedGuides.map(item => <button key={item.id} type="button" className="guide-text-action" onClick={() => start(item.id)}>{item.title}<ArrowRight size={14}/></button>)}</div>}
             {guide && progress && progress.reviewed.length < guide.steps.length && <button type="button" className="guide-resume" onClick={() => start(guide.id)}><span><strong>Continue where you left off</strong><small>{guide.title} · step {index + 1} of {guide.steps.length}</small></span><ArrowRight size={18} /></button>}
@@ -166,7 +194,7 @@ export function GuidedHelp({ userId }: { userId: string }) {
               const reviewed = preferences.progress[item.id]?.reviewed.length ?? 0;
               return <button type="button" key={item.id} className="guide-card" onClick={() => start(item.id)}><span className="guide-card-number">{reviewed === item.steps.length ? <Check size={18} /> : String(number + 1).padStart(2, "0")}</span><span><strong>{item.title}</strong><span className="guide-card-description">{item.description}</span><small>{item.category ?? "Customer journey"} · {item.duration} · {item.steps.length} steps{reviewed > 0 ? ` · ${reviewed} read` : ""}</small></span><ArrowRight size={17} /></button>;
             })}</div>
-            {visibleGuides.length === 0 && <p className="guide-notice">No matching guides. Try a different term or clear the filters to see every workflow.</p>}
+            {visibleGuides.length === 0 && <p className="guide-notice">No matching guides. Try a different term or clear the filters to see your available workflows.</p>}
             <p className="guide-footnote">Starting a guide turns Guide mode on. Settings and reading progress are saved for your sign-in on this browser.</p>
           </>}
 

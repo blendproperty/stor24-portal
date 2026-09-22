@@ -9,6 +9,10 @@ import assert from "node:assert/strict";
 const root = process.cwd();
 const catalogueBundle = await build({ entryPoints: ["src/lib/guided-help.ts"], bundle: true, write: false, format: "esm", platform: "node" });
 const { workflowGuides } = await import(`data:text/javascript;base64,${Buffer.from(catalogueBundle.outputFiles[0].text).toString("base64")}`);
+const accessBundle = await build({ entryPoints: ["src/lib/guided-help-access.ts"], bundle: true, write: false, format: "esm", platform: "node" });
+const { catalogueForAssignments } = await import(`data:text/javascript;base64,${Buffer.from(accessBundle.outputFiles[0].text).toString("base64")}`);
+let guidePersona = [{facilityId: null, role: {name: "Organisation owner", permissions: ["*"]}}];
+let guideAccessDenied = false;
 const navigation = `import React, {useSyncExternalStore} from 'react';
 const subscribe = cb => { window.addEventListener('popstate', cb); return () => window.removeEventListener('popstate', cb); };
 const read = () => window.location.pathname + window.location.search;
@@ -35,6 +39,11 @@ const server = createServer(async (req, res) => {
     res.end(await readFile(path.join(root, "public", url.pathname))); return;
   }
   if (url.pathname === "/api/v1/offline/snapshot") { res.setHeader("content-type", "application/json"); res.end(JSON.stringify({ data: { facilities: [{id: "fixture-store", name: "Training facility with a deliberately long location name", code: "LONG-TRAINING-STORE"}] } })); return; }
+  if (url.pathname === "/api/v1/guided-help") {
+    res.setHeader("content-type", "application/json");
+    if (guideAccessDenied) { res.writeHead(401); res.end(JSON.stringify({error: "UNAUTHENTICATED"})); return; }
+    res.end(JSON.stringify({data: catalogueForAssignments(guidePersona)})); return;
+  }
   if (url.pathname === "/fixture.js") { res.setHeader("content-type", "text/javascript"); res.end(bundle.outputFiles[0].text); return; }
   if (url.pathname === "/fixture.css") { res.setHeader("content-type", "text/css"); res.end(style); return; }
   if (url.pathname === "/api/v1/reservations") { res.setHeader("content-type", "application/json"); res.end(JSON.stringify({data})); return; }
@@ -181,6 +190,7 @@ try {
   await page.screenshot({path: "output/guided-help/expanded-library.png"});
   // Walk every authored step through the real tutorial UI. Business screens remain fixtures.
   for (const guide of workflowGuides) {
+    console.log(`Checking guide: ${guide.id}`);
     await panel.getByLabel("Search guides").fill(guide.title);
     await panel.locator(".guide-card").filter({has: page.getByText(guide.title, {exact: true})}).click();
     for (let index = 0; index < guide.steps.length; index++) {
@@ -200,6 +210,44 @@ try {
   await panel.getByRole("button", {name: "Show me on this page"}).click();
   await expect(panel.getByRole("status")).toContainText("Account statement");
   results.push("Dynamic account statement uses the real URL and handles an absent selected-record target");
+
+  // Real catalogue policy, custom names, restricted routes, stale progress and live revocation.
+  guidePersona = [{facilityId: "fixture-store", role: {name: "Custom facility role", permissions: ["operations.*", "inventory.*", "configuration.view", "users.view", "facility_map.view", "reports.view", "integrations.view", "communications.view"]}}];
+  await page.goto(`${base}/company`);
+  await page.getByRole("button", {name: /Guide me/}).click();
+  await expect(panel.locator(".guide-card").first()).toBeVisible();
+  for (const forbidden of ["Program defaults", "Store setup and public visibility", "Netcash test credentials", "Settings, sign-in"]) await expect(panel).not.toContainText(forbidden);
+  await expect(panel.getByRole("button", {name: "Guide me through this"})).toHaveCount(0);
+  await panel.getByRole("searchbox").fill("App Secret");
+  await expect(panel.locator(".guide-card")).toHaveCount(0);
+  await panel.getByRole("searchbox").fill("");
+  const unitCard = panel.locator(".guide-card").filter({hasText: "Units & rates: your available tasks"});
+  await unitCard.click();
+  await expect(panel).not.toContainText("Reset UAT");
+  await expect(panel.locator(".guide-checklist")).not.toContainText("Keep UAT reset");
+  await page.screenshot({path: "output/guided-help/facility-permissions.png"});
+  // Permission loss while a guide is active is detected on window focus.
+  guidePersona = [];
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(panel.locator(".guide-step")).toHaveCount(0);
+  await expect(panel.locator(".guide-card")).toHaveCount(0);
+  await expect(page.locator(".guide-highlight")).toHaveCount(0);
+  guideAccessDenied = true;
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(panel.getByRole("status")).toContainText("could not confirm");
+  guideAccessDenied = false;
+  guidePersona = [{facilityId: "fixture-store", role: {name: "Custom read only", permissions: ["ledger.view"]}}];
+  // Even forged persisted admin progress cannot restore an unavailable guide.
+  await page.evaluate(() => localStorage.setItem("stor24:guided-help:v1:fixture-staff-a", JSON.stringify({version:1,enabled:true,activeGuide:"program-defaults",progress:{"program-defaults":{step:2,reviewed:[]}}})));
+  await page.goto(`${base}/settings`);
+  await page.getByRole("button", {name: /Guide me/}).click();
+  await expect(panel.locator(".guide-card")).toHaveCount(2);
+  await expect(panel.getByRole("button", {name: /Continue where you left off/})).toHaveCount(0);
+  await expect(panel).not.toContainText("Program defaults");
+  await panel.locator(".guide-card").filter({hasText: "Statements"}).count();
+  await panel.locator(".guide-card").last().click();
+  await expect(panel.locator(".guide-checklist")).not.toContainText("Send only");
+  results.push("Facility/custom/read-only roles, restricted search/context/steps, forged admin progress, active revocation and session failure all fail closed");
 
   await page.goto(`${base}/offline-workspace.html`);
   const offlinePanel = page.locator("#offline-guide");

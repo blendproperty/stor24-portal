@@ -4,7 +4,7 @@ Expanded across the staff backend on 21 September 2026. The earlier three-guide 
 
 ## Using it
 
-Choose **Guide me** in the staff toolbar. **Help with this page** starts its main tutorial; **Also on this screen** exposes additional workflows such as payment, transfer, move-out, statements, packages and setup. Search matches titles, descriptions and step text. Work area filters the library. Clear filters restores every guide.
+Choose **Guide me** in the staff toolbar. **Help with this page** starts its main tutorial; **Also on this screen** exposes additional workflows such as payment, transfer, move-out, statements, packages and setup. Search matches titles, descriptions and step text. Work area filters the library. Clear filters restores every guide available to your account.
 
 Starting a tutorial turns **Guide mode** on. **Show me on this page** outlines the relevant visible area without operating it. **Read & next** records reading only. Back, the checklist, Restart, Pause and Close remain available. Escape closes the guide unless a business modal owns the interaction. Modal forms remain above the tutorial. Switching off removes highlights and returns to the library; it does not erase reading progress. Reloading does not automatically reopen a guide.
 
@@ -12,32 +12,42 @@ Preferences are scoped to the signed-in staff user in this browser, with cross-t
 
 Guidance never submits a reservation, receipt, agreement, message, configuration, stock change or access action. Opening another screen is deliberate. A selected statement uses its real account URL; the guide never invents or selects an account. Missing targets explain which screen, tab, selection or readiness condition is needed.
 
+## Permission matching
+
+The signed-in library is delivered by `/api/v1/guided-help` after `requireSession` reads the current user's database role assignments. Role names and browser progress do not grant tutorial access. Explicit grants and the existing wildcard semantics determine each guide and step; permissions required together must be held for the same facility (organisation-wide grants can contribute). Organisation-wide finance/provider instructions require the corresponding organisation scope. Owner-only steps require a current organisation-owner assignment.
+
+Facility managers with the standard role do not receive company/defaults/settings/credential or employee-administration tutorials. Custom roles receive only the steps covered by their actual grants. Viewing does not imply editing, payment posting, report export, sending, approval or provider configuration. Partial guides have neutral titles/descriptions. Search, categories, counts, contextual/related help, checklists, navigation and saved progress all use only that permitted catalogue. Missing policy entries fail closed and tests require an explicit policy for every new step.
+
+The server returns `private, no-store` responses; the service worker never caches APIs. The client contains state helpers, not the complete staff catalogue. Access refreshes whenever help opens, on navigation/focus, and every 30 seconds while open. Permission or session failures remove loaded tutorials. Previously read material cannot be recalled, but stale/forged saved guide IDs cannot restore restricted guidance. Reading progress saves stable step IDs so filtering does not point at a different action. Load the updated site once after deployment; an already-open old release needs a reload.
+
+This change controls tutorials. It does not modify staff roles, sidebar visibility or the existing server enforcement of operational actions. Personal password/MFA controls continue to follow the application's existing rules.
+
 ## Coverage
 
-43 tutorials contain 204 reading steps across every current staff page and the standalone offline workspace:
+45 authored tutorials contain 212 reading steps (the owner catalogue) across every current staff page and the standalone offline workspace:
 
 | Work area | Tutorials |
 | --- | --- |
 | Customer journey | Orientation; customer records and consent; lead capture; reservations; signed-booking move-in checks; unsigned agreement preparation; transfers; move-out |
-| Money and accounts | Account reading; received payments; statements and portal invitations; billing/reconciliation/daily close; monthly billing; debit-order runs; settlement reconciliation; collections; adjustments/reversals/refunds; Netcash outcomes; proration preview |
-| Facility operations | Tasks and maintenance; units/types/rates/renumbering/batch tools; facility maps; merchandise and stock; packages; paid-order supply; insurance; facial access; calendar |
+| Money and accounts | Account reading; received payments; statements and portal invitations; billing/reconciliation/daily close; monthly billing; debit-order runs; settlement reconciliation; MRI accounting preparation; collections; adjustments/reversals/refunds; Netcash outcomes; proration preview |
+| Facility operations | Tasks and maintenance; units/types/rates/renumbering/batch tools; facility maps; merchandise and stock; packages; paid-order supply; insurance; facial access; private identity-document review; calendar |
 | Reports and oversight | Report parameters and CSV exports; portfolio graphs; system audit |
 | Administration | Store setup/public visibility; tenant defaults; all 18 Program defaults groups; employees/invitations/permissions; settings/password/MFA/recovery; communications; integration health and signing reconciliation; HikCentral; Netcash test configuration; phone integration |
 | Offline work | Device-readiness register; preparation/unlock/capture/unit requests/sync/conflicts/refresh/erasure |
 
-All 34 staff Next pages (including the dynamic account statement) and `/offline-workspace.html` have contextual help. Authentication and customer-facing pages are not staff tutorial surfaces; sign-in/recovery and staff handling of customer portal invitations are explained from the appropriate staff guide.
+All 36 staff Next pages (including the dynamic account statement) and `/offline-workspace.html` have contextual help. Authentication and customer-facing pages are not staff tutorial surfaces; sign-in/recovery and staff handling of customer portal invitations are explained from the appropriate staff guide.
 
 The content distinguishes implemented controls from unfinished screens: Collections queue selection without contact, controlled Adjustments and externally completed refunds, the Phone configuration shell and saved-but-unverified automation/defaults are explicitly explained. The calculator's fixed 31-day assumption is stated. Test payments, mandates, internal ledger matching, insurer records and saved access configuration are not represented as real settlement, completed handover, accepted insurance or working doors.
 
 ## Offline tutorial
 
-The standalone page has its own Guide me panel and on/off switch, Back/Next, Restart, Pause, visible-area highlight and missing-target instructions. It uses the same authored offline lesson as the staff library. The small browser controller never opens the encrypted operational database or calls business APIs. Its preference and reading position are device-level, separate from the staff-user progress.
+The standalone page has its own Guide me panel and on/off switch, Back/Next, Restart, Pause, visible-area highlight and missing-target instructions. It contains five general device-safety lessons only, with no cached staff catalogue or role grants. The full preparation/capture/sync workflows remain in the authenticated staff library and are filtered by permission. The small browser controller never opens the encrypted operational database or calls business APIs. Its preference and reading position are device-level, separate from the staff-user progress.
 
 Load the updated site online so its service worker can cache the offline page, script and stylesheet. The tutorial can then be used during an outage. A server readiness row still does not prove the local snapshot exists, is current or can be unlocked. Tutorial testing never prepares/erases a snapshot or submits an offline enquiry.
 
 ## Maintenance
 
-- Existing booking lessons and preference logic: `src/lib/guided-help.ts`; expanded catalogue: `src/lib/guided-help-catalog.ts`.
+- Booking lessons: `src/lib/guided-help.ts`; expanded catalogue: `src/lib/guided-help-catalog.ts`; client state: `src/lib/guided-help-state.ts`; server permission policy: `src/lib/guided-help-access.ts`.
 - Staff panel: `src/components/guided-help.tsx`; stylesheet: `src/styles/guided-help.css`.
 - Offline controller: `src/pwa/offline-guided-help.ts`; build: `scripts/build-offline-guide.mjs`; style: `public/offline-guided-help.css`.
 - `prebuild` and `predev` generate the offline bundle. It is ignored by Git and lint; its TypeScript source is checked. The production Docker builder includes the generated asset in the final public directory.
@@ -49,6 +59,6 @@ Load the updated site online so its service worker can cache the offline page, s
 
 `npm test` checks corrupt storage, per-user isolation, progress bounds, skipped-step honesty, route coverage, dynamic statements, search/category matching, all Program defaults tabs and offline asset/no-write boundaries.
 
-`npm run test:guides` exercises the real staff tutorial, shell, reservations and move-in components against invented fixtures, then reads every step of every tutorial. It checks search, category/empty states, highlights, reload/resume, restart/completion, switch-off, cross-tab state, storage denial and 390/768/1280px bounds. It also loads the actual standalone offline page and tests the tutorial during simulated network loss, without unlocking or changing business data. The fixture does not simulate every business module and does not prove provider, payment, database or physical operations. All non-GET requests are rejected and recorded; the expected count is zero. CI retains screenshots.
+`npm run test:guides` exercises the real staff tutorial, shell, reservations and move-in components against invented fixtures, then reads every step of every tutorial. It checks search, category/empty states, highlights, reload/resume, restart/completion, switch-off, cross-tab state, storage denial and 390/768/1280px bounds. It checks actual permission selection for facility/custom/read-only users, restricted search/context/steps, stale admin progress, active revocation and session failure. It also loads the actual standalone offline page and tests the tutorial during simulated network loss, without unlocking or changing business data. The fixture does not simulate every business module and does not prove provider, payment, database or physical operations. All non-GET requests are rejected and recorded; the expected count is zero. CI retains screenshots.
 
 After deployment, verify the expanded library and contextual starts on the real signed-in staff pages, plus search, settings-tab explanations, account context, offline help and narrow-screen behaviour. Do not trigger sends, configuration changes or transactions to test a tutorial. Staff training acceptance and the existing finance, provider, legal, data, physical handover/door and launch-approval gates remain separate in `PROJECT_CONTEXT.md`.
