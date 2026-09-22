@@ -1,5 +1,13 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## STOR24 confirmed Information Officer update — 22 September 2026
+
+- **Implementation and evidence:** user supplied a screenshot identifying Mark Corbishley (Chairman) as Information Officer and legal@blendproperty.co.za as the contact for privacy questions, complaints, access and correction. Updated Privacy Policy and PAIA Manual contact tables and request-routing text accordingly; the chairman is described in the supplied capacity, without independently asserting a separate statutory head appointment. Removed the remaining marked contact fields. This supersedes the earlier Information Officer/contact evidence gap. Terms and Conditions unchanged.
+- **Validation:** regenerated Word PDF renders remain 5 and 6 pages. Both changed first pages visually checked; all nine remaining page PNGs exactly match the previously reviewed images by SHA-256. The unchanged six-page terms file has its previously verified hash. All document XML/relationships checked for competitor references and completion placeholders: none. No software or live transaction tests were applicable.
+- **Commit and push:** updated artifacts, evidence and canonical PROJECT_CONTEXT.md on the existing `codex/legal-documents-review-20260922` review branches in both repositories; remote heads and context presence verified after push before handoff.
+- **Merge:** none. **Deployment and configuration:** none. **Live production verification:** no publication, policy activation, customer transaction or physical access verification performed.
+- **Remaining gates:** legal/commercial sign-off and publication, statutory head/contact and any postal-address requirements, retention/provider-country inventory, operational safeguards, provider activation, finance, data, staff training and functional UAT remain as recorded. The screenshot establishes the supplied contact for drafting; it is not independent evidence of regulator registration or a compliance certification.
+
 ## STOR24-only document pack — 22 September 2026
 
 - **Implementation:** prepared clean STOR24 Privacy Policy (5 pages), PAIA Manual (6 pages) and consolidated Terms and Conditions (6 pages). Removed competitor names/links and internal review schedules from all document XML, relationships and metadata. Added CCTV/recording notices where used, alternate-contact authority, website/ecommerce, packaging returns, payment disclosures and promotion provisions. The terms are a revised consolidated edition, not an unchanged copy of the currently published 20-section terms; the original exact-copy artifact is retained separately.
