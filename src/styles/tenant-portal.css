@@ -6,3 +6,5 @@
 @media(max-width:760px){.tenant-entry-story{display:grid;grid-template-columns:minmax(0,1fr) 115px}.tenant-entry-copy{padding:24px 0 24px 22px}.tenant-entry-story .tenant-eyebrow{font-size:8px;letter-spacing:1px}.tenant-entry-story h1{font-size:30px;letter-spacing:-1px;margin:14px 0 0}.tenant-entry-story h1 br:last-of-type{display:block}.tenant-entry-story p{display:none}.tenant-entry-art{width:115px;height:190px;object-fit:cover;object-position:57% center;align-self:end}.tenant-entry-caption{grid-column:1/-1}.tenant-entry .tenant-login{padding-top:26px}}
 
 .tenant-photo-destination{scroll-margin-top:24px;border-radius:20px}.tenant-photo-destination:focus-visible{outline:2px solid #b53d09;outline-offset:4px}
+
+.tenant-portal .tenant-email-help{margin:0;font-size:13px;line-height:1.5;color:#52615b}

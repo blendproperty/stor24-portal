@@ -8,6 +8,7 @@ import type { AccountStatementData } from "@/lib/finance/statement-data";
 import { preferredTenantAccount, tenantAccountLabel } from "@/lib/tenant-account-presentation";
 import { TenantFacePhoto } from "@/components/tenant-face-photo";
 import { TenantPurchases } from "@/components/tenant-purchases";
+import { tenantLoginHint } from "@/lib/tenant-login-hint";
 import { packageItems } from "@/lib/tenant-merchandise";
 
 type PortalData = {
@@ -34,6 +35,7 @@ export function TenantPortal({ organisation, initialAccount, initialFrom, initia
   const [to, setTo] = useState(initialTo && /^\d{4}-\d{2}-\d{2}$/.test(initialTo) ? initialTo : today);
   const [statement, setStatement] = useState<AccountStatementData | null>(null);
   const statementRequest = useRef(0);
+  const loginHint = useRef<string | undefined>(undefined);
   const photoSection = useRef<HTMLDivElement>(null), arrivalFocused = useRef(false);
   function clearStatement() { statementRequest.current++; setStatement(null); }
   async function loadStatement(url: string) {
@@ -48,13 +50,23 @@ export function TenantPortal({ organisation, initialAccount, initialFrom, initia
     return payload;
   }
   useEffect(() => {
+    const fragment = new URLSearchParams(window.location.hash.slice(1));
+    if (fragment.has("email")) {
+      const hint = tenantLoginHint(window.location.hash);
+      loginHint.current = hint;
+      fragment.delete("email");
+      const rest = fragment.toString();
+      window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}${rest ? `#${rest}` : ""}`);
+    }
+  }, []);
+  useEffect(() => {
     let disposed = false;
     fetch("/api/tenant/accounts", { cache: "no-store" }).then(async response => {
       if (response.status === 401) return;
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Your account is temporarily unavailable.");
       if (!disposed) { setData(payload.data); setAccountId(current => preferredTenantAccount(payload.data.accounts, current)); }
-    }).catch(() => { if (!disposed) setError("We could not load your account. Please try again shortly."); }).finally(() => { if (!disposed) setChecking(false); });
+    }).catch(() => { if (!disposed) setError("We could not load your account. Please try again shortly."); }).finally(() => { if (!disposed) { setEmail(current => current || loginHint.current || ""); setChecking(false); } });
     return () => { disposed = true; };
   }, []);
   useEffect(() => {
@@ -97,6 +109,7 @@ export function TenantPortal({ organisation, initialAccount, initialFrom, initia
           else { await request("/api/tenant/auth/verify", { code }); const result = await request("/api/tenant/accounts"); setData(result.data); setAccountId(preferredTenantAccount(result.data.accounts, initialAccount)); setCode(""); }
         }); }}>
           <label>Email on your STOR24 account<input type="email" autoComplete="email" required value={email} disabled={codeSent} onChange={event => setEmail(event.target.value)} /></label>
+          {!codeSent && <p className="tenant-email-help">You can change this email before requesting your sign-in code.</p>}
           {codeSent && <label>Your six-digit code<input autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required value={code} onChange={event => setCode(event.target.value)} /></label>}
           <button className="tenant-primary" disabled={busy}>{busy ? "One moment…" : codeSent ? "Open my account" : "Email me a sign-in code"}<ArrowRight size={18} /></button>
           {codeSent && <button type="button" disabled={busy} onClick={() => { setCodeSent(false); setCode(""); setNotice(""); }}>Use another email / request a new code</button>}
