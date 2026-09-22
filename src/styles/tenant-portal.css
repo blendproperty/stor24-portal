@@ -8,3 +8,7 @@
 .tenant-photo-destination{scroll-margin-top:24px;border-radius:20px}.tenant-photo-destination:focus-visible{outline:2px solid #b53d09;outline-offset:4px}
 
 .tenant-portal .tenant-email-help{margin:0;font-size:13px;line-height:1.5;color:#52615b}
+
+.tenant-move-in-readiness{padding:10px 0 20px}.tenant-move-in-readiness h3{font-size:18px;margin:0 0 12px}.tenant-move-in-readiness ul{padding-left:20px;line-height:1.7}.tenant-portal .tenant-precinct-status{display:flex;align-items:flex-start;gap:12px;padding:16px 18px;margin:0 0 24px;background:#edf2e8;border-radius:12px;font-size:14px}.tenant-precinct-status svg{flex-shrink:0;margin-top:3px}.tenant-precinct-status strong{display:block;color:#09231b;margin-bottom:4px}.tenant-move-in .face-tenant.tenant-card{border:0;border-top:1px solid #dce3dc;border-radius:0;box-shadow:none;margin:0;padding:26px 0 0}.tenant-move-in .face-tenant .face-customer-heading h2{font-size:24px}.tenant-move-in .face-customer-heading>p{max-width:720px}
+
+.tenant-move-in .face-customer-heading{padding:0 0 24px}
