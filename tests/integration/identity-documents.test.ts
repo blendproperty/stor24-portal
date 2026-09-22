@@ -5,7 +5,7 @@ import sharp from "sharp";
 import { db } from "../../src/lib/db";
 import { identityPolicy, newIdentityAccess } from "../../src/lib/identity-document-security";
 import { expireIdentityDocuments, identityGate, identityStatus, listIdentityDocuments, previewIdentity, reviewIdentity, submitIdentity, withdrawIdentity } from "../../src/lib/identity-document-service";
-import { preparePublicReservationLease, completePublicReservationLease } from "../../src/lib/public-lease-workflow";
+import { preparePublicReservationLease, completePublicReservationLease, publicReservationHasSignedLease } from "../../src/lib/public-lease-workflow";
 import { LEASE_CLAUSE_KEYS } from "../../src/lib/lease-agreement-content";
 import { confirmReservationMoveIn } from "../../src/lib/reservation-move-in";
 import { verifyPublicReservationEmail } from "../../src/lib/public-booking-service";
@@ -30,6 +30,43 @@ test("isolated PostgreSQL private identity workflow", async t => {
     return { org, facility, user, customer, booking, scope, input, reference: booking.publicReference!, token: access.token };
   }
   try {
+    await t.test("account pilot follows verified email across new customers and units through signing", async () => {
+      const f = await fixture();
+      const policies = JSON.parse(process.env.IDENTITY_DOCUMENT_POLICIES_JSON!);
+      policies[f.org.id].customerEmailHashes = [createHash("sha256").update(f.customer.email!.trim().toLowerCase()).digest("hex")];
+      process.env.IDENTITY_DOCUMENT_POLICIES_JSON = JSON.stringify(policies);
+      async function nextBooking(email: string) {
+        const grant = newIdentityAccess();
+        const customer = await db.customer.create({ data: { organisationId: f.org.id, email, emailVerifiedAt: new Date() } });
+        const unit = await db.unit.create({ data: { facilityId: f.facility.id, unitTypeId: (await db.unit.findUniqueOrThrow({ where: { id: f.booking.unitId } })).unitTypeId, number: randomUUID(), monthlyRate: 100, status: "RESERVED" } });
+        const booking = await db.reservation.create({ data: { facilityId: f.facility.id, customerId: customer.id, unitId: unit.id, quotedRate: 100, intendedMoveIn: new Date(), publicReference: `ST24-${randomUUID()}`, contactVerifiedAt: new Date(), holdExpiresAt: new Date(Date.now() + 86400000), identityAccessHash: grant.identityAccessHash, identityAccessExpiresAt: grant.identityAccessExpiresAt } });
+        return { customer, booking, reference: booking.publicReference!, token: grant.token };
+      }
+      const next = await nextBooking(f.customer.email!), other = await nextBooking(`${randomUUID()}@example.invalid`);
+      assert.notEqual(next.customer.id, f.customer.id); assert.notEqual(next.booking.unitId, f.booking.unitId);
+      assert.equal((await identityStatus(f.reference, f.token)).required, true);
+      assert.equal((await identityStatus(next.reference, next.token)).required, true);
+      assert.equal((await identityStatus(other.reference, other.token)).required, false);
+      await assert.rejects(identityStatus(next.reference, f.token), /ID_SESSION_REQUIRED/);
+      await db.customer.update({ where: { id: next.customer.id }, data: { emailVerifiedAt: null } });
+      await assert.rejects(identityStatus(next.reference, next.token), /ID_BOOKING_UNAVAILABLE/);
+      await db.customer.update({ where: { id: next.customer.id }, data: { emailVerifiedAt: new Date() } });
+      const input = { ...f.input, policyHash: identityPolicy(f.org.id)!.hash };
+      await assert.rejects(submitIdentity(other.reference, other.token, input), /ID_POLICY_UNAVAILABLE/);
+      assert.equal((await preparePublicReservationLease(next.reference, "CARD")).ok, false);
+      await submitIdentity(next.reference, next.token, input);
+      const prepared = await preparePublicReservationLease(next.reference, "CARD"); assert.ok(prepared.ok); if (!prepared.ok) return;
+      assert.equal(await publicReservationHasSignedLease(next.reference), null);
+      const lease = await db.publicReservationLease.findUniqueOrThrow({ where: { reservationId: next.booking.id } });
+      const appUrl = process.env.APP_URL; delete process.env.APP_URL; // Prevent any welcome-email provider call from a synthetic signature.
+      try { await completePublicReservationLease(prepared.token, { signerName: "Synthetic Tester", initials: [...LEASE_CLAUSE_KEYS], signerIp: null, signerUserAgent: null, termsAccepted: true, acceptedSha256: lease.sha256 }); }
+      finally { if (appUrl === undefined) delete process.env.APP_URL; else process.env.APP_URL = appUrl; }
+      assert.ok(await publicReservationHasSignedLease(next.reference));
+      assert.equal(await identityGate(db, f.org.id, next.booking.id, next.booking.createdAt, "HANDOVER"), false);
+      const document = await db.identityDocument.findUniqueOrThrow({ where: { reservationId: next.booking.id } });
+      await previewIdentity(f.scope, document.id, 1, 0); await previewIdentity(f.scope, document.id, 1, 1); await reviewIdentity(f.scope, document.id, 1, "ACCEPT");
+      assert.equal(await identityGate(db, f.org.id, next.booking.id, next.booking.createdAt, "HANDOVER"), true);
+    });
     await t.test("production pilot applies only to selected bookings in the same organisation", async () => {
       const f = await fixture(), secondAccess = newIdentityAccess();
       const second = await db.reservation.create({ data: { facilityId: f.facility.id, customerId: f.customer.id, unitId: f.booking.unitId, quotedRate: 100, intendedMoveIn: new Date(), publicReference: `ST24-${randomUUID()}`, contactVerifiedAt: new Date(), holdExpiresAt: new Date(Date.now() + 86400000), identityAccessHash: secondAccess.identityAccessHash, identityAccessExpiresAt: secondAccess.identityAccessExpiresAt } });

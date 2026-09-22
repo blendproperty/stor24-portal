@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import sharp from "sharp";
 import { boundedIdentityForm, decryptIdentity, encryptIdentity, identityAccessMatches, identityPolicy, identityRequired, newIdentityAccess, normaliseIdentityPage } from "../src/lib/identity-document-security";
 test("ID policy is absent by default, strictly validated, and applies only from its approved date", () => {
@@ -23,6 +24,16 @@ test("ID policy is absent by default, strictly validated, and applies only from 
   assert.notEqual(identityPolicy("org")!.hash, hash);
   process.env.IDENTITY_DOCUMENT_POLICIES_JSON = JSON.stringify({ org: { ...policy, reservationIds: [] } });
   assert.throws(() => identityRequired("org", new Date("2026-10-02"), "pilot-booking"), /ID_POLICY_UNAVAILABLE/);
+  const customerEmailHashes = [createHash("sha256").update("tester@example.invalid").digest("hex")];
+  process.env.IDENTITY_DOCUMENT_POLICIES_JSON = JSON.stringify({ org: { ...policy, customerEmailHashes } });
+  assert.ok(identityRequired("org", new Date("2026-10-02"), "any-unit-booking", " Tester@Example.Invalid "));
+  assert.ok(identityRequired("org", new Date("2026-10-02"), "new-mobile-booking", "tester@example.invalid"));
+  assert.equal(identityRequired("org", new Date("2026-10-02"), "any-unit-booking", "other@example.invalid"), null);
+  assert.equal(identityRequired("org", new Date("2026-10-02"), "any-unit-booking"), null);
+  process.env.IDENTITY_DOCUMENT_POLICIES_JSON = JSON.stringify({ org: { ...policy, customerEmailHashes, reservationIds: ["booking"] } });
+  assert.throws(() => identityPolicy("org"), /ID_POLICY_UNAVAILABLE/);
+  process.env.IDENTITY_DOCUMENT_POLICIES_JSON = JSON.stringify({ org: { ...policy, customerEmailHashes: [] } });
+  assert.throws(() => identityPolicy("org"), /ID_POLICY_UNAVAILABLE/);
   delete process.env.IDENTITY_DOCUMENT_POLICIES_JSON;
 });
 test("ID grants expire, are unpredictable, and never accept booking references", () => {
