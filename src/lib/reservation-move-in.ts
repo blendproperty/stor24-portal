@@ -1,3 +1,4 @@
+import { identityGate } from "@/lib/identity-document-service";
 import { requestPhotoActivation } from "@/lib/facial-photo-activation";
 import { isTestPayment } from "@/lib/payments/payment-evidence";
 import { createHash } from "node:crypto";
@@ -43,6 +44,7 @@ export async function reservationReadiness(database: Database, scope: RequestSco
   const signed = reservation.publicLease?.status === "SIGNED" && Boolean(reservation.publicLease.signedAt && reservation.publicLease.signedPdfSha256);
   const startDate = reservation.intendedMoveIn ? southAfricaDateKey(reservation.intendedMoveIn) : null;
   const blockers: string[] = [];
+  if (!forPhoto && !(await identityGate(database, scope.organisationId, reservation.id, reservation.createdAt, "HANDOVER"))) blockers.push("The identity document needs staff acceptance before key handover. Open Identity review.");
   const handedOver = forPhoto && reservation.status === "CONVERTED" && reservation.convertedTenancyId &&
     ["ACTIVE", "NOTICE_GIVEN"].includes(reservation.convertedTenancy?.status ?? "") && reservation.convertedTenancy?.occupancies.some(occupancy => occupancy.unitId === reservation.unitId) &&
     Boolean(await database.auditEvent.findFirst({ where: { organisationId: scope.organisationId, entityId: reservation.convertedTenancyId, action: "tenancy.key_handover_confirmed" }, select: { id: true } }));

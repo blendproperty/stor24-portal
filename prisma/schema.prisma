@@ -470,6 +470,9 @@ model Reservation {
   publicLease        PublicReservationLease?
   packageSelection   ReservationPackage?
   facialPhoto        FacialPhotoSubmission?
+  identityDocument   IdentityDocument?
+  identityAccessHash String?
+  identityAccessExpiresAt DateTime?
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 
@@ -1725,4 +1728,30 @@ model AuditEvent {
 
   @@index([organisationId, facilityId, entityType, entityId, occurredAt])
   @@index([actorId, occurredAt])
+}
+
+
+// ID documents are private and separate from facial access photographs.
+model IdentityDocument {
+  id String @id @default(cuid())
+  reservationId String @unique
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  version Int
+  status String
+  documentType String
+  pageCount Int
+  encryptedPages String? @db.Text
+  policyHash String
+  policySnapshot String @db.Text
+  acknowledgedAt DateTime
+  expiresAt DateTime
+  reviewedAt DateTime?
+  reviewedById String?
+  replacementReason String?
+  erasedAt DateTime?
+  @@index([expiresAt, status])
+}
+model IdentityDocumentMaintenance {
+  id String @id
+  completedAt DateTime
 }

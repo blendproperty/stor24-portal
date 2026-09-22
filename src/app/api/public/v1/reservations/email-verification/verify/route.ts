@@ -4,7 +4,7 @@ import { privacyHash, rateLimit, requestIp } from "@/lib/request-security";
 
 export async function POST(request: Request) {
   if (!publicApiAuthorized(request)) return Response.json({ error: { message: "Request rejected." } }, { status: 401 });
-  if (await rateLimit(`public-email-verification-check:${privacyHash(requestIp(request))}`, 15, 15 * 60 * 1000)) return Response.json({ error: { message: "Too many verification attempts. Try again later." } }, { status: 429 });
+  if (await rateLimit(`public-email-verification-check:${privacyHash(request.headers.get("x-stor24-client-ip")?.slice(0, 128) || requestIp(request))}`, 15, 15 * 60 * 1000)) return Response.json({ error: { message: "Too many verification attempts. Try again later." } }, { status: 429 });
   const parsed = publicReservationVerificationSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: { message: "Enter the six-digit email code." } }, { status: 422 });
   const result = await verifyPublicReservationEmail(parsed.data.reference, parsed.data.code);

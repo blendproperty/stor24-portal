@@ -1,0 +1,136 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { createHash, randomUUID } from "node:crypto";
+import sharp from "sharp";
+import { db } from "../../src/lib/db";
+import { identityPolicy, newIdentityAccess } from "../../src/lib/identity-document-security";
+import { expireIdentityDocuments, identityGate, identityStatus, listIdentityDocuments, previewIdentity, reviewIdentity, submitIdentity, withdrawIdentity } from "../../src/lib/identity-document-service";
+import { preparePublicReservationLease, completePublicReservationLease } from "../../src/lib/public-lease-workflow";
+import { LEASE_CLAUSE_KEYS } from "../../src/lib/lease-agreement-content";
+import { confirmReservationMoveIn } from "../../src/lib/reservation-move-in";
+import { verifyPublicReservationEmail } from "../../src/lib/public-booking-service";
+test("isolated PostgreSQL private identity workflow", async t => {
+  assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci");
+  assert.equal(new URL(process.env.DATABASE_URL!).hostname, "localhost");
+  process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY = "ci-identity-key-never-for-production";
+  const image = new File([new Uint8Array(await sharp({ create: { width: 600, height: 800, channels: 3, background: "#889988" } }).png().toBuffer())], "synthetic.png", { type: "image/png" });
+  await expireIdentityDocuments();
+  async function fixture() {
+    const key = randomUUID(), access = newIdentityAccess();
+    const org = await db.organisation.create({ data: { name: "CI identity only", slug: key } });
+    const facility = await db.facility.create({ data: { organisationId: org.id, name: "CI store", code: key } });
+    const user = await db.user.create({ data: { organisationId: org.id, email: `${key}@example.invalid`, name: "CI reviewer" } });
+    const customer = await db.customer.create({ data: { organisationId: org.id, email: `${key}@example.invalid`, emailVerifiedAt: new Date() } });
+    const type = await db.unitType.create({ data: { facilityId: facility.id, name: key, features: [] } });
+    const unit = await db.unit.create({ data: { facilityId: facility.id, unitTypeId: type.id, number: key, monthlyRate: 100, status: "RESERVED" } });
+    const booking = await db.reservation.create({ data: { facilityId: facility.id, customerId: customer.id, unitId: unit.id, quotedRate: 100, intendedMoveIn: new Date(), publicReference: `ST24-${key}`, contactVerifiedAt: new Date(), holdExpiresAt: new Date(Date.now() + 86400000), identityAccessHash: access.identityAccessHash, identityAccessExpiresAt: access.identityAccessExpiresAt } });
+    process.env.IDENTITY_DOCUMENT_POLICIES_JSON = JSON.stringify({ ...JSON.parse(process.env.IDENTITY_DOCUMENT_POLICIES_JSON ?? "{}"), [org.id]: { enabled: true, fullCopyApproved: true, effectiveFrom: "2026-01-01T00:00:00Z", version: "CI", approvalReference: "Synthetic only", notice: "Synthetic test fixture only, not an approved legal notice or real identity record.", acknowledgementLabel: "Synthetic acknowledgement only", retentionHours: 24, acceptedTypes: ["ID_CARD", "PASSPORT"], alternativeContact: "Training store" } });
+    const scope = { userId: user.id, organisationId: org.id, facilityIds: [facility.id], unrestrictedFacilities: false };
+    const input = { expectedVersion: 0, policyHash: identityPolicy(org.id)!.hash, acknowledged: true, documentType: "ID_CARD", pages: [image, image] };
+    return { org, facility, user, customer, booking, scope, input, reference: booking.publicReference!, token: access.token };
+  }
+  try {
+    await t.test("upload before signing, both page previews, staff acceptance and handover gate", async () => {
+      const f = await fixture();
+      assert.equal(await identityGate(db, f.org.id, f.booking.id, f.booking.createdAt, "SIGN"), false);
+      const blocked = await preparePublicReservationLease(f.reference, "EFT");
+      assert.equal(blocked.ok, false); if (!blocked.ok) assert.equal(blocked.code, "IDENTITY_REQUIRED");
+      const document = await submitIdentity(f.reference, f.token, f.input);
+      const prepared = await preparePublicReservationLease(f.reference, "EFT"); assert.equal(prepared.ok, true);
+      const content = "Synthetic signed agreement", pdf = Buffer.from("synthetic-pdf");
+      await db.publicReservationLease.update({ where: { reservationId: f.booking.id }, data: { status: "SIGNED", content, sha256: createHash("sha256").update(content).digest("hex"), signedAt: new Date(), signedPdf: pdf, signedPdfSha256: createHash("sha256").update(pdf).digest("hex") } });
+      await db.reservation.update({ where: { id: f.booking.id }, data: { holdExpiresAt: new Date(0) } });
+      assert.equal((await identityStatus(f.reference, f.token)).canContinue, true);
+      const account = await db.account.create({ data: { customerId: f.customer.id, accountNumber: `ST24-T-${f.booking.id}`, balance: -100 } });
+      const key = randomUUID();
+      await db.payment.create({ data: { accountId: account.id, amount: 100, method: "EFT", status: "SUCCEEDED", processedAt: new Date(), idempotencyKey: key } });
+      await db.ledgerEntry.create({ data: { accountId: account.id, type: "PAYMENT", amount: 100, description: "Synthetic receipt", effectiveAt: new Date(), externalRef: key, createdById: f.user.id } });
+      await assert.rejects(confirmReservationMoveIn(f.scope, f.booking.id), /MOVE_IN_NOT_READY/);
+      assert.equal(document.status, "AWAITING_REVIEW");
+      assert.equal(await identityGate(db, f.org.id, f.booking.id, f.booking.createdAt, "SIGN"), true);
+      assert.equal(await identityGate(db, f.org.id, f.booking.id, f.booking.createdAt, "HANDOVER"), false);
+      assert.equal(JSON.stringify(await identityStatus(f.reference, f.token)).includes("encryptedPages"), false);
+      assert.equal(JSON.stringify(await listIdentityDocuments(f.scope)).includes("encryptedPages"), false);
+      await assert.rejects(reviewIdentity(f.scope, document.id, 1, "ACCEPT"), /ID_PREVIEW_REQUIRED/);
+      assert.ok((await previewIdentity(f.scope, document.id, 1, 0)).length > 100);
+      await assert.rejects(reviewIdentity(f.scope, document.id, 1, "ACCEPT"), /ID_PREVIEW_REQUIRED/);
+      await previewIdentity(f.scope, document.id, 1, 1);
+      await reviewIdentity(f.scope, document.id, 1, "ACCEPT");
+      assert.equal(await identityGate(db, f.org.id, f.booking.id, f.booking.createdAt, "HANDOVER"), true);
+      assert.ok((await confirmReservationMoveIn(f.scope, f.booking.id)).tenancyId);
+      await expireIdentityDocuments();
+      assert.equal((await db.identityDocument.findUniqueOrThrow({ where: { id: document.id } })).encryptedPages, null);
+    });
+    await t.test("an already prepared signing link cannot bypass a withdrawn ID", async () => {
+      const f = await fixture(); await submitIdentity(f.reference, f.token, f.input);
+      const prepared = await preparePublicReservationLease(f.reference, "EFT"); assert.ok(prepared.ok); if (!prepared.ok) return;
+      const lease = await db.publicReservationLease.findUniqueOrThrow({ where: { reservationId: f.booking.id } });
+      await withdrawIdentity(f.reference, f.token, 1);
+      await assert.rejects(completePublicReservationLease(prepared.token, { signerName: "Synthetic Customer", initials: [...LEASE_CLAUSE_KEYS], signerIp: null, signerUserAgent: null, termsAccepted: true, acceptedSha256: lease.sha256 }), /IDENTITY_REQUIRED/);
+      assert.equal((await db.publicReservationLease.findUniqueOrThrow({ where: { id: lease.id } })).status, "READY");
+    });
+    await t.test("reference alone, another booking token and another facility cannot read or mutate", async () => {
+      const f = await fixture(), other = await fixture();
+      await assert.rejects(identityStatus(f.reference, ""), /ID_SESSION_REQUIRED/);
+      await assert.rejects(submitIdentity(f.reference, other.token, f.input), /ID_SESSION_REQUIRED/);
+      const document = await submitIdentity(f.reference, f.token, f.input);
+      await assert.rejects(previewIdentity(other.scope, document.id, 1, 0), /NOT_FOUND/);
+      await assert.rejects(previewIdentity({ ...f.scope, facilityIds: [] }, document.id, 1, 0), /NOT_FOUND/);
+      await assert.rejects(reviewIdentity(other.scope, document.id, 1, "REPLACE", "Document is incomplete"), /NOT_FOUND/);
+      assert.deepEqual(await listIdentityDocuments(other.scope), []);
+    });
+    await t.test("concurrent replacements have one winner and invalidate prior review", async () => {
+      const f = await fixture(), document = await submitIdentity(f.reference, f.token, f.input);
+      await previewIdentity(f.scope, document.id, 1, 0); await previewIdentity(f.scope, document.id, 1, 1); await reviewIdentity(f.scope, document.id, 1, "ACCEPT");
+      const results = await Promise.allSettled([submitIdentity(f.reference, f.token, { ...f.input, expectedVersion: 1 }), submitIdentity(f.reference, f.token, { ...f.input, expectedVersion: 1 })]);
+      assert.equal(results.filter(item => item.status === "fulfilled").length, 1);
+      assert.equal(await identityGate(db, f.org.id, f.booking.id, f.booking.createdAt, "HANDOVER"), false);
+      await assert.rejects(reviewIdentity(f.scope, document.id, 1, "ACCEPT"), /ID_CHANGED/);
+      await assert.rejects(reviewIdentity(f.scope, document.id, 2, "ACCEPT"), /ID_PREVIEW_REQUIRED/);
+    });
+    await t.test("rejection and withdrawal erase copies and block signing", async () => {
+      const f = await fixture(), document = await submitIdentity(f.reference, f.token, f.input);
+      await reviewIdentity(f.scope, document.id, 1, "REPLACE", "Document is incomplete");
+      assert.equal((await db.identityDocument.findUniqueOrThrow({ where: { id: document.id } })).encryptedPages, null);
+      assert.equal((await identityStatus(f.reference, f.token)).canContinue, false);
+      await submitIdentity(f.reference, f.token, { ...f.input, expectedVersion: 1 });
+      await withdrawIdentity(f.reference, f.token, 2);
+      assert.equal((await db.identityDocument.findUniqueOrThrow({ where: { id: document.id } })).encryptedPages, null);
+    });
+    await t.test("expiry removes a pending copy; accepted review survives copy retention", async () => {
+      const f = await fixture(), document = await submitIdentity(f.reference, f.token, f.input);
+      await db.identityDocument.update({ where: { id: document.id }, data: { expiresAt: new Date(0) } });
+      await assert.rejects(previewIdentity(f.scope, document.id, 1, 0), /ID_CHANGED/);
+      await expireIdentityDocuments();
+      assert.equal((await db.identityDocument.findUniqueOrThrow({ where: { id: document.id } })).encryptedPages, null);
+      assert.equal(await identityGate(db, f.org.id, f.booking.id, f.booking.createdAt, "SIGN"), false);
+      const g = await fixture(), accepted = await submitIdentity(g.reference, g.token, g.input);
+      await previewIdentity(g.scope, accepted.id, 1, 0); await previewIdentity(g.scope, accepted.id, 1, 1); await reviewIdentity(g.scope, accepted.id, 1, "ACCEPT");
+      await db.identityDocument.update({ where: { id: accepted.id }, data: { expiresAt: new Date(0) } }); await expireIdentityDocuments();
+      assert.equal(await identityGate(db, g.org.id, g.booking.id, g.booking.createdAt, "HANDOVER"), true);
+      assert.equal((await db.identityDocument.findUniqueOrThrow({ where: { id: accepted.id } })).encryptedPages, null);
+    });
+    await t.test("legal hold, outdated notice, missing pages and expired maintenance cannot collect", async () => {
+      const f = await fixture();
+      await assert.rejects(submitIdentity(f.reference, f.token, { ...f.input, policyHash: "old" }), /ID_NOTICE_REQUIRED/);
+      await assert.rejects(submitIdentity(f.reference, f.token, { ...f.input, pages: [image] }), /ID_INVALID/);
+      await db.identityDocumentMaintenance.update({ where: { id: "expiry" }, data: { completedAt: new Date(0) } });
+      await assert.rejects(submitIdentity(f.reference, f.token, f.input), /ID_MAINTENANCE_REQUIRED/); await expireIdentityDocuments();
+      const policies = process.env.IDENTITY_DOCUMENT_POLICIES_JSON; delete process.env.IDENTITY_DOCUMENT_POLICIES_JSON;
+      assert.equal((await identityStatus(f.reference, f.token)).canContinue, true);
+      await assert.rejects(submitIdentity(f.reference, f.token, f.input), /ID_POLICY_UNAVAILABLE/);
+      process.env.IDENTITY_DOCUMENT_POLICIES_JSON = policies;
+    });
+    await t.test("a fresh email challenge rotates the booking grant and cannot be replayed", async () => {
+      const f = await fixture(); process.env.PUBLIC_RESERVATION_VERIFICATION_ENABLED = "true"; process.env.PUBLIC_BOOKING_API_KEY = "synthetic-public-booking-key-for-ci-only";
+      const hash = createHash("sha256").update(`${process.env.PUBLIC_BOOKING_API_KEY}:${f.booking.id}:email:123456`).digest("hex");
+      await db.reservation.update({ where: { id: f.booking.id }, data: { verificationCodeHash: hash, verificationExpiresAt: new Date(Date.now() + 600000) } });
+      const result = await verifyPublicReservationEmail(f.reference, "123456");
+      assert.ok(result.ok); if (!result.ok) throw new Error("challenge failed");
+      assert.ok(result.identityAccessToken);
+      await assert.rejects(identityStatus(f.reference, f.token), /ID_SESSION_REQUIRED/);
+      assert.equal((await identityStatus(f.reference, result.identityAccessToken)).required, true);
+      assert.equal((await verifyPublicReservationEmail(f.reference, "123456")).ok, false);
+    });
+  } finally { delete process.env.IDENTITY_DOCUMENT_POLICIES_JSON; await db.$disconnect(); }
+});

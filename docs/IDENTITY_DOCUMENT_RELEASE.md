@@ -1,0 +1,25 @@
+# Private identity document collection
+
+22 September 2026. Implementation is separate from activation. No approved ID policy is supplied, no real ID is collected, and no identity-verification provider is claimed.
+
+## Journey and access
+
+The online rental journey places ID upload after mobile/email verification and before payment-method selection and agreement signing. ID card requires front and back; ID booklet and passport require the photo page. JPEG/PNG only, 6 MB per page, 400-pixel minimum dimension; decoded images are bounded, oriented and re-encoded without metadata. PDF/OCR/automated authenticity checks and company-authority documents are outside this release.
+
+Successful booking OTP verification rotates a random 256-bit, one-hour, reservation-bound grant. Only its hash and expiry are stored in CRM. The public proxy removes the grant from JSON and stores it in a Secure, HttpOnly, SameSite=Strict cookie scoped to the identity API. References, signing links and previously verified customer flags alone never authorise ID access. A fresh email challenge restores an expired session. Each challenge has bounded attempts, exact consumption and rate limits; exhausted challenges require assisted recovery. The agreement links back to the identity step, including after signing. Signed active bookings can replace an ID after their original hold expiry; converted/cancelled bookings cannot upload.
+
+Documents are AES-256-GCM encrypted with a separate identity namespace and reservation/version binding. No plaintext ID number, original filename or image is added to booking JSON, exports, browser storage, email or facial/provider queues. Customer status does not return images. The only image endpoint requires `identity.review` plus the correct organisation/store scope. Staff must preview every page of the exact version before accepting. Views and decisions are audited. Private previews bypass image optimisation/caches, clear after 60 seconds, on tab hiding/closure and after decisions. Authorised users can still take screenshots.
+
+Replacement increments the version and invalidates review; stale writes fail. Rejection and customer removal erase the current encrypted copy. Privacy-policy changes require fresh acknowledgement. A current awaiting-review upload permits signing; acceptance is enforced in the staff handover transaction. The original document/person, signed agreement and real verified payment still require the existing staff handover process. Acceptance never activates access. An old signing link cannot bypass a withdrawn, rejected or expired pending ID.
+
+## Legal activation and retention
+
+`IDENTITY_DOCUMENT_POLICIES_JSON` is an organisation-keyed configuration, absent by default. Activation requires an approved object containing `enabled: true`, `fullCopyApproved: true`, `version`, ISO `effectiveFrom`, `approvalReference`, full `notice`, `acknowledgementLabel`, `acceptedTypes` (ID_CARD/ID_BOOKLET/PASSPORT), `retentionHours` and `alternativeContact`. There is deliberately no default wording or period. Invalid configured policy fails closed. Missing organisation policy preserves the existing booking flow without uploads. The effective date scopes the new mandatory step to relevant online bookings; staff/offline reservations without public references retain their existing assisted process.
+
+New uploads also require the configured encryption key and a recent IdentityDocumentMaintenance heartbeat. The existing credential-protected five-minute facial-photo retention worker now separately expires identity copies and records its own ID heartbeat. It erases expired copies, cancelled/expired bookings, abandoned unsigned holds and converted handovers in bounded batches. A backlog prevents a successful heartbeat. Accepted review evidence survives copy erasure; pending expired copies require replacement. Production backups and audit/review metadata need their own legally approved retention/deletion process before activation. Application copy deletion is not proof of backup erasure.
+
+Before enabling: Liezl/legal must approve why a full copy is necessary, accepted documents, wording/lawful basis, copy and abandoned-booking periods, metadata/audit/backup retention, assisted alternative and company representative handling. Assign identity.review only to authorised reviewers, train staff, and run a consenting controlled end-to-end test. Do not use synthetic test-policy wording in production. Do not enable the policy until all operational controls are accepted.
+
+## Release verification
+
+Tests cover policy hold, policy changes, limits/metadata removal, encryption binding, cookie/session isolation, concurrent replacement, scope restrictions, both-page preview, stale approval, actual signing/handover enforcement, accepted-copy erasure and OTP rotation/replay. Browser fixtures use invented names and synthetic images. Live verification must remain a read-only check of the held screen, authentication boundaries, deployed version and retention worker until collection is explicitly approved. No provider gate/biometric test is included.
