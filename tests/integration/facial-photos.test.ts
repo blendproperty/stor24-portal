@@ -77,6 +77,10 @@ test("isolated PostgreSQL private facial photo lifecycle", async t => {
       assert.equal(results.filter(r => r.status === "fulfilled").length, 1);
       const stored = await db.facialPhotoSubmission.findUniqueOrThrow({ where: { id: photo.id } });
       assert.equal(stored.version, 2); assert.equal(stored.status, "WAITING_REVIEW"); assert.equal(stored.reviewedAt, null);
+      const previousConsent = await db.auditEvent.findFirstOrThrow({ where: { entityId: photo.id, action: "facial_photo.customer_submitted", after: { path: ["version"], equals: 1 } } });
+      const evidence = previousConsent.after as { approvedPolicy: { consentLabel: string; approvalReference: string } };
+      assert.equal(evidence.approvedPolicy.consentLabel, "Synthetic consent checkbox only");
+      assert.equal(evidence.approvedPolicy.approvalReference, "CI-only");
       await assert.rejects(reviewFacialPhoto(f.scope, photo.id, 1, "APPROVE"), /PHOTO_CHANGED/);
       await assert.rejects(reviewFacialPhoto(f.scope, photo.id, 2, "APPROVE"), /PHOTO_PREVIEW_REQUIRED/);
       await confirmReservationMoveIn(f.scope, f.reservation.id);
