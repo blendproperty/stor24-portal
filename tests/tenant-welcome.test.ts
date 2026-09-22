@@ -14,6 +14,9 @@ test("welcome uses approved branding and a non-authenticating portal link, escap
     assert.match(message.html, /Open My STOR24/);
     assert.match(message.text, /organisation=store\+%26\+one/);
     assert.match(message.text, /does not confirm payment/);
+    assert.match(message.text, /step=access-photo/);
+    assert.match(message.html, /Prepare for move-in/);
+    assert.match(message.text, /agreement and payment are verified and photo collection is open/);
     assert.doesNotMatch(message.html, /token=|account=|Netcash|onerror="bad"/);
   } finally { if (previous === undefined) delete process.env.APP_URL; else process.env.APP_URL = previous; }
 });
