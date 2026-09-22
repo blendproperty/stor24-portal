@@ -24,6 +24,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Two 6 MiB ID pages plus multipart overhead; the route also enforces its own streamed cap.
+  experimental: { proxyClientMaxBodySize: "13mb" },
   poweredByHeader: false,
   async headers() {
     return [
@@ -41,6 +43,13 @@ const nextConfig: NextConfig = {
       {
         source: "/:path*",
         headers: securityHeaders,
+      },
+      {
+        source: "/identity",
+        // Authenticated ID previews use short-lived browser blob URLs, never the shared image optimiser.
+        headers: securityHeaders.map(header => header.key === "Content-Security-Policy"
+          ? { ...header, value: header.value.replace("img-src 'self' data: https:", "img-src 'self' blob: data: https:") }
+          : header),
       },
     ];
   },

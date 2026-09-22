@@ -25,7 +25,7 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     return Response.json({ data: result }, { headers: { "cache-control": "no-store" } });
   } catch (error) {
     const code = error instanceof Error ? error.message : "INTERNAL_ERROR";
-    const status = code === "EXPIRED" ? 410 : code === "VALIDATION_ERROR" ? 422 : code === "CONFLICT" ? 409 : code === "NOT_FOUND" ? 404 : 500;
-    return Response.json({ error: { code, message: code === "EXPIRED" ? "This signing window has expired." : "The lease could not be signed." } }, { status });
+    const status = code === "EXPIRED" ? 410 : code === "VALIDATION_ERROR" ? 422 : ["CONFLICT", "IDENTITY_REQUIRED"].includes(code) ? 409 : code === "NOT_FOUND" ? 404 : 500;
+    return Response.json({ error: { code, message: code === "IDENTITY_REQUIRED" ? "Your identity document needs attention. Reopen the identity step before signing." : code === "EXPIRED" ? "This signing window has expired." : "The lease could not be signed." } }, { status });
   }
 }

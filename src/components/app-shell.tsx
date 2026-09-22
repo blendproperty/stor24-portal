@@ -40,6 +40,7 @@ const navigation = [
   { href: "/users", label: "Users & permissions", icon: Users },
   { href: "/leads", label: "Lead to lease", icon: CalendarCheck },
   { href: "/reservations", label: "Reservations", icon: CalendarDays },
+  { href: "/identity", label: "Identity review", icon: ShieldCheck },
   { href: "/units", label: "Units & rates", icon: Warehouse },
   { href: "/billing", label: "Billing & payments", icon: CreditCard },
   { href: "/collections", label: "Collections", icon: ShieldAlert },

@@ -1,3 +1,4 @@
+import { newIdentityAccess } from "@/lib/identity-document-security";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { welcomeTenantWhenReady } from "@/lib/tenant-welcome-email";
@@ -358,15 +359,18 @@ export async function verifyPublicReservation(reference: string, code: string) {
     return { ok: false as const, code: "INVALID_CODE" };
   }
   const verifiedAt = new Date();
+  const identityAccess = newIdentityAccess();
   const holdExpiresAt = confirmedPublicHoldExpiry(verifiedAt, reservation.journey, reservation.viewingAt);
   const updated = await db.$transaction(async (tx) => {
-    const item = await tx.reservation.update({ where: { id: reservation.id }, data: { contactVerifiedAt: verifiedAt, holdExpiresAt, verificationCodeHash: null, verificationExpiresAt: null }, include: reservationInclude });
+    const consumed = await tx.reservation.updateMany({ where: { id: reservation.id, contactVerifiedAt: null, verificationCodeHash: reservation.verificationCodeHash, verificationExpiresAt: { gt: verifiedAt } }, data: { verificationCodeHash: null } });
+    if (consumed.count !== 1) throw new Error("VERIFICATION_EXPIRED");
+    const item = await tx.reservation.update({ where: { id: reservation.id }, data: { contactVerifiedAt: verifiedAt, holdExpiresAt, verificationCodeHash: null, verificationExpiresAt: null, identityAccessHash: identityAccess.identityAccessHash, identityAccessExpiresAt: identityAccess.identityAccessExpiresAt }, include: reservationInclude });
     await tx.customer.update({ where: { id: reservation.customerId }, data: { phoneVerifiedAt: verifiedAt } });
     await tx.auditEvent.create({ data: { organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, action: "public_reservation.contact_verified", entityType: "Reservation", entityId: reservation.id, requestId: reservation.idempotencyKey, after: { verifiedAt: verifiedAt.toISOString(), holdExpiresAt: holdExpiresAt.toISOString() } } });
     return item;
   });
   await notifyPublicReservation({ organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, customerId: reservation.customerId, idempotencyKey: reservation.idempotencyKey ?? reservation.id, consent: reservation.customer.communicationConsent as { email: boolean; sms: boolean; phone: boolean; whatsapp?: boolean }, to: { email: reservation.customer.email ?? "", phone: reservation.customer.phone ?? "" }, allowWhatsappWhenAutomationDisabled: true, journey: reservation.journey, firstName: reservation.customer.firstName ?? "customer", facilityName: reservation.facility.name, unitNumber: reservation.unit.number, monthlyRateZar: reservation.quotedRate.toString(), holdExpiresAt: holdExpiresAt.toISOString(), intendedMoveIn: reservation.intendedMoveIn, viewingAt: reservation.viewingAt, reference });
-  return { ok: true as const, ...reservationResult(updated) };
+  return { ok: true as const, ...reservationResult(updated), identityAccessToken: identityAccess.token };
 }
 
 export async function resendPublicReservationVerification(reference: string) {
@@ -381,11 +385,12 @@ export async function resendPublicReservationVerification(reference: string) {
   return result.ok ? { ok: true as const, verificationChannel: result.channel, verificationExpiresAt: verificationExpiresAt.toISOString() } : { ok: false as const, code: "DELIVERY_FAILED" };
 }
 
-export async function startPublicEmailVerification(reference: string) {
+export async function startPublicEmailVerification(reference: string, refreshIdentity = false) {
   if (!publicReservationVerificationEnabled()) return { ok: false as const, code: "DISABLED" };
-  const reservation = await db.reservation.findUnique({ where: { publicReference: reference }, include: { customer: true } });
+  const reservation = await db.reservation.findUnique({ where: { publicReference: reference }, include: { customer: true, publicLease: { select: { status: true } } } });
   if (!reservation || reservation.status !== "ACTIVE" || !reservation.contactVerifiedAt || reservation.journey !== "RENTAL" || !reservation.customer.email) return { ok: false as const, code: "NOT_FOUND" };
-  if (reservation.customer.emailVerifiedAt) return { ok: true as const, alreadyVerified: true, verificationExpiresAt: null };
+  if (reservation.customer.emailVerifiedAt && !refreshIdentity) return { ok: true as const, alreadyVerified: true, verificationExpiresAt: null };
+  if (reservation.verificationAttempts >= 9 || (reservation.publicLease?.status !== "SIGNED" && (!reservation.holdExpiresAt || reservation.holdExpiresAt <= new Date()))) return { ok: false as const, code: "EXPIRED" };
   const code = randomInt(0, 1_000_000).toString().padStart(6, "0");
   const verificationExpiresAt = new Date(Date.now() + verificationWindowMs);
   const attempt = reservation.verificationAttempts + 1;
@@ -399,7 +404,7 @@ export async function startPublicEmailVerification(reference: string) {
 export async function verifyPublicReservationEmail(reference: string, code: string) {
   if (!publicReservationVerificationEnabled()) return { ok: false as const, code: "DISABLED" };
   const reservation = await db.reservation.findUnique({ where: { publicReference: reference }, include: { customer: true } });
-  if (!reservation || reservation.status !== "ACTIVE" || !reservation.contactVerifiedAt || reservation.customer.emailVerifiedAt) return { ok: false as const, code: "NOT_FOUND" };
+  if (!reservation || reservation.status !== "ACTIVE" || !reservation.contactVerifiedAt) return { ok: false as const, code: "NOT_FOUND" };
   if (!reservation.verificationExpiresAt || reservation.verificationExpiresAt < new Date() || reservation.verificationAttempts >= 10) return { ok: false as const, code: "EXPIRED" };
   const expected = Buffer.from(reservation.verificationCodeHash ?? "", "hex");
   const actual = Buffer.from(emailVerificationHash(reservation.id, code), "hex");
@@ -407,12 +412,14 @@ export async function verifyPublicReservationEmail(reference: string, code: stri
     await db.reservation.update({ where: { id: reservation.id }, data: { verificationAttempts: { increment: 1 } } });
     return { ok: false as const, code: "INVALID_CODE" };
   }
-  const verifiedAt = new Date();
-  await db.$transaction([
-    db.customer.update({ where: { id: reservation.customerId }, data: { emailVerifiedAt: verifiedAt } }),
-    db.reservation.update({ where: { id: reservation.id }, data: { verificationCodeHash: null, verificationExpiresAt: null } }),
-    db.auditEvent.create({ data: { organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, action: "public_reservation.email_verified", entityType: "Reservation", entityId: reservation.id, requestId: reservation.idempotencyKey, after: { verifiedAt: verifiedAt.toISOString() } } }),
-  ]);
+  const verifiedAt = new Date(), identityAccess = newIdentityAccess();
+  // Consume exactly the verified challenge; concurrent retries cannot mint another grant.
+  await db.$transaction(async tx => {
+    const consumed = await tx.reservation.updateMany({ where: { id: reservation.id, verificationCodeHash: reservation.verificationCodeHash, verificationExpiresAt: { gt: verifiedAt } }, data: { verificationCodeHash: null, verificationExpiresAt: null, identityAccessHash: identityAccess.identityAccessHash, identityAccessExpiresAt: identityAccess.identityAccessExpiresAt } });
+    if (consumed.count !== 1) throw new Error("VERIFICATION_EXPIRED");
+    await tx.customer.update({ where: { id: reservation.customerId }, data: { emailVerifiedAt: verifiedAt } });
+    await tx.auditEvent.create({ data: { organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, action: "public_reservation.email_verified", entityType: "Reservation", entityId: reservation.id, requestId: reservation.idempotencyKey, after: { verifiedAt: verifiedAt.toISOString() } } });
+  });
   await welcomeTenantWhenReady(reservation.customerId, reservation.customer.organisationId);
-  return { ok: true as const, emailVerifiedAt: verifiedAt.toISOString() };
+  return { ok: true as const, emailVerifiedAt: verifiedAt.toISOString(), identityAccessToken: identityAccess.token };
 }

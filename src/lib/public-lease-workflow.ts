@@ -1,3 +1,5 @@
+import { identityRequired } from "@/lib/identity-document-security";
+import { identityGate } from "@/lib/identity-document-service";
 import { createHash, randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
 import { welcomeTenantWhenReady } from "@/lib/tenant-welcome-email";
@@ -30,6 +32,7 @@ export async function preparePublicReservationLease(reference: string, paymentMe
   if (!reservation || reservation.status !== "ACTIVE" || reservation.journey !== "RENTAL" || !reservation.contactVerifiedAt || !reservation.customer.emailVerifiedAt) {
     return { ok: false as const, code: "RESERVATION_UNAVAILABLE" };
   }
+  if (!(await identityGate(db, reservation.customer.organisationId, reservation.id, reservation.createdAt, "SIGN"))) return { ok: false as const, code: "IDENTITY_REQUIRED" };
   if (!reservation.intendedMoveIn) return { ok: false as const, code: "MOVE_IN_DATE_REQUIRED" };
 
   const context = {
@@ -116,6 +119,8 @@ export async function completePublicReservationLease(token: string, input: { sig
     if (lease.status === "SIGNED") return { reference: lease.reservation.publicReference, status: "SIGNED" as const, idempotent: true };
     if (lease.status !== "READY" || lease.reservation.status !== "ACTIVE") throw new Error("NOT_FOUND");
     if (lease.expiresAt < new Date()) throw new Error("EXPIRED");
+    if (identityRequired(lease.reservation.customer.organisationId, lease.reservation.createdAt)) await tx.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id" = ${lease.reservationId} FOR UPDATE`;
+    if (!(await identityGate(tx, lease.reservation.customer.organisationId, lease.reservationId, lease.reservation.createdAt, "SIGN"))) throw new Error("IDENTITY_REQUIRED");
     if (lease.version === STORAGE_TERMS_VERSION && (input.termsAccepted !== true || input.acceptedSha256 !== lease.sha256)) throw new Error("VALIDATION_ERROR");
     const signedAt = new Date();
     const initials = [...LEASE_CLAUSE_KEYS.map((clauseKey) => ({ clauseKey: String(clauseKey), initialedAt: signedAt.toISOString() })), ...(lease.version === STORAGE_TERMS_VERSION ? [{ clauseKey: `full_terms:${lease.version}:${lease.sha256}`, initialedAt: signedAt.toISOString() }] : [])];

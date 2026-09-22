@@ -1,3 +1,4 @@
+import { expireIdentityDocuments } from "@/lib/identity-document-service";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { expireFacialPhotos } from "@/lib/facial-photo-service";
 import { tenantPrivateHeaders as headers } from "@/lib/tenant-portal-response";
@@ -8,6 +9,6 @@ export async function POST(request: Request) {
   if (!expected || !/^[a-f0-9]{64}$/i.test(expected)) return Response.json({ error: "WORKER_NOT_CONFIGURED" }, { status: 503, headers });
   const supplied = request.headers.get("x-cron-key");
   if (!supplied || supplied.length > 4096 || !timingSafeEqual(createHash("sha256").update(supplied).digest(), Buffer.from(expected, "hex"))) return Response.json({ error: "UNAUTHORISED" }, { status: 401, headers });
-  try { return Response.json({ data: { expired: await expireFacialPhotos() } }, { headers }); }
+  try { return Response.json({ data: { expired: await expireFacialPhotos(), identityDocumentsErased: await expireIdentityDocuments() } }, { headers }); }
   catch { return Response.json({ error: "RETENTION_REVIEW_REQUIRED" }, { status: 503, headers }); }
 }
