@@ -469,6 +469,7 @@ model Reservation {
   publicPaymentSessions PublicPaymentSession[]
   publicLease        PublicReservationLease?
   packageSelection   ReservationPackage?
+  facialPhoto        FacialPhotoSubmission?
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 
@@ -590,6 +591,7 @@ model Occupancy {
   accessState String          @default("PENDING")
   biometricEnrollments BiometricEnrollment[]
   accessDecisions AccessDecision[]
+  facialPhoto FacialPhotoSubmission?
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
@@ -764,6 +766,38 @@ model Account {
   updatedAt     DateTime      @updatedAt
 
   @@index([customerId])
+}
+
+// Raw photographs are encrypted, short-lived and never serialized into API lists.
+// PENDING_PROVIDER is a durable request, not evidence of enrolment or gate access.
+model FacialPhotoSubmission {
+  id                    String @id @default(cuid())
+  reservationId         String @unique
+  reservation           Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  version               Int @default(1)
+  status                String @default("WAITING_REVIEW")
+  encryptedImage        String?
+  imageSha256           String
+  policyVersion         String
+  policyHash            String
+  consentNotice         String
+  consentAt             DateTime
+  expiresAt             DateTime
+  reviewedById          String?
+  reviewedAt            DateTime?
+  occupancyId           String? @unique
+  occupancy             Occupancy? @relation(fields: [occupancyId], references: [id], onDelete: SetNull)
+  activationRequestedAt DateTime?
+  erasedAt              DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([status, expiresAt])
+}
+
+model FacialPhotoMaintenance {
+  id          String @id
+  completedAt DateTime
 }
 
 model CollectionCase {

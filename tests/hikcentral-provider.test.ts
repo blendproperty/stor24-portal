@@ -66,3 +66,11 @@ test("HikCentral provider uses saved runtime credentials without environment sec
   assert.equal(calls[0].headers.get("x-ca-key"), "saved-key");
   assert.ok(calls[0].headers.get("x-ca-signature"));
 });
+
+test("HTTP success without an explicit provider success code is not proof", async () => {
+  const provider = new HikCentralAccessProvider((async (_url, init) => {
+    assert.equal(init?.redirect, "error");
+    return Response.json({ data: {} });
+  }) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "ci", appSecret: "ci", facilities: {} });
+  assert.equal((await provider.health()).ok, false);
+});

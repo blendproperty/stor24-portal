@@ -96,12 +96,19 @@ function pinnedHttpsPost(
         path: `${target.pathname}${target.search}`,
         method: "POST",
         headers: { ...headers, "Content-Length": Buffer.byteLength(body) },
+        agent: false,
         rejectUnauthorized: false,
         timeout: 30_000,
       },
       (response) => {
         const chunks: Buffer[] = [];
-        response.on("data", (chunk) => chunks.push(chunk));
+        let bytes = 0;
+        response.on("error", reject);
+        response.on("data", (chunk) => {
+          bytes += chunk.length;
+          if (bytes > 1024 * 1024) { req.destroy(new Error("HikCentral response exceeded its limit.")); return; }
+          chunks.push(chunk);
+        });
         response.on("end", () => {
           try {
             const text = Buffer.concat(chunks).toString("utf8");
@@ -120,15 +127,31 @@ function pinnedHttpsPost(
         const actualFingerprint = certificate?.fingerprint256 ? normalizeFingerprint(certificate.fingerprint256) : "";
         if (!actualFingerprint || actualFingerprint !== normalizedExpected) {
           req.destroy(new Error("HikCentral certificate fingerprint did not match the configured pin; refusing to trust this connection."));
+          return;
         }
+        req.end(body);
       });
     });
 
     req.on("timeout", () => req.destroy(new Error("HikCentral request timed out.")));
     req.on("error", (error) => reject(error instanceof Error ? error : new Error("HikCentral request failed.")));
-    req.write(body);
-    req.end();
+    const deadline = setTimeout(() => req.destroy(new Error("HikCentral request timed out.")), 30_000);
+    req.on("close", () => clearTimeout(deadline));
   });
+}
+
+async function boundedProviderJson(response: Response): Promise<HikCentralJsonResponse> {
+  if (!response.body) throw new Error("HikCentral returned an empty response.");
+  const reader = response.body.getReader(), chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const next = await reader.read(); if (next.done) break;
+    size += next.value.length;
+    if (size > 1024 * 1024) { await reader.cancel(); throw new Error("HikCentral response exceeded its limit."); }
+    chunks.push(next.value);
+  }
+  try { return JSON.parse(Buffer.concat(chunks).toString("utf8")) as HikCentralJsonResponse; }
+  catch { throw new Error("HikCentral returned an invalid response."); }
 }
 
 function environmentFacilityConfig(facilityId: string): FacilityAccessConfig {
@@ -180,13 +203,13 @@ export class HikCentralAccessProvider {
     const pinnedFingerprint = this.configuration?.pinnedCertSha256?.trim();
     const { status, ok, json } = pinnedFingerprint
       ? await pinnedHttpsPost(`${baseUrl}${path}`, body, headers, pinnedFingerprint)
-      : await this.request(`${baseUrl}${path}`, { method: "POST", headers, body, signal: AbortSignal.timeout(30_000) }).then(async (response) => ({
+      : await this.request(`${baseUrl}${path}`, { method: "POST", headers, body, redirect: "error", signal: AbortSignal.timeout(30_000) }).then(async (response) => ({
           status: response.status,
           ok: response.ok,
-          json: (await response.json()) as HikCentralJsonResponse,
+          json: await boundedProviderJson(response),
         }));
 
-    if (!ok || String(json.code ?? "0") !== "0") throw new Error(`HikCentral rejected ${path}: ${json.msg ?? status}`);
+    if (!ok || String(json.code) !== "0") throw new Error(`HikCentral request was not confirmed (HTTP ${status}).`);
     return json.data ?? {};
   }
 

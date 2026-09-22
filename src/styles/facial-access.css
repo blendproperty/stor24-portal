@@ -1,0 +1,48 @@
+.face-workspace,.face-tenant { font-family:"Satoshi Handover",Arial,sans-serif; font-weight:400; }
+.face-workspace { background:#fff; border:1px solid #dfe5e0; border-radius:20px; padding:32px; color:#13291f; line-height:1.6; }
+.face-workspace h2,.face-workspace h3,.face-workspace h4,.face-workspace p { margin:0; }
+.face-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; }
+.face-eyebrow { font-size:10px; letter-spacing:.15em; font-weight:700; color:#627267; }
+.face-heading h2 { font-size:32px; font-weight:700; letter-spacing:-.035em; line-height:1.2; margin:10px 0 14px; }
+.face-heading p,.face-queue-heading p,.face-footer p { color:#627267; font-size:13px; }
+.face-pill { display:inline-flex; align-items:center; gap:7px; white-space:nowrap; border-radius:30px; padding:7px 12px; color:#825216; background:#fff2d9; font-size:12px; font-weight:500; }
+.face-steps { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin:28px 0 34px; }
+.face-steps article { padding:22px; border:1px solid #e1e7e2; border-radius:14px; background:#f8faf7; }
+.face-steps article>svg { display:block; margin-bottom:18px; color:#47715a; }
+.face-steps span { font-size:11px; color:#66776b; }
+.face-steps h3 { font-size:15px; font-weight:700; margin:6px 0 9px; }
+.face-steps p { font-size:13px; color:#627267; font-weight:400; }
+.face-queue-heading { display:flex; align-items:center; justify-content:space-between; gap:20px; }
+.face-queue-heading h3 { font-size:18px; font-weight:700; }
+.face-queue-heading p { margin-top:6px; }
+.face-workspace .button { font-family:inherit; font-size:12px; font-weight:500; }
+.face-empty { display:flex; flex-direction:column; align-items:center; gap:8px; text-align:center; padding:44px 20px; margin:24px 0; border:1px dashed #d8e1d9; border-radius:14px; background:#fcfdfb; }
+.face-empty svg { color:#7d8c81; margin-bottom:8px; }
+.face-empty h3 { font-size:16px; font-weight:500; }
+.face-empty p,.face-footer { font-size:13px; color:#627267; }
+.face-footer { padding-top:20px; border-top:1px solid #e4e9e4; }
+.face-footer strong { font-weight:500; color:#304b39; }
+.face-footer p { margin-top:6px; max-width:760px; }
+.face-rows { margin:22px 0; }
+.face-row { padding:22px 0; border-top:1px solid #e4e9e4; display:grid; grid-template-columns:1fr auto; gap:14px; align-items:start; }
+.face-row h4 { font-size:15px; font-weight:700; }
+.face-row p { font-size:13px; color:#627267; }
+.face-row small { font-size:11px; color:#627267; }
+.face-row-status { font-size:12px; color:#4d6756; background:#f1f5ef; padding:4px 9px; border-radius:7px; }
+.face-row-actions { grid-column:1 / -1; display:flex; flex-wrap:wrap; gap:8px; }
+.face-preview { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; padding:20px; background:#f1f5ef; border-radius:14px; margin-top:20px; }
+.face-preview img { width:220px; max-width:100%; max-height:280px; object-fit:contain; border-radius:9px; }
+.face-preview p { font-size:12px; margin-top:8px; }
+.face-feedback { font-size:13px; padding:16px 0; }
+.face-tenant .tenant-eyebrow { display:flex; align-items:center; gap:8px; }
+.face-tenant form { display:grid; gap:16px; margin-top:20px; }
+.face-tenant form>label { display:grid; gap:8px; }
+.face-tenant form>p,.face-tenant details { font-size:13px; color:#57665d; }
+.face-tenant details { background:#f5f7f2; padding:16px; border-radius:12px; }
+.face-tenant summary { cursor:pointer; font-weight:500; color:#243e2d; }
+.face-consent { white-space:pre-wrap; }
+.face-tenant .face-checkbox { display:flex; align-items:flex-start; gap:10px; font-size:13px; }
+.face-checkbox input { width:18px; height:18px; flex-shrink:0; margin-top:3px; }
+.face-status { padding:12px; background:#f0f5ec; border-radius:9px; font-size:13px; }
+.face-tenant>.tenant-secondary { margin-top:16px; margin-right:10px; }
+@media(max-width:760px) { .face-workspace { padding:22px; } .face-heading { flex-direction:column; gap:16px; } .face-heading h2 { font-size:28px; } .face-steps { grid-template-columns:1fr; gap:10px; } .face-steps article { padding:18px; } .face-steps article>svg { float:right; margin:0; } .face-queue-heading { align-items:flex-start; flex-direction:column; } .face-row { grid-template-columns:1fr; } .face-row-status { justify-self:start; } .face-preview { flex-direction:column; } }

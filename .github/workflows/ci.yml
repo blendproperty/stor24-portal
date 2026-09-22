@@ -27,6 +27,7 @@ jobs:
       - run: node scripts/test-collections.mjs
       - run: node scripts/test-settlements.mjs
       - run: node scripts/test-mri.mjs
+      - run: node scripts/test-facial-photos.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -40,6 +41,7 @@ jobs:
             output/settlement/
             output/mri/1440.png
             output/mri/390.png
+            output/facial-access/
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 20
