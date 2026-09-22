@@ -6,9 +6,15 @@ import assert from "node:assert/strict";
 const bundle = await build({ entryPoints:["tests/browser/identity-fixture.jsx"], bundle:true, write:false, format:"esm", jsx:"automatic" });
 const fonts = `@font-face{font-family:"Satoshi Handover";src:url("/brand/Satoshi-Handover-400.woff2");font-weight:400}@font-face{font-family:"Satoshi Handover";src:url("/brand/Satoshi-Handover-700.woff2");font-weight:700}`;
 const css = fonts + await readFile("src/styles/identity-review.css","utf8");
+const configBundle = await build({entryPoints:["next.config.ts"],bundle:true,write:false,format:"esm",platform:"node"});
+const config = (await import(`data:text/javascript;base64,${Buffer.from(configBundle.outputFiles[0].text).toString("base64")}`)).default;
+const securityHeaders = (await config.headers()).find(rule=>rule.source==="/identity").headers;
+assert.equal(config.experimental.proxyClientMaxBodySize,"13mb");
+
 const server=createServer(async(req,res)=>{
  if (/^\/brand\/Satoshi-Handover-(400|700)\.woff2$/.test(req.url)) {res.setHeader("Content-Type","font/woff2");return res.end(await readFile(`public${req.url}`));}
  if(req.url==="/fixture.js"){res.setHeader("Content-Type","text/javascript");return res.end(bundle.outputFiles[0].text);}
+ for(const header of securityHeaders) res.setHeader(header.key,header.value);
  res.setHeader("Content-Type","text/html");res.end(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:24px;background:#f5f4ec}*{box-sizing:border-box}${css}</style></head><body><div id="root"></div><script type="module" src="/fixture.js"></script></body></html>`);
 });
 await new Promise(resolve=>server.listen(0,"127.0.0.1",resolve));
@@ -31,6 +37,7 @@ try {
  documents=[document];await page.goto(base+"?enabled");await page.getByRole("button",{name:/Sample Customer/}).click();
  await expect(page.getByRole("button",{name:"Accept document",exact:true})).toBeDisabled();
  await page.getByRole("button",{name:"Open front",exact:true}).click();await expect(page.getByRole("img")).toBeVisible();
+ await expect(page.getByRole("img")).toHaveJSProperty("naturalWidth",1);
  await expect(page.getByRole("button",{name:"Accept document",exact:true})).toBeDisabled();
  await page.getByRole("button",{name:"Open back",exact:true}).click();await expect(page.getByRole("button",{name:"Accept document",exact:true})).toBeEnabled();
  await page.screenshot({path:"output/identity/staff-review-mobile.png",fullPage:true});
