@@ -1,0 +1,26 @@
+{
+  "verifiedAt": "2026-09-22T12:21:44.973096+00:00",
+  "url": "https://stor4.srv938083.hstgr.cloud/terms",
+  "edition": "storage-terms-2026-09-22",
+  "exactClauses": 28,
+  "exactIntroductoryParagraphs": 3,
+  "pdfPages": 7,
+  "pdfSha256": "c1b435e7056cc4f0816779fcc4f8a140c81e25c5f378d88bf4d4e444a3134c37",
+  "competitorReferences": 0,
+  "health": {
+    "status": "healthy",
+    "checkedAt": "2026-09-22T12:21:44.957Z",
+    "dependencies": {
+      "cms": {
+        "ok": true,
+        "status": 200,
+        "latencyMs": 44
+      },
+      "crm": {
+        "ok": true,
+        "status": 200,
+        "latencyMs": 45
+      }
+    }
+  }
+}
