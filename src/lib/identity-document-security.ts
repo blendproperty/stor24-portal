@@ -12,7 +12,8 @@ const policySchema = z.object({
   retentionHours: z.number().int().min(1).max(2160), alternativeContact: z.string().min(1).max(500),
   acceptedTypes: z.array(z.enum(identityTypes)).min(1).max(3),
   reservationIds: z.array(z.string().min(1).max(100)).min(1).max(20).optional(),
-});
+  customerEmailHashes: z.array(z.string().regex(/^[a-f0-9]{64}$/)).min(1).max(20).optional(),
+}).refine(policy => !(policy.reservationIds && policy.customerEmailHashes), "Choose one pilot scope");
 export function identityPolicy(organisationId: string) {
   if (!process.env.IDENTITY_DOCUMENT_POLICIES_JSON) return null;
   try {
@@ -23,11 +24,15 @@ export function identityPolicy(organisationId: string) {
     return { ...policy, hash: createHash("sha256").update(JSON.stringify(policy)).digest("hex") };
   } catch { throw new Error("ID_POLICY_UNAVAILABLE"); }
 }
-export function identityRequired(organisationId: string, createdAt: Date, reservationId?: string) {
+export function identityRequired(organisationId: string, createdAt: Date, reservationId?: string, customerEmail?: string | null) {
   const policy = identityPolicy(organisationId);
   if (!policy || createdAt < new Date(policy.effectiveFrom)) return null;
   // A controlled pilot must never enable collection for the rest of the store.
   if (policy.reservationIds && (!reservationId || !policy.reservationIds.includes(reservationId))) return null;
+  if (policy.customerEmailHashes) {
+    const email = customerEmail?.trim().toLowerCase();
+    if (!email || !policy.customerEmailHashes.includes(createHash("sha256").update(email).digest("hex"))) return null;
+  }
   return policy;
 }
 export function newIdentityAccess() {
