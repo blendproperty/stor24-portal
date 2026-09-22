@@ -1,8 +1,11 @@
+import { FacialPhotoQueue } from "@/components/facial-photo-queue";
+import { listFacialPhotos } from "@/lib/facial-photo-service";
+import { facialPhotoPolicy } from "@/lib/facial-photo-security";
+import { requirePermission } from "@/lib/auth-guards";
 import { BiometricAccessWorkspace } from "@/components/biometric-access-workspace";
 import { MelIntegrationStatus } from "@/components/mel-integration-status";
 import { PageHeader } from "@/components/page-header";
 import { listBiometricAccess } from "@/lib/biometric-access-service";
-import { db } from "@/lib/db";
 import { listAccessDecisions, listIdentityLinks } from "@/lib/mel-integration-status-service";
 import { requirePermissionScope } from "@/lib/scope";
 
@@ -11,16 +14,19 @@ export const dynamic = "force-dynamic";
 
 export default async function AccessPage() {
   const scope = await requirePermissionScope("access.view");
-  const [occupancies, enrollments, identityLinks, accessDecisions] = await Promise.all([
-    db.occupancy.findMany({ where: { status: { in: ["ACTIVE", "NOTICE_GIVEN"] }, tenancy: { facility: { organisationId: scope.organisationId, ...(scope.unrestrictedFacilities ? {} : { id: { in: scope.facilityIds } }) } } }, include: { unit: true, tenancy: { include: { facility: true, customer: true } } }, orderBy: { updatedAt: "desc" } }),
+  const [enrollments, identityLinks, accessDecisions] = await Promise.all([
     listBiometricAccess(scope),
     listIdentityLinks(scope),
     listAccessDecisions(scope),
   ]);
+  const photos = await listFacialPhotos(scope);
+  let manageableFacilities: string[] | null = [];
+  try { manageableFacilities = (await requirePermission("access.manage")).allowedFacilityIds; }
+  catch (error) { if (!(error instanceof Error) || error.message !== "FORBIDDEN") throw error; }
   return <div className="page-stack">
-    <PageHeader eyebrow="Physical security" title="Facial access" description="Consent-led HikCentral enrolment for active Stor24 tenants, with immediate revocation and a complete audit trail." />
+    <PageHeader eyebrow="Physical security" title="Facial access" description="Private photographs, staff review and a clear record of what still needs to be verified." />
+    <FacialPhotoQueue policyConfigured={Boolean(facialPhotoPolicy(scope.organisationId))} manageableFacilities={manageableFacilities} photos={photos.map(photo => ({ id: photo.id, version: photo.version, status: photo.status, expiresAt: photo.expiresAt.toISOString(), facilityId: photo.reservation.facilityId, facilityName: photo.reservation.facility.name, unitNumber: photo.reservation.unit.number, customerName: [photo.reservation.customer.firstName ?? photo.reservation.customer.companyName ?? "Customer", photo.reservation.customer.lastName].filter(Boolean).join(" ") }))} />
     <BiometricAccessWorkspace
-      candidates={occupancies.map((occupancy) => ({ occupancyId: occupancy.id, facilityId: occupancy.tenancy.facilityId, customerId: occupancy.tenancy.customerId, label: `${occupancy.tenancy.customer.firstName ?? occupancy.tenancy.customer.companyName ?? "Customer"} ${occupancy.tenancy.customer.lastName ?? ""} · ${occupancy.tenancy.facility.name} · Unit ${occupancy.unit.number}`.trim() }))}
       enrollments={enrollments.map((item) => ({ id: item.id, customerName: `${item.customer.firstName ?? item.customer.companyName ?? "Customer"} ${item.customer.lastName ?? ""}`.trim(), facilityName: item.facility.name, unitNumber: item.occupancy.unit.number, status: item.status, consentAt: item.consentAt.toISOString(), provisionedAt: item.provisionedAt?.toISOString() ?? null }))}
     />
     <MelIntegrationStatus
