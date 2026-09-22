@@ -1,7 +1,15 @@
-import { extendedGuides } from "../lib/guided-help-catalog";
+import type { GuideStep } from "../lib/guided-help-state";
 
 // Device-level reading state only. Never opens the encrypted operational database.
-const guide = extendedGuides.find(item => item.id === "offline")!;
+// Public, cached device help only. Role-specific operational lessons are delivered
+// by the authenticated staff catalogue; never cache a previous user's grants here.
+const guide: { steps: Pick<GuideStep, "title" | "body" | "selector" | "missing" | "caution">[] } = { steps: [
+  { title: "Prepare this device while online", body: "An authorised colleague must prepare this device using their own sign-in and store permissions. If you do not have that access, ask your administrator. The signed-in Guide me library contains the preparation and capture workflows available to your account.", selector: "#setup-panel", missing: "Open the offline workspace to inspect device readiness." },
+  { title: "Unlock and inspect the snapshot", body: "Only use an offline copy you are authorised to access. Check its store, age and expiry, and keep its unlock passphrase private. A saved copy can be stale and does not confirm current availability.", selector: "#unlock-panel", missing: "The saved-copy information is in the unlock section." },
+  { title: "Understand offline limits", body: "Offline information may be out of date. A locally queued request is not a confirmed reservation, payment, signature or key handover. Your normal account permissions are checked when work reaches the server.", selector: "#lead-form", missing: "Unlock the snapshot to see the workspace. This help does not grant access or unlock it." },
+  { title: "Keep queued work safe", body: "Do not erase browser data or a saved copy while work may remain unsynchronised. Ask the authorised operator to resolve pending work using their own account. Do not borrow another person's sign-in or assume a cleared queue proves a booking succeeded.", selector: "#unlock-panel", missing: "Inspect the saved-copy information without erasing it." },
+  { title: "Use your own online guides", body: "Return online and sign in to see tutorials matched to your current permissions. This cached panel gives general device guidance only and never stores a previous user's administrative or operational tutorial access.", selector: "#offline-guide-toggle", missing: "Use Guide me in the signed-in staff workspace for your permitted workflows." },
+] };
 const key = "stor24:offline-guide:v1";
 const toggle = document.querySelector<HTMLButtonElement>("#offline-guide-toggle")!;
 const panel = document.querySelector<HTMLElement>("#offline-guide")!;
@@ -45,10 +53,10 @@ function render(focus = true) {
       if (state.step < guide.steps.length - 1) state.step++;
       save(); render();
     }));
-    if (state.reviewed.length === guide.steps.length) panel.append(paragraph("Every step read. This does not confirm any enquiry, reservation, payment or sync has completed."));
+    if (state.reviewed.length === guide.steps.length) panel.append(paragraph("Every device-help step read. This does not confirm any enquiry, reservation, payment or sync has completed."));
     panel.append(button("Restart", () => { state.step = 0; state.reviewed = []; save(); render(); }));
   } else {
-    panel.append(paragraph("Turn on Guide mode for preparation, unlock, lead capture, unit requests, sync, conflicts and recovery. This never submits a business action."));
+    panel.append(paragraph("Turn on Guide mode for general device safety and offline limitations. Sign in online for operational tutorials matched to your permissions."));
   }
   panel.append(button("Pause", close), paragraph("Reading position and switch preference are saved on this device, separately from your signed-in staff guides."));
   if (storageFailed) panel.append(paragraph("Browser storage is unavailable. Reading progress may be lost when you leave."));
