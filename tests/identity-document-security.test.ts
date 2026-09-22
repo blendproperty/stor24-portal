@@ -14,6 +14,15 @@ test("ID policy is absent by default, strictly validated, and applies only from 
   const hash = identityPolicy("org")!.hash;
   process.env.IDENTITY_DOCUMENT_POLICIES_JSON = JSON.stringify({ org: { ...policy, notice: policy.notice + " Changed." } });
   assert.notEqual(identityPolicy("org")!.hash, hash);
+  process.env.IDENTITY_DOCUMENT_POLICIES_JSON = JSON.stringify({ org: { ...policy, reservationIds: ["pilot-booking"] } });
+  assert.ok(identityRequired("org", new Date("2026-10-02"), "pilot-booking"));
+  assert.equal(identityRequired("org", new Date("2026-10-02"), "other-booking"), null);
+  assert.equal(identityRequired("org", new Date("2026-10-02")), null);
+  assert.equal(identityRequired("other-org", new Date("2026-10-02"), "pilot-booking"), null);
+  assert.equal(identityRequired("org", new Date("2026-09-01"), "pilot-booking"), null);
+  assert.notEqual(identityPolicy("org")!.hash, hash);
+  process.env.IDENTITY_DOCUMENT_POLICIES_JSON = JSON.stringify({ org: { ...policy, reservationIds: [] } });
+  assert.throws(() => identityRequired("org", new Date("2026-10-02"), "pilot-booking"), /ID_POLICY_UNAVAILABLE/);
   delete process.env.IDENTITY_DOCUMENT_POLICIES_JSON;
 });
 test("ID grants expire, are unpredictable, and never accept booking references", () => {

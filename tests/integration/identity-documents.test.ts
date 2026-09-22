@@ -30,6 +30,32 @@ test("isolated PostgreSQL private identity workflow", async t => {
     return { org, facility, user, customer, booking, scope, input, reference: booking.publicReference!, token: access.token };
   }
   try {
+    await t.test("production pilot applies only to selected bookings in the same organisation", async () => {
+      const f = await fixture(), secondAccess = newIdentityAccess();
+      const second = await db.reservation.create({ data: { facilityId: f.facility.id, customerId: f.customer.id, unitId: f.booking.unitId, quotedRate: 100, intendedMoveIn: new Date(), publicReference: `ST24-${randomUUID()}`, contactVerifiedAt: new Date(), holdExpiresAt: new Date(Date.now() + 86400000), identityAccessHash: secondAccess.identityAccessHash, identityAccessExpiresAt: secondAccess.identityAccessExpiresAt } });
+      const policies = JSON.parse(process.env.IDENTITY_DOCUMENT_POLICIES_JSON!);
+      policies[f.org.id].reservationIds = [f.booking.id];
+      process.env.IDENTITY_DOCUMENT_POLICIES_JSON = JSON.stringify(policies);
+      const input = { ...f.input, policyHash: identityPolicy(f.org.id)!.hash };
+      assert.equal((await identityStatus(f.reference, f.token)).required, true);
+      const unaffected = await identityStatus(second.publicReference!, secondAccess.token);
+      assert.equal(unaffected.required, false); assert.equal(unaffected.canContinue, true); assert.equal(unaffected.policy, null);
+      await assert.rejects(submitIdentity(second.publicReference!, secondAccess.token, input), /ID_POLICY_UNAVAILABLE/);
+      assert.equal(await identityGate(db, f.org.id, second.id, second.createdAt, "SIGN"), true);
+      assert.equal(await identityGate(db, f.org.id, second.id, second.createdAt, "HANDOVER"), true);
+      assert.equal(await identityGate(db, f.org.id, f.booking.id, f.booking.createdAt, "SIGN"), false);
+      const document = await submitIdentity(f.reference, f.token, input);
+      assert.equal(await identityGate(db, f.org.id, f.booking.id, f.booking.createdAt, "SIGN"), true);
+      assert.equal(await identityGate(db, f.org.id, f.booking.id, f.booking.createdAt, "HANDOVER"), false);
+      await previewIdentity(f.scope, document.id, 1, 0); await previewIdentity(f.scope, document.id, 1, 1);
+      await reviewIdentity(f.scope, document.id, 1, "ACCEPT");
+      assert.equal(await identityGate(db, f.org.id, f.booking.id, f.booking.createdAt, "HANDOVER"), true);
+      policies[f.org.id].reservationIds = [second.id];
+      process.env.IDENTITY_DOCUMENT_POLICIES_JSON = JSON.stringify(policies);
+      await assert.rejects(previewIdentity(f.scope, document.id, 1, 0), /ID_CHANGED/);
+      await assert.rejects(reviewIdentity(f.scope, document.id, 1, "ACCEPT"), /ID_CHANGED/);
+      await assert.rejects(submitIdentity(f.reference, f.token, input), /ID_POLICY_UNAVAILABLE/);
+    });
     await t.test("upload before signing, both page previews, staff acceptance and handover gate", async () => {
       const f = await fixture();
       assert.equal(await identityGate(db, f.org.id, f.booking.id, f.booking.createdAt, "SIGN"), false);

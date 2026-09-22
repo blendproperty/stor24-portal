@@ -11,6 +11,7 @@ const policySchema = z.object({
   notice: z.string().min(40).max(12000), acknowledgementLabel: z.string().min(15).max(1000),
   retentionHours: z.number().int().min(1).max(2160), alternativeContact: z.string().min(1).max(500),
   acceptedTypes: z.array(z.enum(identityTypes)).min(1).max(3),
+  reservationIds: z.array(z.string().min(1).max(100)).min(1).max(20).optional(),
 });
 export function identityPolicy(organisationId: string) {
   if (!process.env.IDENTITY_DOCUMENT_POLICIES_JSON) return null;
@@ -22,9 +23,12 @@ export function identityPolicy(organisationId: string) {
     return { ...policy, hash: createHash("sha256").update(JSON.stringify(policy)).digest("hex") };
   } catch { throw new Error("ID_POLICY_UNAVAILABLE"); }
 }
-export function identityRequired(organisationId: string, createdAt: Date) {
+export function identityRequired(organisationId: string, createdAt: Date, reservationId?: string) {
   const policy = identityPolicy(organisationId);
-  return policy && createdAt >= new Date(policy.effectiveFrom) ? policy : null;
+  if (!policy || createdAt < new Date(policy.effectiveFrom)) return null;
+  // A controlled pilot must never enable collection for the rest of the store.
+  if (policy.reservationIds && (!reservationId || !policy.reservationIds.includes(reservationId))) return null;
+  return policy;
 }
 export function newIdentityAccess() {
   const token = randomBytes(32).toString("base64url");

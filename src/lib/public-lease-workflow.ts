@@ -120,7 +120,7 @@ export async function completePublicReservationLease(token: string, input: { sig
     if (lease.status === "SIGNED") return { reference: lease.reservation.publicReference, status: "SIGNED" as const, idempotent: true };
     if (lease.status !== "READY" || lease.reservation.status !== "ACTIVE") throw new Error("NOT_FOUND");
     if (lease.expiresAt < new Date()) throw new Error("EXPIRED");
-    if (identityRequired(lease.reservation.customer.organisationId, lease.reservation.createdAt)) await tx.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id" = ${lease.reservationId} FOR UPDATE`;
+    if (identityRequired(lease.reservation.customer.organisationId, lease.reservation.createdAt, lease.reservationId)) await tx.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id" = ${lease.reservationId} FOR UPDATE`;
     if (!(await identityGate(tx, lease.reservation.customer.organisationId, lease.reservationId, lease.reservation.createdAt, "SIGN"))) throw new Error("IDENTITY_REQUIRED");
     if (requiresFullTermsAcceptance(lease.version) && (input.termsAccepted !== true || input.acceptedSha256 !== lease.sha256)) throw new Error("VALIDATION_ERROR");
     const signedAt = new Date();
