@@ -7,6 +7,8 @@ In **Units & rates**, select a store and use **Floor availability**. Each switch
 
 The release initialises the existing public store `midpoint` with First Floor and Second Floor closed. Ground floor is unchanged. The verified pre-release public inventory on 23 September 2026 contained 142 ground-floor, 194 first-floor and 194 second-floor units. This is a read-only baseline, not proof of deployed closure.
 
+The public facility detail also returns `comingSoonFloors`, a list of display names for closed floors. The companion public website displays these as grey, disabled **Coming soon** tabs. Their unit/map details remain excluded from selectable inventory. Reopening a floor removes its coming-soon label and restores its operational map on the next availability fetch.
+
 Inventory and staff maps retain closed-floor units for administration. Inventory has a Floor under construction filter. Available counts exclude closed-floor units; the Performance table includes otherwise-vacant closed-floor units in Service / unavailable. Physical totals and physical-occupancy denominators still include all inventory.
 
 ## Preservation and existing bookings
@@ -19,7 +21,7 @@ Existing bookings on a newly closed floor remain visible to staff but cannot be 
 
 - Floor keys normalise numeric/named ground, first and second floors. Other floor labels retain case-insensitive exact identity.
 - Unit eligibility checks both its floor label and linked map; a blank/stale label cannot bypass a closed mapped floor.
-- Public unit lists, floor maps, size offers, available counts, staff selectors and offline downloads consume the same policy. The public website contract is unchanged and fetches availability without caching; no companion website deployment is required.
+- Public unit lists, floor maps, size offers, available counts, staff selectors and offline downloads consume the same policy. `comingSoonFloors` is additive and the public website fetches availability without caching. The coming-soon presentation requires both the CRM response addition and companion website release; older website clients safely ignore the new field.
 - Allocation and floor changes share a facility-row lock, then allocation locks/rechecks the unit. A stale request cannot pass a closure committed before its allocation lock. Already-completed bookings are retained.
 - A disconnected offline device may display an old snapshot. Its request remains provisional; sync rechecks current policy and rejects it as unavailable. Facility changes invalidate the snapshot revision.
 - The PATCH endpoint checks same origin, `inventory.manage`, organisation/facility scope and the previously displayed state. Successful changes are audited atomically. A stale staff change requires refresh.
