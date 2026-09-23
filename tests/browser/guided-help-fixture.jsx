@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { AppShell } from "../../src/components/app-shell";
 import { ReservationsWorkspace } from "../../src/components/reservations-workspace";
 import { MoveInWorkspace } from "../../src/components/move-in-workspace";
+import SettingsPage from "../../src/app/settings/page";
 import { usePathname } from "next/navigation";
 
 const readiness = { mandateStatus: null, signed: true, leaseId: "fixture-document", signedAt: "2026-09-21", requiredAmount: 1200, paidAmount: 0, paymentVerified: false, testPayment: true, startDate: "2026-09-30", ready: false, blockers: ["A test payment is recorded. It does not clear the real booking for key collection."] };
@@ -12,12 +13,12 @@ function Fixture() {
   const params = new URLSearchParams(window.location.search);
   const user = params.get("user") || "fixture-staff-a";
   return <AppShell session={{ userId: user, name: "Training Preview", email: "fixture@example.invalid", role: "Organisation owner", sessionVersion: 1 }}>
-    {path === "/reservations" ? <ReservationsWorkspace /> : path === "/operations/move-in" ? <MoveInWorkspace
+    {path === "/settings" ? <SettingsPage /> : path === "/reservations" ? <ReservationsWorkspace /> : path === "/operations/move-in" ? <MoveInWorkspace
       key={params.toString()}
       action={async () => { throw new Error("Fixture must not submit a move-in"); }}
       initialReservationId={params.get("reservation") || undefined}
       facilities={[{ id: "fixture-store", name: "Training store" }]}
-      units={[{ id: "fixture-unit", facilityId: "fixture-store", number: "T01", floor: "Ground", zone: "A", status: "RESERVED", monthlyRate: 1200, typeName: "Training unit", width: 3, length: 3, area: 9, features: [] }]}
+      units={params.has("inventory") ? Array.from({length:530}, (_,i) => ({id:`unit-${i+1}`,facilityId:"fixture-store",number:String(i+1),floor:i<200?"Ground":"First floor",zone:"",status:"AVAILABLE",monthlyRate:1200,typeName:"B2",width:2,length:3,area:6,features:[]})) : [{ id: "fixture-unit", facilityId: "fixture-store", number: "T01", floor: "Ground", zone: "A", status: "RESERVED", monthlyRate: 1200, typeName: "Training unit", width: 3, length: 3, area: 9, features: [] }]}
       customers={[{ id: "fixture-customer", name: "Example Customer", email: "fixture@example.invalid" }]}
       reservations={[{ id: "fixture-reservation", facilityId: "fixture-store", customerId: "fixture-customer", unitId: "fixture-unit", label: "T01 · Example Customer", paymentMethod: "CARD", intendedMoveIn: "2026-09-30", quotedRate: 1200, readiness: params.has("unsigned") ? null : readiness, canRecordPayment: true }]}
     /> : <div className="page-stack">

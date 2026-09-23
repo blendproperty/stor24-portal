@@ -14,6 +14,10 @@ const SHELL_ASSETS = [
   "/icons/icon-maskable-512.png",
   "/icons/apple-touch-icon.png",
   "/brand/stor24-logo-dark.svg",
+  "/brand/stor24-logo-white.svg",
+  "/brand/Satoshi-Handover-400.woff2",
+  "/brand/Satoshi-Handover-500.woff2",
+  "/brand/Satoshi-Handover-700.woff2",
 ];
 
 self.addEventListener("install", (event) => {

@@ -66,6 +66,8 @@ export function MoveInWorkspace({
   const [floorFilter, setFloorFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [find, setFind] = useState("");
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
   const [step, setStep] = useState<1 | 2>(initialReservation ? 2 : 1);
   const [customerOptions, setCustomerOptions] = useState(customers);
   const [customerId, setCustomerId] = useState(
@@ -110,7 +112,7 @@ export function MoveInWorkspace({
     Boolean(find),
   ].filter(Boolean).length;
   function clearFilters() {
-    setFilterKey("ALL");
+    setFilterKey("ALL"); setPage(1);
     setFloorFilter("ALL");
     setStatusFilter("ALL");
     setFind("");
@@ -151,6 +153,9 @@ export function MoveInWorkspace({
       (!find || unit.number.toLowerCase().includes(find.toLowerCase()))
     );
   });
+  const pageCount = Math.max(1, Math.ceil(visible.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const pageUnits = visible.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const selected = units.find((unit) => unit.id === selectedId);
   const selectedCustomer = customerOptions.find(
     (customer) => customer.id === customerId,
@@ -210,7 +215,7 @@ export function MoveInWorkspace({
   }
 
   return (
-    <div className="page-stack" data-guide="move-in-workspace">
+    <div className="page-stack move-in-workspace" data-guide="move-in-workspace">
       <PageHeader
         eyebrow="Operations centre · Accounts"
         title="Move in"
@@ -223,7 +228,7 @@ export function MoveInWorkspace({
         }
       />
       <div className="move-in-steps">
-        <span className="active">1 Select unit</span>
+        <span className={step === 1 ? "active" : ""} aria-current={step === 1 ? "step" : undefined}>1 Select unit</span>
         <span className={step === 2 ? "active" : ""} aria-current={step === 2 ? "step" : undefined}>2 {selectedReservation?.readiness ? "Key handover" : "Account details"}</span>
       </div>
       {step === 1 ? (
@@ -235,9 +240,9 @@ export function MoveInWorkspace({
                 <select
                   value={facilityId}
                   onChange={(event) => {
-                    setFacilityId(event.target.value);
+                    setFacilityId(event.target.value); setPage(1);
                     selectUnit("");
-                    setFilterKey("ALL");
+                    setFilterKey("ALL"); setPage(1);
                     setFloorFilter("ALL");
                   }}
                 >
@@ -252,7 +257,7 @@ export function MoveInWorkspace({
                 Floor
                 <select
                   value={floorFilter}
-                  onChange={(event) => setFloorFilter(event.target.value)}
+                  onChange={(event) => { setFloorFilter(event.target.value); setPage(1); }}
                 >
                   <option value="ALL">All floors</option>
                   {floors.map((floor) => (
@@ -266,7 +271,7 @@ export function MoveInWorkspace({
                 Status
                 <select
                   value={statusFilter}
-                  onChange={(event) => setStatusFilter(event.target.value)}
+                  onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }}
                 >
                   <option value="ALL">All statuses</option>
                   <option value="AVAILABLE">Vacant</option>
@@ -277,7 +282,8 @@ export function MoveInWorkspace({
                 <Search size={16} />
                 <input
                   value={find}
-                  onChange={(event) => setFind(event.target.value)}
+                  aria-label="Find unit number"
+                  onChange={(event) => { setFind(event.target.value); setPage(1); }}
                   placeholder="Find unit number"
                 />
               </label>
@@ -308,7 +314,7 @@ export function MoveInWorkspace({
                   </tr>
                 </thead>
                 <tbody>
-                  {visible.map((unit) => (
+                  {pageUnits.map((unit) => (
                     <tr
                       key={unit.id}
                       className={selectedId === unit.id ? "selected" : ""}
@@ -349,9 +355,14 @@ export function MoveInWorkspace({
                       </td>
                     </tr>
                   ))}
+                {!visible.length && <tr><td colSpan={8}><div className="empty-state"><strong>No units match these filters</strong><p>Try another floor, size or unit number.</p><button className="text-button" type="button" onClick={clearFilters}>Clear filters</button></div></td></tr>}
                 </tbody>
               </table>
             </div>
+            <nav className="unit-pagination" aria-label="Unit result pages">
+              <span>{visible.length ? `${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, visible.length)}` : "0"} of {visible.length} units</span>
+              <div><button type="button" className="button button-secondary" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Previous page</button><span>{currentPage} / {pageCount}</span><button type="button" className="button button-secondary" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>Next page</button></div>
+            </nav>
           </article>
           <aside className="unit-filter-panel">
             <section className="panel">
@@ -360,8 +371,8 @@ export function MoveInWorkspace({
                 {selected?.number ?? "None"}
               </strong>
             </section>
-            <section className="panel">
-              <h3>Filter</h3>
+            <section className="panel unit-size-filters">
+              <h3>Find your fit</h3>
               <div className="filter-toggle">
                 <label>
                   <input
@@ -369,7 +380,7 @@ export function MoveInWorkspace({
                     checked={filterMode === "size"}
                     onChange={() => {
                       setFilterMode("size");
-                      setFilterKey("ALL");
+                      setFilterKey("ALL"); setPage(1);
                     }}
                   />
                   Size
@@ -380,7 +391,7 @@ export function MoveInWorkspace({
                     checked={filterMode === "area"}
                     onChange={() => {
                       setFilterMode("area");
-                      setFilterKey("ALL");
+                      setFilterKey("ALL"); setPage(1);
                     }}
                   />
                   Area
@@ -391,9 +402,9 @@ export function MoveInWorkspace({
                 className={
                   filterKey === "ALL" ? "filter-row active" : "filter-row"
                 }
-                onClick={() => setFilterKey("ALL")}
+                onClick={() => { setFilterKey("ALL"); setPage(1); }}
               >
-                <span>Vacant units</span>
+                <span>All eligible units</span>
                 <strong>{available.length}</strong>
               </button>
               {groups.map((group) => (
@@ -402,7 +413,7 @@ export function MoveInWorkspace({
                   className={
                     filterKey === group.key ? "filter-row active" : "filter-row"
                   }
-                  onClick={() => setFilterKey(group.key)}
+                  onClick={() => { setFilterKey(group.key); setPage(1); }}
                   key={group.key}
                 >
                   <span>
@@ -586,7 +597,8 @@ export function MoveInWorkspace({
         </section>
       )}
       {step === 1 ? (
-        <div className="form-footer">
+        <div className="form-footer move-in-navigation">
+          <div className="move-in-selection" aria-live="polite"><small>{selected ? "READY FOR THE NEXT STEP" : "LET’S FIND THEIR SPACE"}</small><strong>{selected ? `Unit ${selected.number} · ${selected.area?.toFixed(1) ?? "—"} m² · R ${selected.monthlyRate.toLocaleString("en-ZA")} / month` : "Choose a unit to continue"}</strong></div>
           <button
             className="button button-secondary"
             type="button"

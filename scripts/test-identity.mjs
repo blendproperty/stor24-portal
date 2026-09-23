@@ -8,7 +8,7 @@ const fonts = `@font-face{font-family:"Satoshi Handover";src:url("/brand/Satoshi
 const css = fonts + await readFile("src/styles/identity-review.css","utf8");
 const configBundle = await build({entryPoints:["next.config.ts"],bundle:true,write:false,format:"esm",platform:"node"});
 const config = (await import(`data:text/javascript;base64,${Buffer.from(configBundle.outputFiles[0].text).toString("base64")}`)).default;
-const securityHeaders = (await config.headers()).find(rule=>rule.source==="/identity").headers;
+const securityHeaders = (await config.headers()).find(rule=>rule.source==="/:path*").headers;
 assert.equal(config.experimental.proxyClientMaxBodySize,"13mb");
 
 const server=createServer(async(req,res)=>{
@@ -19,12 +19,12 @@ const server=createServer(async(req,res)=>{
 });
 await new Promise(resolve=>server.listen(0,"127.0.0.1",resolve));
 const browser=await chromium.launch(); const page=await browser.newPage(), errors=[];page.on("pageerror",error=>errors.push(error.message));
-let documents=[], writes=0;
+let documents=[], writes=0, brokenImage=false;
 const document={id:"synthetic",version:1,status:"AWAITING_REVIEW",documentType:"ID_CARD",pageCount:2,retentionMode:"TENANCY",expiresAt:null,erasedAt:null,reservation:{publicReference:"ST24-PREVIEW",facility:{name:"Training store"},unit:{number:"106"},customer:{firstName:"Sample",lastName:"Customer",companyName:null}}};
 try {
  await page.route("**/api/v1/identity-documents**",route=>{
   if(route.request().method()==="POST"){writes++;return route.fulfill({status:409,json:{error:{message:"This document changed. Refresh before continuing."}}});}
-  if(route.request().url().includes("preview=true"))return route.fulfill({contentType:"image/png",body:Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jMioAAAAASUVORK5CYII=","base64")});
+  if(route.request().url().includes("preview=true"))return route.fulfill({contentType:"image/png",body:brokenImage ? Buffer.from("broken") : Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jMioAAAAASUVORK5CYII=","base64")});
   return route.fulfill({json:{data:documents}});
  });
  await mkdir("output/identity",{recursive:true}); const base=`http://127.0.0.1:${server.address().port}`;
@@ -43,6 +43,13 @@ try {
  await page.screenshot({path:"output/identity/staff-review-mobile.png",fullPage:true});
  await page.getByRole("button",{name:"Accept document",exact:true}).click();await expect(page.getByRole("alert")).toBeVisible();await expect(page.getByRole("img")).toHaveCount(0);assert.equal(writes,1);
  await expect(page.getByRole("button",{name:"Accept document",exact:true})).toBeDisabled();assert.deepEqual(errors,[]);
+ brokenImage=true;
+ await page.goto(base+"?enabled");await page.getByRole("button",{name:/Sample Customer/}).click();
+ await page.getByRole("button",{name:"Open front",exact:true}).click();
+ await expect(page.getByRole("alert")).toContainText("could not be displayed");
+ await expect(page.getByRole("button",{name:"Accept document",exact:true})).toBeDisabled();
+ await expect(page.getByRole("button",{name:"Open front",exact:true})).toBeVisible();
+ brokenImage=false;
  documents=[{...document,status:"ACCEPTED",reservation:{...document.reservation,status:"CONVERTED"}}];
  await page.goto(base+"?enabled");await page.getByRole("button",{name:/Sample Customer/}).click();
  await expect(page.getByText("Retained for the tenancy. Each private view is recorded.")).toBeVisible();

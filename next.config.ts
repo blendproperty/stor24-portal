@@ -12,7 +12,9 @@ const securityHeaders = [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: https:",
+      // Client navigation retains the first document's CSP, including entry from any staff screen.
+      // Authenticated private previews are short-lived local blobs; scripts/connect remain self-only.
+      "img-src 'self' blob: data: https:",
       "font-src 'self' data:",
       "connect-src 'self'",
       "frame-ancestors 'none'",
