@@ -242,7 +242,8 @@ try {
   await page.evaluate(() => localStorage.setItem("stor24:guided-help:v1:fixture-staff-a", JSON.stringify({version:1,enabled:true,activeGuide:"program-defaults",progress:{"program-defaults":{step:2,reviewed:[]}}})));
   await page.goto(`${base}/settings`);
   await page.getByRole("button", {name: /Guide me/}).click();
-  await expect(panel.locator(".guide-card")).toHaveCount(2);
+  await expect(panel.locator(".guide-card")).toHaveCount(3); // Account, statement and access-request guidance only.
+  await expect(panel.locator(".guide-card").filter({hasText: "Understand restricted access"})).toHaveCount(1);
   await expect(panel.getByRole("button", {name: /Continue where you left off/})).toHaveCount(0);
   await expect(panel).not.toContainText("Program defaults");
   await panel.locator(".guide-card").filter({hasText: "Statements"}).count();
