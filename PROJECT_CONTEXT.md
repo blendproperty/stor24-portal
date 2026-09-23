@@ -1,5 +1,16 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Move-in branding and mandatory photo approval - 23 September 2026
+
+- **Implementation:** restore existing Satoshi font and stronger staff headings; backend/ID primary actions use STOR24 orange with dark readable text. Progress is green when completed, orange for next actions and red when blocked/overdue. Remove redundant forward links and accepted-ID prompts; receipt entry belongs inside the payment stage. Brett explicitly requires a current uploaded, staff-approved access photo before keys, even while collection is held. Server readiness and locked handover enforce current policy, reviewer evidence, image availability and retention. Photo collection avoids circular approval dependency; approval queues access without claiming provider success.
+- **Testing:** local TypeScript, focused lint, 366 application tests, identity-review browser checks and workspace checks at 1440/1024/768/390/320px passed. Move-in checks at 1440/768/390/320px cover orange actions, semantic progress, removed repeats, receipt expansion, keyboard/scoped links, disabled handover and no overflow/errors/writes. Production build and exact-head PostgreSQL CI pending at this checkpoint. DB cases cover missing/unreviewed/rejected/withdrawn/expired/erased images, missing reviewer, changed/held policy, replacement and the approved connected journey.
+- **Commit and push:** implementation bfdd45f pushed to canonical origin on codex/move-in-brand-status-20260923 from main 4a760c2154c027fd6cbc62828fce1098959bfd0c. This context update accompanies the same change before promotion; unrelated checkouts preserved.
+- **Merge:** pending.
+- **Deployment and configuration:** pending; no schema/configuration change required. Photo collection policy remains held and intentionally blocks new handovers until satisfied. Existing recorded handovers retain idempotent confirmation.
+- **Live production verification:** pending; no production payment, photo, ID decision, handover or provider activation submitted.
+- **Open gates:** Brett's visual/workflow acceptance, photo policy/consent/retention and capture method, payment/date, Hikvision, full P01, J19/J20/J21, historical 14-booking review and finance/legal/privacy/backup/data/training/launch acceptance remain. Excel is a dated export.
+
+
 ## Six-step move-in release evidence — 23 September 2026
 
 - **Implementation:** top navigation now follows Select unit, Agreement, Payment, Check ID, Access photo, Hand over keys. Completion ticks use saved records. Stage anchors, record-payment links, ID/photo review and same-booking return paths are connected. Final handover returns to its saved confirmation and audit time; visiting a step never marks it done.
