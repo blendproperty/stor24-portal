@@ -5,12 +5,13 @@ import { createServer } from "node:http";
 import { readFile, mkdir } from "node:fs/promises";
 import assert from "node:assert/strict";
 const bundle=await build({entryPoints:["tests/browser/tenant-login-fixture.jsx"],bundle:true,define:{"process.env":"{}"},write:false,loader:{".css":"empty"},format:"esm",jsx:"automatic"});
-const css=await readFile("src/styles/facial-access.css","utf8")+await readFile("src/styles/tenant-portal.css","utf8");
+const fonts=[400,500,700].map(weight=>`@font-face{font-family:"Satoshi Handover";src:url("/brand/Satoshi-Handover-${weight}.woff2") format("woff2");font-weight:${weight};font-display:swap}`).join("");
+const css=fonts+await readFile("src/styles/facial-access.css","utf8")+await readFile("src/styles/tenant-portal.css","utf8")+await readFile("src/styles/tenant-shop.css","utf8")+await readFile("src/styles/tenant-dashboard.css","utf8");
 const server=createServer(async(req,res)=>{
  if(req.url==="/fixture.js"){res.setHeader("Content-Type","text/javascript");return res.end(bundle.outputFiles[0].text);}
  const url=new URL(req.url,"http://localhost");
  const asset=url.pathname==="/_next/image" ? url.searchParams.get("url") : url.pathname;
- if(asset?.startsWith("/brand/") && !asset.includes("..")){try{res.setHeader("Content-Type",asset.endsWith(".svg")?"image/svg+xml":"image/png");return res.end(await readFile(`public${asset}`));}catch{res.statusCode=404;return res.end();}}
+ if(asset?.startsWith("/brand/") && !asset.includes("..")){try{res.setHeader("Content-Type",asset.endsWith(".svg")?"image/svg+xml":asset.endsWith(".woff2")?"font/woff2":"image/png");return res.end(await readFile(`public${asset}`));}catch{res.statusCode=404;return res.end();}}
 
  res.setHeader("Content-Type","text/html");res.end(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;font-family:Arial}*{box-sizing:border-box}${css}.tenant-email-help{margin:0;font-size:13px;color:#52615b}</style></head><body><div id="root"></div><script type="module" src="/fixture.js"></script></body></html>`);
 });
@@ -57,6 +58,8 @@ try {
   await page.goto(`http://127.0.0.1:${server.address().port}/my`);
   const moveIn=page.getByRole("region",{name:"Your move-in",exact:true});
   await expect(moveIn).toHaveCount(1);
+  await expect(moveIn.locator(".tenant-photo-details")).not.toHaveAttribute("open", "");
+  await moveIn.locator(".tenant-photo-details>summary").click();
   await expect(moveIn.getByText("Photo collection isn’t open yet",{exact:true})).toBeVisible();
   await expect(moveIn.getByText("Your photo will be uploaded and added",{exact:false})).toBeVisible();
   await expect(moveIn.getByText("Not yet active.",{exact:false})).toBeVisible();
@@ -72,11 +75,11 @@ try {
   assert.deepEqual(errors,[]);await page.close();
  }
 
- for(const width of [1440,390,320]){
+ for(const width of [1440,1024,768,390,320]){
   const page=await browser.newPage({viewport:{width,height:1100}}), errors=[];
   page.on("pageerror",error=>errors.push(error.message));
   let identityStatus="AWAITING_REVIEW", reviewRequired=false, packageStatus="RESERVED";
-  const reservation={id:"booking-preview",publicReference:"ST24-PREVIEW",packageSelection:{packageName:"Compact Move",status:"RESERVED",priceSnapshot:"1099.00",itemsSnapshot:[{name:"Medium Moving Box",quantity:10}],fulfilledAt:null}};
+  const reservation={id:"booking-preview",publicReference:"ST24-PREVIEW",packageSelection:{packageName:"Compact Move",status:"RESERVED",priceSnapshot:"1099.00",itemsSnapshot:[{name:"Medium Moving Box",quantity:10},{name:"Small Moving Box",quantity:10},{name:"Bubble Wrap 1.2m x 5m",quantity:1},{name:"Packing Tape 100m",quantity:2},{name:"Permanent Marker",quantity:1},{name:"Fragile Sticker",quantity:10}],fulfilledAt:null}};
   const account={id:"account-preview",accountNumber:"TEST-ACCOUNT",balance:"0.00",currency:"ZAR",tenancy:null};
   await page.route("**/api/**",route=>{
    assert.equal(route.request().method(),"GET","customer status checks must not change bookings or send messages");
@@ -85,10 +88,12 @@ try {
    if(path.endsWith("/statement"))return route.fulfill({json:{data:{accountNumber:account.accountNumber,currency:"ZAR",openingBalance:"0.00",closingBalance:"0.00",rows:[]}}});
    if(path.includes("/orders"))return route.fulfill({json:{data:[]}});
    assert.equal(path,"/api/tenant/accounts");
-   return route.fulfill({json:{data:{accounts:[{...account,balance:reviewRequired?null:"0.00",financialReviewRequired:reviewRequired},{...account,id:"other",accountNumber:"OTHER"}],documents:[],agreements:[],payments:[],merchandiseRequests:[],expiresAt:new Date(Date.now()+1800000).toISOString(),testPayments:[{id:"test-payment",accountId:account.id,amount:"2199.00",currency:"ZAR",status:"TEST_SUCCEEDED"}],units:[{key:"reservation:booking-preview",unitId:"unit-preview",number:"55",facilityName:"Training store",accountId:account.id,status:"ACTIVE",reservations:[{...reservation,packageSelection:{...reservation.packageSelection,status:packageStatus},identityDocument:{status:identityStatus,acknowledgedAt:"2026-09-23T07:55:00Z",reviewedAt:null,retentionMode:"TENANCY",expiresAt:null}}]},{key:"reservation:other",unitId:"unit-other",number:"99",facilityName:"Training store",accountId:"other",status:"ACTIVE",reservations:[{id:"other-booking",publicReference:"ST24-OTHER",packageSelection:null,identityDocument:null}]}]}}});
+   return route.fulfill({json:{data:{accounts:[{...account,balance:reviewRequired?null:"0.00",financialReviewRequired:reviewRequired},{...account,id:"other",accountNumber:"OTHER"}],documents:[],agreements:[{id:"signed-preview",signedAt:"2026-09-23T07:50:00Z",reservation:{id:"booking-preview",publicReference:"ST24-PREVIEW",unitId:"unit-preview",convertedTenancy:null}}],payments:[],merchandiseRequests:[],onboarding:[{reservationId:"booking-preview",ready:false,paidAmount:0,requiredAmount:2199,startDate:"2026-09-30",mandateStatus:null,blockers:["The identity document needs staff acceptance before key handover.","Key collection starts on 2026-09-30.","A test payment is recorded. It does not clear the real booking for key collection."]}],expiresAt:new Date(Date.now()+1800000).toISOString(),testPayments:[{id:"test-payment",accountId:account.id,amount:"2199.00",currency:"ZAR",status:"TEST_SUCCEEDED"}],units:[{key:"reservation:booking-preview",unitId:"unit-preview",number:"55",facilityName:"Training store",accountId:account.id,status:"ACTIVE",reservations:[{...reservation,packageSelection:{...reservation.packageSelection,status:packageStatus},identityDocument:{status:identityStatus,acknowledgedAt:"2026-09-23T07:55:00Z",reviewedAt:null,retentionMode:"TENANCY",expiresAt:null}}]},{key:"reservation:other",unitId:"unit-other",number:"99",facilityName:"Training store",accountId:"other",status:"ACTIVE",reservations:[{id:"other-booking",publicReference:"ST24-OTHER",packageSelection:null,identityDocument:null}]}]}}});
   });
   await page.goto(`http://127.0.0.1:${server.address().port}/my`);
   await expect(page.getByRole("heading",{name:"ID uploaded — pending verification",exact:true})).toBeVisible();
+  await expect(page.locator(".tenant-overview-facts")).toContainText("30 Sept 2026");
+  await expect(page.locator(".tenant-overview-facts")).toContainText("Signed agreement saved");
   await expect(page.getByText("Upload received",{exact:false})).toBeVisible();
   await expect(page.getByRole("article",{name:"Booking package Compact Move"})).toBeVisible();
   await expect(page.getByText("10 × Medium Moving Box",{exact:true})).toBeVisible();
@@ -99,7 +104,20 @@ try {
   await expect(page.locator("#tenant-statements")).toContainText("No real transactions in this period");
   await expect(page.locator("#tenant-statements")).toContainText("ID verification does not turn a test payment into a real receipt");
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await page.evaluate(()=>document.fonts.ready);
+  const nav=page.getByRole("navigation",{name:"Your account sections"});await expect(nav.getByRole("link")).toHaveCount(4);
+  await expect(page.locator(".tenant-photo-details")).not.toHaveAttribute("open", "");
+  await nav.getByRole("link",{name:"Supplies",exact:true}).focus();await page.keyboard.press("Enter");assert.equal(new URL(page.url()).hash,"#tenant-supplies");
+  await expect(page.getByRole("article",{name:"Booking package Compact Move"})).toBeInViewport();
+  await nav.getByRole("link",{name:"Documents",exact:true}).click();assert.equal(new URL(page.url()).hash,"#tenant-documents");
+  await expect(page.locator("#tenant-documents")).toBeInViewport();
+  await page.evaluate(()=>window.scrollTo(0,0));
   await page.screenshot({path:`output/email-prefill/booking-status-${width}.png`,fullPage:true});
+  await page.screenshot({path:`output/email-prefill/dashboard-top-${width}.png`});
+  await page.locator(".tenant-move-in").screenshot({path:`output/email-prefill/dashboard-move-in-${width}.png`});
+  await page.locator("#tenant-supplies").screenshot({path:`output/email-prefill/dashboard-supplies-${width}.png`});
+  const columns=await page.locator(".tenant-workspace").evaluate(element=>getComputedStyle(element).gridTemplateColumns.split(" ").length);assert.equal(columns,width>900?2:1);
+  if(width<=600){const controls=await nav.getByRole("link").evaluateAll(elements=>elements.map(element=>element.getBoundingClientRect().height));assert.ok(controls.every(height=>height>=44));}
   identityStatus="ACCEPTED";await page.getByRole("button",{name:"Refresh move-in status"}).click();await expect(page.getByRole("heading",{name:"ID verified",exact:true})).toBeVisible();
   identityStatus="REPLACEMENT_REQUIRED";await page.getByRole("button",{name:"Refresh move-in status"}).click();await expect(page.getByRole("heading",{name:"Replacement ID needed",exact:true})).toBeVisible();
   packageStatus="RELEASED";reviewRequired=true;await page.reload();await expect(page.getByText("Reservation released · items are no longer held",{exact:true})).toBeVisible();
@@ -109,9 +127,16 @@ try {
   await expect(page.getByRole("article",{name:"Booking package Compact Move"})).toHaveCount(0);
   await expect(page.getByText("Test payments are excluded",{exact:false})).toHaveCount(0);
   await expect(page.getByRole("heading",{name:"Replacement ID needed",exact:true})).toHaveCount(0);
+  await page.goto(`http://127.0.0.1:${server.address().port}/my?step=access-photo`);
+  await expect(page.locator(".tenant-photo-details")).toHaveAttribute("open", "");
+  await expect(page.locator("#access-photo")).toBeFocused();
+  await expect(page.getByText("Photo collection isn’t open yet",{exact:true})).toBeVisible();
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await page.locator(".tenant-photo-details>summary").focus();await page.keyboard.press("Enter");
+  await expect(page.locator(".tenant-photo-details")).not.toHaveAttribute("open", "");
   assert.deepEqual(errors,[]);await page.close();
  }
- console.log("PASS customer UAT regressions at 1440/390/320px: visible package/items, test statement explanation, pending/accepted/replacement/missing identity, refresh, released package, hidden review balance and unit isolation; zero writes");
+ console.log("PASS customer dashboard at 1440/1024/768/390/320px: responsive columns, section navigation and mobile touch targets; UAT regressions: visible package/items, test statement explanation, pending/accepted/replacement/missing identity, refresh, released package, hidden review balance and unit isolation; zero writes");
  console.log("PASS move-in: single section at desktop/390/320px, precinct purpose, held upload, staff-only link removed, payment blocker preserved, active/revoked states");
  console.log("PASS desktop/mobile: editable prefill, fragment removed, no automatic OTP, changed email payload, code reset, invalid/no hint and no overflow");
 } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}

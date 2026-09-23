@@ -1,0 +1,125 @@
+/* Customer account workspace. Keep entry and signing pages independent. */
+.tenant-portal.is-signed-in{background:#f3f5f2;font-family:"Satoshi Handover",Arial,sans-serif;font-weight:400;font-size:14px;line-height:1.55}
+.is-signed-in,.is-signed-in *{box-sizing:border-box}
+.is-signed-in .tenant-header{padding:18px max(24px,calc((100vw - 1200px)/2));background:#fff;border-bottom:1px solid #dde5df;gap:22px}
+.is-signed-in .tenant-header img{width:140px}
+.is-signed-in .tenant-header>span{padding-left:22px;border-left:1px solid #d7e0d9;color:#56675e;font-size:10px;letter-spacing:1.5px}
+.is-signed-in .tenant-body{max-width:1200px;padding:34px 24px 20px}
+.is-signed-in h1,.is-signed-in h2,.is-signed-in h3{font-weight:700}
+.is-signed-in .tenant-overview-heading{display:flex;align-items:center;justify-content:space-between;gap:28px;margin-bottom:24px}
+.is-signed-in .tenant-welcome h1{font-size:34px;letter-spacing:-1.2px;margin:8px 0}
+.is-signed-in .tenant-welcome p{margin:0;font-size:14px}
+.is-signed-in .tenant-eyebrow{font-size:10px;letter-spacing:1.6px}
+.is-signed-in .tenant-unit-picker{width:330px;max-width:100%;flex-shrink:0}
+.is-signed-in .tenant-account-switch{margin:0;font-size:12px;gap:6px}
+.is-signed-in .tenant-account-switch select{font-size:14px;padding:11px 32px 11px 12px;min-height:44px;border-color:#d4ded6;background:#fff}
+.is-signed-in .tenant-account-summary{grid-template-columns:minmax(0,1fr) 310px;margin:0 0 20px;border:0;border-radius:16px;background:#103c30;box-shadow:0 5px 20px #123e2e0b;overflow:hidden}
+.is-signed-in .tenant-account-main{padding:28px 30px;color:#fff;background:radial-gradient(ellipse at right top,#245b4755,transparent 70%)}
+.is-signed-in .tenant-account-main>.tenant-eyebrow{color:#fec89f}
+.is-signed-in .tenant-account-main h2{color:#fff;font-size:26px;letter-spacing:-.7px;margin:10px 0 22px}
+.is-signed-in .tenant-overview-facts{display:flex;flex-wrap:wrap;gap:20px 28px}
+.is-signed-in .tenant-overview-facts>span{display:flex;gap:10px;align-items:center;font-size:13px}
+.is-signed-in .tenant-overview-facts svg{color:#9bc5ad;flex-shrink:0}
+.is-signed-in .tenant-overview-facts small{display:block;color:#b4d0c0;font-size:11px;margin-bottom:3px}
+.is-signed-in .tenant-account-reference{margin-top:20px;color:#c1d6c9;font-size:11px}
+.is-signed-in .tenant-account-reference summary{cursor:pointer;min-height:28px;padding:4px 0}
+.is-signed-in .tenant-account-reference p{color:#c1d6c9;margin:4px 0;overflow-wrap:anywhere}
+.is-signed-in .tenant-account-main .tenant-account-switch{margin-top:16px;color:#fff}
+.is-signed-in .tenant-account-main .tenant-account-switch span{color:#c1d6c9}
+.is-signed-in .tenant-balance-panel{background:#fff;color:#133a2d;padding:24px 28px;gap:6px;border:1px solid #dce5df;border-radius:0 16px 16px 0}
+.is-signed-in .tenant-balance-panel>span{font-size:12px;font-weight:600;color:#526b5e}
+.is-signed-in .tenant-balance-panel>strong{font-size:34px;line-height:1.15;letter-spacing:-1px;font-variant-numeric:tabular-nums}
+.is-signed-in .tenant-balance-panel p{font-size:12px;font-weight:400;color:#52675b;margin:3px 0;line-height:1.5}
+.is-signed-in .tenant-balance-panel a{font-size:12px;font-weight:700;color:#134b35;min-height:36px}
+.is-signed-in .tenant-section-nav{display:flex;gap:6px;margin:0 0 24px;padding:5px;background:#e7ede7;border:1px solid #dbe4dc;border-radius:12px}
+.is-signed-in .tenant-section-nav a{display:flex;align-items:center;justify-content:center;gap:9px;flex:1;min-width:0;min-height:44px;padding:8px 12px;color:#294939;text-decoration:none;font-size:13px;font-weight:600;border-radius:8px}
+.is-signed-in .tenant-section-nav a:hover,.is-signed-in .tenant-section-nav a:focus-visible{background:white;color:#123c2c}
+.is-signed-in .tenant-workspace{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:22px;align-items:start}
+.is-signed-in .tenant-main-column,.is-signed-in .tenant-side-column{min-width:0}
+.is-signed-in .tenant-card{background:white;border:1px solid #dce5df;border-radius:14px;padding:24px;margin:0 0 22px;box-shadow:0 2px 6px #122d1e03;min-width:0}
+.is-signed-in h2{font-size:19px;letter-spacing:-.4px;margin:0 0 10px;line-height:1.3}
+.is-signed-in h3{font-size:15px;line-height:1.4;letter-spacing:-.1px}
+.is-signed-in p{font-size:13px;font-weight:400;line-height:1.65;margin:10px 0;color:#52675b}
+.is-signed-in .tenant-section-title{display:flex;align-items:center;gap:11px;margin-bottom:16px}
+.is-signed-in .tenant-section-title svg{color:#617f69;flex-shrink:0}
+.is-signed-in .tenant-section-title h2{margin:0}
+.is-signed-in button,.is-signed-in .tenant-downloads a{min-height:44px;border-radius:9px;font-size:12px;font-weight:600;line-height:1.4;padding:10px 14px}
+.is-signed-in .tenant-primary{background:#c84408;color:#fff;border-color:#b43c07}
+.is-signed-in .tenant-primary:hover{background:#b53d09}
+.is-signed-in .tenant-secondary{background:#f7f9f6;border-color:#dce5dc;color:#28563e}
+.is-signed-in .tenant-identity-status{padding:16px 18px;background:#edf5ed;border:1px solid #d6e6d6;border-left:3px solid #5a8b61;border-radius:8px;margin:0 0 12px}
+.is-signed-in .tenant-identity-status h3{margin:0 0 6px;font-size:15px;color:#254d33}
+.is-signed-in .tenant-identity-status p:last-child{font-size:11px;color:#57705b;margin-bottom:0}
+.is-signed-in .tenant-move-in-readiness{padding:20px 0;border-bottom:1px solid #e3eae4;margin-bottom:18px}
+.is-signed-in .tenant-move-in-readiness h3{font-size:15px;margin-bottom:8px}
+.is-signed-in .tenant-move-in-readiness ul{font-size:13px;color:#6e4d23;background:#fbf6ed;border:1px solid #eee1ca;padding:13px 16px 13px 32px;border-radius:8px;line-height:1.7;margin:14px 0 0}
+.is-signed-in .tenant-precinct-status{background:#f3f6f2;padding:14px;font-size:12px;margin:16px 0;border-radius:8px}
+.is-signed-in .tenant-photo-details{border-top:1px solid #e0e8e0;margin-top:18px}
+.is-signed-in .tenant-photo-details>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 0 0;cursor:pointer;font-size:13px;font-weight:600;list-style:none;min-height:48px}
+.is-signed-in .tenant-photo-details>summary::-webkit-details-marker{display:none}
+.is-signed-in .tenant-photo-details>summary small{display:block;font-size:11px;color:#617164;font-weight:400;margin-top:3px}
+.is-signed-in .tenant-photo-details[open]>summary>svg{transform:rotate(180deg)}
+.is-signed-in .tenant-photo-details .face-customer-layout{grid-template-columns:1fr}
+.is-signed-in .tenant-photo-details .face-photo-guide{padding:20px}
+.is-signed-in .tenant-photo-details .face-portrait-mark{display:none}
+.is-signed-in .tenant-photo-details .face-customer-heading{padding:18px 0}
+.is-signed-in .tenant-photo-details .face-customer-heading h2{font-size:18px}
+.is-signed-in .tenant-photo-details .face-customer-form{padding:20px 0}
+.is-signed-in .tenant-filters{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:end;margin-top:18px}
+.is-signed-in .tenant-filters label{min-width:0;font-size:11px;gap:6px}
+.is-signed-in .tenant-filters input{min-width:0;max-width:100%;font-size:14px;padding:10px 8px;min-height:44px;border-color:#cedbce;border-radius:8px}
+.is-signed-in .tenant-filters button{grid-column:1/-1;width:100%}
+.is-signed-in .tenant-test-note{font-size:12px;background:#faf5eb;border-left:3px solid #d6ae5e;padding:12px 14px;border-radius:6px}
+.is-signed-in .tenant-test-activity{background:#faf8f1;border-color:#e7dfcd}
+.is-signed-in .tenant-test-activity h2{font-size:15px}
+.is-signed-in .tenant-test-activity p{font-size:12px}
+.is-signed-in .tenant-table{max-width:100%;border:1px solid #e1e8e1;border-radius:8px;margin-top:16px}
+.is-signed-in .tenant-table table{font-size:12px}
+.is-signed-in .tenant-table th{background:#f2f6f0;font-size:11px;font-weight:600;color:#3c5b45}
+.is-signed-in .tenant-scroll-hint{display:block;font-size:11px}
+.is-signed-in .tenant-downloads{gap:8px;margin:16px 0}
+.is-signed-in .tenant-downloads>*{flex:1}
+.is-signed-in .tenant-request{border:1px solid #dce5db;border-radius:10px;padding:18px;margin:16px 0;background:#f8faf6}
+.is-signed-in .tenant-request h3{font-size:18px;margin:7px 0}
+.is-signed-in .tenant-request ul{padding:14px 0 0;border-top:1px solid #dfe8dc;list-style:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 16px;font-size:12px;color:#3b5844}
+.is-signed-in .tenant-request li{overflow-wrap:anywhere}
+.is-signed-in .tenant-document-list a{padding:13px 14px;background:#f8faf7;border:1px solid #e2e9df;border-radius:9px;font-size:13px;min-height:60px}
+.is-signed-in .tenant-document-list svg{flex-shrink:0;color:#567760}
+.is-signed-in .tenant-document-list small{font-size:10px}
+.is-signed-in .tenant-footer{border-top:1px solid #dce5da;margin-top:12px;font-size:11px;padding:24px 8px}
+.is-signed-in :is(#tenant-move-in,#tenant-statements,#tenant-supplies,#tenant-documents){scroll-margin-top:18px}
+.is-signed-in :is(a,button,input,select,summary,[tabindex="0"]):focus-visible{outline:3px solid #c54a12;outline-offset:3px}
+@media(max-width:900px){
+ .is-signed-in .tenant-workspace{grid-template-columns:1fr;gap:0}
+ .is-signed-in .tenant-unit-picker{width:290px}
+ .is-signed-in .tenant-account-summary{grid-template-columns:minmax(0,1fr) 270px}
+ .is-signed-in .tenant-overview-facts{gap:16px}
+}
+@media(max-width:600px){
+ .is-signed-in .tenant-header{padding:13px 16px;gap:12px}
+ .is-signed-in .tenant-header img{width:109px}
+ .is-signed-in .tenant-header>span{padding-left:12px;letter-spacing:1px;font-size:8px}
+ .is-signed-in .tenant-header>button{padding:8px 10px;font-size:11px;gap:6px}
+ .is-signed-in .tenant-body{padding:24px 16px 8px}
+ .is-signed-in .tenant-overview-heading{display:block;margin-bottom:18px}
+ .is-signed-in .tenant-welcome h1{font-size:29px;letter-spacing:-1px}
+ .is-signed-in .tenant-unit-picker{width:100%;margin-top:20px}
+ .is-signed-in .tenant-account-summary{grid-template-columns:1fr;border-radius:12px}
+ .is-signed-in .tenant-account-main{padding:22px}
+ .is-signed-in .tenant-account-main h2{font-size:22px;margin-bottom:20px}
+ .is-signed-in .tenant-overview-facts{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+ .is-signed-in .tenant-overview-facts>span{font-size:12px;gap:8px;align-items:flex-start}
+ .is-signed-in .tenant-overview-facts>span:last-child{grid-column:1/-1}
+ .is-signed-in .tenant-balance-panel{padding:18px 22px;border-radius:0 0 12px 12px;gap:4px}
+ .is-signed-in .tenant-balance-panel>strong{font-size:30px}
+ .is-signed-in .tenant-section-nav{gap:2px;padding:4px;margin-bottom:18px}
+ .is-signed-in .tenant-section-nav a{flex-direction:column;gap:4px;padding:8px 2px;min-height:56px;font-size:10px}
+ .is-signed-in .tenant-card{padding:20px;margin-bottom:18px;border-radius:12px}
+ .is-signed-in .tenant-filters label{min-width:0}
+ .is-signed-in .tenant-filters input{font-size:16px}
+ .is-signed-in .tenant-identity-status{padding:14px}
+ .is-signed-in .tenant-request{padding:15px}
+ .is-signed-in .tenant-request ul{grid-template-columns:1fr}
+ .is-signed-in .tenant-document-list a{padding:12px;gap:10px}
+}
+@media(prefers-reduced-motion:reduce){.is-signed-in *{scroll-behavior:auto!important}}

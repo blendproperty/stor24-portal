@@ -1,5 +1,15 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## My STOR24 customer dashboard redesign — 23 September 2026
+
+- **Implementation:** on canonical main `a7462bc5903b6c71169ce76c242fb49e48de2d3d`, redesigned the signed-in customer page with a compact store/unit overview, recorded booking/tenancy status, agreed move-in date, saved-agreement summary and account balance. Section links jump directly to move-in, statements, supplies and documents. Desktop uses two columns; tablet/mobile stacks safely. Added scoped static Satoshi typography, restrained cards, readable status panels, date controls, keyboard-scrollable statement table and at least 44px navigation/action targets. Photo guidance is an expandable section; the existing access-photo arrival link automatically opens and focuses it. Empty historical-request panels are omitted. Booking packages and pending ID remain visible; test-payment and access blockers remain explicit. No business rules, customer records, authentication, provider/policy settings or financial data changed.
+- **Testing:** TypeScript, focused lint and all 365 application tests passed. Actual-component checks pass at 1440/1024/768/390/320px with representative signed agreement, move-in blockers and six package lines. Verified desktop/mobile column layout, no page overflow, keyboard section navigation, 44px navigation targets, collapsed guidance, direct-link open/focus, keyboard collapse, unit isolation and the prior D002–D004 regressions. Browser errors and operational writes were zero. Desktop/390/320 screenshots inspected. Production build passed; exact-head release checks are recorded at promotion. Local evidence is in `output/customer-journey/dashboard-*` and `output/email-prefill/dashboard-*`.
+- **Commit and push:** prepared on `codex/customer-portal-design-20260923`; the enclosing PR records exact commit/push. Unrelated primary checkouts are preserved, and canonical context presence is checked before handoff.
+- **Merge:** pending for this redesign at this record.
+- **Deployment and configuration:** pending. No schema, provider, policy or business configuration change required.
+- **Live production verification:** current page visually inspected before redesign. Post-deployment desktop/phone verification and Brett's visual acceptance remain pending; local synthetic browser evidence is not live proof.
+- **Open gates:** P01 remains open. Preserve D002–D004 reviewer acceptance, live J19 floor-toggle acceptance, J20 deferred genuine Netcash, J21 blocked physical access, historical 14-booking review, finance/tax/proration/refund, legal/privacy/retention/backup, data/training and launch gates.
+
 ## Priority 1 customer portal corrections live — 23 September 2026
 
 - **Implementation:** D002–D004 are released: booking packages are visible, test/real statement differences are explained, and ID receipt/review status is explicit. This release changes presentation and scoped metadata only; it does not accept ID, settle payment, fulfil stock or activate a tenancy.
