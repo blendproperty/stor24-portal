@@ -48,6 +48,7 @@ jobs:
             output/facial-access/
             output/identity/
             output/floor-availability/
+            output/email-prefill/
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 20
