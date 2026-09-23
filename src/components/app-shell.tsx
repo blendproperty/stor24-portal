@@ -32,6 +32,7 @@ import { clsx } from "clsx";
 import { useRouter } from "next/navigation";
 import type { SessionPayload } from "@/lib/session";
 import { ConnectivityStatus } from "@/components/connectivity-status";
+import { BrandCorner } from "@/components/brand-corner";
 import { GuidedHelp } from "@/components/guided-help";
 
 const navigation = [
@@ -139,6 +140,7 @@ export function AppShell({ children, session }: { children: React.ReactNode; ses
 
       <div className="app-main">
         <header className="topbar">
+          <details key={pathname} className="staff-mobile-nav"><summary>Menu</summary><nav aria-label="Mobile navigation">{navigation.map(item => <Link href={item.href} key={item.href} aria-current={pathname === item.href ? "page" : undefined}><item.icon size={17} />{item.label}</Link>)}<Link href="/settings"><Settings size={17} />Settings</Link></nav></details>
           <label className="search">
             <Search size={18} />
             <input
@@ -164,6 +166,7 @@ export function AppShell({ children, session }: { children: React.ReactNode; ses
           </div>
         </header>
         <main className="content">{children}</main>
+        <BrandCorner key={pathname} pathname={pathname} />
       </div>
     </div>
   );

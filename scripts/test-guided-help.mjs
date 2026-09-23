@@ -26,7 +26,7 @@ const bundle = await build({ absWorkingDir: root, entryPoints: ["tests/browser/g
   b.onResolve({filter: /^@\/app\/actions\//}, args => ({path: args.path, namespace: "actions"}));
   b.onLoad({filter: /.*/, namespace: "actions"}, () => ({contents: "export async function confirmReservationMoveInAction() { throw new Error('Unexpected handover'); } export async function recordReservationPaymentAction() { throw new Error('Unexpected payment'); }"}));
 } }] });
-const style = (await Promise.all(["src/app/globals.css", "src/styles/stor24-brand.css", "src/styles/guided-help.css"].map(file => readFile(file, "utf8")))).join("\n").replace('@import "tailwindcss";', "");
+const style = (await Promise.all(["src/app/globals.css", "src/styles/stor24-brand.css", "src/styles/guided-help.css", "src/styles/identity-review.css", "src/styles/staff-workspace.css"].map(file => readFile(file, "utf8")))).join("\n").replace('@import "tailwindcss";', "");
 const customer = { id: "fixture-customer", firstName: "Example", lastName: "Customer", companyName: null, email: "fixture@example.invalid", phone: null };
 const unit = {id: "fixture-unit", facilityId: "fixture-store", number: "T01", monthlyRate: "1200", unitType: {name: "Training unit", areaSqMetres: "9"}};
 const data = { facilities: [{id: "fixture-store", name: "Training store", units: [unit]}], customers: [customer], reservations: [{id: "fixture-reservation", status: "ACTIVE", quotedRate: "1200", holdExpiresAt: "2026-09-30T12:00:00Z", intendedMoveIn: "2026-09-30T12:00:00Z", createdAt: "2026-09-21T12:00:00Z", facility: {id: "fixture-store", name: "Training store"}, customer, unit, lead: null, convertedTenancy: null}] };
@@ -44,6 +44,7 @@ const server = createServer(async (req, res) => {
     if (guideAccessDenied) { res.writeHead(401); res.end(JSON.stringify({error: "UNAUTHENTICATED"})); return; }
     res.end(JSON.stringify({data: catalogueForAssignments(guidePersona)})); return;
   }
+  if (url.pathname === "/api/auth/mfa") { res.setHeader("content-type", "application/json"); res.end(JSON.stringify({data:{enabled:true,recoveryCodesRemaining:8}})); return; }
   if (url.pathname === "/fixture.js") { res.setHeader("content-type", "text/javascript"); res.end(bundle.outputFiles[0].text); return; }
   if (url.pathname === "/fixture.css") { res.setHeader("content-type", "text/css"); res.end(style); return; }
   if (url.pathname === "/api/v1/reservations") { res.setHeader("content-type", "application/json"); res.end(JSON.stringify({data})); return; }

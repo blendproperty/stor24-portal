@@ -7,6 +7,7 @@ import "./globals.css";
 import "../styles/stor24-brand.css";
 import "../styles/guided-help.css";
 import "../styles/mri-workspace.css";
+import "../styles/staff-workspace.css";
 
 const satoshi = localFont({
   src: "../../public/brand/Satoshi-Variable.ttf",
