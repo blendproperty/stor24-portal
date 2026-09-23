@@ -1,8 +1,8 @@
 # STOR24 delivery checklist
 
-Updated: 23 September 2026. This is the authoritative check-off register for the remaining programme. [Scope and release boundaries](STOR24_REMAINING_PRIORITIES_2026-09-23.md) describe the 13 priorities; [PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md) holds dated release evidence. Latest entries take precedence over historical pending statements.
+Updated: 23 September 2026. This is the authoritative check-off register for the remaining programme. [Scope and release boundaries](STOR24_REMAINING_PRIORITIES_2026-09-23.md) describe the 14 priorities; [PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md) holds dated release evidence. Latest entries take precedence over historical pending statements.
 
-**Current item: P01 — complete customer journey and recovery. Programme completion: 0 of 13 priorities accepted.** Priority 1 is confirmed by Brett; the remaining sequence is proposed. Initial states below are drawn from the existing release record, not a fresh acceptance test.
+**Current item: P01 — complete customer journey and recovery. Programme completion: 0 of 14 priorities accepted.** Priorities 1 and 2 are confirmed by Brett; the remaining sequence follows the revised order. Stable P IDs identify records, not their current rank. Initial states below are drawn from the existing release record, not a fresh acceptance test.
 
 ## How we work through this
 
@@ -19,19 +19,20 @@ Updated: 23 September 2026. This is the authoritative check-off register for the
 
 | Done | ID | Priority | Build | Test | Commit / push | Merge | Deploy / config | Live check |
 |---|---|---|---|---|---|---|---|---|
-| [ ] | P01 | Complete customer journey | Partial | Partial | Partial | Partial | Partial | Not run |
-| [ ] | P02 | Finance and reconciliation | Partial | Partial | Partial | Partial | Partial | Not run |
-| [ ] | P03 | Netcash and debit orders | Partial | Partial | Partial | Partial | Deferred | Deferred |
-| [ ] | P04 | Physical access lifecycle | Partial | Partial | Partial | Partial | Blocked | Not run |
-| [ ] | P05 | MRI journal integration | Partial | Partial | Partial | Partial | Not started | Not run |
-| [ ] | P06 | Settings and daily close | Partial | Partial | Partial | Partial | Partial | Not run |
-| [ ] | P07 | Merchandise operations | Partial | Partial | Partial | Partial | Partial | Not run |
-| [ ] | P08 | Communications and tenant portal | Partial | Partial | Partial | Partial | Partial | Not run |
-| [ ] | P09 | Commercial, legal and insurance | Not started | Not run | Not started | Not started | Not started | Not run |
-| [ ] | P10 | Privacy and retention operations | Partial | Partial | Partial | Partial | Partial | Not run |
-| [ ] | P11 | Security and resilience | Partial | Partial | Partial | Partial | Partial | Not run |
-| [ ] | P12 | Offline and two-device recovery | Partial | Partial | Partial | Partial | Partial | Not run |
-| [ ] | P13 | Data, training and launch | Not started | Not run | Not started | Not started | Not started | Not run |
+| [ ] | P01 | 1. Complete customer journey | Partial | Partial | Partial | Partial | Partial | Not run |
+| [ ] | P14 | 2. Privacy and CIA security | Partial | Partial | Partial | Partial | Partial | Not run |
+| [ ] | P02 | 3. Finance and reconciliation | Partial | Partial | Partial | Partial | Partial | Not run |
+| [ ] | P03 | 4. Netcash and debit orders | Partial | Partial | Partial | Partial | Deferred | Deferred |
+| [ ] | P04 | 5. Physical access lifecycle | Partial | Partial | Partial | Partial | Blocked | Not run |
+| [ ] | P05 | 6. MRI journal integration | Partial | Partial | Partial | Partial | Not started | Not run |
+| [ ] | P06 | 7. Settings and daily close | Partial | Partial | Partial | Partial | Partial | Not run |
+| [ ] | P07 | 8. Merchandise operations | Partial | Partial | Partial | Partial | Partial | Not run |
+| [ ] | P08 | 9. Communications and tenant portal | Partial | Partial | Partial | Partial | Partial | Not run |
+| [ ] | P09 | 10. Commercial, legal and insurance | Not started | Not run | Not started | Not started | Not started | Not run |
+| [ ] | P10 | 11. Privacy and retention operations | Partial | Partial | Partial | Partial | Partial | Not run |
+| [ ] | P11 | 12. Security and resilience | Partial | Partial | Partial | Partial | Partial | Not run |
+| [ ] | P12 | 13. Offline and two-device recovery | Partial | Partial | Partial | Partial | Partial | Not run |
+| [ ] | P13 | 14. Data, training and launch | Not started | Not run | Not started | Not started | Not started | Not run |
 
 ## Next actions, evidence and acceptance
 
@@ -42,6 +43,7 @@ Privacy review, 23 September 2026: [GAPP assessment and PRIV-01–PRIV-11 closur
 | ID | Next action | Open blocker | Owner | Accepted by / date | Evidence |
 |---|---|---|---|---|---|
 | P01 | Brett: enable E010 in-app manager training after release and practise the demo handover, then continue E008/live acceptance and resolve live photo policy/capture method, then retest the live D002–D004 portal corrections, then resume the guided journey. Review historical candidates separately; retain J19–J21 gates. | D001–D004 deployed; D002–D004 live readback passed. Full staff acceptance, 14 historical cancelled/signed candidates and P03/P04 dependencies remain open. | Codex: technical work; Brett: hands-on acceptance | Pending | [E001–E004 journey and UAT evidence](PRIORITY_1_ACCEPTANCE_2026-09-23.md) |
+| P14 | Close PRIV-01–PRIV-11 and CIA-C/I/A acceptance items; reuse linked P09/P10/P11 evidence. | Legal, provider, retention/deletion, permissions, integrity and recovery proof remain. | Brett: assign control owners | Pending | [Privacy review](PRIVACY_GAPP_GAP_REVIEW_2026-09-23.md), [CIA checklist](CIA_SECURITY_ACCEPTANCE.md) |
 | P02 | Agree a representative account and reconcile invoice, receipt, statement and settlement. | Opening balances, reconciliation, charge/tax rules, refund authority and finance acceptance remain. | Unassigned | Pending | [Baseline release record](../PROJECT_CONTEXT.md); current acceptance pending |
 | P03 | Keep live activation held; prepare provider acceptance cases and record the activation decision. | Live activation remains deferred by Brett. Merchant/mandate approval and settlement evidence required. | Unassigned | Pending | [Baseline release record](../PROJECT_CONTEXT.md); current acceptance pending |
 | P04 | Confirm policy and installed provider; prove enrolment, suspend, restore, revoke and uncertain outcomes. | Photo policy/consent, installed-provider configuration and actual entry/removal proof remain. | Unassigned | Pending | [Baseline release record](../PROJECT_CONTEXT.md); current acceptance pending |
