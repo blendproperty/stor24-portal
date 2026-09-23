@@ -63,6 +63,8 @@ Source review found encrypted private identity/photo storage, scoped staff acces
 
 ## Recommended order and acceptance boundary
 
+Brett additionally requires CIA triad best practice. The [CIA security acceptance checklist](CIA_SECURITY_ACCEPTANCE.md) covers confidentiality, integrity and availability alongside this privacy review. It records requirements and remaining verification; no new security audit or compliance acceptance is implied.
+
 Resolve PRIV-01/02 first, then PRIV-03/04/05 and the privacy-request process. Governance and processor work can be prepared alongside those items. Keep P01/P04/P09/P10/P11 open; do not equate successful training or a working switch with legal approval, actual provider deletion or customer-journey acceptance. This review authorises no configuration change and publishes no customer-facing policy.
 
 ## Reference framework and legal context

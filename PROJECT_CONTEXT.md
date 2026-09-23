@@ -1,5 +1,15 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## CIA security requirements — 23 September 2026
+
+- **Implementation:** documentation-only CIA-C1–C3/I1–I3/A1–A3 acceptance requirements added in docs/CIA_SECURITY_ACCEPTANCE.md, linked to GAPP review and P11 register. No runtime remediation claimed.
+- **Testing:** requirements checked against existing open delivery gates and NIST references; documentation diff/link checks only. No new security scan, penetration test, permission UAT, backup restore or outage exercise.
+- **Commit and push:** enclosing codex/cia-acceptance-20260923 documentation commit/PR records promotion.
+- **Merge:** enclosing documentation PR and remote main context readback provide evidence.
+- **Deployment and configuration:** none required or changed.
+- **Live production verification:** no new live control verification in this requirements addition; prior evidence retains its stated scope.
+- **Open gates:** all nine CIA items, assigned owners, agreed recovery targets, security assessment, MFA/permission acceptance, reconciliation, restore/incident/provider/offline drills and all PRIV/legal/training/UAT gates. No compliance certification or programme completion claimed.
+
 ## GAPP/privacy gap assessment — 23 September 2026
 
 - **Implementation:** internal read-only assessment and eleven open PRIV items in [privacy review](docs/PRIVACY_GAPP_GAP_REVIEW_2026-09-23.md); no remediation code or customer policy published. Companion public repository records website findings. Owner photo permission is not legal approval; recommend resolving compulsory-consent/lawful-basis review before wider collection. This supersedes any implication that merely enabling the switch establishes privacy readiness.

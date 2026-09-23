@@ -35,6 +35,8 @@ Updated: 23 September 2026. This is the authoritative check-off register for the
 
 ## Next actions, evidence and acceptance
 
+CIA security requirement, 23 September 2026: [CIA-C1–C3, CIA-I1–I3 and CIA-A1–A3](CIA_SECURITY_ACCEPTANCE.md) are explicit acceptance requirements under P11 and linked journey/finance/access/privacy/offline priorities. All remain open. This requirements mapping is not a completed security scan or proof of compliance.
+
 Privacy review, 23 September 2026: [GAPP assessment and PRIV-01–PRIV-11 closure checklist](PRIVACY_GAPP_GAP_REVIEW_2026-09-23.md) adds evidence and open work to P01/P04/P09/P10/P11/P13. Resolve collection notices and compulsory biometric lawful-basis review before treating the owner photo toggle as live privacy readiness. All PRIV items remain open; this assessment changes no programme acceptance state.
 
 | ID | Next action | Open blocker | Owner | Accepted by / date | Evidence |
