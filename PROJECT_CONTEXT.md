@@ -1,5 +1,14 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Custom manager training eligibility - 23 September 2026
+
+- **Implementation:** customising employee permissions replaces Facility manager with Custom access, which the training role-name check excluded. Recognise the exact user's custom role when it currently grants move_in.create, retaining facility scope and Brett-only controller checks. Training entry also refreshes on window focus and every 15 seconds; enabled practice appears without a manager toggle. Live bookings are not automatically converted into demos.
+- **Testing:** eight isolated PostgreSQL checks passed, including custom manager automatic enabled visibility, no toggle access, facility rejection and immediate denial after move-in grant revocation. Typecheck, focused lint and permission/help tests passed; responsive training workflow checked at 1440/390/320px. Production read-only query confirmed the affected custom role has move_in.create but no billing grant. Exact-head CI pending.
+- **Commit and push:** prepared on codex/custom-manager-training-20260923 from canonical main a6f7e67; enclosing PR records promotion.
+- **Merge:** pending.
+- **Deployment and configuration:** pending; no live role, grant, training toggle or schema changes.
+- **Live production verification:** pending manager readback after deployment. Full P01 and real payment/photo/provider/physical-access acceptance remain open.
+
 ## Restricted navigation release evidence - 23 September 2026
 
 - **Implementation:** greyed-out locked desktop/mobile sections with administrator-contact guidance; restricted direct page requests redirect to Access restricted before rendering. Current database roles/grants drive navigation; API and facility-scope enforcement is retained. Added permission-neutral guidance for requesting access. No grants were changed.

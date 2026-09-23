@@ -77,6 +77,20 @@ test("isolated PostgreSQL owner-controlled manager training",async t=>{
   await assert.rejects(trainingSnapshot(f.owner.id),/FORBIDDEN/);
   await db.user.update({where:{id:f.owner.id},data:{active:true}});
  });
+ await t.test("customised manager automatically receives enabled training but cannot toggle or escape facility scope",async()=>{
+  const custom=await fixture();
+  const assignment=await db.roleAssignment.findFirstOrThrow({where:{userId:custom.manager.id}});
+  await db.role.update({where:{id:assignment.roleId},data:{name:`Custom access · ${custom.manager.id}`,permissions:["operations.view","move_in.create"]}});
+  await trainingCommand(custom.owner.id,{action:"toggle",enabled:true,version:0});
+  const snapshot=await trainingSnapshot(custom.manager.id);
+  assert.equal(snapshot.enabled,true);assert.equal(snapshot.canToggle,false);
+  assert.deepEqual(snapshot.facilities.map(f=>f.id),[custom.facility.id]);
+  await trainingCommand(custom.manager.id,{action:"start",facilityId:custom.facility.id});
+  await assert.rejects(trainingCommand(custom.manager.id,{action:"toggle",enabled:false,version:snapshot.controlVersion}),/FORBIDDEN/);
+  await assert.rejects(trainingCommand(custom.manager.id,{action:"start",facilityId:custom.other.id}),/FORBIDDEN/);
+  await db.role.update({where:{id:assignment.roleId},data:{permissions:["operations.view"]}});
+  await assert.rejects(trainingSnapshot(custom.manager.id),/FORBIDDEN/);
+ });
  await t.test("another organisation cannot address a training facility",async()=>{
   const other=await fixture();await trainingCommand(other.owner.id,{action:"toggle",enabled:true,version:0});
   await assert.rejects(trainingCommand(other.owner.id,{action:"start",facilityId:f.facility.id}),/FORBIDDEN/);

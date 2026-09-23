@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import sharp from "sharp";
+import { hasPermission } from "@/lib/permissions";
 import { db } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
 import { advanceTraining, initialTrainingState, type TrainingAction, type TrainingState } from "@/lib/move-in-training-contract";
@@ -12,7 +13,10 @@ export async function trainingAccess(database: Database, userId: string) {
   if (!user?.active) throw new Error("FORBIDDEN");
   const assignments = user.roleAssignments.filter(a => a.role.organisationId === user.organisationId && (!a.facility || a.facility.organisationId === user.organisationId));
   const owner = assignments.some(a => a.role.name === "Organisation owner" && !a.facilityId);
-  const managers = assignments.filter(a => a.role.name === "Facility manager");
+  // Customising a manager replaces the named role. Keep their current move-in grant
+  // and assigned facilities authoritative without granting any live permissions.
+  const managers = assignments.filter(a => a.role.name === "Facility manager" ||
+    (a.role.name === `Custom access · ${user.id}` && hasPermission(a.role.permissions, "move_in.create")));
   if (!owner && !managers.length) throw new Error("FORBIDDEN");
   const facilities = await database.facility.findMany({ where:{organisationId:user.organisationId, ...(!owner && !managers.some(a=>!a.facilityId) ? { id:{in:managers.flatMap(a=>a.facilityId ? [a.facilityId] : [])} } : {})}, select:{id:true,name:true}, orderBy:{name:"asc"} });
   return { userId:user.id, organisationId:user.organisationId, owner, facilities };
