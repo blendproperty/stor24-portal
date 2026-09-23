@@ -4,7 +4,7 @@ import test from "node:test";
 import { createHash, randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { db } from "../../src/lib/db";
-import { confirmReservationMoveIn } from "../../src/lib/reservation-move-in";
+import { confirmReservationMoveIn, getReservationMoveInReadiness } from "../../src/lib/reservation-move-in";
 import { facialPhotoPolicy } from "../../src/lib/facial-photo-security";
 import { submitTenantPhoto, tenantPhotoStatus, withdrawTenantPhoto, listFacialPhotos, previewFacialPhoto, reviewFacialPhoto, expireFacialPhotos } from "../../src/lib/facial-photo-service";
 
@@ -39,6 +39,35 @@ test("isolated PostgreSQL private facial photo lifecycle", async t => {
   }
 
   try {
+    await t.test("handover requires current staff approval and leaves blocked bookings untouched", async () => {
+      const f = await fixture();
+      async function blocked() {
+        const readiness = await getReservationMoveInReadiness(f.scope, f.reservation.id);
+        assert.equal(readiness.ready, false);
+        assert.ok(readiness.blockers.some(value => value.includes("staff-approved access photo")));
+        await assert.rejects(confirmReservationMoveIn(f.scope, f.reservation.id), /MOVE_IN_NOT_READY/);
+        assert.equal(await db.tenancy.count({ where: { accountId: f.account.id } }), 0);
+        assert.equal((await db.unit.findUniqueOrThrow({ where: { id: f.unit.id } })).status, "RESERVED");
+        assert.equal(await db.auditEvent.count({ where: { organisationId: f.org.id, action: "tenancy.key_handover_confirmed" } }), 0);
+      }
+      await blocked();
+      const photo = await submitTenantPhoto(f.session, f.upload);
+      await blocked();
+      await previewFacialPhoto(f.scope, photo.id, 1);
+      await reviewFacialPhoto(f.scope, photo.id, 1, "APPROVE");
+      const approved = await db.facialPhotoSubmission.findUniqueOrThrow({ where: { id: photo.id } });
+      assert.equal((await getReservationMoveInReadiness(f.scope, f.reservation.id)).ready, true);
+      for (const change of [{ status: "REJECTED" as const }, { status: "WITHDRAWN" as const }, { expiresAt: new Date(0) }, { encryptedImage: null }, { erasedAt: new Date() }, { reviewedAt: null }, { reviewedById: null }, { policyHash: "old-policy" }]) {
+        await db.facialPhotoSubmission.update({ where: { id: photo.id }, data: change });
+        await blocked();
+        await db.facialPhotoSubmission.update({ where: { id: photo.id }, data: { status: approved.status, expiresAt: approved.expiresAt, encryptedImage: approved.encryptedImage, erasedAt: approved.erasedAt, reviewedAt: approved.reviewedAt, reviewedById: approved.reviewedById, policyHash: approved.policyHash } });
+      }
+      const policies = process.env.FACIAL_ACCESS_POLICIES_JSON;
+      process.env.FACIAL_ACCESS_POLICIES_JSON = "{}";
+      await blocked();
+      process.env.FACIAL_ACCESS_POLICIES_JSON = policies;
+      assert.equal((await getReservationMoveInReadiness(f.scope, f.reservation.id)).ready, true);
+    });
     await t.test("private queue, audited preview and reviewed handover create one durable activation request", async () => {
       const f = await fixture();
       const photo = await submitTenantPhoto(f.session, f.upload);
@@ -89,7 +118,7 @@ test("isolated PostgreSQL private facial photo lifecycle", async t => {
       assert.equal(evidence.approvedPolicy.approvalReference, "CI-only");
       await assert.rejects(reviewFacialPhoto(f.scope, photo.id, 1, "APPROVE"), /PHOTO_CHANGED/);
       await assert.rejects(reviewFacialPhoto(f.scope, photo.id, 2, "APPROVE"), /PHOTO_PREVIEW_REQUIRED/);
-      await confirmReservationMoveIn(f.scope, f.reservation.id);
+      await assert.rejects(confirmReservationMoveIn(f.scope, f.reservation.id), /MOVE_IN_NOT_READY/);
       assert.equal((await db.facialPhotoSubmission.findUniqueOrThrow({ where: { id: photo.id } })).activationRequestedAt, null);
     });
     await t.test("future move-in may queue a photo but cannot activate; sandbox payments never qualify", async () => {
@@ -130,13 +159,16 @@ test("isolated PostgreSQL private facial photo lifecycle", async t => {
     });
     await t.test("a photo submitted after staff handover still requires current review; closed tenancies cannot preview it", async () => {
       const f = await fixture();
+      const first = await submitTenantPhoto(f.session, f.upload);
+      await previewFacialPhoto(f.scope, first.id, 1);
+      await reviewFacialPhoto(f.scope, first.id, 1, "APPROVE");
       const tenancy = await confirmReservationMoveIn(f.scope, f.reservation.id);
-      const photo = await submitTenantPhoto(f.session, f.upload);
-      await previewFacialPhoto(f.scope, photo.id, 1);
-      await reviewFacialPhoto(f.scope, photo.id, 1, "APPROVE");
+      const photo = await submitTenantPhoto(f.session, { ...f.upload, expectedVersion: 1 });
+      await previewFacialPhoto(f.scope, photo.id, 2);
+      await reviewFacialPhoto(f.scope, photo.id, 2, "APPROVE");
       assert.equal((await db.facialPhotoSubmission.findUniqueOrThrow({ where: { id: photo.id } })).status, "PENDING_PROVIDER");
       await db.tenancy.update({ where: { id: tenancy.tenancyId }, data: { status: "CLOSED" } });
-      await assert.rejects(previewFacialPhoto(f.scope, photo.id, 1), /PHOTO_BOOKING_NOT_READY/);
+      await assert.rejects(previewFacialPhoto(f.scope, photo.id, 2), /PHOTO_BOOKING_NOT_READY/);
       await expireFacialPhotos();
       assert.equal((await db.facialPhotoSubmission.findUniqueOrThrow({ where: { id: photo.id } })).encryptedImage, null);
     });

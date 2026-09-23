@@ -34,3 +34,7 @@ separate or realign the orange hexagon in CSS.
 Use plain operational labels and direct verbs. Explain what happens next.
 Humour may be used around clutter and everyday chaos, never security, money or
 collections.
+
+## Staff workflow clarification — 23 September 2026
+
+Brett confirmed orange primary action buttons and the move-in progression colours: green for done, orange for the next required action, and red for blocked, overdue or unresolved exceptions. Keep a written status alongside colour. Primary actions use STOR24 orange with dark ink for readable contrast; disabled actions remain neutral. Use Satoshi and strong, readable headings throughout the backend. Avoid repeating forward links when the step navigation already supplies them.

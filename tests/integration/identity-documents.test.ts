@@ -1,3 +1,4 @@
+import { seedApprovedPhoto } from "./helpers/approved-photo";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
@@ -138,6 +139,7 @@ test("isolated PostgreSQL private identity workflow", async t => {
       await previewIdentity(f.scope, document.id, 1, 1);
       await reviewIdentity(f.scope, document.id, 1, "ACCEPT");
       assert.equal(await identityGate(db, f.org.id, f.booking.id, f.booking.createdAt, "HANDOVER"), true);
+      await seedApprovedPhoto(f.org.id, f.booking.id, f.scope.userId);
       const moved = await confirmReservationMoveIn(f.scope, f.booking.id); assert.ok(moved.tenancyId);
       await expireIdentityDocuments();
       const retained = await db.identityDocument.findUniqueOrThrow({ where: { id: document.id } });
