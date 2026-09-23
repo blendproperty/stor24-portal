@@ -1757,3 +1757,26 @@ model IdentityDocumentMaintenance {
   id String @id
   completedAt DateTime
 }
+
+// Training records never reference live bookings, accounts, occupancies or access jobs.
+model MoveInTrainingControl {
+  organisationId String @id
+  controllerUserId String
+  enabled Boolean @default(false)
+  version Int @default(1)
+  generation Int @default(1)
+  updatedAt DateTime @updatedAt
+}
+
+model MoveInTrainingRun {
+  id String @id @default(cuid())
+  organisationId String
+  userId String
+  facilityId String
+  generation Int
+  version Int @default(1)
+  state Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([organisationId, userId, facilityId])
+}

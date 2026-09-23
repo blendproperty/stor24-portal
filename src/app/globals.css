@@ -2651,3 +2651,22 @@ a.module-card:focus-visible {
 
 .move-in-progress__number { position:relative; }
 .move-in-progress__tick { position:absolute; right:-5px; bottom:-4px; width:15px; height:15px; padding:2px; border-radius:50%; background:#fff; color:#079447; box-shadow:0 0 0 1px #079447; stroke-width:3; }
+
+.training-entry { display:flex; flex-wrap:wrap; gap:16px; justify-content:space-between; align-items:center; border:1px solid #ffc797; background:#fff5eb; padding:18px; border-radius:14px; margin-bottom:24px; }
+.training-entry strong,.training-entry__actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.training-entry p { margin:6px 0 0; }
+.training-entry__actions label { display:flex; align-items:center; gap:10px; }
+.training-entry input[role=switch] { appearance:none; position:relative; width:46px; height:26px; border:1px solid #758478; border-radius:20px; background:#dce3d7; cursor:pointer; }
+.training-entry input[role=switch]::after { content:""; position:absolute; width:18px; height:18px; top:3px; left:3px; border-radius:50%; background:#fff; box-shadow:0 1px 3px #07141144; }
+.training-entry input[role=switch]:checked { background:#ff5a0a; border-color:#ff5a0a; }
+.training-entry input[role=switch]:checked::after { left:23px; }
+.training-entry input[role=switch]:focus-visible { outline:2px solid #071411; outline-offset:3px; }
+.training-entry input[role=switch]:disabled { opacity:.6; cursor:wait; }
+.training-banner { display:flex; gap:16px; padding:20px; background:#071411; color:#fff; border:3px solid #ff5a0a; border-radius:16px; }
+.training-banner p { margin:8px 0 0; color:#eee; }
+.training-workspace select,.training-workspace input:not([type=checkbox]) { display:block; max-width:100%; padding:12px; border:1px solid #bdcbbb; border-radius:8px; margin:8px 0 16px; }
+.training-step { min-width:0; overflow-wrap:anywhere; }
+.training-step .button { margin:8px 8px 8px 0; }
+.training-document { background:#f5f3ea; border:1px dashed #a8b5a9; padding:20px; margin:16px 0; border-radius:12px; }
+.training-photo,.training-footer { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin-top:20px; }
+@media(max-width:600px) { .training-entry__actions { width:100%; } .training-workspace .button { max-width:100%; white-space:normal; } .training-step { padding:18px !important; } }
