@@ -1,5 +1,15 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Facial policy source preparation - 23 September 2026
+
+- **Implementation:** retrieved the exact 23 September email to Liezl about facial access/photo retention and recorded docs/FACIAL_PHOTO_POLICY_DRAFT.md as the working source. It contains the workflow and legal questions, not approved consent wording, numeric retention or an alternative-access process. Asked Brett for interim retention and alternative-access settings; no invented defaults.
+- **Testing:** manually checked the draft against the retrieved email; documentation-only diff check. No runtime implementation/test claim.
+- **Commit and push:** prepared on codex/photo-policy-draft-20260923 from canonical main f6b5761; enclosing commit/PR records promotion.
+- **Merge:** enclosing documentation PR records merge.
+- **Deployment and configuration:** none; photo collection remains unchanged. Owner-only photo toggle implementation is still outstanding; pending settings must not be labelled legal approval.
+- **Live production verification:** Outlook source retrieved; no live photo upload, policy change, toggle change, email send or provider action.
+- **Open gates:** interim retention/contact input, owner-control implementation/testing, Liezl's wording/retention/deletion review and provider/physical-access acceptance remain open.
+
 ## Facility/access status release evidence - 23 September 2026
 
 - **Implementation:** account-scoped facility footer replaces Randburg; global accounts say All facilities. Browser connectivity is not described as live data/provider health; training route identifies demo records. Facial page reports missing collection policy versus unavailable activation and explains the unconnected queue-to-Hikvision activation step and remaining on-site checks. Existing privacy, permission, training and provider controls unchanged.
