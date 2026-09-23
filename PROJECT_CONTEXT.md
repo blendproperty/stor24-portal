@@ -1,5 +1,15 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Restricted navigation release evidence - 23 September 2026
+
+- **Implementation:** greyed-out locked desktop/mobile sections with administrator-contact guidance; restricted direct page requests redirect to Access restricted before rendering. Current database roles/grants drive navigation; API and facility-scope enforcement is retained. Added permission-neutral guidance for requesting access. No grants were changed.
+- **Testing:** 370 application tests pass, including direct-route denial, inactive sessions, current grants overriding stale JWT role, and API routing. Responsive actual-shell tests pass at 1440/390/320px. Complete help browser suite passes (47 guides, 218 steps, no operational writes or browser errors). Initial checks exposed missing help coverage and old guide-count expectations; corrected with explicit access-request guidance assertions. Final exact-head CI 35860755260 and DB transaction checks 35860755258 succeeded on 73ebbac89e4be40b28d57c8a01035dabe889b331; typecheck, lint and build passed.
+- **Commit and push:** implementation and context pushed on codex/restricted-navigation-20260923. This release evidence accompanies codex/restricted-access-release-20260923; enclosing documentation PR records promotion.
+- **Merge:** PR #216 merged as 74afaf1e91279a212fb484a7898369e96fdb8543.
+- **Deployment and configuration:** main CI 35861029761 and deployment 35861267655 succeeded. Runtime 74afaf1e91279a212fb484a7898369e96fdb8543 and healthy stor24-crm:74afaf1e9 container verified. No schema or permission configuration changes.
+- **Live production verification:** reproduced original Billing server-error screen in the existing Chrome restricted staff test session. Reload after deployment redirects /billing to /access-restricted, showing the administrator-contact message and disabled Billing, Collections, Identity review and other unavailable navigation entries. Live profile is Brett with Custom access, matching the user-configured restrictions. Health app/database OK at 2026-09-23T12:35:51.216Z. No live records or access grants changed.
+- **Open gates:** full P01 staff journey, training acceptance, provider/finance/legal/privacy/data and physical-access acceptance remain open.
+
 ## Restricted staff navigation - 23 September 2026
 
 - **Implementation:** restricted sidebar/mobile entries are greyed out, keyboard-focusable non-links with a lock and administrator-contact message. Current database grants drive navigation and pre-render page redirects to a branded Access restricted page; API and facility-scope enforcement remains unchanged. Settings/password/MFA remain available. Specific billing subroutes retain their own permission requirements; current assignments, not the JWT job title, determine navigation.
