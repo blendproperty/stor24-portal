@@ -1,5 +1,17 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Move-in stage icons and manual test environment choice - 23 September 2026
+
+- **Implementation:** six stages now keep descriptive icons (unit, agreement, payment, ID, camera, keys), with a separate completion tick and existing green/orange/red state. Both initial unit selection and booking handover use the icons; no completion or readiness rules changed.
+- **Testing:** TypeScript, focused component lint, move-in browser checks at 1440/768/390/320px and existing workspace checks at 1440/1024/768/390/320px passed. Production CI/build pending.
+- **Commit and push:** prepared on codex/move-in-stage-icons-20260923 from canonical main 477dc839720a6a916c1b5fc15466191c647155bd; enclosing commit/PR records promotion.
+- **Merge:** pending.
+- **Deployment and configuration:** pending; no configuration/schema change needed.
+- **Live production verification:** pending for icons.
+- **Manual test request:** Brett wants to record test payment, upload/review a test photo and complete key handover. Current live booking correctly refuses sandbox funds, held photo policy and future start date. Recommended a separate isolated environment using actual workflow/services and synthetic records; an on-screen rehearsal would not prove saved records/balances. Asked Brett which option to use. No separate manual environment has been provisioned, no production guard bypassed and no test funds or photographs posted into production. Existing 137 isolated DB checks remain technical evidence, not Brett acceptance or physical access proof.
+- **Open gates:** full P01, manual environment choice/setup and staff acceptance, photo policy/consent/retention/capture method, real payment/provider/precinct access and all prior finance/legal/privacy/backup/data/training/launch gates remain. Excel remains a dated export.
+
+
 ## Move-in branding and approved-photo release evidence - 23 September 2026
 
 - **Implementation:** E008 restores STOR24 orange actions and Satoshi headings, adds green/orange/red step states and removes duplicate prompts. Current uploaded staff-approved access photo is now mandatory for new handovers, as explicitly requested by Brett. Policy hold, missing review, replacement, rejection, withdrawal, expiry, erased image and missing reviewer evidence fail closed. Already-recorded handovers remain idempotent; Hikvision provisioning is separate.

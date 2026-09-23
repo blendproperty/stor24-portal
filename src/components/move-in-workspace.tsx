@@ -3,7 +3,7 @@
 import { MoveInProgressNav } from "./move-in-progress-nav";
 import type { MoveInProgress } from "@/lib/move-in-progress";
 import { useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Plus, Search, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Plus, Search, X, Warehouse, FileCheck2, Wallet, ShieldCheck, Camera, KeyRound } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { southAfricaDateKey } from "@/lib/south-africa-time";
@@ -233,12 +233,12 @@ export function MoveInWorkspace({
         }
       />
       {(step === 1 || !selectedReservation?.readiness) && <MoveInProgressNav steps={[
-        { label: "Select unit", status: selectedId ? `Unit ${selected?.number}` : "Choose a unit", complete: Boolean(selectedId), onClick: () => setStep(1) },
-        { label: "Agreement", status: selectedReservation?.readiness?.signed ? "Signed" : "Not signed", complete: Boolean(selectedReservation?.readiness?.signed), onClick: selectedId ? () => setStep(2) : undefined },
-        { label: "Payment", status: selectedReservation?.readiness?.paymentVerified ? "Verified" : "Awaiting payment", complete: Boolean(selectedReservation?.readiness?.paymentVerified), onClick: selectedReservation?.readiness ? () => setStep(2) : undefined },
-        { label: "Check ID", status: selectedReservation?.progress?.identityAccepted ? "Accepted" : "Check required", complete: Boolean(selectedReservation?.progress?.identityAccepted), onClick: selectedReservation?.readiness ? () => setStep(2) : undefined },
-        { label: "Access photo", status: selectedReservation?.progress?.photoReviewed ? "Reviewed" : "Capture / review", complete: Boolean(selectedReservation?.progress?.photoReviewed), onClick: selectedReservation?.readiness ? () => setStep(2) : undefined },
-        { label: "Hand over keys", status: selectedReservation?.progress?.handedOver ? "Recorded" : "Not recorded", complete: Boolean(selectedReservation?.progress?.handedOver), onClick: selectedReservation?.readiness ? () => setStep(2) : undefined },
+        { label: "Select unit", icon: Warehouse, status: selectedId ? `Unit ${selected?.number}` : "Choose a unit", complete: Boolean(selectedId), onClick: () => setStep(1) },
+        { label: "Agreement", icon: FileCheck2, status: selectedReservation?.readiness?.signed ? "Signed" : "Not signed", complete: Boolean(selectedReservation?.readiness?.signed), onClick: selectedId ? () => setStep(2) : undefined },
+        { label: "Payment", icon: Wallet, status: selectedReservation?.readiness?.paymentVerified ? "Verified" : "Awaiting payment", complete: Boolean(selectedReservation?.readiness?.paymentVerified), onClick: selectedReservation?.readiness ? () => setStep(2) : undefined },
+        { label: "Check ID", icon: ShieldCheck, status: selectedReservation?.progress?.identityAccepted ? "Accepted" : "Check required", complete: Boolean(selectedReservation?.progress?.identityAccepted), onClick: selectedReservation?.readiness ? () => setStep(2) : undefined },
+        { label: "Access photo", icon: Camera, status: selectedReservation?.progress?.photoReviewed ? "Reviewed" : "Capture / review", complete: Boolean(selectedReservation?.progress?.photoReviewed), onClick: selectedReservation?.readiness ? () => setStep(2) : undefined },
+        { label: "Hand over keys", icon: KeyRound, status: selectedReservation?.progress?.handedOver ? "Recorded" : "Not recorded", complete: Boolean(selectedReservation?.progress?.handedOver), onClick: selectedReservation?.readiness ? () => setStep(2) : undefined },
       ]} />}
       {step === 1 ? (
         <section className="unit-selector-layout">

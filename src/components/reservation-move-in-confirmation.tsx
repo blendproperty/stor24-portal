@@ -5,7 +5,7 @@ import { MoveInProgressNav } from "./move-in-progress-nav";
 import type { MoveInProgress } from "@/lib/move-in-progress";
 import { ReservationPaymentForm } from "./reservation-payment-form";
 import { useState } from "react";
-import { FileCheck2, Wallet, CalendarDays, ArrowUpRight, CircleAlert, KeyRound, Check, ShieldCheck, Camera } from "lucide-react";
+import { FileCheck2, Wallet, CalendarDays, ArrowUpRight, CircleAlert, KeyRound, Check, ShieldCheck, Camera, Warehouse } from "lucide-react";
 import type { ReservationMoveInReadiness } from "@/lib/reservation-move-in";
 import { confirmReservationMoveInAction } from "@/app/actions/leasing";
 
@@ -23,12 +23,12 @@ export function ReservationMoveInConfirmation({ reservationId, customerName, uni
   const identityLabel = identityDone ? progress?.identityAccepted ? "Accepted" : "Checked at handover" : progress?.identityStatus === "REPLACEMENT_REQUIRED" ? "Replacement needed" : progress?.identityStatus === "AWAITING_REVIEW" ? "Awaiting review" : "Check required";
   const photoLabel = photoDone ? "Reviewed" : progress?.photoStatus === "WAITING_REVIEW" ? "Awaiting review" : progress?.photoCollectionEnabled ? "Capture needed" : "Collection on hold";
   return <><MoveInProgressNav steps={[
-    { label: "Select unit", status: `Unit ${unitNumber} selected`, complete: true, onClick: onBack },
-    { label: "Agreement", status: readiness.signed ? "Signed" : "Not signed", complete: readiness.signed, blocked: overdue, href: "#move-in-agreement" },
-    { label: "Payment", status: readiness.paymentVerified ? "Verified" : readiness.testPayment ? "Test payment only" : "Record payment", complete: readiness.paymentVerified, blocked: readiness.testPayment || overdue, href: "#move-in-payment" },
-    { label: "Check ID", status: identityLabel, complete: identityDone, blocked: overdue || ["REPLACEMENT_REQUIRED", "EXPIRED", "WITHDRAWN"].includes(progress?.identityStatus ?? ""), href: "#move-in-identity" },
-    { label: "Access photo", status: photoLabel, complete: photoDone, blocked: overdue || !progress?.photoCollectionEnabled || ["EXPIRED", "WITHDRAWN", "REJECTED"].includes(progress?.photoStatus ?? ""), href: "#move-in-photo" },
-    { label: "Hand over keys", status: handedOver ? "Recorded" : readiness.ready ? "Ready to record" : "Checks outstanding", complete: handedOver, blocked: !readiness.ready, href: "#move-in-keys" },
+    { label: "Select unit", icon: Warehouse, status: `Unit ${unitNumber} selected`, complete: true, onClick: onBack },
+    { label: "Agreement", icon: FileCheck2, status: readiness.signed ? "Signed" : "Not signed", complete: readiness.signed, blocked: overdue, href: "#move-in-agreement" },
+    { label: "Payment", icon: Wallet, status: readiness.paymentVerified ? "Verified" : readiness.testPayment ? "Test payment only" : "Record payment", complete: readiness.paymentVerified, blocked: readiness.testPayment || overdue, href: "#move-in-payment" },
+    { label: "Check ID", icon: ShieldCheck, status: identityLabel, complete: identityDone, blocked: overdue || ["REPLACEMENT_REQUIRED", "EXPIRED", "WITHDRAWN"].includes(progress?.identityStatus ?? ""), href: "#move-in-identity" },
+    { label: "Access photo", icon: Camera, status: photoLabel, complete: photoDone, blocked: overdue || !progress?.photoCollectionEnabled || ["EXPIRED", "WITHDRAWN", "REJECTED"].includes(progress?.photoStatus ?? ""), href: "#move-in-photo" },
+    { label: "Hand over keys", icon: KeyRound, status: handedOver ? "Recorded" : readiness.ready ? "Ready to record" : "Checks outstanding", complete: handedOver, blocked: !readiness.ready, href: "#move-in-keys" },
   ]} /><section className="handover-workspace" aria-label="Booking handover checks">
     <header className="handover-heading">
       <div><p className="handover-eyebrow">BOOKING HANDOVER</p><h2>{handedOver ? "Key handover recorded" : readiness.ready ? "Ready for key collection" : "Move-in checks"}</h2><p className="handover-customer">{customerName}<span>Unit {unitNumber}</span></p></div>
