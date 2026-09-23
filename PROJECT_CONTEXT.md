@@ -1,5 +1,15 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Custom manager training release evidence - 23 September 2026
+
+- **Implementation:** the training eligibility defect was an exact Facility manager name check after custom permissions replaced that label. The exact user's Custom access role now qualifies through its current move_in.create grant, retaining facility scope, active-user checks and Brett-only toggle. Move in entry refreshes on focus and at 15-second intervals; existing live bookings remain live until staff choose the separate demo run.
+- **Testing:** eight isolated DB checks passed, including custom-manager enabled visibility, demo start, switch denial, out-of-scope denial and revocation. Focused guide/state tests, lint, typecheck and responsive training workflow passed locally. Exact-head CI 35861799882 and DB transaction run 35861799818 succeeded on cd2aa3b111e337b35449948863a5c0437042b8b9. Test DB stopped afterward.
+- **Commit and push:** implementation/context pushed on codex/custom-manager-training-20260923. This release record accompanies codex/custom-training-release-20260923; enclosing documentation PR records promotion.
+- **Merge:** PR #218 merged as 5a5c4105a8151833f68090377454bc4223938227.
+- **Deployment and configuration:** main CI 35862044908 and deployment 35862277110 succeeded. Runtime 5a5c4105a8151833f68090377454bc4223938227 and healthy stor24-crm:5a5c4105a verified. No permission, training-control or schema configuration changes.
+- **Live production verification:** authenticated Chrome custom-manager session now reaches /operations/move-in/training without rejection, showing Training is switched off and no owner switch. Live control readback is OFF, version 5; verifier did not change it. Consequently Start training is correctly absent until Brett enables it again. Read-only role check confirms move_in.create and no billing grant. Health app/database OK at 2026-09-23T12:45:12.709Z. Enabled manager flow verified in isolated DB/browser tests; live enabled transition remains for Brett to perform.
+- **Open gates:** Brett/manager hands-on training and full P01 remain open, including real payment, ID/photo, provider and physical-access acceptance.
+
 ## Custom manager training eligibility - 23 September 2026
 
 - **Implementation:** customising employee permissions replaces Facility manager with Custom access, which the training role-name check excluded. Recognise the exact user's custom role when it currently grants move_in.create, retaining facility scope and Brett-only controller checks. Training entry also refreshes on window focus and every 15 seconds; enabled practice appears without a manager toggle. Live bookings are not automatically converted into demos.
