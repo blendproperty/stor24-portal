@@ -1,5 +1,17 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Owner-controlled manager move-in training - 23 September 2026
+
+- **Implementation:** Brett authorised an in-app training toggle for himself and current managers, with only him controlling on/off. Add an owner-only switch on Operations > Move in and a separate in-app demo workspace. Current database owner/Facility manager assignments authorise access; managers keep facility scope. The first controlling owner is pinned and another owner cannot take over the switch. All mutations recheck current roles, organisation, enabled generation and optimistic run version under a shared transaction lock. Disable invalidates open runs. Read-only production role count confirmed one active organisation-wide owner and one active facility-scoped manager.
+- **Training boundary:** dedicated MoveInTrainingControl/MoveInTrainingRun tables store synthetic workflow state; no live customer/booking/account/payment/unit/tenancy/access records are created. The six-step practice flow includes demo agreement, partial/full test receipt, sample ID, supplied synthetic image upload/preview/rejection/replacement/approval and simulated key handover. Arbitrary/real photos are rejected by normalised sample hash; uploaded bytes are never persisted. No customer messages, external transport or Hikvision commands are sent. This is persisted training practice, not full acceptance of live financial, document or provider integrations. No separate environment is required for users.
+- **Testing:** migration applied successfully to a new isolated localhost PostgreSQL database. Seven database checks passed, covering current owner control, manager scope, stale/revoked/inactive sessions, second-owner denial, cross-organisation denial, partial-payment/photo recovery, saved handover, on/off generation invalidation and zero live records. Two state-transition tests pass. Responsive actual-component training tests pass at 1440/390/320px. Existing application suite initially found the missing training tutorial; added a permission-scoped tutorial and all 20 affected guide tests pass. Local build passed before final tutorial/style refinement; final exact-head CI pending.
+- **Commit and push:** prepared on codex/owner-manager-training-20260923 from canonical main 6b7a3fcca6bba23c80aa812e85a25c5e5664f5ea. Enclosing commit/PR records promotion; unrelated checkouts preserved.
+- **Merge:** pending.
+- **Deployment and configuration:** pending; additive training-only schema migration required. Default is OFF. Production payment/photo-policy/provider safeguards remain unchanged.
+- **Live production verification:** pending. No production training toggle or demo mutation performed; Brett will choose when to enable it.
+- **Open gates:** Brett and manager hands-on training acceptance, full P01/J19/J20/J21, genuine money/signature/ID/photo-policy/precinct access, historical 14-booking review, finance/legal/privacy/retention/backup/data/training/launch acceptance remain open. Excel remains a dated export. This supersedes the earlier separate-test-environment proposal; it does not close live customer-journey acceptance.
+
+
 ## Move-in stage icons release evidence - 23 September 2026
 
 - **Implementation:** warehouse/unit, agreement, wallet, ID shield, camera and key icons appear in both move-in navigation views. Completion ticks are separate from stage icons; colours, accessible labels, booking links and readiness rules are retained.

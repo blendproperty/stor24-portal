@@ -11,6 +11,11 @@ function guide(id: string, title: string, category: string, route: string, scree
 }
 
 export const extendedGuides: WorkflowGuide[] = [
+  guide("move-in-training", "Practise a move-in safely", "Facility operations", "/operations/move-in/training", "Move-in training", "Use a saved demo run while the owner has training enabled.", [
+    ["Check training is enabled", "The owner controls the training switch on Operations, Move in. Existing facility managers can start a demo run while it is on. The training banner identifies demo records; returning to live Move in leaves the real booking safeguards in place.", ".training-banner"],
+    ["Complete the demo checks", "Select a demo unit, confirm the practice agreement, record the full test payment and check the sample identity. These actions save training progress only. They do not create live receipts, customer documents or an occupied unit.", ".training-step"],
+    ["Review the sample and hand over demo keys", "Download the supplied non-person image and upload it for review. Open it before approval, or request a replacement and upload it again. Completing the demo handover proves the practice steps only; no Hikvision access or customer message is sent. Turning training off invalidates open runs.", ".training-step"],
+  ]),
   guide("identity", "Review a customer identity document", "Facility operations", "/identity", "Identity review", "Privately review ID uploads before staff-confirmed key handover.", [
     ["Check whether collection is open", "The hold notice means the approved ID policy has not been enabled. Online ID collection is separate from facial access and requires approved document types, privacy wording and retention arrangements. Existing bookings continue to their normal handover check.", ".identity-review"],
     ["Open the correct submission", "Choose the customer's submission and confirm the store, unit and booking reference. You need explicit identity-review permission for the store. The queue contains review details; document images only open when you request a private preview.", ".identity-review__layout"],

@@ -9,6 +9,7 @@ const rule = (base: string, steps: string[], organisation = false): Rule => ({ b
 // Commas mean AND, pipes mean OR. @owner uses a current database assignment, never the JWT label.
 // Missing guides/steps fail closed; the coverage test requires an explicit editorial decision.
 export const guideAccessRules: Record<string, Rule> = {
+  "move-in-training": rule("@owner|@manager", ["", "", ""]),
   orientation: rule("operations.view", ["", "", "leads.view,reservations.manage,ledger.view,collections.view", ""]),
   reservations: rule("reservations.manage", ["", "", "", "", "move_in.create"]),
   "move-in": rule("move_in.create", ["reservations.manage", "", "", "payments.manage", "", ""]),
@@ -63,7 +64,7 @@ function permitted(assignments: GuideAssignment[], requirement: string, organisa
     const relevant = assignments.filter(a => a.facilityId === null || (facility !== null && a.facilityId === facility));
     const grants = relevant.flatMap(a => a.role.permissions);
     return requirement.split(",").filter(Boolean).every(all => all.split("|").some(permission =>
-      permission === "@owner" ? relevant.some(a => a.facilityId === null && a.role.name === "Organisation owner" && hasPermission(a.role.permissions, "*")) : hasPermission(grants, permission)));
+      permission === "@owner" ? relevant.some(a => a.facilityId === null && a.role.name === "Organisation owner" && hasPermission(a.role.permissions, "*")) : permission === "@manager" ? relevant.some(a => a.role.name === "Facility manager") : hasPermission(grants, permission)));
   });
 }
 
