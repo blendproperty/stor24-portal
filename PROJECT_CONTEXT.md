@@ -1,5 +1,14 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Branded password-reset email - 23 September 2026
+
+- **Implementation:** replace bare password-reset paragraphs with official STOR24 logo, orange CTA, ink/cream table layout, Satoshi where supported plus Arial/Helvetica fallback, warm workspace copy, plain-text alternative and fallback link. Subject is Reset your STOR24 password. Names/URLs escaped. Existing 30-minute single-use reset and anti-enumeration/rate-limit controls unchanged.
+- **Testing:** focused escaping/link/expiry/URL-validation test, TypeScript and focused lint passed. Actual template rendered and visually inspected with official local logo/font at 700/390/320px; no overflow and logo loaded. Preview uses an explicitly fake token. No email sent and no password-reset request triggered. Gmail/Outlook inbox rendering remains unverified.
+- **Commit and push:** prepared on codex/branded-password-reset-20260923 from canonical main c589ee1; enclosing PR records promotion.
+- **Merge:** pending.
+- **Deployment and configuration:** pending; no provider/config/schema change.
+- **Live production verification:** pending; existing inbox messages will not change. Preserve P01 and all current launch/provider/UAT gates.
+
 ## Custom manager training release evidence - 23 September 2026
 
 - **Implementation:** the training eligibility defect was an exact Facility manager name check after custom permissions replaced that label. The exact user's Custom access role now qualifies through its current move_in.create grant, retaining facility scope, active-user checks and Brett-only toggle. Move in entry refreshes on focus and at 15-second intervals; existing live bookings remain live until staff choose the separate demo run.
