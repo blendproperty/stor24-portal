@@ -1,10 +1,11 @@
+import { resolvedPhotoPolicy } from "@/lib/facial-photo-control";
 import { createHash } from "node:crypto";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { facilityWhere, type RequestScope } from "@/lib/scope";
 import { tenantCustomerScope } from "@/lib/tenant-portal-security";
 import { reservationReadiness } from "@/lib/reservation-move-in";
-import { decryptPhoto, encryptPhoto, facialPhotoPolicy, normaliseFacialPhoto } from "@/lib/facial-photo-security";
+import { decryptPhoto, encryptPhoto, normaliseFacialPhoto } from "@/lib/facial-photo-security";
 import { integrationEncryptionConfigured } from "@/lib/integrations/integration-secret-vault";
 import { requestPhotoActivation } from "@/lib/facial-photo-activation";
 
@@ -25,8 +26,8 @@ async function lockBooking(database: Database, id: string) {
   await database.$queryRaw`SELECT "id" FROM "Account" WHERE "accountNumber" = ${accountNumber} FOR UPDATE`;
 }
 async function readyToCollect(database: Database, organisationId: string) {
-  const policy = facialPhotoPolicy(organisationId);
-  if (!policy || !integrationEncryptionConfigured()) throw new Error("PHOTO_POLICY_PENDING");
+  const policy = await resolvedPhotoPolicy(database, organisationId);
+  if (!policy?.enabled || !integrationEncryptionConfigured()) throw new Error("PHOTO_POLICY_PENDING");
   const maintenance = await database.facialPhotoMaintenance.findUnique({ where: { id: "expiry" } });
   if (!maintenance || maintenance.completedAt.getTime() < Date.now() - 90 * 60 * 1000) throw new Error("PHOTO_MAINTENANCE_REQUIRED");
   return policy;
@@ -41,11 +42,11 @@ async function requireBookingEligible(database: Database, organisationId: string
 export async function tenantPhotoStatus(session: Tenant, reservationId: string) {
   await tenantBooking(db, session, reservationId);
   let available = false;
-  const policy = facialPhotoPolicy(session.organisationId);
+  const policy = await resolvedPhotoPolicy(db, session.organisationId);
   try { await readyToCollect(db, session.organisationId); await requireBookingEligible(db, session.organisationId, reservationId); available = true; } catch { /* Read-only status is still available during policy/provider holds. */ }
   const photo = await db.facialPhotoSubmission.findUnique({ where: { reservationId }, select: photoSummary });
   return { available, policy: policy ? { version: policy.version, hash: policy.hash, notice: policy.notice, consentLabel: policy.consentLabel, retentionHours: policy.retentionHours, alternativeContact: policy.alternativeContact } : null,
-    photo: photo ? { ...photo, status: photo.expiresAt <= new Date() && liveStatuses.includes(photo.status) ? "EXPIRED" : photo.status } : null };
+    photo: photo ? { ...photo, status: (photo.expiresAt !== null && photo.expiresAt <= new Date()) && liveStatuses.includes(photo.status) ? "EXPIRED" : photo.status } : null };
 }
 
 export async function submitTenantPhoto(session: Tenant, input: { reservationId: string; policyHash: string; consent: boolean; expectedVersion: number; image: File }) {
@@ -56,6 +57,7 @@ export async function submitTenantPhoto(session: Tenant, input: { reservationId:
   const bytes = await normaliseFacialPhoto(input.image);
   try {
     return await db.$transaction(async tx => {
+      await tx.$queryRaw`SELECT "id" FROM "Organisation" WHERE "id" = ${session.organisationId} FOR UPDATE`;
       await lockBooking(tx, input.reservationId);
       const reservation = await tenantBooking(tx, session, input.reservationId);
       const currentPolicy = await readyToCollect(tx, session.organisationId);
@@ -64,9 +66,9 @@ export async function submitTenantPhoto(session: Tenant, input: { reservationId:
       const current = await tx.facialPhotoSubmission.findUnique({ where: { reservationId: reservation.id } });
       if ((current?.version ?? 0) !== input.expectedVersion) throw new Error("PHOTO_CHANGED");
       const version = (current?.version ?? 0) + 1, now = new Date();
-      const values = { version, status: "WAITING_REVIEW", encryptedImage: encryptPhoto(bytes, binding(reservation.id, version)), imageSha256: createHash("sha256").update(bytes).digest("hex"), policyVersion: currentPolicy.version, policyHash: currentPolicy.hash, consentNotice: JSON.stringify({ notice: currentPolicy.notice, consentLabel: currentPolicy.consentLabel, alternativeContact: currentPolicy.alternativeContact, retentionHours: currentPolicy.retentionHours, approvalReference: currentPolicy.approvalReference }), consentAt: now, expiresAt: new Date(now.getTime() + currentPolicy.retentionHours * 3600000), reviewedAt: null, reviewedById: null, activationRequestedAt: null, occupancyId: null, erasedAt: null };
+      const values = { version, status: "WAITING_REVIEW", encryptedImage: encryptPhoto(bytes, binding(reservation.id, version)), imageSha256: createHash("sha256").update(bytes).digest("hex"), policyVersion: currentPolicy.version, policyHash: currentPolicy.hash, consentNotice: JSON.stringify({ notice: currentPolicy.notice, consentLabel: currentPolicy.consentLabel, alternativeContact: currentPolicy.alternativeContact, retentionHours: currentPolicy.retentionHours, approvalReference: currentPolicy.approvalReference }), consentAt: now, expiresAt: currentPolicy.retentionHours === null ? null : new Date(now.getTime() + currentPolicy.retentionHours * 3600000), reviewedAt: null, reviewedById: null, activationRequestedAt: null, occupancyId: null, erasedAt: null };
       const photo = await tx.facialPhotoSubmission.upsert({ where: { reservationId: reservation.id }, create: { reservationId: reservation.id, ...values }, update: values, select: photoSummary });
-      await tx.auditEvent.create({ data: { organisationId: session.organisationId, facilityId: reservation.facilityId, action: "facial_photo.customer_submitted", entityType: "FacialPhotoSubmission", entityId: photo.id, after: { customerId: reservation.customerId, version, policyHash: currentPolicy.hash, policyVersion: currentPolicy.version, approvalReference: currentPolicy.approvalReference, approvedPolicy: currentPolicy, consentAt: now.toISOString(), expiresAt: values.expiresAt.toISOString(), replacedVersion: current?.version ?? null } } });
+      await tx.auditEvent.create({ data: { organisationId: session.organisationId, facilityId: reservation.facilityId, action: "facial_photo.customer_submitted", entityType: "FacialPhotoSubmission", entityId: photo.id, after: { customerId: reservation.customerId, version, policyHash: currentPolicy.hash, policyVersion: currentPolicy.version, approvalReference: currentPolicy.approvalReference, collectionPolicy: currentPolicy, consentAt: now.toISOString(), expiresAt: values.expiresAt?.toISOString() ?? null, replacedVersion: current?.version ?? null } } });
       return photo;
     });
   } finally { bytes.fill(0); }
@@ -100,7 +102,7 @@ export async function previewFacialPhoto(scope: RequestScope, id: string, versio
     const candidate = await staffPhoto(tx, scope, id);
     await lockBooking(tx, candidate.reservationId);
     const photo = await staffPhoto(tx, scope, id);
-    if (photo.version !== version || !photo.encryptedImage || photo.expiresAt <= new Date() || !liveStatuses.includes(photo.status) || facialPhotoPolicy(scope.organisationId)?.hash !== photo.policyHash || !["ACTIVE", "CONVERTED"].includes(photo.reservation.status)) throw new Error("PHOTO_CHANGED");
+    if (photo.version !== version || !photo.encryptedImage || (photo.expiresAt !== null && photo.expiresAt <= new Date()) || !liveStatuses.includes(photo.status) || (await resolvedPhotoPolicy(tx, scope.organisationId))?.hash !== photo.policyHash || !["ACTIVE", "CONVERTED"].includes(photo.reservation.status)) throw new Error("PHOTO_CHANGED");
     await requireBookingEligible(tx, scope.organisationId, photo.reservationId);
     const bytes = decryptPhoto(photo.encryptedImage, binding(photo.reservationId, photo.version));
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: photo.reservation.facilityId, actorId: scope.userId, action: "facial_photo.previewed", entityType: "FacialPhotoSubmission", entityId: id, after: { version } } });
@@ -112,10 +114,10 @@ export async function reviewFacialPhoto(scope: RequestScope, id: string, version
     const candidate = await staffPhoto(tx, scope, id);
     await lockBooking(tx, candidate.reservationId);
     const photo = await staffPhoto(tx, scope, id);
-    if (photo.version !== version || photo.status !== "WAITING_REVIEW" || !photo.encryptedImage || photo.expiresAt <= new Date()) throw new Error("PHOTO_CHANGED");
+    if (photo.version !== version || photo.status !== "WAITING_REVIEW" || !photo.encryptedImage || (photo.expiresAt !== null && photo.expiresAt <= new Date())) throw new Error("PHOTO_CHANGED");
     if (decision === "APPROVE") {
-      const policy = await readyToCollect(tx, scope.organisationId);
-      if (policy.hash !== photo.policyHash) throw new Error("PHOTO_CONSENT_REQUIRED");
+      const policy = await resolvedPhotoPolicy(tx, scope.organisationId);
+      if (!policy || policy.hash !== photo.policyHash) throw new Error("PHOTO_CONSENT_REQUIRED");
       await requireBookingEligible(tx, scope.organisationId, photo.reservationId);
       const previewed = await tx.auditEvent.findFirst({ where: { organisationId: scope.organisationId, actorId: scope.userId, entityId: id, action: "facial_photo.previewed", after: { path: ["version"], equals: version } } });
       if (!previewed) throw new Error("PHOTO_PREVIEW_REQUIRED");

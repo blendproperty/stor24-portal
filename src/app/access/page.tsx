@@ -1,6 +1,7 @@
 import { FacialPhotoQueue } from "@/components/facial-photo-queue";
 import { listFacialPhotos } from "@/lib/facial-photo-service";
-import { facialPhotoPolicy } from "@/lib/facial-photo-security";
+import { photoControlSnapshot } from "@/lib/facial-photo-control";
+import { PhotoCollectionControl } from "@/components/photo-collection-control";
 import { requirePermission } from "@/lib/auth-guards";
 import { BiometricAccessWorkspace } from "@/components/biometric-access-workspace";
 import { MelIntegrationStatus } from "@/components/mel-integration-status";
@@ -20,6 +21,7 @@ export default async function AccessPage({ searchParams }: { searchParams: Promi
     listIdentityLinks(scope),
     listAccessDecisions(scope),
   ]);
+  const control = await photoControlSnapshot(scope.organisationId, scope.userId);
   const photos = await listFacialPhotos(scope, reservation);
   let manageableFacilities: string[] | null = [];
   try { manageableFacilities = (await requirePermission("access.manage")).allowedFacilityIds; }
@@ -27,7 +29,8 @@ export default async function AccessPage({ searchParams }: { searchParams: Promi
   return <div className="page-stack face-page">
     <PageHeader eyebrow="Physical security" title="Facial access" description="Private photographs, staff review and a clear record of what still needs to be verified." />
     {reservation && <a className="button button-secondary" href={`/operations/move-in?reservation=${encodeURIComponent(reservation)}`}>Back to move-in checks</a>}
-    <FacialPhotoQueue policyConfigured={Boolean(facialPhotoPolicy(scope.organisationId))} manageableFacilities={manageableFacilities} photos={photos.map(photo => ({ id: photo.id, version: photo.version, status: photo.status, expiresAt: photo.expiresAt.toISOString(), facilityId: photo.reservation.facilityId, facilityName: photo.reservation.facility.name, unitNumber: photo.reservation.unit.number, customerName: [photo.reservation.customer.firstName ?? photo.reservation.customer.companyName ?? "Customer", photo.reservation.customer.lastName].filter(Boolean).join(" ") }))} />
+    <PhotoCollectionControl initial={control} />
+    <FacialPhotoQueue policyConfigured={control.enabled} manageableFacilities={manageableFacilities} photos={photos.map(photo => ({ id: photo.id, version: photo.version, status: photo.status, expiresAt: photo.expiresAt?.toISOString() ?? null, facilityId: photo.reservation.facilityId, facilityName: photo.reservation.facility.name, unitNumber: photo.reservation.unit.number, customerName: [photo.reservation.customer.firstName ?? photo.reservation.customer.companyName ?? "Customer", photo.reservation.customer.lastName].filter(Boolean).join(" ") }))} />
     <BiometricAccessWorkspace
       enrollments={enrollments.map((item) => ({ id: item.id, customerName: `${item.customer.firstName ?? item.customer.companyName ?? "Customer"} ${item.customer.lastName ?? ""}`.trim(), facilityName: item.facility.name, unitNumber: item.occupancy.unit.number, status: item.status, consentAt: item.consentAt.toISOString(), provisionedAt: item.provisionedAt?.toISOString() ?? null }))}
     />

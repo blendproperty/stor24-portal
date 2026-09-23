@@ -1,5 +1,15 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Owner photo collection control - 23 September 2026
+
+- **Implementation:** shared database switch, controlling-owner pin inherited from the established training owner at first use, fresh-role checks, same-origin API, version checks, audit and upload/disable locking. Managers see read-only state refreshed every 15 seconds/on focus. Interim notice awaits review; active booking/tenancy retention deletes on cancellation/expiry/end/withdrawal. Off stops uploads but preserves consent/review/deletion. Legacy policies retain fixed-hour expiry. No gate activation implied.
+- **Testing:** TypeScript passed; lint zero errors (seven existing warnings); 371 unit tests; 42 connected journey/handover/photo database tests passed. Responsive component tests passed on desktop/mobile including owner switch and manager view. Photo test proves pin, stale version rejection, shared state, uploads blocked while off, review/handover, active tenancy retention and deletion after close. Final CI pending.
+- **Commit and push:** prepared on codex/owner-photo-control-20260923 from main 27fe92b; enclosing commit records implementation/context.
+- **Merge:** pending.
+- **Deployment and configuration:** pending; migration adds control and nullable lifecycle expiry. Collection remains off until Brett enables it. Live controlling-owner pin verified against Brett; training unchanged.
+- **Live production verification:** release pending. Read-only production check found deletion heartbeat; no collection toggle, customer upload, financial entry, email or provider action performed.
+- **Open gates:** Liezl review, Brett collection acceptance, provider enrolment/deletion and on-site access lifecycle. Seven-day rule starts at confirmed failure; debit batch currently retrieves load reports, not final customer failure/settlement results. Result ingestion, reconciliation and Hikvision suspension/restoration are unbuilt and NOT represented as live. P01/P03/P04/P09/P10 remain partial.
+
 ## Facial policy source preparation - 23 September 2026
 
 - **Implementation:** retrieved the exact 23 September email to Liezl about facial access/photo retention and recorded docs/FACIAL_PHOTO_POLICY_DRAFT.md as the working source. It contains the workflow and legal questions, not approved consent wording, numeric retention or an alternative-access process. Asked Brett for interim retention and alternative-access settings; no invented defaults.

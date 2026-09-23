@@ -6,8 +6,8 @@ import { ArrowRight, Camera, Check, ChevronDown, Clock3, FileImage, RefreshCw, S
 
 type PhotoState = {
   available: boolean;
-  policy: { version: string; hash: string; notice: string; consentLabel: string; retentionHours: number; alternativeContact: string } | null;
-  photo: { version: number; status: string; expiresAt: string; erasedAt: string | null } | null;
+  policy: { version: string; hash: string; notice: string; consentLabel: string; retentionHours: number | null; alternativeContact: string } | null;
+  photo: { version: number; status: string; expiresAt: string | null; erasedAt: string | null } | null;
 };
 const labels: Record<string, string> = { WAITING_REVIEW: "Photo received · awaiting staff review", APPROVED: "Photo reviewed · awaiting move-in", PENDING_PROVIDER: "Move-in recorded · access activation pending", EXPIRED: "Photo expired · a new photo will be needed", WITHDRAWN: "Consent withdrawn · stored photo removed", REJECTED: "New photograph needed" };
 
@@ -63,7 +63,7 @@ export function TenantFacePhoto({ reservationId }: { reservationId: string }) {
         <input aria-label="Choose your access photograph" name="image" type="file" accept="image/jpeg,image/png" required disabled={busy} onChange={event => setFileName(event.currentTarget.files?.[0]?.name ?? "")} />
       </label>
       <p className="face-format-note">JPEG or PNG · Up to 5 MB{state.photo ? " · A replacement needs a new staff review." : ""}</p>
-      <details><summary>How we use your photograph<ChevronDown size={17} aria-hidden="true" /></summary><p className="face-consent">{state.policy.notice}</p><p>Available for staff review for up to {state.policy.retentionHours} hours. The notice explains the deletion arrangements.</p><p>{state.policy.alternativeContact}</p></details>
+      <details><summary>How we use your photograph<ChevronDown size={17} aria-hidden="true" /></summary><p className="face-consent">{state.policy.notice}</p><p>{state.policy.retentionHours === null ? "Retained during your active booking and tenancy. Removed when the booking or tenancy ends, or you withdraw consent." : `Available for staff review for up to ${state.policy.retentionHours} hours.`} The notice explains the deletion arrangements.</p><p>{state.policy.alternativeContact}</p></details>
       <label className="face-checkbox"><input name="consent" type="checkbox" required disabled={busy} /><span>{state.policy.consentLabel}</span></label>
       <button className="face-submit" disabled={busy}>{busy ? "Saving securely…" : state.photo ? "Replace my photograph" : "Submit photograph"}<ArrowRight size={18} aria-hidden="true" /></button>
       <p className="face-activation-note">Our team will confirm when your precinct access is active.</p>

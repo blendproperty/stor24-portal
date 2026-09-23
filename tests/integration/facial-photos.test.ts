@@ -1,3 +1,4 @@
+import { photoControlSnapshot, setPhotoCollection, resolvedPhotoPolicy } from "../../src/lib/facial-photo-control";
 import { getMoveInProgress } from "../../src/lib/move-in-progress";
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -39,6 +40,38 @@ test("isolated PostgreSQL private facial photo lifecycle", async t => {
   }
 
   try {
+    await t.test("owner switch is shared, pinned, audited; tenancy retention and deletion continue while off", async () => {
+      const f=await fixture();
+      const role=await db.role.create({data:{organisationId:f.org.id,name:"Organisation owner",permissions:["*"]}});
+      await db.roleAssignment.create({data:{userId:f.scope.userId,roleId:role.id}});
+      await db.moveInTrainingControl.create({data:{organisationId:f.org.id,controllerUserId:f.scope.userId}});
+      const other=await db.user.create({data:{organisationId:f.org.id,email:randomUUID()+"@example.invalid",name:"Another owner",roleAssignments:{create:{roleId:role.id}}}});
+      assert.equal((await photoControlSnapshot(f.org.id,other.id)).canToggle,false);
+      await assert.rejects(setPhotoCollection(other.id,true,0),/FORBIDDEN/);
+      await setPhotoCollection(f.scope.userId,true,0);
+      assert.equal((await photoControlSnapshot(f.org.id,other.id)).enabled,true);
+      await assert.rejects(setPhotoCollection(f.scope.userId,false,0),/PHOTO_CONTROL_CHANGED/);
+      const policy=await resolvedPhotoPolicy(db,f.org.id);
+      const photo=await submitTenantPhoto(f.session,{...f.upload,policyHash:policy!.hash});
+      assert.equal(photo.expiresAt,null);
+      await setPhotoCollection(f.scope.userId,false,1);
+      assert.equal((await tenantPhotoStatus(f.session,f.reservation.id)).available,false);
+      await assert.rejects(submitTenantPhoto(f.session,{...f.upload,policyHash:policy!.hash,expectedVersion:1}),/PHOTO_POLICY_PENDING/);
+      assert.equal((await resolvedPhotoPolicy(db,f.org.id))!.hash,policy!.hash);
+      await previewFacialPhoto(f.scope,photo.id,1);
+      await reviewFacialPhoto(f.scope,photo.id,1,"APPROVE");
+      assert.equal((await getReservationMoveInReadiness(f.scope,f.reservation.id)).ready,true);
+      const moved=await confirmReservationMoveIn(f.scope,f.reservation.id);
+      await db.reservation.update({where:{id:f.reservation.id},data:{holdExpiresAt:new Date(0)}});
+      await expireFacialPhotos();
+      assert.ok((await db.facialPhotoSubmission.findUniqueOrThrow({where:{id:photo.id}})).encryptedImage);
+      await db.tenancy.update({where:{id:moved.tenancyId},data:{status:"CLOSED"}});
+      await expireFacialPhotos();
+      assert.equal((await db.facialPhotoSubmission.findUniqueOrThrow({where:{id:photo.id}})).encryptedImage,null);
+      assert.equal(await db.auditEvent.count({where:{organisationId:f.org.id,action:{in:["facial_photo.collection_enabled","facial_photo.collection_disabled"]}}}),2);
+      await db.roleAssignment.deleteMany({where:{userId:f.scope.userId}});
+      await assert.rejects(setPhotoCollection(f.scope.userId,true,2),/FORBIDDEN/);
+    });
     await t.test("handover requires current staff approval and leaves blocked bookings untouched", async () => {
       const f = await fixture();
       async function blocked() {
@@ -113,9 +146,9 @@ test("isolated PostgreSQL private facial photo lifecycle", async t => {
       const stored = await db.facialPhotoSubmission.findUniqueOrThrow({ where: { id: photo.id } });
       assert.equal(stored.version, 2); assert.equal(stored.status, "WAITING_REVIEW"); assert.equal(stored.reviewedAt, null);
       const previousConsent = await db.auditEvent.findFirstOrThrow({ where: { entityId: photo.id, action: "facial_photo.customer_submitted", after: { path: ["version"], equals: 1 } } });
-      const evidence = previousConsent.after as { approvedPolicy: { consentLabel: string; approvalReference: string } };
-      assert.equal(evidence.approvedPolicy.consentLabel, "Synthetic consent checkbox only");
-      assert.equal(evidence.approvedPolicy.approvalReference, "CI-only");
+      const evidence = previousConsent.after as { collectionPolicy: { consentLabel: string; approvalReference: string } };
+      assert.equal(evidence.collectionPolicy.consentLabel, "Synthetic consent checkbox only");
+      assert.equal(evidence.collectionPolicy.approvalReference, "CI-only");
       await assert.rejects(reviewFacialPhoto(f.scope, photo.id, 1, "APPROVE"), /PHOTO_CHANGED/);
       await assert.rejects(reviewFacialPhoto(f.scope, photo.id, 2, "APPROVE"), /PHOTO_PREVIEW_REQUIRED/);
       await assert.rejects(confirmReservationMoveIn(f.scope, f.reservation.id), /MOVE_IN_NOT_READY/);
