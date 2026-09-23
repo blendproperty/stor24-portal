@@ -1,5 +1,12 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Premium workspace final responsive pass — 23 September 2026
+
+- **Implementation:** follow-up on `codex/premium-workspace-final-pass-20260923` from canonical main `00134b7`. The deeper live audit found page overflow in the facility-performance and Netcash payment tables at narrow widths. Both now use bounded, keyboard-focusable table regions. Graphs has the distinct heading `Performance overview`. The move-in customer dialog has an accessible name and labelled close control; duplicate pagination reset removed.
+- **Testing:** TypeScript, focused ESLint, diff checks and the actual-component premium suite passed, including 530-unit selection/pagination, persistent Next, account details, contextual tip and 1440/1024/768/390/320px layout. Existing live release audited at 390px across primary and billing screens, then all 27 navigation destinations at 320px, plus move-in and provider settings. Graphs and Netcash defects above are the identified exceptions awaiting deployment/readback. The live move-in account step and add-customer dialog were opened and cancelled without a write.
+- **Commit and push:** pending this checkpoint. **Merge:** pending exact-head checks. **Deployment and configuration:** pending; no schema, business-setting, provider or payment change. **Live production verification:** final fix readback pending deployment. Prior release evidence below remains valid; this entry does not claim these follow-up changes are already live.
+- **Open gates:** all prior actual-money, Netcash, legal/retention, provider/physical-access, finance/MRI, data, staff training, customer UAT and launch approval gates remain unchanged.
+
 
 ## Premium staff workspace and identity preview correction — 23 September 2026
 

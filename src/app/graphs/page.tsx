@@ -75,7 +75,7 @@ export default async function GraphsPage() {
     <div className="page-stack">
       <PageHeader
         eyebrow="Reporting"
-        title="Dashboard"
+        title="Performance overview"
         description="Live portfolio performance across pipeline, occupancy, revenue and collections — built from real leasing and billing data."
       />
 
@@ -149,6 +149,7 @@ export default async function GraphsPage() {
 
       <section className="panel panel-spacious">
         <div className="panel-heading"><h2>Unit status by facility</h2><DoorOpen className="muted-icon" /></div>
+        <div className="table-wrap" role="region" aria-label="Unit status by facility" tabIndex={0}>
         <table className="unit-status-table">
           <thead>
             <tr>
@@ -183,6 +184,7 @@ export default async function GraphsPage() {
             )}
           </tbody>
         </table>
+        </div>
       </section>
     </div>
   );

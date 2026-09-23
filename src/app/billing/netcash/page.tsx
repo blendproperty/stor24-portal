@@ -72,7 +72,7 @@ export default async function NetcashPaymentsPage() {
     <section className="panel netcash-ops-note"><AlertTriangle size={18} /><div><strong>Internal matching is separate from bank settlement</strong><p>These controls compare payment and ledger records. Open <Link href="/billing/settlements">Settlement reconciliation</Link> to import the full provider statement, match bank payouts and independently review evidence.</p></div></section>
     <section className="panel table-panel netcash-payments-panel">
       <div className="panel-heading"><div><h2>Recent Netcash payments</h2><p>Latest 250 attempts, newest first.</p></div></div>
-      <div className="table-scroll"><table className="data-table"><thead><tr><th>Created</th><th>Customer / account</th><th>Payment</th><th>Provider reference</th><th>Outcome</th><th>Internal reconciliation</th></tr></thead><tbody>
+      <div className="table-wrap" role="region" aria-label="Recent Netcash payments" tabIndex={0}><table className="data-table"><thead><tr><th>Created</th><th>Customer / account</th><th>Payment</th><th>Provider reference</th><th>Outcome</th><th>Internal reconciliation</th></tr></thead><tbody>
         {rows.map(({ payment, reconciliation }) => {
           const customer = payment.account.customer;
           const name = customer.companyName || [customer.firstName, customer.lastName].filter(Boolean).join(" ") || "Customer";
