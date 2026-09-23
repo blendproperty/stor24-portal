@@ -20,7 +20,7 @@ test("real endpoint returns only the fresh authenticated selection and never cac
   assert.equal((await full.json()).data.guides.length, workflowGuides.length);
   endpoint.setAuth({role: "Organisation owner", user: {roleAssignments: [assignment(["ledger.view"])]}});
   const reduced = (await (await endpoint.GET()).json()).data;
-  assert.deepEqual(reduced.guides.map((g: {id: string}) => g.id), ["accounts", "statements"]);
+  assert.deepEqual(reduced.guides.map((g: {id: string}) => g.id), ["access-restricted", "accounts", "statements"]);
   endpoint.setAuth(null);
   const rejected = await endpoint.GET();
   assert.equal(rejected.status, 401);
@@ -44,11 +44,11 @@ test("facility managers have operational guidance without configuration, credent
 });
 
 test("custom grants, not a role label, determine visibility including added and revoked setup access", () => {
-  assert.equal(catalogueForAssignments([assignment([], null, "Organisation owner")]).guides.length, 0);
+  assert.deepEqual(catalogueForAssignments([assignment([], null, "Organisation owner")]).guides.map(g => g.id), ["access-restricted"]);
   const configured = catalogueForAssignments([assignment(["configuration.view", "configuration.manage"], "store-a", "Tailored manager")]);
   assert.ok(configured.guides.some(g => g.id === "program-defaults"));
   assert.ok(!configured.guides.some(g => g.id === "users"));
-  assert.equal(catalogueForAssignments([assignment(["configuration.view"])]).guides.length, 0);
+  assert.deepEqual(catalogueForAssignments([assignment(["configuration.view"])]).guides.map(g => g.id), ["access-restricted"]);
   assert.deepEqual(catalogueForAssignments([]), { guides: [], pages: [] });
 });
 
