@@ -61,7 +61,7 @@ test("full terms acceptance is server enforced against the displayed fingerprint
 test("server refuses missing or stale terms consent and saves exact accepted edition", async () => {
   const original = Reflect.get(db, "$transaction");
   let saved: unknown; let audits = 0;
-  const tx = { publicReservationLease: {
+  const tx = { $queryRaw: async () => [], publicReservationLease: {
     findUnique: async () => ({ id: "sample", reservationId: "sample", status: "READY", version: STORAGE_TERMS_VERSION, content: renderReviewLeaseDocument(context), sha256: "a".repeat(64), paymentMethod: "DEBIT_ORDER", expiresAt: new Date(Date.now() + 60000), reservation: { status: "ACTIVE", publicReference: "SAMPLE", customer: { organisationId: "sample" } } }),
     updateMany: async (args: unknown) => { saved = args; return { count: 1 }; },
   }, auditEvent: { create: async () => { audits++; } } };
@@ -80,7 +80,7 @@ test("server refuses missing or stale terms consent and saves exact accepted edi
 test("an unsigned previous edition still requires its own complete terms consent after publication", async () => {
   const original = Reflect.get(db, "$transaction");
   let writes = 0;
-  const tx = { publicReservationLease: {
+  const tx = { $queryRaw: async () => [], publicReservationLease: {
     findUnique: async () => ({ status: "READY", version: PREVIOUS_STORAGE_TERMS_VERSION, sha256: "a".repeat(64), expiresAt: new Date(Date.now() + 60000), reservation: { status: "ACTIVE", customer: { organisationId: "sample" } } }),
     updateMany: async () => { writes++; return { count: 1 }; },
   } };
@@ -94,30 +94,32 @@ test("an unsigned previous edition still requires its own complete terms consent
 });
 
 test("the previous signed review edition resumes unchanged and rejects repricing without being rewritten", async () => {
-  const original = Reflect.get(db.reservation, "findUnique");
+  const original = Reflect.get(db, "$transaction");
   const previousContext = { ...context, storagePackage: null };
   const reservation = { status: "ACTIVE", journey: "RENTAL", contactVerifiedAt: new Date(), intendedMoveIn: context.startDate, quotedRate: context.monthlyRate,
     customer: { companyName: context.customerName, emailVerifiedAt: new Date() }, facility: { name: context.facilityName }, unit: { number: context.unitNumber, unitType: { name: context.unitTypeName } },
     publicLease: { status: "SIGNED", version: PREVIOUS_STORAGE_TERMS_VERSION, signingToken: "previous-token", sha256: createHash("sha256").update(renderPreviousEdition(previousContext)).digest("hex") } };
-  Reflect.set(db.reservation, "findUnique", async () => reservation);
+  const tx = { $queryRaw: async () => [], reservation: { findUnique: async () => reservation } };
+  Reflect.set(db, "$transaction", async (callback: (value: typeof tx) => unknown) => callback(tx));
   try {
     assert.equal((await preparePublicReservationLease("SAMPLE", "DEBIT_ORDER")).ok, true);
     reservation.quotedRate = 1600;
     assert.deepEqual(await preparePublicReservationLease("SAMPLE", "DEBIT_ORDER"), { ok: false, code: "SIGNED_LEASE_CHANGED" });
     assert.equal(reservation.publicLease.version, PREVIOUS_STORAGE_TERMS_VERSION);
-  } finally { Reflect.set(db.reservation, "findUnique", original); }
+  } finally { Reflect.set(db, "$transaction", original); }
 });
 
 test("historical signed reservation can resume but changed commercial terms cannot", async () => {
-  const original = Reflect.get(db.reservation, "findUnique");
+  const original = Reflect.get(db, "$transaction");
   const legacyContext = { ...context, storagePackage: null };
   const reservation = { status: "ACTIVE", journey: "RENTAL", contactVerifiedAt: new Date(), intendedMoveIn: context.startDate, quotedRate: context.monthlyRate,
     customer: { companyName: context.customerName, emailVerifiedAt: new Date() }, facility: { name: context.facilityName }, unit: { number: context.unitNumber, unitType: { name: context.unitTypeName } },
     publicLease: { status: "SIGNED", version: LEASE_VERSION, signingToken: "old-token", sha256: createHash("sha256").update(renderLeaseDocument(legacyContext)).digest("hex") } };
-  Reflect.set(db.reservation, "findUnique", async () => reservation);
+  const tx = { $queryRaw: async () => [], reservation: { findUnique: async () => reservation } };
+  Reflect.set(db, "$transaction", async (callback: (value: typeof tx) => unknown) => callback(tx));
   try {
     assert.equal((await preparePublicReservationLease("SAMPLE", "DEBIT_ORDER")).ok, true);
     reservation.quotedRate = 1600;
     assert.deepEqual(await preparePublicReservationLease("SAMPLE", "DEBIT_ORDER"), { ok: false, code: "SIGNED_LEASE_CHANGED" });
-  } finally { Reflect.set(db.reservation, "findUnique", original); }
+  } finally { Reflect.set(db, "$transaction", original); }
 });
