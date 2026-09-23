@@ -26,6 +26,7 @@ type Facility = { id: string; name: string };
 type Customer = { id: string; name: string; email: string | null };
 type Reservation = {
   canRecordPayment?: boolean;
+  canReviewIdentity?: boolean;
   id: string;
   facilityId: string;
   customerId: string;
@@ -437,7 +438,7 @@ export function MoveInWorkspace({
       ) : selectedReservation?.readiness ? (
         <ReservationMoveInConfirmation key={selectedReservation.id} reservationId={selectedReservation.id}
           customerName={selectedCustomer?.name ?? selectedReservation.label} unitNumber={selected?.number ?? ""}
-          canRecordPayment={selectedReservation.canRecordPayment} readiness={selectedReservation.readiness} onBack={() => setStep(1)} />
+          canReviewIdentity={selectedReservation.canReviewIdentity} canRecordPayment={selectedReservation.canRecordPayment} readiness={selectedReservation.readiness} onBack={() => setStep(1)} />
       ) : (
         <section className="panel panel-spacious">
           <form key={`${selectedId}:${reservationId}`} action={action} className="move-in-form">

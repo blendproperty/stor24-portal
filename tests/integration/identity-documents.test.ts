@@ -30,6 +30,18 @@ test("isolated PostgreSQL private identity workflow", async t => {
     return { org, facility, user, customer, booking, scope, input, reference: booking.publicReference!, token: access.token };
   }
   try {
+    await t.test("booking-filtered review retains organisation and facility isolation", async () => {
+      const f = await fixture(), other = await fixture();
+      await submitIdentity(f.reference, f.token, f.input);
+      await submitIdentity(other.reference, other.token, other.input);
+      const selected = await listIdentityDocuments(f.scope, f.booking.id);
+      assert.equal(selected.length, 1);
+      assert.equal(selected[0].reservation.publicReference, f.reference);
+      assert.deepEqual(await listIdentityDocuments(f.scope, other.booking.id), []);
+      assert.deepEqual(await listIdentityDocuments({ ...f.scope, facilityIds: [] }, f.booking.id), []);
+      assert.deepEqual(await listIdentityDocuments(f.scope, "not-a-booking"), []);
+      assert.equal((await listIdentityDocuments(f.scope)).length, 1);
+    });
     await t.test("account pilot follows verified email across new customers and units through signing", async () => {
       const f = await fixture();
       const policies = JSON.parse(process.env.IDENTITY_DOCUMENT_POLICIES_JSON!);

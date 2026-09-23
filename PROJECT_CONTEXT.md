@@ -1,5 +1,15 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Priority 1 handover to ID review navigation — 23 September 2026
+
+- **Implementation:** Brett found D005 during the guided staff handover: the ID blocker said Open Identity review without a link. Add a visible Review ID action for staff with identity.review permission at that booking's facility, a reservation-filtered review page that selects the matching metadata, and Back to move-in checks returning to the same booking. Filtering remains inside the existing organisation/facility scope, before the 200-row queue limit. Missing/inaccessible submissions show an explicit empty state. A saved review shows confirmation; private image previews still require explicit clicks and all-page acceptance guards remain intact. No ID decision, payment, date, booking or access state is changed by navigation.
+- **Testing:** TypeScript, focused lint, all 366 application tests and the extended actual-component identity browser suite passed. Browser checks cover 1440/390/320px, booking selection, keyboard return link, no automatic preview/decision, inaccessible booking recovery, successful/stale review handling, broken images, and existing all-page preview gates. Production build passed. CI/database isolation checks are pending at this checkpoint; a new isolated PostgreSQL case checks booking filtering, cross-organisation/store denial and normal queue compatibility.
+- **Commit and push:** prepared on codex/handover-id-navigation-20260923 from canonical main d3d87cd1a2de19f702defd9140021e93596aad6b. Enclosing PR records exact pushed commit. Unrelated primary checkouts preserved.
+- **Merge:** pending.
+- **Deployment and configuration:** pending; no migration or configuration change required.
+- **Live production verification:** current staff screen reproduces the dead-end text. Post-release link/return verification remains pending; no real private document preview or staff decision has been submitted.
+- **Open gates:** D005 staff retest and full P01 remain open. Preserve J19 controlled floor acceptance, J20 deferred genuine Netcash, J21 blocked physical access, historical 14-booking review, finance/legal/privacy/retention/backup, data/training and launch approval gates. The Excel copy remains a dated export.
+
 ## Customer dashboard design released and live-checked — 23 September 2026
 
 - **Implementation:** the responsive My STOR24 redesign below is shipped. D002–D004 package, ID and test-payment explanations remain intact; photo guidance is expandable without changing upload/consent or access controls.

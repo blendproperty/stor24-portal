@@ -12,7 +12,7 @@ export async function GET(request: Request) {
       const bytes = await previewIdentity(scope, url.searchParams.get("id") ?? "", Number(url.searchParams.get("version")), Number(url.searchParams.get("page")));
       return new Response(new Uint8Array(bytes), { headers: { ...headers, "Content-Type": "image/jpeg", "Content-Disposition": "inline", "Content-Security-Policy": "default-src 'none'; sandbox" } });
     }
-    return Response.json({ data: await listIdentityDocuments(scope) }, { headers });
+    return Response.json({ data: await listIdentityDocuments(scope, url.searchParams.get("reservation") || undefined) }, { headers });
   } catch (error) { return identityError(error); }
 }
 export async function POST(request: Request) {

@@ -6,8 +6,8 @@ import { FileCheck2, Wallet, CalendarDays, ArrowUpRight, CircleAlert, KeyRound, 
 import type { ReservationMoveInReadiness } from "@/lib/reservation-move-in";
 import { confirmReservationMoveInAction } from "@/app/actions/leasing";
 
-export function ReservationMoveInConfirmation({ reservationId, customerName, unitNumber, readiness, canRecordPayment = false, onBack }: {
-  canRecordPayment?: boolean; reservationId: string; customerName: string; unitNumber: string; readiness: ReservationMoveInReadiness; onBack: () => void;
+export function ReservationMoveInConfirmation({ reservationId, customerName, unitNumber, readiness, canRecordPayment = false, canReviewIdentity = false, onBack }: {
+  canReviewIdentity?: boolean; canRecordPayment?: boolean; reservationId: string; customerName: string; unitNumber: string; readiness: ReservationMoveInReadiness; onBack: () => void;
 }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -23,7 +23,7 @@ export function ReservationMoveInConfirmation({ reservationId, customerName, uni
       <section className="handover-check"><div className="handover-check-label"><Wallet size={19} aria-hidden="true" /><span>02 · Payment</span></div><h3>{readiness.paymentVerified ? "Payment verified" : "Payment confirmation needed"}</h3><p className="handover-amount">{money(readiness.paidAmount)} <span>verified</span></p><p>of {money(readiness.requiredAmount)} required for this booking</p>{readiness.testPayment && <span className="handover-test-label">Sandbox payment on file</span>}</section>
       <section className="handover-check"><div className="handover-check-label"><CalendarDays size={19} aria-hidden="true" /><span>03 · Move-in date</span></div><h3>{moveInDate}</h3><p>Key collection is available from the agreed start date, once all checks are complete.</p></section>
     </div>
-    {readiness.blockers.length > 0 && <aside className="handover-notice" role="status"><CircleAlert size={20} aria-hidden="true" /><div><h3>Before keys can be released</h3><ul>{readiness.blockers.map(blocker => <li key={blocker}>{blocker.replace(/\b\d{4}-\d{2}-\d{2}\b/g, value => new Intl.DateTimeFormat("en-ZA", { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Johannesburg" }).format(new Date(`${value}T12:00:00+02:00`)))}</li>)}</ul>{readiness.signed && <p>Your signed agreement stays on file.</p>}</div></aside>}
+    {readiness.blockers.length > 0 && <aside className="handover-notice" role="status"><CircleAlert size={20} aria-hidden="true" /><div><h3>Before keys can be released</h3><ul>{readiness.blockers.map(blocker => <li key={blocker}>{blocker.replace(/\b\d{4}-\d{2}-\d{2}\b/g, value => new Intl.DateTimeFormat("en-ZA", { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Johannesburg" }).format(new Date(`${value}T12:00:00+02:00`)))}</li>)}</ul>{readiness.signed && <p>Your signed agreement stays on file.</p>}{canReviewIdentity && <a className="button button-primary" href={`/identity?reservation=${encodeURIComponent(reservationId)}`}>Review ID <ArrowUpRight size={16} aria-hidden="true" /></a>}</div></aside>}
     {readiness.mandateStatus && <div className="handover-mandate"><h3>Debit-order mandate <span>{readiness.mandateStatus.replaceAll("_", " ")}</span></h3><p>A mandate is not a payment. Collections are not enabled; verify the first payment separately.</p></div>}
     {canRecordPayment && !readiness.paymentVerified && <ReservationPaymentForm reservationId={reservationId} />}
     <div className="handover-key-note"><KeyRound size={20} aria-hidden="true" /><div><h3>Key handover at the guard house</h3><p>Check the customer’s identity and unit before recording collection. A reviewed customer photo enters the activation queue when move-in is recorded. Gate access still requires provider confirmation.</p></div></div>
