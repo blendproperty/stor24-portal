@@ -1,3 +1,5 @@
+import { requireOperationalUnit } from "@/lib/floor-availability-service";
+import { unitIsOperational, floorMapSelection } from "@/lib/floor-availability";
 import { createHash } from "node:crypto";
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
@@ -100,8 +102,9 @@ export async function listLeasing(scope: RequestScope) {
     where: facilityWhere(scope),
     orderBy: { name: "asc" },
     include: {
+      maps: { select: { name: true } },
       unitTypes: { orderBy: { name: "asc" } },
-      units: { include: { unitType: true }, orderBy: { number: "asc" } },
+      units: { include: { unitType: true, mapElements: floorMapSelection }, orderBy: { number: "asc" } },
     },
   });
   const facilityIds = facilities.map((facility) => facility.id);
@@ -172,7 +175,7 @@ export async function listLeasing(scope: RequestScope) {
       orderBy: { updatedAt: "desc" },
     }),
   ]);
-  return { facilities, customers, leads, reservations, tenancies };
+  return { facilities: facilities.map(facility => ({ ...facility, units: facility.units.map(unit => ({ ...unit, floorOperational: unitIsOperational(unit, facility.closedFloors) })) })), customers, leads, reservations, tenancies };
 }
 
 export async function createFacility(
@@ -271,6 +274,7 @@ export async function createReservation(
 ) {
   await requireFacility(scope, data.facilityId);
   return db.$transaction(async (tx) => {
+    await requireOperationalUnit(tx, data.facilityId, data.unitId);
     const unit = await tx.unit.findFirst({
       where: {
         id: data.unitId,
@@ -592,6 +596,7 @@ export async function moveIn(
 ) {
   await requireFacility(scope, input.facilityId);
   const result = await db.$transaction(async (tx) => {
+    await requireOperationalUnit(tx, input.facilityId, input.unitId);
     await tx.$queryRaw`SELECT "id" FROM "Unit" WHERE "id" = ${input.unitId} FOR UPDATE`;
     const blockingOccupancy = await tx.occupancy.count({ where: { unitId: input.unitId, status: { in: ["PENDING", "ACTIVE", "NOTICE_GIVEN", "TRANSFERRING"] } } });
     const activeReservations = await tx.reservation.findMany({ where: { unitId: input.unitId, status: "ACTIVE" }, select: { id: true, publicLease: { select: { status: true } } } });
@@ -786,6 +791,7 @@ export async function completeBlendSignEnvelope(envelopeId: string) {
       (item) => item.status === "PENDING",
     );
     if (!occupancy) throw new Error("CONFLICT");
+    await requireOperationalUnit(tx, document.tenancy.facilityId, occupancy.unitId);
     await tx.occupancy.update({
       where: { id: occupancy.id },
       data: { status: "ACTIVE" },
@@ -858,6 +864,7 @@ export async function completeLeaseSigning(
       (item) => item.status === "PENDING",
     );
     if (!occupancy) throw new Error("NOT_FOUND");
+    await requireOperationalUnit(tx, tenancy.facilityId, occupancy.unitId);
     const initialsRecord = LEASE_CLAUSE_KEYS.map((key) => ({
       clauseKey: key,
       initialedAt: new Date().toISOString(),
@@ -967,6 +974,7 @@ export async function transfer(
     });
     if (!tenancy || tenancy.occupancies.length !== 1)
       throw new Error("CONFLICT");
+    await requireOperationalUnit(tx, tenancy.facilityId, input.toUnitId);
     const next = await tx.unit.findFirst({
       where: {
         id: input.toUnitId,

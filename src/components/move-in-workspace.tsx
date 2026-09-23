@@ -53,7 +53,7 @@ export function MoveInWorkspace({
   action: (data: FormData) => void | Promise<void>;
 }) {
   const initialReservation = reservations.find(
-    (item) => item.id === initialReservationId,
+    (item) => item.id === initialReservationId && units.some(unit => unit.id === item.unitId),
   );
   const [facilityId, setFacilityId] = useState(
     initialReservation?.facilityId ?? facilities[0]?.id ?? "",
@@ -162,7 +162,7 @@ export function MoveInWorkspace({
   );
   const canSendForSignature =
     Boolean(customerId) &&
-    Boolean(selectedId) &&
+    Boolean(units.find(unit => unit.id === selectedId)) &&
     Boolean(selectedCustomer?.email);
 
   async function addCustomer(formData: FormData) {

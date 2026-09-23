@@ -1,3 +1,4 @@
+import { unitIsOperational, floorMapSelection } from "@/lib/floor-availability";
 import { testPaymentReviewAccounts } from "@/lib/payments/test-payment-review";
 import { isTestPayment } from "@/lib/payments/payment-evidence";
 import { randomUUID } from "node:crypto";
@@ -16,9 +17,9 @@ export async function GET() {
       include: { customer: true, tenancy: { include: { facility: true, documents: { where: { type: "LEASE_AGREEMENT" }, orderBy: { createdAt: "desc" } }, occupancies: { where: { status: { in: ["PENDING", "ACTIVE", "NOTICE_GIVEN"] } }, include: { unit: { include: { unitType: true } } }, orderBy: { startDate: "desc" }, take: 1 } } }, ledgerEntries: { orderBy: [{ effectiveAt: "desc" }, { createdAt: "desc" }], take: 50 }, payments: { orderBy: { createdAt: "desc" }, take: 25 } },
       orderBy: { updatedAt: "desc" }, take: 250,
     });
-    const facilities = await db.facility.findMany({ where: { organisationId, active: true, ...(allowedFacilityIds ? { id: { in: allowedFacilityIds } } : {}) }, include: { units: { where: { status: "AVAILABLE" }, include: { unitType: true }, orderBy: { number: "asc" } } }, orderBy: { name: "asc" } });
+    const facilities = await db.facility.findMany({ where: { organisationId, active: true, ...(allowedFacilityIds ? { id: { in: allowedFacilityIds } } : {}) }, include: { units: { where: { status: "AVAILABLE" }, include: { unitType: true, mapElements: floorMapSelection }, orderBy: { number: "asc" } } }, orderBy: { name: "asc" } });
     const review = await testPaymentReviewAccounts(accounts.map(a => a.id));
-    return Response.json({ data: { accounts: accounts.map(account => ({ ...account, financialReviewRequired: review.has(account.id), payments: account.payments.map(p => ({ ...p, status: isTestPayment(p) && p.status === "SUCCEEDED" ? "TEST_SUCCEEDED" : p.status })) })), facilities } });
+    return Response.json({ data: { accounts: accounts.map(account => ({ ...account, financialReviewRequired: review.has(account.id), payments: account.payments.map(p => ({ ...p, status: isTestPayment(p) && p.status === "SUCCEEDED" ? "TEST_SUCCEEDED" : p.status })) })), facilities: facilities.map(facility => ({ ...facility, units: facility.units.filter(unit => unitIsOperational(unit, facility.closedFloors)) })) } });
   } catch (error) { return authErrorResponse(error); }
 }
 

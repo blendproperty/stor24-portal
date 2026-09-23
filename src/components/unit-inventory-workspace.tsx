@@ -1,5 +1,7 @@
 "use client";
 
+import { FloorAvailabilityControls } from "@/components/floor-availability-controls";
+import { unitIsOperational } from "@/lib/floor-availability";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
@@ -32,6 +34,7 @@ type Unit = {
   unitTypeId: string;
   number: string;
   floor: string | null;
+  mapElements?: { map: { name: string } }[];
   zone: string | null;
   status: string;
   monthlyRate: string;
@@ -43,6 +46,8 @@ type Facility = {
   id: string;
   name: string;
   code: string;
+  closedFloors?: string[];
+  maps?: { name: string }[];
   unitTypes: UnitType[];
   units: Unit[];
 };
@@ -109,7 +114,7 @@ export function UnitInventoryWorkspace({
     (unit) =>
       (!facilityId || unit.facilityId === facilityId) &&
       (!typeId || unit.unitTypeId === typeId) &&
-      (!status || unit.status === status) &&
+      (!status || (status === "UNDER_CONSTRUCTION" ? !unitIsOperational(unit, unit.facility.closedFloors) : unit.status === status && (status !== "AVAILABLE" || unitIsOperational(unit, unit.facility.closedFloors)))) &&
       (!query ||
         `${unit.number} ${unit.unitType.name} ${unit.floor ?? ""} ${unit.zone ?? ""}`
           .toLowerCase()
@@ -119,7 +124,7 @@ export function UnitInventoryWorkspace({
     ["Total units", allUnits.length],
     [
       "Available",
-      allUnits.filter((unit) => unit.status === "AVAILABLE").length,
+      allUnits.filter((unit) => unit.status === "AVAILABLE" && unitIsOperational(unit, unit.facility.closedFloors)).length,
     ],
     ["Reserved", allUnits.filter((unit) => unit.status === "RESERVED").length],
     ["Occupied", allUnits.filter((unit) => unit.status === "OCCUPIED").length],
@@ -132,7 +137,7 @@ export function UnitInventoryWorkspace({
           (unit) => unit.unitTypeId === type.id,
         ).length,
         available: selectedFacility.units.filter(
-          (unit) => unit.unitTypeId === type.id && unit.status === "AVAILABLE",
+          (unit) => unit.unitTypeId === type.id && unit.status === "AVAILABLE" && unitIsOperational(unit, selectedFacility.closedFloors),
         ).length,
       })) ?? [],
     [selectedFacility],
@@ -465,6 +470,7 @@ export function UnitInventoryWorkspace({
           </div>
         </section>
       ) : null}
+      {selectedFacility && <FloorAvailabilityControls key={selectedFacility.id} facility={selectedFacility} onSaved={closedFloors => setFacilities(current => current.map(facility => facility.id === selectedFacility.id ? { ...facility, closedFloors } : facility))} />}
       <section className="summary-strip">
         {summaries.map(([label, count]) => (
           <div className="summary-cell" key={label}>
@@ -515,6 +521,7 @@ export function UnitInventoryWorkspace({
             onChange={(event) => setStatus(event.target.value)}
           >
             <option value="">All statuses</option>
+            <option value="UNDER_CONSTRUCTION">Floor under construction</option>
             {[
               "AVAILABLE",
               "HELD",
@@ -617,6 +624,7 @@ export function UnitInventoryWorkspace({
                         >
                           {statusLabel(unit.status)}
                         </StatusPill>
+                        {!unitIsOperational(unit, unit.facility.closedFloors) && <span className="unit-floor-held">Floor under construction</span>}
                       </td>
                       <td>{money(unit.monthlyRate)}</td>
                       <td>

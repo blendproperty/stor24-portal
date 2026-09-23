@@ -46,6 +46,7 @@ type Unit = {
   id: string;
   number: string;
   status: string;
+  floorOperational?: boolean;
   monthlyRate: string;
   unitTypeId: string;
   unitType: UnitType;
@@ -196,7 +197,7 @@ export function FacilityMapEditor() {
   );
   const statusCounts = useMemo(
     () => ({
-      available: elements.filter((element) => element.status === "AVAILABLE")
+      available: elements.filter((element) => element.status === "AVAILABLE" && element.unitDetails?.floorOperational !== false)
         .length,
       reserved: elements.filter((element) =>
         ["RESERVED", "HELD"].includes(element.status || ""),
@@ -1274,7 +1275,7 @@ export function FacilityMapEditor() {
                 <div>
                   <span>Status</span>
                   <strong>
-                    {selected.unitDetails.status
+                    {selected.unitDetails.floorOperational === false ? "Floor under construction" : selected.unitDetails.status
                       .toLowerCase()
                       .replaceAll("_", " ")}
                   </strong>
@@ -1311,7 +1312,7 @@ export function FacilityMapEditor() {
                 <Link href="/units" className="button button-secondary">
                   Open unit record
                 </Link>
-                {selected.unitDetails.status === "AVAILABLE" ? (
+                {selected.unitDetails.status === "AVAILABLE" && selected.unitDetails.floorOperational !== false ? (
                   <Link href="/reservations" className="button button-primary">
                     Reserve this unit
                   </Link>
