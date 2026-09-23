@@ -155,25 +155,43 @@ async function deliverEmailVerificationCode(input: { code: string; email: string
 }
 
 export async function releaseExpiredPublicReservations(now = new Date()) {
+  // Signing commits the booking beyond its original shopping hold. Staff must
+  // resolve signed bookings explicitly, including any payment reconciliation.
+  const expirable = {
+    status: "ACTIVE", source: { in: ["PUBLIC_WEBSITE", "PUBLIC_VIEWING"] },
+    holdExpiresAt: { lte: now }, publicLease: { isNot: { status: "SIGNED" } },
+  } satisfies Prisma.ReservationWhereInput;
   const expired = await db.reservation.findMany({
-    where: { status: "ACTIVE", source: { in: ["PUBLIC_WEBSITE", "PUBLIC_VIEWING"] }, holdExpiresAt: { lte: now } },
-    select: { id: true, unitId: true, packageSelection: { select: { id: true, status: true, itemsSnapshot: true } } },
+    where: expirable,
+    select: { id: true, unitId: true },
     take: 100,
   });
+  let released = 0;
   for (const item of expired) {
-    await db.$transaction(async (tx) => {
-      const cancelled = await tx.reservation.updateMany({ where: { id: item.id, status: "ACTIVE", holdExpiresAt: { lte: now } }, data: { status: "CANCELLED", verificationCodeHash: null, verificationExpiresAt: null } });
+    released += await db.$transaction(async (tx) => {
+      // Same unit-before-reservation order as staff handover. Re-read after
+      // waiting: a signature or another expiry worker may have committed.
+      await tx.$queryRaw`SELECT "id" FROM "Unit" WHERE "id" = ${item.unitId} FOR UPDATE`;
+      await tx.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id" = ${item.id} FOR UPDATE`;
+      const current = await tx.reservation.findFirst({ where: { id: item.id, ...expirable }, include: { packageSelection: true, customer: { select: { organisationId: true } } } });
+      if (!current) return 0;
+      const cancelled = await tx.reservation.updateMany({ where: { id: item.id, ...expirable }, data: { status: "CANCELLED", verificationCodeHash: null, verificationExpiresAt: null } });
       if (cancelled.count === 1) {
-        await tx.unit.updateMany({ where: { id: item.unitId, status: "RESERVED" }, data: { status: "AVAILABLE" } });
-        if (item.packageSelection?.status === "RESERVED") {
-          const lines = item.packageSelection.itemsSnapshot as Array<{ productId: string; quantity: number }>;
+        const occupied = await tx.occupancy.count({ where: { unitId: item.unitId, status: { in: ["PENDING", "ACTIVE", "NOTICE_GIVEN", "TRANSFERRING"] } } });
+        const held = await tx.reservation.count({ where: { unitId: item.unitId, status: "ACTIVE" } });
+        const maintenance = await tx.maintenanceRequest.count({ where: { unitId: item.unitId, status: { in: ["OPEN", "SCHEDULED", "IN_PROGRESS", "BLOCKED"] } } });
+        await tx.unit.updateMany({ where: { id: item.unitId, status: "RESERVED" }, data: { status: occupied ? "OCCUPIED" : maintenance ? "SERVICE" : held ? "RESERVED" : "AVAILABLE" } });
+        if (current.packageSelection?.status === "RESERVED") {
+          const lines = current.packageSelection.itemsSnapshot as Array<{ productId: string; quantity: number }>;
           for (const line of lines) await tx.product.update({ where: { id: line.productId }, data: { quantityReserved: { decrement: line.quantity } } });
-          await tx.reservationPackage.update({ where: { id: item.packageSelection.id }, data: { status: "RELEASED", releasedAt: now } });
+          await tx.reservationPackage.update({ where: { id: current.packageSelection.id }, data: { status: "RELEASED", releasedAt: now } });
         }
+        await tx.auditEvent.create({ data: { organisationId: current.customer.organisationId, facilityId: current.facilityId, action: "public_reservation.hold_expired", entityType: "Reservation", entityId: current.id, after: { unitId: current.unitId, expiredAt: now.toISOString() } } });
       }
+      return cancelled.count;
     });
   }
-  return expired.length;
+  return released;
 }
 
 export async function createPublicReservation(input: PublicReservationInput, ipHash: string) {

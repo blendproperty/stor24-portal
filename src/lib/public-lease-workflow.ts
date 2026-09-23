@@ -1,4 +1,3 @@
-import { identityRequired } from "@/lib/identity-document-security";
 import { identityGate } from "@/lib/identity-document-service";
 import { createHash, randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
@@ -25,56 +24,61 @@ function publicLeaseExpiry(holdExpiresAt: Date | null, now = new Date()) {
 }
 
 export async function preparePublicReservationLease(reference: string, paymentMethod: PublicLeasePaymentMethod) {
-  const reservation = await db.reservation.findUnique({
-    where: { publicReference: reference },
-    include: { customer: true, facility: true, unit: { include: { unitType: true } }, publicLease: true, packageSelection: true },
+  return db.$transaction(async tx => {
+    const target = await tx.reservation.findUnique({ where: { publicReference: reference }, select: { id: true } });
+    if (!target) return { ok: false as const, code: "RESERVATION_UNAVAILABLE" };
+    await tx.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id" = ${target.id} FOR UPDATE`;
+    const reservation = await tx.reservation.findUnique({
+      where: { publicReference: reference },
+      include: { customer: true, facility: true, unit: { include: { unitType: true } }, publicLease: true, packageSelection: true },
+    });
+    if (!reservation || reservation.status !== "ACTIVE" || reservation.journey !== "RENTAL" || !reservation.contactVerifiedAt || !reservation.customer.emailVerifiedAt) {
+      return { ok: false as const, code: "RESERVATION_UNAVAILABLE" };
+    }
+    if (!(await identityGate(tx, reservation.customer.organisationId, reservation.id, reservation.createdAt, "SIGN"))) return { ok: false as const, code: "IDENTITY_REQUIRED" };
+    if (!reservation.intendedMoveIn) return { ok: false as const, code: "MOVE_IN_DATE_REQUIRED" };
+
+    const context = {
+      facilityName: reservation.facility.name,
+      unitNumber: reservation.unit.number,
+      unitTypeName: reservation.unit.unitType.name,
+      customerName: customerName(reservation.customer),
+      monthlyRate: Number(reservation.quotedRate),
+      startDate: reservation.intendedMoveIn,
+      paymentMethod,
+      storagePackage: reservation.packageSelection ? {
+        name: reservation.packageSelection.packageName,
+        priceZar: Number(reservation.packageSelection.priceSnapshot),
+        contents: (reservation.packageSelection.itemsSnapshot as Array<{ name: string; quantity: number }>).map((item) => `${item.quantity} x ${item.name}`).join(", "),
+      } : null,
+    };
+    // Keep historical signed agreements on their original renderer, while still
+    // detecting a changed price, goods selection or payment method.
+    const legacySigned = reservation.publicLease?.status === "SIGNED" && reservation.publicLease.version === LEASE_VERSION;
+    const edition = reservation.publicLease?.status === "SIGNED" ? reservation.publicLease.version : STORAGE_TERMS_VERSION;
+    const content = legacySigned ? renderLeaseDocument(context) : renderStorageTermsEdition(context, edition);
+    if (!content) return { ok: false as const, code: "SIGNED_LEASE_CHANGED" };
+    const sha256 = createHash("sha256").update(content).digest("hex");
+    const clauses = buildReviewLeaseClauses(context);
+    const now = new Date();
+
+    if (reservation.publicLease?.status === "SIGNED") {
+      if (reservation.publicLease.sha256 !== sha256) return { ok: false as const, code: "SIGNED_LEASE_CHANGED" };
+      return { ok: true as const, status: "SIGNED" as const, token: reservation.publicLease.signingToken, reference, signedAt: reservation.publicLease.signedAt?.toISOString() ?? null };
+    }
+
+    const token = reservation.publicLease?.expiresAt && reservation.publicLease.expiresAt > now
+      ? reservation.publicLease.signingToken
+      : randomBytes(32).toString("base64url");
+    const lease = await tx.publicReservationLease.upsert({
+      where: { reservationId: reservation.id },
+      create: { reservationId: reservation.id, version: STORAGE_TERMS_VERSION, paymentMethod, content, clauses, sha256, signingToken: token, expiresAt: publicLeaseExpiry(reservation.holdExpiresAt, now) },
+      update: { status: "READY", version: STORAGE_TERMS_VERSION, paymentMethod, content, clauses, sha256, signingToken: token, expiresAt: publicLeaseExpiry(reservation.holdExpiresAt, now), signerName: null, signerIp: null, signerUserAgent: null, initials: undefined, signedAt: null, signedPdf: null, signedPdfSha256: null },
+    });
+    await tx.reservation.update({ where: { id: reservation.id }, data: { paymentMethod } });
+    await tx.auditEvent.create({ data: { organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, action: "public_lease.prepared", entityType: "PublicReservationLease", entityId: lease.id, requestId: reservation.idempotencyKey, after: { reservationId: reservation.id, version: lease.version, paymentMethod, sha256: lease.sha256, expiresAt: lease.expiresAt.toISOString() } } });
+    return { ok: true as const, status: "READY" as const, token: lease.signingToken, reference, expiresAt: lease.expiresAt.toISOString() };
   });
-  if (!reservation || reservation.status !== "ACTIVE" || reservation.journey !== "RENTAL" || !reservation.contactVerifiedAt || !reservation.customer.emailVerifiedAt) {
-    return { ok: false as const, code: "RESERVATION_UNAVAILABLE" };
-  }
-  if (!(await identityGate(db, reservation.customer.organisationId, reservation.id, reservation.createdAt, "SIGN"))) return { ok: false as const, code: "IDENTITY_REQUIRED" };
-  if (!reservation.intendedMoveIn) return { ok: false as const, code: "MOVE_IN_DATE_REQUIRED" };
-
-  const context = {
-    facilityName: reservation.facility.name,
-    unitNumber: reservation.unit.number,
-    unitTypeName: reservation.unit.unitType.name,
-    customerName: customerName(reservation.customer),
-    monthlyRate: Number(reservation.quotedRate),
-    startDate: reservation.intendedMoveIn,
-    paymentMethod,
-    storagePackage: reservation.packageSelection ? {
-      name: reservation.packageSelection.packageName,
-      priceZar: Number(reservation.packageSelection.priceSnapshot),
-      contents: (reservation.packageSelection.itemsSnapshot as Array<{ name: string; quantity: number }>).map((item) => `${item.quantity} x ${item.name}`).join(", "),
-    } : null,
-  };
-  // Keep historical signed agreements on their original renderer, while still
-  // detecting a changed price, goods selection or payment method.
-  const legacySigned = reservation.publicLease?.status === "SIGNED" && reservation.publicLease.version === LEASE_VERSION;
-  const edition = reservation.publicLease?.status === "SIGNED" ? reservation.publicLease.version : STORAGE_TERMS_VERSION;
-  const content = legacySigned ? renderLeaseDocument(context) : renderStorageTermsEdition(context, edition);
-  if (!content) return { ok: false as const, code: "SIGNED_LEASE_CHANGED" };
-  const sha256 = createHash("sha256").update(content).digest("hex");
-  const clauses = buildReviewLeaseClauses(context);
-  const now = new Date();
-
-  if (reservation.publicLease?.status === "SIGNED") {
-    if (reservation.publicLease.sha256 !== sha256) return { ok: false as const, code: "SIGNED_LEASE_CHANGED" };
-    return { ok: true as const, status: "SIGNED" as const, token: reservation.publicLease.signingToken, reference, signedAt: reservation.publicLease.signedAt?.toISOString() ?? null };
-  }
-
-  const token = reservation.publicLease?.expiresAt && reservation.publicLease.expiresAt > now
-    ? reservation.publicLease.signingToken
-    : randomBytes(32).toString("base64url");
-  const lease = await db.publicReservationLease.upsert({
-    where: { reservationId: reservation.id },
-    create: { reservationId: reservation.id, version: STORAGE_TERMS_VERSION, paymentMethod, content, clauses, sha256, signingToken: token, expiresAt: publicLeaseExpiry(reservation.holdExpiresAt, now) },
-    update: { status: "READY", version: STORAGE_TERMS_VERSION, paymentMethod, content, clauses, sha256, signingToken: token, expiresAt: publicLeaseExpiry(reservation.holdExpiresAt, now), signerName: null, signerIp: null, signerUserAgent: null, initials: undefined, signedAt: null, signedPdf: null, signedPdfSha256: null },
-  });
-  await db.reservation.update({ where: { id: reservation.id }, data: { paymentMethod } });
-  await db.auditEvent.create({ data: { organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, action: "public_lease.prepared", entityType: "PublicReservationLease", entityId: lease.id, requestId: reservation.idempotencyKey, after: { reservationId: reservation.id, version: lease.version, paymentMethod, sha256: lease.sha256, expiresAt: lease.expiresAt.toISOString() } } });
-  return { ok: true as const, status: "READY" as const, token: lease.signingToken, reference, expiresAt: lease.expiresAt.toISOString() };
 }
 
 export async function getPublicReservationLease(token: string) {
@@ -114,13 +118,17 @@ export async function completePublicReservationLease(token: string, input: { sig
   if (LEASE_CLAUSE_KEYS.some((key) => !input.initials.includes(key))) throw new Error("VALIDATION_ERROR");
   let recipient: { id: string; organisationId: string } | undefined;
   const result = await db.$transaction(async (tx) => {
+    const target = await tx.publicReservationLease.findUnique({ where: { signingToken: token }, select: { reservationId: true } });
+    if (!target) throw new Error("NOT_FOUND");
+    // Serialise with hold expiry and re-read the lease/booking after the lock.
+    // This applies even where identity collection is not enabled.
+    await tx.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id" = ${target.reservationId} FOR UPDATE`;
     const lease = await tx.publicReservationLease.findUnique({ where: { signingToken: token }, include: { reservation: { include: { customer: true } } } });
     if (!lease) throw new Error("NOT_FOUND");
     recipient = lease.reservation.customer;
     if (lease.status === "SIGNED") return { reference: lease.reservation.publicReference, status: "SIGNED" as const, idempotent: true };
     if (lease.status !== "READY" || lease.reservation.status !== "ACTIVE") throw new Error("NOT_FOUND");
     if (lease.expiresAt < new Date()) throw new Error("EXPIRED");
-    if (identityRequired(lease.reservation.customer.organisationId, lease.reservation.createdAt, lease.reservationId, lease.reservation.customer.email)) await tx.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id" = ${lease.reservationId} FOR UPDATE`;
     if (!(await identityGate(tx, lease.reservation.customer.organisationId, lease.reservationId, lease.reservation.createdAt, "SIGN"))) throw new Error("IDENTITY_REQUIRED");
     if (requiresFullTermsAcceptance(lease.version) && (input.termsAccepted !== true || input.acceptedSha256 !== lease.sha256)) throw new Error("VALIDATION_ERROR");
     const signedAt = new Date();
