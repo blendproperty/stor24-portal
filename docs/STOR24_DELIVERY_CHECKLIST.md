@@ -35,6 +35,8 @@ Updated: 23 September 2026. This is the authoritative check-off register for the
 
 ## Next actions, evidence and acceptance
 
+Privacy review, 23 September 2026: [GAPP assessment and PRIV-01–PRIV-11 closure checklist](PRIVACY_GAPP_GAP_REVIEW_2026-09-23.md) adds evidence and open work to P01/P04/P09/P10/P11/P13. Resolve collection notices and compulsory biometric lawful-basis review before treating the owner photo toggle as live privacy readiness. All PRIV items remain open; this assessment changes no programme acceptance state.
+
 | ID | Next action | Open blocker | Owner | Accepted by / date | Evidence |
 |---|---|---|---|---|---|
 | P01 | Brett: enable E010 in-app manager training after release and practise the demo handover, then continue E008/live acceptance and resolve live photo policy/capture method, then retest the live D002–D004 portal corrections, then resume the guided journey. Review historical candidates separately; retain J19–J21 gates. | D001–D004 deployed; D002–D004 live readback passed. Full staff acceptance, 14 historical cancelled/signed candidates and P03/P04 dependencies remain open. | Codex: technical work; Brett: hands-on acceptance | Pending | [E001–E004 journey and UAT evidence](PRIORITY_1_ACCEPTANCE_2026-09-23.md) |

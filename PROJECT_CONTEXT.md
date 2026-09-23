@@ -1,5 +1,15 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## GAPP/privacy gap assessment — 23 September 2026
+
+- **Implementation:** internal read-only assessment and eleven open PRIV items in [privacy review](docs/PRIVACY_GAPP_GAP_REVIEW_2026-09-23.md); no remediation code or customer policy published. Companion public repository records website findings. Owner photo permission is not legal approval; recommend resolving compulsory-consent/lawful-basis review before wider collection. This supersedes any implication that merely enabling the switch establishes privacy readiness.
+- **Testing:** inspected source baselines CRM main 30cedda and public master c3f9d16, live public footer/booking form, privacy/PAIA HTTP routes and non-sensitive maintenance state. Documentation checks only; no new application tests, private-document read, full security audit or customer UAT.
+- **Commit and push:** prepared on codex/privacy-gap-review-20260923; enclosing documentation commit/PR records promotion.
+- **Merge:** evidenced by enclosing documentation PR and canonical remote main readback at handoff; no runtime release implied.
+- **Deployment and configuration:** no deployment needed; no switch, retention configuration, payment, provider or customer record changed.
+- **Live production verification:** public /privacy and /paia returned 404; CRM /privacy led to sign-in, not public notice. Booking contact form preselected four service channels without a linked collection notice. Facial maintenance heartbeat 2026-09-23 19:26:55.975 UTC; no organisation control row found. This is not proof of all-copy deletion or a new owner-switch acceptance.
+- **Open gates:** PRIV-01–PRIV-11, Liezl/privacy approval, lawful biometric basis/choice, public notices, processor agreements, provider/device/backup deletion, rights handling, governance and payment/access quality. P01/P04/P09/P10/P11/P13 remain open; no programme priority accepted.
+
 ## Owner photo control release evidence - 23 September 2026
 
 - **Implementation:** shared owner-only collection control and interim lifecycle retention shipped. Details and seven-day rule/provider boundary are in docs/FACIAL_PHOTO_POLICY_DRAFT.md.
