@@ -2,6 +2,7 @@
    Scoped to the authenticated shell so customer and signing journeys keep their own designs. */
 .app-shell {
   --border: var(--line);
+  --paper: #f8faf4;
   --ink: #183b2c;
   --muted: #657468;
   --line: #dce3d7;
@@ -140,9 +141,9 @@
 .app-shell .setup-nav > button { padding: 16px 18px; background: #fffefa; font-weight: 400; }
 .app-shell .setup-nav > .setup-nav-active { background: #edf3e5; box-shadow: inset 3px 0 #42644c; }
 .app-shell .company-form legend, .app-shell .defaults-group legend { font-size: 14px; font-weight: 500; }
-.app-shell .company-form fieldset, .app-shell .defaults-group { padding: 20px; border-radius: 12px; background: #fffefa; }
-.app-shell .defaults-tabs { gap: 8px; }
-.app-shell .defaults-tabs button { font-weight: 500; padding: 10px 13px; border-radius: 9px; }
+.app-shell .company-form fieldset { padding: 20px; border-radius: 12px; background: #fffefa; }
+.app-shell .program-tabs { gap: 8px; }
+.app-shell .program-tabs button { font-weight: 500; padding: 10px 13px; border-radius: 9px; }
 .app-shell .defaults-help, .app-shell .defaults-scope-note { font-size: 12px; line-height: 1.65; }
 .app-shell .mfa-actions form { min-width: 0; }
 .staff-mobile-nav { display: none; }
@@ -158,3 +159,7 @@
 }
 
 .brand-corner:has(.brand-corner__tip) { z-index: 40; }
+
+.app-shell .program-tabs button.active { background: #edf3e5; border-color: #9eb69f; color: #183b2c; }
+.app-shell .defaults-group > h3 { padding: 15px 18px; font-weight: 500; background: #f0f2e9; }
+.app-shell .defaults-fields { padding: 18px; gap: 15px; }
