@@ -2613,3 +2613,25 @@ a.module-card:focus-visible {
 .settlement-workspace .data-table td { white-space:normal; overflow-wrap:anywhere; min-width:145px; max-width:320px; vertical-align:top; }
 .settlement-workspace code, .settlement-workspace li { overflow-wrap:anywhere; }
 @media(max-width:640px) { .settlement-fields { grid-template-columns:1fr; } .settlement-workspace .panel { padding:16px; } .settlement-actions .button { max-width:100%; white-space:normal; } }
+
+/* Saved evidence across the complete reception move-in workflow. */
+.move-in-progress { font-family:"Satoshi Handover",Arial,sans-serif; font-weight:400; position:sticky; top:8px; z-index:10; padding:12px; background:#fffefa; border:1px solid #dce3d7; border-radius:16px; box-shadow:0 4px 16px #183b2c08; }
+.move-in-progress ol { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:8px; margin:0; padding:0; list-style:none; }
+.move-in-progress li { position:relative; min-width:0; }
+.move-in-progress a,.move-in-progress button { display:flex; gap:9px; align-items:center; width:100%; min-height:62px; padding:10px; border:0; border-radius:10px; background:transparent; text-align:left; color:#183b2c; text-decoration:none; font:inherit; cursor:pointer; }
+.move-in-progress button:disabled { cursor:default; color:#68776d; }
+.move-in-progress a:hover,.move-in-progress button:not(:disabled):hover { background:#f0f4e7; }
+.move-in-progress strong { display:block; font-size:13px; line-height:1.4; }
+.move-in-progress small { display:block; font-size:11px; line-height:1.4; margin-top:4px; color:#68776d; }
+.move-in-progress__number { display:grid; place-items:center; flex-shrink:0; width:27px; height:27px; border:1px solid #bdcbbb; border-radius:50%; font-size:12px; }
+.move-in-progress .is-complete .move-in-progress__number { background:#183b2c; border-color:#183b2c; color:white; }
+.move-in-progress .is-complete small { color:#236343; }
+.move-in-progress__arrow { position:absolute; right:-10px; top:24px; color:#95a292; }
+.move-in-review-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; margin:24px 0; }
+.move-in-continue { display:block; width:fit-content; margin-top:14px; padding:10px 0; min-height:44px; color:#183b2c; font-size:13px; font-weight:600; text-decoration:underline; text-underline-offset:3px; }
+.move-in-review-grid .button { margin:8px 8px 0 0; }
+.move-in-review-grid .move-in-provider-note { font-size:12px; }
+[id^="move-in-"] { scroll-margin-top:130px; }
+[id^="move-in-"]:focus-visible,.move-in-progress a:focus-visible,.move-in-progress button:focus-visible { outline:2px solid #236343; outline-offset:4px; }
+@media(max-width:1200px) { .move-in-progress ol { grid-template-columns:repeat(3,minmax(0,1fr)); } .move-in-progress__arrow { display:none; } [id^="move-in-"] { scroll-margin-top:200px; } }
+@media(max-width:700px) { .move-in-progress { position:static; padding:8px; } .move-in-progress ol { grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; } .move-in-progress a,.move-in-progress button { padding:8px; } .move-in-review-grid { grid-template-columns:1fr; } [id^="move-in-"] { scroll-margin-top:24px; } }

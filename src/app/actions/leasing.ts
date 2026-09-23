@@ -73,7 +73,7 @@ export async function confirmReservationMoveInAction(data: FormData): Promise<{ 
     throw error;
   }
   for (const path of ["/tenants", "/units", "/reservations", "/operations/accounts", "/operations/move-in", "/my"]) revalidatePath(path);
-  redirect("/operations/accounts");
+  redirect(`/operations/move-in?reservation=${encodeURIComponent(reservationId)}`);
 }
 export async function transferAction(data: FormData) { await requirePermission("operations.manage"); const parsed = transferSchema.parse({ tenancyId: text(data, "tenancyId"), toUnitId: text(data, "toUnitId"), effectiveAt: text(data, "effectiveAt"), monthlyRate: number(data, "monthlyRate") }); await transfer(await requireScope(), parsed); revalidatePath("/tenants"); }
 export async function noticeAction(data: FormData) { await requirePermission("collections.manage"); const parsed = noticeSchema.parse({ tenancyId: text(data, "tenancyId"), noticeDate: text(data, "noticeDate"), plannedMoveOut: text(data, "plannedMoveOut") }); await giveNotice(await requireScope(), parsed); revalidatePath("/tenants"); }

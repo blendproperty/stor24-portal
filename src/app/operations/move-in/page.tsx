@@ -1,3 +1,4 @@
+import { getMoveInProgress } from "@/lib/move-in-progress";
 import { requireSession } from "@/lib/auth-guards";
 import { hasPermission } from "@/lib/permissions";
 import { moveInAction } from "@/app/actions/leasing";
@@ -14,7 +15,9 @@ export default async function MoveInPage({ searchParams }: { searchParams: Promi
   const scope = await requireScope();
   const data = await listLeasing(scope);
   const auth = await requireSession();
-  const reservations = await Promise.all(data.reservations.filter(reservation => reservation.status === "ACTIVE").map(async reservation => ({
+  const reservations = await Promise.all(data.reservations.filter(reservation => reservation.status === "ACTIVE" || (reservation.id === initialReservationId && reservation.status === "CONVERTED")).map(async reservation => ({
+    progress: reservation.publicLease?.status === "SIGNED" ? await getMoveInProgress(scope, reservation.id) : undefined,
+    canReviewPhoto: auth.role === "Organisation owner" || auth.user.roleAssignments.some(a => (!a.facilityId || a.facilityId === reservation.facilityId) && hasPermission(a.role.permissions, "access.view")),
     canReviewIdentity: auth.role === "Organisation owner" || auth.user.roleAssignments.some(a => (!a.facilityId || a.facilityId === reservation.facilityId) && hasPermission(a.role.permissions, "identity.review")),
     canRecordPayment: auth.role === "Organisation owner" || auth.user.roleAssignments.some(a => (!a.facilityId || a.facilityId === reservation.facilityId) && hasPermission(a.role.permissions, "payments.manage")),
     id: reservation.id, facilityId: reservation.facilityId, customerId: reservation.customerId, unitId: reservation.unitId,

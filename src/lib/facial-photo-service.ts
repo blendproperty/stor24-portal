@@ -86,8 +86,8 @@ export async function withdrawTenantPhoto(session: Tenant, reservationId: string
   });
 }
 
-export async function listFacialPhotos(scope: RequestScope) {
-  return db.facialPhotoSubmission.findMany({ where: { reservation: { facility: facilityWhere(scope), customer: { organisationId: scope.organisationId } } },
+export async function listFacialPhotos(scope: RequestScope, reservationId?: string) {
+  return db.facialPhotoSubmission.findMany({ where: { ...(reservationId ? { reservationId } : {}), reservation: { facility: facilityWhere(scope), customer: { organisationId: scope.organisationId } } },
     select: { ...photoSummary, reservation: { select: { status: true, facilityId: true, customer: { select: { firstName: true, lastName: true, companyName: true } }, unit: { select: { number: true } }, facility: { select: { name: true } } } } }, orderBy: { updatedAt: "desc" }, take: 200 });
 }
 async function staffPhoto(database: Database, scope: RequestScope, id: string) {
