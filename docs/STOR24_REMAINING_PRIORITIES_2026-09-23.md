@@ -1,5 +1,7 @@
 # STOR24 remaining priorities — 23 September 2026
 
+**Execution and check-off:** use [STOR24_DELIVERY_CHECKLIST.md](STOR24_DELIVERY_CHECKLIST.md) for the authoritative stage statuses, evidence, blockers and acceptance. This document defines the scope and order; it is not a second status tracker.
+
 This current work order supersedes the older Netcash-first list for sequencing. Brett confirmed Priority 1 as complete customer-journey acceptance. The order below is a proposed programme sequence; it does not change deferred provider activation, financial authority or legal decisions. Current PROJECT_CONTEXT.md release evidence takes precedence over older uncompleted checklists.
 
 | Priority | Remaining work | Current boundary and completion evidence |

@@ -1,0 +1,96 @@
+# STOR24 delivery checklist
+
+Updated: 23 September 2026. This is the authoritative check-off register for the remaining programme. [Scope and release boundaries](STOR24_REMAINING_PRIORITIES_2026-09-23.md) describe the 13 priorities; [PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md) holds dated release evidence. Latest entries take precedence over historical pending statements.
+
+**Current item: P01 — complete customer journey and recovery. Programme completion: 0 of 13 priorities accepted.** Priority 1 is confirmed by Brett; the remaining sequence is proposed. Initial states below are drawn from the existing release record, not a fresh acceptance test.
+
+## How we work through this
+
+1. Select one priority and confirm its scope, owner, acceptance criteria and permitted test environment.
+2. Reuse existing implementation. Build or fix only the remaining gaps.
+3. Run the relevant tests. Record environment, exact version, result and an evidence link. Log any defect against its stable P/J ID, fix it and rerun affected checks.
+4. Record commit/push, merge and deployment/configuration separately. A local test or successful deployment is not live workflow acceptance.
+5. Perform permitted live verification and staff/business acceptance. Capture reviewer name and date, resolve blockers, then tick the priority and move on.
+6. Update this register and PROJECT_CONTEXT.md together. Refresh the Excel working copy after a checkpoint; it is a dated export and does not sync automatically. Where work affects the public website or another repository, update that canonical context too.
+
+**Status rules:** Partial means component evidence exists, but the whole priority is not verified. Verified means the complete stated stage has linked evidence. Not run is untested. Blocked and Deferred stay open. Not required needs an explicit reason and named approval in the evidence record; it cannot quietly remove a provider, legal or launch gate. No priority is complete until every required stage is verified, a reviewer/date and evidence are present, and its blocker is cleared. P01 additionally requires every J case below to pass with evidence, reviewer and date. An approved reduced launch scope must be recorded as a scope decision, not a false pass.
+
+## Stage register
+
+| Done | ID | Priority | Build | Test | Commit / push | Merge | Deploy / config | Live check |
+|---|---|---|---|---|---|---|---|---|
+| [ ] | P01 | Complete customer journey | Partial | Partial | Partial | Partial | Partial | Not run |
+| [ ] | P02 | Finance and reconciliation | Partial | Partial | Partial | Partial | Partial | Not run |
+| [ ] | P03 | Netcash and debit orders | Partial | Partial | Partial | Partial | Deferred | Deferred |
+| [ ] | P04 | Physical access lifecycle | Partial | Partial | Partial | Partial | Blocked | Not run |
+| [ ] | P05 | MRI journal integration | Partial | Partial | Partial | Partial | Not started | Not run |
+| [ ] | P06 | Settings and daily close | Partial | Partial | Partial | Partial | Partial | Not run |
+| [ ] | P07 | Merchandise operations | Partial | Partial | Partial | Partial | Partial | Not run |
+| [ ] | P08 | Communications and tenant portal | Partial | Partial | Partial | Partial | Partial | Not run |
+| [ ] | P09 | Commercial, legal and insurance | Not started | Not run | Not started | Not started | Not started | Not run |
+| [ ] | P10 | Privacy and retention operations | Partial | Partial | Partial | Partial | Partial | Not run |
+| [ ] | P11 | Security and resilience | Partial | Partial | Partial | Partial | Partial | Not run |
+| [ ] | P12 | Offline and two-device recovery | Partial | Partial | Partial | Partial | Partial | Not run |
+| [ ] | P13 | Data, training and launch | Not started | Not run | Not started | Not started | Not started | Not run |
+
+## Next actions, evidence and acceptance
+
+| ID | Next action | Open blocker | Owner | Accepted by / date | Evidence |
+|---|---|---|---|---|---|
+| P01 | Run J01–J21 below, log failures, fix and repeat affected checks. | Current complete journey and staff acceptance are not evidenced. Real provider proof depends on P03/P04. | Unassigned | Pending | [Baseline release record](../PROJECT_CONTEXT.md); current acceptance pending |
+| P02 | Agree a representative account and reconcile invoice, receipt, statement and settlement. | Opening balances, reconciliation, charge/tax rules, refund authority and finance acceptance remain. | Unassigned | Pending | [Baseline release record](../PROJECT_CONTEXT.md); current acceptance pending |
+| P03 | Keep live activation held; prepare provider acceptance cases and record the activation decision. | Live activation remains deferred by Brett. Merchant/mandate approval and settlement evidence required. | Unassigned | Pending | [Baseline release record](../PROJECT_CONTEXT.md); current acceptance pending |
+| P04 | Confirm policy and installed provider; prove enrolment, suspend, restore, revoke and uncertain outcomes. | Photo policy/consent, installed-provider configuration and actual entry/removal proof remain. | Unassigned | Pending | [Baseline release record](../PROJECT_CONTEXT.md); current acceptance pending |
+| P05 | Confirm posting contract and mappings; build posting, duplicate protection, correction and reconciliation. | Access/source preparation exists; journal endpoint and property/entity/GL/tax mapping are unapproved. | Unassigned | Pending | [Baseline release record](../PROJECT_CONTEXT.md); current acceptance pending |
+| P06 | Trace defaults into workflows and reconcile daily close reports to source transactions. | Saved defaults need workflow proof. Daily balancing, exceptions and period closure need acceptance. | Unassigned | Pending | [Baseline release record](../PROJECT_CONTEXT.md); current acceptance pending |
+| P07 | Agree retail scope; prove stock, checkout, receiving, returns, fulfilment and expiry reconciliation. | Retail scope is not complete. Storage-only launch can defer it explicitly. | Unassigned | Pending | [Baseline release record](../PROJECT_CONTEXT.md); current acceptance pending |
+| P08 | Test approved channels and My STOR24 documents, statements and status across units/devices. | Delivery, consent, inbound/retry and cross-device tenant acceptance remain; WhatsApp enablement separate. | Unassigned | Pending | [Baseline release record](../PROJECT_CONTEXT.md); current acceptance pending |
+| P09 | Record decisions and named approvals; implement approved wording and preserve signed records. | Final wording, transfers/mandates, insurance product/premium/cover/cancellation decisions remain. | Unassigned | Pending | [Baseline release record](../PROJECT_CONTEXT.md); current acceptance pending |
+| P10 | Approve policies and roles; prove access boundaries, deletion, backup treatment and restoration. | Tenancy ID retention is implemented; notices, backup policy, access-photo policy and deletion proof remain. | Unassigned | Pending | [Baseline release record](../PROJECT_CONTEXT.md); current acceptance pending |
+| P11 | Verify role isolation, finish controls, rehearse restore/rollback and prove alerts reach an owner. | Role/facility acceptance, remaining MFA/dependencies, restoration and incident ownership remain. | Unassigned | Pending | [Baseline release record](../PROJECT_CONTEXT.md); current acceptance pending |
+| P12 | Test stale/closed units, duplicate sync, competing requests and reconnect/update on two devices. | Real two-device recovery acceptance remains. Disconnected availability stays provisional. | Unassigned | Pending | [Baseline release record](../PROJECT_CONTEXT.md); current acceptance pending |
+| P13 | Reconcile units/rates/accounts; rehearse migration, train staff and record launch/support/rollback approval. | Data reconciliation, migration rehearsal, role training, critical defects and launch sign-off remain. | Unassigned | Pending | [Baseline release record](../PROJECT_CONTEXT.md); current acceptance pending |
+
+## P01 customer-journey acceptance cases
+
+Use one traceable test customer/journey for J01–J07, with approved fixtures/environment. Record environment, application version, test reference, expected versus observed result, evidence, tester/date and defects. Use redacted references or approved private storage for identity, signatures and payment information; never commit private customer evidence or credentials here. Component or simulated passes must remain labelled and cannot close J20/J21. The main P01 checkbox stays open until all required cases and release stages are accepted.
+
+| Done | Case | Scenario | Acceptance result required | Status | Evidence / defect | Reviewer / date |
+|---|---|---|---|---|---|---|
+| [ ] | J01 | Booking and floor eligibility | Ground-floor booking creates one hold with correct unit/rate. First/Second Floor stay visible as disabled Coming soon; stale/direct requests cannot allocate them. | Not run | Pending | Pending |
+| [ ] | J02 | Identity review | Authorised staff preview required pages, review the correct customer, and record a decision/audit. Unreviewed identity blocks the required next step. | Not run | Pending | Pending |
+| [ ] | J03 | Agreement and signature | Correct customer, unit, price, terms and document version are presented. Completed signature is retained and retrievable with its audit. | Not run | Pending | Pending |
+| [ ] | J04 | Payment and balance | Expected charge, receipt, ledger and booking status agree. Label sandbox/simulated evidence explicitly; it cannot satisfy genuine provider acceptance. | Not run | Pending | Pending |
+| [ ] | J05 | Staff handover | Staff can hand over only after required ID, agreement, payment, date and unit eligibility conditions. Actor, time and reasons are recorded. | Not run | Pending | Pending |
+| [ ] | J06 | Active tenancy and portal | Exactly one intended tenancy is active; occupied unit is unavailable. My STOR24 shows the correct documents, balance and move-in/access status. | Not run | Pending | Pending |
+| [ ] | J07 | Move-out and final reconciliation | Authorised move-out records effective date, final charges/credits and balance. Unit availability, retained documents and audit follow approved policy. | Not run | Pending | Pending |
+| [ ] | J08 | Rejected and replaced identity | Rejected ID blocks progression. Replacement clears stale review state and requires the new pages to be reviewed without exposing another customer. | Not run | Pending | Pending |
+| [ ] | J09 | Hold expires or booking is abandoned | Expired hold cannot be used for a stale allocation. Eligibility is recalculated; the unit is released only when no other valid block remains. | Not run | Pending | Pending |
+| [ ] | J10 | Failed, abandoned and retried payment | Failure never grants paid status or handover. Retry/resume associates payment with the correct obligation and avoids a duplicate charge/receipt. | Not run | Pending | Pending |
+| [ ] | J11 | Duplicate or delayed callbacks | Duplicate, late or out-of-order callbacks produce one consistent ledger result. Invalid callbacks are rejected and recoverable failures remain visible. | Not run | Pending | Pending |
+| [ ] | J12 | Refresh and resume | Refresh, sign-out/sign-in and return links retain the correct customer/unit/document/payment state without duplicate submissions or cross-account access. | Not run | Pending | Pending |
+| [ ] | J13 | Blocked handover | Missing ID, unsigned agreement, unpaid balance, future date or newly closed floor prevents handover with a clear reason and no partial activation. | Not run | Pending | Pending |
+| [ ] | J14 | Competing or stale unit allocation | Two competing requests produce at most one allocation. A stale selection or floor closed after selection is rejected safely, preserving the winning record. | Not run | Pending | Pending |
+| [ ] | J15 | Interrupted signing and duplicate completion | Interrupted signing resumes safely. Expired links and duplicate completion cannot create a second tenancy or substitute the wrong document. | Not run | Pending | Pending |
+| [ ] | J16 | Cross-stage documents and audit | Trace one booking through all seven stages. IDs, timestamps, actors and document versions agree; no missing or duplicate financial or status transition. | Not run | Pending | Pending |
+| [ ] | J17 | Role and facility boundaries | Customer and staff roles see only permitted accounts, documents, units and actions; blocked attempts leave appropriate audit without disclosing private data. | Not run | Pending | Pending |
+| [ ] | J18 | Staff correction and recovery | For each failure, staff identify the blocker, use an authorised recovery route and resume safely. Record defect, fix, retest and any unresolved exception. | Not run | Pending | Pending |
+| [ ] | J19 | Live floor toggle and reload | An authorised controlled toggle/save/reload proves persisted closure and reopening eligibility. Preserve occupied/held/maintenance records and restore the intended configuration. | Not run | Pending | Pending |
+| [ ] | J20 | Genuine payment provider acceptance | Under separately authorised provider acceptance, prove real payment result, failed/retry behaviour and settlement reconciliation. Link P03 evidence. | Deferred | Pending | Pending |
+| [ ] | J21 | Actual physical access and removal | With approved policy, installed provider, operator and consenting participant, prove entry after activation and denial/removal after revocation. Link P04 evidence. | Blocked | Pending | Pending |
+
+## Evidence and defect log
+
+Append one row per run or defect; preserve failed results when a later retest passes. A baseline PROJECT_CONTEXT link does not prove fresh acceptance. A stage marked Verified must point to the exact run/release/approval entry. A blocker is cleared only when the retest or decision is linked.
+
+| Record | Priority / case | Environment and version | Observed result / defect | Evidence link | Owner | Date | Resolution / retest |
+|---|---|---|---|---|---|---|---|
+| E000 | Programme baseline | Source review, 2026-09-23 | Checklist created; no new operational acceptance performed | [Priority scope](STOR24_REMAINING_PRIORITIES_2026-09-23.md), [release history](../PROJECT_CONTEXT.md) | Unassigned | 2026-09-23 | All 13 priorities remain open |
+
+## Existing release evidence to reuse
+
+- [CRM floor correction PR #197](https://github.com/blendproperty/stor24-portal/pull/197) and [public website PR #73](https://github.com/blendproperty/stor24/pull/73) shipped. Live readback on 23 September showed 142 Ground-floor units and disabled First/Second Floor Coming soon tabs. This is component evidence, not P01 completion. Live staff toggle/save/reload remains J19.
+- Billing, finance workspaces, ID retention, access-photo queue, dashboards/help, MRI access and accounting source preparation already have scoped evidence in PROJECT_CONTEXT.md. Reuse it without treating provider activation, legal approval or complete staff acceptance as implied.
+- Live Netcash activation remains deferred. Access-photo collection/policy, actual physical entry, MRI journal posting, finance/data reconciliation, legal/retention/backup decisions, training and launch approval retain their gates.
+
+The checklist does not itself authorise real money, identity decisions/uploads, legal signatures, provider enrolment, customer messages or production configuration changes.
