@@ -15,14 +15,14 @@ function getConnectivitySnapshot() {
   return navigator.onLine;
 }
 
-export function ConnectivityStatus({ compact = false }: { compact?: boolean }) {
+export function ConnectivityStatus({ compact = false, training = false }: { compact?: boolean; training?: boolean }) {
   const online = useSyncExternalStore(subscribeToConnectivity, getConnectivitySnapshot, () => true);
 
   if (compact) {
     return (
-      <div className="connectivity-compact" data-online={online} aria-live="polite">
+      <div className="connectivity-compact" title="Browser connectivity only. This does not confirm gate access or provider availability." data-online={online} aria-live="polite">
         <span aria-hidden="true" />
-        <small>{online ? "Online · Live data" : "Offline · Actions unavailable"}</small>
+        <small>{online ? training ? "Training · Demo records" : "Browser online" : "Offline · Actions unavailable"}</small>
       </div>
     );
   }

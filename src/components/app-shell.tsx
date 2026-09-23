@@ -67,7 +67,7 @@ const navigation = [
   { href: "/offline-readiness", label: "Offline readiness", icon: ShieldCheck },
 ];
 
-export function AppShell({ children, session, access = { owner: false, permissions: [] } }: { children: React.ReactNode; session: SessionPayload | null; access?: NavigationAccess }) {
+export function AppShell({ children, session, facilityLabel = "Your facilities", access = { owner: false, permissions: [] } }: { children: React.ReactNode; session: SessionPayload | null; access?: NavigationAccess; facilityLabel?: string }) {
   const pathname = usePathname();
   const router = useRouter();
   const publicPage = pathname === "/login" || pathname === "/forgot-password" || pathname.startsWith("/reset-password/") || pathname.startsWith("/invite/") || pathname.startsWith("/setup/");
@@ -137,8 +137,9 @@ export function AppShell({ children, session, access = { owner: false, permissio
         <div className="sidebar-footer">
           <div className="facility-card">
             <div>
-              <strong>Stor24 Randburg</strong>
-              <ConnectivityStatus compact />
+              <small>Facility access</small>
+              <strong>{facilityLabel}</strong>
+              <ConnectivityStatus compact training={pathname === "/operations/move-in/training"} />
             </div>
           </div>
         </div>
