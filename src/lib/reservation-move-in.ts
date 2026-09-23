@@ -50,7 +50,7 @@ export async function reservationReadiness(database: Database, scope: RequestSco
   if (!unitIsOperational(reservation.unit, reservation.facility.closedFloors)) blockers.push("This floor is not operational. Staff must arrange an operational unit before move-in.");
   if (!forPhoto && !(await identityGate(database, scope.organisationId, reservation.id, reservation.createdAt, "HANDOVER"))) blockers.push("The identity document needs staff acceptance before key handover.");
   // Photo collection eligibility must not depend on approval of the photo being collected.
-  if (!forPhoto && !approvedPhotoForHandover(await database.facialPhotoSubmission.findUnique({ where: { reservationId } }), scope.organisationId)) blockers.push("A current, staff-approved access photo is required before key handover.");
+  if (!forPhoto && !(await approvedPhotoForHandover(await database.facialPhotoSubmission.findUnique({ where: { reservationId } }), scope.organisationId, database))) blockers.push("A current, staff-approved access photo is required before key handover.");
   const handedOver = forPhoto && reservation.status === "CONVERTED" && reservation.convertedTenancyId &&
     ["ACTIVE", "NOTICE_GIVEN"].includes(reservation.convertedTenancy?.status ?? "") && reservation.convertedTenancy?.occupancies.some(occupancy => occupancy.unitId === reservation.unitId) &&
     Boolean(await database.auditEvent.findFirst({ where: { organisationId: scope.organisationId, entityId: reservation.convertedTenancyId, action: "tenancy.key_handover_confirmed" }, select: { id: true } }));

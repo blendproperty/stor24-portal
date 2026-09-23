@@ -1,6 +1,6 @@
 # Facial photo collection - working basis
 
-Status: DRAFT - awaiting Liezl's review. This is not a legal approval or authority to enable collection.
+Status: DRAFT - awaiting Liezl's review. Brett authorised interim collection settings on 23 September 2026. This is not legal approval.
 
 ## Source
 
@@ -29,9 +29,9 @@ This is a structure for customer-facing wording, not a finished privacy notice. 
 
 | Setting | Working state |
 | --- | --- |
-| Portal photo retention | Unset - Brett's interim instruction requested |
-| Alternative access contact/process | Unset - Brett's interim instruction requested |
-| Customer-facing notice and consent wording | Draft to be completed from the workflow and confirmed settings |
+| Portal photo retention | Active booking and tenancy; delete on cancellation, expiry, tenancy end or withdrawal |
+| Alternative access contact/process | Facial enrolment required for precinct entry; contact facility manager for help; no alternative entry method currently configured |
+| Customer-facing notice and consent wording | Interim v1 implemented in src/lib/facial-photo-control.ts; visibly awaiting review |
 | Provider/device biometric retention and deletion deadlines | Awaiting Liezl and installed-provider confirmation |
 | Consent-record/access-log/backup retention | Awaiting Liezl's review |
 | Processing-party responsibilities, security incidents, hosting and cross-border arrangements | Awaiting confirmation |
@@ -44,6 +44,16 @@ Requested: owner-controlled Enable photo collection switch, separate from traini
 
 Existing encryption and recent expiry-maintenance checks remain required. Real Hikvision enrolment and physical access remain a separate unfinished integration and acceptance gate.
 
-## Current implementation boundary
+## Owner-authorised business rule - 23 September 2026
 
-This change records the user's selected source and open decisions only. No owner photo toggle has been built by this change; no runtime policy, live collection, customer notice, permission, provider setting or training switch has been changed. No email sent.
+The seven-day period starts at confirmed debit-order failure, not its scheduled payment date or a pending result. Retries must not reset unresolved debt age. Suspension requires the debt still to be unpaid; restoration requires verified settlement of the relevant debt. Test payments must never affect live access.
+
+This rule is recorded for the next provider work. Current batch integration reads load reports, not a final per-instruction settlement/failure feed; upload rejection is not a confirmed customer debit failure. Therefore this release does not fabricate failure dates or issue automatic gate suspension/restoration. Required work: verified final result ingestion, invoice/payment reconciliation, durable idempotent suspension/restoration scheduling and the installed Hikvision connector, followed by on-site acceptance.
+
+## Implementation boundary
+
+Owner switch is shared organisation-wide and pinned to the existing controlling owner. Managers see its current state and cannot change it. Turning it off blocks new/replacement uploads but retains consent, review and deletion. Interim policy versions/hashes are captured with consent; changes require fresh consent. Existing environment policies retain their fixed-hour expiry; interim submissions use booking/tenancy lifecycle retention (no arbitrary distant expiry date). Scheduled deletion continues while off. Portal deletion is not proof of HikCentral/device deletion.
+
+No customer consent is preselected. Withdrawal remains available and does not promise an alternative entry method. Liezl's review, provider/device deletion, consent/audit/backup retention, minors and additional users remain open.
+
+Deployment/test evidence belongs in PROJECT_CONTEXT.md. No email sent.

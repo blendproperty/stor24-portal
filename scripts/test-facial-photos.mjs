@@ -9,7 +9,7 @@ const server=createServer(async(req,res)=>{
   if (/^\/brand\/Satoshi-Handover-(400|500|700)\.woff2$/.test(req.url)) { res.setHeader("Content-Type","font/woff2"); return res.end(await readFile(`public${req.url}`)); }
   if(req.url==="/fixture.js"){res.setHeader("Content-Type","text/javascript");return res.end(bundle.outputFiles[0].text);}
   if(req.url==="/fixture.css"){res.setHeader("Content-Type","text/css");return res.end(css);}
-  res.setHeader("Content-Type","text/html");res.end('<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/fixture.css"></head><body><div id="root"></div><script type="module" src="/fixture.js"></script></body></html>');
+  res.setHeader("Content-Type","text/html");res.end('<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/fixture.css"></head><body><div id="root"></div><script type="module" src="/fixture.js"></script></body></html>');
 });
 await new Promise(resolve=>server.listen(0,"127.0.0.1",resolve));
 const browser=await chromium.launch(process.env.PLAYWRIGHT_CHANNEL ? {channel:process.env.PLAYWRIGHT_CHANNEL} : {});
@@ -18,8 +18,11 @@ let available=false, tenantPhoto=null;
 const tenantWrites=[];
 try {
   const page=await browser.newPage();
+  await page.route("**/api/v1/access/photo-control",route=>route.fulfill({json:{data:{enabled:false,version:0,canToggle:true,storageReady:true,maintenanceReady:true,reviewStatus:"Interim  -  awaiting review"}}}));
   await page.goto(base);await expect(page.getByText("Photo collection disabled",{exact:true})).toBeVisible();
   await expect(page.getByText("Automatic activation from this photo queue is not connected to Hikvision yet. An approved photo does not grant gate access.",{exact:true})).toBeVisible();
+  await expect(page.getByRole("switch",{name:"Photo collection"})).toHaveAttribute("aria-checked","false");
+  await page.goto(base+"?readonly");await expect(page.getByRole("switch")).toHaveCount(0);await expect(page.getByText("Only the owner can change this",{exact:true})).toBeVisible();
   await page.goto(base+"?policy");await expect(page.getByText("Gate activation unavailable",{exact:true})).toBeVisible();
 page.on("pageerror",error=>errors.push(error.message));
   await page.route("**/api/tenant/access-photo**",route=>{

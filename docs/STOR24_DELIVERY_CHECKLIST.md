@@ -111,3 +111,9 @@ Append one row per run or defect; preserve failed results when a later retest pa
 - Live Netcash activation remains deferred. Access-photo collection/policy, actual physical entry, MRI journal posting, finance/data reconciliation, legal/retention/backup decisions, training and launch approval retain their gates.
 
 The checklist does not itself authorise real money, identity decisions/uploads, legal signatures, provider enrolment, customer messages or production configuration changes.
+
+## Photo collection control checkpoint - 23 September 2026
+
+Owner-only shared switch and interim tenancy retention implemented; local unit, database journey and responsive component tests passed. Merge/deployment/live UI verification pending (PROJECT_CONTEXT.md). Off preserves review and deletion; managers cannot change settings. No live collection enabled. P01 remains open for Brett's acceptance.
+
+P03/P04: Brett confirmed seven days from actual debit-order failure, not scheduled date. Final customer debit result ingestion, settlement reconciliation and Hikvision suspension/restoration remain required; load rejection is not customer non-payment. [Interim policy and review gates](FACIAL_PHOTO_POLICY_DRAFT.md).

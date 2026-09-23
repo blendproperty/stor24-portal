@@ -8,7 +8,7 @@ export function facialPhotoError(error: unknown) {
     TENANT_NOT_FOUND: [404, "This booking is unavailable."], NOT_FOUND: [404, "This photograph is unavailable."],
     PHOTO_INVALID: [422, "Choose a clear JPEG or PNG photograph, at least 160 pixels wide and high, up to 5 MB."],
     PHOTO_CONSENT_REQUIRED: [409, "Read and accept the current consent notice before continuing."],
-    PHOTO_POLICY_PENDING: [409, "Photo collection is awaiting approved privacy arrangements. Contact your store about access."],
+    PHOTO_POLICY_PENDING: [409, "Photo collection is switched off or its settings are unavailable. Contact your store about access."],
     PHOTO_MAINTENANCE_REQUIRED: [503, "Photo collection is temporarily unavailable. Contact your store."],
     PHOTO_BOOKING_NOT_READY: [409, "A signed agreement, verified booking payment and an active reservation are required."],
     PHOTO_CHANGED: [409, "This photograph has changed or expired. Refresh before continuing."],
