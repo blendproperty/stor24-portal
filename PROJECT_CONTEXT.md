@@ -1,5 +1,15 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Facility/access status release evidence - 23 September 2026
+
+- **Implementation:** account-scoped facility footer replaces Randburg; global accounts say All facilities. Browser connectivity is not described as live data/provider health; training route identifies demo records. Facial page reports missing collection policy versus unavailable activation and explains the unconnected queue-to-Hikvision activation step and remaining on-site checks. Existing privacy, permission, training and provider controls unchanged.
+- **Testing:** TypeScript, lint and responsive component checks passed locally. Browser assertions cover both policy states, manager/global facility labels, connectivity and training wording. Exact-head CI 35864372296 and DB checks 35864372245 passed on 7e7443d623a624f02434feef1f55f2977d6a7102.
+- **Commit and push:** implementation/context pushed on codex/facility-access-status-20260923. This evidence accompanies codex/status-release-20260923, promoted by its documentation PR.
+- **Merge:** PR #222 merged as 5f7ed214818a6b40f46cc828054b22dd6c1b3c58.
+- **Deployment and configuration:** main CI 35864678914 and deployment 35864929875 succeeded. Runtime 5f7ed214818a6b40f46cc828054b22dd6c1b3c58 and healthy stor24-crm:5f7ed2148 verified. No schema or operational configuration changes.
+- **Live production verification:** live owner Facial access shows Photo collection disabled, missing configured policy and unconnected queue activation explanation; footer reads Facility access / All facilities / Browser online. Existing Chrome custom manager training page reads Store 1 - Midpoint / Training - Demo records. No live records or settings changed. App/database health OK at 2026-09-23T13:09:18.096Z.
+- **Open gates:** approved collection policy, Hikvision activation connection, physical entry/removal and complete P01/training acceptance remain open.
+
 ## Facility footer and facial-access readiness - 23 September 2026
 
 - **Implementation:** remove hard-coded Randburg footer. Fresh account assignments supply the single facility name, assigned-facility count, All facilities for global access, or No facility assigned. Label is explicitly Facility access, not a claim about a page-local store filter. Browser connectivity is labelled Browser online; demo route says Training - Demo records. Facial page differentiates missing photo policy from unavailable gate activation, explains that this queue is not connected to Hikvision activation, and lists remaining setup/on-site checks. No gate/provider health claim, legal-review progress assumption or activation is introduced.
