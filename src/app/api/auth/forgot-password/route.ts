@@ -1,3 +1,4 @@
+import { passwordResetEmail } from "@/lib/password-reset-email";
 import { addMinutes } from "date-fns";
 import { db } from "@/lib/db";
 import { emailProvider } from "@/lib/email";
@@ -21,6 +22,6 @@ export async function POST(request: Request) {
     db.auditEvent.create({ data: { organisationId: user.organisationId, action: "user.password_reset.requested", entityType: "User", entityId: user.id, ipHash: privacyHash(requestIp(request)) } }),
   ]);
   const appUrl = process.env.APP_URL || new URL(request.url).origin;
-  try { await emailProvider().send({ to: user.email, subject: "Reset your Stor24 CRM password", text: `Reset your password: ${appUrl}/reset-password/${token}\nThis link expires in 30 minutes.`, html: `<p>Reset your Stor24 CRM password using the secure link below. It expires in 30 minutes.</p><p><a href="${appUrl}/reset-password/${token}">Reset password</a></p>` }); } catch (error) { console.error("Password reset email delivery failed", error instanceof Error ? error.message : "unknown error"); }
+  try { await emailProvider().send({ to: user.email, ...passwordResetEmail({ name: user.name, resetUrl: `${appUrl.replace(/\/$/, "")}/reset-password/${token}` }) }); } catch (error) { console.error("Password reset email delivery failed", error instanceof Error ? error.message : "unknown error"); }
   return Response.json(generic);
 }
