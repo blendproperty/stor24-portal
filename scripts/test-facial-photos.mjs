@@ -18,7 +18,7 @@ let available=false, tenantPhoto=null;
 const tenantWrites=[];
 try {
   const page=await browser.newPage();
-  await page.route("**/api/v1/access/photo-control",route=>route.fulfill({json:{data:{enabled:false,version:0,canToggle:true,storageReady:true,maintenanceReady:true,reviewStatus:"Interim — awaiting review"}}}));
+  await page.route("**/api/v1/access/photo-control",route=>route.fulfill({json:{data:{enabled:false,version:0,canToggle:true,storageReady:true,maintenanceReady:true,reviewStatus:"Interim  -  awaiting review"}}}));
   await page.goto(base);await expect(page.getByText("Photo collection disabled",{exact:true})).toBeVisible();
   await expect(page.getByText("Automatic activation from this photo queue is not connected to Hikvision yet. An approved photo does not grant gate access.",{exact:true})).toBeVisible();
   await expect(page.getByRole("switch",{name:"Photo collection"})).toHaveAttribute("aria-checked","false");
