@@ -11,6 +11,11 @@ function guide(id: string, title: string, category: string, route: string, scree
 }
 
 export const extendedGuides: WorkflowGuide[] = [
+  guide("access-restricted", "Understand restricted access", "Workspace", "/access-restricted", "Access restricted", "Understand your permissions and request the access needed for your work.", [
+    ["Recognise a restricted section", "Grey menu items with a lock indicate sections unavailable to your account. A direct link displays Access restricted. This is an account permission boundary, and refreshing alone does not grant additional access.", ".restricted-page"],
+    ["Contact your administrator", "Tell your administrator which section you need, which facility it relates to and the work you need to perform. The administrator reviews the request and decides whether to update your permissions; this page does not submit or approve that request.", ".restricted-page"],
+    ["Continue with available work", "Return to the dashboard and use the sections available to you. After your administrator confirms a permission change, reload the page to refresh the menu. Never use another employee's account to work around a restriction.", ".restricted-page"],
+  ]),
   guide("move-in-training", "Practise a move-in safely", "Facility operations", "/operations/move-in/training", "Move-in training", "Use a saved demo run while the owner has training enabled.", [
     ["Check training is enabled", "The owner controls the training switch on Operations, Move in. Existing facility managers can start a demo run while it is on. The training banner identifies demo records; returning to live Move in leaves the real booking safeguards in place.", ".training-banner"],
     ["Complete the demo checks", "Select a demo unit, confirm the practice agreement, record the full test payment and check the sample identity. These actions save training progress only. They do not create live receipts, customer documents or an occupied unit.", ".training-step"],

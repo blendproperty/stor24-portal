@@ -13,7 +13,7 @@ function Fixture() {
   const path = usePathname();
   const params = new URLSearchParams(window.location.search);
   const user = params.get("user") || "fixture-staff-a";
-  return <AppShell session={{ userId: user, name: "Training Preview", email: "fixture@example.invalid", role: "Organisation owner", sessionVersion: 1 }}>
+  return <AppShell access={{owner:true,permissions:["*"]}} session={{ userId: user, name: "Training Preview", email: "fixture@example.invalid", role: "Organisation owner", sessionVersion: 1 }}>
     {params.has("merchandise") ? <OperationsWorkspace view="merchandise" /> : path === "/settings" ? <SettingsPage /> : path === "/reservations" ? <ReservationsWorkspace /> : path === "/operations/move-in" ? <MoveInWorkspace
       key={params.toString()}
       action={async () => { throw new Error("Fixture must not submit a move-in"); }}

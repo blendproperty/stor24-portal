@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { sessionCookieName, verifySessionToken } from "@/lib/session";
+import { canVisit } from "@/lib/navigation-access";
 import { db } from "@/lib/db";
 
 const publicPagePrefixes = ["/login", "/forgot-password", "/reset-password/", "/invite/", "/setup/", "/brand/", "/icons/", "/sign/", "/offline.html", "/offline-workspace.html", "/offline-workspace.css", "/offline-workspace.js", "/manifest.webmanifest", "/sw.js"];
@@ -22,7 +23,7 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isPublic = isPublicPathname(pathname);
   const session = await verifySessionToken(request.cookies.get(sessionCookieName)?.value);
-  const user = session ? await db.user.findUnique({ where: { id: session.userId }, select: { active: true, sessionVersion: true } }) : null;
+  const user = session ? await db.user.findUnique({ where: { id: session.userId }, select: { active: true, sessionVersion: true, roleAssignments: { include: { role: true } } } }) : null;
   const validSession = Boolean(session && user?.active && user.sessionVersion === session.sessionVersion);
 
   if (pathname === "/login" && validSession) {
@@ -39,6 +40,10 @@ export async function proxy(request: NextRequest) {
     response.cookies.delete(sessionCookieName);
     return response;
   }
+  if (!pathname.startsWith("/api/") && user && !canVisit(pathname, {
+    owner: user.roleAssignments.some(a => a.facilityId === null && a.role.name === "Organisation owner"),
+    permissions: user.roleAssignments.flatMap(a => a.role.permissions),
+  })) return NextResponse.redirect(new URL("/access-restricted", request.url));
   return NextResponse.next();
 }
 

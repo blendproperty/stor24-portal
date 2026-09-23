@@ -1,5 +1,14 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Restricted staff navigation - 23 September 2026
+
+- **Implementation:** restricted sidebar/mobile entries are greyed out, keyboard-focusable non-links with a lock and administrator-contact message. Current database grants drive navigation and pre-render page redirects to a branded Access restricted page; API and facility-scope enforcement remains unchanged. Settings/password/MFA remain available. Specific billing subroutes retain their own permission requirements; current assignments, not the JWT job title, determine navigation.
+- **Testing:** focused policy/proxy tests passed for restricted direct links, current grants, stale owner JWT, inactive accounts and unchanged API routing. Desktop/mobile actual-shell checks passed at 1440/390/320px. TypeScript and focused lint checked; exact-head CI pending.
+- **Commit and push:** implementation ba15bfb pushed on codex/restricted-navigation-20260923 from canonical main 8a79742; enclosing PR records promotion.
+- **Merge:** pending.
+- **Deployment and configuration:** pending; no schema or permission-grant changes.
+- **Live production verification:** pending restricted manager login readback. P01/training and all existing provider, finance, data and acceptance gates remain open.
+
 ## Owner-controlled training release evidence - 23 September 2026
 
 - **Implementation:** in-app training toggle and saved six-step demo flow for the current organisation owner and facility managers. Database role checks, facility scope, pinned controller, run versions and enable generations protect all training actions. Only the supplied synthetic image is accepted; no image bytes persist. Live payments, bookings, inventory, tenancies, communications and access-provider jobs are untouched by training.
