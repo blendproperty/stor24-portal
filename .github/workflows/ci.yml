@@ -30,6 +30,7 @@ jobs:
       - run: node scripts/test-facial-photos.mjs
       - run: node scripts/test-identity.mjs
       - run: node scripts/test-premium-workspace.mjs
+      - run: node scripts/test-floor-availability.mjs
       - run: node scripts/test-tenant-login.mjs
       - uses: actions/upload-artifact@v4
         if: always()
@@ -46,6 +47,7 @@ jobs:
             output/mri/390.png
             output/facial-access/
             output/identity/
+            output/floor-availability/
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 20

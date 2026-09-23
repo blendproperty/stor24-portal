@@ -1,3 +1,4 @@
+import { unitIsOperational, floorMapSelection } from "@/lib/floor-availability";
 import { apiError, jsonBody } from "@/lib/api";
 import { requirePermission } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
@@ -30,7 +31,7 @@ export async function GET() {
         include: {
           units: {
             where: { status: "AVAILABLE" },
-            include: { unitType: true },
+            include: { unitType: true, mapElements: floorMapSelection },
             orderBy: { number: "asc" },
           },
         },
@@ -52,7 +53,7 @@ export async function GET() {
         orderBy: { updatedAt: "desc" },
       }),
     ]);
-    return Response.json({ data: { facilities, customers, reservations } });
+    return Response.json({ data: { facilities: facilities.map(facility => ({ ...facility, units: facility.units.filter(unit => unitIsOperational(unit, facility.closedFloors)) })), customers, reservations } });
   } catch (error) {
     return apiError(error);
   }

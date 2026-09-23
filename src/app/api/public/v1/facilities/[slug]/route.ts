@@ -1,3 +1,4 @@
+import { floorIsOperational, unitIsOperational, floorMapSelection } from "@/lib/floor-availability";
 import { db } from "@/lib/db";
 import {
   publicApiAuthorized,
@@ -41,6 +42,7 @@ export async function GET(
     where: { publicSlug: slug.toLowerCase(), active: true, publicBookingEnabled: true },
     select: {
       name: true,
+      closedFloors: true,
       publicSlug: true,
       timezone: true,
       address: true,
@@ -51,6 +53,7 @@ export async function GET(
       },
       units: {
         select: {
+          mapElements: floorMapSelection,
           id: true, number: true, floor: true, zone: true, status: true,
           monthlyRate: true, taxRate: true,
           unitType: { select: { name: true, widthMetres: true, lengthMetres: true, areaSqMetres: true, features: true } },
@@ -66,7 +69,7 @@ export async function GET(
               rotation: true, label: true, config: true, sortOrder: true,
               unit: {
                 select: {
-                  id: true, number: true, status: true, monthlyRate: true, taxRate: true,
+                  id: true, number: true, floor: true, status: true, monthlyRate: true, taxRate: true,
                   unitType: { select: { name: true, widthMetres: true, lengthMetres: true, areaSqMetres: true, features: true } },
                 },
               },
@@ -140,13 +143,13 @@ export async function GET(
       priceZar: Number(product.sellingPrice.toString()),
       availableQuantity: Math.max(0, product.quantityOnHand - product.quantityReserved),
     })),
-    units: facility.units.map(unitView),
-    maps: facility.maps.map((map) => ({
+    units: facility.units.filter(unit => unitIsOperational(unit, facility.closedFloors)).map(unitView),
+    maps: facility.maps.filter(map => floorIsOperational(map.name, facility.closedFloors)).map((map) => ({
       id: map.id,
       name: map.name,
       width: map.width,
       height: map.height,
-      elements: map.elements.map((element) => ({
+      elements: map.elements.filter(element => !element.unit || floorIsOperational(element.unit.floor, facility.closedFloors)).map((element) => ({
         id: element.id,
         type: element.type,
         x: element.x,

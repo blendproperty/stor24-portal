@@ -1,3 +1,4 @@
+import { requireOperationalUnit } from "@/lib/floor-availability-service";
 import { db } from "@/lib/db";
 import { notifyReservationConfirmed } from "@/lib/notifications";
 import { requireFacility, type RequestScope } from "@/lib/scope";
@@ -63,6 +64,7 @@ export async function syncOfflineReservation(scope: RequestScope, input: Offline
 
   try {
     const created = await db.$transaction(async (tx) => {
+      await requireOperationalUnit(tx, input.facilityId, input.unitId);
       const claimed = await tx.unit.updateMany({
         where: { id: input.unitId, facilityId: input.facilityId, status: "AVAILABLE" },
         data: { status: "RESERVED" },

@@ -1,3 +1,4 @@
+import { floorIsOperational } from "@/lib/floor-availability";
 import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
 import { apiError, jsonBody } from "@/lib/api";
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
     const facilityId = new URL(request.url).searchParams.get("facilityId");
     if (facilityId) await requireFacility(scope, facilityId);
     const facilities = await db.facility.findMany({ where: { organisationId: auth.organisationId, active: true, ...(auth.allowedFacilityIds ? { id: { in: auth.allowedFacilityIds } } : {}), ...(facilityId ? { id: facilityId } : {}) }, include: { unitTypes: { orderBy: { name: "asc" } }, units: { include: { unitType: true }, orderBy: { number: "asc" } }, maps: { include: { elements: { include: { unit: { include: { unitType: true } } }, orderBy: { sortOrder: "asc" } } }, orderBy: { name: "asc" } } }, orderBy: { name: "asc" } });
-    return Response.json({ data: facilities });
+    return Response.json({ data: facilities.map(facility => ({ ...facility, maps: facility.maps.map(map => ({ ...map, elements: map.elements.map(element => ({ ...element, unit: element.unit ? { ...element.unit, floorOperational: floorIsOperational(element.unit.floor, facility.closedFloors) && floorIsOperational(map.name, facility.closedFloors) } : null })) })) })) });
   } catch (error) { return apiError(error); }
 }
 

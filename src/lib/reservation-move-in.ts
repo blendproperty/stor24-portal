@@ -1,3 +1,5 @@
+import { requireOperationalUnit } from "@/lib/floor-availability-service";
+import { unitIsOperational, floorMapSelection } from "@/lib/floor-availability";
 import { identityGate } from "@/lib/identity-document-service";
 import { requestPhotoActivation } from "@/lib/facial-photo-activation";
 import { isTestPayment } from "@/lib/payments/payment-evidence";
@@ -9,10 +11,11 @@ import { southAfricaDateKey } from "@/lib/south-africa-time";
 
 type Database = Prisma.TransactionClient;
 const reservationInclude = {
+  facility: { select: { closedFloors: true } },
   publicLease: { select: { id: true, status: true, signedAt: true, signedPdfSha256: true, paymentMethod: true, mandate: { select: { status: true } } } },
   packageSelection: { select: { priceSnapshot: true } },
   convertedTenancy: { select: { status: true, occupancies: { where: { status: { in: ["ACTIVE", "NOTICE_GIVEN"] } }, select: { unitId: true } } } },
-  unit: { select: { status: true, occupancies: { where: { status: { in: ["PENDING", "ACTIVE", "NOTICE_GIVEN", "TRANSFERRING"] } }, select: { id: true } } } },
+  unit: { select: { mapElements: floorMapSelection, floor: true, status: true, occupancies: { where: { status: { in: ["PENDING", "ACTIVE", "NOTICE_GIVEN", "TRANSFERRING"] } }, select: { id: true } } } },
 } satisfies Prisma.ReservationInclude;
 
 /** Use the exact booking account. Shopping, test receipts and another unit's payments cannot clear a move-in. */
@@ -44,6 +47,7 @@ export async function reservationReadiness(database: Database, scope: RequestSco
   const signed = reservation.publicLease?.status === "SIGNED" && Boolean(reservation.publicLease.signedAt && reservation.publicLease.signedPdfSha256);
   const startDate = reservation.intendedMoveIn ? southAfricaDateKey(reservation.intendedMoveIn) : null;
   const blockers: string[] = [];
+  if (!unitIsOperational(reservation.unit, reservation.facility.closedFloors)) blockers.push("This floor is not operational. Staff must arrange an operational unit before move-in.");
   if (!forPhoto && !(await identityGate(database, scope.organisationId, reservation.id, reservation.createdAt, "HANDOVER"))) blockers.push("The identity document needs staff acceptance before key handover. Open Identity review.");
   const handedOver = forPhoto && reservation.status === "CONVERTED" && reservation.convertedTenancyId &&
     ["ACTIVE", "NOTICE_GIVEN"].includes(reservation.convertedTenancy?.status ?? "") && reservation.convertedTenancy?.occupancies.some(occupancy => occupancy.unitId === reservation.unitId) &&
@@ -77,8 +81,9 @@ export async function getReservationMoveInReadiness(scope: RequestScope, reserva
 /** Caller authorises move_in.create for this facility. No signing dispatch, payment posting or door provisioning. */
 export async function confirmReservationMoveIn(scope: RequestScope, reservationId: string) {
   return db.$transaction(async tx => {
-    const target = await tx.reservation.findFirst({ where: { id: reservationId, facility: facilityWhere(scope), customer: { organisationId: scope.organisationId } }, select: { unitId: true } });
+    const target = await tx.reservation.findFirst({ where: { id: reservationId, facility: facilityWhere(scope), customer: { organisationId: scope.organisationId } }, select: { unitId: true, facilityId: true } });
     if (!target) throw new Error("NOT_FOUND");
+    await requireOperationalUnit(tx, target.facilityId, target.unitId);
     await tx.$queryRaw`SELECT "id" FROM "Unit" WHERE "id" = ${target.unitId} FOR UPDATE`;
     await tx.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id" = ${reservationId} FOR UPDATE`;
     const existing = await tx.reservation.findUniqueOrThrow({ where: { id: reservationId } });

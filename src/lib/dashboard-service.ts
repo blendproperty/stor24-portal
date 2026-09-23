@@ -1,3 +1,4 @@
+import { unitIsOperational, floorMapSelection } from "@/lib/floor-availability";
 import { netCollectionTotal } from "@/lib/finance/collection-total";
 import { db } from "@/lib/db";
 import { facilityWhere, type RequestScope } from "@/lib/scope";
@@ -199,31 +200,20 @@ export type FacilityUnitStats = {
 export async function getUnitStatsByFacility(scope: RequestScope): Promise<FacilityUnitStats[]> {
   const facilities = await db.facility.findMany({
     where: facilityWhere(scope),
-    select: { id: true, name: true },
+    select: { id: true, name: true, closedFloors: true, units: { select: { status: true, floor: true, mapElements: floorMapSelection } } },
     orderBy: { name: "asc" },
   });
-  const stats = await Promise.all(
-    facilities.map(async (facility) => {
-      const [total, available, reserved, occupied, service] = await Promise.all([
-        db.unit.count({ where: { facilityId: facility.id } }),
-        db.unit.count({ where: { facilityId: facility.id, status: "AVAILABLE" } }),
-        db.unit.count({ where: { facilityId: facility.id, status: { in: ["RESERVED", "HELD"] } } }),
-        db.unit.count({ where: { facilityId: facility.id, status: "OCCUPIED" } }),
-        db.unit.count({ where: { facilityId: facility.id, status: { in: ["SERVICE", "UNAVAILABLE"] } } }),
-      ]);
-      return {
-        facilityId: facility.id,
-        facilityName: facility.name,
-        total,
-        available,
-        reserved,
-        occupied,
-        service,
-        occupancyPct: total > 0 ? Math.round((occupied / total) * 1000) / 10 : 0,
-      };
-    }),
-  );
-  return stats;
+  return facilities.map(facility => {
+    const total = facility.units.length;
+    const occupied = facility.units.filter(unit => unit.status === "OCCUPIED").length;
+    return {
+      facilityId: facility.id, facilityName: facility.name, total, occupied,
+      available: facility.units.filter(unit => unit.status === "AVAILABLE" && unitIsOperational(unit, facility.closedFloors)).length,
+      reserved: facility.units.filter(unit => ["RESERVED", "HELD"].includes(unit.status)).length,
+      service: facility.units.filter(unit => ["SERVICE", "UNAVAILABLE"].includes(unit.status) || (unit.status === "AVAILABLE" && !unitIsOperational(unit, facility.closedFloors))).length,
+      occupancyPct: total > 0 ? Math.round((occupied / total) * 1000) / 10 : 0,
+    };
+  });
 }
 
 export async function getOperationsHome(scope: RequestScope) {

@@ -1,3 +1,4 @@
+import { floorIsOperational, unitIsOperational, floorMapSelection } from "@/lib/floor-availability";
 import { db } from "@/lib/db";
 import { publicApiAuthorized } from "@/lib/public-booking-contract";
 import { releaseExpiredPublicReservations } from "@/lib/public-booking-service";
@@ -14,10 +15,11 @@ export async function GET(request: Request) {
     where: { active: true, publicBookingEnabled: true, publicSlug: { not: null } },
     select: {
       name: true,
+      closedFloors: true,
       publicSlug: true,
       address: true,
       maps: { select: { name: true }, orderBy: { name: "asc" } },
-      _count: { select: { units: { where: { status: "AVAILABLE" } } } },
+      units: { where: { status: "AVAILABLE" }, select: { floor: true, mapElements: floorMapSelection } },
     },
     orderBy: { name: "asc" },
   });
@@ -27,8 +29,8 @@ export async function GET(request: Request) {
       name: facility.name,
       slug: facility.publicSlug,
       address: facility.address,
-      availableUnitCount: facility._count.units,
-      floors: facility.maps.map((map) => map.name),
+      availableUnitCount: facility.units.filter(unit => unitIsOperational(unit, facility.closedFloors)).length,
+      floors: facility.maps.filter(map => floorIsOperational(map.name, facility.closedFloors)).map((map) => map.name),
     })),
     meta: { count: facilities.length },
   }, { headers: noStore });

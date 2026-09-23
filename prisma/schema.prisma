@@ -270,6 +270,7 @@ model Facility {
   active                Boolean                 @default(true)
   publicSlug            String?                 @unique
   publicBookingEnabled  Boolean                 @default(false)
+  closedFloors          String[]                @default([])
   unitTypes             UnitType[]
   units                 Unit[]
   maps                  FacilityMap[]

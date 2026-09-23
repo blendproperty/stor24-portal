@@ -1,3 +1,4 @@
+import { requireOperationalUnit } from "@/lib/floor-availability-service";
 import { apiError, jsonBody } from "@/lib/api";
 import { db } from "@/lib/db";
 import {
@@ -307,6 +308,15 @@ export async function PATCH(
             data: { label: nextNumber },
           });
           return updated;
+        });
+      } else if (resource === "reservations") {
+        await requirePermission("reservations.manage", current.facilityId);
+        const patch = data as { facilityId?: string; unitId?: string };
+        if (patch.facilityId && patch.facilityId !== current.facilityId) throw new Error("FORBIDDEN");
+        entity = await db.$transaction(async tx => {
+          const reservation = await tx.reservation.findUniqueOrThrow({ where: { id: current.id } });
+          await requireOperationalUnit(tx, current.facilityId, patch.unitId ?? reservation.unitId);
+          return tx.reservation.update({ where: { id: current.id }, data });
         });
       } else {
         entity = await (model as typeof db.unit).update({

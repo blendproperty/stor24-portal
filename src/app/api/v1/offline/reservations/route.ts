@@ -17,7 +17,7 @@ export async function POST(request: Request) {
       paymentLink: { status: "BLOCKED", reason: "Netcash must pass sandbox and authenticated-webhook verification before live payment links are enabled." },
     } } }, { status: data.idempotent ? 200 : 201, headers: { "Cache-Control": "no-store", Pragma: "no-cache" } });
   } catch (error) {
-    if (error instanceof Error && error.message === "UNIT_UNAVAILABLE") {
+    if (error instanceof Error && ["UNIT_UNAVAILABLE", "FLOOR_NOT_OPERATIONAL"].includes(error.message)) {
       return Response.json({ error: { code: "UNIT_UNAVAILABLE", message: "That unit is no longer available. Refresh the offline copy and choose another unit." } }, { status: 409 });
     }
     return apiError(error);

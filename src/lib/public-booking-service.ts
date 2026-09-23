@@ -1,5 +1,6 @@
 import { newIdentityAccess } from "@/lib/identity-document-security";
 import type { Prisma } from "@/generated/prisma/client";
+import { requireOperationalUnit } from "@/lib/floor-availability-service";
 import { db } from "@/lib/db";
 import { welcomeTenantWhenReady } from "@/lib/tenant-welcome-email";
 import {
@@ -207,6 +208,10 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
 
   try {
     const reservation = await db.$transaction(async (tx) => {
+      try { await requireOperationalUnit(tx, facility.id, input.unitId); } catch (error) {
+        if (error instanceof Error && ["FLOOR_NOT_OPERATIONAL", "UNIT_UNAVAILABLE"].includes(error.message)) throw new PublicBookingError("UNIT_UNAVAILABLE", 409);
+        throw error;
+      }
       const unit = await tx.unit.findFirst({
         where: { id: input.unitId, facilityId: facility.id },
         include: { unitType: true },
