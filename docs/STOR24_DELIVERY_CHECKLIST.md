@@ -114,6 +114,6 @@ The checklist does not itself authorise real money, identity decisions/uploads, 
 
 ## Photo collection control checkpoint - 23 September 2026
 
-Owner-only shared switch and interim tenancy retention implemented; local unit, database journey and responsive component tests passed. Merge/deployment/live UI verification pending (PROJECT_CONTEXT.md). Off preserves review and deletion; managers cannot change settings. No live collection enabled. P01 remains open for Brett's acceptance.
+Owner-only shared switch and interim tenancy retention implemented; local unit, database journey and responsive component tests passed. PR #225 merged as eec3417b6; deployment 35870250545 succeeded. Live owner page verified with orange control OFF and interim rules (PROJECT_CONTEXT.md). Off preserves review and deletion; managers cannot change settings. No live collection enabled. P01 remains open for Brett's acceptance.
 
 P03/P04: Brett confirmed seven days from actual debit-order failure, not scheduled date. Final customer debit result ingestion, settlement reconciliation and Hikvision suspension/restoration remain required; load rejection is not customer non-payment. [Interim policy and review gates](FACIAL_PHOTO_POLICY_DRAFT.md).

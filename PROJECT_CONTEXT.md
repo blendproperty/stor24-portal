@@ -1,5 +1,15 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Owner photo control release evidence - 23 September 2026
+
+- **Implementation:** shared owner-only collection control and interim lifecycle retention shipped. Details and seven-day rule/provider boundary are in docs/FACIAL_PHOTO_POLICY_DRAFT.md.
+- **Testing:** exact-head CI 35869637329 and database checks 35869637315 succeeded on 28cd98e02bed0f74c5dca130824b109a15b0d700. Main CI 35869984110 succeeded. Local 371 unit tests, 42 connected database tests and responsive actual-component checks passed; final targeted photo rerun passed all 10 tests. No live customer workflow claimed.
+- **Commit and push:** implementation/context b6da6e0 and fixture correction 28cd98e pushed. This evidence is promoted from codex/photo-control-release-20260923 through its enclosing documentation PR.
+- **Merge:** PR #225 merged as eec3417b679ce52a7136cb243ec04c5efed38d54.
+- **Deployment and configuration:** deployment 35870250545 succeeded; server checkout eec3417b679ce52a7136cb243ec04c5efed38d54 and healthy stor24-crm:eec3417b6 verified. Migration deployed. Collection remains OFF; no owner switch or training configuration changed by this task.
+- **Live production verification:** Edge owner session at /access shows Brett Dovey / Organisation owner, Photo collection off and orange Turn collection on control. Expanded interim rules show tenancy retention, required enrolment, no configured alternative and seven days from confirmed debit failure; suspension/restoration explicitly unconnected. No photo uploaded, provider call, payment, email or gate action. Manager permissions/shared state were verified in automated tests, not a live manager photo workflow.
+- **Open gates:** Brett enabling collection and customer/staff hands-on acceptance; Liezl review; final debit failure/settlement result ingestion and reconciliation; Hikvision activation, suspension/restoration, device deletion and on-site tests. P01 and wider programme remain unaccepted.
+
 ## Owner photo collection control - 23 September 2026
 
 - **Implementation:** shared database switch, controlling-owner pin inherited from the established training owner at first use, fresh-role checks, same-origin API, version checks, audit and upload/disable locking. Managers see read-only state refreshed every 15 seconds/on focus. Interim notice awaits review; active booking/tenancy retention deletes on cancellation/expiry/end/withdrawal. Off stops uploads but preserves consent/review/deletion. Legacy policies retain fixed-hour expiry. No gate activation implied.
