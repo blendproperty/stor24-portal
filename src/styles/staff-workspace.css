@@ -163,3 +163,17 @@
 .app-shell .program-tabs button.active { background: #edf3e5; border-color: #9eb69f; color: #183b2c; }
 .app-shell .defaults-group > h3 { padding: 15px 18px; font-weight: 500; background: #f0f2e9; }
 .app-shell .defaults-fields { padding: 18px; gap: 15px; }
+
+/* Complete rows and legible form labels on specialist workspaces. */
+.app-shell .leasing-form { align-items: end; gap: 16px; margin: 18px 0 32px; }
+.app-shell .leasing-form label { display: grid; gap: 8px; min-width: 0; font-size: 12px; }
+.app-shell details.panel > summary { cursor: pointer; padding: 20px 24px; font-size: 14px; font-weight: 500; }
+.app-shell details.panel[open] > summary { border-bottom: 1px solid var(--line); }
+.app-shell .calendar-day { background: #fffefa; border-color: var(--line); border-radius: 14px; min-width: 0; }
+.app-shell .calendar-day > div { flex-wrap: wrap; }
+.app-shell .calendar-day > p { background: #f0f2e9; color: #657468; }
+@media(min-width:1101px) {
+ .app-shell .summary-strip:has(> :nth-child(3):last-child) { grid-template-columns: repeat(3,minmax(0,1fr)); }
+ .app-shell .metric-grid:has(> :nth-child(6):last-child) { grid-template-columns: repeat(3,minmax(0,1fr)); }
+ .app-shell .calendar-grid { grid-template-columns: repeat(7,minmax(0,1fr)); gap: 12px; }
+}

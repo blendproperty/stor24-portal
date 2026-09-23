@@ -167,8 +167,8 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
   </>;
 
   if (view === "merchandise") return <div className="page-stack">
-    <details className="panel"><summary>Customer purchases · collection and delivery</summary><MerchandiseOrderQueue /></details>
     <PageHeader eyebrow="Operations · Merchandise" title="Merchandise" description="A dedicated catalogue, stock and package workspace for everything sold alongside a Stor24 unit." action={<span className="inline-actions"><button className="button button-secondary" onClick={() => setShowStock(true)}>Move stock</button><button className="button button-primary" onClick={() => setShowProduct(true)}><Plus size={16}/> Add product</button></span>} />
+    <details className="panel"><summary>Customer purchases · collection and delivery</summary><MerchandiseOrderQueue /></details>
     {error ? <p className="form-error">{error}</p> : null}
     <section className="summary-strip">
       {[["Products", data?.products.length ?? 0], ["Active packages", data?.storagePackages.filter((pack) => pack.active).length ?? 0], ["Reorder items", reorder.length], ["Facilities", data?.facilities.length ?? 0]].map(([label, value]) => <div className="summary-cell" key={label}><span>{label}</span><strong>{value}</strong></div>)}
