@@ -37,7 +37,7 @@ Updated: 23 September 2026. This is the authoritative check-off register for the
 
 | ID | Next action | Open blocker | Owner | Accepted by / date | Evidence |
 |---|---|---|---|---|---|
-| P01 | Review E001 and complete current browser/staff acceptance; retain J19–J21 gates. | Connected isolated journey passes; D001 repaired. Live browser/staff acceptance, historical impact review and P03/P04 provider dependencies remain. | Codex: technical work; staff reviewer unassigned | Pending | [E001 journey evidence](PRIORITY_1_ACCEPTANCE_2026-09-23.md) |
+| P01 | Brett: guided J01 floor/selection check, then agree controlled journey/customer; review historical candidates separately. Retain J19–J21 gates. | D001 deployed; automated journey passes. Full browser/staff acceptance, 14 historical cancelled/signed candidates and P03/P04 dependencies remain open. | Codex: technical work; Brett: hands-on acceptance | Pending | [E001/E002 journey and release evidence](PRIORITY_1_ACCEPTANCE_2026-09-23.md) |
 | P02 | Agree a representative account and reconcile invoice, receipt, statement and settlement. | Opening balances, reconciliation, charge/tax rules, refund authority and finance acceptance remain. | Unassigned | Pending | [Baseline release record](../PROJECT_CONTEXT.md); current acceptance pending |
 | P03 | Keep live activation held; prepare provider acceptance cases and record the activation decision. | Live activation remains deferred by Brett. Merchant/mandate approval and settlement evidence required. | Unassigned | Pending | [Baseline release record](../PROJECT_CONTEXT.md); current acceptance pending |
 | P04 | Confirm policy and installed provider; prove enrolment, suspend, restore, revoke and uncertain outcomes. | Photo policy/consent, installed-provider configuration and actual entry/removal proof remain. | Unassigned | Pending | [Baseline release record](../PROJECT_CONTEXT.md); current acceptance pending |
@@ -87,6 +87,7 @@ Append one row per run or defect; preserve failed results when a later retest pa
 |---|---|---|---|---|---|---|---|
 | E000 | Programme baseline | Source review, 2026-09-23 | Checklist created; no new operational acceptance performed | [Priority scope](STOR24_REMAINING_PRIORITIES_2026-09-23.md), [release history](../PROJECT_CONTEXT.md) | Unassigned | 2026-09-23 | All 13 priorities remain open |
 | E001 / D001 | P01; J01–J18 partial technical coverage | Isolated PostgreSQL, synthetic data and intercepted messaging, 2026-09-23 | Connected journey reproduced signed/paid booking cancellation at hold expiry; repaired and retested. | [Acceptance evidence](PRIORITY_1_ACCEPTANCE_2026-09-23.md) | Codex | 2026-09-23 | 15 connected tests and 43 related DB tests pass; live/staff/provider acceptance remains open |
+| E002 | P01 / D001 release and impact screening | Production `70cf5e24f`, read-only checks | Deployment/runtime healthy; floor response preserved. 14 cancelled/signed candidates need individual review; payment environment unspecified. No customer changes. | [Release and impact evidence](PRIORITY_1_ACCEPTANCE_2026-09-23.md#e002-release-and-historical-impact-screening) | Codex; Brett assigned hands-on reviewer | 2026-09-23 | Repair released; full browser acceptance and historical remediation remain open |
 
 ## Existing release evidence to reuse
 

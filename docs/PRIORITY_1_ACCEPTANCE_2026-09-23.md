@@ -67,4 +67,24 @@ The fixture records a R100 payment followed by a R25 final charge, giving a R75 
 
 ## Next acceptance step
 
-After the reviewed repair is deployed, perform the current browser journey with an authorised staff reviewer and an agreed test environment/customer. Record actual screen outcomes, documents, balances and audit references, then fix/retest failures. Keep live payment and physical access deferred/blocked until their existing approvals and provider readiness are satisfied. Reconcile the checklist and any dated Excel copy at that checkpoint.
+**Reviewer: Brett**, explicitly assigned on 23 September 2026. The repair is deployed; no staff acceptance result has yet been submitted. Guide Brett through one step at a time and record actual outcomes against J IDs.
+
+1. J01 initial browser check: open the [public booking page](https://stor4.srv938083.hstgr.cloud/book), confirm Ground Floor is selectable and First Floor / Second Floor are grey, labelled Coming soon and cannot be selected. Select an available ground-floor unit and verify the displayed unit/rate. Stop before submitting personal details or creating a reservation. This covers only the visibility/selection part of J01.
+2. Agree the controlled test customer and environment before booking submission, identity, signing, receipt or messaging steps. Continue the same traceable journey through J01–J07, recording documents, balances, audit references and observed recovery results. Do not make a real signature/payment or contact a customer merely to obtain a test pass.
+3. Review the historical candidates below individually with staff/finance. Keep genuine payment and physical access deferred/blocked until the existing approvals and provider readiness are satisfied. Reconcile the checklist and dated Excel copy at each checkpoint.
+
+## E002: release and historical impact screening
+
+[PR #200](https://github.com/blendproperty/stor24-portal/pull/200) merged as `70cf5e24f470538e1fbd579c460b8540fc8218e0` after all exact-head checks passed. Main CI `35832716072` and [deployment `35832882012`](https://github.com/blendproperty/stor24-portal/actions/runs/35832882012) succeeded. The production checkout and healthy image `stor24-crm:70cf5e24f` match that release. CRM health at `2026-09-23T07:42:17.627Z` reported application/database `ok`; public Midpoint detail retained 142 units and both upper floors in `comingSoonFloors`. No schema/configuration change was needed. This is release/readback evidence, not a production expiry rehearsal or Brett's acceptance.
+
+A bounded `BEGIN READ ONLY` transaction on the verified production database, followed by `ROLLBACK`, screened signed agreements joined to their reservations, current units and `ST24-T-<reservationId>` accounts/payments. Only aggregate results are recorded here:
+
+| Finding | Count / result |
+|---|---|
+| Active signed reservations | 3, none converted to tenancy |
+| Cancelled signed candidates | 14, all PUBLIC_WEBSITE, none converted to tenancy |
+| Current unit state for those candidates | 6 AVAILABLE; 8 RESERVED (reservation counts, not distinct units) |
+| Linked payment rows | 7 SUCCEEDED; 4 PENDING; 3 FAILED |
+| Payment provenance | All NETCASH / PAY_NOW; environment unspecified |
+
+The 14 candidates are not 14 proven instances of D001, nor necessarily 14 customers. Manual cancellation and test history must be distinguished, and a stored SUCCEEDED status with unspecified environment does not establish real funds or settlement. Old records lack the new expiry-specific audit evidence. No production record was reopened, reallocated or financially changed. Individual staff/finance review remains open: establish cancellation reason, test/live provenance, signed-document position and present unit rights before choosing recovery. Never restore a booking over another customer's allocation.
