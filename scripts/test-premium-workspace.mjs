@@ -67,7 +67,7 @@ if (process.env.PREVIEW_ONLY) {
   await mkdir('output/premium-workspace',{recursive:true});
   const page = await browser.newPage();
   const errors=[]; page.on('pageerror',e=>errors.push(e.message));
-  for (const width of [1440, 1024, 768, 390, 320]) {
+  for (const width of [1440, 1024, 768, 390, 320, 305]) {
    await page.setViewportSize({width,height:900});
    await page.goto(base + '/operations/move-in?inventory');
    await expect(page.getByRole('button',{name:'Next',exact:true})).toBeDisabled();

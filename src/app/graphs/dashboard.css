@@ -6,7 +6,11 @@
 
 .line-chart-wrap {
   padding-top: 8px;
+  padding-bottom: 6px;
+  overflow-x: auto;
 }
+
+.line-chart-wrap > svg, .line-chart-labels { min-width: 420px; }
 
 .line-chart {
   width: 100%;

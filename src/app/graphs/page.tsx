@@ -12,7 +12,7 @@ import {
   getUnitStatsByFacility,
 } from "@/lib/dashboard-service";
 
-export const metadata = { title: "Dashboard" };
+export const metadata = { title: "Performance overview" };
 
 const currency = new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR", maximumFractionDigits: 0 });
 
@@ -33,7 +33,7 @@ function LineChart({ points, formatValue }: { points: { label: string; value: nu
   const areaPath = `${path} L ${coords[coords.length - 1]?.x ?? 0} ${height} L 0 ${height} Z`;
 
   return (
-    <div className="line-chart-wrap">
+    <div className="line-chart-wrap" role="region" aria-label="Monthly occupancy trend" tabIndex={0}>
       <svg viewBox={`0 0 ${width} ${height}`} className="line-chart" preserveAspectRatio="none">
         <defs>
           <linearGradient id="lineFill" x1="0" y1="0" x2="0" y2="1">

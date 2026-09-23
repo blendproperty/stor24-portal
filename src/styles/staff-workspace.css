@@ -162,6 +162,10 @@
 }
 
 .brand-corner:has(.brand-corner__tip) { z-index: 40; }
+@media(max-width:400px) {
+ .app-shell .topbar { padding-inline: 10px; gap: 4px; }
+ .app-shell .top-actions { gap: 6px; }
+}
 
 .app-shell .program-tabs button.active { background: #edf3e5; border-color: #9eb69f; color: #183b2c; }
 .app-shell .defaults-group > h3 { padding: 15px 18px; font-weight: 500; background: #f0f2e9; }
