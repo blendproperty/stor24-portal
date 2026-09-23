@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { requireTenantSession } from "@/lib/tenant-portal-auth";
 import { tenantCustomerScope } from "@/lib/tenant-portal-security";
 import { tenantError, tenantPrivateHeaders } from "@/lib/tenant-portal-response";
+import { tenantIdentitySelect } from "@/lib/tenant-identity-presentation";
 
 export async function GET() {
   try {
@@ -19,7 +20,7 @@ export async function GET() {
     const payments = await db.payment.findMany({ where: { account: { customer }, status: { in: ["SUCCEEDED", "TEST_SUCCEEDED", "TEST_PENDING"] } }, select: { status: true, idempotencyKey: true, environment: true, id: true, accountId: true, amount: true, currency: true, processedAt: true, createdAt: true, account: { select: { accountNumber: true } } }, orderBy: { createdAt: "desc" }, take: 200 });
     const reservations = await db.reservation.findMany({
       where: { customer, OR: [{ publicLease: { status: "SIGNED" } }, { convertedTenancyId: { not: null } }] },
-      select: { id: true, customerId: true, status: true, publicReference: true, unitId: true, unit: { select: { number: true } }, facility: { select: { name: true } }, convertedTenancy: { select: { accountId: true } }, packageSelection: { select: { packageName: true, status: true, priceSnapshot: true, itemsSnapshot: true, fulfilledAt: true } } },
+      select: { id: true, customerId: true, status: true, publicReference: true, unitId: true, identityDocument: { select: tenantIdentitySelect }, unit: { select: { number: true } }, facility: { select: { name: true } }, convertedTenancy: { select: { accountId: true } }, packageSelection: { select: { packageName: true, status: true, priceSnapshot: true, itemsSnapshot: true, fulfilledAt: true } } },
       orderBy: { createdAt: "desc" },
     });
     const reviewAccounts = await testPaymentReviewAccounts(accounts.map(account => account.id));

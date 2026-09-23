@@ -88,3 +88,15 @@ A bounded `BEGIN READ ONLY` transaction on the verified production database, fol
 | Payment provenance | All NETCASH / PAY_NOW; environment unspecified |
 
 The 14 candidates are not 14 proven instances of D001, nor necessarily 14 customers. Manual cancellation and test history must be distinguished, and a stored SUCCEEDED status with unspecified environment does not establish real funds or settlement. Old records lack the new expiry-specific audit evidence. No production record was reopened, reallocated or financially changed. Individual staff/finance review remains open: establish cancellation reason, test/live provenance, signed-document position and present unit rights before choosing recovery. Never restore a booking over another customer's allocation.
+
+## E003: Brett's customer portal acceptance findings
+
+Brett progressed beyond the initial floor check and reported these issues on 23 September. The live browser and read-only database diagnosis confirmed the following; no customer data was changed. This does not retroactively accept earlier J cases without their stated evidence.
+
+| Defect / cases | Reproduced finding | Correction and remaining acceptance |
+|---|---|---|
+| D002 / J01, J06, J16 | Compact Move package R1,099 saved as RESERVED, but hidden in collapsed selections while the separate-orders section claimed no supplies purchased. No separate order existed. | Display booking package, saved items and supply status openly; distinguish reserved/test activity from paid separate orders. Browser regression passes; production release and Brett's retest remain. |
+| D003 / J04, J06 | R2,199 sandbox TEST_SUCCEEDED payment; zero real ledger entries; R0 statement without nearby explanation. Payment includes R1,100 storage plus R1,099 package. | Explain test exclusion beside the account balance/statement and on PDF; preserve genuine balance and receipt rules. A reviewed/accepted ID cannot make test payment real. Reconciliation-held null balance displays Under review. Browser regression passes; production release and Brett's retest remain. |
+| D004 / J02, J06 | ID upload persisted as AWAITING_REVIEW, but portal only said staff acceptance was needed. | Show upload acknowledgement/date and review state; refresh without resubmitting. Include accepted, replacement, withdrawn, expired and missing states using only customer-scoped metadata. Browser regression passes; production release and Brett's retest remain. |
+
+Validation: 365 application tests, TypeScript and focused lint pass; actual component checks at 1440/390/320px cover all three findings, released stock, unavailable balance and account/unit isolation with zero operational writes. Build/CI, commit, merge, deployment and production proof are separately recorded in PROJECT_CONTEXT.md. P01 remains open.

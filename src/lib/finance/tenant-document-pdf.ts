@@ -79,5 +79,5 @@ export function renderAccountStatementPdf(statement: AccountStatementData) {
     subtitle: `${statement.from} to ${statement.to} | ${statement.facilityName}`,
     columns: ["Date", "Description", "Debit", "Credit", "Balance"],
     rows: [["", "Opening balance", "", "", money(statement.openingBalance)], ...statement.rows.map(row => [formatSouthAfricaDate(row.date), row.description, Number(row.debit) ? money(row.debit) : "-", Number(row.credit) ? money(row.credit) : "-", money(row.balance)]), ["", "Closing balance", "", "", money(statement.closingBalance)]],
-    notes: [`Prepared ${formatSouthAfricaDate(statement.generatedAt)}. A negative balance is a credit on your account.`, "This is a statement of transactions recorded in STOR24, not a tax invoice or bank settlement confirmation. Pending payments and booking estimates are excluded. Please contact STOR24 if anything does not look right."] });
+    notes: [`Prepared ${formatSouthAfricaDate(statement.generatedAt)}. A negative balance is a credit on your account.`, "This is a statement of transactions recorded in STOR24, not a tax invoice or bank settlement confirmation. Test payments, pending payments and booking estimates are excluded. A zero balance does not confirm that a booking is paid. Please contact STOR24 if anything does not look right."] });
 }
