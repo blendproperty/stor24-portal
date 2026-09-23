@@ -100,3 +100,11 @@ Brett progressed beyond the initial floor check and reported these issues on 23 
 | D004 / J02, J06 | ID upload persisted as AWAITING_REVIEW, but portal only said staff acceptance was needed. | Show upload acknowledgement/date and review state; refresh without resubmitting. Include accepted, replacement, withdrawn, expired and missing states using only customer-scoped metadata. Browser regression passes; production release and Brett's retest remain. |
 
 Validation: 365 application tests, TypeScript and focused lint pass; actual component checks at 1440/390/320px cover all three findings, released stock, unavailable balance and account/unit isolation with zero operational writes. Build/CI, commit, merge, deployment and production proof are separately recorded in PROJECT_CONTEXT.md. P01 remains open.
+
+## E004: customer portal fixes released and read back
+
+[PR #202](https://github.com/blendproperty/stor24-portal/pull/202) merged as `fbb9f6903ed5833b0ecd40030e819924ac263d57` after all exact-head checks passed. Main CI `35839223437` and deployment `35839453541` succeeded; production checkout/image match. Health was `ok` at `2026-09-23T08:53:31.067Z`.
+
+Codex refreshed Brett's existing authenticated booking page and verified the visible R1,099 Compact Move package with all six product lines, reserved/test labels, dated ID-upload/pending-verification confirmation, and explanations beside the R0 balance and statement. View statement returned R0 opening/closing with No real transactions in this period and separately displayed the R2,199 test payment. Saved agreement and handover controls remained visible. No operational customer change or message was submitted.
+
+This supersedes E003's release-pending statements. D002–D004 are deployed and live-readback passed; **Brett's retest is still pending**, and none of the complete J cases or P01 is accepted by this partial production check. Live PDF download and actual staff ID-decision transitions were not exercised. The older Excel file remains a dated export; the canonical checklist is current.
