@@ -240,7 +240,7 @@ export function MoveInWorkspace({
                 <select
                   value={facilityId}
                   onChange={(event) => {
-                    setFacilityId(event.target.value); setPage(1);
+                    setFacilityId(event.target.value);
                     selectUnit("");
                     setFilterKey("ALL"); setPage(1);
                     setFloorFilter("ALL");
@@ -620,15 +620,16 @@ export function MoveInWorkspace({
       ) : null}
       {showCustomer ? (
         <div className="modal-backdrop">
-          <div className="modal-card" role="dialog" aria-modal="true">
+          <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="move-in-customer-title">
             <button
               className="modal-close"
+              aria-label="Close add customer"
               onClick={() => setShowCustomer(false)}
             >
               <X size={18} />
             </button>
             <p className="eyebrow">Move in</p>
-            <h2>Add customer</h2>
+            <h2 id="move-in-customer-title">Add customer</h2>
             <p className="modal-copy">
               Create the operational customer record without leaving the move-in
               workflow.

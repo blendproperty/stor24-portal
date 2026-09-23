@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { AppShell } from "../../src/components/app-shell";
 import { ReservationsWorkspace } from "../../src/components/reservations-workspace";
 import { MoveInWorkspace } from "../../src/components/move-in-workspace";
+import { OperationsWorkspace } from "../../src/components/operations-workspace";
 import SettingsPage from "../../src/app/settings/page";
 import { usePathname } from "next/navigation";
 
@@ -13,7 +14,7 @@ function Fixture() {
   const params = new URLSearchParams(window.location.search);
   const user = params.get("user") || "fixture-staff-a";
   return <AppShell session={{ userId: user, name: "Training Preview", email: "fixture@example.invalid", role: "Organisation owner", sessionVersion: 1 }}>
-    {path === "/settings" ? <SettingsPage /> : path === "/reservations" ? <ReservationsWorkspace /> : path === "/operations/move-in" ? <MoveInWorkspace
+    {params.has("merchandise") ? <OperationsWorkspace view="merchandise" /> : path === "/settings" ? <SettingsPage /> : path === "/reservations" ? <ReservationsWorkspace /> : path === "/operations/move-in" ? <MoveInWorkspace
       key={params.toString()}
       action={async () => { throw new Error("Fixture must not submit a move-in"); }}
       initialReservationId={params.get("reservation") || undefined}

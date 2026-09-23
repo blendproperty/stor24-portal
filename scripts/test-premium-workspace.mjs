@@ -45,6 +45,7 @@ const server = createServer(async (req, res) => {
     res.end(JSON.stringify({data: catalogueForAssignments(guidePersona)})); return;
   }
   if (url.pathname === "/api/auth/mfa") { res.setHeader("content-type", "application/json"); res.end(JSON.stringify({data:{enabled:true,recoveryCodesRemaining:8}})); return; }
+  if (url.pathname === "/api/v1/operations") { res.setHeader("content-type", "application/json"); res.end(JSON.stringify({data:{tasks:[],maintenance:[],products:[],storagePackages:[],dailyCloses:[],notes:[],facilities:[{id:"fixture-store",name:"Training store",units:[]}]}})); return; }
   if (url.pathname === "/fixture.js") { res.setHeader("content-type", "text/javascript"); res.end(bundle.outputFiles[0].text); return; }
   if (url.pathname === "/fixture.css") { res.setHeader("content-type", "text/css"); res.end(style); return; }
   if (url.pathname === "/api/v1/reservations") { res.setHeader("content-type", "application/json"); res.end(JSON.stringify({data})); return; }
@@ -85,6 +86,18 @@ if (process.env.PREVIEW_ONLY) {
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth),true,`move-in overflow ${width}`);
    await page.screenshot({path:`output/premium-workspace/move-in-${width}.png`,fullPage:true});
    await next.click(); await expect(page.getByRole('button',{name:'Send lease for signature'})).toBeVisible();
+   await page.getByRole('button',{name:'Add a new customer'}).click();
+   await expect(page.getByRole('dialog',{name:'Add customer',exact:true})).toBeVisible();
+   await page.getByRole('button',{name:'Close add customer'}).click();
+   await page.goto(base+'/operations/merchandise?merchandise');
+   await page.getByRole('button',{name:'Add product',exact:true}).click();
+   const cost = await page.getByLabel('Cost price', {exact:true}).boundingBox();
+   const sale = await page.getByLabel('Selling price', {exact:true}).boundingBox();
+   if (width>700) assert.ok(Math.abs(cost.y-sale.y)<2 && sale.x>cost.x,'Product price fields share a row');
+   else assert.ok(sale.y>cost.y,'Product price fields stack on phones');
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth),true,`product dialog overflow ${width}`);
+   await page.screenshot({path:`output/premium-workspace/product-dialog-${width}.png`,fullPage:true});
+   await page.getByRole('button',{name:'Cancel',exact:true}).click();
    await page.goto(base+'/settings');
    await expect(page.getByRole('heading',{name:'Settings',exact:true})).toBeVisible();
    if(width<=760) {
@@ -101,6 +114,7 @@ if (process.env.PREVIEW_ONLY) {
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth),true,`settings overflow ${width}`);
   }
   assert.deepEqual(errors,[]);
+  assert.deepEqual(writes,[]);
   console.log('Premium workspace passed: 530-unit pagination, persistent Next, selection through filters, account step, settings, contextual tip/Escape and 1440/1024/768/390/320px bounds.');
  } finally { await browser.close(); await new Promise(resolve=>server.close(resolve)); }
 }
