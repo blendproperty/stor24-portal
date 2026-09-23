@@ -29,6 +29,7 @@ jobs:
       - run: node scripts/test-mri.mjs
       - run: node scripts/test-facial-photos.mjs
       - run: node scripts/test-identity.mjs
+      - run: node scripts/test-move-in-flow.mjs
       - run: node scripts/test-premium-workspace.mjs
       - run: node scripts/test-floor-availability.mjs
       - run: node scripts/test-tenant-login.mjs
@@ -47,6 +48,7 @@ jobs:
             output/mri/390.png
             output/facial-access/
             output/identity/
+            output/move-in-flow/
             output/floor-availability/
             output/email-prefill/
   validate:

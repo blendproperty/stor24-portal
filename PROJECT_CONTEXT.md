@@ -1,5 +1,16 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Six-step move-in workflow — 23 September 2026
+
+- **Implementation:** Brett requested Select unit → Agreement → Payment/record receipt → Check ID → Access photo → Hand over keys. Add a responsive top navigation with clickable stage links and completion ticks from saved booking evidence, explicit ID/photo sections and forward links, scoped photo-review/return navigation, preserved booking selection after receipt/refresh, and a read-only recorded key-handover confirmation with audit time. Completion is never inferred from visiting a page, test payment or image capture. Real payment, identity, date, unit and provider safeguards remain unchanged. Captured/reviewed photo is separate from Hikvision activation.
+- **Photo boundary:** retain the existing customer capture/consent route and staff photo review. The choice of reception staff capture versus customer-phone capture was asked during implementation and remains unanswered at this checkpoint. No new staff-upload capability, consent policy, collection activation or Hikvision provisioning is asserted. Held collection is visible and unchecked.
+- **Testing:** TypeScript, focused lint, all 366 application tests and the existing premium-workspace browser suite passed. New actual-component browser checks pass at 1440/768/390/320px: six steps, saved completion ticks, keyboard anchors, correct ID/photo booking links, held collection, future-date rejection, recorded-handover state without a second submit, no overflow/errors/writes. Production build passed before the final small typography and booking-return refinements; final exact-head CI build is pending. Extended PostgreSQL customer-journey/photo suites now check scoped progress, real handover audit confirmation and photo-review evidence; CI execution pending.
+- **Commit and push:** prepared on codex/move-in-guided-flow-20260923 from canonical main 76e4a293bc45055f75aa5d6da3eb1daed3bbe2f4. Enclosing PR records exact pushed commit; unrelated checkouts preserved.
+- **Merge:** pending.
+- **Deployment and configuration:** pending; no schema or configuration change required.
+- **Live production verification:** pending for this six-step change. Synthetic completion tests do not constitute a real staff handover or access-provider acceptance.
+- **Open gates:** Brett's flow acceptance and capture-method preference remain open, as do full P01, J19 controlled floor acceptance, J20 genuine Netcash deferral, J21 physical access/policy readiness, historical 14-booking review, finance/legal/privacy/retention/backup, data/training and launch approvals. Existing Excel is a dated export.
+
 ## Handover ID navigation release evidence — 23 September 2026
 
 - **Implementation:** D005 adds the visible Review ID button, booking-filtered review with automatic metadata selection, saved-decision feedback and Back to move-in checks for the same reservation. Permission and organisation/store scope, explicit private previews, all-page acceptance, payment and date gates remain enforced.

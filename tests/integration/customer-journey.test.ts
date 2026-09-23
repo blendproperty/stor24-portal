@@ -1,3 +1,4 @@
+import { getMoveInProgress } from "../../src/lib/move-in-progress";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash, randomUUID } from "node:crypto";
@@ -108,6 +109,10 @@ test("isolated PostgreSQL connected customer journey", async t => {
       await assert.rejects(reviewIdentity(scope, first.id, 2, "ACCEPT"), /ID_PREVIEW_REQUIRED/);
       await previewIdentity(scope, first.id, 2, 1);
       await reviewIdentity(scope, first.id, 2, "ACCEPT");
+      const progress = await getMoveInProgress(scope, reservation.id);
+      assert.equal(progress.identityAccepted, true); assert.equal(progress.handedOver, false);
+      assert.equal(progress.photoReviewed, false);
+      await assert.rejects(getMoveInProgress({ ...scope, facilityIds: [] }, reservation.id), /NOT_FOUND/);
     });
     let signedHash = "";
     await t.test("J03/J15 interrupted and repeated signing preserves one signed PDF", async () => {
@@ -157,6 +162,9 @@ test("isolated PostgreSQL connected customer journey", async t => {
       await assert.rejects(confirmReservationMoveIn({ ...scope, facilityIds: [] }, reservation.id), /NOT_FOUND/);
       const [a, b] = await Promise.all([confirmReservationMoveIn(scope, reservation.id), confirmReservationMoveIn(scope, reservation.id)]);
       assert.equal(a.tenancyId, b.tenancyId); tenancyId = a.tenancyId;
+      const completed = await getMoveInProgress(scope, reservation.id);
+      assert.equal(completed.handedOver, true); assert.ok(completed.handedOverAt);
+      assert.equal(completed.photoReviewed, false); // Handover must not invent an access photo or provider activation.
       const active = await db.tenancy.findUniqueOrThrow({ where: { id: tenancyId }, include: { documents: true, occupancies: true } });
       assert.equal(active.accountId, account.id); assert.equal(active.status, "ACTIVE");
       assert.equal(active.documents.length, 1); assert.equal(active.occupancies.length, 1);

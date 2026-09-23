@@ -1,5 +1,7 @@
 "use client";
 
+import { MoveInProgressNav } from "./move-in-progress-nav";
+import type { MoveInProgress } from "@/lib/move-in-progress";
 import { useMemo, useState } from "react";
 import { ArrowLeft, ArrowRight, Plus, Search, X } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
@@ -26,6 +28,8 @@ type Facility = { id: string; name: string };
 type Customer = { id: string; name: string; email: string | null };
 type Reservation = {
   canRecordPayment?: boolean;
+  canReviewPhoto?: boolean;
+  progress?: MoveInProgress;
   canReviewIdentity?: boolean;
   id: string;
   facilityId: string;
@@ -228,10 +232,14 @@ export function MoveInWorkspace({
               : "Complete the booking details, then send the lease agreement for review and signature."
         }
       />
-      <div className="move-in-steps">
-        <span className={step === 1 ? "active" : ""} aria-current={step === 1 ? "step" : undefined}>1 Select unit</span>
-        <span className={step === 2 ? "active" : ""} aria-current={step === 2 ? "step" : undefined}>2 {selectedReservation?.readiness ? "Key handover" : "Account details"}</span>
-      </div>
+      {(step === 1 || !selectedReservation?.readiness) && <MoveInProgressNav steps={[
+        { label: "Select unit", status: selectedId ? `Unit ${selected?.number}` : "Choose a unit", complete: Boolean(selectedId), onClick: () => setStep(1) },
+        { label: "Agreement", status: selectedReservation?.readiness?.signed ? "Signed" : "Not signed", complete: Boolean(selectedReservation?.readiness?.signed), onClick: selectedId ? () => setStep(2) : undefined },
+        { label: "Payment", status: selectedReservation?.readiness?.paymentVerified ? "Verified" : "Awaiting payment", complete: Boolean(selectedReservation?.readiness?.paymentVerified), onClick: selectedReservation?.readiness ? () => setStep(2) : undefined },
+        { label: "Check ID", status: selectedReservation?.progress?.identityAccepted ? "Accepted" : "Check required", complete: Boolean(selectedReservation?.progress?.identityAccepted), onClick: selectedReservation?.readiness ? () => setStep(2) : undefined },
+        { label: "Access photo", status: selectedReservation?.progress?.photoReviewed ? "Reviewed" : "Capture / review", complete: Boolean(selectedReservation?.progress?.photoReviewed), onClick: selectedReservation?.readiness ? () => setStep(2) : undefined },
+        { label: "Hand over keys", status: selectedReservation?.progress?.handedOver ? "Recorded" : "Not recorded", complete: Boolean(selectedReservation?.progress?.handedOver), onClick: selectedReservation?.readiness ? () => setStep(2) : undefined },
+      ]} />}
       {step === 1 ? (
         <section className="unit-selector-layout">
           <article className="panel unit-results">
@@ -438,7 +446,7 @@ export function MoveInWorkspace({
       ) : selectedReservation?.readiness ? (
         <ReservationMoveInConfirmation key={selectedReservation.id} reservationId={selectedReservation.id}
           customerName={selectedCustomer?.name ?? selectedReservation.label} unitNumber={selected?.number ?? ""}
-          canReviewIdentity={selectedReservation.canReviewIdentity} canRecordPayment={selectedReservation.canRecordPayment} readiness={selectedReservation.readiness} onBack={() => setStep(1)} />
+          progress={selectedReservation.progress} canReviewPhoto={selectedReservation.canReviewPhoto} canReviewIdentity={selectedReservation.canReviewIdentity} canRecordPayment={selectedReservation.canRecordPayment} readiness={selectedReservation.readiness} onBack={() => setStep(1)} />
       ) : (
         <section className="panel panel-spacious">
           <form key={`${selectedId}:${reservationId}`} action={action} className="move-in-form">

@@ -14,7 +14,7 @@ export function ReservationPaymentForm({ reservationId }: { reservationId: strin
       if (busy) return;
       setBusy(true); setError("");
       requestId.current ??= crypto.randomUUID(); data.set("requestId", requestId.current);
-      try { const result = await recordReservationPaymentAction(data); if (result.error) setError(result.error); else window.location.reload(); }
+      try { const result = await recordReservationPaymentAction(data); if (result.error) setError(result.error); else window.location.assign(`/operations/move-in?reservation=${encodeURIComponent(reservationId)}#move-in-payment`); }
       catch { setError("Confirmation was interrupted. Retry with the same details; the receipt will not be posted twice."); }
       finally { setBusy(false); }
     }}>

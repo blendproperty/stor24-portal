@@ -1,3 +1,4 @@
+import { getMoveInProgress } from "../../src/lib/move-in-progress";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash, randomUUID } from "node:crypto";
@@ -44,10 +45,15 @@ test("isolated PostgreSQL private facial photo lifecycle", async t => {
       assert.equal(photo.status, "WAITING_REVIEW");
       assert.equal("encryptedImage" in photo, false);
       assert.equal(JSON.stringify(await listFacialPhotos(f.scope)).includes("encryptedImage"), false);
+      assert.equal((await listFacialPhotos(f.scope, f.reservation.id)).length, 1);
+      assert.deepEqual(await listFacialPhotos(f.scope, "not-this-booking"), []);
+      assert.deepEqual(await listFacialPhotos({ ...f.scope, facilityIds: [] }, f.reservation.id), []);
+      assert.equal((await getMoveInProgress(f.scope, f.reservation.id)).photoReviewed, false);
       assert.equal(JSON.stringify(await tenantPhotoStatus(f.session, f.reservation.id)).includes("imageSha256"), false);
       await assert.rejects(reviewFacialPhoto(f.scope, photo.id, 1, "APPROVE"), /PHOTO_PREVIEW_REQUIRED/);
       assert.ok((await previewFacialPhoto(f.scope, photo.id, 1)).length > 100);
       await reviewFacialPhoto(f.scope, photo.id, 1, "APPROVE");
+      assert.equal((await getMoveInProgress(f.scope, f.reservation.id)).photoReviewed, true);
       const [a,b] = await Promise.all([confirmReservationMoveIn(f.scope, f.reservation.id), confirmReservationMoveIn(f.scope, f.reservation.id)]);
       assert.equal(a.tenancyId, b.tenancyId);
       const stored = await db.facialPhotoSubmission.findUniqueOrThrow({ where: { id: photo.id } });
