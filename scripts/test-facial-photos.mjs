@@ -17,7 +17,11 @@ const base=`http://127.0.0.1:${server.address().port}`, errors=[], writes=[];
 let available=false, tenantPhoto=null;
 const tenantWrites=[];
 try {
-  const page=await browser.newPage();page.on("pageerror",error=>errors.push(error.message));
+  const page=await browser.newPage();
+  await page.goto(base);await expect(page.getByText("Photo collection disabled",{exact:true})).toBeVisible();
+  await expect(page.getByText("Automatic activation from this photo queue is not connected to Hikvision yet. An approved photo does not grant gate access.",{exact:true})).toBeVisible();
+  await page.goto(base+"?policy");await expect(page.getByText("Gate activation unavailable",{exact:true})).toBeVisible();
+page.on("pageerror",error=>errors.push(error.message));
   await page.route("**/api/tenant/access-photo**",route=>{
     if(route.request().method()!=="GET") { tenantWrites.push(route.request().method()); return route.fulfill({status:409,json:{error:"Your booking has changed. Please refresh before continuing."}}); }
     return route.fulfill({json:{data:{available,policy:available?{version:"ci",hash:"ci-hash",notice:"Synthetic browser fixture. This is not legal wording or a real consent record.",consentLabel:"Preview only — consent wording awaiting legal approval.",retentionHours:24,alternativeContact:"Speak to the training store."}:null,photo:tenantPhoto}}});

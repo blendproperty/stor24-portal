@@ -1,5 +1,14 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Facility footer and facial-access readiness - 23 September 2026
+
+- **Implementation:** remove hard-coded Randburg footer. Fresh account assignments supply the single facility name, assigned-facility count, All facilities for global access, or No facility assigned. Label is explicitly Facility access, not a claim about a page-local store filter. Browser connectivity is labelled Browser online; demo route says Training - Demo records. Facial page differentiates missing photo policy from unavailable gate activation, explains that this queue is not connected to Hikvision activation, and lists remaining setup/on-site checks. No gate/provider health claim, legal-review progress assumption or activation is introduced.
+- **Testing:** TypeScript/focused lint and actual-component facial/desktop/mobile navigation checks passed. Browser tests verify policy-off versus policy-configured messages, scoped/owner facility labels, browser-online wording and training route wording at 1440/390/320px. Exact-head CI pending.
+- **Commit and push:** prepared on codex/facility-access-status-20260923 from canonical main f8cd610; enclosing PR records promotion.
+- **Merge:** pending.
+- **Deployment and configuration:** pending; no policy, permission, training toggle or provider configuration changes.
+- **Live production verification:** pending. Photo policy, Hikvision activation connector, real entry/removal and P01 acceptance remain open.
+
 ## Password-reset email release evidence - 23 September 2026
 
 - **Implementation:** official STOR24 logo, orange reset CTA, ink/cream responsive table layout, Satoshi with email-client fallbacks and friendly workspace copy replace the bare CRM reset message. Plain-text alternative and secure fallback link retained; no change to reset/security behaviour.
