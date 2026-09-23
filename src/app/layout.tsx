@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { AppShell } from "@/components/app-shell";
+import { db } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 import "./globals.css";
@@ -48,11 +49,14 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const session = await getSession();
+  const user = session ? await db.user.findUnique({ where: { id: session.userId }, include: { roleAssignments: { include: { role: true } } } }) : null;
+  const assignments = user?.active && user.sessionVersion === session?.sessionVersion ? user.roleAssignments : [];
+  const access = { owner: assignments.some(a => a.facilityId === null && a.role.name === "Organisation owner"), permissions: assignments.flatMap(a => a.role.permissions) };
   return (
     <html lang="en" className={`${satoshi.variable} h-full antialiased`}>
       <body className="min-h-full">
         <ServiceWorkerRegistration />
-        <AppShell session={session}>{children}</AppShell>
+        <AppShell session={session} access={access}>{children}</AppShell>
       </body>
     </html>
   );

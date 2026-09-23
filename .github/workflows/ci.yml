@@ -31,6 +31,7 @@ jobs:
       - run: node scripts/test-identity.mjs
       - run: node scripts/test-move-in-flow.mjs
       - run: node scripts/test-move-in-training.mjs
+      - run: node scripts/test-restricted-navigation.mjs
       - run: node scripts/test-premium-workspace.mjs
       - run: node scripts/test-floor-availability.mjs
       - run: node scripts/test-tenant-login.mjs
@@ -51,6 +52,7 @@ jobs:
             output/identity/
             output/move-in-flow/
             output/training/
+            output/restricted-navigation/
             output/floor-availability/
             output/email-prefill/
   validate:

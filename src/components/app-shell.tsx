@@ -14,6 +14,7 @@ import {
   LandPlot,
   LayoutDashboard,
   LogOut,
+  LockKeyhole,
   PhoneCall,
   Search,
   Settings,
@@ -34,6 +35,8 @@ import type { SessionPayload } from "@/lib/session";
 import { ConnectivityStatus } from "@/components/connectivity-status";
 import { BrandCorner } from "@/components/brand-corner";
 import { GuidedHelp } from "@/components/guided-help";
+
+import { canVisit, restrictedMessage, type NavigationAccess } from "@/lib/navigation-access";
 
 const navigation = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -64,7 +67,7 @@ const navigation = [
   { href: "/offline-readiness", label: "Offline readiness", icon: ShieldCheck },
 ];
 
-export function AppShell({ children, session }: { children: React.ReactNode; session: SessionPayload | null }) {
+export function AppShell({ children, session, access = { owner: false, permissions: [] } }: { children: React.ReactNode; session: SessionPayload | null; access?: NavigationAccess }) {
   const pathname = usePathname();
   const router = useRouter();
   const publicPage = pathname === "/login" || pathname === "/forgot-password" || pathname.startsWith("/reset-password/") || pathname.startsWith("/invite/") || pathname.startsWith("/setup/");
@@ -105,6 +108,9 @@ export function AppShell({ children, session }: { children: React.ReactNode; ses
               item.href === "/" || item.href === "/operations"
                 ? pathname === item.href
                 : pathname.startsWith(item.href);
+            if (!canVisit(item.href, access)) return <span key={item.href} className="nav-link nav-link-restricted" role="link" aria-disabled="true" tabIndex={0} title={restrictedMessage}>
+              <item.icon size={18} /><span>{item.label}<small>{restrictedMessage}</small></span><LockKeyhole size={14} aria-hidden="true" />
+            </span>;
             return (
               <Link
                 className={clsx("nav-link", active && "nav-link-active")}
@@ -140,7 +146,7 @@ export function AppShell({ children, session }: { children: React.ReactNode; ses
 
       <div className="app-main">
         <header className="topbar">
-          <details key={pathname} className="staff-mobile-nav"><summary>Menu</summary><nav aria-label="Mobile navigation">{navigation.map(item => <Link href={item.href} key={item.href} aria-current={pathname === item.href ? "page" : undefined}><item.icon size={17} />{item.label}</Link>)}<Link href="/settings"><Settings size={17} />Settings</Link></nav></details>
+          <details key={pathname} className="staff-mobile-nav"><summary>Menu</summary><nav aria-label="Mobile navigation">{navigation.map(item => !canVisit(item.href, access) ? <span key={item.href} className="nav-link-restricted" role="link" aria-disabled="true" tabIndex={0} title={restrictedMessage}><item.icon size={17} /><span>{item.label}<small>{restrictedMessage}</small></span><LockKeyhole size={14} /></span> : <Link href={item.href} key={item.href} aria-current={pathname === item.href ? "page" : undefined}><item.icon size={17} />{item.label}</Link>)}<Link href="/settings"><Settings size={17} />Settings</Link></nav></details>
           <label className="search">
             <Search size={18} />
             <input
