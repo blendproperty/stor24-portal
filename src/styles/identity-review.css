@@ -31,3 +31,6 @@
 .identity-review__reason { display:block; margin:24px 0 12px; font-size:13px; font-weight:700; }
 .identity-review__reason select { display:block; width:100%; margin-top:10px; }
 @media(max-width:800px) { .identity-review__layout { grid-template-columns:1fr; } .identity-review h1 { font-size:30px; } .identity-review__row { flex-wrap:wrap; } .identity-review__layout>section { padding:20px; } }
+
+.identity-review__return { display:inline-flex; align-items:center; min-height:44px; padding:10px 16px; border:1px solid #bdcbbb; border-radius:10px; color:#183b2c; background:#fffefa; font-size:14px; text-decoration:none; }
+.identity-review__return:focus-visible { outline:2px solid #254c37; outline-offset:3px; }

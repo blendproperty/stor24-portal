@@ -20,3 +20,12 @@ test("test payments keep the signed agreement visible and disable handover", () 
   assert.doesNotMatch(html, /name="handoverConfirmed"|Send lease for signature/);
 });
 
+
+test("blocked handover links an authorised reviewer to this exact booking", () => {
+  const props = { reservationId: "booking/with space", customerName: "CI customer", unitNumber: "107", onBack: () => {}, readiness: { mandateStatus: null, signed: true, leaseId: "original", signedAt: "2026-09-18", requiredAmount: 1100, paidAmount: 0, paymentVerified: false, testPayment: true, startDate: "2026-09-30", ready: false, blockers: ["The identity document needs staff acceptance before key handover."] } };
+  const html = renderToStaticMarkup(<ReservationMoveInConfirmation {...props} canReviewIdentity />);
+  assert.match(html, /href="\/identity\?reservation=booking%2Fwith%20space"/);
+  assert.match(html, /Review ID/);
+  assert.match(html, /disabled="">Confirm move-in/);
+  assert.doesNotMatch(renderToStaticMarkup(<ReservationMoveInConfirmation {...props} />), /href="\/identity/);
+});

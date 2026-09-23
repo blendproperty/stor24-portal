@@ -85,8 +85,8 @@ export async function identityGate(database: Database, organisationId: string, r
   const document = await database.identityDocument.findUnique({ where: { reservationId } });
   return Boolean(document && document.policyHash === policy.hash && (document.status === "ACCEPTED" || (stage === "SIGN" && document.status === "AWAITING_REVIEW" && document.encryptedPages && copyWithinRetention(document))));
 }
-export async function listIdentityDocuments(scope: RequestScope) {
-  return db.identityDocument.findMany({ where: { reservation: { facility: facilityWhere(scope), customer: { organisationId: scope.organisationId } } }, select: { ...identitySummary, reservation: { select: { status: true, facilityId: true, publicReference: true, facility: { select: { name: true } }, unit: { select: { number: true } }, customer: { select: { firstName: true, lastName: true, companyName: true } } } } }, orderBy: { acknowledgedAt: "desc" }, take: 200 });
+export async function listIdentityDocuments(scope: RequestScope, reservationId?: string) {
+  return db.identityDocument.findMany({ where: { ...(reservationId ? { reservationId } : {}), reservation: { facility: facilityWhere(scope), customer: { organisationId: scope.organisationId } } }, select: { ...identitySummary, reservation: { select: { status: true, facilityId: true, publicReference: true, facility: { select: { name: true } }, unit: { select: { number: true } }, customer: { select: { firstName: true, lastName: true, companyName: true } } } } }, orderBy: { acknowledgedAt: "desc" }, take: 200 });
 }
 async function scopedDocument(database: Database, scope: RequestScope, id: string, version: number) {
   const initial = await database.identityDocument.findFirst({ where: { id, reservation: { facility: facilityWhere(scope), customer: { organisationId: scope.organisationId } } }, select: { reservationId: true } });

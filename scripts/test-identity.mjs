@@ -19,12 +19,14 @@ const server=createServer(async(req,res)=>{
 });
 await new Promise(resolve=>server.listen(0,"127.0.0.1",resolve));
 const browser=await chromium.launch(); const page=await browser.newPage(), errors=[];page.on("pageerror",error=>errors.push(error.message));
-let documents=[], writes=0, brokenImage=false;
+let documents=[], writes=0, brokenImage=false, acceptSuccess=false, previews=0;
 const document={id:"synthetic",version:1,status:"AWAITING_REVIEW",documentType:"ID_CARD",pageCount:2,retentionMode:"TENANCY",expiresAt:null,erasedAt:null,reservation:{publicReference:"ST24-PREVIEW",facility:{name:"Training store"},unit:{number:"106"},customer:{firstName:"Sample",lastName:"Customer",companyName:null}}};
 try {
  await page.route("**/api/v1/identity-documents**",route=>{
-  if(route.request().method()==="POST"){writes++;return route.fulfill({status:409,json:{error:{message:"This document changed. Refresh before continuing."}}});}
-  if(route.request().url().includes("preview=true"))return route.fulfill({contentType:"image/png",body:brokenImage ? Buffer.from("broken") : Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jMioAAAAASUVORK5CYII=","base64")});
+  if(route.request().method()==="POST"){writes++;if(acceptSuccess){ documents=[{...document,status:"ACCEPTED"}]; return route.fulfill({json:{data:{reviewed:true}}}); } return route.fulfill({status:409,json:{error:{message:"This document changed. Refresh before continuing."}}});}
+  if(route.request().url().includes("preview=true")){ previews++; return route.fulfill({contentType:"image/png",body:brokenImage ? Buffer.from("broken") : Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jMioAAAAASUVORK5CYII=","base64")}); }
+  const booking=new URL(route.request().url()).searchParams.get("reservation");
+  if(booking && booking !== "booking-106") return route.fulfill({json:{data:[]}});
   return route.fulfill({json:{data:documents}});
  });
  await mkdir("output/identity",{recursive:true}); const base=`http://127.0.0.1:${server.address().port}`;
@@ -57,5 +59,35 @@ try {
  await expect(page.getByRole("button",{name:"Request replacement",exact:true})).toHaveCount(0);
  await page.getByRole("button",{name:"Open front",exact:true}).click();await expect(page.getByRole("img")).toBeVisible();
  assert.equal(writes,1);assert.deepEqual(errors,[]);
+ // Booking links select metadata only; no private preview or decision is automatic.
+ documents=[document]; const previewsBefore=previews;
+ for(const width of [1440,390,320]) {
+  await page.setViewportSize({width,height:1000});
+  await page.goto(base+"?enabled&reservation=booking-106");
+  await expect(page.getByRole("heading",{name:"Unit 106",exact:true})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Accept document",exact:true})).toBeDisabled();
+  await expect(page.getByRole("img")).toHaveCount(0);
+  const back=page.getByRole("link",{name:"Back to move-in checks"});
+  await expect(back).toHaveAttribute("href","/operations/move-in?reservation=booking-106");
+  await back.focus(); await expect(back).toBeFocused();
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await page.screenshot({path:`output/identity/booking-review-${width}.png`,fullPage:true});
+ }
+ assert.equal(previews,previewsBefore); assert.equal(writes,1);
+ acceptSuccess=true;
+ await page.getByRole("button",{name:"Open front",exact:true}).click();
+ await expect(page.getByRole("img")).toHaveJSProperty("naturalWidth",1);
+ await page.getByRole("button",{name:"Open back",exact:true}).click();
+ await expect(page.getByRole("button",{name:"Accept document",exact:true})).toBeEnabled();
+ await page.getByRole("button",{name:"Accept document",exact:true}).click();
+ await expect(page.getByRole("status")).toContainText("Document accepted");
+ await expect(page.getByRole("button",{name:"Accept document",exact:true})).toBeDisabled();
+ await expect(page.getByRole("img")).toHaveCount(0);
+ await page.getByRole("link",{name:"Back to move-in checks"}).click();
+ await expect(page).toHaveURL(base+"/operations/move-in?reservation=booking-106");
+ await page.goto(base+"?enabled&reservation=not-accessible");
+ await expect(page.getByText("No accessible document for this booking")).toBeVisible();
+ await expect(page.getByRole("button",{name:"Accept document",exact:true})).toHaveCount(0);
+ assert.equal(writes,2); assert.deepEqual(errors,[]);
  console.log("Identity review browser: held state, responsive bounds, private two-page preview, stale approval and cleared preview passed.");
 } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}
