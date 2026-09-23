@@ -1,5 +1,16 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Move-in stage icons release evidence - 23 September 2026
+
+- **Implementation:** warehouse/unit, agreement, wallet, ID shield, camera and key icons appear in both move-in navigation views. Completion ticks are separate from stage icons; colours, accessible labels, booking links and readiness rules are retained.
+- **Testing:** local TypeScript, focused lint and actual-component browser checks passed at 1440/768/390/320px; existing workspace checks passed at 1440/1024/768/390/320px. Exact-head CI 35855770871 and transactions 35855770953 passed on 0a3d274; main CI 35856005599 passed. These include the existing 366 application tests and 137 PostgreSQL tests; no live handover is implied.
+- **Commit and push:** implementation/context 0a3d274 pushed to canonical blendproperty/stor24-portal. This release record accompanies codex/move-in-icons-release-20260923; enclosing documentation PR records promotion.
+- **Merge:** PR #212 merged as e2054191366dc3891383e7e9567f587f3350aac1.
+- **Deployment and configuration:** deployment 35856208518 succeeded. SSH confirmed e2054191366dc3891383e7e9567f587f3350aac1 and healthy image stor24-crm:e20541913. Application/database health returned ok at 2026-09-23T11:46:21.483Z. No schema, payment, photo-policy or provider configuration change.
+- **Live production verification:** authenticated Unit 55 page renders all six expected SVG stage icons, with separate completion ticks on unit, agreement and ID. Payment, photo and keys retain blocked states and disabled handover. The new labels retain their stage navigation links. No payment, image, ID decision, handover or provider mutation performed.
+- **Manual testing and remaining gates:** recommended a separate isolated environment with actual services and synthetic booking, receipt, image/review and handover records. Brett has been asked to choose this or an explicitly limited screen rehearsal; no environment has been created. Current live booking still requires sufficient verified payment, the agreed date and a current approved photo. Full P01, manual staff acceptance, photo-policy/capture method, real provider/physical entry, historical data and finance/legal/privacy/backup/training/launch gates remain open. Excel remains a dated export.
+
+
 ## Move-in stage icons and manual test environment choice - 23 September 2026
 
 - **Implementation:** six stages now keep descriptive icons (unit, agreement, payment, ID, camera, keys), with a separate completion tick and existing green/orange/red state. Both initial unit selection and booking handover use the icons; no completion or readiness rules changed.
