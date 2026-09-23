@@ -54,11 +54,26 @@ test("isolated PostgreSQL floor operating policy", async t => {
       const detail = await (await publicFacility(request, { params: Promise.resolve({ slug: key }) })).json();
       assert.deepEqual(detail.data.units.map((u: { id: string }) => u.id), [units[0].id]);
       assert.deepEqual(detail.data.maps.map((m: { name: string }) => m.name), ["Ground Floor"]);
+      assert.deepEqual(detail.data.comingSoonFloors, ["First Floor", "Second Floor"]);
       const list = await (await publicFacilities(request)).json();
       const stats = await getUnitStatsByFacility(scope);
       assert.equal(stats[0].available, 1); assert.equal(stats[0].service, 2); assert.equal(stats[0].total, 3);
       assert.equal(list.data.find((f: { slug: string }) => f.slug === key).availableUnitCount, 1);
       assert.equal((await publicFacility(new Request("http://localhost/api"), { params: Promise.resolve({ slug: key }) })).status, 401);
+    });
+    await t.test("coming-soon labels follow reopening and remain visible when every floor is closed", async () => {
+      const request = new Request("http://localhost/api", { headers: { "x-stor24-public-key": process.env.PUBLIC_BOOKING_API_KEY! } });
+      await toggle("First Floor", true);
+      const reopened = await (await publicFacility(request, { params: Promise.resolve({ slug: key }) })).json();
+      assert.deepEqual(reopened.data.comingSoonFloors, ["Second Floor"]);
+      assert.ok(reopened.data.maps.some((map: { name: string }) => map.name === "First Floor"));
+      await toggle("First Floor", false);
+      await toggle("Ground Floor", false);
+      const closed = await (await publicFacility(request, { params: Promise.resolve({ slug: key }) })).json();
+      assert.deepEqual(closed.data.comingSoonFloors, ["Ground Floor", "First Floor", "Second Floor"]);
+      assert.deepEqual(closed.data.maps, []);
+      assert.deepEqual(closed.data.units, []);
+      await toggle("Ground Floor", true);
     });
     await t.test("staff, direct public, move-in and stale offline submissions cannot allocate closed units", async () => {
       await assert.rejects(reserve(first.id), /FLOOR_NOT_OPERATIONAL/);

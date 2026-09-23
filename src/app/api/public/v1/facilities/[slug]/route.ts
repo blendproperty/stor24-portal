@@ -1,4 +1,4 @@
-import { floorIsOperational, unitIsOperational, floorMapSelection } from "@/lib/floor-availability";
+import { floorIsOperational, unitIsOperational, floorMapSelection, facilityFloorKeys, floorLabel } from "@/lib/floor-availability";
 import { db } from "@/lib/db";
 import {
   publicApiAuthorized,
@@ -120,6 +120,7 @@ export async function GET(
     slug: facility.publicSlug,
     timezone: facility.timezone,
     address: facility.address,
+    comingSoonFloors: facilityFloorKeys(facility).filter(floor => !floorIsOperational(floor, facility.closedFloors)).map(floorLabel),
     storeInformation: safeStoreInformation(facility.configurationProfiles[0]?.config),
     storagePackages: facility.storagePackages.map((pack) => ({
       id: pack.id,
