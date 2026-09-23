@@ -1,5 +1,15 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Excel Priority 2 insertion — 23 September 2026
+
+- **Implementation:** updated the latest Excel working copy as STOR24-delivery-tracker-priority-2.xlsx: Priority 1 remains customer journey, new Priority 2 is combined privacy/GAPP/POPIA and CIA security, Finance becomes Priority 3 and subsequent items shift down. Fourteen priorities remain open. Stable P01–P13 IDs and historical evidence are preserved; new P14 is the combined acceptance item reusing P09/P10/P11 work. Canonical scope/register now match the revised order.
+- **Testing:** workbook recalculation, zero-error scan, export/reimport and assertions for shifted records, zero completed priorities and unchanged journey/evidence sheets passed. Rendered changed ranges inspected. Workbook remains a dated export; unrelated historical status entries were not refreshed. No native Excel interactive acceptance or application tests claimed.
+- **Commit and push:** enclosing codex/priority-two-tracker-20260923 documentation commit/PR records source promotion. Workbook delivered locally under Documents/Codex/outputs/stor24-delivery-checklist-20260923, not committed as application code.
+- **Merge:** enclosing documentation PR and canonical remote main context readback provide evidence.
+- **Deployment and configuration:** none required or changed.
+- **Live production verification:** not applicable to this spreadsheet/order edit; no new live operational verification.
+- **Open gates:** all fourteen priority acceptance gates, PRIV/CIA evidence, provider/legal/data/training/UAT requirements remain open. Reordering is not control implementation or compliance acceptance.
+
 ## CIA security requirements — 23 September 2026
 
 - **Implementation:** documentation-only CIA-C1–C3/I1–I3/A1–A3 acceptance requirements added in docs/CIA_SECURITY_ACCEPTANCE.md, linked to GAPP review and P11 register. No runtime remediation claimed.
