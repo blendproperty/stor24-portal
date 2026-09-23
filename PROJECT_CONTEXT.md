@@ -1,5 +1,15 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Password-reset email release evidence - 23 September 2026
+
+- **Implementation:** official STOR24 logo, orange reset CTA, ink/cream responsive table layout, Satoshi with email-client fallbacks and friendly workspace copy replace the bare CRM reset message. Plain-text alternative and secure fallback link retained; no change to reset/security behaviour.
+- **Testing:** focused escaping/link/expiry validation, TypeScript and lint passed. Actual template visually inspected at 700/390/320px with logo/fonts loaded and no overflow; preview contains no real token. Exact-head CI 35862886397 and DB transaction run 35862886532 succeeded on 1a04ce20320e165373c768ec8b6da107eec6b9d2; main CI 35863169445 succeeded.
+- **Commit and push:** implementation/context pushed on codex/branded-password-reset-20260923; this record accompanies codex/reset-email-release-20260923, promoted by its enclosing documentation PR.
+- **Merge:** PR #220 merged as 30aab6045957009b3f8050574107ef46325a9e10.
+- **Deployment and configuration:** deployment 35863401662 succeeded; runtime 30aab6045957009b3f8050574107ef46325a9e10 and healthy stor24-crm:30aab6045 container verified. No provider/config/schema changes.
+- **Live production verification:** health app/database OK at 2026-09-23T12:55:41.591Z. No real reset request or email send performed. Actual Gmail/Outlook received-email rendering remains open; old inbox messages are unchanged. Preview: output/password-reset/390.png and preview.html.
+- **Open gates:** inbox rendering acceptance, P01 and existing operational/provider/launch gates remain open.
+
 ## Branded password-reset email - 23 September 2026
 
 - **Implementation:** replace bare password-reset paragraphs with official STOR24 logo, orange CTA, ink/cream table layout, Satoshi where supported plus Arial/Helvetica fallback, warm workspace copy, plain-text alternative and fallback link. Subject is Reset your STOR24 password. Names/URLs escaped. Existing 30-minute single-use reset and anti-enumeration/rate-limit controls unchanged.
