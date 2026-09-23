@@ -68,7 +68,7 @@ export async function confirmReservationMoveInAction(data: FormData): Promise<{ 
   } catch (error) {
     const code = error instanceof Error ? error.message : "";
     if (["FLOOR_NOT_OPERATIONAL", "MOVE_IN_NOT_READY", "MOVE_IN_REVIEW_REQUIRED", "MOVE_IN_DOCUMENT_REVIEW", "CONFLICT"].includes(code)) {
-      return { error: "The booking cannot be moved in yet. Refresh to check the signed agreement, cleared payment, move-in date and unit availability. No handover was recorded." };
+      return { error: "The booking cannot be moved in yet. Refresh to check the signed agreement, cleared payment, accepted ID, approved access photo, move-in date and unit availability. No handover was recorded." };
     }
     throw error;
   }

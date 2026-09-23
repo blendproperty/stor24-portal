@@ -1,3 +1,4 @@
+import { seedApprovedPhoto } from "./helpers/approved-photo";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash, randomUUID } from "node:crypto";
@@ -29,6 +30,7 @@ test("isolated PostgreSQL signed reservation handover", async t => {
     const payment = await db.payment.create({ data: { accountId: account.id, amount: 100, method: "EFT", status: "SUCCEEDED", processedAt: new Date(), idempotencyKey: key } });
     const receipt = await db.ledgerEntry.create({ data: { accountId: account.id, type: "PAYMENT", amount: 100, description: "CI receipt", effectiveAt: new Date(), externalRef: key, createdById: user.id } });
     const scope = { userId: user.id, organisationId: org.id, facilityIds: [facility.id], unrestrictedFacilities: false };
+    await seedApprovedPhoto(org.id, reservation.id, user.id);
     return { org, facility, customer, unit, reservation, account, payment, receipt, scope, pdf, startDate };
   }
   async function unchanged(f: Awaited<ReturnType<typeof fixture>>) {

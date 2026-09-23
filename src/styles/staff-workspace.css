@@ -7,7 +7,7 @@
   --muted: #657468;
   --line: #dce3d7;
   --canvas: #f5f3ea;
-  font-family: "Satoshi Handover", Arial, sans-serif;
+  font-family: var(--font-satoshi), "Satoshi Handover", Arial, sans-serif;
   font-weight: 400;
   font-size: 14px;
   line-height: 1.5;
@@ -17,7 +17,7 @@
 .app-shell .content { max-width: 1600px; padding: 32px clamp(20px, 3vw, 44px) 110px; }
 .app-shell .page-stack { gap: 26px; }
 .app-shell .page-header { align-items: center; gap: 20px; flex-wrap: wrap; }
-.app-shell .page-header h1 { font-size: clamp(30px, 2.7vw, 40px); line-height: 1.15; font-weight: 500; letter-spacing: -.04em; }
+.app-shell .page-header h1 { font-size: clamp(30px, 2.7vw, 40px); line-height: 1.15; font-weight: 700; letter-spacing: -.04em; }
 .app-shell .page-header p:not(.eyebrow) { font-size: 14px; line-height: 1.65; font-weight: 400; max-width: 760px; }
 .app-shell .eyebrow { color: var(--muted); font-size: 10px; letter-spacing: .16em; font-weight: 700; margin-bottom: 10px; }
 .app-shell .nav { padding: 14px 12px; gap: 2px; }
@@ -39,8 +39,8 @@
 .app-shell .metric-icon, .app-shell .work-icon { background: #f0f3e9; border-radius: 12px; color: #42644c; }
 .app-shell .button { min-height: 44px; padding: 10px 17px; border-radius: 10px; font-size: 13px; line-height: 1.4; font-weight: 500; box-shadow: none; }
 .app-shell .button:hover { transform: none; }
-.app-shell .button-primary { background: #183b2c; color: #fffefa; border: 1px solid #183b2c; }
-.app-shell .button-primary:hover { background: #28513c; }
+.app-shell .button-primary { background: var(--stor24-orange); color: var(--stor24-ink); border: 1px solid var(--stor24-orange); font-weight:700; }
+.app-shell .button-primary:not(:disabled):hover { background: var(--stor24-orange-bright); border-color:var(--stor24-orange-bright); }
 .app-shell .button-secondary { background: #fffefa; border-color: #bdcbbb; color: #183b2c; }
 .app-shell .text-link, .app-shell .text-button { color: #28513c; font-weight: 500; }
 .app-shell .status-pill { font-weight: 500; font-size: 11px; padding: 5px 10px; }

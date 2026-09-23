@@ -1,3 +1,5 @@
+import { facialPhotoPolicy } from "../../src/lib/facial-photo-security";
+import { submitTenantPhoto, previewFacialPhoto, reviewFacialPhoto, expireFacialPhotos } from "../../src/lib/facial-photo-service";
 import { getMoveInProgress } from "../../src/lib/move-in-progress";
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -147,6 +149,14 @@ test("isolated PostgreSQL connected customer journey", async t => {
       const [a, b] = await Promise.all([recordReservationReceipt(scope, receipt), recordReservationReceipt(scope, receipt)]);
       assert.equal(a.paymentId, b.paymentId);
       await assert.rejects(recordReservationReceipt(scope, { ...receipt, requestId: randomUUID() }), /REFERENCE_EXISTS/);
+      assert.equal((await getReservationMoveInReadiness(scope, reservation.id)).ready, false);
+      await assert.rejects(confirmReservationMoveIn(scope, reservation.id), /MOVE_IN_NOT_READY/);
+      process.env.FACIAL_ACCESS_POLICIES_JSON = JSON.stringify({ [org.id]: { enabled: true, version: "ci-v1", notice: "Synthetic CI policy only. This does not represent legal approval or a real customer consent.", consentLabel: "Synthetic consent checkbox only", approvalReference: "CI-only", retentionHours: 24, alternativeContact: "CI staff assisted alternative" } });
+      await expireFacialPhotos();
+      const photo = await submitTenantPhoto({ organisationId: org.id, email: input.email, customerIds: [reservation.customerId] }, { reservationId: reservation.id, policyHash: facialPhotoPolicy(org.id)!.hash, consent: true, expectedVersion: 0, image });
+      await assert.rejects(confirmReservationMoveIn(scope, reservation.id), /MOVE_IN_NOT_READY/);
+      await previewFacialPhoto(scope, photo.id, 1);
+      await reviewFacialPhoto(scope, photo.id, 1, "APPROVE");
       assert.equal((await getReservationMoveInReadiness(scope, reservation.id)).ready, true);
     });
     const account = await db.account.findUniqueOrThrow({ where: { accountNumber: `ST24-T-${reservation.id}` } });
@@ -164,7 +174,8 @@ test("isolated PostgreSQL connected customer journey", async t => {
       assert.equal(a.tenancyId, b.tenancyId); tenancyId = a.tenancyId;
       const completed = await getMoveInProgress(scope, reservation.id);
       assert.equal(completed.handedOver, true); assert.ok(completed.handedOverAt);
-      assert.equal(completed.photoReviewed, false); // Handover must not invent an access photo or provider activation.
+      assert.equal(completed.photoReviewed, true);
+      assert.equal(completed.photoStatus, "PENDING_PROVIDER"); // Approval queues access; it does not prove physical activation.
       const active = await db.tenancy.findUniqueOrThrow({ where: { id: tenancyId }, include: { documents: true, occupancies: true } });
       assert.equal(active.accountId, account.id); assert.equal(active.status, "ACTIVE");
       assert.equal(active.documents.length, 1); assert.equal(active.occupancies.length, 1);

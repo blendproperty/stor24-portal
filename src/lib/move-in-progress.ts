@@ -16,7 +16,7 @@ export async function getMoveInProgress(scope: RequestScope, reservationId: stri
     select: { status: true, createdAt: true, publicReference: true, convertedTenancyId: true,
       customer: { select: { email: true } },
       identityDocument: { select: { status: true, policyHash: true } },
-      facialPhoto: { select: { status: true, policyHash: true, expiresAt: true, erasedAt: true } } },
+      facialPhoto: { select: { status: true, policyHash: true, expiresAt: true, erasedAt: true, reviewedAt: true, reviewedById: true } } },
   });
   if (!booking) throw new Error("NOT_FOUND");
   const idPolicy = identityRequired(scope.organisationId, booking.createdAt, reservationId, booking.customer.email);
@@ -24,6 +24,7 @@ export async function getMoveInProgress(scope: RequestScope, reservationId: stri
   const identityAccepted = Boolean(booking.identityDocument?.status === "ACCEPTED" && (!idPolicy || booking.identityDocument.policyHash === idPolicy.hash));
   const photo = booking.facialPhoto;
   const photoCurrent = Boolean(photo && !photo.erasedAt && photo.expiresAt > new Date() && photo.policyHash === photoPolicy?.hash);
+  const photoStored = photoCurrent && await db.facialPhotoSubmission.count({ where: { reservationId, encryptedImage: { not: null } } }) > 0;
   const handover = booking.status === "CONVERTED" && booking.convertedTenancyId ? await db.auditEvent.findFirst({
     where: { organisationId: scope.organisationId, entityType: "Tenancy", entityId: booking.convertedTenancyId, action: "tenancy.key_handover_confirmed" },
     select: { occurredAt: true }, orderBy: { occurredAt: "desc" },
@@ -31,7 +32,7 @@ export async function getMoveInProgress(scope: RequestScope, reservationId: stri
   return {
     identityStatus: booking.identityDocument?.status ?? "NOT_UPLOADED", identityAccepted, identityRequired: Boolean(idPolicy),
     photoStatus: photo ? photoCurrent ? photo.status : ["WITHDRAWN", "REJECTED"].includes(photo.status) ? photo.status : "EXPIRED" : "NOT_CAPTURED",
-    photoReviewed: photoCurrent && ["APPROVED", "PENDING_PROVIDER"].includes(photo!.status), photoCollectionEnabled: Boolean(photoPolicy),
+    photoReviewed: Boolean(photo?.reviewedAt && photo?.reviewedById) && photoStored && ["APPROVED", "PENDING_PROVIDER"].includes(photo!.status), photoCollectionEnabled: Boolean(photoPolicy),
     handedOver: Boolean(handover), handedOverAt: handover?.occurredAt.toISOString() ?? null, publicReference: booking.publicReference,
   };
 }
