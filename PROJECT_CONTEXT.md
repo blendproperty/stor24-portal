@@ -1,4 +1,14 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Unattended release verification — 24 September 2026, 16:48 UTC
+
+- **Implementation:** PR243 adds session revocation/current-permission regression coverage. PR244 blocks monthly billing of unreconciled or future-dated accounts. PR245 removes credential/account metadata from all four operations staff relations, retaining id/name and nullable behavior.
+- **Testing:** PR243 all required checks passed (387 local tests). PR244 all checks passed on c6dd84a, including isolated PostgreSQL statement/invoice agreement and no-write rejection; main CI 36028860783 passed on rerun after a tenant-navigation timing failure. PR245 all checks passed on 8725023, including real-Prisma populated relation exclusion; 389 local tests/typecheck and independent read-only security review passed. Synthetic before/after reproduction proved the disclosure removed while staff names/nulls and facility scope remain. No production credentials accessed.
+- **Commit/push:** 79a8e25 (sessions), c6dd84a (billing), 8725023 (operations privacy) pushed and verified by PR checks.
+- **Merge:** PR243 -> 9cc511fea1e2de85e5ad3dd182c6285c0add865a; PR244 -> 13cd1981d4f9ca12a83dd759a62f568041db55e9; PR245 -> c1148ed7f26ebfb328cbab21d6c639b3c492eda4.
+- **Deployment/configuration:** billing deployment 36029530585 succeeded. Operations privacy rollout pending at this checkpoint. No payment, photo, gate, training or billing-automation configuration changed.
+- **Live verification:** independently inspected stor24-crm:13cd1981d healthy and public /api/health service/status/database all correct. No real financial transaction or private customer read performed. Production behavior of the privacy repair remains unverified until rollout.
+- **Tracker:** Excel E005–E007 updated, recalculated, exported/reimported and rendered; prior stage statuses and journey preserved, 0/14 accepted. Finance UAT, opening balances, legal/provider/CAPTCHA, MFA/recovery, data/training and programme acceptance remain open. Further work continues under the four-hour authorisation.
+
 ## Operations staff-data minimisation checkpoint — 24 September 2026
 
 - **Implementation:** operations GET now requests only id/name for task assignee, note author, maintenance assignee and daily-close closer. Existing permission/facility scope and nullable relations are retained. This prevents password hashes and account metadata from entering the operations response.
