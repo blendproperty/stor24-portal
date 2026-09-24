@@ -7,6 +7,7 @@ import { db } from "../../src/lib/db";
 import { requireFacility } from "../../src/lib/scope";
 import { createCustomer, createLead, requireLeasingCustomer } from "../../src/lib/leasing-service";
 import { listIdentityLinks } from "../../src/lib/mel-integration-status-service";
+import { listCommunicationLogs } from "../../src/lib/communication-log-service";
 
 test("isolated PostgreSQL security boundaries and safe staff projections", async t => {
   assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci");
@@ -20,6 +21,29 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
   const foreign = await db.facility.create({ data: { organisationId: other.id, code: "foreign", name: "Foreign" } });
   const scope = { userId: user.id, organisationId: org.id, facilityIds: [a.id], unrestrictedFacilities: false };
   try {
+    await t.test("message listings retain customer scope when a facility is unassigned", async () => {
+      const own = await db.customer.create({ data: { organisationId: org.id, firstName: "Log own", leads: { create: { facilityId: a.id, source: "CI" } } } });
+      const unrelated = await db.customer.create({ data: { organisationId: org.id, firstName: "Log other", leads: { create: { facilityId: b.id, source: "CI" } } } });
+      const unlinked = await db.customer.create({ data: { organisationId: org.id, firstName: "Log unlinked" } });
+      const foreignCustomer = await db.customer.create({ data: { organisationId: other.id, firstName: "Log foreign" } });
+      const fixtures = [
+        { customerId: own.id, facilityId: a.id, channel: "EMAIL" as const },
+        { customerId: own.id, facilityId: null, channel: "SMS" as const },
+        { customerId: own.id, facilityId: b.id, channel: "WHATSAPP" as const },
+        { customerId: unrelated.id, facilityId: null, channel: "EMAIL" as const },
+        { customerId: unlinked.id, facilityId: null, channel: "EMAIL" as const },
+        { customerId: foreignCustomer.id, facilityId: null, channel: "EMAIL" as const },
+        { customerId: null, facilityId: null, channel: "EMAIL" as const },
+      ];
+      const logs = [];
+      for (const row of fixtures) logs.push(await db.communicationLog.create({ data: { ...row, organisationId: org.id, messageType: "CI", recipientHash: "synthetic", idempotencyKey: randomUUID() } }));
+      const foreignLog = await db.communicationLog.create({ data: { organisationId: other.id, facilityId: foreign.id, customerId: foreignCustomer.id, channel: "EMAIL", messageType: "CI", recipientHash: "synthetic", idempotencyKey: randomUUID() } });
+      assert.deepEqual(new Set((await listCommunicationLogs(scope)).map(row => row.id)), new Set(logs.slice(0, 2).map(row => row.id)));
+      assert.equal((await listCommunicationLogs({ ...scope, facilityIds: [] })).length, 0);
+      const unrestricted = await listCommunicationLogs({ ...scope, unrestrictedFacilities: true });
+      assert.equal(unrestricted.length, logs.length);
+      assert.ok(!unrestricted.some(row => row.id === foreignLog.id));
+    });
     await t.test("manual messaging checks customer and facility relationships before any provider attempt", async () => {
       const role = await db.role.create({ data: { organisationId: org.id, name: "Messaging scope", permissions: ["operations.manage"] } });
       await db.roleAssignment.create({ data: { userId: user.id, roleId: role.id, facilityId: a.id } });

@@ -1,5 +1,7 @@
 # STOR24 delivery checklist
 
+24 September communications visibility checkpoint: P14/P08 limits unassigned delivery history to permitted customers and shows email/SMS alongside WhatsApp with review-only failure controls. Before/after actual-page proof, 441 tests/typecheck and independent review pass; PostgreSQL/required CI and promotion pending. PR269 deployed 6164000bd with exact image/public readiness verified at 19:45 UTC. All operational/provider/legal acceptance remains open.
+
 24 September setup recovery checkpoint: P06 company setup handles failed loads/saves, retains fields, reports partial success and refreshes saved values without automatic mutation retry. Desktop/mobile actual-component failure/recovery passed with Satoshi/brand CSS, no overflow/page errors; 438 tests/typecheck/lint pass. Required CI/promotion pending. PR268 deployed 2fca1bc7 and PR267 deployed b4f4c0dd, both live readiness verified. Actual operational settings enforcement and staff/finance acceptance remain open.
 
 24 September close-precision checkpoint: P06/CIA-I1 rejects sub-cent/out-of-range cash before close persistence. Before 0.005 was accepted; after standard validation/no writes, valid cents preserved. 438 tests/typecheck/lint pass; PostgreSQL/required CI and promotion pending. PR267 passed all checks and merged b4f4c0d; rollout pending. PR266 deployed ffcdfa28 and live readiness verified. Historical closes, balancing/period policy and staff/finance acceptance remain open.
