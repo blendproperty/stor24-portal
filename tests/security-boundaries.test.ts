@@ -64,6 +64,44 @@ async function load(entry: string, state: ReturnType<typeof fixture>) {
   new Function("require", "module", "exports", "__fixture", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, state);
   return loaded.exports;
 }
+test("account document metadata stays inside the actor organisation and facility grants", async () => {
+  const state = fixture();
+  const account = { id: "account", customer: { organisationId: "other" }, tenancy: { id: "tenancy", facilityId: "foreign" } };
+  state.db.account = { findFirst: async ({ where }: Row) => matches(account, where) ? account : null };
+  let documentReads = 0;
+  state.db.document = { findMany: async (query: Row) => {
+    documentReads++;
+    assert.deepEqual(query, { where: { tenancyId: "tenancy", type: { in: ["INVOICE", "STATEMENT"] } }, select: { id: true, type: true, status: true, sentAt: true, createdAt: true }, orderBy: { createdAt: "desc" }, take: 100 });
+    return [{ id: "document", type: "INVOICE", status: "SENT", sentAt: null, createdAt: "2026-01-01" }];
+  } };
+  const api = await load("./src/app/api/v1/accounts/[id]/documents/route.ts", state);
+  const read = (id = "account") => api.GET(request("GET"), { params: Promise.resolve({ id }) });
+  for (const role of ["Ledger reader", "Organisation owner"]) {
+    state.tables.user[0].roleAssignments = [];
+    state.grant("ledger.view", null, role);
+    assert.equal((await read()).status, 404, role);
+    assert.equal(documentReads, 0);
+  }
+  account.customer.organisationId = "org"; account.tenancy.facilityId = "b";
+  assert.equal((await read()).status, 200);
+  state.tables.user[0].roleAssignments = []; state.grant("ledger.view", null);
+  assert.equal((await read()).status, 200);
+  state.tables.user[0].roleAssignments = []; state.grant("ledger.view", "a"); state.grant("reports.view", null);
+  assert.equal((await read()).status, 403); assert.equal(documentReads, 2);
+  account.tenancy.facilityId = "a";
+  assert.deepEqual((await (await read()).json()).data.documents.map((d: Row) => d.id), ["document"]);
+  assert.equal((await read("missing")).status, 404);
+  state.tables.user[0].roleAssignments = [];
+  assert.equal((await read()).status, 403);
+  state.tables.user[0].active = false;
+  assert.equal((await read()).status, 401);
+  state.tables.user[0].active = true; state.tables.user[0].sessionVersion = 2;
+  assert.equal((await read()).status, 401);
+  state.tables.user.length = 0;
+  assert.equal((await read()).status, 401);
+  assert.equal(documentReads, 3); assert.equal(state.writes.length, 0);
+});
+
 const scope = { userId: "staff", organisationId: "org", facilityIds: ["a"], unrestrictedFacilities: false };
 const context = (resource: string) => ({ params: Promise.resolve({ resource }) });
 function request(method: string, body?: unknown) {

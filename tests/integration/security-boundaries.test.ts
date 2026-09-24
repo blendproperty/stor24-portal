@@ -20,6 +20,40 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
   const foreign = await db.facility.create({ data: { organisationId: other.id, code: "foreign", name: "Foreign" } });
   const scope = { userId: user.id, organisationId: org.id, facilityIds: [a.id], unrestrictedFacilities: false };
   try {
+    await t.test("account documents enforce organisation ownership with current global and facility roles", async () => {
+      const reader = await db.role.create({ data: { organisationId: org.id, name: "Ledger test", permissions: ["ledger.view"] } });
+      const owner = await db.role.create({ data: { organisationId: org.id, name: "Organisation owner", permissions: ["*"] } });
+      const accounts = [];
+      for (const facility of [a, b, foreign]) {
+        const customer = await db.customer.create({ data: { organisationId: facility.organisationId, firstName: "Synthetic" } });
+        const account = await db.account.create({ data: { customerId: customer.id, accountNumber: randomUUID() } });
+        const tenancy = await db.tenancy.create({ data: { facilityId: facility.id, customerId: customer.id, accountId: account.id, startDate: new Date("2026-01-01") } });
+        await db.document.create({ data: { tenancyId: tenancy.id, type: "INVOICE", status: "SENT", provider: "CI", storageKey: "inline:synthetic-ci", content: "Synthetic private invoice" } });
+        accounts.push(account);
+      }
+      const output = await build({ entryPoints: ["src/app/api/v1/accounts/[id]/documents/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "isolated-session", setup(builder) {
+        builder.onResolve({ filter: /^@\/lib\/(db|session)$/ }, args => ({ path: args.path, namespace: "fixture" }));
+        builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
+      } }] });
+      const loaded = { exports: {} as { GET: (request: Request, context: { params: Promise<{ id: string }> }) => Promise<Response> } };
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: user.id, sessionVersion: user.sessionVersion });
+      const read = (id: string) => loaded.exports.GET(new Request("https://example.invalid/api/v1/accounts/test/documents"), { params: Promise.resolve({ id }) });
+      for (const roleId of [reader.id, owner.id]) {
+        await db.roleAssignment.deleteMany({ where: { userId: user.id } });
+        await db.roleAssignment.create({ data: { userId: user.id, roleId, facilityId: null } });
+        assert.equal((await read(accounts[2].id)).status, 404);
+        const own = await read(accounts[1].id); assert.equal(own.status, 200);
+        const body = await own.json(); assert.equal(body.data.documents.length, 1);
+        assert.equal(JSON.stringify(body).includes("Synthetic private invoice"), false);
+      }
+      await db.roleAssignment.deleteMany({ where: { userId: user.id } });
+      await db.roleAssignment.create({ data: { userId: user.id, roleId: reader.id, facilityId: a.id } });
+      assert.equal((await read(accounts[0].id)).status, 200);
+      assert.equal((await read(accounts[1].id)).status, 403);
+      assert.equal((await read(accounts[2].id)).status, 404);
+      await db.roleAssignment.deleteMany({ where: { userId: user.id } });
+      assert.equal((await read(accounts[0].id)).status, 403);
+    });
     await t.test("SQL intersects requested ID with assigned facility and organisation", async () => {
       assert.equal((await requireFacility(scope, a.id)).id, a.id);
       for (const id of [b.id, foreign.id]) await assert.rejects(requireFacility(scope, id), /FORBIDDEN/);
