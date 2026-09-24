@@ -17,22 +17,31 @@ export async function POST(request: Request) {
   const eventKey = { organisationId: log.organisationId, provider: "TWILIO", externalEventId: `${providerRef}:${isRead ? "read" : status}` };
   try {
     await db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "CommunicationLog" WHERE "id" = ${log.id} FOR UPDATE`;
+      const current = await tx.communicationLog.findUniqueOrThrow({ where: { id: log.id } });
       // Claim the event before its effects; upsert would still repeat the task
       // and log updates when a signed callback is retried.
       await tx.webhookInbox.create({
         data: { ...eventKey, facilityId: log.facilityId, eventType: "MESSAGE_STATUS", payload, status: "SUCCEEDED", attempts: 1, processedAt: new Date() },
       });
+      // Callbacks can arrive out of order. Keep every event in the inbox, but
+      // never let an earlier/unknown state erase confirmed delivery or failure.
+      if (!isDelivered) {
+        if (current.status === "SUCCEEDED" || current.deliveredAt || current.readAt) return;
+        if (isFailed && current.failedAt) return;
+        if (!isFailed && (current.status === "FAILED" || current.failedAt || !["accepted", "scheduled", "queued", "sending", "sent"].includes(status))) return;
+      }
       await tx.communicationLog.update({ where: { id: log.id }, data: {
         status: isFailed ? "FAILED" : isDelivered ? "SUCCEEDED" : "PROCESSING",
-        sentAt: ["sent", "delivered", "read"].includes(status) || isRead ? (log.sentAt ?? new Date()) : undefined,
-        deliveredAt: isDelivered ? (log.deliveredAt ?? new Date()) : undefined,
-        readAt: isRead ? (log.readAt ?? new Date()) : undefined,
-        failedAt: isFailed ? new Date() : undefined,
-        failureCode: isFailed ? (payload.ErrorCode || "DELIVERY_FAILED") : undefined,
-        failureMessage: isFailed ? (payload.ChannelStatusMessage || "Twilio could not deliver the message.") : undefined,
-        nextRetryAt: isFailed && log.attempts < 3 ? new Date(Date.now() + 5 * 60_000) : undefined,
+        sentAt: ["sent", "delivered", "read"].includes(status) || isRead ? (current.sentAt ?? new Date()) : undefined,
+        deliveredAt: isDelivered ? (current.deliveredAt ?? new Date()) : undefined,
+        readAt: isRead ? (current.readAt ?? new Date()) : undefined,
+        failedAt: isFailed ? new Date() : isDelivered ? null : undefined,
+        failureCode: isFailed ? (payload.ErrorCode || "DELIVERY_FAILED") : isDelivered ? null : undefined,
+        failureMessage: isFailed ? (payload.ChannelStatusMessage || "Twilio could not deliver the message.") : isDelivered ? null : undefined,
+        nextRetryAt: isFailed ? (current.attempts < 3 ? new Date(Date.now() + 5 * 60_000) : null) : isDelivered ? null : undefined,
       } });
-      if (isFailed) await tx.task.create({ data: { organisationId: log.organisationId, facilityId: log.facilityId, customerId: log.customerId, title: "WhatsApp delivery failed", description: `Review communication ${log.id}. Twilio error ${payload.ErrorCode || "unknown"}.`, priority: log.attempts >= 3 ? "HIGH" : "NORMAL" } });
+      if (isFailed) await tx.task.create({ data: { organisationId: current.organisationId, facilityId: current.facilityId, customerId: current.customerId, title: "WhatsApp delivery failed", description: `Review communication ${current.id}. Twilio error ${payload.ErrorCode || "unknown"}.`, priority: current.attempts >= 3 ? "HIGH" : "NORMAL" } });
     });
   } catch (error) {
     if (typeof error === "object" && error !== null && "code" in error && error.code === "P2002") {
