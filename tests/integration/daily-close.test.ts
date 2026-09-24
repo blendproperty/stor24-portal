@@ -14,6 +14,19 @@ test("isolated PostgreSQL daily-close snapshot integrity", async t => {
   const user = await db.user.create({ data: { organisationId: org.id, name: "Synthetic closer", email: `${key}@example.invalid` } });
   const input = { facilityId: facility.id, businessDate: "2026-01-01", expectedCash: 0.1, countedCash: 0.3, checks: [{ key: "review", label: "Synthetic attestation", complete: true }] };
   try {
+    await t.test("cash precision is rejected before writes and valid cents reconcile exactly", async () => {
+      for (const field of ["expectedCash", "countedCash"]) {
+        for (const value of [0.005, 0.004, 1_000_000_000_000]) {
+          await assert.rejects(recordDailyClose(org.id, user.id, { ...input, businessDate: "2026-01-10", [field]: value }));
+        }
+      }
+      assert.equal(await db.dailyClose.count({ where: { organisationId: org.id } }), 0);
+      assert.equal(await db.auditEvent.count({ where: { organisationId: org.id } }), 0);
+      const closed = await recordDailyClose(org.id, user.id, { ...input, businessDate: "2026-01-10", expectedCash: 0.29, countedCash: 1.15 });
+      assert.equal(closed.variance?.toFixed(2), "0.86");
+      assert.equal(closed.countedCash?.minus(closed.expectedCash).toFixed(2), closed.variance?.toFixed(2));
+      assert.equal(await db.auditEvent.count({ where: { entityId: closed.id } }), 1);
+    });
     await t.test("closed snapshot cannot be replaced and retains one audit", async () => {
       const first = await recordDailyClose(org.id, user.id, input);
       assert.equal(first.variance?.toFixed(2), "0.20");

@@ -1,5 +1,7 @@
 # STOR24 delivery checklist
 
+24 September close-precision checkpoint: P06/CIA-I1 rejects sub-cent/out-of-range cash before close persistence. Before 0.005 was accepted; after standard validation/no writes, valid cents preserved. 438 tests/typecheck/lint pass; PostgreSQL/required CI and promotion pending. PR267 passed all checks and merged b4f4c0d; rollout pending. PR266 deployed ffcdfa28 and live readiness verified. Historical closes, balancing/period policy and staff/finance acceptance remain open.
+
 24 September booking send-claim checkpoint: P08/CIA-I2 reservation/viewing email and SMS now persist one attempt before transport. Before three concurrent sends; after one per channel, uncertainty and finalisation failures require review without resend. 437 tests/typecheck/lint pass; PostgreSQL/required CI and promotion pending. PR266 passed all checks and merged ffcdfa2; rollout pending. PR265 deployed 13986737 and live readiness verified. Cross-key/provider/staff acceptance remains open.
 
 24 September offline consent checkpoint: P14/P08 preserves the existing WhatsApp opt-out rule through offline notification projection and both replay summaries. Synthetic inconsistent stored consent reproduced before; 434 tests/typecheck/lint pass after. Ordinary STOP remains correctly false plus timestamp; no production bypass alleged. Review/required CI/promotion pending. PR265 passed all checks and merged 1398673; rollout pending. PR264 deployed 88fbd655 and live readiness verified. All priority acceptance remains open.

@@ -429,11 +429,14 @@ export const storagePackageUpdateSchema = z.object({
   }
 });
 
+// Match DailyClose Decimal(14, 2); never silently round an attested cash count.
+const dailyCloseCash = z.number().nonnegative().max(999_999_999_999.99).multipleOf(0.01, "Use at most two decimal places.");
+
 export const dailyCloseSchema = z.object({
   facilityId: z.string().cuid(),
   businessDate: z.iso.date(),
-  expectedCash: z.number().nonnegative(),
-  countedCash: z.number().nonnegative(),
+  expectedCash: dailyCloseCash,
+  countedCash: dailyCloseCash,
   notes: z.string().trim().max(2000).optional(),
   checks: z
     .array(
