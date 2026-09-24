@@ -1,3 +1,4 @@
+import { bookingPreferenceRecord } from "@/lib/privacy-preferences";
 import { db } from "@/lib/db";
 import type { PublicLeadInput } from "@/lib/public-lead-contract";
 
@@ -46,6 +47,7 @@ export async function createPublicLead(input: PublicLeadInput, ipHash: string) {
     input.websitePath ? `Website path: ${input.websitePath}` : null,
   ].filter(Boolean).join("\n");
 
+  const preferenceEvidence = { ...bookingPreferenceRecord({}, input.privacyNoticeVersion, "PUBLIC_QUOTE_FORM"), purpose: "RESPOND_TO_ENQUIRY", preferredContact: input.contactMethod ?? null };
   return db.$transaction(async (tx) => {
     let customer = await tx.customer.findFirst({
       where: { organisationId: facility.organisationId, email: { equals: input.email, mode: "insensitive" } },
@@ -60,7 +62,7 @@ export async function createPublicLead(input: PublicLeadInput, ipHash: string) {
           lastName: input.lastName,
           email: input.email,
           phone: input.phone,
-          communicationConsent: { email: true, sms: false, phone: false, recordedAt: new Date().toISOString(), source: "PUBLIC_QUOTE_FORM" },
+          communicationConsent: preferenceEvidence,
         },
       });
     } else {
@@ -93,7 +95,7 @@ export async function createPublicLead(input: PublicLeadInput, ipHash: string) {
         entityType: "Lead",
         entityId: lead.id,
         ipHash,
-        after: { source: "PUBLIC_QUOTE_FORM", customerId: customer.id },
+        after: { source: "PUBLIC_QUOTE_FORM", customerId: customer.id, communicationPreferences: preferenceEvidence },
       },
     });
 

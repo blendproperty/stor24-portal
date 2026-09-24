@@ -43,7 +43,7 @@ export function facilityWhere(scope: RequestScope) {
 }
 
 export async function requireFacility(scope: RequestScope, facilityId: string) {
-  const facility = await db.facility.findFirst({ where: { id: facilityId, ...facilityWhere(scope) } });
+  const facility = await db.facility.findFirst({ where: { AND: [{ id: facilityId }, facilityWhere(scope)] } });
   if (!facility) throw new Error("FACILITY_FORBIDDEN");
   return facility;
 }

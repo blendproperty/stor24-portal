@@ -16,6 +16,7 @@ import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { TwilioSmsProvider, TwilioWhatsAppProvider, normalizeTwilioRecipient } from "@/lib/integrations/twilio-provider";
 import { emailProvider, stor24EmailVerificationHtml } from "@/lib/email";
 import { privacyHash } from "@/lib/request-security";
+import { bookingPreferenceRecord } from "@/lib/privacy-preferences";
 
 export class PublicBookingError extends Error {
   constructor(
@@ -259,11 +260,7 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
       }
 
       const source = input.journey === "VIEWING" ? "PUBLIC_VIEWING" : "PUBLIC_WEBSITE";
-      const consent = {
-        ...input.communicationConsent,
-        recordedAt: new Date().toISOString(),
-        source,
-      };
+      const consent = bookingPreferenceRecord(input.communicationConsent, input.privacyNoticeVersion, source);
       let customer = verificationEnabled ? null : await tx.customer.findFirst({ where: { organisationId: facility.organisationId, email: { equals: input.email, mode: "insensitive" } }, orderBy: { updatedAt: "desc" } });
       if (!customer) customer = await tx.customer.create({ data: { organisationId: facility.organisationId, type: "INDIVIDUAL", firstName: input.firstName, lastName: input.lastName, email: input.email, phone: normalizeTwilioRecipient(input.phone) ?? input.phone, communicationConsent: consent } });
 
@@ -322,6 +319,7 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
             source,
             unitId: unit.id,
             leadId: lead.id,
+            communicationPreferences: consent,
             holdExpiresAt: holdExpiresAt.toISOString(),
           },
         },

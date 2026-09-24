@@ -65,7 +65,7 @@ test("editorial guide destinations are fixed staff read screens and IDs are uniq
 });
 
 test("every staff page and navigation destination has a substantive contextual tutorial", () => {
-  const publicPages = new Set(["/login", "/forgot-password", "/reset-password/[token]", "/invite/[token]", "/setup/[token]", "/sign/[token]", "/my", "/my/orders/[id]"]);
+  const publicPages = new Set(["/privacy", "/paia", "/login", "/forgot-password", "/reset-password/[token]", "/invite/[token]", "/setup/[token]", "/sign/[token]", "/my", "/my/orders/[id]"]);
   const routes = readdirSync("src/app", { recursive: true }).map(String).map(path => path.replaceAll("\\", "/"))
     .filter(path => path === "page.tsx" || path.endsWith("/page.tsx"))
     .map(path => path === "page.tsx" ? "/" : `/${path.slice(0, -9)}`).filter(route => !publicPages.has(route));

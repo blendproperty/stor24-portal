@@ -16,6 +16,7 @@ export const publicReservationSchema = z.object({
   intendedMoveIn: z.coerce.date().optional(),
   journey: z.enum(["RENTAL", "VIEWING"]).default("RENTAL"),
   viewingAt: z.coerce.date().optional(),
+  privacyNoticeVersion: z.string().trim().max(80).optional(),
   communicationConsent: z.object({
     email: z.boolean().default(false),
     sms: z.boolean().default(false),
