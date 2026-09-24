@@ -104,7 +104,7 @@ async function nextDocumentNumber(organisationId: string, type: "INVOICE" | "STA
 
 type SendResult =
   | { ok: true; documentId: string; communicationLogId: string }
-  | { ok: false; code: "ACCOUNT_NOT_FOUND" | "NO_LEDGER_ENTRIES" | "NO_CUSTOMER_EMAIL" | "EMAIL_FAILED" | "TEST_PAYMENT_RECONCILIATION_REQUIRED"; message?: string };
+  | { ok: false; code: "ACCOUNT_NOT_FOUND" | "NO_LEDGER_ENTRIES" | "INVALID_INVOICE_ENTRIES" | "NO_CUSTOMER_EMAIL" | "EMAIL_FAILED" | "TEST_PAYMENT_RECONCILIATION_REQUIRED"; message?: string };
 
 export async function sendInvoiceEmail(input: { accountId: string; organisationId: string; ledgerEntryIds: string[]; actorId: string; payNowUrl?: string }): Promise<SendResult> {
   const context = await getAccountBillingContext(input.accountId, input.organisationId);
@@ -113,6 +113,13 @@ export async function sendInvoiceEmail(input: { accountId: string; organisationI
 
   const entries = await db.ledgerEntry.findMany({ where: { id: { in: input.ledgerEntryIds }, accountId: context.account.id }, orderBy: { effectiveAt: "asc" } });
   if (!entries.length) return { ok: false, code: "NO_LEDGER_ENTRIES" };
+  // An invoice describes charges, not payments/credits or a silently reduced selection.
+  // Reject duplicate IDs too: they must not produce an alternative idempotency key
+  // for the same invoice lines.
+  if (new Set(input.ledgerEntryIds).size !== input.ledgerEntryIds.length ||
+      entries.length !== input.ledgerEntryIds.length || entries.some(entry => entry.type !== "CHARGE")) {
+    return { ok: false, code: "INVALID_INVOICE_ENTRIES" };
+  }
 
   const company = await getBillingDocumentCompanyDetails(context.organisationId, context.facilityId);
   const invoiceNumber = await nextDocumentNumber(context.organisationId, "INVOICE");
