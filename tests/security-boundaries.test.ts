@@ -33,7 +33,7 @@ function fixture() {
     auditEvent: [{ id: "audit", organisationId: "org", actorId: "staff", entityType: "Customer", entityId: "new-own", action: "customer.created" }],
     lead: [{ id: "lead-a", facilityId: "a" }], reservation: [], unit: [], integrationIdentityLink: [], accessDecision: [],
   };
-  const writes: Row[] = [], queries: Row[] = [];
+  const writes: Row[] = [], queries: Row[] = [], sends: unknown[][] = [];
   const db: Row = {};
   for (const [model, rows] of Object.entries(tables)) db[model] = {
     findFirst: async (args: Row) => { queries.push({ model, ...args }); return rows.find(row => matches(row, args.where)) ?? null; },
@@ -48,7 +48,7 @@ function fixture() {
   const grant = (permission: string, facilityId: string | null = "a", name = "Facility manager") => {
     tables.user[0].roleAssignments.push({ facilityId, role: { name, permissions: [permission] } });
   };
-  return { db, session, grant, tables, writes, queries };
+  return { db, session, grant, tables, writes, queries, sends };
 }
 
 async function load(entry: string, state: ReturnType<typeof fixture>) {
@@ -58,12 +58,66 @@ async function load(entry: string, state: ReturnType<typeof fixture>) {
     plugins: [{ name: "synthetic-persistence", setup(builder) {
       builder.onResolve({ filter: /^@\/lib\/(db|session)$/ }, args => ({ path: args.path, namespace: "fixture" }));
       builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__fixture.db;" : "export const getSession=async()=>__fixture.session;" }));
+      builder.onResolve({ filter: /^@\/lib\/integrations\/twilio-provider$/ }, args => ({ path: args.path, namespace: "provider" }));
+      builder.onLoad({ filter: /.*/, namespace: "provider" }, () => ({ contents: "export class TwilioWhatsAppProvider { async sendTemplate(...args) { __fixture.sends.push(args); return {ok:true,providerReference:'synthetic-message'}; } }" }));
     } }],
   });
   const loaded = { exports: {} as Row };
   new Function("require", "module", "exports", "__fixture", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, state);
   return loaded.exports;
 }
+
+test("manual WhatsApp send and retry authorize the recipient independently of the supplied facility", async () => {
+  const state = fixture(); state.grant("operations.manage"); state.grant("reports.view", null);
+  for (const customer of state.tables.customer) Object.assign(customer, { phone: "+27820000000", communicationConsent: { whatsapp: true } });
+  const log: Row = { id: "failed", organisationId: "org", channel: "WHATSAPP", status: "FAILED", facilityId: null, customerId: "customer-b", customer: state.tables.customer[1], messageType: "PAYMENT_REMINDER", metadata: { variables: {} }, idempotencyKey: "synthetic-failed-message", attempts: 0 };
+  state.db.communicationLog = {
+    findFirst: async ({ where }: Row) => matches(log, where) ? log : null,
+    findUnique: async () => null,
+    upsert: async ({ create }: Row) => { state.writes.push({ model: "communicationLog", data: create }); return { id: "sent" }; },
+    update: async ({ data }: Row) => { state.writes.push({ model: "communicationLog", data }); return log; },
+  };
+  const envKey = "TWILIO_WHATSAPP_PAYMENT_REMINDER_SID", previous = process.env[envKey];
+  process.env[envKey] = "HXsynthetic";
+  try {
+    const sendApi = await load("./src/app/api/v1/communications/send-whatsapp/route.ts", state);
+    const retryApi = await load("./src/app/api/v1/communications/retry-whatsapp/route.ts", state);
+    const send = (customerId = "customer-b", facilityId = "a") => sendApi.POST(request("POST", { customerId, facilityId, messageType: "PAYMENT_REMINDER", variables: {}, idempotencyKey: "synthetic-request-key" }));
+    const retry = () => retryApi.POST(request("POST", { logId: "failed" }));
+    assert.equal((await send()).status, 403);
+    assert.equal((await retry()).status, 403);
+    assert.equal(state.sends.length, 0); assert.equal(state.writes.length, 0);
+    for (const id of ["customer-a", "new-own"]) assert.equal((await send(id)).status, 202);
+    assert.equal((await send("new-other")).status, 403);
+    log.customerId = "customer-a"; log.customer = state.tables.customer[0];
+    assert.equal((await retry()).status, 200);
+    for (const facilityId of ["b", "foreign", "missing"]) {
+      assert.equal((await send("customer-a", facilityId)).status, 403);
+      log.facilityId = facilityId; assert.equal((await retry()).status, 403);
+    }
+    assert.equal(state.sends.length, 3);
+    for (const role of ["Operations administrator", "Organisation owner"]) {
+      state.tables.user[0].roleAssignments = []; state.grant("operations.manage", null, role);
+      assert.equal((await send("customer-b", "b")).status, 202);
+      assert.equal((await send("customer-b", "foreign")).status, 403);
+    }
+    state.tables.customer[1].organisationId = "other"; log.customerId = "customer-b"; log.customer = state.tables.customer[1]; log.facilityId = "a";
+    assert.equal((await send()).status, 403); assert.equal((await retry()).status, 403);
+    state.tables.user[0].roleAssignments = []; state.grant("operations.manage"); state.grant("operations.manage", "b");
+    state.tables.customer[1].organisationId = "org";
+    assert.equal((await send()).status, 202); // Customer is within the actor's overall operations scope.
+    state.tables.customer[0].communicationConsent = { whatsapp: false };
+    assert.equal((await send("customer-a")).status, 409);
+    state.tables.customer[0].communicationConsent = { whatsapp: true, optedOutAt: "2026-01-01" };
+    assert.equal((await send("customer-a")).status, 409);
+    state.tables.customer[0].phone = null;
+    assert.equal((await send("customer-a")).status, 404);
+    for (const mutate of [() => { state.tables.user[0].roleAssignments = []; }, () => { state.tables.user[0].sessionVersion = 2; }, () => { state.tables.user.length = 0; }]) {
+      mutate(); assert.ok([401, 403].includes((await send()).status)); assert.ok([401, 403].includes((await retry()).status));
+    }
+    assert.equal(state.sends.length, 6);
+  } finally { if (previous === undefined) delete process.env[envKey]; else process.env[envKey] = previous; }
+});
 test("account document metadata stays inside the actor organisation and facility grants", async () => {
   const state = fixture();
   const account = { id: "account", customer: { organisationId: "other" }, tenancy: { id: "tenancy", facilityId: "foreign" } };

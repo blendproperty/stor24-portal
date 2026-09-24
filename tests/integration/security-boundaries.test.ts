@@ -20,6 +20,53 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
   const foreign = await db.facility.create({ data: { organisationId: other.id, code: "foreign", name: "Foreign" } });
   const scope = { userId: user.id, organisationId: org.id, facilityIds: [a.id], unrestrictedFacilities: false };
   try {
+    await t.test("manual messaging checks customer and facility relationships before any provider attempt", async () => {
+      const role = await db.role.create({ data: { organisationId: org.id, name: "Messaging scope", permissions: ["operations.manage"] } });
+      await db.roleAssignment.create({ data: { userId: user.id, roleId: role.id, facilityId: a.id } });
+      const customers = [];
+      for (const facility of [a, b, foreign]) customers.push(await db.customer.create({ data: { organisationId: facility.organisationId, firstName: "Synthetic message", phone: "+27820000000", communicationConsent: { whatsapp: true }, leads: { create: { facilityId: facility.id, source: "CI" } } } }));
+      let sends = 0;
+      const provider = async () => { sends++; return { ok: true, providerReference: `synthetic-${sends}` }; };
+      const load = async (entry: string) => {
+        const output = await build({ entryPoints: [entry], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "isolated-messaging", setup(builder) {
+          builder.onResolve({ filter: /^@\/lib\/(db|session|integrations\/twilio-provider)$/ }, args => ({ path: args.path, namespace: "fixture" }));
+          builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : args.path.endsWith("/session") ? "export const getSession=async()=>__session;" : "export class TwilioWhatsAppProvider { sendTemplate(...args) { return __provider(...args); } }" }));
+        } }] });
+        const loaded = { exports: {} as { POST: (request: Request) => Promise<Response> } };
+        new Function("require", "module", "exports", "__db", "__session", "__provider", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: user.id, sessionVersion: user.sessionVersion }, provider);
+        return loaded.exports;
+      };
+      const sendApi = await load("src/app/api/v1/communications/send-whatsapp/route.ts");
+      const retryApi = await load("src/app/api/v1/communications/retry-whatsapp/route.ts");
+      const request = (body: unknown) => new Request("https://example.invalid/api/v1/communications", { method: "POST", headers: { origin: "https://example.invalid", "content-type": "application/json" }, body: JSON.stringify(body) });
+      const send = (customerId: string, facilityId = a.id) => sendApi.POST(request({ customerId, facilityId, messageType: "PAYMENT_REMINDER", variables: {}, idempotencyKey: randomUUID() }));
+      const retry = async (customerId: string, facilityId: string | null = null) => {
+        const log = await db.communicationLog.create({ data: { organisationId: org.id, facilityId, customerId, channel: "WHATSAPP", status: "FAILED", messageType: "PAYMENT_REMINDER", recipientHash: "synthetic", metadata: { variables: {} }, idempotencyKey: randomUUID() } });
+        const response = await retryApi.POST(request({ logId: log.id }));
+        if (response.status === 403) assert.equal((await db.communicationLog.findUniqueOrThrow({ where: { id: log.id } })).attempts, 1);
+        return response;
+      };
+      const envKey = "TWILIO_WHATSAPP_PAYMENT_REMINDER_SID", previous = process.env[envKey]; process.env[envKey] = "HXsynthetic";
+      try {
+        assert.equal((await send(customers[1].id)).status, 403);
+        assert.equal((await retry(customers[1].id)).status, 403);
+        assert.equal((await retry(customers[2].id, a.id)).status, 403);
+        assert.equal(sends, 0);
+        assert.equal(await db.auditEvent.count({ where: { organisationId: org.id, action: "communication.whatsapp.sent" } }), 0);
+        assert.equal((await send(customers[0].id)).status, 202);
+        assert.equal((await retry(customers[0].id)).status, 200);
+        assert.equal((await send(customers[0].id, b.id)).status, 403);
+        await db.roleAssignment.create({ data: { userId: user.id, roleId: role.id, facilityId: null } });
+        assert.equal((await send(customers[1].id, b.id)).status, 202);
+        assert.equal((await send(customers[1].id, foreign.id)).status, 403);
+        assert.equal((await retry(customers[0].id, foreign.id)).status, 403);
+        assert.equal((await send(customers[2].id)).status, 403);
+        assert.equal(sends, 3);
+      } finally {
+        if (previous === undefined) delete process.env[envKey]; else process.env[envKey] = previous;
+        await db.roleAssignment.deleteMany({ where: { userId: user.id } });
+      }
+    });
     await t.test("account documents enforce organisation ownership with current global and facility roles", async () => {
       const reader = await db.role.create({ data: { organisationId: org.id, name: "Ledger test", permissions: ["ledger.view"] } });
       const owner = await db.role.create({ data: { organisationId: org.id, name: "Organisation owner", permissions: ["*"] } });
