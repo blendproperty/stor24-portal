@@ -135,3 +135,7 @@ P03/P04: Brett confirmed seven days from actual debit-order failure, not schedul
 24 September 16:48 UTC follow-up: PR244 deployed via 36029530585; exact image 13cd1981d healthy and public database/application health passed. PR245 all required tests passed, including real-Prisma projections, and merged as c1148ed; rollout pending. Excel E005–E007 reconciled. See latest PROJECT_CONTEXT entry; all programme acceptance remains open.
 
 24 September follow-up: PR245 staff-data projection deployed (36030044204, image c1148ed7f healthy); PR247 stock-facility guard deployed (36031175753, image 1c1a6e825 healthy). Both passed independent security review, required CI and public readiness checks. No production private-response or stock write test performed. PR248 daily-close immutability/atomic audit is built with 391 local tests/typecheck passed; database/CI and promotion pending. Excel E007–E009 records scope; P14/P06 and programme acceptance remain open.
+
+### 24 September, 17:13 UTC — daily-close release gate
+PR248 merged as 1b47214 after all PR/database checks passed. Main browser CI 36031936705 failed at an immediate tenant-navigation hash assertion, so deployment was skipped. Current live image remains 1c1a6e825 healthy. Exact-URL retry assertions pass locally with existing keyboard/click/viewport checks retained; correction awaiting promotion. P06 and all acceptance gates remain open.
+
