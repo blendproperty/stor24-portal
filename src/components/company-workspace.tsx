@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Building2, CheckCircle2, Clock3, Globe2, MapPin, Plus, SlidersHorizontal, Trash2, UsersRound } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { ProgramDefaults } from "@/components/program-defaults";
@@ -62,12 +62,24 @@ export function CompanyWorkspace() {
   const [busy, setBusy] = useState(false);
   const [showAddStore, setShowAddStore] = useState(false);
   const [storeBusy, setStoreBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const working = busy || storeBusy || refreshing;
+  const feedbackRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => { if (error) feedbackRef.current?.focus(); }, [error]);
 
   const load = useCallback(async () => {
-    const response = await fetch("/api/v1/configuration", { cache: "no-store" });
-    const payload = await response.json();
-    if (!response.ok) setError(payload.error?.message ?? "Setup data could not be loaded.");
-    else { setData(payload.data); setFacilityId((current) => current || payload.data.facilities[0]?.id || ""); setError(""); }
+    setRefreshing(true);
+    try {
+      const response = await fetch("/api/v1/configuration", { cache: "no-store" });
+      const payload = await response.json();
+      if (!response.ok) { setError(payload.error?.message ?? "Setup data could not be loaded. Refresh setup to try again."); return false; }
+      if (!["facilities", "profiles", "integrations", "roles", "users"].every(key => Array.isArray(payload.data?.[key]))) throw new Error("Invalid setup response");
+      setRevision(current => current + 1);
+      setData(payload.data); setFacilityId((current) => current || payload.data.facilities[0]?.id || ""); setError("");
+      return true;
+    } catch { setError("Setup data could not be loaded. Refresh setup to try again."); return false; }
+    finally { setRefreshing(false); }
   }, []);
 
   useEffect(() => {
@@ -77,8 +89,9 @@ export function CompanyWorkspace() {
       .then(({ response, payload }) => {
         if (cancelled) return;
         if (!response.ok) setError(payload.error?.message ?? "Setup data could not be loaded.");
-        else { setData(payload.data); setFacilityId(payload.data.facilities[0]?.id || ""); }
-      });
+        else { if (!["facilities", "profiles", "integrations", "roles", "users"].every(key => Array.isArray(payload.data?.[key]))) throw new Error("Invalid setup response"); setData(payload.data); setFacilityId(payload.data.facilities[0]?.id || ""); }
+      })
+      .catch(() => { if (!cancelled) setError("Setup data could not be loaded. Refresh setup to try again."); });
     return () => { cancelled = true; };
   }, []);
 
@@ -89,60 +102,73 @@ export function CompanyWorkspace() {
   async function save(domain: string, config: Record<string, unknown>) {
     if (!facilityId) { setError("Select a facility before saving setup details."); return; }
     setBusy(true); setNotice(""); setError("");
-    const response = await fetch("/api/v1/configuration", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "profile", payload: { facilityId, domain, name: "Default", status: "READY", config } }) });
-    const payload = await response.json(); setBusy(false);
-    if (!response.ok) { setError(payload.error?.message ?? "Configuration could not be saved."); return; }
-    setNotice("Setup saved for this facility."); await load();
+    try {
+      const response = await fetch("/api/v1/configuration", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "profile", payload: { facilityId, domain, name: "Default", status: "READY", config } }) });
+      const payload = await response.json();
+      if (!response.ok) { setError(payload.error?.message ?? "Configuration could not be saved."); return; }
+      setNotice("Setup saved for this facility."); await load();
+    } catch { setError("Could not confirm the setup save. Refresh setup to check the saved values before retrying."); }
+    finally { setBusy(false); }
   }
 
   async function saveStoreInformation(config: Record<string, unknown>, publicSettings: { publicSlug: string | null; publicBookingEnabled: boolean }) {
     if (!facilityId) { setError("Select a facility before saving setup details."); return; }
     setBusy(true); setNotice(""); setError("");
-    const profileResponse = await fetch("/api/v1/configuration", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "profile", payload: { facilityId, domain: "STORE_INFORMATION", name: "Default", status: "READY", config } }) });
-    const profilePayload = await profileResponse.json();
-    if (!profileResponse.ok) { setBusy(false); setError(profilePayload.error?.message ?? "Store information could not be saved."); return; }
-    const slugResponse = await fetch("/api/v1/leasing/facilities", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: facilityId, data: { publicSlug: publicSettings.publicSlug } }) });
-    const slugPayload = await slugResponse.json();
-    if (!slugResponse.ok) { setBusy(false); setError(slugPayload.error?.message ?? slugPayload.error?.fields?.publicSlug?.[0] ?? "Public store address could not be saved."); return; }
-    const facilityResponse = await fetch("/api/v1/leasing/facilities", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: facilityId, data: { publicBookingEnabled: publicSettings.publicBookingEnabled } }) });
-    const facilityPayload = await facilityResponse.json(); setBusy(false);
-    if (!facilityResponse.ok) { setError(facilityPayload.error?.message ?? facilityPayload.error?.fields?.publicSlug?.[0] ?? "Website booking settings could not be saved."); return; }
-    setNotice(publicSettings.publicBookingEnabled ? "Store setup saved and website booking enabled." : "Store setup saved."); await load();
+    let completed = "";
+    try {
+      const profileResponse = await fetch("/api/v1/configuration", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "profile", payload: { facilityId, domain: "STORE_INFORMATION", name: "Default", status: "READY", config } }) });
+      const profilePayload = await profileResponse.json();
+      if (!profileResponse.ok) { setError(profilePayload.error?.message ?? "Store information could not be saved."); return; }
+      completed = "Store details saved. ";
+      const slugResponse = await fetch("/api/v1/leasing/facilities", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: facilityId, data: { publicSlug: publicSettings.publicSlug } }) });
+      const slugPayload = await slugResponse.json();
+      if (!slugResponse.ok) { setError(completed + (slugPayload.error?.message ?? slugPayload.error?.fields?.publicSlug?.[0] ?? "Public store address could not be saved.")); return; }
+      completed = "Store details and public address saved. ";
+      const facilityResponse = await fetch("/api/v1/leasing/facilities", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: facilityId, data: { publicBookingEnabled: publicSettings.publicBookingEnabled } }) });
+      const facilityPayload = await facilityResponse.json();
+      if (!facilityResponse.ok) { setError(completed + (facilityPayload.error?.message ?? facilityPayload.error?.fields?.publicSlug?.[0] ?? "Website booking settings could not be saved.")); return; }
+      setNotice(publicSettings.publicBookingEnabled ? "Store setup saved and website booking enabled." : "Store setup saved."); await load();
+    } catch { setError(completed + "Could not confirm the remaining setup changes. Refresh setup to check the saved values before retrying."); }
+    finally { setBusy(false); }
   }
 
   async function addStore(formData: FormData) {
     setStoreBusy(true); setError(""); setNotice("");
-    const response = await fetch("/api/v1/leasing/facilities", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: String(formData.get("name") ?? ""), code: String(formData.get("code") ?? ""), timezone: "Africa/Johannesburg", active: true }) });
-    const payload = await response.json(); setStoreBusy(false);
-    if (!response.ok) { setError(payload.error?.message ?? payload.error?.fields?.code?.[0] ?? "Store could not be added."); return; }
-    setShowAddStore(false); setNotice(`${payload.data.name} added.`); await load(); setFacilityId(payload.data.id);
+    try {
+      const response = await fetch("/api/v1/leasing/facilities", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: String(formData.get("name") ?? ""), code: String(formData.get("code") ?? ""), timezone: "Africa/Johannesburg", active: true }) });
+      const payload = await response.json();
+      if (!response.ok) { setError(payload.error?.message ?? payload.error?.fields?.code?.[0] ?? "Store could not be added."); return; }
+      if (typeof payload.data?.id !== "string" || typeof payload.data?.name !== "string") throw new Error("Invalid store response");
+      setShowAddStore(false); setNotice(`${payload.data.name} added.`); await load(); setFacilityId(payload.data.id);
+    } catch { setError("Could not confirm whether the store was added. Refresh setup before adding it again."); }
+    finally { setStoreBusy(false); }
   }
 
   return <div className="page-stack">
-    <PageHeader eyebrow="Administration" title="Company setup" description="Facility information and operational defaults, organised to match the SiteLink Site Setup workflow." action={<div className="facility-actions"><label className="facility-picker"><span>Store</span><select value={facilityId} onChange={(event) => { setFacilityId(event.target.value); setNotice(""); }}>{data?.facilities.map((facility) => <option value={facility.id} key={facility.id}>{facility.name}</option>)}</select></label><button type="button" className="button button-primary" onClick={() => setShowAddStore((current) => !current)}><Plus size={16}/>{showAddStore ? "Cancel" : "Add store"}</button></div>}/>
-    {showAddStore ? <form action={addStore} className="panel add-store-form"><div><p className="eyebrow">Portfolio</p><h2>Add another store</h2><p className="panel-subtitle">Create a separate store workspace with its own contact details, hours, website attributes and defaults.</p></div><Field name="name" label="Store name" placeholder="e.g. Store 7 – Location TBC" required/><Field name="code" label="Store code" placeholder="e.g. STORE-7" required maxLength={40}/><button className="button button-primary" disabled={storeBusy}>{storeBusy ? "Adding…" : "Add store"}</button></form> : null}
-    {error ? <p className="form-error">{error}</p> : null}{notice ? <p className="form-success"><CheckCircle2 size={16}/>{notice}</p> : null}
+    <PageHeader eyebrow="Administration" title="Company setup" description="Facility information and operational defaults, organised to match the SiteLink Site Setup workflow." action={<div className="facility-actions"><label className="facility-picker"><span>Store</span><select disabled={working} value={facilityId} onChange={(event) => { setFacilityId(event.target.value); setNotice(""); }}>{data?.facilities.map((facility) => <option value={facility.id} key={facility.id}>{facility.name}</option>)}</select></label><button type="button" className="button button-primary" disabled={working} onClick={() => setShowAddStore((current) => !current)}><Plus size={16}/>{showAddStore ? "Cancel" : "Add store"}</button></div>}/>
+    {showAddStore ? <form onSubmit={(event) => { event.preventDefault(); void addStore(new FormData(event.currentTarget)); }} className="panel add-store-form"><div><p className="eyebrow">Portfolio</p><h2>Add another store</h2><p className="panel-subtitle">Create a separate store workspace with its own contact details, hours, website attributes and defaults.</p></div><Field name="name" label="Store name" placeholder="e.g. Store 7 – Location TBC" required/><Field name="code" label="Store code" placeholder="e.g. STORE-7" required maxLength={40}/><button className="button button-primary" disabled={working}>{storeBusy ? "Adding…" : "Add store"}</button></form> : null}
+    {error ? <div><p className="form-error" role="alert" tabIndex={-1} ref={feedbackRef}>{error}</p><button type="button" className="button button-secondary" disabled={working} onClick={() => void load()}>{refreshing ? "Refreshing…" : "Refresh setup"}</button></div> : null}{notice ? <p className="form-success" role="status"><CheckCircle2 size={16}/>{notice}</p> : null}
     <section className="summary-strip">{[["Facilities", data?.facilities.length ?? 0], ["Employees", data?.users.length ?? 0], ["Security levels", data?.roles.length ?? 0], ["Setup sections", `${configured.size}/4`]].map(([label, value]) => <div className="summary-cell" key={label}><span>{label}</span><strong>{value}</strong></div>)}</section>
     <section className="setup-layout company-setup-layout">
       <nav className="panel setup-nav" aria-label="Company setup sections">
         <div className="setup-nav-heading"><Building2 size={18}/><div><strong>Site setup</strong><small>{selectedFacility?.name ?? "Select a facility"}</small></div></div>
-        <SetupNavButton active={section === "STORE_INFORMATION"} configured={configured.has("STORE_INFORMATION")} icon={<MapPin size={17}/>} label="Store information" onClick={() => setSection("STORE_INFORMATION")}/>
-        <SetupNavButton active={section === "TENANT_DEFAULTS"} configured={configured.has("TENANT_DEFAULTS")} icon={<UsersRound size={17}/>} label="Tenant defaults" onClick={() => setSection("TENANT_DEFAULTS")}/>
-        <SetupNavButton active={section === "WEBSITE_ATTRIBUTES"} configured={configured.has("WEBSITE_ATTRIBUTES")} icon={<Globe2 size={17}/>} label="Attributes on website" onClick={() => setSection("WEBSITE_ATTRIBUTES")}/>
-        <SetupNavButton active={section === "PROGRAM_DEFAULTS"} configured={configured.has("PROGRAM_DEFAULTS")} icon={<SlidersHorizontal size={17}/>} label="Program defaults" onClick={() => setSection("PROGRAM_DEFAULTS")}/>
+        <SetupNavButton disabled={working} active={section === "STORE_INFORMATION"} configured={configured.has("STORE_INFORMATION")} icon={<MapPin size={17}/>} label="Store information" onClick={() => setSection("STORE_INFORMATION")}/>
+        <SetupNavButton disabled={working} active={section === "TENANT_DEFAULTS"} configured={configured.has("TENANT_DEFAULTS")} icon={<UsersRound size={17}/>} label="Tenant defaults" onClick={() => setSection("TENANT_DEFAULTS")}/>
+        <SetupNavButton disabled={working} active={section === "WEBSITE_ATTRIBUTES"} configured={configured.has("WEBSITE_ATTRIBUTES")} icon={<Globe2 size={17}/>} label="Attributes on website" onClick={() => setSection("WEBSITE_ATTRIBUTES")}/>
+        <SetupNavButton disabled={working} active={section === "PROGRAM_DEFAULTS"} configured={configured.has("PROGRAM_DEFAULTS")} icon={<SlidersHorizontal size={17}/>} label="Program defaults" onClick={() => setSection("PROGRAM_DEFAULTS")}/>
       </nav>
       <article className="panel panel-spacious company-setup-panel">
-        {section === "STORE_INFORMATION" ? <StoreInformation key={`${facilityId}-${profile("STORE_INFORMATION")?.id ?? "new"}`} initial={profile("STORE_INFORMATION")?.config} facility={selectedFacility} busy={busy} onSave={saveStoreInformation}/> : null}
-        {section === "TENANT_DEFAULTS" ? <TenantDefaults key={`${facilityId}-${profile("TENANT_DEFAULTS")?.id ?? "new"}`} initial={profile("TENANT_DEFAULTS")?.config} busy={busy} onSave={(config) => save("TENANT_DEFAULTS", config)}/> : null}
-        {section === "WEBSITE_ATTRIBUTES" ? <WebsiteAttributes key={`${facilityId}-${profile("WEBSITE_ATTRIBUTES")?.id ?? "new"}`} initial={profile("WEBSITE_ATTRIBUTES")?.config} busy={busy} onSave={(config) => save("WEBSITE_ATTRIBUTES", config)}/> : null}
-        {section === "PROGRAM_DEFAULTS" ? <ProgramDefaults key={`${facilityId}-${profile("PROGRAM_DEFAULTS")?.id ?? "new"}`} initial={profile("PROGRAM_DEFAULTS")?.config} busy={busy} stores={data?.facilities.map(({ id, name }) => ({ id, name })) ?? []} currentStoreId={facilityId} onSave={(config) => save("PROGRAM_DEFAULTS", config)}/> : null}
+        {section === "STORE_INFORMATION" ? <StoreInformation key={`${facilityId}-${profile("STORE_INFORMATION")?.id ?? "new"}-${revision}`} initial={profile("STORE_INFORMATION")?.config} facility={selectedFacility} busy={working} onSave={saveStoreInformation}/> : null}
+        {section === "TENANT_DEFAULTS" ? <TenantDefaults key={`${facilityId}-${profile("TENANT_DEFAULTS")?.id ?? "new"}-${revision}`} initial={profile("TENANT_DEFAULTS")?.config} busy={working} onSave={(config) => save("TENANT_DEFAULTS", config)}/> : null}
+        {section === "WEBSITE_ATTRIBUTES" ? <WebsiteAttributes key={`${facilityId}-${profile("WEBSITE_ATTRIBUTES")?.id ?? "new"}-${revision}`} initial={profile("WEBSITE_ATTRIBUTES")?.config} busy={working} onSave={(config) => save("WEBSITE_ATTRIBUTES", config)}/> : null}
+        {section === "PROGRAM_DEFAULTS" ? <ProgramDefaults key={`${facilityId}-${profile("PROGRAM_DEFAULTS")?.id ?? "new"}-${revision}`} initial={profile("PROGRAM_DEFAULTS")?.config} busy={working} stores={data?.facilities.map(({ id, name }) => ({ id, name })) ?? []} currentStoreId={facilityId} onSave={(config) => save("PROGRAM_DEFAULTS", config)}/> : null}
       </article>
     </section>
   </div>;
 }
 
-function SetupNavButton({ active, configured, icon, label, onClick }: { active: boolean; configured: boolean; icon: React.ReactNode; label: string; onClick: () => void }) {
-  return <button type="button" className={active ? "setup-nav-active" : ""} onClick={onClick}><span>{icon}<strong>{label}</strong></span><StatusPill tone={configured ? "positive" : "warning"}>{configured ? "Saved" : "Configure"}</StatusPill></button>;
+function SetupNavButton({ active, configured, icon, label, onClick, disabled }: { disabled: boolean; active: boolean; configured: boolean; icon: React.ReactNode; label: string; onClick: () => void }) {
+  return <button type="button" disabled={disabled} className={active ? "setup-nav-active" : ""} onClick={onClick}><span>{icon}<strong>{label}</strong></span><StatusPill tone={configured ? "positive" : "warning"}>{configured ? "Saved" : "Configure"}</StatusPill></button>;
 }
 
 function StoreInformation({ initial, facility, busy, onSave }: { initial?: Record<string, unknown>; facility?: Facility; busy: boolean; onSave: (config: Record<string, unknown>, publicSettings: { publicSlug: string | null; publicBookingEnabled: boolean }) => void }) {
@@ -157,7 +183,7 @@ function StoreInformation({ initial, facility, busy, onSave }: { initial?: Recor
     const publicSlug = String(formData.get("publicSlug") ?? "").trim().toLowerCase() || null;
     onSave(config, { publicSlug, publicBookingEnabled });
   }
-  return <form action={submit} className="company-form">
+  return <form onSubmit={(event) => { event.preventDefault(); submit(new FormData(event.currentTarget)); }} className="company-form">
     <div className="panel-heading"><div><p className="eyebrow">General setup</p><h2>Store information</h2><p className="panel-subtitle">Contact information, access hours, office hours, location and website details for the selected facility.</p></div><Building2 className="positive-icon"/></div>
     <div className="company-form-grid">
       <fieldset><legend>Contact information</legend><div className="field-grid two-column">
