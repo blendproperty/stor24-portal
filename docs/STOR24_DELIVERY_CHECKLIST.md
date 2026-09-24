@@ -142,3 +142,6 @@ PR248 merged as 1b47214 after all PR/database checks passed. Main browser CI 360
 
 ### 24 September, 17:23 UTC — invoice selection validation
 P02/P08 candidate rejects payments/credits/refunds/reversals/write-offs, duplicates and partial account selections before document creation or email. Synthetic before/after proof, 392 tests and typecheck passed; CI/promotion/live pending. Resend consistency and numbering remain open. PR249 merged 079ae6c after all required checks; main release CI still running. No acceptance status changed.
+
+### 24 September, 17:35 UTC — verified daily-close release
+PR248/249 deployed through 36033956292; exact image 079ae6c73 healthy and public application/database readiness verified. No production close recorded. PR250 invoice validation passed all required checks and merged e15e1e4; its deployment is pending. Excel E009/E010 reconciled to these states. Manual close reconciliation/automation/reopening, invoice retry/numbering and staff acceptance remain open; 0/14 accepted.
