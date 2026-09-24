@@ -1,4 +1,13 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Release evidence — 24 September 2026, 17:35 UTC
+
+- **Implementation:** daily-close immutable snapshots/atomic audit (PR248), tenant-navigation test timing correction (PR249), and complete charge-only invoice selection validation (PR250).
+- **Testing:** PR248 PostgreSQL concurrency/single-audit/rollback and all required checks passed; PR249 all required checks and main CI 36033659977 passed; PR250 all required build/browser/database/security checks passed on e443117e618d3a2ac52ea1e0b1c28a3a81dcbc4a, with 392 local tests and typecheck. No customer messages or live operational writes used for testing.
+- **Commit/push:** aaaa9375cc05f65100c0a1f758757e9e601a9f26 (daily close), 83003cc645842b046a77840a96b286f3659ae05f (navigation test), e443117e618d3a2ac52ea1e0b1c28a3a81dcbc4a (invoice validation) pushed and checked.
+- **Merge:** PR248 -> 1b47214ecb807916cd13a439e8d7dc6cc825444b; PR249 -> 079ae6c739ddbdb036d8e0ee769bffdcafe0f708; PR250 -> e15e1e4a597f87abd7a7b927ee6ad51e76d0b2d4.
+- **Deployment/configuration:** deployment 36033956292 succeeded for 079ae6c, including daily-close protection. Invoice validation deployment pending at this checkpoint. No payment, gate/photo, training or other operational switches changed.
+- **Live verification:** independently inspected stor24-crm:079ae6c73 healthy and public service/status/database health correct at 17:35 UTC. This verifies the deployed version/readiness; no real daily close, invoice or receipt created.
+- **Acceptance:** daily-close cash-source reconciliation, automatic close, reopen workflow and financial-period rules remain open. Invoice resend consistency, numbering, historical tax and staff/finance acceptance remain open. Legal/provider, CAPTCHA, recovery/restore, training/data and all 14 programme acceptance gates remain unchanged.
 ## Invoice selection integrity checkpoint — 24 September 2026, 17:23 UTC
 
 - **Implementation:** invoice generation now rejects non-charge ledger entries, duplicate selections and partially matched account selections before configuration, document creation or delivery. The staff API returns a clear 422. Complete charge-only selections retain the existing generation path.
