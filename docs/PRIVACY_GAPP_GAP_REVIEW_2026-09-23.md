@@ -1,5 +1,8 @@
 # STOR24 privacy and GAPP gap review
 
+24 September progress: see [Priority 2 technical release](PRIORITY_2_RELEASE_2026-09-24.md) for implemented controls and current evidence. The observations below retain their original assessment date. All PRIV and CIA acceptance items remain open; deployed changes do not substitute for legal, provider, staff or recovery acceptance.
+
+
 Review date: 23 September 2026. Status: review completed; remediation and legal acceptance OPEN. This is a scoped technical and operational gap assessment, not a legal opinion, certification, penetration test or approval to collect biometrics.
 
 ## Conclusion and scope

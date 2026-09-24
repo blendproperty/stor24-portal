@@ -1,4 +1,15 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Priority 2 verified technical release — 24 September 2026
+
+- **Implementation:** the privacy/CIA technical changes below are delivered. Full scope, six source findings, test evidence and remaining controls: [release record](docs/PRIORITY_2_RELEASE_2026-09-24.md). P14 and all 14 programme priorities remain OPEN.
+- **Testing:** 383 CRM local tests, typecheck/build/schema checks and zero-known-finding full dependency audit passed. PR CI 36012126077, isolated PostgreSQL security and transaction CI 36012126025, and main CI 36012507113 passed. Public 52 unit/15 browser checks and revised CI 36013036298 passed. Synthetic tests do not establish provider or staff acceptance.
+- **Commit and push:** CRM implementation 4da06c9af96bdd777c33bf96aed8d1588cc1a393 and public 19adf31fb78c21074072f4ac6dfe8ab644398d34 pushed to canonical repositories. This documentation follow-up records final evidence; enclosing PR supplies its own commit/merge identity.
+- **Merge:** CRM PR230 → 0455f1472ed93a7c880760c2c1d7f0ba27f2ce24; public PR77 → 428270b9735ddb52c218b262a6edaffb331979e8.
+- **Deployment and configuration:** CRM deployment 36012746940 succeeded; running image stor24-crm:0455f1472 is healthy and reports Next 16.3.6. Public deployment 36013430247 succeeded at merge 428270b9735ddb52c218b262a6edaffb331979e8; running Next 15.5.26 verified. All 408 inspected backup files and public .env were restricted to root-only 0600. CRM .env was already 0600. Photo/provider/payment toggles unchanged. Existing billing scheduler credential mismatch remains a separate P02/P03 gate; no billing activated.
+- **Live production verification:** CRM anonymous /privacy and /paia return 200 with one heading and no horizontal overflow at 1440/390/320px. Public /privacy and /paia return 200, one heading, footer links and no overflow at 1440/390/320px; live 320px booking form shows all four optional choices unchecked and its privacy link, without submitting. Mobile screenshots inspected. No customer form submitted or customer/private document, payment, message or gate action performed. Custom-domain equivalence and authenticated staff-role UAT remain unverified.
+- **Tracker:** canonical P14 stage/evidence register and existing Excel working copy are reconciled with this delivery. Workbook recalculation, export/reimport and changed-range checks recorded in the release record. No overall acceptance awarded.
+- **Open gates:** legal notice and formal PAIA approval, biometric basis/alternative/retention, processor/device deletion, Information Officer ownership, privacy-request/preference-change rehearsal, privileged MFA/role UAT, encrypted off-system recovery/restore and alert/incident/outage drills remain open with all provider, finance, data, training and P01 gates.
+
 
 ## Priority 2 privacy and CIA remediation — 24 September 2026
 

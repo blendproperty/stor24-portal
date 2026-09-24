@@ -1,5 +1,8 @@
 # STOR24 CIA security acceptance
 
+24 September progress: see [Priority 2 technical release](PRIORITY_2_RELEASE_2026-09-24.md) for implemented controls and current evidence. The observations below retain their original assessment date. All PRIV and CIA acceptance items remain open; deployed changes do not substitute for legal, provider, staff or recovery acceptance.
+
+
 Added 23 September 2026 at Brett's request. CIA means Confidentiality, Integrity and Availability. These are mandatory security objectives for the public website, CRM, customer portal and connected payment/access services. CIA is a model, not a standalone certification. This requirements mapping complements the [GAPP review](PRIVACY_GAPP_GAP_REVIEW_2026-09-23.md) and does not replace POPIA/legal approval.
 
 ## Evidence boundary
