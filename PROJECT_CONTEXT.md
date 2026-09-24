@@ -1,4 +1,14 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Daily-close record integrity checkpoint — 24 September 2026
+
+- **Implementation:** close recording and its audit now commit together. Already CLOSED snapshots return an explicit 409 instead of overwriting totals/actor/time. OPEN, READY and explicitly REOPENED records can close through a conditional update; concurrent creation uses the existing unique facility/date key. Cash variance uses decimal arithmetic. Operations labels these as recorded snapshots and colours non-closed records as requiring attention.
+- **Testing:** actual-route synthetic before test overwrote a closed snapshot (201); after test returns 409 without extra writes/audit and preserves original cash. Incomplete checks remain blocked. 391 local tests and typecheck passed. Added isolated PostgreSQL tests for duplicate/concurrent creation, concurrent draft closure, recorded prior state and rollback when audit creation fails; CI pending.
+- **Commit/push:** enclosing daily-close-integrity PR records promotion.
+- **Merge:** pending required checks.
+- **Deployment/configuration:** pending. This records manual attestations only; it does not reconcile supplied cash against receipts, run automatic close, add a reopen workflow or lock future financial postings. Those Priority 7 requirements remain open.
+- **Live verification:** no real close or financial transaction performed. P06 and wider programme remain unaccepted.
+- **Prior stock fix verified:** PR247 merged as 1c1a6e8254d6615905f8e5b3e2fa71fa8aa98c26 after all required checks, including isolated PostgreSQL/no-write tests, passed. Independent security review found no concrete bypass/regression. Deployment 36031175753 succeeded; independently inspected stor24-crm:1c1a6e825 healthy and public application/database health correct. No live stock mutation performed; staff acceptance remains open.
+
 ## Stock facility-authorisation checkpoint — 24 September 2026
 
 - **Implementation:** stock-movement POST checks inventory.manage against the retrieved product facility before either stock write. Organisation filtering remains; no request-supplied facility can widen access. Global inventory grants and owner access retain existing behavior.

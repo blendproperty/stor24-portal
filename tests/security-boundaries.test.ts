@@ -209,3 +209,28 @@ test("stock movements require inventory authority at the product's actual facili
   assert.equal((await send("RECEIPT", "c9999999999999999999999999")).status, 403);
   assert.equal(state.writes.length, count); assert.equal(product.quantityOnHand, 13);
 });
+
+test("daily-close API preserves closed snapshots and returns a useful conflict", async () => {
+  const state = fixture();
+  const facilityId = "c2222222222222222222222222";
+  state.grant("daily_close.perform", facilityId);
+  state.db.facility.count = async () => 1;
+  let saved: Row | null = null;
+  state.db.dailyClose = {
+    findFirst: async () => saved,
+    create: async ({ data }: Row) => { saved = { id: "close", ...data }; state.writes.push({ model: "dailyClose", data }); return saved; },
+    upsert: async ({ create, update }: Row) => { saved = { id: "close", ...(saved ? { ...saved, ...update } : create) }; state.writes.push({ model: "dailyClose", data: saved }); return saved; },
+  };
+  const api = await load("./src/app/api/v1/operations/route.ts", state);
+  const payload = { facilityId, businessDate: "2026-01-01", expectedCash: 10, countedCash: 10, checks: [{ key: "review", label: "Synthetic check", complete: true }] };
+  assert.equal((await api.POST(request("POST", { kind: "dailyClose", payload }))).status, 201);
+  const writeCount = state.writes.length;
+  const repeated = await api.POST(request("POST", { kind: "dailyClose", payload: { ...payload, countedCash: 99 } }));
+  assert.equal(repeated.status, 409);
+  assert.equal((await repeated.json()).error.code, "DAILY_CLOSE_ALREADY_CLOSED");
+  assert.equal(state.writes.length, writeCount);
+  assert.equal((saved as Row | null)?.countedCash, 10);
+  assert.equal(state.writes.filter(row => row.model === "auditEvent").length, 1);
+  assert.equal((await api.POST(request("POST", { kind: "dailyClose", payload: { ...payload, checks: [{ key: "review", label: "Synthetic check", complete: false }] } }))).status, 409);
+  assert.equal(state.writes.length, writeCount);
+});
