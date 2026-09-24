@@ -7,6 +7,7 @@ type CloseInput = z.infer<typeof dailyCloseSchema>;
 
 /** Record an attested close snapshot. This does not lock financial postings. */
 export async function recordDailyClose(organisationId: string, actorId: string, input: CloseInput) {
+  input = dailyCloseSchema.parse(input);
   const businessDate = new Date(`${input.businessDate}T00:00:00.000Z`);
   try {
     return await db.$transaction(async tx => {

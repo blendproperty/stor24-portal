@@ -316,6 +316,12 @@ test("daily-close API preserves closed snapshots and returns a useful conflict",
   };
   const api = await load("./src/app/api/v1/operations/route.ts", state);
   const payload = { facilityId, businessDate: "2026-01-01", expectedCash: 10, countedCash: 10, checks: [{ key: "review", label: "Synthetic check", complete: true }] };
+  for (const field of ["expectedCash", "countedCash"]) {
+    for (const value of [0.005, 0.004, 1_000_000_000_000]) {
+      assert.equal((await api.POST(request("POST", { kind: "dailyClose", payload: { ...payload, [field]: value } }))).status, 422);
+      assert.equal(state.writes.length, 0);
+    }
+  }
   assert.equal((await api.POST(request("POST", { kind: "dailyClose", payload }))).status, 201);
   const writeCount = state.writes.length;
   const repeated = await api.POST(request("POST", { kind: "dailyClose", payload: { ...payload, countedCash: 99 } }));

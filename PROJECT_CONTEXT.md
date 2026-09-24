@@ -1,4 +1,12 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Daily-close cash precision — 24 September 2026
+
+- **Implementation:** daily-close expected/count cash must be nonnegative cent values within the existing Decimal(14,2) database range. The shared schema is checked by both the API and service before any transaction, preventing independent rounding of attested totals and variance. Existing permissions/checklist/immutable-close/audit behavior remains; this is not a posting lock or automatic balancing policy.
+- **Testing:** before 0.005 passed validation; after sub-cent, negative, nonfinite, string and out-of-range values are rejected. Valid cents, zero and database maximum remain accepted. Actual API returns its standard 422 without writes. All 438 unit tests, typecheck and focused lint pass. PostgreSQL direct-service rejection/no-write and exact saved variance controls added; required CI pending.
+- **Commit/push:** enclosing daily-close-cash-precision PR records promotion.
+- **Merge/deployment/configuration/live verification:** pending. No production close or financial record changed. Real source reconciliation, historical snapshot review, correction/reopen policy and staff/finance acceptance remain open.
+- **Prior releases:** PR267 passed all required checks on e900fb3fa3706391acbe4c509b7fbea7b845ed5a, including actual PostgreSQL notification claims/failed finalisation and full journey/restore (36047982191), merged b4f4c0ddc8008753d257f169e54d29cf43641122. Main CI 36048297824 running; deployment unverified. PR266 deployment 36047825810 succeeded; exact image stor24-crm:ffcdfa28 healthy/public readiness independently verified at 19:25 UTC. Canonical context present on remote main; all programme acceptance remains open.
+
 ## Booking email/SMS attempt claims — 24 September 2026
 
 - **Implementation:** reservation and viewing email/SMS notifications persist a unique pending attempt before provider transport. Matching accepted repeats reuse the saved outcome; changed scope/recipient/payload, legacy logs without comparable evidence, unfinished and uncertain attempts cannot silently resend. Finalisation failure leaves the durable pending record; timeouts and missing SMS references require review. Only a payload hash and existing hashed recipient are stored, not message bodies. Existing consent gates/content and SMS API-acceptance status contract remain.
