@@ -12,6 +12,7 @@ const requestSchema = z.discriminatedUnion("action", [
 ]);
 function failure(error: unknown) {
   const messages: Record<string, string> = {
+    BILLING_RECONCILIATION_REQUIRED: "The saved balance and transaction history need finance review before billing. Check opening balances, corrections and future-dated entries; nothing has been posted.",
     BILLING_PLAN_REQUIRED: "Save approved billing terms for this account before previewing.",
     BILLING_BEFORE_APPROVED_START: "This month is earlier than the approved first unbilled month. Check the opening balance and billing history with finance.",
     BILLING_EXISTING_CHARGES_REVIEW: "This month already contains charges or corrections. Finance must reconcile them before monthly billing; nothing has been posted.",
