@@ -154,3 +154,6 @@ P02/P08: date-boundary reproduction showed R3 instead of R6. Emailed statements 
 
 ### 24 September — bounded email-provider requests
 P14/CIA-A3 and P08 candidate: all three email providers have a 15-second abort deadline without automatic retries. Synthetic success/stall/rejection tests, 412-test suite and typecheck pass; CI/promotion pending. PR252 deployed as bba6e5c1e with readiness verified; PR253 date correction merged caab923, rollout pending. Real delivery/recovery and staff acceptance remain open.
+
+### 24 September — delivery callback replay candidate
+P08/CIA-I2: repeated signed status callbacks no longer repeat failure tasks/log updates; inbox claim and effects roll back together on failure. 413 local tests/typecheck pass; PostgreSQL concurrency/rollback CI pending. PR253 statement dates deployed caab923d5 with readiness verified. PR254 email timeouts merged ff3d093, rollout pending. Exact replay is covered; out-of-order/provider/staff acceptance remains open.

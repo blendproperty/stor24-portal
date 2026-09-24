@@ -1,4 +1,12 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Delivery callback replay checkpoint — 24 September 2026
+
+- **Implementation:** signed Twilio status events now claim the existing unique inbox key inside the same transaction as log/task effects. Duplicate successful events are acknowledged without repeating tasks, failure timestamps or retry scheduling. Unexpected errors still fail for retry; a rolled-back claim is not treated as processed.
+- **Testing:** actual signed synthetic callback before test created two failure tasks; after test creates one, preserves timestamps, rejects invalid signatures, ignores unknown message IDs and permits retry after task-write rollback. 413 local tests and typecheck passed. Added isolated PostgreSQL concurrent-callback and transaction rollback tests; CI pending. No live callback/provider invoked.
+- **Commit/push:** enclosing delivery-callback-idempotency PR records source promotion.
+- **Merge/deployment/configuration:** pending. No WhatsApp automation change or outbound message. This handles exact event replay; different/out-of-order status transitions and broader outbound retry controls remain separate acceptance work.
+- **Live verification:** none for this candidate. Provider/staff acceptance remains open.
+- **Prior releases:** PR253 deployment 36037635349 succeeded; independently inspected stor24-crm:caab923d5 healthy and public service/status/database health correct. PR254 provider-timeout fix passed all required checks on 2b99562 and merged ff3d093e49394922a4911eaa7f2d967a9861ed7e; main CI 36037805139 running and deployment unverified.
 ## Email-provider request deadline — 24 September 2026
 
 - **Implementation:** Resend, SendGrid and Twilio Email HTTP sends use a 15-second abort deadline, matching existing integration timeout conventions. No automatic retry is added; uncertain financial-document delivery remains protected by PR252.
