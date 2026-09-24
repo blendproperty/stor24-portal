@@ -1,4 +1,12 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Delivery callback ordering — 24 September 2026
+
+- **Implementation:** status callbacks lock and reread the communication before applying events. Confirmed delivered/read state cannot regress to queued/sent/failure; failure cannot regress to an earlier progress state. Unknown events remain recorded without overwriting delivery state. Repeated failure variants do not create another task. Confirmed delivery clears stale failure/retry flags; prior staff tasks remain for review.
+- **Testing:** actual signed synthetic before case changed SUCCEEDED back to PROCESSING on a late queued callback. After fix ordering, read-first/EventType READ, unknown states, duplicate failure, signature, replay and rollback controls pass. All 425 unit tests, typecheck and focused lint passed; final added read-first case also passed. Extended isolated PostgreSQL mixed concurrent callbacks and rollback coverage; required CI pending.
+- **Commit/push:** enclosing delivery-status-order PR records promotion.
+- **Merge/deployment/configuration/live verification:** pending for this candidate. No real callbacks/messages or configuration changes. Provider receipt and staff recovery acceptance remain open; inbox events retain conflicting evidence.
+- **Prior releases:** PR258 deployment 36042047962 succeeded; stor24-crm:4af496c independently verified healthy with public service/status/database readiness at 18:35 UTC. PR259 passed all checks, including PostgreSQL customer/facility scope coverage (36042115115), on b26ca50b7d750430483e9feac045baf052d7bcb2 and merged 2f042623ef382fde93cd369cd81f8b6bcc848941. Main CI 36042385468 running, deployment unverified. Canonical context present on remote main. No programme priority accepted.
+
 ## Manual messaging customer scope — 24 September 2026
 
 - **Implementation:** manual WhatsApp send and retry independently authorize the recipient through the existing leasing-customer scope and every supplied/stored facility through the organisation/facility scope. Null-facility retries still require customer access. Owners/global operations grants retain own-organisation access; creator-owned unlinked customers and multi-facility managers retain existing scope semantics. Consent/template/automation gates are unchanged.
