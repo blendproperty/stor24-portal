@@ -26,6 +26,8 @@ No real payments, customer messages, customer balances, physical access actions 
 
 PR270 head `1f1b285b12c0d0dd1e92579079a18dff29cda9e7` passed required CI 36050573967, isolated PostgreSQL 36050573971 and security checks 36050574013. It merged as `89dcef6cb5d8a55712f20b04a8030e6992465cc2`. Main CI 36050880269 and deployment 36051179733 passed. At 19:55:01 UTC the exact running image `stor24-crm:89dcef6cb` was healthy and public service/database readiness was OK. No production customer data was queried or changed.
 
+Evidence consolidation [PR271](https://github.com/blendproperty/stor24-portal/pull/271) passed its required checks on `d2adf9c7b1720013d072e4851542a3638cfb558b` and merged `ad75699283db6573a19cbeb09196e0b9f2057afe`. Main CI 36051702893 and deployment 36051927992 passed; exact image `stor24-crm:ad7569928` was healthy with public readiness OK at 20:01:50 UTC. This changed documentation only.
+
 Latest application release and final documentation promotion are recorded in the newest dated entry in [PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md). A merged PR is not deployment evidence. Historical pending statements in earlier entries are superseded only by later explicit verification.
 
 The table below records immutable merge commits checked against GitHub. Deployments are separately recorded in the canonical context and Excel Evidence log; documentation-only checkpoints do not imply a new application behaviour.
