@@ -20,7 +20,7 @@ Updated: 24 September 2026. This is the authoritative check-off register for the
 | Done | ID | Priority | Build | Test | Commit / push | Merge | Deploy / config | Live check |
 |---|---|---|---|---|---|---|---|---|
 | [ ] | P01 | 1. Complete customer journey | Partial | Partial | Partial | Partial | Partial | Not run |
-| [ ] | P14 | 2. Privacy and CIA security | Partial | Partial | Partial | Partial | Partial | Not run |
+| [ ] | P14 | 2. Privacy and CIA security | Partial | Partial | Verified | Verified | Partial | Partial |
 | [ ] | P02 | 3. Finance and reconciliation | Partial | Partial | Partial | Partial | Partial | Not run |
 | [ ] | P03 | 4. Netcash and debit orders | Partial | Partial | Partial | Partial | Deferred | Deferred |
 | [ ] | P04 | 5. Physical access lifecycle | Partial | Partial | Partial | Partial | Blocked | Not run |
@@ -36,7 +36,7 @@ Updated: 24 September 2026. This is the authoritative check-off register for the
 
 ## Next actions, evidence and acceptance
 
-24 September technical checkpoint: privacy notices/preferences and six scoped security findings remediated locally, 383 tests pass, dependency audit zero, backup file permissions corrected. Promotion/live checks pending. Operating procedures and outstanding legal/provider/recovery decisions are in [Priority 2 operating pack](PRIORITY_2_OPERATING_PACK.md). No priority is accepted.
+24 September technical release: privacy notices/preferences and six scoped security findings remediated, tested, merged and deployed in both apps. Anonymous live pages/mobile contact defaults verified. [Release evidence](PRIORITY_2_RELEASE_2026-09-24.md) records exact versions and limits; commit/merge Verified applies to this technical delivery. The whole P14 build, tests, deployment and live acceptance remain Partial. Operating procedures and outstanding legal/provider/recovery decisions are in [Priority 2 operating pack](PRIORITY_2_OPERATING_PACK.md). No priority is accepted.
 
 CIA security requirement, 23 September 2026: [CIA-C1–C3, CIA-I1–I3 and CIA-A1–A3](CIA_SECURITY_ACCEPTANCE.md) are explicit acceptance requirements under P11 and linked journey/finance/access/privacy/offline priorities. All remain open. This requirements mapping is not a completed security scan or proof of compliance.
 
