@@ -239,7 +239,8 @@ export const moveOutSchema = z.object({
 });
 export const accountPaymentSchema = z.object({
   accountId: id,
-  amount: z.coerce.number().positive().max(10_000_000),
+  requestId: z.string().uuid(),
+  amount: z.coerce.number().positive().max(10_000_000).refine(value => Math.abs(value * 100 - Math.round(value * 100)) < 0.00001, "Use at most two decimal places."),
   method: z.enum(["CASH", "EFT", "CARD", "BANK_DEBIT"]),
   reference: z.string().trim().max(120).optional(),
   receivedAt: z.coerce.date(),
