@@ -18,7 +18,7 @@ export function encryptIntegrationSecret(value: string) {
 export function decryptIntegrationSecret(value: string) {
   const [version, ivValue, tagValue, ciphertextValue, extra] = value.split(".");
   if (version !== VERSION || !ivValue || !tagValue || !ciphertextValue || extra) throw new Error("INTEGRATION_SECRET_INVALID");
-  const decipher = createDecipheriv("aes-256-gcm", encryptionKey(), Buffer.from(ivValue, "base64url"));
+  const decipher = createDecipheriv("aes-256-gcm", encryptionKey(), Buffer.from(ivValue, "base64url"), { authTagLength: 16 });
   decipher.setAuthTag(Buffer.from(tagValue, "base64url"));
   return Buffer.concat([decipher.update(Buffer.from(ciphertextValue, "base64url")), decipher.final()]).toString("utf8");
 }

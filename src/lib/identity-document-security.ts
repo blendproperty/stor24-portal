@@ -58,7 +58,7 @@ export function encryptIdentity(bytes: Buffer, binding: string) {
 export function decryptIdentity(value: string, binding: string) {
   const [version, iv, tag, body] = value.split(".");
   if (version !== "v1") throw new Error("ID_CHANGED");
-  const cipher = createDecipheriv("aes-256-gcm", key(), Buffer.from(iv, "base64url"));
+  const cipher = createDecipheriv("aes-256-gcm", key(), Buffer.from(iv, "base64url"), { authTagLength: 16 });
   cipher.setAAD(Buffer.from(binding)); cipher.setAuthTag(Buffer.from(tag, "base64url"));
   return Buffer.concat([cipher.update(Buffer.from(body, "base64url")), cipher.final()]);
 }

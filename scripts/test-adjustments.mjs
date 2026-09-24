@@ -1,3 +1,4 @@
+import { fixtureBrandAssets } from "./fixture-brand-assets.mjs";
 import { build } from "esbuild";
 import { chromium, expect } from "@playwright/test";
 import { createServer } from "node:http";
@@ -5,10 +6,11 @@ import { readFile, mkdir } from "node:fs/promises";
 import assert from "node:assert/strict";
 const bundle = await build({entryPoints:["tests/browser/adjustments-fixture.jsx"],bundle:true,write:false,format:"esm",jsx:"automatic"});
 const css=(await readFile("src/app/globals.css","utf8")).replace('@import "tailwindcss";',"");
+const brandAssets = await fixtureBrandAssets();
 const server=createServer(async(req,res)=>{
   if(req.url==="/fixture.js"){res.setHeader("Content-Type","text/javascript");return res.end(bundle.outputFiles[0].text);}
   if(req.url==="/fixture.css"){res.setHeader("Content-Type","text/css");return res.end(css);}
-  if(req.url?.startsWith("/brand/")){try{return res.end(await readFile(`public${req.url}`));}catch{res.writeHead(404);return res.end();}}
+  if(req.url?.startsWith("/brand/")){const asset=brandAssets.get(req.url);if(asset)return res.end(asset);res.writeHead(404);return res.end();}
   res.setHeader("Content-Type","text/html");res.end('<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/fixture.css"></head><body><div id="root"></div><script type="module" src="/fixture.js"></script></body></html>');
 });
 await new Promise(resolve=>server.listen(0,"127.0.0.1",resolve));
