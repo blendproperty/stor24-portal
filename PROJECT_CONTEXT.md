@@ -1,4 +1,13 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Booking notification failure isolation — 24 September 2026
+
+- **Implementation:** reservation and viewing notifications now isolate each consented channel. Template, provider and log-persistence exceptions return an unsuccessful channel result instead of escaping after a booking/contact verification has committed or preventing other channels from running. Existing consent/contact gates, message content and provider controls remain.
+- **Testing:** before tests showed log/template exceptions escaping both notification services. After fix provider/log/template failures return per-channel results and continue independent channels; no-consent/no-contact cases send nothing. All 433 unit tests, typecheck and focused lint pass. Added a real PostgreSQL customer-journey case requiring successful committed verification, its access token, reserved unit and single audit despite notification-log failure; required CI pending.
+- **CI correction:** first PostgreSQL run 36046279361 exposed a test-fixture issue: Node method mocking cannot intercept the Prisma dynamic delegate, and the second synthetic booking polluted the earlier journey-wide audit count. The recovery case now runs after that audit assertion and uses a temporary NOT VALID database check constraint to force actual log-write failure, removed in finally. This changes only the synthetic test; revalidation pending.
+- **Commit/push:** enclosing booking-notification-isolation PR records promotion.
+- **Merge/deployment/configuration/live verification:** pending for this candidate. No real messages or production records used. A failed result is not proof of non-delivery; unavailable logging cannot be claimed persisted. Email/SMS repeat-attempt protection and provider/monitoring/staff acceptance remain separate work.
+- **Prior releases:** PR264 passed all checks on 3b0e4cb6cbb8478ce3f9f26106cecd4f70cf500d, including PostgreSQL SMS compatibility (36045610632), merged 88fbd655dd2464e7f31ba473ad52f2b3de021a06; main CI 36045946605 passed, deployment unverified. PR263 deployed via 36045617938; independently verified stor24-crm:aabb348e healthy/public service/status/database at 19:06 UTC. Canonical context present on remote main. All programme acceptance remains open.
+
 ## SMS delivery evidence compatibility — 24 September 2026
 
 - **Implementation:** the shared callback ordering guard now uses delivered/read timestamps as confirmed delivery evidence. Legacy SMS logs set SUCCEEDED when the provider accepts a request; that alone must not suppress a later genuine failure. Failed SMS tasks now identify the SMS channel. Confirmed delivery still cannot regress.
