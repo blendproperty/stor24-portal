@@ -51,8 +51,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 // actually sent to this customer" view referenced in scope §5.
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   try {
+    const auth = await requirePermission("ledger.view");
     const { id: accountId } = await context.params;
-    const account = await db.account.findFirst({ where: { id: accountId }, include: { tenancy: { select: { id: true, facilityId: true } } } });
+    const account = await db.account.findFirst({ where: { id: accountId, customer: { organisationId: auth.organisationId } }, include: { tenancy: { select: { id: true, facilityId: true } } } });
     if (!account?.tenancy) return Response.json({ error: { code: "NOT_FOUND", message: "Account not found." } }, { status: 404 });
     await requirePermission("ledger.view", account.tenancy.facilityId);
     const documents = await db.document.findMany({

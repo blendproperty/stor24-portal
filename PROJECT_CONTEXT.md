@@ -1,4 +1,14 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Account document organisation isolation — 24 September 2026
+
+- **Implementation:** document-list GET authenticates before account lookup and constrains the account to the actor's organisation. The existing target-facility permission check, metadata-only projection, ordering, limit and response envelope remain. Document sending already checks organisation in its service and is unchanged.
+- **Security evidence:** scoped Codex Security scan afde73af-e90b-4176-bda5-6e434fa72f77 completed against ab553db8e3e6c7c8c9b35a44bf22720abdfcf910, covering all five account API routes. One low-severity cross-organisation metadata finding (csf_e66fba57099be30ce69f61fe); no document-content disclosure established. This is scoped source review, not full GAPP/CIA acceptance.
+- **Testing:** actual-handler synthetic before test returned 200 for a foreign account; after fix returns 404 before document lookup. Own-organisation owner/global/assigned-facility controls pass; wrong-facility, missing permission, inactive/revoked/deleted staff denied. All 414 unit tests pass. Added PostgreSQL route/role/relation-filter coverage; required CI pending.
+- **Commit/push:** enclosing account-document-isolation PR records promotion.
+- **Merge/deployment/configuration:** pending for this fix. No live customer data read, messages sent or operational switches changed.
+- **Live verification:** none for this candidate. Legacy token-bearing data, approved permissions, staff/MFA, CAPTCHA rotation, backup restore, legal/provider and all programme acceptance gates remain open.
+- **Prior release evidence:** PR254 merged ff3d093e49394922a4911eaa7f2d967a9861ed7e; deployment 36038058566 succeeded and image stor24-crm:ff3d093e4 independently verified healthy. PR255 passed all checks on ab553db8e3e6c7c8c9b35a44bf22720abdfcf910, merged 3d75d2544e40acb75652c9753e84c572858f83ba, and deployed via 36039035317. Image stor24-crm:3d75d2544 and public service/status/database readiness independently verified at 18:09 UTC. No real callback or outbound message was used. Excel evidence reconciled through PR255 merge; final deployment checkpoint follows.
+
 ## Delivery callback replay checkpoint — 24 September 2026
 
 - **Implementation:** signed Twilio status events now claim the existing unique inbox key inside the same transaction as log/task effects. Duplicate successful events are acknowledged without repeating tasks, failure timestamps or retry scheduling. Unexpected errors still fail for retry; a rolled-back claim is not treated as processed.

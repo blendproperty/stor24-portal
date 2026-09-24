@@ -2,6 +2,8 @@
 
 Updated: 24 September 2026. This is the authoritative check-off register for the remaining programme. [Scope and release boundaries](STOR24_REMAINING_PRIORITIES_2026-09-23.md) describe the 14 priorities; [PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md) holds dated release evidence. Latest entries take precedence over historical pending statements.
 
+24 September account-isolation checkpoint: P14/CIA-C1 scoped five-route account review found one cross-organisation metadata disclosure. GET now binds account ownership before retaining facility permission checks. Before/after synthetic proof and 414 unit tests passed; PostgreSQL and required CI, merge and deployment pending. PR254 email timeouts deployed ff3d093e4; PR255 callback replay deployed 3d75d2544 via 36039035317, with exact image/public readiness verified. Staff/provider/legal/recovery acceptance remains open; no programme priority checked off.
+
 **Current item: P14 — Priority 2 privacy and CIA security; P01 acceptance remains open. Programme completion: 0 of 14 priorities accepted.** Priorities 1 and 2 are confirmed by Brett; the remaining sequence follows the revised order. Stable P IDs identify records, not their current rank. Initial states below are drawn from the existing release record, not a fresh acceptance test.
 
 ## How we work through this
