@@ -14,23 +14,32 @@ export async function POST(request: Request) {
   const isRead = status === "read" || payload.EventType?.toUpperCase() === "READ";
   const isDelivered = status === "delivered" || isRead;
   const isFailed = status === "failed" || status === "undelivered";
-  await db.$transaction(async (tx) => {
-    await tx.webhookInbox.upsert({
-      where: { organisationId_provider_externalEventId: { organisationId: log.organisationId, provider: "TWILIO", externalEventId: `${providerRef}:${isRead ? "read" : status}` } },
-      create: { organisationId: log.organisationId, facilityId: log.facilityId, provider: "TWILIO", eventType: "MESSAGE_STATUS", externalEventId: `${providerRef}:${isRead ? "read" : status}`, payload, status: "SUCCEEDED", attempts: 1, processedAt: new Date() },
-      update: {},
+  const eventKey = { organisationId: log.organisationId, provider: "TWILIO", externalEventId: `${providerRef}:${isRead ? "read" : status}` };
+  try {
+    await db.$transaction(async (tx) => {
+      // Claim the event before its effects; upsert would still repeat the task
+      // and log updates when a signed callback is retried.
+      await tx.webhookInbox.create({
+        data: { ...eventKey, facilityId: log.facilityId, eventType: "MESSAGE_STATUS", payload, status: "SUCCEEDED", attempts: 1, processedAt: new Date() },
+      });
+      await tx.communicationLog.update({ where: { id: log.id }, data: {
+        status: isFailed ? "FAILED" : isDelivered ? "SUCCEEDED" : "PROCESSING",
+        sentAt: ["sent", "delivered", "read"].includes(status) || isRead ? (log.sentAt ?? new Date()) : undefined,
+        deliveredAt: isDelivered ? (log.deliveredAt ?? new Date()) : undefined,
+        readAt: isRead ? (log.readAt ?? new Date()) : undefined,
+        failedAt: isFailed ? new Date() : undefined,
+        failureCode: isFailed ? (payload.ErrorCode || "DELIVERY_FAILED") : undefined,
+        failureMessage: isFailed ? (payload.ChannelStatusMessage || "Twilio could not deliver the message.") : undefined,
+        nextRetryAt: isFailed && log.attempts < 3 ? new Date(Date.now() + 5 * 60_000) : undefined,
+      } });
+      if (isFailed) await tx.task.create({ data: { organisationId: log.organisationId, facilityId: log.facilityId, customerId: log.customerId, title: "WhatsApp delivery failed", description: `Review communication ${log.id}. Twilio error ${payload.ErrorCode || "unknown"}.`, priority: log.attempts >= 3 ? "HIGH" : "NORMAL" } });
     });
-    await tx.communicationLog.update({ where: { id: log.id }, data: {
-      status: isFailed ? "FAILED" : isDelivered ? "SUCCEEDED" : "PROCESSING",
-      sentAt: ["sent", "delivered", "read"].includes(status) || isRead ? (log.sentAt ?? new Date()) : undefined,
-      deliveredAt: isDelivered ? (log.deliveredAt ?? new Date()) : undefined,
-      readAt: isRead ? (log.readAt ?? new Date()) : undefined,
-      failedAt: isFailed ? new Date() : undefined,
-      failureCode: isFailed ? (payload.ErrorCode || "DELIVERY_FAILED") : undefined,
-      failureMessage: isFailed ? (payload.ChannelStatusMessage || "Twilio could not deliver the message.") : undefined,
-      nextRetryAt: isFailed && log.attempts < 3 ? new Date(Date.now() + 5 * 60_000) : undefined,
-    } });
-    if (isFailed) await tx.task.create({ data: { organisationId: log.organisationId, facilityId: log.facilityId, customerId: log.customerId, title: "WhatsApp delivery failed", description: `Review communication ${log.id}. Twilio error ${payload.ErrorCode || "unknown"}.`, priority: log.attempts >= 3 ? "HIGH" : "NORMAL" } });
-  });
+  } catch (error) {
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "P2002") {
+      const previous = await db.webhookInbox.findUnique({ where: { organisationId_provider_externalEventId: eventKey } });
+      if (previous?.status === "SUCCEEDED") return new Response(null, { status: 204 });
+    }
+    throw error;
+  }
   return new Response(null, { status: 204 });
 }
