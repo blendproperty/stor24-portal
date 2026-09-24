@@ -1,4 +1,12 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Manual messaging customer scope — 24 September 2026
+
+- **Implementation:** manual WhatsApp send and retry independently authorize the recipient through the existing leasing-customer scope and every supplied/stored facility through the organisation/facility scope. Null-facility retries still require customer access. Owners/global operations grants retain own-organisation access; creator-owned unlinked customers and multi-facility managers retain existing scope semantics. Consent/template/automation gates are unchanged.
+- **Testing:** actual-handler synthetic before test accepted an unrelated facility's customer (202); after fix returns 403 before provider/audit writes. All 425 unit tests, typecheck and focused lint passed. Added isolated PostgreSQL recipient/facility/null-log/foreign-relation coverage; required CI pending. No real messages or customer data used.
+- **Commit/push:** enclosing messaging-customer-scope PR records promotion. Fresh independent candidate review found no concrete surviving bypass or regression; required CI is pending.
+- **Merge/deployment/configuration/live verification:** pending for this candidate. No production switches changed. Outbound idempotency/retry concurrency, provider delivery, staff and overall privacy/CIA acceptance remain open.
+- **Prior releases:** PR257 passed all checks on 1a08d710f8c8f4942608778d4ef5e01734af2ae9 and merged 92be964667117da7c6443084efdefb919c61d63a. Deployment 36041294060 succeeded; independently inspected stor24-crm:92be964 healthy and public service/status/database readiness at 18:30 UTC. PR258 passed all required checks on 49016246f87e0a36bb74ae265a062905ed8f5a81 and merged 4af496c881901490306dbc735a4166a977bfe09d; main CI 36041731158 running, deployment unverified. Canonical context verified on remote main through PR258. Excel checkpoint follows release validation; zero priorities accepted.
+
 ## SMS and WhatsApp request deadline — 24 September 2026
 
 - **Implementation:** the shared Twilio Messages request now has a 15-second abort deadline, covering SMS, WhatsApp text and approved-template calls. Existing result/retry classification, consent and automation gates remain. No automatic resend added.
