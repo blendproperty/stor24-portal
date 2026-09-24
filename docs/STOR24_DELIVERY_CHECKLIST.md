@@ -1,5 +1,7 @@
 # STOR24 delivery checklist
 
+24 September final release verification: evidence PR271 merged ad75699283db6573a19cbeb09196e0b9f2057afe after all checks. Main CI 36051702893 and deployment 36051927992 passed; exact image ad7569928 healthy/public readiness verified at 20:01:50 UTC. Documentation-only difference from the already verified PR270 application. Canonical evidence and Excel retain all acceptance gates.
+
 24 September evening consolidation: [delivery evidence and next acceptance walkthroughs](UNATTENDED_DELIVERY_2026-09-24.md) records PR243–270, 441 passing local tests, required CI and real isolated PostgreSQL scope/transaction/journey/75-table restore proof. PR270 merged 89dcef6c after all checks; main CI 36050880269 and deployment 36051179733 passed. Exact image 89dcef6cb healthy and public readiness verified at 19:55 UTC. Excel evidence and affected priority notes reconciled, formulas/export/reimport/render checked; zero of 14 accepted. Staff, finance, legal, provider, Google rotation and production recovery gates remain open. Latest canonical context supersedes historical pending entries below.
 
 24 September communications visibility checkpoint: P14/P08 limits unassigned delivery history to permitted customers and shows email/SMS alongside WhatsApp with review-only failure controls. Before/after actual-page proof, 441 tests/typecheck and independent review pass; PostgreSQL/required CI and promotion pending. PR269 deployed 6164000bd with exact image/public readiness verified at 19:45 UTC. All operational/provider/legal acceptance remains open.
