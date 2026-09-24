@@ -14,9 +14,8 @@
  * revisiting together with lease-document storage if a real blob store is
  * adopted later.
  *
- * Delivery tracking: reuses `CommunicationLog`, following the exact
- * upsert-by-idempotencyKey pattern src/lib/whatsapp.ts already uses for
- * WhatsApp sends — same model, same shape, different channel.
+ * Delivery tracking: reuses `CommunicationLog` with a unique document
+ * claim before delivery and an idempotent result log afterwards.
  * `CommunicationLog.status` is the `DeliveryStatus` enum (PENDING /
  * PROCESSING / SUCCEEDED / FAILED / DEAD_LETTER) — a synchronous send that
  * succeeds is recorded as SUCCEEDED, not "SENT" (there is no such enum
@@ -30,11 +29,10 @@
  * existing Document rows for the organisation this year. This is a
  * provisional scheme, not a decision — see claude/invoicing-statements-scope.md
  * §6 in the Stor24 project ("Invoice numbering") for the open question
- * (facility-scoped? aligned to a future MRI/MDA mapping?). It is also not
- * concurrency-safe (two documents generated in the same instant could in
- * theory get the same sequence number) — acceptable for the initial manual
- * send path this is built for, worth hardening (e.g. a DB sequence or a
- * unique constraint + retry) before high-volume automated use.
+ * (facility-scoped? aligned to a future MRI/MDA mapping?). Generation now
+ * serializes count and document creation under the organisation row lock.
+ * Historical numbering/deletion review and the final numbering policy
+ * remain separate acceptance work; this does not renumber old documents.
  *
  * Netcash: this module never calls Netcash. `payNowUrl` is accepted purely
  * as an optional pass-through string for the renderer — the caller decides
@@ -42,6 +40,7 @@
  * should stay undefined until Pay Now is unblocked for real customers.
  */
 import { createHash } from "node:crypto";
+import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { emailProvider } from "@/lib/email";
 import { getBillingDocumentCompanyDetails } from "@/lib/finance/billing-document-config";
@@ -99,11 +98,35 @@ async function getAccountBillingContext(accountId: string, organisationId: strin
   };
 }
 
-async function nextDocumentNumber(organisationId: string, type: "INVOICE" | "STATEMENT"): Promise<string> {
-  const yearStart = new Date(Date.UTC(new Date().getUTCFullYear(), 0, 1));
-  const count = await db.document.count({ where: { type, tenancy: { facility: { organisationId } }, createdAt: { gte: yearStart } } });
+async function nextDocumentNumber(tx: Prisma.TransactionClient, organisationId: string, type: "INVOICE" | "STATEMENT", issuedAt: Date): Promise<string> {
+  const yearStart = new Date(Date.UTC(issuedAt.getUTCFullYear(), 0, 1));
+  const count = await tx.document.count({ where: { type, tenancy: { facility: { organisationId } }, createdAt: { gte: yearStart } } });
   const prefix = type === "INVOICE" ? "INV" : "STMT";
-  return `${prefix}-${new Date().getUTCFullYear()}-${String(count + 1).padStart(5, "0")}`;
+  return `${prefix}-${issuedAt.getUTCFullYear()}-${String(count + 1).padStart(5, "0")}`;
+}
+
+async function claimBillingDocument(input: { organisationId: string; tenancyId: string; type: "INVOICE" | "STATEMENT"; idempotencyKey: string; render: (number: string, issuedAt: Date) => string }) {
+  try {
+    return await db.$transaction(async tx => {
+      await tx.$queryRaw`SELECT "id" FROM "Organisation" WHERE "id" = ${input.organisationId} FOR UPDATE`;
+      const existing = await tx.document.findFirst({ where: { idempotencyKey: input.idempotencyKey } });
+      if (existing) return { document: existing, created: false, number: "", html: "" };
+      const issuedAt = new Date();
+      const number = await nextDocumentNumber(tx, input.organisationId, input.type, issuedAt);
+      const html = input.render(number, issuedAt);
+      const sha256 = createHash("sha256").update(html).digest("hex");
+      const document = await tx.document.create({ data: { tenancyId: input.tenancyId, type: input.type, storageKey: `inline:${sha256}`, status: "GENERATED", content: html, sha256, idempotencyKey: input.idempotencyKey, createdAt: issuedAt } });
+      return { document, created: true, number, html };
+    });
+  } catch (error) {
+    // A previous release may still be finishing a request during deployment.
+    // Resolve its unique claim after our transaction has rolled back.
+    if (isUniqueConflict(error)) {
+      const existing = await db.document.findFirst({ where: { idempotencyKey: input.idempotencyKey } });
+      if (existing) return { document: existing, created: false, number: "", html: "" };
+    }
+    throw error;
+  }
 }
 
 type SendResult =
@@ -141,12 +164,12 @@ export async function sendInvoiceEmail(input: { accountId: string; organisationI
   }
 
   const company = await getBillingDocumentCompanyDetails(context.organisationId, context.facilityId);
-  const invoiceNumber = await nextDocumentNumber(context.organisationId, "INVOICE");
   const lines: InvoiceLedgerLine[] = entries.map((entry) => ({ id: entry.id, description: entry.description, effectiveAt: entry.effectiveAt, amount: entry.amount.toString(), taxAmount: entry.taxAmount.toString() }));
-
-  const html = renderInvoiceHtml({
+  const idempotencyKey = `INVOICE:${context.account.id}:${[...input.ledgerEntryIds].sort().join("+")}`;
+  const idempotencyKeyHash = createHash("sha256").update(idempotencyKey).digest("hex").slice(0, 32);
+  const { document, created, number: invoiceNumber, html } = await claimBillingDocument({ organisationId: context.organisationId, tenancyId: context.tenancyId, type: "INVOICE", idempotencyKey: `doc-invoice-${idempotencyKeyHash}`, render: (invoiceNumber, issueDate) => renderInvoiceHtml({
     invoiceNumber,
-    issueDate: new Date(),
+    issueDate,
     facilityName: context.facilityName,
     company,
     customerName: customerDisplayName(context.customer),
@@ -157,34 +180,7 @@ export async function sendInvoiceEmail(input: { accountId: string; organisationI
     currentBalance: String(context.account.balance),
     lines,
     payNowUrl: input.payNowUrl,
-  });
-
-  const sha256 = createHash("sha256").update(html).digest("hex");
-  const idempotencyKey = `INVOICE:${context.account.id}:${[...input.ledgerEntryIds].sort().join("+")}`;
-  const idempotencyKeyHash = createHash("sha256").update(idempotencyKey).digest("hex").slice(0, 32);
-
-  let created = true;
-  const document = await db.document.create({
-    data: {
-      tenancyId: context.tenancyId,
-      type: "INVOICE",
-      storageKey: `inline:${sha256}`,
-      status: "GENERATED",
-      content: html,
-      sha256,
-      idempotencyKey: `doc-invoice-${idempotencyKeyHash}`,
-    },
-  }).catch(async (error) => {
-    // Unique constraint on idempotencyKey -- this exact invoice (same
-    // account + same ledger entries) was already generated; reuse it
-    // rather than creating a duplicate numbered invoice.
-    if (isUniqueConflict(error)) {
-      created = false;
-      return db.document.findFirst({ where: { idempotencyKey: `doc-invoice-${idempotencyKeyHash}` } });
-    }
-    throw error;
-  });
-  if (!document) return { ok: false, code: "ACCOUNT_NOT_FOUND" };
+  }) });
   if (!created) return existingDelivery(document);
 
   const commsIdempotencyKey = `${document.idempotencyKey}:EMAIL`;
@@ -243,12 +239,12 @@ export async function sendStatementEmail(input: { accountId: string; organisatio
   const openingBalance = Number(statement.openingBalance), closingBalance = Number(statement.closingBalance);
 
   const company = await getBillingDocumentCompanyDetails(context.organisationId, context.facilityId);
-  const statementNumber = await nextDocumentNumber(context.organisationId, "STATEMENT");
   const lines: StatementLedgerLine[] = statement.rows.map(row => ({ id: row.id, type: row.type as StatementLedgerLine["type"], description: row.description, effectiveAt: new Date(row.date), amount: Math.abs(Number(row.debit) - Number(row.credit)), signedAmount: Number(row.debit) - Number(row.credit) }));
-
-  const html = renderStatementHtml({
+  const idempotencyKey = `STATEMENT:${context.account.id}:${periodKey}`;
+  const idempotencyKeyHash = createHash("sha256").update(idempotencyKey).digest("hex").slice(0, 32);
+  const { document, created, number: statementNumber, html } = await claimBillingDocument({ organisationId: context.organisationId, tenancyId: context.tenancyId, type: "STATEMENT", idempotencyKey: `doc-statement-${idempotencyKeyHash}`, render: (statementNumber, issueDate) => renderStatementHtml({
     statementNumber,
-    issueDate: new Date(),
+    issueDate,
     periodFrom: from,
     periodTo: through,
     facilityName: context.facilityName,
@@ -260,23 +256,7 @@ export async function sendStatementEmail(input: { accountId: string; organisatio
     lines,
     closingBalance,
     payNowUrl: input.payNowUrl,
-  });
-
-  const sha256 = createHash("sha256").update(html).digest("hex");
-  const idempotencyKey = `STATEMENT:${context.account.id}:${periodKey}`;
-  const idempotencyKeyHash = createHash("sha256").update(idempotencyKey).digest("hex").slice(0, 32);
-
-  let created = true;
-  const document = await db.document.create({
-    data: { tenancyId: context.tenancyId, type: "STATEMENT", storageKey: `inline:${sha256}`, status: "GENERATED", content: html, sha256, idempotencyKey: `doc-statement-${idempotencyKeyHash}` },
-  }).catch(async (error) => {
-    if (isUniqueConflict(error)) {
-      created = false;
-      return db.document.findFirst({ where: { idempotencyKey: `doc-statement-${idempotencyKeyHash}` } });
-    }
-    throw error;
-  });
-  if (!document) return { ok: false, code: "ACCOUNT_NOT_FOUND" };
+  }) });
   if (!created) return existingDelivery(document);
 
   const commsIdempotencyKey = `${document.idempotencyKey}:EMAIL`;
