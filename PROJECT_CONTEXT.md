@@ -1,4 +1,12 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Synthetic recovery drill — 24 September 2026
+
+- **Implementation:** the isolated transaction workflow now backs up its synthetic PostgreSQL fixture and restores to a separate disposable database. It compares all table counts/content checksums, columns, constraints, indexes, enums and sequences; requires representative finance/documents/audit/roles; verifies the source remains unchanged; removes the target and retains an aggregate report only. Strict CI/database/container guards and bounded calls prevent running against other targets. [Procedure and limits](docs/SYNTHETIC_RESTORE_DRILL.md).
+- **Testing:** target guard tests pass, including remote/production database, altered port/credentials/query and missing CI/container rejection. Direct local invocation correctly refused before database/container access. Typecheck/focused lint pass. Actual pg_dump/pg_restore execution is pending isolated GitHub CI; no restore success claimed yet.
+- **Commit/push:** enclosing synthetic-restore-drill PR records promotion.
+- **Merge/deployment/configuration/live verification:** pending. No production data/configuration changed. This is CI recovery coverage only; approved RPO/RTO, actual production backup, encryption/off-system custody/key recovery, restored-data deletion, provider/physical access and operational acceptance remain open.
+- **Prior release:** PR261 passed all required checks on 3f500335e4f793a803757d4357e682d1ad43a78f, including real PostgreSQL send/manual-retry claims (36043716248) and desktop/mobile recovery. Merged d851bafc03e30a7a1456d0daaa1e758eb72b1b6c; main CI 36044070265 running, deployment unverified. Canonical context present on remote main. All programme gates remain open.
+
 ## WhatsApp attempt and retry protection — 24 September 2026
 
 - **Implementation:** a unique durable communication claim precedes the provider call. Matching confirmed repeats reuse the accepted attempt; conflicting ownership/content fails without exposing another log. Pending, failed or uncertain attempts cannot silently resend. Manual retry uses one stable child key per failed log, so lost responses and concurrent clicks cannot create another child attempt. Uncertain/legacy delivery requires provider review; confirmed failures remain manually retryable. API/UI now distinguish failure/review from queued success and recover from lost responses.
