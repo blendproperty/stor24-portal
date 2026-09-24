@@ -43,7 +43,7 @@ export type StatementRenderInput = {
 const DEBIT_TYPES = new Set(["CHARGE", "REFUND"]);
 
 function formatDate(date: Date) {
-  return date.toLocaleDateString("en-ZA", { year: "numeric", month: "long", day: "numeric" });
+  return date.toLocaleDateString("en-ZA", { timeZone: "Africa/Johannesburg", year: "numeric", month: "long", day: "numeric" });
 }
 
 export function renderStatementHtml(input: StatementRenderInput): string {

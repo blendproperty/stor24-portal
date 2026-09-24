@@ -1,4 +1,12 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Emailed statement period alignment — 24 September 2026
+
+- **Implementation:** emailed statement arithmetic now uses the portal's inclusive South African calendar-date range. The renderer explicitly uses Africa/Johannesburg; plain-text and audit dates match the actual range. Invalid/reversed periods return 422 before document creation or delivery. Existing document keys are retained so this correction does not automatically resend historical documents.
+- **Testing:** synthetic before case returned R3.00 instead of R6.00 and omitted the first/last period entries; reversed dates still sent. After fix both boundary entries are included, the next day's entry excluded, and invalid ranges cause no document/email. 402 local tests and typecheck passed. Added isolated PostgreSQL date-boundary/audit test; required CI pending. Provider is stubbed throughout.
+- **Commit/push:** enclosing statement-period-integrity PR records promotion.
+- **Merge/deployment/configuration:** pending. No historical document rewritten, real email sent, customer balance changed or operational switch modified. Default statement-period policy and historical document review remain open.
+- **Live verification:** none for this candidate; finance/staff acceptance remains open.
+- **Prior release:** PR252 duplicate-delivery guard passed all required checks, including real PostgreSQL overlap/uncertainty cases, on 355a366 and merged bba6e5c1e8c59b7ed79946887350ce9243619387. Main CI 36036817585 running at this checkpoint; deployment unverified.
 ## Billing delivery retry guard — 24 September 2026
 
 - **Implementation:** the unique document record claims its single automatic email attempt. Repeated confirmed requests return the original document/log result without another send. Overlapping, failed, partially finalised or legacy attempts return an actionable 409 requiring delivery review. The provider-failure message no longer asserts non-delivery when the outcome is uncertain. Database uniqueness is detected through Prisma P2002, not error text.
