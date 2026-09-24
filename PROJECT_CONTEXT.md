@@ -1,4 +1,12 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Release-check checkpoint — 24 September 2026, 17:13 UTC
+
+- **Implementation:** tenant portal browser checks now wait for the exact Supplies/Documents navigation URL instead of sampling the URL immediately after the input event. Existing keyboard/click and viewport assertions remain; no product behavior changed.
+- **Testing:** full synthetic tenant-login/dashboard fixture passed locally at desktop/tablet/mobile widths, with zero operational writes. This addresses the repeated empty-hash assertion at test-tenant-login.mjs:110 in main CI 36031936705; no arbitrary sleep or skipped assertion added.
+- **Commit/push and merge:** this test correction is pending its enclosing PR and required checks. Daily-close PR248 merged as 1b47214ecb807916cd13a439e8d7dc6cc825444b after all PR checks passed, including isolated PostgreSQL concurrency and audit rollback tests on aaaa937.
+- **Deployment/configuration:** daily-close deployment 36032207453 was skipped because main browser CI failed; it is not yet live. No deployment gate bypassed and no switches changed.
+- **Live verification:** independently inspected current image stor24-crm:1c1a6e825 healthy and public service/status/database health correct. This is the prior stock-permission release, not daily-close verification.
+- **Acceptance:** manual cash reconciliation, automatic daily close, reopening and financial-period rules remain open. All 14 priorities remain unaccepted. Invoice/statement resend consistency was inspected only and remains a candidate for the next bounded investigation.
 ## Daily-close record integrity checkpoint — 24 September 2026
 
 - **Implementation:** close recording and its audit now commit together. Already CLOSED snapshots return an explicit 409 instead of overwriting totals/actor/time. OPEN, READY and explicitly REOPENED records can close through a conditional update; concurrent creation uses the existing unique facility/date key. Cash variance uses decimal arithmetic. Operations labels these as recorded snapshots and colours non-closed records as requiring attention.

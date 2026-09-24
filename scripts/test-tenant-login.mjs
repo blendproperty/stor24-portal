@@ -107,9 +107,9 @@ try {
   await page.evaluate(()=>document.fonts.ready);
   const nav=page.getByRole("navigation",{name:"Your account sections"});await expect(nav.getByRole("link")).toHaveCount(4);
   await expect(page.locator(".tenant-photo-details")).not.toHaveAttribute("open", "");
-  await nav.getByRole("link",{name:"Supplies",exact:true}).focus();await page.keyboard.press("Enter");assert.equal(new URL(page.url()).hash,"#tenant-supplies");
+  await nav.getByRole("link",{name:"Supplies",exact:true}).focus();await page.keyboard.press("Enter");await expect(page).toHaveURL(/#tenant-supplies$/);
   await expect(page.getByRole("article",{name:"Booking package Compact Move"})).toBeInViewport();
-  await nav.getByRole("link",{name:"Documents",exact:true}).click();assert.equal(new URL(page.url()).hash,"#tenant-documents");
+  await nav.getByRole("link",{name:"Documents",exact:true}).click();await expect(page).toHaveURL(/#tenant-documents$/);
   await expect(page.locator("#tenant-documents")).toBeInViewport();
   await page.evaluate(()=>window.scrollTo(0,0));
   await page.screenshot({path:`output/email-prefill/booking-status-${width}.png`,fullPage:true});
