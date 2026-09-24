@@ -154,3 +154,28 @@ test("an old owner role in the session cannot retain owner authority", async () 
   state.tables.user[0].roleAssignments = [];
   await assert.rejects(guards.requireOwner(), /FORBIDDEN/);
 });
+
+test("operations response limits every staff relation to display identity", async () => {
+  const state = fixture(); state.grant("operations.view");
+  const privateStaff = { id: "reviewer", name: "Synthetic reviewer", email: "private@example.invalid", passwordHash: "synthetic-private-hash", sessionVersion: 9, passwordChangedAt: new Date() };
+  const relations = [["task", "assignee", "tasks"], ["unitNote", "author", "notes"], ["maintenanceRequest", "assignedTo", "maintenance"], ["dailyClose", "closedBy", "dailyCloses"]];
+  for (const [model, relation] of relations) state.db[model] = { findMany: async (args: Row) => {
+    assert.equal(args.where.organisationId, "org");
+    assert.deepEqual(args.where.facilityId, { in: ["a"] });
+    const selection = args.include[relation];
+    const staff = selection === true ? privateStaff : Object.fromEntries(Object.keys(selection.select).filter(key => selection.select[key]).map(key => [key, privateStaff[key as keyof typeof privateStaff]]));
+    return [{ id: model, [relation]: staff }, { id: `${model}-unassigned`, [relation]: null }];
+  } };
+  for (const model of ["product", "storagePackage"]) state.db[model] = { findMany: async () => [] };
+  const api = await load("./src/app/api/v1/operations/route.ts", state);
+  const response = await api.GET();
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  for (const [, relation, collection] of relations) {
+    assert.deepEqual(body.data[collection][0][relation], { id: privateStaff.id, name: privateStaff.name });
+    assert.equal(body.data[collection][1][relation], null);
+  }
+  assert.equal(JSON.stringify(body).includes("synthetic-private-hash"), false);
+  assert.equal(JSON.stringify(body).includes("passwordHash"), false);
+  assert.equal(state.writes.length, 0);
+});

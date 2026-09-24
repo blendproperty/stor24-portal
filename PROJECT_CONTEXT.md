@@ -1,4 +1,14 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Operations staff-data minimisation checkpoint — 24 September 2026
+
+- **Implementation:** operations GET now requests only id/name for task assignee, note author, maintenance assignee and daily-close closer. Existing permission/facility scope and nullable relations are retained. This prevents password hashes and account metadata from entering the operations response.
+- **Testing:** populated synthetic route reproduction exposed passwordHash/email/sessionVersion before the change; all four exact display-only shapes and nullable cases pass after. 389 unit tests and typecheck pass. Independent boundary investigator and candidate reviewer found no concrete bypass/regression. Added real-Prisma isolated PostgreSQL response coverage; CI pending.
+- **Commit and push:** enclosing operations-staff-projection PR records promotion.
+- **Merge:** pending required checks.
+- **Deployment/configuration:** pending. No credentials read or changed, no customer data queried.
+- **Live verification:** not performed. No exploitation claim. P14 remains open.
+- **Prior billing release:** PR244 merged as 13cd1981d4f9ca12a83dd759a62f568041db55e9 after all PR checks passed. Main build passed but tenant browser navigation test observed an empty hash immediately after keyboard activation; deployment was skipped. Failed browser job rerun requested; billing runtime remains unverified. No deployment gate bypassed.
+
 ## Monthly billing reconciliation checkpoint — 24 September 2026
 
 - **Implementation:** monthly preview and atomic posting now compare the saved account balance with the ledger-derived statement balance. Invalid reversals and future-dated ledger entries require finance review. The staff API explains the blocker; no balance is auto-corrected and no billing automation activated.

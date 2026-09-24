@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { build } from "esbuild";
+import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
 import { db } from "../../src/lib/db";
 import { requireFacility } from "../../src/lib/scope";
@@ -33,6 +35,33 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
       assert.equal((await requireLeasingCustomer(scope, own.id)).id, own.id);
       await assert.rejects(requireLeasingCustomer(scope, unrelated.id), /FORBIDDEN/);
       await assert.rejects(createLead(scope, { facilityId: a.id, customerId: unrelated.id, source: "CI" }), /FORBIDDEN/);
+    });
+    await t.test("operations serializes only display fields from populated staff relations", async () => {
+      const type = await db.unitType.create({ data: { facilityId: a.id, name: "Projection test", features: [] } });
+      const unit = await db.unit.create({ data: { facilityId: a.id, unitTypeId: type.id, number: "TEST", monthlyRate: 1 } });
+      for (const assigneeId of [user.id, null]) await db.task.create({ data: { organisationId: org.id, facilityId: a.id, title: "Synthetic task", assigneeId } });
+      await db.task.create({ data: { organisationId: org.id, facilityId: b.id, title: "Excluded facility", assigneeId: user.id } });
+      await db.unitNote.create({ data: { organisationId: org.id, facilityId: a.id, unitId: unit.id, authorId: user.id, note: "Synthetic note" } });
+      for (const assignedToId of [user.id, null]) await db.maintenanceRequest.create({ data: { organisationId: org.id, facilityId: a.id, title: "Synthetic maintenance", assignedToId } });
+      for (const [index, closedById] of [user.id, null].entries()) await db.dailyClose.create({ data: { organisationId: org.id, facilityId: a.id, businessDate: new Date(`2026-01-0${index + 1}`), checks: [], closedById } });
+      // Exercise the real route and Prisma projections; substitute only authentication.
+      const output = await build({ stdin: { contents: 'export { GET } from "./src/app/api/v1/operations/route.ts";', resolveDir: process.cwd(), loader: "ts" }, bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "isolated-route", setup(builder) {
+        builder.onResolve({ filter: /^@\/lib\/(db|auth-guards)$/ }, args => ({ path: args.path, namespace: "fixture" }));
+        builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const requirePermission=async()=>__auth; export const authErrorResponse=(error)=>{throw error};" }));
+      } }] });
+      const loaded = { exports: {} as { GET: () => Promise<Response> } };
+      new Function("require", "module", "exports", "__db", "__auth", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { organisationId: org.id, allowedFacilityIds: [a.id] });
+      const response = await loaded.exports.GET(); assert.equal(response.status, 200);
+      const { data } = await response.json();
+      for (const [collection, relation] of [["tasks", "assignee"], ["notes", "author"], ["maintenance", "assignedTo"], ["dailyCloses", "closedBy"]]) {
+        assert.equal(data[collection].length, collection === "notes" ? 1 : 2);
+        const assigned = data[collection].filter((row: Record<string, unknown>) => row[relation] !== null);
+        assert.equal(assigned.length, 1);
+        assert.deepEqual(assigned[0][relation], { id: user.id, name: user.name });
+      }
+      assert.equal(JSON.stringify(data).includes("passwordHash"), false);
+      assert.equal(JSON.stringify(data).includes("synthetic-not-a-real-password-hash"), false);
+      assert.equal(JSON.stringify(data).includes("sessionVersion"), false);
     });
     await t.test("populated status rows omit password hashes and other-facility customers", async () => {
       for (const customerId of [own.id, unrelated.id]) await db.integrationIdentityLink.create({ data: { organisationId: org.id, customerId, resolvedById: user.id } });
