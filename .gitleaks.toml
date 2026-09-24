@@ -1,0 +1,34 @@
+title = "STOR24 reviewed non-secret fixtures"
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Exact RFC 6238 published test vector, not a deployed MFA seed"
+condition = "AND"
+paths = ['''(^|/)tests/mfa\.test\.ts$''']
+regexes = ['''^GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ$''']
+
+[[allowlists]]
+description = "Exact synthetic idempotency keys in input validation tests"
+condition = "AND"
+paths = ['''(^|/)tests/(tenant-merchandise|whatsapp-workflow)\.test\.ts$''']
+regexes = ['''^(e6c32f4b-bc2c-4dfe-8cd8-14c6fe008abc|1234567890abcdef)$''']
+
+[[allowlists]]
+description = "Exact sandbox-shaped fixture in HTTP-mocked payment tests"
+condition = "AND"
+paths = ['''(^|/)tests/netcash-pay-now\.test\.ts$''']
+regexes = ['''^bacc82ed-64df-4878-bbb2-e25d08b13a40$''']
+
+[[allowlists]]
+description = "Type enum labels and confirmation copy are not credentials"
+condition = "AND"
+paths = ['''(^|/)src/lib/(access-decision-service|integrations/netcash-configuration)\.ts$''']
+regexTarget = "match"
+regexes = ['''AccessDecisionSource''', '''NETCASH_ENABLE_CONFIRMATION''']
+
+[[allowlists]]
+description = "Netcash's published default software vendor identifier (NetConnector documentation)"
+condition = "AND"
+paths = ['''(^|/)src/lib/integrations/netcash-configuration\.ts$''']
+regexes = ['''^24ade73c-98cf-47b3-99be-cc7b867b3080$''']
