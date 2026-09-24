@@ -90,7 +90,6 @@ function pinnedHttpsPost(
     const normalizedExpected = normalizeFingerprint(expectedFingerprint);
 
     // Exact certificate pin is checked before req.end; wrong-pin/no-request regression: tests/hikcentral-tls.test.ts.
-    // nosemgrep: problem-based-packs.insecure-transport.js-node.bypass-tls-verification.bypass-tls-verification
     const req = httpsRequest(
       {
         hostname: target.hostname,
