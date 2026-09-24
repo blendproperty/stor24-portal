@@ -1,5 +1,6 @@
 import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
+import { recordDailyClose } from "@/lib/daily-close-service";
 import { createTaskSchema, dailyCloseSchema, maintenanceSchema, productSchema, stockMovementSchema, storagePackageSchema, unitNoteSchema } from "@/lib/validators";
 
 export async function GET() {
@@ -106,11 +107,8 @@ export async function POST(request: Request) {
       await ensureFacility(input.facilityId);
       const allComplete = input.checks.every((check) => check.complete);
       if (!allComplete) return Response.json({ error: { code: "CHECKS_INCOMPLETE", message: "Complete every operational check before closing." } }, { status: 409 });
-      result = await db.dailyClose.upsert({
-        where: { facilityId_businessDate: { facilityId: input.facilityId, businessDate: new Date(`${input.businessDate}T00:00:00.000Z`) } },
-        update: { ...input, businessDate: undefined, status: "CLOSED", variance: input.countedCash - input.expectedCash, closedById: user.id, closedAt: new Date() },
-        create: { organisationId, ...input, businessDate: new Date(`${input.businessDate}T00:00:00.000Z`), status: "CLOSED", variance: input.countedCash - input.expectedCash, closedById: user.id, closedAt: new Date() },
-      });
+      result = await recordDailyClose(organisationId, user.id, input);
+      audited = true;
     } else {
       return Response.json({ error: { code: "UNKNOWN_OPERATION", message: "The requested operation type is not supported." } }, { status: 400 });
     }
@@ -119,6 +117,7 @@ export async function POST(request: Request) {
     if (!audited) await db.auditEvent.create({ data: { organisationId, actorId: user.id, action: `${entityType}.create`, entityType, entityId, after: JSON.parse(JSON.stringify(result)) } });
     return Response.json({ data: result }, { status: 201 });
   } catch (error) {
+    if (error instanceof Error && error.message === "DAILY_CLOSE_ALREADY_CLOSED") return Response.json({ error: { code: error.message, message: "This day is already closed. Its recorded totals cannot be overwritten. Ask finance to review any correction." } }, { status: 409 });
     if (error instanceof Error && error.message === "INSUFFICIENT_STOCK") return Response.json({ error: { code: error.message, message: "This movement would make stock negative." } }, { status: 409 });
     if (error instanceof Error && error.message === "UNIT_NOT_AVAILABLE") return Response.json({ error: { code: error.message, message: "Only an available unit can be placed into service." } }, { status: 409 });
     return authErrorResponse(error);
