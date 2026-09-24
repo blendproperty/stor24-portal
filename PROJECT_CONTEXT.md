@@ -1,4 +1,13 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Session acceptance checkpoint — 24 September 2026
+
+- **Implementation:** added regression coverage for staff session expiry/signature/algorithm/required claims, revoked session versions, inactive/deleted accounts, removed permissions and owner demotion. No application behaviour or production configuration changed.
+- **Testing:** 387 local unit tests passed, including nine focused session and access-boundary tests. Tests use synthetic sessions/persistence; these are not real staff acceptance or a complete penetration test.
+- **Commit and push:** enclosing codex/session-acceptance-20260924 commit/PR records promotion; pending at this checkpoint.
+- **Merge:** pending required CI.
+- **Deployment/configuration:** not required for test-only changes; production untouched.
+- **Live verification:** none for this checkpoint. P14 remains open, including CAPTCHA rotation, legal/provider decisions, MFA recovery, private-data and restore acceptance. Next bounded work is Priority 3 finance reconciliation.
+
 ## Security monitoring release verified — 24 September 2026
 
 - **Implementation:** [security follow-up](docs/SECURITY_MONITORING_2026-09-24.md) records scanners, secret removal, full AES-GCM tag checks and four fixture-server fixes. Final follow-up also limits scanner parsing-error output to type/code, preventing source excerpts in logs.
@@ -1669,3 +1678,4 @@ A CRM capability is complete only when it is database-backed, scoped, permission
 - Deployment/configuration: CRM run 34438007430 attempt 1 timed out connecting SSH before execution; attempt 2 succeeded and logs confirm migration 20260910110000_debit_order_preferences applied. Website run 34438380340 succeeded. Provider configuration and transaction enablement were not changed.
 - Live read-only verification: the existing customer test booking still returns SIGNED / DEBIT_ORDER, setupAvailable true and no saved preferences. Its actual phone-sized page shows first-date/monthly-day fields and zero download links. Zero booking POSTs were made in this check. Real preference-save/database readback remains customer UAT.
 - NOT COMPLETE: automated Netcash bank-mandate creation, signed mandate retrieval and verified provider completion/reconciliation are not implemented or tested by this slice. No collection is authorised. Provider integration and approved first-payment/recurring-collection rules remain prerequisites to full debit-order checkout. Previous legal, financial, provider, data, training, activation and approval gates remain open.
+
