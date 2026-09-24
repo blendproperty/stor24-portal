@@ -98,6 +98,11 @@ function customerDateTime(value: string) {
   return date.toLocaleString("en-ZA", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Africa/Johannesburg" }).replace(",", " at");
 }
 
+async function attemptChannel(channel: Channel, send: () => Promise<boolean>) {
+  try { return { channel, ok: await send() }; }
+  catch { return { channel, ok: false }; }
+}
+
 /**
  * Sends the reservation-confirmation notification across whichever channels
  * the customer consented to, using an active CommunicationTemplate for the
@@ -106,8 +111,9 @@ function customerDateTime(value: string) {
  * placeholder) Communications screen.
  *
  * Never throws — a notification failure must not fail or roll back the
- * reservation itself. Every attempt, success or failure, is logged to
- * CommunicationLog with the recipient stored only as a privacy-safe hash.
+ * reservation itself. Channels fail independently. Attempts are logged to
+ * CommunicationLog when persistence is available, with hashed recipients;
+ * unavailable logging is returned as unconfirmed delivery, never success.
  *
  * WhatsApp requires its own active consent flag. Phone or SMS permission must
  * never be treated as WhatsApp permission.
@@ -116,39 +122,45 @@ export async function notifyReservationConfirmed(input: ReservationConfirmationI
   const results: Array<{ channel: Channel; ok: boolean }> = [];
 
   if (input.consent.email && input.to.email) {
-    const { templateId, subject, body } = await resolveTemplate(input.organisationId, "EMAIL");
-    const idempotencyKey = `${input.idempotencyKey}:EMAIL`;
-    const emailVariables = { ...input.variables, holdExpiresAt: customerDateTime(input.variables.holdExpiresAt) };
-    const renderedBody = render(body, emailVariables);
-    try {
-      await emailProvider().send({
-        to: input.to.email,
-        subject: render(subject ?? "Your Stor24 reservation", input.variables),
-        text: renderedBody,
-        html: stor24ReservationHeldHtml(emailVariables),
-      });
-      await logDelivery({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, templateId, channel: "EMAIL", recipient: input.to.email, idempotencyKey, provider: process.env.EMAIL_PROVIDER ?? "disabled", result: { ok: true, providerReference: "" } });
-      results.push({ channel: "EMAIL", ok: true });
-    } catch (error) {
-      await logDelivery({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, templateId, channel: "EMAIL", recipient: input.to.email, idempotencyKey, provider: process.env.EMAIL_PROVIDER ?? "disabled", result: { ok: false, code: "SEND_FAILED", message: error instanceof Error ? error.message : "Email send failed." } });
-      results.push({ channel: "EMAIL", ok: false });
-    }
+    results.push(await attemptChannel("EMAIL", async () => {
+      const { templateId, subject, body } = await resolveTemplate(input.organisationId, "EMAIL");
+      const idempotencyKey = `${input.idempotencyKey}:EMAIL`;
+      const emailVariables = { ...input.variables, holdExpiresAt: customerDateTime(input.variables.holdExpiresAt) };
+      const renderedBody = render(body, emailVariables);
+      try {
+        await emailProvider().send({
+          to: input.to.email,
+          subject: render(subject ?? "Your Stor24 reservation", input.variables),
+          text: renderedBody,
+          html: stor24ReservationHeldHtml(emailVariables),
+        });
+        await logDelivery({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, templateId, channel: "EMAIL", recipient: input.to.email, idempotencyKey, provider: process.env.EMAIL_PROVIDER ?? "disabled", result: { ok: true, providerReference: "" } });
+        return true;
+      } catch (error) {
+        await logDelivery({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, templateId, channel: "EMAIL", recipient: input.to.email, idempotencyKey, provider: process.env.EMAIL_PROVIDER ?? "disabled", result: { ok: false, code: "SEND_FAILED", message: error instanceof Error ? error.message : "Email send failed." } });
+        return false;
+      }
+    }));
   }
 
   if (input.consent.sms && input.to.phone) {
-    const { templateId, body } = await resolveTemplate(input.organisationId, "SMS");
-    const idempotencyKey = `${input.idempotencyKey}:SMS`;
-    const result: ProviderResult<{ status: "QUEUED" }> = await new TwilioSmsProvider().send(
-      { recipient: input.to.phone, body: render(body, input.variables) },
-      { organisationId: input.organisationId, facilityId: input.facilityId, idempotencyKey },
-    );
-    await logDelivery({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, templateId, channel: "SMS", recipient: input.to.phone, idempotencyKey, provider: "twilio", result: result.ok ? { ok: true, providerReference: result.providerReference } : { ok: false, code: result.code, message: result.message } });
-    results.push({ channel: "SMS", ok: result.ok });
+    results.push(await attemptChannel("SMS", async () => {
+      const { templateId, body } = await resolveTemplate(input.organisationId, "SMS");
+      const idempotencyKey = `${input.idempotencyKey}:SMS`;
+      const result: ProviderResult<{ status: "QUEUED" }> = await new TwilioSmsProvider().send(
+        { recipient: input.to.phone, body: render(body, input.variables) },
+        { organisationId: input.organisationId, facilityId: input.facilityId, idempotencyKey },
+      );
+      await logDelivery({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, templateId, channel: "SMS", recipient: input.to.phone, idempotencyKey, provider: "twilio", result: result.ok ? { ok: true, providerReference: result.providerReference } : { ok: false, code: result.code, message: result.message } });
+      return result.ok;
+    }));
   }
 
   if (input.consent.whatsapp && input.to.phone) {
-    const result = await sendWhatsAppTemplate({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, recipient: input.to.phone, consent: input.consent, messageType: "RESERVATION_CONFIRMED", idempotencyKey: `${input.idempotencyKey}:WHATSAPP`, variables: { "1": input.variables.firstName, "2": input.variables.unitNumber, "3": input.variables.facilityName, "4": input.variables.intendedMoveIn, "5": `R${input.variables.monthlyRateZar}` }, allowWhenAutomationDisabled: input.allowWhatsappWhenAutomationDisabled });
-    results.push({ channel: "WHATSAPP", ok: result.ok });
+    results.push(await attemptChannel("WHATSAPP", async () => {
+      const result = await sendWhatsAppTemplate({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, recipient: input.to.phone, consent: input.consent, messageType: "RESERVATION_CONFIRMED", idempotencyKey: `${input.idempotencyKey}:WHATSAPP`, variables: { "1": input.variables.firstName, "2": input.variables.unitNumber, "3": input.variables.facilityName, "4": input.variables.intendedMoveIn, "5": `R${input.variables.monthlyRateZar}` }, allowWhenAutomationDisabled: input.allowWhatsappWhenAutomationDisabled });
+      return result.ok;
+    }));
   }
 
   return results;
@@ -161,26 +173,32 @@ export async function notifyViewingBooked(input: Omit<ReservationConfirmationInp
   const results: Array<{ channel: Channel; ok: boolean }> = [];
   const body = `Hi ${input.variables.firstName},\n\nYour viewing of Unit ${input.variables.unitNumber} at ${input.variables.facilityName} is booked for ${input.variables.viewingAt}, during office hours. The unit is protected for you until ${input.variables.holdExpiresAt}. Please arrive for your booked appointment; after-hours viewing is not available.\n\nReference: ${input.variables.reference}. You can pay at the facility or request an online payment link after viewing.\n\nStor24`;
   if (input.consent.email && input.to.email) {
-    const idempotencyKey = `${input.idempotencyKey}:EMAIL`;
-    try {
-      await emailProvider().send({ to: input.to.email, subject: `Your Stor24 viewing is booked — ${input.variables.reference}`, text: body, html: `<p>${escapeEmailHtml(body).replaceAll("\n", "<br/>")}</p>` });
-      await logDelivery({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, templateId: null, channel: "EMAIL", recipient: input.to.email, idempotencyKey, provider: process.env.EMAIL_PROVIDER ?? "disabled", result: { ok: true, providerReference: "" } });
-      results.push({ channel: "EMAIL", ok: true });
-    } catch (error) {
-      await logDelivery({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, templateId: null, channel: "EMAIL", recipient: input.to.email, idempotencyKey, provider: process.env.EMAIL_PROVIDER ?? "disabled", result: { ok: false, code: "SEND_FAILED", message: error instanceof Error ? error.message : "Email send failed." } });
-      results.push({ channel: "EMAIL", ok: false });
-    }
+    results.push(await attemptChannel("EMAIL", async () => {
+      const idempotencyKey = `${input.idempotencyKey}:EMAIL`;
+      try {
+        await emailProvider().send({ to: input.to.email, subject: `Your Stor24 viewing is booked — ${input.variables.reference}`, text: body, html: `<p>${escapeEmailHtml(body).replaceAll("\n", "<br/>")}</p>` });
+        await logDelivery({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, templateId: null, channel: "EMAIL", recipient: input.to.email, idempotencyKey, provider: process.env.EMAIL_PROVIDER ?? "disabled", result: { ok: true, providerReference: "" } });
+        return true;
+      } catch (error) {
+        await logDelivery({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, templateId: null, channel: "EMAIL", recipient: input.to.email, idempotencyKey, provider: process.env.EMAIL_PROVIDER ?? "disabled", result: { ok: false, code: "SEND_FAILED", message: error instanceof Error ? error.message : "Email send failed." } });
+        return false;
+      }
+    }));
   }
   if (input.consent.sms && input.to.phone) {
-    const idempotencyKey = `${input.idempotencyKey}:SMS`;
-    const smsBody = `Stor24: Viewing for Unit ${input.variables.unitNumber} at ${input.variables.facilityName} is booked for ${input.variables.viewingAt}. Ref ${input.variables.reference}.`;
-    const result = await new TwilioSmsProvider().send({ recipient: input.to.phone, body: smsBody }, { organisationId: input.organisationId, facilityId: input.facilityId, idempotencyKey });
-    await logDelivery({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, templateId: null, channel: "SMS", recipient: input.to.phone, idempotencyKey, provider: "twilio", result: result.ok ? { ok: true, providerReference: result.providerReference } : { ok: false, code: result.code, message: result.message } });
-    results.push({ channel: "SMS", ok: result.ok });
+    results.push(await attemptChannel("SMS", async () => {
+      const idempotencyKey = `${input.idempotencyKey}:SMS`;
+      const smsBody = `Stor24: Viewing for Unit ${input.variables.unitNumber} at ${input.variables.facilityName} is booked for ${input.variables.viewingAt}. Ref ${input.variables.reference}.`;
+      const result = await new TwilioSmsProvider().send({ recipient: input.to.phone, body: smsBody }, { organisationId: input.organisationId, facilityId: input.facilityId, idempotencyKey });
+      await logDelivery({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, templateId: null, channel: "SMS", recipient: input.to.phone, idempotencyKey, provider: "twilio", result: result.ok ? { ok: true, providerReference: result.providerReference } : { ok: false, code: result.code, message: result.message } });
+      return result.ok;
+    }));
   }
   if (input.consent.whatsapp && input.to.phone) {
-    const result = await sendWhatsAppTemplate({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, recipient: input.to.phone, consent: input.consent, messageType: "VIEWING_BOOKED", idempotencyKey: `${input.idempotencyKey}:WHATSAPP`, variables: { "1": input.variables.firstName, "2": input.variables.unitNumber, "3": input.variables.facilityName, "4": input.variables.viewingAt, "5": input.variables.reference }, allowWhenAutomationDisabled: input.allowWhatsappWhenAutomationDisabled });
-    results.push({ channel: "WHATSAPP", ok: result.ok });
+    results.push(await attemptChannel("WHATSAPP", async () => {
+      const result = await sendWhatsAppTemplate({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, recipient: input.to.phone, consent: input.consent, messageType: "VIEWING_BOOKED", idempotencyKey: `${input.idempotencyKey}:WHATSAPP`, variables: { "1": input.variables.firstName, "2": input.variables.unitNumber, "3": input.variables.facilityName, "4": input.variables.viewingAt, "5": input.variables.reference }, allowWhenAutomationDisabled: input.allowWhatsappWhenAutomationDisabled });
+      return result.ok;
+    }));
   }
   return results;
 }
