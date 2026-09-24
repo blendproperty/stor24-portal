@@ -1,4 +1,12 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Billing delivery retry guard — 24 September 2026
+
+- **Implementation:** the unique document record claims its single automatic email attempt. Repeated confirmed requests return the original document/log result without another send. Overlapping, failed, partially finalised or legacy attempts return an actionable 409 requiring delivery review. The provider-failure message no longer asserts non-delivery when the outcome is uncertain. Database uniqueness is detected through Prisma P2002, not error text.
+- **Testing:** real-service synthetic before tests sent twice for both invoice and explicit-period statement. After fix eight focused cases pass: confirmed repeat, overlapping requests, all uncertain/legacy states and persistence failure after provider success. The full 398-test suite passed before adding the two finalisation cases; both added cases and typecheck passed. Added isolated PostgreSQL delivery-claim/concurrency checks with a stub provider; CI pending. No external messages sent.
+- **Commit/push:** enclosing billing-delivery-guard PR records promotion.
+- **Merge/deployment/configuration:** pending. No schema change, customer balance change, switches or provider configuration changes. This is at-most-one automatic attempt per existing document key, not proof of delivery or an approved resend/recovery workflow. Numbering and statement default-period policy remain separate open items.
+- **Live verification:** none for this candidate. Finance/staff and provider acceptance remain open.
+- **Prior release verified:** PR250 merged e15e1e4a597f87abd7a7b927ee6ad51e76d0b2d4 after all checks; deployment 36035665129 succeeded. Independently inspected stor24-crm:e15e1e4a5 healthy and public service/status/database health correct. PR251 evidence merged f4e2e0a0530c84cb2e0a1a7540095c8564171212 after all checks. Canonical context present on remote main.
 ## Release evidence — 24 September 2026, 17:35 UTC
 
 - **Implementation:** daily-close immutable snapshots/atomic audit (PR248), tenant-navigation test timing correction (PR249), and complete charge-only invoice selection validation (PR250).

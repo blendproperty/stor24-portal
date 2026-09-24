@@ -145,3 +145,6 @@ P02/P08 candidate rejects payments/credits/refunds/reversals/write-offs, duplica
 
 ### 24 September, 17:35 UTC — verified daily-close release
 PR248/249 deployed through 36033956292; exact image 079ae6c73 healthy and public application/database readiness verified. No production close recorded. PR250 invoice validation passed all required checks and merged e15e1e4; its deployment is pending. Excel E009/E010 reconciled to these states. Manual close reconciliation/automation/reopening, invoice retry/numbering and staff acceptance remain open; 0/14 accepted.
+
+### 24 September — billing email retry guard candidate
+P02/P08: before tests sent the same invoice/statement twice; the candidate uses document uniqueness to allow one automatic attempt and returns saved success or review-required on repetition. Eight synthetic cases and typecheck pass; PostgreSQL/CI and promotion pending. Provider receipt, approved resend workflow, numbering/default statement period and staff acceptance remain open. PR250 deployed through 36035665129; image e15e1e4a5 and public readiness verified. No acceptance checkbox changed.
