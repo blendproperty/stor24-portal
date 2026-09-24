@@ -1,4 +1,12 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## SMS delivery evidence compatibility — 24 September 2026
+
+- **Implementation:** the shared callback ordering guard now uses delivered/read timestamps as confirmed delivery evidence. Legacy SMS logs set SUCCEEDED when the provider accepts a request; that alone must not suppress a later genuine failure. Failed SMS tasks now identify the SMS channel. Confirmed delivery still cannot regress.
+- **Testing:** synthetic before case with an accepted legacy SMS incorrectly remained SUCCEEDED after a signed failed callback; after fix becomes FAILED with one SMS-labelled task. Existing replay/order/read/signature/rollback cases and all 430 unit tests pass; typecheck/lint pass. Added PostgreSQL accepted-SMS failure, delivered recovery and late-failure controls; required CI pending.
+- **Commit/push:** enclosing sms-delivery-evidence PR records promotion.
+- **Merge/deployment/configuration/live verification:** pending. This closes a compatibility gap identified after PR260's ordering change; no real provider message or production record was used. Provider/staff acceptance remains open.
+- **Prior releases:** PR263 passed all required checks, including real PostgreSQL distinct invoice/statement numbers and no-send rollback (36045054222), on ae1205e60b82ce749d10788863fae3d3e43d6f21 and merged aabb348eff2085d67db103053efbf1715013555e; rollout pending. PR262 deployment 36044978352 succeeded; independently verified stor24-crm:45b0bac1 healthy/public service/status/database at 19:00 UTC. Its 75-table restore remains synthetic evidence only. Canonical context present on remote main; all programme acceptance open.
+
 ## Financial document numbering concurrency — 24 September 2026
 
 - **Implementation:** invoice/statement numbering and unique document creation now occur together under an organisation row lock, before external email delivery. The existing INV/STMT year/count format and document idempotency keys remain. One issue timestamp also supplies the number year and creation date. Existing/uncertain documents still reuse the saved result or require review; old documents are not renumbered.

@@ -61,6 +61,16 @@ test("isolated PostgreSQL callback replay and rollback", async () => {
     assert.equal(delivered.failedAt, null); assert.equal(delivered.failureCode, null); assert.equal(delivered.nextRetryAt, null);
     assert.equal(await db.task.count({ where: { organisationId: org.id } }), 2);
     assert.equal(await db.webhookInbox.count({ where: { organisationId: org.id } }), 10);
+    const smsKey = randomUUID();
+    const sms = await db.communicationLog.create({ data: { organisationId: org.id, channel: "SMS", provider: "twilio", providerRef: smsKey, recipientHash: "synthetic", idempotencyKey: smsKey, status: "SUCCEEDED", sentAt: new Date() } });
+    await loaded.exports.POST(request("failed", smsKey));
+    assert.equal((await db.communicationLog.findUniqueOrThrow({ where: { id: sms.id } })).status, "FAILED");
+    assert.equal(await db.task.count({ where: { organisationId: org.id, title: "SMS delivery failed" } }), 1);
+    await loaded.exports.POST(request("delivered", smsKey));
+    await loaded.exports.POST(request("undelivered", smsKey));
+    const smsDelivered = await db.communicationLog.findUniqueOrThrow({ where: { id: sms.id } });
+    assert.equal(smsDelivered.status, "SUCCEEDED"); assert.ok(smsDelivered.deliveredAt); assert.equal(smsDelivered.failedAt, null);
+    assert.equal(await db.task.count({ where: { organisationId: org.id, title: "SMS delivery failed" } }), 1);
   } finally {
     if (saved.token === undefined) delete process.env.TWILIO_AUTH_TOKEN; else process.env.TWILIO_AUTH_TOKEN = saved.token;
     if (saved.url === undefined) delete process.env.APP_URL; else process.env.APP_URL = saved.url;

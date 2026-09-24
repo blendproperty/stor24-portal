@@ -27,7 +27,8 @@ export async function POST(request: Request) {
       // Callbacks can arrive out of order. Keep every event in the inbox, but
       // never let an earlier/unknown state erase confirmed delivery or failure.
       if (!isDelivered) {
-        if (current.status === "SUCCEEDED" || current.deliveredAt || current.readAt) return;
+        // Legacy SMS logs use SUCCEEDED for API acceptance, not delivery.
+        if (current.deliveredAt || current.readAt) return;
         if (isFailed && current.failedAt) return;
         if (!isFailed && (current.status === "FAILED" || current.failedAt || !["accepted", "scheduled", "queued", "sending", "sent"].includes(status))) return;
       }
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
         failureMessage: isFailed ? (payload.ChannelStatusMessage || "Twilio could not deliver the message.") : isDelivered ? null : undefined,
         nextRetryAt: isFailed ? (current.attempts < 3 ? new Date(Date.now() + 5 * 60_000) : null) : isDelivered ? null : undefined,
       } });
-      if (isFailed) await tx.task.create({ data: { organisationId: current.organisationId, facilityId: current.facilityId, customerId: current.customerId, title: "WhatsApp delivery failed", description: `Review communication ${current.id}. Twilio error ${payload.ErrorCode || "unknown"}.`, priority: current.attempts >= 3 ? "HIGH" : "NORMAL" } });
+      if (isFailed) await tx.task.create({ data: { organisationId: current.organisationId, facilityId: current.facilityId, customerId: current.customerId, title: `${current.channel === "SMS" ? "SMS" : "WhatsApp"} delivery failed`, description: `Review communication ${current.id}. Twilio error ${payload.ErrorCode || "unknown"}.`, priority: current.attempts >= 3 ? "HIGH" : "NORMAL" } });
     });
   } catch (error) {
     if (typeof error === "object" && error !== null && "code" in error && error.code === "P2002") {
