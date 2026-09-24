@@ -1651,7 +1651,7 @@ function UnitPlacementDialog({
           ) : (
             <p className="form-error inventory-form-wide">
               Create at least one unit type before placing units.{" "}
-              <Link href="/units">Open Units & Availability</Link>.
+              <Link href="/units">Open Units &amp; Availability</Link>.
             </p>
           )}
           {selectedType ? (

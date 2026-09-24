@@ -36,7 +36,7 @@ export function encryptPhoto(bytes: Buffer, binding: string) {
 export function decryptPhoto(value: string, binding: string) {
   const [version, iv, tag, data, extra] = value.split(".");
   if (version !== "v1" || !iv || !tag || !data || extra) throw new Error("PHOTO_STORAGE_UNAVAILABLE");
-  const cipher = createDecipheriv("aes-256-gcm", photoKey(), Buffer.from(iv, "base64url"));
+  const cipher = createDecipheriv("aes-256-gcm", photoKey(), Buffer.from(iv, "base64url"), { authTagLength: 16 });
   cipher.setAAD(Buffer.from(binding)); cipher.setAuthTag(Buffer.from(tag, "base64url"));
   return Buffer.concat([cipher.update(Buffer.from(data, "base64url")), cipher.final()]);
 }
