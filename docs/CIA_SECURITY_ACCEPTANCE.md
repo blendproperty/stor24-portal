@@ -1,5 +1,7 @@
 # STOR24 CIA security acceptance
 
+24 September evening update: [unattended delivery evidence](UNATTENDED_DELIVERY_2026-09-24.md) records additional confidentiality fixes, replay/concurrency/recovery tests and a successful synthetic 75-table restore. These are technical controls and evidence, not acceptance of production recovery, legal obligations, providers or staff workflows. The original assessment below is historical; all acceptance boxes remain open.
+
 24 September progress: see [Priority 2 technical release](PRIORITY_2_RELEASE_2026-09-24.md) for implemented controls and current evidence. The observations below retain their original assessment date. All PRIV and CIA acceptance items remain open; deployed changes do not substitute for legal, provider, staff or recovery acceptance.
 
 
