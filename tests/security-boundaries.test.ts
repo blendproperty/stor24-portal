@@ -70,12 +70,13 @@ async function load(entry: string, state: ReturnType<typeof fixture>) {
 test("manual WhatsApp send and retry authorize the recipient independently of the supplied facility", async () => {
   const state = fixture(); state.grant("operations.manage"); state.grant("reports.view", null);
   for (const customer of state.tables.customer) Object.assign(customer, { phone: "+27820000000", communicationConsent: { whatsapp: true } });
-  const log: Row = { id: "failed", organisationId: "org", channel: "WHATSAPP", status: "FAILED", facilityId: null, customerId: "customer-b", customer: state.tables.customer[1], messageType: "PAYMENT_REMINDER", metadata: { variables: {} }, idempotencyKey: "synthetic-failed-message", attempts: 0 };
+  const log: Row = { id: "failed", organisationId: "org", channel: "WHATSAPP", status: "FAILED", facilityId: null, customerId: "customer-b", customer: state.tables.customer[1], messageType: "PAYMENT_REMINDER", metadata: { variables: {} }, idempotencyKey: "synthetic-failed-message", attempts: 0, providerRef: "SMsynthetic", failedAt: new Date(), failureCode: "DELIVERY_FAILED" };
   state.db.communicationLog = {
     findFirst: async ({ where }: Row) => matches(log, where) ? log : null,
     findUnique: async () => null,
-    upsert: async ({ create }: Row) => { state.writes.push({ model: "communicationLog", data: create }); return { id: "sent" }; },
+    create: async ({ data }: Row) => { state.writes.push({ model: "communicationLog", data }); return { id: "sent", ...data }; },
     update: async ({ data }: Row) => { state.writes.push({ model: "communicationLog", data }); return log; },
+    updateMany: async ({ data }: Row) => { state.writes.push({ model: "communicationLog", data }); return { count: 1 }; },
   };
   const envKey = "TWILIO_WHATSAPP_PAYMENT_REMINDER_SID", previous = process.env[envKey];
   process.env[envKey] = "HXsynthetic";
@@ -90,7 +91,7 @@ test("manual WhatsApp send and retry authorize the recipient independently of th
     for (const id of ["customer-a", "new-own"]) assert.equal((await send(id)).status, 202);
     assert.equal((await send("new-other")).status, 403);
     log.customerId = "customer-a"; log.customer = state.tables.customer[0];
-    assert.equal((await retry()).status, 200);
+    assert.equal((await retry()).status, 202);
     for (const facilityId of ["b", "foreign", "missing"]) {
       assert.equal((await send("customer-a", facilityId)).status, 403);
       log.facilityId = facilityId; assert.equal((await retry()).status, 403);

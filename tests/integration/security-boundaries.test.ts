@@ -41,7 +41,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
       const request = (body: unknown) => new Request("https://example.invalid/api/v1/communications", { method: "POST", headers: { origin: "https://example.invalid", "content-type": "application/json" }, body: JSON.stringify(body) });
       const send = (customerId: string, facilityId = a.id) => sendApi.POST(request({ customerId, facilityId, messageType: "PAYMENT_REMINDER", variables: {}, idempotencyKey: randomUUID() }));
       const retry = async (customerId: string, facilityId: string | null = null) => {
-        const log = await db.communicationLog.create({ data: { organisationId: org.id, facilityId, customerId, channel: "WHATSAPP", status: "FAILED", messageType: "PAYMENT_REMINDER", recipientHash: "synthetic", metadata: { variables: {} }, idempotencyKey: randomUUID() } });
+        const log = await db.communicationLog.create({ data: { organisationId: org.id, facilityId, customerId, channel: "WHATSAPP", status: "FAILED", messageType: "PAYMENT_REMINDER", recipientHash: "synthetic", metadata: { variables: {} }, idempotencyKey: randomUUID(), providerRef: "SMsynthetic", failedAt: new Date(), failureCode: "DELIVERY_FAILED" } });
         const response = await retryApi.POST(request({ logId: log.id }));
         if (response.status === 403) assert.equal((await db.communicationLog.findUniqueOrThrow({ where: { id: log.id } })).attempts, 1);
         return response;
@@ -54,7 +54,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
         assert.equal(sends, 0);
         assert.equal(await db.auditEvent.count({ where: { organisationId: org.id, action: "communication.whatsapp.sent" } }), 0);
         assert.equal((await send(customers[0].id)).status, 202);
-        assert.equal((await retry(customers[0].id)).status, 200);
+        assert.equal((await retry(customers[0].id)).status, 202);
         assert.equal((await send(customers[0].id, b.id)).status, 403);
         await db.roleAssignment.create({ data: { userId: user.id, roleId: role.id, facilityId: null } });
         assert.equal((await send(customers[1].id, b.id)).status, 202);
