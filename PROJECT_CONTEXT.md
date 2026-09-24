@@ -1,4 +1,12 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Email-provider request deadline — 24 September 2026
+
+- **Implementation:** Resend, SendGrid and Twilio Email HTTP sends use a 15-second abort deadline, matching existing integration timeout conventions. No automatic retry is added; uncertain financial-document delivery remains protected by PR252.
+- **Testing:** before change all three providers lacked the deadline signal. Synthetic fetch/abort tests now cover successful payloads, stalled requests, one attempt only and status-only rejection messages for each provider. All 412 local tests and typecheck passed. Tests substitute network calls and timeout signals; no real emails sent and no provider availability claim.
+- **Commit/push:** enclosing email-provider-timeout PR records promotion; required CI pending.
+- **Merge/deployment/configuration:** pending. Provider credentials/configuration, payment/access/training switches and customer data remain unchanged.
+- **Live verification:** none for this candidate. Real communications receipt, recovery and provider/staff acceptance remain open.
+- **Prior releases:** PR252 deployment 36037045916 succeeded; independently inspected stor24-crm:bba6e5c1e healthy and public service/status/database health correct. PR253 passed all required checks including PostgreSQL statement boundary/audit coverage and merged caab923d5f2829166ed0573b80375ae79476fbb0. Main CI 36037384302 running; statement-period deployment not yet verified.
 ## Emailed statement period alignment — 24 September 2026
 
 - **Implementation:** emailed statement arithmetic now uses the portal's inclusive South African calendar-date range. The renderer explicitly uses Africa/Johannesburg; plain-text and audit dates match the actual range. Invalid/reversed periods return 422 before document creation or delivery. Existing document keys are retained so this correction does not automatically resend historical documents.

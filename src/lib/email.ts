@@ -83,7 +83,7 @@ function parseFromAddress(raw: string | undefined) {
 
 class ResendEmailProvider implements EmailProvider {
   async send(message: EmailMessage) {
-    const response = await fetch("https://api.resend.com/emails", { method: "POST", headers: { authorization: `Bearer ${process.env.RESEND_API_KEY}`, "content-type": "application/json" }, body: JSON.stringify({ from: process.env.EMAIL_FROM, ...message }) });
+    const response = await fetch("https://api.resend.com/emails", { method: "POST", signal: AbortSignal.timeout(15_000), headers: { authorization: `Bearer ${process.env.RESEND_API_KEY}`, "content-type": "application/json" }, body: JSON.stringify({ from: process.env.EMAIL_FROM, ...message }) });
     if (!response.ok) throw new Error(`Email provider rejected request (${response.status}).`);
   }
 }
@@ -100,6 +100,7 @@ class SendGridEmailProvider implements EmailProvider {
     const from = parseFromAddress(process.env.EMAIL_FROM);
     const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
       method: "POST",
+      signal: AbortSignal.timeout(15_000),
       headers: { authorization: `Bearer ${process.env.SENDGRID_API_KEY}`, "content-type": "application/json" },
       body: JSON.stringify({
         personalizations: [{ to: [{ email: message.to }] }],
@@ -132,6 +133,7 @@ class TwilioEmailProvider implements EmailProvider {
     const fromName = parseFromAddress(process.env.EMAIL_FROM).name ?? "Stor24";
     const response = await fetch("https://comms.twilio.com/v1/Emails", {
       method: "POST",
+      signal: AbortSignal.timeout(15_000),
       headers: {
         authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString("base64")}`,
         "content-type": "application/json",
