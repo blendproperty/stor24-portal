@@ -123,3 +123,34 @@ test("operational staff relations request only safe display fields", async () =>
   assert.deepEqual(state.queries[0].include.resolvedBy, { select: { id: true, name: true } });
   assert.deepEqual(state.queries[1].include.requestedBy, { select: { id: true, name: true } });
 });
+
+test("existing sessions lose access after revocation, deactivation or removal of current grants", async () => {
+  const state = fixture();
+  state.grant("billing.view");
+  const guards = await load("./src/lib/auth-guards.ts", state);
+  assert.equal((await guards.requirePermission("billing.view", "a")).userId, "staff");
+  state.tables.user[0].sessionVersion = 2;
+  await assert.rejects(guards.requireSession(), /UNAUTHENTICATED/);
+  state.tables.user[0].sessionVersion = 1;
+  state.tables.user[0].active = false;
+  await assert.rejects(guards.requireSession(), /UNAUTHENTICATED/);
+  state.tables.user[0].active = true;
+  state.tables.user[0].roleAssignments = [];
+  await assert.rejects(guards.requirePermission("billing.view", "a"), /FORBIDDEN/);
+  state.tables.user.length = 0;
+  await assert.rejects(guards.requireSession(), /UNAUTHENTICATED/);
+});
+
+test("an old owner role in the session cannot retain owner authority", async () => {
+  const state = fixture();
+  state.session.role = "Organisation owner";
+  state.grant("operations.view");
+  const guards = await load("./src/lib/auth-guards.ts", state);
+  await assert.rejects(guards.requireOwner(), /FORBIDDEN/);
+  assert.equal((await guards.requireSession()).role, "Facility manager");
+  state.tables.user[0].roleAssignments = [];
+  state.grant("*", null, "Organisation owner");
+  assert.equal((await guards.requireOwner()).userId, "staff");
+  state.tables.user[0].roleAssignments = [];
+  await assert.rejects(guards.requireOwner(), /FORBIDDEN/);
+});
