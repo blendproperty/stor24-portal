@@ -179,3 +179,33 @@ test("operations response limits every staff relation to display identity", asyn
   assert.equal(JSON.stringify(body).includes("passwordHash"), false);
   assert.equal(state.writes.length, 0);
 });
+
+test("stock movements require inventory authority at the product's actual facility", async () => {
+  const state = fixture(); state.grant("inventory.manage", "a"); state.grant("reports.view", "b");
+  const productId = "c1234567890123456789012345";
+  const product = { id: productId, organisationId: "org", facilityId: "b", quantityOnHand: 10 };
+  state.db.product = {
+    findFirst: async ({ where }: Row) => matches(product, where) ? product : null,
+    update: async ({ data }: Row) => { state.writes.push({ model: "product", data }); product.quantityOnHand += data.quantityOnHand.increment; return product; },
+  };
+  state.db.stockMovement = { create: async ({ data }: Row) => { state.writes.push({ model: "stockMovement", data }); return { id: "movement", ...data }; } };
+  const api = await load("./src/app/api/v1/operations/route.ts", state);
+  const send = (type = "RECEIPT", id = productId) => api.POST(request("POST", { kind: "stockMovement", payload: { productId: id, type, quantity: 1, facilityId: "a" } }));
+  for (const type of ["RECEIPT", "SALE", "RETURN", "ADJUSTMENT", "DAMAGE", "TRANSFER"]) assert.equal((await send(type)).status, 403, type);
+  assert.equal(product.quantityOnHand, 10); assert.equal(state.writes.length, 0);
+  product.facilityId = "a";
+  assert.equal((await send()).status, 201); assert.equal(product.quantityOnHand, 11);
+  assert.equal(state.writes.filter(row => row.model === "stockMovement").length, 1);
+  assert.equal(state.writes.filter(row => row.model === "auditEvent").length, 1);
+  product.facilityId = "b";
+  state.grant("inventory.manage", null);
+  assert.equal((await send()).status, 201); assert.equal(product.quantityOnHand, 12);
+  state.tables.user[0].roleAssignments = [];
+  state.grant("*", null, "Organisation owner");
+  assert.equal((await send()).status, 201); assert.equal(product.quantityOnHand, 13);
+  const count = state.writes.length;
+  product.organisationId = "other";
+  assert.equal((await send()).status, 403);
+  assert.equal((await send("RECEIPT", "c9999999999999999999999999")).status, 403);
+  assert.equal(state.writes.length, count); assert.equal(product.quantityOnHand, 13);
+});

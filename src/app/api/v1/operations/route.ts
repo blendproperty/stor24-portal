@@ -84,6 +84,7 @@ export async function POST(request: Request) {
       result = await db.$transaction(async (tx) => {
         const product = await tx.product.findFirst({ where: { id: input.productId, organisationId } });
         if (!product) throw new Error("FORBIDDEN");
+        await requirePermission("inventory.manage", product.facilityId);
         const delta = ["SALE", "DAMAGE"].includes(input.type) ? -Math.abs(input.quantity) : input.quantity;
         if (product.quantityOnHand + delta < 0) throw new Error("INSUFFICIENT_STOCK");
         const movement = await tx.stockMovement.create({ data: { ...input, quantity: delta, createdById: user.id } });
