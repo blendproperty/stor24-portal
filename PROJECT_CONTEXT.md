@@ -1,4 +1,14 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Stock facility-authorisation checkpoint — 24 September 2026
+
+- **Implementation:** stock-movement POST checks inventory.manage against the retrieved product facility before either stock write. Organisation filtering remains; no request-supplied facility can widen access. Global inventory grants and owner access retain existing behavior.
+- **Testing:** synthetic real-route reproduction returned 201 for a manager changing another facility before the fix. Afterward all six movement types return 403 with zero writes for that facility, while own-facility, organisation-wide and owner controls pass. Foreign/missing products remain denied. 390 local tests, typecheck and diff check passed. Added real PostgreSQL route/current-role/no-write checks; CI pending. Independent candidate review pending at this checkpoint.
+- **Commit/push:** enclosing stock-facility-scope PR records promotion.
+- **Merge:** pending required checks.
+- **Deployment/configuration:** pending; no real stock, payment, customer or configuration changes made.
+- **Live verification:** no stock test executed in production. All finance, retail, staff and provider acceptance gates remain open.
+- **Prior privacy release verified:** PR245 deployment 36030044204 succeeded. Independently inspected stor24-crm:c1148ed7f healthy and /api/health service/status/database correct. This verifies deployed version and readiness, not a real staff-data acceptance test. PR246 evidence merged as 141de62ff5280f074c178b0951b74f82b6e2a581; canonical PROJECT_CONTEXT present on main.
+
 ## Unattended release verification — 24 September 2026, 16:48 UTC
 
 - **Implementation:** PR243 adds session revocation/current-permission regression coverage. PR244 blocks monthly billing of unreconciled or future-dated accounts. PR245 removes credential/account metadata from all four operations staff relations, retaining id/name and nullable behavior.

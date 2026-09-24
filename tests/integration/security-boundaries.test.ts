@@ -63,6 +63,32 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
       assert.equal(JSON.stringify(data).includes("synthetic-not-a-real-password-hash"), false);
       assert.equal(JSON.stringify(data).includes("sessionVersion"), false);
     });
+    await t.test("stock POST cannot write outside current inventory facility grants", async () => {
+      const manage = await db.role.create({ data: { organisationId: org.id, name: "Inventory fixture", permissions: ["inventory.manage"] } });
+      const view = await db.role.create({ data: { organisationId: org.id, name: "Reports fixture", permissions: ["reports.view"] } });
+      await db.roleAssignment.create({ data: { userId: user.id, roleId: manage.id, facilityId: a.id } });
+      await db.roleAssignment.create({ data: { userId: user.id, roleId: view.id, facilityId: b.id } });
+      const products = [];
+      for (const facilityId of [a.id, b.id]) products.push(await db.product.create({ data: { organisationId: org.id, facilityId, sku: "SCOPE", name: "Synthetic product", category: "Test", sellingPrice: 1, quantityOnHand: 10 } }));
+      const output = await build({ stdin: { contents: 'export { POST } from "./src/app/api/v1/operations/route.ts";', resolveDir: process.cwd(), loader: "ts" }, bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "isolated-session", setup(builder) {
+        builder.onResolve({ filter: /^@\/lib\/(db|session)$/ }, args => ({ path: args.path, namespace: "fixture" }));
+        builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
+      } }] });
+      const loaded = { exports: {} as { POST: (request: Request) => Promise<Response> } };
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: user.id, sessionVersion: user.sessionVersion });
+      const send = (productId: string) => loaded.exports.POST(new Request("https://example.invalid/api/v1/operations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "stockMovement", payload: { productId, type: "RECEIPT", quantity: 1 } }) }));
+      assert.equal((await send(products[1].id)).status, 403);
+      assert.equal((await db.product.findUniqueOrThrow({ where: { id: products[1].id } })).quantityOnHand, 10);
+      assert.equal(await db.stockMovement.count({ where: { productId: products[1].id } }), 0);
+      assert.equal(await db.auditEvent.count({ where: { organisationId: org.id, action: "stockMovement.create" } }), 0);
+      assert.equal((await send(products[0].id)).status, 201);
+      assert.equal((await db.product.findUniqueOrThrow({ where: { id: products[0].id } })).quantityOnHand, 11);
+      assert.equal(await db.stockMovement.count({ where: { productId: products[0].id } }), 1);
+      assert.equal(await db.auditEvent.count({ where: { organisationId: org.id, action: "stockMovement.create" } }), 1);
+      await db.roleAssignment.create({ data: { userId: user.id, roleId: manage.id, facilityId: null } });
+      assert.equal((await send(products[1].id)).status, 201);
+      assert.equal((await db.product.findUniqueOrThrow({ where: { id: products[1].id } })).quantityOnHand, 11);
+    });
     await t.test("populated status rows omit password hashes and other-facility customers", async () => {
       for (const customerId of [own.id, unrelated.id]) await db.integrationIdentityLink.create({ data: { organisationId: org.id, customerId, resolvedById: user.id } });
       const rows = await listIdentityLinks(scope);
