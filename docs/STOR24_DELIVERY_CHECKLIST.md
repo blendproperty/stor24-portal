@@ -139,3 +139,6 @@ P03/P04: Brett confirmed seven days from actual debit-order failure, not schedul
 ### 24 September, 17:13 UTC — daily-close release gate
 PR248 merged as 1b47214 after all PR/database checks passed. Main browser CI 36031936705 failed at an immediate tenant-navigation hash assertion, so deployment was skipped. Current live image remains 1c1a6e825 healthy. Exact-URL retry assertions pass locally with existing keyboard/click/viewport checks retained; correction awaiting promotion. P06 and all acceptance gates remain open.
 
+
+### 24 September, 17:23 UTC — invoice selection validation
+P02/P08 candidate rejects payments/credits/refunds/reversals/write-offs, duplicates and partial account selections before document creation or email. Synthetic before/after proof, 392 tests and typecheck passed; CI/promotion/live pending. Resend consistency and numbering remain open. PR249 merged 079ae6c after all required checks; main release CI still running. No acceptance status changed.

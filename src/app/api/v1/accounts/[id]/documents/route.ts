@@ -27,10 +27,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       : await sendStatementEmail({ accountId, organisationId: auth.organisationId, from: parsed.data.from ? new Date(parsed.data.from) : undefined, to: new Date(parsed.data.to), actorId: auth.user.id });
 
     if (!result.ok) {
-      const status = result.code === "TEST_PAYMENT_RECONCILIATION_REQUIRED" ? 409 : result.code === "ACCOUNT_NOT_FOUND" ? 404 : result.code === "NO_LEDGER_ENTRIES" ? 422 : result.code === "NO_CUSTOMER_EMAIL" ? 422 : 502;
+      const status = result.code === "TEST_PAYMENT_RECONCILIATION_REQUIRED" ? 409 : result.code === "ACCOUNT_NOT_FOUND" ? 404 : result.code === "NO_LEDGER_ENTRIES" || result.code === "INVALID_INVOICE_ENTRIES" ? 422 : result.code === "NO_CUSTOMER_EMAIL" ? 422 : 502;
       const message = {
         ACCOUNT_NOT_FOUND: "Account not found.",
         NO_LEDGER_ENTRIES: "None of the specified ledger entries belong to this account.",
+        INVALID_INVOICE_ENTRIES: "Select each charge once from this account. Payments, credits, refunds, reversals and write-offs cannot be issued as invoice lines.",
         NO_CUSTOMER_EMAIL: "This customer has no email address on file.",
         EMAIL_FAILED: "The document was generated but could not be emailed.",
         TEST_PAYMENT_RECONCILIATION_REQUIRED: "Historical sandbox entries must be reconciled before issuing a financial statement.",

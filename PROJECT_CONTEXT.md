@@ -1,4 +1,12 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Invoice selection integrity checkpoint — 24 September 2026, 17:23 UTC
+
+- **Implementation:** invoice generation now rejects non-charge ledger entries, duplicate selections and partially matched account selections before configuration, document creation or delivery. The staff API returns a clear 422. Complete charge-only selections retain the existing generation path.
+- **Testing:** real-service synthetic before test reached document generation for a PAYMENT entry; after fix all five non-charge types, mixed selections, duplicate IDs and missing/other-account IDs reject before document work. Empty/unmatched selection retains its existing result; complete reordered charges reach the existing generation boundary. 392 local tests and typecheck passed. No email provider or production data used.
+- **Commit/push:** enclosing invoice-selection-integrity PR records source promotion; required CI pending.
+- **Merge/deployment/configuration:** pending. This does not repair document resend idempotency, concurrency-safe numbering, historical VAT, or approve finance/provider settings.
+- **Live verification:** not performed for this candidate. P02/P08 and all programme acceptance remain open.
+- **Prior release:** PR249 navigation assertion repair passed all required checks on 83003cc and merged as 079ae6c739ddbdb036d8e0ee769bffdcafe0f708. Main CI 36033659977 is still running. Daily-close PR248 remains merged but not verified deployed; last independently verified live image is 1c1a6e825.
 ## Release-check checkpoint — 24 September 2026, 17:13 UTC
 
 - **Implementation:** tenant portal browser checks now wait for the exact Supplies/Documents navigation URL instead of sampling the URL immediately after the input event. Existing keyboard/click and viewport assertions remain; no product behavior changed.
