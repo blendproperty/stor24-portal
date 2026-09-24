@@ -1,4 +1,13 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Monthly billing reconciliation checkpoint — 24 September 2026
+
+- **Implementation:** monthly preview and atomic posting now compare the saved account balance with the ledger-derived statement balance. Invalid reversals and future-dated ledger entries require finance review. The staff API explains the blocker; no balance is auto-corrected and no billing automation activated.
+- **Testing:** synthetic real-service reproduction initially accepted an unexplained R50 balance; after the fix it rejects it and accepts an explicitly reconciled opening entry. Invalid reversal/future-entry checks pass. 385 branch-local unit tests and typecheck pass. Added isolated PostgreSQL case for zero writes on rejection and invoice/statement/opening balance agreement; CI pending.
+- **Commit and push:** enclosing codex/billing-reconciliation-20260924 PR records promotion.
+- **Merge:** pending required CI.
+- **Deployment/configuration:** pending; runtime unchanged at this checkpoint.
+- **Live verification:** not performed. Finance opening balances, approved charges/tax/refund rules, real payment/settlement and staff acceptance remain open. P02/P14 not accepted.
+
 ## Security monitoring release verified — 24 September 2026
 
 - **Implementation:** [security follow-up](docs/SECURITY_MONITORING_2026-09-24.md) records scanners, secret removal, full AES-GCM tag checks and four fixture-server fixes. Final follow-up also limits scanner parsing-error output to type/code, preventing source excerpts in logs.
@@ -1669,3 +1678,4 @@ A CRM capability is complete only when it is database-backed, scoped, permission
 - Deployment/configuration: CRM run 34438007430 attempt 1 timed out connecting SSH before execution; attempt 2 succeeded and logs confirm migration 20260910110000_debit_order_preferences applied. Website run 34438380340 succeeded. Provider configuration and transaction enablement were not changed.
 - Live read-only verification: the existing customer test booking still returns SIGNED / DEBIT_ORDER, setupAvailable true and no saved preferences. Its actual phone-sized page shows first-date/monthly-day fields and zero download links. Zero booking POSTs were made in this check. Real preference-save/database readback remains customer UAT.
 - NOT COMPLETE: automated Netcash bank-mandate creation, signed mandate retrieval and verified provider completion/reconciliation are not implemented or tested by this slice. No collection is authorised. Provider integration and approved first-payment/recurring-collection rules remain prerequisites to full debit-order checkout. Previous legal, financial, provider, data, training, activation and approval gates remain open.
+

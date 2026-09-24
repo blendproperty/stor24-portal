@@ -3,6 +3,7 @@ import test from "node:test";
 import { randomUUID } from "node:crypto";
 import { db } from "../../src/lib/db";
 import { getMonthlyBillingPlan, monthlyBillingAccounts, postMonthlyBilling, previewMonthlyBilling, saveMonthlyBillingPlan } from "../../src/lib/monthly-billing-service";
+import { getStatementData } from "../../src/lib/finance/statement-data";
 import { runMonthlyBilling } from "../../src/lib/billing-service";
 import type { BillingPlan } from "../../src/lib/monthly-billing-policy";
 const plan: BillingPlan = { firstPeriod: "2026-02", proration: "ACTUAL_DAYS", taxPercent: 15, rentTaxable: true, insuranceEnabled: false, insuranceTaxable: false, charges: [{ code: "ADMIN", name: "Agreed admin", amount: 115, taxable: true }], discount: { name: "Rent discount", type: "PERCENTAGE", value: 10, startsPeriod: "2026-02", endsPeriod: "2026-03" }, approvalReference: "CI fixture only" };
@@ -43,6 +44,27 @@ test("isolated PostgreSQL monthly billing", async t => {
       assert.ok(doc.content?.includes("February"));
       await assert.rejects(previewMonthlyBilling(f.scope, f.account.id, "2026-02"), /ALREADY_POSTED/);
     });
+    await t.test("unreconciled balances block preview and posting without financial writes", async () => {
+      const f = await fixture();
+      await saveMonthlyBillingPlan(f.scope, f.account.id, plan);
+      const preview = await previewMonthlyBilling(f.scope, f.account.id, "2026-02");
+      await db.account.update({ where: { id: f.account.id }, data: { balance: 50 } });
+      await assert.rejects(previewMonthlyBilling(f.scope, f.account.id, "2026-02"), /RECONCILIATION_REQUIRED/);
+      await assert.rejects(postMonthlyBilling(f.scope, f.account.id, "2026-02", preview.fingerprint), /RECONCILIATION_REQUIRED/);
+      assert.equal(await db.ledgerEntry.count({ where: { accountId: f.account.id } }), 0);
+      assert.equal(await db.document.count({ where: { tenancyId: f.tenancy.id } }), 0);
+      assert.equal(await db.auditEvent.count({ where: { entityId: f.account.id, action: "billing.month_posted" } }), 0);
+      assert.equal((await db.account.findUniqueOrThrow({ where: { id: f.account.id } })).balance.toString(), "50");
+      // A reconciled, explicit opening charge is retained in the statement.
+      await db.ledgerEntry.create({ data: { accountId: f.account.id, type: "CHARGE", amount: 50, description: "Synthetic opening balance", effectiveAt: new Date("2026-01-01") } });
+      const reconciled = await previewMonthlyBilling(f.scope, f.account.id, "2026-02");
+      await postMonthlyBilling(f.scope, f.account.id, "2026-02", reconciled.fingerprint);
+      const statement = await getStatementData({ id: f.account.id }, "2026-02-01", "2026-02-28");
+      assert.equal(statement.openingBalance, "50.00");
+      assert.equal(statement.closingBalance, "1200.00");
+      assert.equal(statement.rows.length, 3);
+      assert.equal((await db.account.findUniqueOrThrow({ where: { id: f.account.id } })).balance.toFixed(2), statement.closingBalance);
+    });
     await t.test("changed plans, receipts and scope invalidate or reject posting", async () => {
       const f = await fixture(); await saveMonthlyBillingPlan(f.scope, f.account.id, plan);
       const bill = await previewMonthlyBilling(f.scope, f.account.id, "2026-02");
@@ -50,7 +72,7 @@ test("isolated PostgreSQL monthly billing", async t => {
       await assert.rejects(postMonthlyBilling(f.scope, f.account.id, "2026-02", bill.fingerprint), /PREVIEW_CHANGED/);
       const refreshed = await previewMonthlyBilling(f.scope, f.account.id, "2026-02");
       await db.ledgerEntry.create({ data: { accountId: f.account.id, type: "PAYMENT", amount: 100, description: "CI receipt", effectiveAt: new Date() } });
-      await assert.rejects(postMonthlyBilling(f.scope, f.account.id, "2026-02", refreshed.fingerprint), /PREVIEW_CHANGED/);
+      await assert.rejects(postMonthlyBilling(f.scope, f.account.id, "2026-02", refreshed.fingerprint), /RECONCILIATION_REQUIRED/);
       for (const scope of [{ ...f.scope, organisationId: "other" }, { ...f.scope, facilityIds: [] }]) {
         assert.equal((await monthlyBillingAccounts(scope)).length, 0);
         await assert.rejects(getMonthlyBillingPlan(scope, f.account.id), /ACCOUNT_NOT_FOUND/);

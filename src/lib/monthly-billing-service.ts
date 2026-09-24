@@ -7,6 +7,8 @@ import { isTestPayment } from "./payments/payment-evidence";
 import { renderInvoiceHtml } from "./finance/invoice-renderer";
 import { getBillingDocumentCompanyDetails } from "./finance/billing-document-config";
 
+import { buildAccountStatement } from "./finance/account-statement";
+
 const DOMAIN = "MONTHLY_BILLING";
 type Client = Prisma.TransactionClient;
 function accountWhere(scope: RequestScope, accountId?: string): Prisma.AccountWhereInput {
@@ -55,6 +57,15 @@ async function preview(client: Client, scope: RequestScope, accountId: string, p
   const payments = await client.payment.findMany({ where: { accountId }, orderBy: { id: "asc" } });
   const tests = payments.filter(isTestPayment);
   if (entries.some(entry => entry.type === "PAYMENT" && tests.some(payment => entry.externalRef === payment.idempotencyKey || (entry.metadata as { paymentId?: string } | null)?.paymentId === payment.id))) throw new Error("BILLING_TEST_PAYMENT_REVIEW");
+  // Re-run inside the posting transaction as well as the read-only preview.
+  // Never carry an unexplained stored balance into a new invoice.
+  let ledgerBalance: string;
+  try {
+    ledgerBalance = buildAccountStatement(entries.map(entry => ({ ...entry, amount: entry.amount.toString() })), new Date(0), new Date("9999-01-01")).closingBalance;
+  } catch {
+    throw new Error("BILLING_RECONCILIATION_REQUIRED");
+  }
+  if (!account.balance.equals(ledgerBalance) || entries.some(entry => entry.effectiveAt > new Date())) throw new Error("BILLING_RECONCILIATION_REQUIRED");
   const result = calculateMonthlyBill(period, plan, tenancy.occupancies.filter(o => !["PENDING", "CANCELLED"].includes(o.status)).map(o => ({ id: o.id, number: o.unit.number, monthlyRate: Number(o.monthlyRate), startDate: o.startDate, endDate: o.endDate })), tenancy.insuranceEnrollment ? { ...tenancy.insuranceEnrollment, monthlyPremium: tenancy.insuranceEnrollment.monthlyPremium === null ? null : Number(tenancy.insuranceEnrollment.monthlyPremium) } : null);
   const fingerprint = createHash("sha256").update(JSON.stringify({ account, profile, entries, payments, result })).digest("hex");
   return { ...result, fingerprint, accountNumber: account.accountNumber, accountId, customerName: account.customer.companyName || [account.customer.firstName, account.customer.lastName].filter(Boolean).join(" ") || "Customer", facilityName: tenancy.facility.name, tenancyId: tenancy.id, facilityId: tenancy.facilityId, balance: account.balance.toString(), approvalReference: plan.approvalReference };
