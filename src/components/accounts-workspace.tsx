@@ -109,6 +109,7 @@ export function AccountsWorkspace({
   const [search, setSearch] = useState("");
   const [dialog, setDialog] = useState<Dialog>(null);
   const [paymentReference, setPaymentReference] = useState("");
+  const [paymentRequestId, setPaymentRequestId] = useState("");
   const [moveOutIdempotencyKey, setMoveOutIdempotencyKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -189,6 +190,7 @@ export function AccountsWorkspace({
       "/api/v1/accounts",
       {
         accountId: selectedId,
+        requestId: paymentRequestId,
         amount: Number(formData.get("amount")),
         method: formData.get("method"),
         reference: formData.get("reference") || undefined,
@@ -236,22 +238,28 @@ export function AccountsWorkspace({
     setBusy(true);
     setError("");
     setNotice("");
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const payload = await response.json();
-    setBusy(false);
-    if (!response.ok) {
-      setError(
-        payload.error?.message ?? "The account action could not be completed.",
-      );
-      return;
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        setError(
+          payload.error?.message ?? "The account action could not be completed.",
+        );
+        return;
+      }
+      setDialog(null);
+      setNotice(payload.data?.notificationReviewRequired ? "Payment recorded. Its notification needs review in Communications." : message);
+      try { await load(); }
+      catch { setError("The action was recorded, but the account could not refresh. Reload before starting another action."); }
+    } catch {
+      setError(url === "/api/v1/accounts" ? "The response could not be confirmed. Retry this same form to check the result before starting another payment." : "The response could not be confirmed. Reload and check the account before starting another action.");
+    } finally {
+      setBusy(false);
     }
-    setDialog(null);
-    setNotice(message);
-    await load();
   }
   const facility = data?.facilities.find(
     (item) => item.id === selected?.tenancy?.facilityId,
@@ -270,7 +278,7 @@ export function AccountsWorkspace({
           </Link>
         }
       />
-      {error ? <p className="form-error">{error}</p> : null}
+      {error && !dialog ? <p className="form-error" role="alert">{error}</p> : null}
       {notice ? <p className="form-success">{notice}</p> : null}
       <section className="summary-strip">
         {[
@@ -370,6 +378,7 @@ export function AccountsWorkspace({
                     setPaymentReference(
                       generateReference(selected.accountNumber),
                     );
+                    setPaymentRequestId(crypto.randomUUID());
                     setDialog("payment");
                   }}
                 >
@@ -509,7 +518,7 @@ export function AccountsWorkspace({
       {dialog && selected ? (
         <div className="modal-backdrop">
           <div className="modal-card" role="dialog" aria-modal="true">
-            <button className="modal-close" onClick={() => setDialog(null)}>
+            <button className="modal-close" disabled={busy} onClick={() => setDialog(null)}>
               <X size={18} />
             </button>
             <p className="eyebrow">{selected.accountNumber}</p>
@@ -520,8 +529,9 @@ export function AccountsWorkspace({
                   ? "Transfer unit"
                   : "Move out"}
             </h2>
+            {error ? <p className="form-error" role="alert">{error}</p> : null}
             {dialog === "payment" ? (
-              <form action={submitPayment} className="invite-form">
+              <form onSubmit={event => { event.preventDefault(); void submitPayment(new FormData(event.currentTarget)); }} className="invite-form">
                 <label>
                   Amount
                   <input
@@ -669,7 +679,7 @@ function ActionButtons({
 }) {
   return (
     <div className="form-actions">
-      <button type="button" className="button button-secondary" onClick={close}>
+      <button type="button" className="button button-secondary" disabled={busy} onClick={close}>
         Cancel
       </button>
       <button className="button button-primary" disabled={busy}>

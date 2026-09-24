@@ -24,6 +24,7 @@ jobs:
       - run: node scripts/test-monthly-billing.mjs
       - run: node scripts/test-debit-orders.mjs
       - run: node scripts/test-adjustments.mjs
+      - run: node scripts/test-account-payment-retry.mjs
       - run: node scripts/test-collections.mjs
       - run: node scripts/test-settlements.mjs
       - run: node scripts/test-mri.mjs

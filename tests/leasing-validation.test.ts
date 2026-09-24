@@ -44,9 +44,9 @@ test("customer operations accept South African contacts and recorded consent", (
 });
 
 test("account payments require a positive amount and supported tender", () => {
-  assert.equal(accountPaymentSchema.safeParse({ accountId: "account-1", amount: 250, method: "EFT", receivedAt: "2026-08-07" }).success, true);
-  assert.equal(accountPaymentSchema.safeParse({ accountId: "account-1", amount: 0, method: "EFT", receivedAt: "2026-08-07" }).success, false);
-  assert.equal(accountPaymentSchema.safeParse({ accountId: "account-1", amount: 250, method: "CHEQUE", receivedAt: "2026-08-07" }).success, false);
+  assert.equal(accountPaymentSchema.safeParse({ accountId: "account-1", requestId: "11111111-1111-4111-8111-111111111111", amount: 250, method: "EFT", receivedAt: "2026-08-07" }).success, true);
+  assert.equal(accountPaymentSchema.safeParse({ accountId: "account-1", requestId: "11111111-1111-4111-8111-111111111111", amount: 0, method: "EFT", receivedAt: "2026-08-07" }).success, false);
+  assert.equal(accountPaymentSchema.safeParse({ accountId: "account-1", requestId: "11111111-1111-4111-8111-111111111111", amount: 250, method: "CHEQUE", receivedAt: "2026-08-07" }).success, false);
 });
 
 test("transfers atomically claim the destination and audit both unit identities", () => {

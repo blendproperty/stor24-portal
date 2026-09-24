@@ -1,4 +1,13 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Manual account receipt retry safety — 24 September 2026
+
+- **Implementation:** Accounts payment forms retain a UUID request ID and entered values across failed/lost responses. Server receipt writes lock the account and reuse the existing payment for an identical request; changed details return 409. Required request IDs and cent precision reject unsafe requests before posting. Older loaded clients must refresh, with an explicit message. A notification exception after commit cannot turn a successful payment into a failed response; review is shown and audited where possible. Retried receipts never automatically repeat the notification.
+- **Testing:** synthetic before cases demonstrated a second receipt on retry and a 500 after notification failure despite committed payment. After fix all 417 unit tests, typecheck and focused lint passed; actual component browser tests at 1440/390px preserve fields/request ID after lost response and show notification review. Added isolated PostgreSQL simultaneous retry, conflict, notification failure, audit rollback/recovery and revoked-permission cases; required CI pending. No real payments/messages used.
+- **Commit/push:** enclosing manual-payment-retry PR records source promotion.
+- **Merge/deployment/configuration:** pending. No balances or provider/automation switches changed in production. This protects the same request/form retry; a separately opened form or page reload creates a new request and is not proof that two receipts represent different bank transactions. Cross-request bank reference reconciliation remains open.
+- **Live verification:** none for this candidate. Finance/staff acceptance remains open.
+- **Prior security release:** PR256 passed required checks including PostgreSQL isolation tests on 24e581631760a68ae9dc1f8fb970bdb5d6f85973, merged 5e186299686c6a74b28391f70c75932326476e1f, and deployed via 36040248934. Independently inspected image stor24-crm:5e18629 healthy and public service/status/database readiness at 18:19 UTC. Canonical context verified on remote main. No live private records accessed; overall privacy/CIA acceptance remains open.
+
 ## Account document organisation isolation — 24 September 2026
 
 - **Implementation:** document-list GET authenticates before account lookup and constrains the account to the actor's organisation. The existing target-facility permission check, metadata-only projection, ordering, limit and response envelope remain. Document sending already checks organisation in its service and is unchanged.
