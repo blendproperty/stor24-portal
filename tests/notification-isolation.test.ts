@@ -11,7 +11,7 @@ async function fixture(failure: string) {
     escapeEmailHtml, stor24ReservationHeldHtml,
     db: {
       communicationTemplate: { findFirst: async () => { if (failure === "template") throw new Error("SYNTHETIC_TEMPLATE_FAILURE"); return null; } },
-      communicationLog: { upsert: async () => { if (failure === "log") throw new Error("SYNTHETIC_LOG_FAILURE"); return { id: "synthetic" }; } },
+      communicationLog: { create: async () => { if (failure === "log") throw new Error("SYNTHETIC_LOG_FAILURE"); return { id: "synthetic" }; }, update: async () => { if (failure === "finalize") throw new Error("SYNTHETIC_LOG_FAILURE"); return {}; } },
     },
     send: async (channel: string) => { sends.push(channel); if (failure === channel) throw new Error(`SYNTHETIC_${channel}_FAILURE`); return { ok: true, providerReference: "synthetic" }; },
   };
@@ -26,11 +26,11 @@ async function fixture(failure: string) {
 }
 
 for (const method of ["notifyReservationConfirmed", "notifyViewingBooked"]) test(`${method} returns per-channel failures without interrupting committed work`, async () => {
-  for (const failure of ["log", "EMAIL", "SMS", "WHATSAPP", "none"]) {
+  for (const failure of ["log", "finalize", "EMAIL", "SMS", "WHATSAPP", "none"]) {
     const f = await fixture(failure);
     const result = await f.api[method](f.input);
-    assert.deepEqual(result, ["EMAIL", "SMS", "WHATSAPP"].map(channel => ({ channel, ok: failure !== channel && !(failure === "log" && channel !== "WHATSAPP") })));
-    assert.deepEqual(f.sends, ["EMAIL", "SMS", "WHATSAPP"]);
+    assert.deepEqual(result, ["EMAIL", "SMS", "WHATSAPP"].map(channel => ({ channel, ok: failure !== channel && !(["log", "finalize"].includes(failure) && channel !== "WHATSAPP") })));
+    assert.deepEqual(f.sends, failure === "log" ? ["WHATSAPP"] : ["EMAIL", "SMS", "WHATSAPP"]);
   }
   const f = await fixture("none");
   assert.deepEqual(await f.api[method]({ ...f.input, consent: { email: false, sms: false, whatsapp: false, phone: true } }), []);

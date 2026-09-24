@@ -1,4 +1,12 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Booking email/SMS attempt claims — 24 September 2026
+
+- **Implementation:** reservation and viewing email/SMS notifications persist a unique pending attempt before provider transport. Matching accepted repeats reuse the saved outcome; changed scope/recipient/payload, legacy logs without comparable evidence, unfinished and uncertain attempts cannot silently resend. Finalisation failure leaves the durable pending record; timeouts and missing SMS references require review. Only a payload hash and existing hashed recipient are stored, not message bodies. Existing consent gates/content and SMS API-acceptance status contract remain.
+- **Testing:** before three concurrent calls made three email attempts; after one email and one SMS per logical message. Both notification paths cover replay, context/payload conflicts, consent withdrawal, failed claims, uncertain transport, rejected SMS, missing references and failed finalisation. All 437 unit tests, typecheck and focused lint pass. Added real PostgreSQL concurrent claim and database rejection/finalisation controls to required CI; pending.
+- **Commit/push:** enclosing booking-message-claims PR records promotion.
+- **Merge/deployment/configuration/live verification:** pending. No real messages/configuration/production data used. Provider acceptance is not delivered/read evidence. Cross-key duplicates, operator reconciliation of legacy/uncertain attempts, unused legacy signing-link helper and provider/staff acceptance remain separate gates.
+- **Prior releases:** PR266 passed all required checks on d2269502aedab9207946b0f12cc661fb7161d1f6 (SQL 36047315222), merged ffcdfa28fcf96041190f64368adb1b75b3191847; main CI 36047587124 passed, deployment 36047825810 running. PR265 deployment 36047346057 succeeded; exact image stor24-crm:13986737 healthy/public readiness independently verified at 19:21 UTC. Canonical context present on remote main. No programme priority accepted.
+
 ## Offline WhatsApp consent preservation — 24 September 2026
 
 - **Implementation:** the shared offline reservation consent projection now uses hasWhatsAppConsent on the original stored value. A saved opt-out is retained as ineligible during new notifications, ordinary idempotent replay and race recovery. Email/SMS/phone flags keep strict boolean semantics.
