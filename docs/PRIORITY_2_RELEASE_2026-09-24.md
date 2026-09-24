@@ -29,6 +29,10 @@ The completed static scan `5ab61770-353f-4acb-9e35-3539f3c9f43b` reviewed all 14
 
 CRM [PR 230](https://github.com/blendproperty/stor24-portal/pull/230) merged as `0455f1472ed93a7c880760c2c1d7f0ba27f2ce24`. Public [PR 77](https://github.com/blendproperty/stor24/pull/77) merged as `428270b9735ddb52c218b262a6edaffb331979e8`. CRM deployment [36012746940](https://github.com/blendproperty/stor24-portal/actions/runs/36012746940) and public deployment [36013430247](https://github.com/blendproperty/stor24/actions/runs/36013430247) succeeded. CRM running image `stor24-crm:0455f1472` is healthy; runtime Next versions verified as 16.3.6 and 15.5.26 respectively. Both apps served anonymous privacy/PAIA pages with HTTP 200, one heading and no overflow at 1440/390/320px. Live public booking at 320px displayed four unchecked optional choices and the privacy link; no submission was made. Screenshots inspected. Custom-domain equivalence and authenticated staff UAT remain unverified. Canonical PROJECT_CONTEXT.md records the final dated deployment state; do not infer runtime deployment from a merged source commit.
 
+## Evening unattended follow-up
+
+[The evening delivery record](UNATTENDED_DELIVERY_2026-09-24.md) consolidates subsequent session/permission, staff/account/message confidentiality, financial integrity, provider-recovery and synthetic restore evidence. The baseline counts and deployment below/above are historical; use the latest canonical context for exact current promotion. The 75-table synthetic restore does not close production recovery acceptance. No PRIV/CIA or whole-programme acceptance has been granted.
+
 ## Subsequent security follow-up
 
 [Security monitoring and encryption follow-up](SECURITY_MONITORING_2026-09-24.md) records PR232/PR79, fixed authentication-tag length, continuous scanners and urgent rotation of the exposed historical CAPTCHA secret. That credential remains live until Google-side rotation is verified.
