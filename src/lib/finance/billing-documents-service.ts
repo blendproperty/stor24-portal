@@ -22,6 +22,9 @@
  * succeeds is recorded as SUCCEEDED, not "SENT" (there is no such enum
  * value; `Document.status` is the separate free-text field that uses
  * "SENT").
+ * The unique document key also claims the one automatic delivery attempt.
+ * Existing confirmed deliveries return their saved result; uncertain/legacy
+ * attempts require staff review rather than risking a duplicate email.
  *
  * Numbering: `INV-{year}-{sequence}` / `STMT-{year}-{sequence}` by counting
  * existing Document rows for the organisation this year. This is a
@@ -104,7 +107,22 @@ async function nextDocumentNumber(organisationId: string, type: "INVOICE" | "STA
 
 type SendResult =
   | { ok: true; documentId: string; communicationLogId: string }
-  | { ok: false; code: "ACCOUNT_NOT_FOUND" | "NO_LEDGER_ENTRIES" | "INVALID_INVOICE_ENTRIES" | "NO_CUSTOMER_EMAIL" | "EMAIL_FAILED" | "TEST_PAYMENT_RECONCILIATION_REQUIRED"; message?: string };
+  | { ok: false; code: "ACCOUNT_NOT_FOUND" | "NO_LEDGER_ENTRIES" | "INVALID_INVOICE_ENTRIES" | "NO_CUSTOMER_EMAIL" | "EMAIL_FAILED" | "DOCUMENT_DELIVERY_REVIEW_REQUIRED" | "TEST_PAYMENT_RECONCILIATION_REQUIRED"; message?: string };
+
+function isUniqueConflict(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
+}
+
+async function existingDelivery(document: { id: string; idempotencyKey: string | null; status: string }): Promise<SendResult> {
+  // The document's unique key is the delivery claim. Only its creator may send.
+  // A previous provider call may have succeeded even if its response/log write
+  // failed, so neither old nor overlapping requests may automatically retry.
+  const log = document.idempotencyKey ? await db.communicationLog.findUnique({ where: { idempotencyKey: `${document.idempotencyKey}:EMAIL` } }) : null;
+  if (document.status === "SENT" && log?.status === "SUCCEEDED") {
+    return { ok: true, documentId: document.id, communicationLogId: log.id };
+  }
+  return { ok: false, code: "DOCUMENT_DELIVERY_REVIEW_REQUIRED" };
+}
 
 export async function sendInvoiceEmail(input: { accountId: string; organisationId: string; ledgerEntryIds: string[]; actorId: string; payNowUrl?: string }): Promise<SendResult> {
   const context = await getAccountBillingContext(input.accountId, input.organisationId);
@@ -144,6 +162,7 @@ export async function sendInvoiceEmail(input: { accountId: string; organisationI
   const idempotencyKey = `INVOICE:${context.account.id}:${[...input.ledgerEntryIds].sort().join("+")}`;
   const idempotencyKeyHash = createHash("sha256").update(idempotencyKey).digest("hex").slice(0, 32);
 
+  let created = true;
   const document = await db.document.create({
     data: {
       tenancyId: context.tenancyId,
@@ -158,12 +177,14 @@ export async function sendInvoiceEmail(input: { accountId: string; organisationI
     // Unique constraint on idempotencyKey -- this exact invoice (same
     // account + same ledger entries) was already generated; reuse it
     // rather than creating a duplicate numbered invoice.
-    if (error instanceof Error && error.message.includes("Unique constraint")) {
+    if (isUniqueConflict(error)) {
+      created = false;
       return db.document.findFirst({ where: { idempotencyKey: `doc-invoice-${idempotencyKeyHash}` } });
     }
     throw error;
   });
   if (!document) return { ok: false, code: "ACCOUNT_NOT_FOUND" };
+  if (!created) return existingDelivery(document);
 
   const commsIdempotencyKey = `${document.idempotencyKey}:EMAIL`;
   try {
@@ -232,15 +253,18 @@ export async function sendStatementEmail(input: { accountId: string; organisatio
   const idempotencyKey = `STATEMENT:${context.account.id}:${from.toISOString().slice(0, 10)}:${input.to.toISOString().slice(0, 10)}`;
   const idempotencyKeyHash = createHash("sha256").update(idempotencyKey).digest("hex").slice(0, 32);
 
+  let created = true;
   const document = await db.document.create({
     data: { tenancyId: context.tenancyId, type: "STATEMENT", storageKey: `inline:${sha256}`, status: "GENERATED", content: html, sha256, idempotencyKey: `doc-statement-${idempotencyKeyHash}` },
   }).catch(async (error) => {
-    if (error instanceof Error && error.message.includes("Unique constraint")) {
+    if (isUniqueConflict(error)) {
+      created = false;
       return db.document.findFirst({ where: { idempotencyKey: `doc-statement-${idempotencyKeyHash}` } });
     }
     throw error;
   });
   if (!document) return { ok: false, code: "ACCOUNT_NOT_FOUND" };
+  if (!created) return existingDelivery(document);
 
   const commsIdempotencyKey = `${document.idempotencyKey}:EMAIL`;
   try {
