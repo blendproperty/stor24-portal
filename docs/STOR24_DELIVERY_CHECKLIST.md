@@ -1,5 +1,7 @@
 # STOR24 delivery checklist
 
+24 September offline consent checkpoint: P14/P08 preserves the existing WhatsApp opt-out rule through offline notification projection and both replay summaries. Synthetic inconsistent stored consent reproduced before; 434 tests/typecheck/lint pass after. Ordinary STOP remains correctly false plus timestamp; no production bypass alleged. Review/required CI/promotion pending. PR265 passed all checks and merged 1398673; rollout pending. PR264 deployed 88fbd655 and live readiness verified. All priority acceptance remains open.
+
 Updated: 24 September 2026. This is the authoritative check-off register for the remaining programme. [Scope and release boundaries](STOR24_REMAINING_PRIORITIES_2026-09-23.md) describe the 14 priorities; [PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md) holds dated release evidence. Latest entries take precedence over historical pending statements.
 
 24 September booking recovery checkpoint: P01/P08/CIA-A3 notification template/provider/log errors now return unsuccessful channel results without interrupting committed bookings or other channels. Before/after proof, 433 tests/typecheck/lint pass; PostgreSQL journey failure/recovery, required CI and promotion pending. PR264 passed all checks and merged 88fbd655; rollout pending. PR263 deployed aabb348e with exact image/public readiness verified. No priority or provider/staff acceptance closed.

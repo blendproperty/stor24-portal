@@ -4,6 +4,7 @@ import { notifyReservationConfirmed } from "@/lib/notifications";
 import { requireFacility, type RequestScope } from "@/lib/scope";
 import type { OfflineReservationSyncInput } from "@/lib/validators";
 import { formatSouthAfricaDate } from "@/lib/south-africa-time";
+import { hasWhatsAppConsent } from "@/lib/whatsapp";
 
 const HOLD_HOURS = 24;
 
@@ -21,7 +22,7 @@ type DeliveryResult = { channel: DeliveryChannel; status: "SENT" | "FAILED" | "N
 
 function consentObject(value: unknown) {
   const consent = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
-  return { email: consent.email === true, sms: consent.sms === true, phone: consent.phone === true, whatsapp: consent.whatsapp === true };
+  return { email: consent.email === true, sms: consent.sms === true, phone: consent.phone === true, whatsapp: hasWhatsAppConsent(value) };
 }
 
 function deliverySummary(consent: ReturnType<typeof consentObject>, contact: { email: string | null; phone: string | null }, attempted: Array<{ channel: DeliveryChannel; ok: boolean }>): DeliveryResult[] {

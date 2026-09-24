@@ -1,4 +1,13 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Offline WhatsApp consent preservation — 24 September 2026
+
+- **Implementation:** the shared offline reservation consent projection now uses hasWhatsAppConsent on the original stored value. A saved opt-out is retained as ineligible during new notifications, ordinary idempotent replay and race recovery. Email/SMS/phone flags keep strict boolean semantics.
+- **Security classification:** a synthetic stored true-plus-optedOutAt record previously became eligible after projection. Normal STOP writes both false and a timestamp; no normal producer of that inconsistent representation or production occurrence was established. This is defensive alignment of an existing consent invariant, not proof of a live STOP bypass.
+- **Testing:** actual offline/notification/WhatsApp services with substituted persistence/allocation guards/transports reproduced SENT before the fix. Afterwards fresh and both replay paths report NOT_CONSENTED, make no WhatsApp attempt, preserve independent email/SMS, and retain active-consent controls. Alternate nonempty markers and missing/malformed records are covered. All 434 unit tests, typecheck and focused lint pass. Fresh independent candidate review found no concrete bypass/regression; required CI pending. No production messages/data/configuration used.
+- **Commit/push:** enclosing offline-consent-preservation PR records promotion.
+- **Merge/deployment/configuration/live verification:** pending for this candidate. Provider delivery, customer preference reconciliation, legal and staff acceptance remain open.
+- **Prior releases:** PR265 passed all required checks on f304f10, including actual PostgreSQL notification-write failure/recovery and 75-table synthetic restore (36046744116), and merged 1398673720c93c739ee8eea7abf7a2a720a77e30. Main CI 36047075177 pending. PR264 deployment 36046213588 succeeded; exact image stor24-crm:88fbd655 healthy/public service/status/database independently verified at 19:14 UTC. Canonical context present on remote main. No programme priority accepted.
+
 ## Booking notification failure isolation — 24 September 2026
 
 - **Implementation:** reservation and viewing notifications now isolate each consented channel. Template, provider and log-persistence exceptions return an unsuccessful channel result instead of escaping after a booking/contact verification has committed or preventing other channels from running. Existing consent/contact gates, message content and provider controls remain.
