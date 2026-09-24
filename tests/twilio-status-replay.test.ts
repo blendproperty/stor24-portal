@@ -79,6 +79,10 @@ test("signed delivery callbacks process each event once and preserve retry after
     await loaded.exports.POST(request("delivered", true, "SMread"));
     await loaded.exports.POST(request("failed", true, "SMread"));
     assert.equal(log.readAt, readAt); assert.equal(log.status, "SUCCEEDED"); assert.equal(tasks.length, 2);
+    log = { id: "sms", organisationId: "org", facilityId: "facility", customerId: "customer", channel: "SMS", provider: "twilio", providerRef: "SMaccepted", attempts: 1, status: "SUCCEEDED", sentAt: new Date(), deliveredAt: null, readAt: null };
+    await loaded.exports.POST(request("failed", true, "SMaccepted"));
+    assert.equal(log.status, "FAILED");
+    assert.equal(tasks.at(-1)?.title, "SMS delivery failed");
   } finally {
     if (saved.token === undefined) delete process.env.TWILIO_AUTH_TOKEN; else process.env.TWILIO_AUTH_TOKEN = saved.token;
     if (saved.url === undefined) delete process.env.APP_URL; else process.env.APP_URL = saved.url;
