@@ -94,22 +94,6 @@ test("isolated PostgreSQL connected customer journey", async t => {
     const image = new File([new Uint8Array(await sharp({ create: { width: 600, height: 800, channels: 3, background: "#669988" } }).png().toBuffer())], "synthetic.png", { type: "image/png" });
     const identityInput = { expectedVersion: 0, policyHash: identityPolicy(org.id)!.hash, acknowledged: true, documentType: "ID_CARD", pages: [image, image] };
     let documentId = "";
-    await t.test("J12 committed verification survives notification-log failure", async () => {
-      const nextUnit = await db.unit.create({ data: { facilityId: facility.id, unitTypeId: unitType.id, number: "NOTIFICATION-RECOVERY", floor: "Ground Floor", monthlyRate: 100 } });
-      const next = await createPublicReservation({ ...input, unitId: nextUnit.id, idempotencyKey: randomUUID(), communicationConsent: { email: true, sms: true, whatsapp: false, phone: false } }, "synthetic-notification-recovery");
-      const nextReference = next.reference!, code = smsCode;
-      const logging = t.mock.method(db.communicationLog, "upsert", async () => { throw new Error("SYNTHETIC_NOTIFICATION_LOG_FAILURE"); });
-      try {
-        const verified = await verifyPublicReservation(nextReference, code);
-        assert.ok(verified.ok);
-        assert.ok("identityAccessToken" in verified && verified.identityAccessToken);
-      } finally { logging.mock.restore(); }
-      const saved = await db.reservation.findUniqueOrThrow({ where: { publicReference: nextReference } });
-      assert.ok(saved.contactVerifiedAt); assert.equal(saved.verificationCodeHash, null);
-      assert.equal((await db.unit.findUniqueOrThrow({ where: { id: nextUnit.id } })).status, "RESERVED");
-      assert.equal(await db.auditEvent.count({ where: { entityId: saved.id, action: "public_reservation.contact_verified" } }), 1);
-      assert.equal((await verifyPublicReservation(nextReference, code)).ok, false);
-    });
     await t.test("J02/J08 rejected identity replacement requires fresh page reviews", async () => {
       assert.equal((await preparePublicReservationLease(reference, "EFT")).ok, false);
       const first = await submitIdentity(reference, identityToken, identityInput);
@@ -237,6 +221,23 @@ test("isolated PostgreSQL connected customer journey", async t => {
       assert.equal(await db.tenancy.count({ where: { accountId: account.id } }), 1);
       assert.ok(attemptedHosts.length > 0);
       assert.ok(attemptedHosts.every(host => ["api.twilio.com", "comms.twilio.com"].includes(host)));
+    });
+    await t.test("J12 committed verification survives notification-log failure", async () => {
+      const nextUnit = await db.unit.create({ data: { facilityId: facility.id, unitTypeId: unitType.id, number: "NOTIFICATION-RECOVERY", floor: "Ground Floor", monthlyRate: 100 } });
+      const next = await createPublicReservation({ ...input, unitId: nextUnit.id, idempotencyKey: randomUUID(), communicationConsent: { email: true, sms: true, whatsapp: false, phone: false } }, "synthetic-notification-recovery");
+      const nextReference = next.reference!, code = smsCode;
+      // A real database constraint rejects log writes; Prisma delegates are dynamic proxies.
+      await db.$executeRawUnsafe('ALTER TABLE "CommunicationLog" ADD CONSTRAINT "synthetic_notification_failure" CHECK (false) NOT VALID');
+      try {
+        const verified = await verifyPublicReservation(nextReference, code);
+        assert.ok(verified.ok);
+        assert.ok("identityAccessToken" in verified && verified.identityAccessToken);
+      } finally { await db.$executeRawUnsafe('ALTER TABLE "CommunicationLog" DROP CONSTRAINT "synthetic_notification_failure"'); }
+      const saved = await db.reservation.findUniqueOrThrow({ where: { publicReference: nextReference } });
+      assert.ok(saved.contactVerifiedAt); assert.equal(saved.verificationCodeHash, null);
+      assert.equal((await db.unit.findUniqueOrThrow({ where: { id: nextUnit.id } })).status, "RESERVED");
+      assert.equal(await db.auditEvent.count({ where: { entityId: saved.id, action: "public_reservation.contact_verified" } }), 1);
+      assert.equal((await verifyPublicReservation(nextReference, code)).ok, false);
     });
     await t.test("J09 expired unsigned hold releases its unit and cannot be signed", async () => {
       const next = await createPublicReservation({ ...input, idempotencyKey: randomUUID() }, "synthetic");
