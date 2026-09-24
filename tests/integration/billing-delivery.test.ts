@@ -10,8 +10,9 @@ test("isolated PostgreSQL billing delivery claim", async t => {
   assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci");
   assert.equal(new URL(process.env.DATABASE_URL!).hostname, "localhost");
   let sends = 0;
+  const messages: { html: string; text: string }[] = [];
   let provider: () => Promise<void> = async () => {};
-  const state = { db, escapeEmailHtml, send: async () => { sends++; await provider(); } };
+  const state = { db, escapeEmailHtml, send: async (message: { html: string; text: string }) => { sends++; messages.push(message); await provider(); } };
   const output = await build({
     entryPoints: ["src/lib/finance/billing-documents-service.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external",
     plugins: [{ name: "real-db-fake-delivery", setup(builder) {
@@ -35,7 +36,7 @@ test("isolated PostgreSQL billing delivery claim", async t => {
     const send = () => kind === "invoice"
       ? loaded.exports.sendInvoiceEmail({ ...input, ledgerEntryIds: [charge.id] })
       : loaded.exports.sendStatementEmail({ ...input, from: new Date("2026-01-01"), to: new Date("2026-01-31") });
-    return { org, tenancy, send };
+    return { org, tenancy, account, send };
   }
   try {
     for (const kind of ["invoice", "statement"]) {
@@ -63,5 +64,22 @@ test("isolated PostgreSQL billing delivery claim", async t => {
         assert.equal(await db.communicationLog.count({ where: { organisationId: f.org.id, status: "FAILED" } }), 1);
       });
     }
+    await t.test("emailed statement includes exact South African day boundaries", async () => {
+      const f = await fixture("statement"); provider = async () => {};
+      await db.ledgerEntry.deleteMany({ where: { accountId: f.account.id } });
+      await db.ledgerEntry.createMany({ data: [
+        { description: "opening", amount: 1, effectiveAt: new Date("2025-12-31T21:59:59Z") },
+        { description: "first-minute", amount: 2, effectiveAt: new Date("2025-12-31T22:00:00Z") },
+        { description: "last-minute", amount: 3, effectiveAt: new Date("2026-01-31T21:59:59Z") },
+        { description: "next-day", amount: 100, effectiveAt: new Date("2026-01-31T22:00:00Z") },
+      ].map(row => ({ ...row, accountId: f.account.id, type: "CHARGE" as const })) });
+      assert.equal((await f.send()).ok, true);
+      const message = messages.at(-1)!;
+      assert.match(message.html, /first-minute/); assert.match(message.html, /last-minute/);
+      assert.doesNotMatch(message.html, /next-day/); assert.match(message.text, /6\.00/);
+      const audit = await db.auditEvent.findFirstOrThrow({ where: { organisationId: f.org.id } });
+      assert.equal((audit.after as { from: string }).from, "2025-12-31T22:00:00.000Z");
+      assert.equal((audit.after as { to: string }).to, "2026-01-31T21:59:59.999Z");
+    });
   } finally { await db.$disconnect(); }
 });

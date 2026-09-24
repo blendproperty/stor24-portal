@@ -148,3 +148,6 @@ PR248/249 deployed through 36033956292; exact image 079ae6c73 healthy and public
 
 ### 24 September — billing email retry guard candidate
 P02/P08: before tests sent the same invoice/statement twice; the candidate uses document uniqueness to allow one automatic attempt and returns saved success or review-required on repetition. Eight synthetic cases and typecheck pass; PostgreSQL/CI and promotion pending. Provider receipt, approved resend workflow, numbering/default statement period and staff acceptance remain open. PR250 deployed through 36035665129; image e15e1e4a5 and public readiness verified. No acceptance checkbox changed.
+
+### 24 September — emailed statement date alignment candidate
+P02/P08: date-boundary reproduction showed R3 instead of R6. Emailed statements now share portal South African inclusive date boundaries; renderer/audit agree, invalid dates reject without sending, old document keys remain. 402 tests/typecheck passed; database CI and promotion pending. PR252 retry guard merged bba6e5c after all checks; rollout pending. Finance/staff acceptance stays open.

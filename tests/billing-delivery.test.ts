@@ -8,9 +8,10 @@ type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-exp
 async function fixture() {
   const documents: Row[] = [], logs: Row[] = [], messages: Row[] = [], audits: Row[] = [];
   let provider: (message: Row) => Promise<void> = async () => {};
+  let entries = [{ id: "charge", type: "CHARGE", amount: "115", taxAmount: "15", description: "Synthetic rent", effectiveAt: new Date("2026-01-02"), reversalOfId: null }];
   const db = {
     account: { findFirst: async () => ({ id: "account", accountNumber: "TEST", balance: "115", currency: "ZAR", customer: { id: "customer", email: "test@example.invalid", firstName: "Synthetic" }, tenancy: { id: "tenancy", facilityId: "facility", facility: { name: "Synthetic" }, occupancies: [] } }) },
-    ledgerEntry: { findMany: async () => [{ id: "charge", type: "CHARGE", amount: "115", taxAmount: "15", description: "Synthetic rent", effectiveAt: new Date("2026-01-02"), reversalOfId: null }] },
+    ledgerEntry: { findMany: async () => entries },
     payment: { findMany: async () => [] },
     configurationProfile: { findFirst: async () => null },
     document: {
@@ -42,11 +43,38 @@ async function fixture() {
   });
   const loaded = { exports: {} as Row };
   new Function("require", "module", "exports", "__fixture", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, state);
-  const send = (kind: string) => kind === "invoice"
+  const send = (kind: string, dates: { from?: Date; to?: Date } = {}) => kind === "invoice"
     ? loaded.exports.sendInvoiceEmail({ accountId: "account", organisationId: "org", actorId: "staff", ledgerEntryIds: ["charge"] })
-    : loaded.exports.sendStatementEmail({ accountId: "account", organisationId: "org", actorId: "staff", from: new Date("2026-01-01"), to: new Date("2026-01-31") });
-  return { send, documents, logs, messages, audits, setProvider: (fn: typeof provider) => { provider = fn; }, failFinalisation: () => { db.document.update = async () => { throw new Error("SYNTHETIC_FINALISATION_FAILURE"); }; } };
+    : loaded.exports.sendStatementEmail({ accountId: "account", organisationId: "org", actorId: "staff", from: new Date("2026-01-01"), to: new Date("2026-01-31"), ...dates });
+  return { send, documents, logs, messages, audits, setEntries: (rows: typeof entries) => { entries = rows; }, setProvider: (fn: typeof provider) => { provider = fn; }, failFinalisation: () => { db.document.update = async () => { throw new Error("SYNTHETIC_FINALISATION_FAILURE"); }; } };
 }
+
+test("emailed statement includes the full South African end date and matches portal boundaries", async () => {
+  const f = await fixture();
+  const row = (id: string, amount: string, date: string) => ({ id, type: "CHARGE", amount, taxAmount: "0", description: id, effectiveAt: new Date(date), reversalOfId: null });
+  f.setEntries([
+    row("opening-before-period", "1", "2025-12-31T21:59:59Z"),
+    row("first-minute-in-period", "2", "2025-12-31T22:00:00Z"),
+    row("last-minute-in-period", "3", "2026-01-31T21:59:59Z"),
+    row("next-day-excluded", "100", "2026-01-31T22:00:00Z"),
+  ]);
+  assert.equal((await f.send("statement")).ok, true);
+  const html = f.messages[0].html;
+  assert.match(html, /first-minute-in-period/);
+  assert.match(html, /last-minute-in-period/);
+  assert.doesNotMatch(html, /next-day-excluded|opening-before-period/);
+  assert.match(f.messages[0].text, /6\.00/);
+  assert.match(html, /1 January 2026/);
+  assert.match(html, /31 January 2026/);
+});
+
+test("invalid or reversed statement periods fail before saving or sending", async () => {
+  for (const dates of [{ from: new Date("2026-02-01") }, { to: new Date("invalid") }]) {
+    const f = await fixture();
+    assert.deepEqual(await f.send("statement", dates), { ok: false, code: "INVALID_STATEMENT_PERIOD" });
+    assert.equal(f.documents.length, 0); assert.equal(f.messages.length, 0);
+  }
+});
 
 for (const kind of ["invoice", "statement"]) {
   test(`${kind}: confirmed repeat returns original result without sending or changing saved content`, async () => {

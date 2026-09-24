@@ -48,6 +48,7 @@ import { getBillingDocumentCompanyDetails } from "@/lib/finance/billing-document
 import { renderInvoiceHtml, type InvoiceLedgerLine } from "@/lib/finance/invoice-renderer";
 import { renderStatementHtml, type StatementLedgerLine } from "@/lib/finance/statement-renderer";
 import { testPaymentReviewAccounts } from "@/lib/payments/test-payment-review";
+import { buildAccountStatement, statementPeriod } from "@/lib/finance/account-statement";
 
 type AccountBillingContext = {
   account: { id: string; accountNumber: string; balance: unknown; currency: string };
@@ -107,7 +108,7 @@ async function nextDocumentNumber(organisationId: string, type: "INVOICE" | "STA
 
 type SendResult =
   | { ok: true; documentId: string; communicationLogId: string }
-  | { ok: false; code: "ACCOUNT_NOT_FOUND" | "NO_LEDGER_ENTRIES" | "INVALID_INVOICE_ENTRIES" | "NO_CUSTOMER_EMAIL" | "EMAIL_FAILED" | "DOCUMENT_DELIVERY_REVIEW_REQUIRED" | "TEST_PAYMENT_RECONCILIATION_REQUIRED"; message?: string };
+  | { ok: false; code: "ACCOUNT_NOT_FOUND" | "NO_LEDGER_ENTRIES" | "INVALID_INVOICE_ENTRIES" | "INVALID_STATEMENT_PERIOD" | "NO_CUSTOMER_EMAIL" | "EMAIL_FAILED" | "DOCUMENT_DELIVERY_REVIEW_REQUIRED" | "TEST_PAYMENT_RECONCILIATION_REQUIRED"; message?: string };
 
 function isUniqueConflict(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
@@ -224,9 +225,21 @@ export async function sendStatementEmail(input: { accountId: string; organisatio
     from = lastStatement?.createdAt ?? tenancy?.startDate ?? input.to;
   }
 
+  let period: ReturnType<typeof statementPeriod>;
+  let fromDay: string, toDay: string;
+  let periodKey: string;
+  try {
+    // Retain existing document identity: this correction must not resend an
+    // already generated historical statement under a new date-derived key.
+    periodKey = `${from.toISOString().slice(0, 10)}:${input.to.toISOString().slice(0, 10)}`;
+    const localDay = (date: Date) => date.toLocaleDateString("en-CA", { timeZone: "Africa/Johannesburg" });
+    fromDay = localDay(from); toDay = localDay(input.to);
+    period = statementPeriod(fromDay, toDay);
+  } catch { return { ok: false, code: "INVALID_STATEMENT_PERIOD" }; }
+  from = period.start;
+  const through = new Date(period.endExclusive.getTime() - 1);
   const entries = await db.ledgerEntry.findMany({ where: { accountId: context.account.id }, orderBy: [{ effectiveAt: "asc" }, { id: "asc" }] });
-  const { buildAccountStatement } = await import("@/lib/finance/account-statement");
-  const statement = buildAccountStatement(entries.map(entry => ({ ...entry, amount: entry.amount.toString() })), from, new Date(input.to.getTime() + 1));
+  const statement = buildAccountStatement(entries.map(entry => ({ ...entry, amount: entry.amount.toString() })), from, period.endExclusive);
   const openingBalance = Number(statement.openingBalance), closingBalance = Number(statement.closingBalance);
 
   const company = await getBillingDocumentCompanyDetails(context.organisationId, context.facilityId);
@@ -237,7 +250,7 @@ export async function sendStatementEmail(input: { accountId: string; organisatio
     statementNumber,
     issueDate: new Date(),
     periodFrom: from,
-    periodTo: input.to,
+    periodTo: through,
     facilityName: context.facilityName,
     company,
     customerName: customerDisplayName(context.customer),
@@ -250,7 +263,7 @@ export async function sendStatementEmail(input: { accountId: string; organisatio
   });
 
   const sha256 = createHash("sha256").update(html).digest("hex");
-  const idempotencyKey = `STATEMENT:${context.account.id}:${from.toISOString().slice(0, 10)}:${input.to.toISOString().slice(0, 10)}`;
+  const idempotencyKey = `STATEMENT:${context.account.id}:${periodKey}`;
   const idempotencyKeyHash = createHash("sha256").update(idempotencyKey).digest("hex").slice(0, 32);
 
   let created = true;
@@ -268,14 +281,14 @@ export async function sendStatementEmail(input: { accountId: string; organisatio
 
   const commsIdempotencyKey = `${document.idempotencyKey}:EMAIL`;
   try {
-    await emailProvider().send({ to: context.customer.email, subject: `Your Stor24 statement (${statementNumber})`, text: `Statement ${statementNumber} for the period ${from.toDateString()} to ${input.to.toDateString()}. Closing balance: R${closingBalance.toFixed(2)}.`, html });
+    await emailProvider().send({ to: context.customer.email, subject: `Your Stor24 statement (${statementNumber})`, text: `Statement ${statementNumber} for the period ${fromDay} to ${toDay}. Closing balance: R${closingBalance.toFixed(2)}.`, html });
     const log = await db.communicationLog.upsert({
       where: { idempotencyKey: commsIdempotencyKey },
       create: { organisationId: context.organisationId, facilityId: context.facilityId, customerId: context.customer.id, channel: "EMAIL", direction: "OUTBOUND", messageType: "STATEMENT", recipientHash: createHash("sha256").update(context.customer.email).digest("hex"), status: "SUCCEEDED", idempotencyKey: commsIdempotencyKey, sentAt: new Date(), metadata: { documentId: document.id, statementNumber } },
       update: { status: "SUCCEEDED", sentAt: new Date() },
     });
     await db.document.update({ where: { id: document.id }, data: { sentAt: new Date(), status: "SENT" } });
-    await db.auditEvent.create({ data: { organisationId: context.organisationId, facilityId: context.facilityId, actorId: input.actorId, action: "billing_document.statement_sent", entityType: "Document", entityId: document.id, after: { statementNumber, accountId: context.account.id, from: from.toISOString(), to: input.to.toISOString(), communicationLogId: log.id } } });
+    await db.auditEvent.create({ data: { organisationId: context.organisationId, facilityId: context.facilityId, actorId: input.actorId, action: "billing_document.statement_sent", entityType: "Document", entityId: document.id, after: { statementNumber, accountId: context.account.id, from: from.toISOString(), to: through.toISOString(), communicationLogId: log.id } } });
     return { ok: true, documentId: document.id, communicationLogId: log.id };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

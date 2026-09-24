@@ -27,11 +27,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       : await sendStatementEmail({ accountId, organisationId: auth.organisationId, from: parsed.data.from ? new Date(parsed.data.from) : undefined, to: new Date(parsed.data.to), actorId: auth.user.id });
 
     if (!result.ok) {
-      const status = result.code === "TEST_PAYMENT_RECONCILIATION_REQUIRED" || result.code === "DOCUMENT_DELIVERY_REVIEW_REQUIRED" ? 409 : result.code === "ACCOUNT_NOT_FOUND" ? 404 : result.code === "NO_LEDGER_ENTRIES" || result.code === "INVALID_INVOICE_ENTRIES" ? 422 : result.code === "NO_CUSTOMER_EMAIL" ? 422 : 502;
+      const status = result.code === "TEST_PAYMENT_RECONCILIATION_REQUIRED" || result.code === "DOCUMENT_DELIVERY_REVIEW_REQUIRED" ? 409 : result.code === "ACCOUNT_NOT_FOUND" ? 404 : ["NO_LEDGER_ENTRIES", "INVALID_INVOICE_ENTRIES", "INVALID_STATEMENT_PERIOD", "NO_CUSTOMER_EMAIL"].includes(result.code) ? 422 : 502;
       const message = {
         ACCOUNT_NOT_FOUND: "Account not found.",
         NO_LEDGER_ENTRIES: "None of the specified ledger entries belong to this account.",
         INVALID_INVOICE_ENTRIES: "Select each charge once from this account. Payments, credits, refunds, reversals and write-offs cannot be issued as invoice lines.",
+        INVALID_STATEMENT_PERIOD: "Choose valid statement dates, with the start date on or before the end date.",
         NO_CUSTOMER_EMAIL: "This customer has no email address on file.",
         EMAIL_FAILED: "Email delivery could not be confirmed. Check the delivery record before attempting another send.",
         DOCUMENT_DELIVERY_REVIEW_REQUIRED: "This document already has a delivery attempt. Ask finance to check its delivery record before arranging another send.",
