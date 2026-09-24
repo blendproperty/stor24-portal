@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import type { RequestScope } from "@/lib/scope";
+import { leasingCustomerWhere } from "@/lib/leasing-service";
 
 /**
  * Read-only queries backing the Stage 6 MEL/HikCentral integration status
@@ -15,8 +16,8 @@ import type { RequestScope } from "@/lib/scope";
 
 export async function listIdentityLinks(scope: RequestScope) {
   return db.integrationIdentityLink.findMany({
-    where: { organisationId: scope.organisationId },
-    include: { customer: true, resolvedBy: true },
+    where: { organisationId: scope.organisationId, customer: leasingCustomerWhere(scope, scope.facilityIds) },
+    include: { customer: true, resolvedBy: { select: { id: true, name: true } } },
     orderBy: { updatedAt: "desc" },
     take: 200,
   });
@@ -31,7 +32,7 @@ export async function listAccessDecisions(scope: RequestScope) {
     include: {
       facility: true,
       occupancy: { include: { unit: true, tenancy: { include: { customer: true } } } },
-      requestedBy: true,
+      requestedBy: { select: { id: true, name: true } },
     },
     orderBy: { createdAt: "desc" },
     take: 200,

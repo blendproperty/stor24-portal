@@ -20,6 +20,7 @@ export const publicLeadSchema = z.object({
   intendedMoveIn: z.coerce.date().optional(),
   duration: z.string().trim().max(80).optional(),
   collectionPreference: z.string().trim().max(80).optional(),
+  privacyNoticeVersion: z.string().trim().max(80).optional(),
   contactMethod: z.string().trim().max(40).optional(),
   websitePath: z.string().trim().max(300).optional(),
   honeypot: z.string().max(0).optional(),

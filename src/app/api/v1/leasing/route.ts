@@ -1,8 +1,8 @@
 import { apiError } from "@/lib/api";
 import { listLeasing } from "@/lib/leasing-service";
-import { requireScope } from "@/lib/scope";
+import { requirePermissionScope } from "@/lib/scope";
 
 export async function GET() {
-  try { return Response.json({ data: await listLeasing(await requireScope()) }); }
+  try { return Response.json({ data: await listLeasing(await requirePermissionScope("operations.view")) }); }
   catch (error) { return apiError(error); }
 }

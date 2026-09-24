@@ -82,6 +82,29 @@ export function leasingCustomerWhere(
   };
 }
 
+/** Linked customers follow facility scope. A new unlinked record remains usable
+ * only by its creator until it is linked; organisation owners retain full access. */
+export async function requireLeasingCustomer(scope: RequestScope, customerId: string, client: Tx = db) {
+  const customer = await client.customer.findFirst({
+    where: { id: customerId, ...leasingCustomerWhere(scope, scope.facilityIds) },
+  });
+  if (customer) return customer;
+  if (!scope.unrestrictedFacilities) {
+    const created = await client.auditEvent.findFirst({ where: {
+      organisationId: scope.organisationId, actorId: scope.userId,
+      entityType: "Customer", entityId: customerId, action: "customer.created",
+    }, select: { id: true } });
+    if (created) {
+      const unlinked = await client.customer.findFirst({ where: {
+        id: customerId, organisationId: scope.organisationId,
+        leads: { none: {} }, reservations: { none: {} }, tenancies: { none: {} },
+      } });
+      if (unlinked) return unlinked;
+    }
+  }
+  throw new Error("FORBIDDEN");
+}
+
 export function moveInReservationWhere(input: {
   reservationId: string;
   facilityId: string;
@@ -254,13 +277,9 @@ export async function createLead(
   data: Prisma.LeadUncheckedCreateInput,
 ) {
   await requireFacility(scope, data.facilityId);
-  if (
-    data.customerId &&
-    !(await db.customer.findFirst({
-      where: { id: data.customerId, organisationId: scope.organisationId },
-    }))
-  )
-    throw new Error("FORBIDDEN");
+  if (data.customerId) await requireLeasingCustomer(scope, data.customerId);
+  if (data.desiredUnitTypeId && !await db.unitType.findFirst({ where: { id: data.desiredUnitTypeId, facilityId: data.facilityId } })) throw new Error("FORBIDDEN");
+  if (data.assignedToId && !await db.user.findFirst({ where: { id: data.assignedToId, organisationId: scope.organisationId, active: true, roleAssignments: { some: { OR: [{ facilityId: data.facilityId }, { facilityId: null }] } } } })) throw new Error("FORBIDDEN");
   return db.$transaction(async (tx) => {
     const entity = await tx.lead.create({ data });
     await audit(tx, scope, "lead.created", "Lead", entity.id, data.facilityId);
@@ -282,9 +301,7 @@ export async function createReservation(
         status: "AVAILABLE",
       },
     });
-    const customer = await tx.customer.findFirst({
-      where: { id: data.customerId, organisationId: scope.organisationId },
-    });
+    const customer = await requireLeasingCustomer(scope, data.customerId, tx);
     const lead = data.leadId
       ? await tx.lead.findFirst({
           where: {

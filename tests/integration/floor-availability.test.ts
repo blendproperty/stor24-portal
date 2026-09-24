@@ -23,6 +23,8 @@ test("isolated PostgreSQL floor operating policy", async t => {
   const customer = await db.customer.create({ data: { organisationId: org.id } });
   const type = await db.unitType.create({ data: { facilityId: facility.id, name: "CI unit" } });
   const scope = { userId: user.id, organisationId: org.id, facilityIds: [facility.id], unrestrictedFacilities: false };
+  // Same attribution written by the staff create-customer workflow.
+  await db.auditEvent.create({ data: { organisationId: org.id, actorId: user.id, action: "customer.created", entityType: "Customer", entityId: customer.id } });
   const units = await Promise.all(["Ground Floor", "First Floor", "Second Floor"].map((floor, index) => db.unit.create({ data: { facilityId: facility.id, unitTypeId: type.id, number: String(index), floor, monthlyRate: 100 } })));
   const maps = await Promise.all(units.map(unit => db.facilityMap.create({ data: { facilityId: facility.id, name: unit.floor!, elements: { create: { unitId: unit.id, type: "UNIT", x: 0, y: 0, width: 30, height: 30 } } } })));
   const first = units[1];

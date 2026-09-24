@@ -48,7 +48,7 @@ jobs:
         run: |
           test -n "$VPS_USER"
           ssh -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" \
-            "cd /opt/stor24-crm && \
+            "set -o pipefail && umask 077 && cd /opt/stor24-crm && \
              git fetch origin '$DEPLOY_REF' && \
              git checkout --detach FETCH_HEAD && \
              if ! grep -q '^INTEGRATION_CONFIG_ENCRYPTION_KEY=' .env; then \

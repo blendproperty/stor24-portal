@@ -9,8 +9,9 @@ import {
   createUnit,
   createUnitType,
   listLeasing,
+  requireLeasingCustomer,
 } from "@/lib/leasing-service";
-import { facilityWhere, requireFacility, requireScope } from "@/lib/scope";
+import { facilityWhere, requireFacility, requirePermissionScope } from "@/lib/scope";
 import {
   customerSchema,
   facilitySchema,
@@ -20,6 +21,7 @@ import {
   unitTypeSchema,
 } from "@/lib/validators";
 import { requireOwner, requirePermission } from "@/lib/auth-guards";
+import { leasingResourcePermissions } from "@/lib/leasing-resource-permissions";
 import { sameOrigin } from "@/lib/request-security";
 
 const schemas = {
@@ -40,10 +42,7 @@ export async function GET(
   try {
     const { resource } = await context.params;
     if (!isResource(resource)) throw new Error("NOT_FOUND");
-    if (resource === "customers") await requirePermission("operations.view");
-    if (["facilities", "unit-types", "units"].includes(resource))
-      await requirePermission("inventory.manage");
-    const data = await listLeasing(await requireScope());
+    const data = await listLeasing(await requirePermissionScope(leasingResourcePermissions[resource].read));
     const values =
       resource === "unit-types"
         ? data.facilities.flatMap((f) => f.unitTypes)
@@ -68,9 +67,7 @@ export async function POST(
       );
     const { resource } = await context.params;
     if (!isResource(resource)) throw new Error("NOT_FOUND");
-    if (resource === "customers") await requirePermission("operations.manage");
-    if (["facilities", "unit-types", "units"].includes(resource))
-      await requirePermission("inventory.manage");
+    const scope = await requirePermissionScope(leasingResourcePermissions[resource].create);
     const parsed = schemas[resource].safeParse(await jsonBody(request));
     if (!parsed.success)
       return Response.json(
@@ -82,7 +79,6 @@ export async function POST(
         },
         { status: 422 },
       );
-    const scope = await requireScope();
     if (resource === "unit-types") {
       const unitTypeData = parsed.data as { facilityId: string; name: string };
       if (
@@ -133,9 +129,7 @@ export async function PATCH(
       );
     const { resource } = await context.params;
     if (!isResource(resource)) throw new Error("NOT_FOUND");
-    if (resource === "customers") await requirePermission("operations.manage");
-    if (["facilities", "unit-types", "units"].includes(resource))
-      await requirePermission("inventory.manage");
+    const scope = await requirePermissionScope(leasingResourcePermissions[resource].change);
     const body = (await jsonBody(request)) as { id?: string; data?: unknown };
     if (!body.id) throw new Error("NOT_FOUND");
     const rawData = body.data && typeof body.data === "object" && !Array.isArray(body.data)
@@ -152,7 +146,6 @@ export async function PATCH(
         },
         { status: 422 },
       );
-    const scope = await requireScope();
     const data = Object.fromEntries(
       Object.keys(rawData)
         .filter((key) => key in parsed.data)
@@ -195,10 +188,7 @@ export async function PATCH(
       }
       entity = await db.facility.update({ where: { id: current.id }, data });
     } else if (resource === "customers") {
-      const current = await db.customer.findFirst({
-        where: { id: body.id, organisationId: scope.organisationId },
-      });
-      if (!current) throw new Error("NOT_FOUND");
+      const current = await requireLeasingCustomer(scope, body.id);
       entity = await db.customer.update({ where: { id: current.id }, data });
     } else {
       const model =
@@ -215,6 +205,12 @@ export async function PATCH(
       } as never)) as { id: string; facilityId: string; number?: string } | null;
       if (!current) throw new Error("NOT_FOUND");
       await requireFacility(scope, current.facilityId);
+      const parent = parsed.data as { facilityId?: string };
+      if (parent.facilityId && parent.facilityId !== current.facilityId) throw new Error("FORBIDDEN");
+      const relation = parsed.data as { customerId?: string; desiredUnitTypeId?: string; assignedToId?: string };
+      if (relation.customerId) await requireLeasingCustomer(scope, relation.customerId);
+      if (relation.desiredUnitTypeId && !await db.unitType.findFirst({ where: { id: relation.desiredUnitTypeId, facilityId: current.facilityId } })) throw new Error("FORBIDDEN");
+      if (relation.assignedToId && !await db.user.findFirst({ where: { id: relation.assignedToId, organisationId: scope.organisationId, active: true, roleAssignments: { some: { OR: [{ facilityId: current.facilityId }, { facilityId: null }] } } } })) throw new Error("FORBIDDEN");
       if (resource === "unit-types") {
         const unitTypeData = parsed.data as { name?: string };
         if (
@@ -354,15 +350,13 @@ export async function DELETE(
       );
     const { resource } = await context.params;
     if (!isResource(resource)) throw new Error("NOT_FOUND");
-    if (resource === "customers") await requirePermission("operations.manage");
-    if (["facilities", "unit-types", "units"].includes(resource))
-      await requirePermission("inventory.manage");
+    const scope = await requirePermissionScope(leasingResourcePermissions[resource].change);
     const requestUrl = new URL(request.url);
     const id = requestUrl.searchParams.get("id");
     const force = requestUrl.searchParams.get("force") === "true";
     if (!id) throw new Error("NOT_FOUND");
-    const scope = await requireScope();
     if (resource === "customers") {
+      await requireLeasingCustomer(scope, id);
       const entity = await db.customer.findFirst({
         where: { id, organisationId: scope.organisationId },
         include: { tenancies: true, reservations: true },

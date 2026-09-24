@@ -1,6 +1,6 @@
 import { getSession } from "@/lib/session";
 import { db } from "@/lib/db";
-import { hasPermission } from "@/lib/permissions";
+import { currentRoleAccess } from "@/lib/current-role-access";
 import { ZodError } from "zod";
 
 export async function requireSession() {
@@ -8,12 +8,13 @@ export async function requireSession() {
   if (!session) throw new Error("UNAUTHENTICATED");
   const user = await db.user.findUnique({ where: { id: session.userId }, include: { roleAssignments: { include: { role: true, facility: true } } } });
   if (!user?.active || user.sessionVersion !== session.sessionVersion) throw new Error("UNAUTHENTICATED");
-  return { ...session, user, permissions: user.roleAssignments.flatMap((assignment) => assignment.role.permissions) };
+  const current = currentRoleAccess(user.roleAssignments);
+  return { ...session, role: current.owner ? "Organisation owner" : user.roleAssignments[0]?.role.name ?? "", user, permissions: user.roleAssignments.flatMap((assignment) => assignment.role.permissions) };
 }
 
 export async function requireOwner() {
   const session = await requireSession();
-  if (session.role !== "Organisation owner") throw new Error("FORBIDDEN");
+  if (!currentRoleAccess(session.user.roleAssignments).owner) throw new Error("FORBIDDEN");
   return session;
 }
 
@@ -21,14 +22,9 @@ export async function requirePermission(permission: string, facilityId?: string)
   const auth = await requireSession();
   const user = auth.user;
 
-  const matchingAssignments = user.roleAssignments.filter((assignment) => {
-    if (facilityId && assignment.facilityId && assignment.facilityId !== facilityId) return false;
-    return hasPermission(assignment.role.permissions, permission);
-  });
-  const allowed = auth.role === "Organisation owner" || matchingAssignments.length > 0;
-  if (!allowed) throw new Error("FORBIDDEN");
-  const organisationWide = auth.role === "Organisation owner" || matchingAssignments.some((assignment) => assignment.facilityId === null);
-  return { ...auth, organisationId: user.organisationId, allowedFacilityIds: organisationWide ? null : matchingAssignments.map((assignment) => assignment.facilityId!).filter(Boolean) };
+  const access = currentRoleAccess(user.roleAssignments, permission, facilityId);
+  if (!access.allowed) throw new Error("FORBIDDEN");
+  return { ...auth, organisationId: user.organisationId, allowedFacilityIds: access.allowedFacilityIds };
 }
 
 export function authErrorResponse(error: unknown) {
