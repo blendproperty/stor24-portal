@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import { build } from "esbuild";
 import { db } from "../../src/lib/db";
 import { escapeEmailHtml } from "../../src/lib/email";
+import type { Prisma } from "../../src/generated/prisma/client";
 
 test("isolated PostgreSQL billing delivery claim", async t => {
   assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci");
@@ -36,10 +37,39 @@ test("isolated PostgreSQL billing delivery claim", async t => {
     const send = () => kind === "invoice"
       ? loaded.exports.sendInvoiceEmail({ ...input, ledgerEntryIds: [charge.id] })
       : loaded.exports.sendStatementEmail({ ...input, from: new Date("2026-01-01"), to: new Date("2026-01-31") });
-    return { org, tenancy, account, send };
+    return { org, tenancy, account, charge, input, send };
   }
   try {
     for (const kind of ["invoice", "statement"]) {
+      await t.test(`${kind} concurrent distinct documents have distinct numbers and rollback cannot send`, async () => {
+        const f = await fixture(kind), before = sends;
+        provider = async () => {};
+        const original = db.$transaction, transaction = db.$transaction.bind(db);
+        db.$transaction = (async (callback: (tx: Prisma.TransactionClient) => Promise<unknown>) => transaction(async tx => callback(new Proxy(tx, { get(target, property) {
+          if (property === "document") return { ...target.document, create: async () => { throw new Error("SYNTHETIC_DOCUMENT_FAILURE"); } };
+          return Reflect.get(target, property);
+        } })))) as typeof db.$transaction;
+        try { await assert.rejects(f.send(), /SYNTHETIC_DOCUMENT_FAILURE/); }
+        finally { db.$transaction = original; }
+        assert.equal(sends, before);
+        assert.equal(await db.document.count({ where: { tenancyId: f.tenancy.id } }), 0);
+        let results;
+        if (kind === "invoice") {
+          const charges = [f.charge];
+          for (let index = 0; index < 2; index++) charges.push(await db.ledgerEntry.create({ data: { accountId: f.account.id, type: "CHARGE", amount: 115, taxAmount: 15, description: `Synthetic ${index}`, effectiveAt: new Date("2026-01-02") } }));
+          await db.account.update({ where: { id: f.account.id }, data: { balance: 345 } });
+          results = await Promise.all(charges.map(charge => loaded.exports.sendInvoiceEmail({ ...f.input, ledgerEntryIds: [charge.id] })));
+        } else {
+          results = await Promise.all([10, 20, 30].map(day => loaded.exports.sendStatementEmail({ ...f.input, from: new Date("2026-01-01"), to: new Date(`2026-01-${day}`) })));
+        }
+        assert.ok(results.every(result => result.ok));
+        const documents = await db.document.findMany({ where: { tenancyId: f.tenancy.id }, orderBy: { createdAt: "asc" } });
+        const numbers = documents.map(document => document.content?.match(/(?:INV|STMT)-\d{4}-\d+/)?.[0]);
+        assert.equal(documents.length, 3); assert.equal(new Set(numbers).size, 3); assert.ok(numbers.every(Boolean));
+        assert.deepEqual(numbers.map(number => Number(number!.split("-").at(-1))).sort(), [1, 2, 3]);
+        assert.equal(sends - before, 3);
+        assert.equal(await db.auditEvent.count({ where: { organisationId: f.org.id, entityType: "Document" } }), 3);
+      });
       await t.test(`${kind} unique document prevents overlapping and completed resends`, async () => {
         const f = await fixture(kind), before = sends;
         let release!: () => void, entered!: () => void;

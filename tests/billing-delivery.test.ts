@@ -9,7 +9,15 @@ async function fixture() {
   const documents: Row[] = [], logs: Row[] = [], messages: Row[] = [], audits: Row[] = [];
   let provider: (message: Row) => Promise<void> = async () => {};
   let entries = [{ id: "charge", type: "CHARGE", amount: "115", taxAmount: "15", description: "Synthetic rent", effectiveAt: new Date("2026-01-02"), reversalOfId: null }];
-  const db = {
+  let transactionTail = Promise.resolve();
+  const db: Row = {
+    $queryRaw: async () => [],
+    $transaction: async (fn: (client: Row) => Promise<unknown>) => {
+      const previous = transactionTail; let release!: () => void;
+      transactionTail = new Promise<void>(resolve => { release = resolve; });
+      await previous;
+      try { return await fn(db); } finally { release(); }
+    },
     account: { findFirst: async () => ({ id: "account", accountNumber: "TEST", balance: "115", currency: "ZAR", customer: { id: "customer", email: "test@example.invalid", firstName: "Synthetic" }, tenancy: { id: "tenancy", facilityId: "facility", facility: { name: "Synthetic" }, occupancies: [] } }) },
     ledgerEntry: { findMany: async () => entries },
     payment: { findMany: async () => [] },
@@ -18,10 +26,10 @@ async function fixture() {
       count: async () => documents.length,
       create: async ({ data }: Row) => {
         if (documents.some(d => d.idempotencyKey === data.idempotencyKey)) throw Object.assign(new Error("Unique constraint"), { code: "P2002" });
-        const row = { id: "document", ...data }; documents.push(row); return { ...row };
+        const row = { id: `document-${documents.length}`, ...data }; documents.push(row); return { ...row };
       },
       findFirst: async ({ where }: Row) => { const row = documents.find(d => d.idempotencyKey === where.idempotencyKey); return row ? { ...row } : null; },
-      update: async ({ data }: Row) => Object.assign(documents[0], data),
+      update: async ({ where, data }: Row) => Object.assign(documents.find(row => row.id === where.id)!, data),
     },
     communicationLog: {
       findUnique: async ({ where }: Row) => logs.find(l => l.idempotencyKey === where.idempotencyKey) ?? null,
@@ -48,6 +56,16 @@ async function fixture() {
     : loaded.exports.sendStatementEmail({ accountId: "account", organisationId: "org", actorId: "staff", from: new Date("2026-01-01"), to: new Date("2026-01-31"), ...dates });
   return { send, documents, logs, messages, audits, setEntries: (rows: typeof entries) => { entries = rows; }, setProvider: (fn: typeof provider) => { provider = fn; }, failFinalisation: () => { db.document.update = async () => { throw new Error("SYNTHETIC_FINALISATION_FAILURE"); }; } };
 }
+
+test("different financial documents generated together receive distinct sequence numbers", async () => {
+  const f = await fixture();
+  const results = await Promise.all([10, 20, 30].map(day => f.send("statement", { to: new Date(`2026-01-${day}`) })));
+  assert.ok(results.every(result => result.ok));
+  assert.equal(f.documents.length, 3);
+  const numbers = f.messages.map(message => message.subject.match(/STMT-\d{4}-\d+/)?.[0]);
+  assert.equal(new Set(numbers).size, 3);
+  assert.ok(numbers.every(Boolean));
+});
 
 test("emailed statement includes the full South African end date and matches portal boundaries", async () => {
   const f = await fixture();
