@@ -37,6 +37,7 @@ jobs:
       - run: npx tsx --test tests/integration/daily-close.test.ts
       - run: npx tsx --test tests/integration/billing-delivery.test.ts
       - run: npx tsx --test tests/integration/twilio-status-replay.test.ts
+      - run: npx tsx --test tests/integration/whatsapp-delivery-claim.test.ts
       - run: npx tsx --test tests/integration/merchandise-transactions.test.ts
       - run: npx tsx --test tests/integration/move-in-training.test.ts
       - run: npx tsx --test tests/integration/reservation-move-in.test.ts

@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     const customer = await requireLeasingCustomer(actor, parsed.data.customerId);
     if (!customer?.phone) return Response.json({ error: "Customer phone number not found." }, { status: 404 });
     const result = await sendWhatsAppTemplate({ organisationId: actor.organisationId, facilityId: parsed.data.facilityId, customerId: customer.id, recipient: customer.phone, consent: customer.communicationConsent, messageType: parsed.data.messageType, variables: parsed.data.variables, idempotencyKey: parsed.data.idempotencyKey, allowWhenAutomationDisabled: true });
-    if (!result.ok) return Response.json({ error: result.code }, { status: result.code === "CONSENT_REQUIRED" ? 409 : 502 });
+    if (!result.ok) return Response.json({ error: result.code }, { status: ["CONSENT_REQUIRED", "DELIVERY_REVIEW_REQUIRED", "IDEMPOTENCY_CONFLICT"].includes(result.code) ? 409 : 502 });
     await db.auditEvent.create({ data: { organisationId: actor.organisationId, facilityId: parsed.data.facilityId, actorId: actor.userId, action: "communication.whatsapp.sent", entityType: "Customer", entityId: customer.id, after: { messageType: parsed.data.messageType, communicationLogId: result.logId } } });
     return Response.json({ data: { logId: result.logId } }, { status: 202 });
   } catch (error) { return authErrorResponse(error instanceof Error && error.message === "FACILITY_FORBIDDEN" ? new Error("FORBIDDEN") : error); }
