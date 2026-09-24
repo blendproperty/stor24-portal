@@ -1,4 +1,13 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## SMS and WhatsApp request deadline — 24 September 2026
+
+- **Implementation:** the shared Twilio Messages request now has a 15-second abort deadline, covering SMS, WhatsApp text and approved-template calls. Existing result/retry classification, consent and automation gates remain. No automatic resend added.
+- **Testing:** all three paths lacked the deadline before the change. Synthetic successful-payload and stalled-abort cases now pass for each path, one attempt only. All 424 local tests and typecheck passed. No network messages or provider credentials used in tests.
+- **Commit/push:** enclosing twilio-request-timeout PR records promotion; required CI pending.
+- **Merge/deployment/configuration/live verification:** pending for this candidate. No server switches changed. An aborted request does not prove provider non-delivery; staff/provider reconciliation remains required.
+- **Prior release:** PR257 passed all required checks, including real PostgreSQL simultaneous receipt retries/audit rollback and desktop/mobile recovery, on 1a08d710f8c8f4942608778d4ef5e01734af2ae9. Merged 92be964667117da7c6443084efdefb919c61d63a; main CI 36041040186 running, deployment unverified.
+- **Security monitoring:** GitHub API refresh at approximately 18:25 UTC returned zero open Dependabot, CodeQL and secret-scanning alerts for stor24-portal. This does not revoke the previously exposed Google credential or close its rotation gate. All legal/provider/recovery/staff acceptance remains open.
+
 ## Manual account receipt retry safety — 24 September 2026
 
 - **Implementation:** Accounts payment forms retain a UUID request ID and entered values across failed/lost responses. Server receipt writes lock the account and reuse the existing payment for an identical request; changed details return 409. Required request IDs and cent precision reject unsafe requests before posting. Older loaded clients must refresh, with an explicit message. A notification exception after commit cannot turn a successful payment into a failed response; review is shown and audited where possible. Retried receipts never automatically repeat the notification.

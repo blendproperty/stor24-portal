@@ -42,6 +42,7 @@ async function sendTwilioMessage(kind: "SMS" | "WHATSAPP", to: string, body: str
     if (statusCallback) form.set("StatusCallback", statusCallback);
     const response = await fetch(`${TWILIO_API}/Accounts/${auth.sid}/Messages.json`, {
       method: "POST",
+      signal: AbortSignal.timeout(15_000),
       headers: { authorization: auth.header, "content-type": "application/x-www-form-urlencoded" },
       body: form,
     });
