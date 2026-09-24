@@ -7,7 +7,7 @@
 - **Merge:** pending required checks.
 - **Deployment/configuration:** pending. This records manual attestations only; it does not reconcile supplied cash against receipts, run automatic close, add a reopen workflow or lock future financial postings. Those Priority 7 requirements remain open.
 - **Live verification:** no real close or financial transaction performed. P06 and wider programme remain unaccepted.
-- **Prior stock fix:** PR247 merged as 1c1a6e8254d6615905f8e5b3e2fa71fa8aa98c26 after all required checks, including isolated PostgreSQL/no-write tests, passed. Independent security review found no concrete bypass/regression. Deployment verification remains pending.
+- **Prior stock fix verified:** PR247 merged as 1c1a6e8254d6615905f8e5b3e2fa71fa8aa98c26 after all required checks, including isolated PostgreSQL/no-write tests, passed. Independent security review found no concrete bypass/regression. Deployment 36031175753 succeeded; independently inspected stor24-crm:1c1a6e825 healthy and public application/database health correct. No live stock mutation performed; staff acceptance remains open.
 
 ## Stock facility-authorisation checkpoint — 24 September 2026
 
