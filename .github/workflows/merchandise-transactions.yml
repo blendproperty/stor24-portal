@@ -51,3 +51,13 @@ jobs:
       - run: npx tsx --test tests/integration/collections.test.ts
       - run: npx tsx --test tests/integration/settlements.test.ts
       - run: npx tsx --test tests/integration/mri.test.ts
+      - name: Verify synthetic database backup and restore
+        run: npx tsx scripts/test-synthetic-restore.ts
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: synthetic-restore-evidence
+          path: output/recovery/synthetic-restore.json
+          if-no-files-found: ignore
