@@ -3,6 +3,7 @@ import { unitIsOperational, floorMapSelection } from "@/lib/floor-availability";
 import { createHash } from "node:crypto";
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { assertMoveOutDatePolicy } from "@/lib/move-out-date-policy";
 import { welcomeTenantWhenReady } from "@/lib/tenant-welcome-email";
 import { facilityWhere, requireFacility, type RequestScope } from "@/lib/scope";
 import { revokeBiometricAccess } from "@/lib/biometric-access-service";
@@ -1137,6 +1138,8 @@ export async function moveOut(
   if (existing.status === "CLOSED" && !replayed) throw new Error("CONFLICT");
 
   if (!replayed) {
+    const policy = await db.configurationProfile.findFirst({ where: { organisationId: scope.organisationId, facilityId: existing.facilityId, domain: "PROGRAM_DEFAULTS", name: "Default", status: "READY" }, select: { config: true } });
+    assertMoveOutDatePolicy(policy?.config, input.movedOutAt);
     const activeBiometrics = await db.biometricEnrollment.findMany({
       where: { occupancy: { tenancyId: existing.id }, status: "ACTIVE" },
       select: { id: true },
