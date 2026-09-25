@@ -279,7 +279,10 @@ test("stock movements require inventory authority at the product's actual facili
   const product = { id: productId, organisationId: "org", facilityId: "b", quantityOnHand: 10 };
   state.db.product = {
     findFirst: async ({ where }: Row) => matches(product, where) ? product : null,
-    update: async ({ data }: Row) => { state.writes.push({ model: "product", data }); product.quantityOnHand += data.quantityOnHand.increment; return product; },
+    updateMany: async ({ where, data }: Row) => {
+      if (where.id !== product.id || where.organisationId !== product.organisationId || (where.quantityOnHand && product.quantityOnHand < where.quantityOnHand.gte)) return { count: 0 };
+      state.writes.push({ model: "product", data }); product.quantityOnHand += data.quantityOnHand.increment; return { count: 1 };
+    },
   };
   state.db.stockMovement = { create: async ({ data }: Row) => { state.writes.push({ model: "stockMovement", data }); return { id: "movement", ...data }; } };
   const api = await load("./src/app/api/v1/operations/route.ts", state);

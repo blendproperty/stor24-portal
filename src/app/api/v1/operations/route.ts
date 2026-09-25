@@ -87,11 +87,16 @@ export async function POST(request: Request) {
         if (!product) throw new Error("FORBIDDEN");
         await requirePermission("inventory.manage", product.facilityId);
         const delta = ["SALE", "DAMAGE"].includes(input.type) ? -Math.abs(input.quantity) : input.quantity;
-        if (product.quantityOnHand + delta < 0) throw new Error("INSUFFICIENT_STOCK");
+        const claimed = await tx.product.updateMany({
+          where: { id: product.id, organisationId, ...(delta < 0 ? { quantityOnHand: { gte: -delta } } : {}) },
+          data: { quantityOnHand: { increment: delta } },
+        });
+        if (claimed.count !== 1) throw new Error("INSUFFICIENT_STOCK");
         const movement = await tx.stockMovement.create({ data: { ...input, quantity: delta, createdById: user.id } });
-        await tx.product.update({ where: { id: product.id }, data: { quantityOnHand: { increment: delta } } });
+        await tx.auditEvent.create({ data: { organisationId, actorId: user.id, action: "stockMovement.create", entityType: "stockMovement", entityId: movement.id, after: JSON.parse(JSON.stringify(movement)) } });
         return movement;
       });
+      audited = true;
     } else if (body.kind === "storagePackage") {
       const input = storagePackageSchema.parse(body.payload);
       await ensureFacility(input.facilityId);
