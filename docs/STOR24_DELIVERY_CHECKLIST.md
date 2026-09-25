@@ -1,4 +1,4 @@
-# STOR24 delivery checklist
+$125 September connection resilience checkpoint: three bounded SSH connection attempts address observed pre-execution timeouts; strict host verification retained and remote deployment is never replayed automatically. YAML/OpenSSH option validation passed; required CI/promotion pending. PR279 deployed with exact image/readiness verified at 06:30:04 UTC; PR280 actual PostgreSQL MFA races and every required check passed, merged 0ac8ff5e, rollout pending. All acceptance gates remain open.
 
 25 September MFA checkpoint: original verification admitted eight sessions for one recovery code. Shared credential lifecycle lock/transaction candidate passes actual-route cases, independent review and 454 tests/typecheck/lint. PostgreSQL race/rollback checks and promotion pending. PR278 deployed/verified; PR279 deployment safely retrying an SSH timeout before execution. All staff/security acceptance remains open.
 

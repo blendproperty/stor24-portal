@@ -47,7 +47,10 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
           test -n "$VPS_USER"
-          ssh -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" \
+          # Retry connection establishment only; never replay a partially executed deployment.
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o ConnectionAttempts=3 -o ConnectTimeout=20 \
+            -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" \
             "set -o pipefail && umask 077 && cd /opt/stor24-crm && \
              git fetch origin '$DEPLOY_REF' && \
              git checkout --detach FETCH_HEAD && \
