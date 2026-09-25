@@ -380,25 +380,42 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
     if (await createInventory("storagePackage", { facilityId: packageFacilityId, code: String(formData.get("code") ?? "").trim(), name: String(formData.get("name") ?? "").trim(), description: formData.get("description"), badge: formData.get("badge") || undefined, imageUrl: formData.get("imageUrl") || undefined, sellingPrice: Number(formData.get("sellingPrice")), minUnitAreaSqM: formData.get("minUnitAreaSqM") ? Number(formData.get("minUnitAreaSqM")) : undefined, maxUnitAreaSqM: formData.get("maxUnitAreaSqM") ? Number(formData.get("maxUnitAreaSqM")) : undefined, active: true, items: selectedProducts.map((product) => ({ productId: product.id, quantity: Number(formData.get(`quantity:${product.id}`)) })) })) { setShowPackage(false); setPackageFacilityId(""); }
   }
 
+  const packageUpdateRequest = useRef(false);
+  const [packageUpdateMessage, setPackageUpdateMessage] = useState("");
+  const [packageUpdateUncertain, setPackageUpdateUncertain] = useState(false);
   async function updatePackage(formData: FormData) {
-    if (!selectedPackage || !data) return;
-    const selectedProducts = data.products.filter((product) => product.facilityId === selectedPackage.facilityId && Number(formData.get(`quantity:${product.id}`)) > 0);
-    setBusy(true); setError("");
-    const response = await fetch(`/api/v1/operations/storage-packages/${selectedPackage.id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        code: formData.get("code"), name: formData.get("name"), description: formData.get("description"), badge: formData.get("badge") || undefined, imageUrl: formData.get("imageUrl") || null,
-        sellingPrice: Number(formData.get("sellingPrice")), minUnitAreaSqM: formData.get("minUnitAreaSqM") ? Number(formData.get("minUnitAreaSqM")) : undefined,
-        maxUnitAreaSqM: formData.get("maxUnitAreaSqM") ? Number(formData.get("maxUnitAreaSqM")) : undefined, sortOrder: Number(formData.get("sortOrder")),
-        active: formData.get("active") === "on", items: selectedProducts.map((product) => ({ productId: product.id, quantity: Number(formData.get(`quantity:${product.id}`)) })),
-      }),
-    });
-    const body = await response.json(); setBusy(false);
-    if (!response.ok) { setError(body.error?.message ?? "Package could not be updated."); return; }
-    setSelectedPackage(null); await load();
+    if (!selectedPackage || !data || packageUpdateRequest.current || packageUpdateUncertain) return;
+    packageUpdateRequest.current = true;
+    setBusy(true); setPackageUpdateMessage("");
+    const id = selectedPackage.id;
+    const selectedProducts = data.products.filter(product => product.facilityId === selectedPackage.facilityId && Number(formData.get(`quantity:${product.id}`)) > 0);
+    const input = {
+      code: String(formData.get("code") ?? "").trim(), name: String(formData.get("name") ?? "").trim(), description: formData.get("description"), badge: formData.get("badge") || undefined, imageUrl: formData.get("imageUrl") || null,
+      sellingPrice: Number(formData.get("sellingPrice")), minUnitAreaSqM: formData.get("minUnitAreaSqM") ? Number(formData.get("minUnitAreaSqM")) : undefined,
+      maxUnitAreaSqM: formData.get("maxUnitAreaSqM") ? Number(formData.get("maxUnitAreaSqM")) : undefined, sortOrder: Number(formData.get("sortOrder")),
+      active: formData.get("active") === "on", items: selectedProducts.map(product => ({ productId: product.id, quantity: Number(formData.get(`quantity:${product.id}`)) })),
+    };
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20_000);
+    try {
+      const response = await fetch(`/api/v1/operations/storage-packages/${id}`, { method: "PATCH", signal: controller.signal, headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
+      const body = await response.json();
+      if ([400, 401, 403, 404, 422, 429].includes(response.status)) {
+        setPackageUpdateMessage(typeof body.error?.message === "string" ? body.error.message : "Package was not updated. Check the details and your access, then try again.");
+        return;
+      }
+      const saved = body.data;
+      const matchingItems = Array.isArray(saved?.items) && saved.items.length === input.items.length && input.items.every(item => saved.items.filter((entry: {productId: string; quantity: number}) => entry.productId === item.productId && entry.quantity === item.quantity).length === 1);
+      if (!response.ok || saved?.id !== id || saved.facilityId !== selectedPackage.facilityId || saved.code !== input.code || saved.name !== input.name || Number(saved.sellingPrice) !== input.sellingPrice || saved.active !== input.active || !matchingItems) throw new Error("Unconfirmed package update");
+      setSelectedPackage(null); setPackageUpdateMessage("Package updated.");
+      await load();
+    } catch {
+      setPackageUpdateUncertain(true);
+      setPackageUpdateMessage("We could not confirm the package changes. Reload the catalogue and check the contents and price before editing again.");
+    } finally {
+      clearTimeout(timeout); packageUpdateRequest.current = false; setBusy(false);
+    }
   }
-
   if (!data) return <div className="page-stack">
     <PageHeader eyebrow="Facility workflows" title={view === "merchandise" ? "Merchandise" : "Operations centre"} description="Work queues and facility records." />
     <section className="panel panel-spacious">
@@ -421,12 +438,13 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
     {showStock ? <div className="modal-backdrop"><div className="modal-card" role="dialog" aria-modal="true"><p className="eyebrow">Stock control</p><h2>Record stock movement</h2><form onSubmit={(event) => { event.preventDefault(); void moveStock(new FormData(event.currentTarget)); }} className="invite-form">{stockMessage ? <div role="alert"><p>{stockMessage}</p>{stockUncertain ? <button type="button" className="button button-primary" onClick={() => window.location.reload()}>Reload inventory</button> : null}</div> : null}<label>Product<select name="productId" required><option value="">Choose product</option>{data?.products.map((product) => <option key={product.id} value={product.id}>{product.facility.name} · {product.name} · {product.quantityOnHand - product.quantityReserved} available</option>)}</select></label><label>Movement<select name="type" defaultValue="RECEIPT"><option>RECEIPT</option><option>ADJUSTMENT</option><option>DAMAGE</option><option>RETURN</option></select></label><label>Quantity<input name="quantity" type="number" step="1" required/></label><label>Unit cost<input name="unitCost" type="number" min="0" step="0.01"/></label><label>Supplier/reference<input name="reference"/></label><label>Reason<input name="reason"/></label><div className="form-actions"><button type="button" className="button button-secondary" onClick={() => setShowStock(false)}>Cancel</button><button className="button button-primary" disabled={busy || stockUncertain}>{busy ? "Saving…" : "Record movement"}</button></div></form></div></div> : null}
     {showPackage && !draftPackage ? <div className="modal-backdrop"><div className="modal-card package-facility-dialog" role="dialog" aria-modal="true"><p className="eyebrow">Package studio</p><h2>Where will this package be sold?</h2><p className="modal-copy">Choose a facility so we can show the correct products, prices and available stock.</p><label>Facility<select value={packageFacilityId} onChange={(event) => setPackageFacilityId(event.target.value)}><option value="">Choose facility</option>{data?.facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}</select></label><div className="form-actions"><button type="button" className="button button-secondary" onClick={() => { setShowPackage(false); setPackageFacilityId(""); }}>Cancel</button></div></div></div> : null}
     {showPackage && draftPackage && data ? <PackageEditorModal mode="create" message={packageCreationMessage} uncertain={packageCreationUncertain} storagePackage={draftPackage} products={data.products} busy={busy} close={() => { setShowPackage(false); setPackageFacilityId(""); }} save={createPackage}/> : null}
-    {selectedPackage && data ? <PackageEditorModal storagePackage={selectedPackage} products={data.products} busy={busy} close={() => setSelectedPackage(null)} save={updatePackage}/> : null}
+    {selectedPackage && data ? <PackageEditorModal message={packageUpdateMessage} uncertain={packageUpdateUncertain} storagePackage={selectedPackage} products={data.products} busy={busy} close={() => setSelectedPackage(null)} save={updatePackage}/> : null}
   </>;
 
   if (view === "merchandise") return <div className="page-stack">
     <PageHeader eyebrow="Operations · Merchandise" title="Merchandise" description="A dedicated catalogue, stock and package workspace for everything sold alongside a Stor24 unit." action={<span className="inline-actions"><button className="button button-secondary" disabled={busy || stockUncertain} onClick={() => setShowStock(true)}>Move stock</button><button className="button button-primary" disabled={busy || productCreationUncertain} onClick={() => setShowProduct(true)}><Plus size={16}/> Add product</button></span>} />
     <details className="panel"><summary>Customer purchases · collection and delivery</summary><MerchandiseOrderQueue /></details>
+    {packageUpdateMessage && !selectedPackage ? <div role={packageUpdateUncertain ? "alert" : "status"}><p>{packageUpdateMessage}</p>{packageUpdateUncertain ? <button className="button button-primary" onClick={() => window.location.reload()}>Reload catalogue</button> : null}</div> : null}
     {packageCreationMessage && !showPackage ? <div role={packageCreationUncertain ? "alert" : "status"}><p>{packageCreationMessage}</p>{packageCreationUncertain ? <button className="button button-primary" onClick={() => window.location.reload()}>Reload catalogue</button> : null}</div> : null}
     {productUpdateMessage && !selectedProduct ? <div role={productUpdateUncertain ? "alert" : "status"}><p>{productUpdateMessage}</p>{productUpdateUncertain ? <button className="button button-primary" onClick={() => window.location.reload()}>Reload catalogue</button> : null}</div> : null}
     {productCreationMessage && !showProduct ? <div role={productCreationUncertain ? "alert" : "status"}><p>{productCreationMessage}</p>{productCreationUncertain ? <button className="button button-primary" onClick={() => window.location.reload()}>Reload catalogue</button> : null}</div> : null}

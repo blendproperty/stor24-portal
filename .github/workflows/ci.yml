@@ -40,6 +40,7 @@ jobs:
       - run: node scripts/test-product-create-recovery.mjs
       - run: node scripts/test-product-update-recovery.mjs
       - run: node scripts/test-package-create-recovery.mjs
+      - run: node scripts/test-package-update-recovery.mjs
       - run: node scripts/test-login-redirect.mjs
       - run: node scripts/test-whatsapp-retry.mjs
       - run: node scripts/test-collections.mjs
@@ -70,6 +71,7 @@ jobs:
             output/product-create-recovery/
             output/product-update-recovery/
             output/package-create-recovery/
+            output/package-update-recovery/
             output/password-form-recovery/
             output/monthly-billing/
             output/debit-orders/
