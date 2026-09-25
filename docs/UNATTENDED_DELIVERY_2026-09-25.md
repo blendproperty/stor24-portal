@@ -68,3 +68,13 @@ PR285 deployment attempt 1 exhausted its three SSH connection attempts before re
 The expired two-hour heartbeat is paused. A usage-limit interruption stopped work before Brett's later CARRY ON; this record does not count the intervening scheduled wakeups as implementation time. Latest continuation is actively authorised, without inventing a new unattended deadline.
 
 Legal/PAIA/biometric basis and retention, external provider/device deletion and access, Google ownership/rotation, staff/MFA UAT, approved opening balances and tax/rent rules, MRI/Netcash evidence, billing schedule credential correction, production backup/key recovery targets and delivered alerts remain open. Repeated TOTP policy and existing reset/change transaction-conflict handling are separate from the repaired boundaries.
+
+## Afternoon regression and account-security recovery
+
+PR287 source e61d00783c207d346023ad741d3cd0cc0926bdc5 passed CI 36137656573, PostgreSQL 36137656583 and security 36137656539, and merged aa475cc36a95fd0ce36620bd619505ef20eb12e3. Main CI 36138808482 passed; deployment 36139032611 passed. Exact image stor24-crm:aa475cc36 healthy at 13:10 UTC. Workbook E046 records this release; staff acceptance remains open.
+
+The account-security screen now recovers from failed reads, bounds mutation requests and prevents silent retries after uncertain results. Existing credential/session policies are unchanged. Actual-component browser fixtures cover initial read retry, interrupted/malformed/timeout responses, validation recovery and successful setup at desktop/mobile widths. Staff acceptance remains open.
+
+Fresh baseline: 458 tests, typecheck, lint with existing warnings and production build passed. Synthetic browser checks additionally passed monthly billing, company settings, six-step move-in, password recovery, local sign-in return links, restricted navigation, payment retries, debit orders, adjustments/refunds, collections, settlements and MRI. These do not prove real provider delivery, finance reconciliation or staff acceptance.
+
+
