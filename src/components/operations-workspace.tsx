@@ -20,6 +20,9 @@ type OperationsData = { tasks: Task[]; maintenance: Maintenance[]; products: Pro
 export function OperationsWorkspace({ view = "operations" }: { view?: "operations" | "merchandise" }) {
   const [data, setData] = useState<OperationsData | null>(null);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [readFailed, setReadFailed] = useState(false);
+  const readRequest = useRef<AbortController | null>(null);
   const taskRequest = useRef(false);
   const [taskBusy, setTaskBusy] = useState(false);
   const [taskNeedsCheck, setTaskNeedsCheck] = useState(false);
@@ -38,20 +41,36 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
   const [productCategory, setProductCategory] = useState("ALL");
 
   const load = useCallback(async () => {
-    const response = await fetch("/api/v1/operations", { cache: "no-store" });
-    const payload = await response.json();
-    if (!response.ok) { setError(payload.error?.message ?? "Operations data could not be loaded."); return; }
-    setData(payload.data); setError("");
+    readRequest.current?.abort();
+    const controller = new AbortController();
+    readRequest.current = controller;
+    setLoading(true);
+    const timeout = setTimeout(() => controller.abort(), 20_000);
+    try {
+      const response = await fetch("/api/v1/operations", { cache: "no-store", signal: controller.signal });
+      const payload = await response.json();
+      if (!response.ok || !payload.data || !["tasks", "maintenance", "products", "storagePackages", "dailyCloses", "notes", "facilities"].every(key => Array.isArray(payload.data[key]))) throw new Error("Operations data unavailable");
+      if (readRequest.current !== controller) return;
+      setData(payload.data);
+      setError("");
+      setReadFailed(false);
+    } catch {
+      if (readRequest.current !== controller) return;
+      setReadFailed(true);
+      setError("Operations data could not be loaded. Please try again.");
+    } finally {
+      clearTimeout(timeout);
+      if (readRequest.current === controller) {
+        readRequest.current = null;
+        setLoading(false);
+      }
+    }
   }, []);
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/v1/operations", { cache: "no-store" }).then(async (response) => ({ response, payload: await response.json() })).then(({ response, payload }) => {
-      if (cancelled) return;
-      if (!response.ok) setError(payload.error?.message ?? "Operations data could not be loaded.");
-      else setData(payload.data);
-    });
-    return () => { cancelled = true; };
-  }, []);
+    void Promise.resolve().then(() => { if (!cancelled) void load(); });
+    return () => { cancelled = true; readRequest.current?.abort(); readRequest.current = null; };
+  }, [load]);
 
   async function createTask(formData: FormData) {
     setBusy(true);
@@ -194,6 +213,14 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
     setSelectedPackage(null); await load();
   }
 
+  if (!data) return <div className="page-stack">
+    <PageHeader eyebrow="Facility workflows" title={view === "merchandise" ? "Merchandise" : "Operations centre"} description="Work queues and facility records." />
+    <section className="panel panel-spacious">
+      {loading ? <p role="status">Loading operations data…</p> : <><p role="alert">{error}</p><button className="button button-primary" onClick={() => void load()}>Retry loading</button></>}
+    </section>
+  </div>;
+
+  const readRecovery = readFailed ? <div role="alert"><p>Displayed records may be out of date.</p><button className="button button-primary" disabled={loading} onClick={() => void load()}>{loading ? "Loading…" : "Retry loading"}</button></div> : null;
   const openTasks = data?.tasks.filter((task) => !["COMPLETED", "CANCELLED"].includes(task.status)) ?? [];
   const service = data?.maintenance.filter((item) => !["COMPLETED", "CANCELLED"].includes(item.status)) ?? [];
   const reorder = data?.products.filter((product) => product.quantityOnHand <= product.reorderPoint) ?? [];
@@ -214,7 +241,7 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
   if (view === "merchandise") return <div className="page-stack">
     <PageHeader eyebrow="Operations · Merchandise" title="Merchandise" description="A dedicated catalogue, stock and package workspace for everything sold alongside a Stor24 unit." action={<span className="inline-actions"><button className="button button-secondary" onClick={() => setShowStock(true)}>Move stock</button><button className="button button-primary" onClick={() => setShowProduct(true)}><Plus size={16}/> Add product</button></span>} />
     <details className="panel"><summary>Customer purchases · collection and delivery</summary><MerchandiseOrderQueue /></details>
-    {error ? <p className="form-error">{error}</p> : null}
+    {error ? <p className="form-error">{error}</p> : null}{readRecovery}
     <section className="summary-strip">
       {[["Products", data?.products.length ?? 0], ["Active packages", data?.storagePackages.filter((pack) => pack.active).length ?? 0], ["Reorder items", reorder.length], ["Facilities", data?.facilities.length ?? 0]].map(([label, value]) => <div className="summary-cell" key={label}><span>{label}</span><strong>{value}</strong></div>)}
     </section>
@@ -226,7 +253,7 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
   return <div className="page-stack">
     <PageHeader eyebrow="Facility workflows" title="Operations centre" description="Database-backed work queues, maintenance and end-of-day control for Stor24." action={<button className="button button-primary" onClick={() => setShowTask(true)}><Plus size={16}/> New task</button>} />
     {taskMessage ? <div role={taskNeedsCheck ? "alert" : "status"}><p>{taskMessage}</p>{taskNeedsCheck ? <button className="button button-primary" disabled={taskBusy} onClick={checkTaskStatus}>{taskBusy ? "Checking…" : "Check task status"}</button> : null}</div> : null}
-    {error ? <p className="form-error">{error}</p> : null}
+    {error ? <p className="form-error">{error}</p> : null}{readRecovery}
     <section className="summary-strip">
       {[["Open tasks", openTasks.length], ["Service required", service.length], ["Reorder items", reorder.length], ["Daily closes", data?.dailyCloses.length ?? 0]].map(([label, value]) => <div className="summary-cell" key={label}><span>{label}</span><strong>{value}</strong></div>)}
     </section>

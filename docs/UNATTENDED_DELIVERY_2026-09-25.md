@@ -77,4 +77,22 @@ The account-security screen now recovers from failed reads, bounds mutation requ
 
 Fresh baseline: 458 tests, typecheck, lint with existing warnings and production build passed. Synthetic browser checks additionally passed monthly billing, company settings, six-step move-in, password recovery, local sign-in return links, restricted navigation, payment retries, debit orders, adjustments/refunds, collections, settlements and MRI. These do not prove real provider delivery, finance reconciliation or staff acceptance.
 
+## Afternoon operations checkpoint — 14:55 UTC
+
+PR289/290 portal pending/completed purchase read recovery and PR291 task status/audit atomicity are deployed; exact promotion evidence is retained in PROJECT_CONTEXT.md and Excel E048–E050. PR292 stock movement transaction/concurrency protection is deployed; expanded regression found a historical-negative-stock receipt edge case, corrected in PR293 rather than silently treating PR292 as complete coverage.
+
+PR293 source3cc322c65ef41c6fa82a7fe1b69bc879c949653a merged d7ac92e3f509d28329a67222bfcc5d39d86d9525. CI36147684921/SQL36147684901/security36147684864 and mainCI36148138323/deploy36148432411 passed; exact imaged7ac92e3f healthy/service/database verified14:36:50 UTC. Task, unit-note, product and package creation now rolls back if audit creation fails, including nested package items; the receipt correction preserves the original non-negative result rule.
+
+PR294 source6506c975f29f3036e11825da361b1cf56db9b4db merged14c7c7c7ed7a390a65d7b4d7aa4e78f0ade161e4. CI36149214934/SQL36149214953/security36149214704 and mainCI36150205019/deploy36150494999 passed. Exact image14c7c7c7e healthy/service/database verified14:55:33 UTC. Task completion validates confirmation and requires a read-only status check after an uncertain result. All462 unit tests passed; actual-component desktop/mobile failure and recovery fixtures passed. Workbook E052/E053 records these releases; zero programme priorities accepted.
+
+### Staff acceptance still required
+
+- [ ] With an authorised synthetic task, confirm Complete removes the task from the open queue and creates one audit entry.
+- [ ] Review the supplied rejected/lost-response browser evidence: an uncertain completion must offer Check task status and must not repeat a change automatically. Do not deliberately fault production.
+- [ ] Review isolated PostgreSQL stock evidence: competing deductions cannot oversell current quantity, audit failure rolls back the movement, and a receipt against negative stock must restore a non-negative quantity. Reserved-stock policy and cross-request idempotency remain separate.
+- [ ] Review task/note/product/package rollback evidence and then verify permitted creation and audit history using approved test records. No production transactions were created by these rehearsals.
+- [ ] Confirm portal purchase and pending-order recovery guidance is understandable on a phone; provider payment and financial acceptance remain open.
+
+The next candidate addresses false empty operations/merchandise screens after failed initial reads. It is not yet deployed at this checkpoint. Other mutation forms and the original legal/provider/finance/recovery gates remain open.
+
 
