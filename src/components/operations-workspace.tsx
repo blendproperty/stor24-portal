@@ -39,6 +39,9 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
   const [maintenanceUncertain, setMaintenanceUncertain] = useState(false);
   const [maintenanceFacilityId, setMaintenanceFacilityId] = useState("");
   const [showProduct, setShowProduct] = useState(false);
+  const productCreationRequest = useRef(false);
+  const [productCreationMessage, setProductCreationMessage] = useState("");
+  const [productCreationUncertain, setProductCreationUncertain] = useState(false);
   const [showStock, setShowStock] = useState(false);
   const stockRequest = useRef(false);
   const [stockMessage, setStockMessage] = useState("");
@@ -248,7 +251,7 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
     }
   }
 
-  async function createInventory(kind: "product" | "storagePackage", payload: Record<string, unknown>) {
+  async function createInventory(kind: "storagePackage", payload: Record<string, unknown>) {
     setBusy(true); setError("");
     const response = await fetch("/api/v1/operations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, payload }) });
     const body = await response.json(); setBusy(false);
@@ -257,7 +260,35 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
   }
 
   async function createProduct(formData: FormData) {
-    if (await createInventory("product", { facilityId: formData.get("facilityId"), sku: formData.get("sku"), name: formData.get("name"), category: formData.get("category"), barcode: formData.get("barcode") || undefined, imageUrl: formData.get("imageUrl") || undefined, costPrice: Number(formData.get("costPrice")), sellingPrice: Number(formData.get("sellingPrice")), quantityOnHand: Number(formData.get("quantityOnHand")), reorderPoint: Number(formData.get("reorderPoint")) })) setShowProduct(false);
+    if (productCreationRequest.current || productCreationUncertain) return;
+    productCreationRequest.current = true;
+    setBusy(true);
+    setProductCreationMessage("");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20_000);
+    try {
+      const facilityId = String(formData.get("facilityId") ?? "");
+      const sku = String(formData.get("sku") ?? "").trim();
+      const name = String(formData.get("name") ?? "").trim();
+      const quantityOnHand = Number(formData.get("quantityOnHand"));
+      const response = await fetch("/api/v1/operations", { method: "POST", signal: controller.signal, headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "product", payload: { facilityId, sku, name, quantityOnHand, category: formData.get("category"), barcode: formData.get("barcode") || undefined, imageUrl: formData.get("imageUrl") || undefined, costPrice: Number(formData.get("costPrice")), sellingPrice: Number(formData.get("sellingPrice")), reorderPoint: Number(formData.get("reorderPoint")) } }) });
+      const body = await response.json();
+      if ([400, 401, 403, 404, 422, 429].includes(response.status)) {
+        setProductCreationMessage(typeof body.error?.message === "string" ? body.error.message : "Product was not created. Check the details and your access, then try again.");
+        return;
+      }
+      if (!response.ok || typeof body.data?.id !== "string" || !body.data.id || body.data.facilityId !== facilityId || body.data.sku !== sku || body.data.name !== name || body.data.quantityOnHand !== quantityOnHand) throw new Error("Unconfirmed product creation");
+      setShowProduct(false);
+      setProductCreationMessage("Product created.");
+      await load();
+    } catch {
+      setProductCreationUncertain(true);
+      setProductCreationMessage("We could not confirm whether this product was created. Reload the catalogue and check the product and opening stock before creating it again.");
+    } finally {
+      clearTimeout(timeout);
+      productCreationRequest.current = false;
+      setBusy(false);
+    }
   }
 
   async function updateProduct(formData: FormData) {
@@ -342,7 +373,7 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
   const draftPackage: StoragePackage | null = packageFacility ? { id: "", facilityId: packageFacility.id, code: "", name: "", description: "", badge: null, imageUrl: null, sellingPrice: "0", minUnitAreaSqM: null, maxUnitAreaSqM: null, sortOrder: data?.storagePackages.length ?? 0, active: true, facility: { name: packageFacility.name }, items: [] } : null;
 
   const merchandiseModals = <>
-    {showProduct ? <div className="modal-backdrop"><div className="modal-card" role="dialog" aria-modal="true"><p className="eyebrow">Merchandise catalogue</p><h2>Add a product</h2><form action={createProduct} className="invite-form"><label>Facility<select name="facilityId" required><option value="">Choose facility</option>{data?.facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}</select></label><label>SKU<input name="sku" required maxLength={60}/></label><label>Product name<input name="name" required maxLength={160}/></label><label>Category<input name="category" required placeholder="Boxes, protection, locks…"/></label><label>Barcode<input name="barcode"/></label><div className="form-grid two"><label>Cost price<input name="costPrice" type="number" min="0" step="0.01" defaultValue="0" required/></label><label>Selling price<input name="sellingPrice" type="number" min="0" step="0.01" required/></label><label>Opening stock<input name="quantityOnHand" type="number" min="0" step="1" defaultValue="0" required/></label><label>Reorder point<input name="reorderPoint" type="number" min="0" step="1" defaultValue="0" required/></label></div><div className="form-actions"><button type="button" className="button button-secondary" onClick={() => setShowProduct(false)}>Cancel</button><button className="button button-primary" disabled={busy}>{busy ? "Saving…" : "Add product"}</button></div></form></div></div> : null}
+    {showProduct ? <div className="modal-backdrop"><div className="modal-card" role="dialog" aria-modal="true"><p className="eyebrow">Merchandise catalogue</p><h2>Add a product</h2><form onSubmit={(event) => { event.preventDefault(); void createProduct(new FormData(event.currentTarget)); }} className="invite-form">{productCreationMessage ? <div role="alert"><p>{productCreationMessage}</p>{productCreationUncertain ? <button type="button" className="button button-primary" onClick={() => window.location.reload()}>Reload catalogue</button> : null}</div> : null}<label>Facility<select name="facilityId" required><option value="">Choose facility</option>{data?.facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}</select></label><label>SKU<input name="sku" required maxLength={60}/></label><label>Product name<input name="name" required maxLength={160}/></label><label>Category<input name="category" required placeholder="Boxes, protection, locks…"/></label><label>Barcode<input name="barcode"/></label><div className="form-grid two"><label>Cost price<input name="costPrice" type="number" min="0" step="0.01" defaultValue="0" required/></label><label>Selling price<input name="sellingPrice" type="number" min="0" step="0.01" required/></label><label>Opening stock<input name="quantityOnHand" type="number" min="0" step="1" defaultValue="0" required/></label><label>Reorder point<input name="reorderPoint" type="number" min="0" step="1" defaultValue="0" required/></label></div><div className="form-actions"><button type="button" className="button button-secondary" onClick={() => setShowProduct(false)}>Cancel</button><button className="button button-primary" disabled={busy || productCreationUncertain}>{busy ? "Saving…" : "Add product"}</button></div></form></div></div> : null}
     {selectedProduct ? <ProductEditorModal product={selectedProduct} busy={busy} close={() => setSelectedProduct(null)} save={updateProduct}/> : null}
     {showStock ? <div className="modal-backdrop"><div className="modal-card" role="dialog" aria-modal="true"><p className="eyebrow">Stock control</p><h2>Record stock movement</h2><form onSubmit={(event) => { event.preventDefault(); void moveStock(new FormData(event.currentTarget)); }} className="invite-form">{stockMessage ? <div role="alert"><p>{stockMessage}</p>{stockUncertain ? <button type="button" className="button button-primary" onClick={() => window.location.reload()}>Reload inventory</button> : null}</div> : null}<label>Product<select name="productId" required><option value="">Choose product</option>{data?.products.map((product) => <option key={product.id} value={product.id}>{product.facility.name} · {product.name} · {product.quantityOnHand - product.quantityReserved} available</option>)}</select></label><label>Movement<select name="type" defaultValue="RECEIPT"><option>RECEIPT</option><option>ADJUSTMENT</option><option>DAMAGE</option><option>RETURN</option></select></label><label>Quantity<input name="quantity" type="number" step="1" required/></label><label>Unit cost<input name="unitCost" type="number" min="0" step="0.01"/></label><label>Supplier/reference<input name="reference"/></label><label>Reason<input name="reason"/></label><div className="form-actions"><button type="button" className="button button-secondary" onClick={() => setShowStock(false)}>Cancel</button><button className="button button-primary" disabled={busy || stockUncertain}>{busy ? "Saving…" : "Record movement"}</button></div></form></div></div> : null}
     {showPackage && !draftPackage ? <div className="modal-backdrop"><div className="modal-card package-facility-dialog" role="dialog" aria-modal="true"><p className="eyebrow">Package studio</p><h2>Where will this package be sold?</h2><p className="modal-copy">Choose a facility so we can show the correct products, prices and available stock.</p><label>Facility<select value={packageFacilityId} onChange={(event) => setPackageFacilityId(event.target.value)}><option value="">Choose facility</option>{data?.facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}</select></label><div className="form-actions"><button type="button" className="button button-secondary" onClick={() => { setShowPackage(false); setPackageFacilityId(""); }}>Cancel</button></div></div></div> : null}
@@ -351,8 +382,9 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
   </>;
 
   if (view === "merchandise") return <div className="page-stack">
-    <PageHeader eyebrow="Operations · Merchandise" title="Merchandise" description="A dedicated catalogue, stock and package workspace for everything sold alongside a Stor24 unit." action={<span className="inline-actions"><button className="button button-secondary" disabled={busy || stockUncertain} onClick={() => setShowStock(true)}>Move stock</button><button className="button button-primary" onClick={() => setShowProduct(true)}><Plus size={16}/> Add product</button></span>} />
+    <PageHeader eyebrow="Operations · Merchandise" title="Merchandise" description="A dedicated catalogue, stock and package workspace for everything sold alongside a Stor24 unit." action={<span className="inline-actions"><button className="button button-secondary" disabled={busy || stockUncertain} onClick={() => setShowStock(true)}>Move stock</button><button className="button button-primary" disabled={busy || productCreationUncertain} onClick={() => setShowProduct(true)}><Plus size={16}/> Add product</button></span>} />
     <details className="panel"><summary>Customer purchases · collection and delivery</summary><MerchandiseOrderQueue /></details>
+    {productCreationMessage && !showProduct ? <div role={productCreationUncertain ? "alert" : "status"}><p>{productCreationMessage}</p>{productCreationUncertain ? <button className="button button-primary" onClick={() => window.location.reload()}>Reload catalogue</button> : null}</div> : null}
     {stockMessage && !showStock ? <div role={stockUncertain ? "alert" : "status"}><p>{stockMessage}</p>{stockUncertain ? <button className="button button-primary" onClick={() => window.location.reload()}>Reload inventory</button> : null}</div> : null}
     {error ? <p className="form-error">{error}</p> : null}{readRecovery}
     <section className="summary-strip">
