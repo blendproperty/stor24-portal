@@ -1,4 +1,11 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Product edit failure recovery — 25 September 2026
+
+- **Implementation:** product edits retain rejected input and catch network/JSON failures, with a 20-second timeout and duplicate-submit guard. Confirmations validate product/facility identity, SKU/name/category, prices, reorder threshold and active state. Uncertain outcomes block save even after reopening and offer a GET-only catalogue reload. Confirmed saves close the editor and show a message before refresh. Backend audit/availability policies are unchanged; this is not server cross-request idempotency.
+- **Testing:** actual-component prepatch network error reproduced. Candidate validation/denial/input retention, duplicate, timeout, malformed/mismatched identity/name/SKU/price/active, conflict/server/lost confirmation, reopened-editor block, read-only reload, success and failed-refresh recovery pass at1440/390/320px. Initial test caught a collapsed alert row; alert moved into the scrolling editor layout and retested. All462 unit tests/typecheck/focused lint and product-create/access browser regressions pass. Fixture screenshot inspected; production font/shell and staff acceptance remain separate. Required CI pending.
+- **Commit/push/merge/deployment/live verification:** candidate promotion pending in enclosing PR. No production product/stock changes.
+- **Prior verified checkpoint:** PR302 source dc863a93788e02b14a37386d848fff3d6dd4ad82 passed CI36162806265/SQL36162806037/security36162806053, mergedddc9b3ffe86ce899c3d1d62d21084abd3c99c40d. Main CI36163434558/deploy36163815127 passed. Exact image stor24-crm:ddc9b3ffe healthy/service/database verified2026-09-25T16:56:43.861Z. Excel E061 updated/rendered/export-reimport passed with known native exit-after-export limitation. All14 programme acceptance gates remain open.
+
 ## Product creation failure recovery — 25 September 2026
 
 - **Implementation:** product creation retains rejected input, bounds requests to 20 seconds and guards duplicate submissions. Confirmation must match saved ID, facility, SKU, name and opening quantity. Uncertain outcomes block resubmission after closing the modal and offer read-only catalogue reload. Backend policies and server cross-request idempotency are unchanged.

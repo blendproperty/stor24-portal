@@ -291,15 +291,36 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
     }
   }
 
+  const productUpdateRequest = useRef(false);
+  const [productUpdateMessage, setProductUpdateMessage] = useState("");
+  const [productUpdateUncertain, setProductUpdateUncertain] = useState(false);
   async function updateProduct(formData: FormData) {
-    if (!selectedProduct) return;
-    setBusy(true); setError("");
-    const response = await fetch(`/api/v1/operations/products/${selectedProduct.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ sku: formData.get("sku"), name: formData.get("name"), category: formData.get("category"), barcode: formData.get("barcode") || undefined, imageUrl: formData.get("imageUrl") || null, costPrice: Number(formData.get("costPrice")), sellingPrice: Number(formData.get("sellingPrice")), reorderPoint: Number(formData.get("reorderPoint")), active: formData.get("active") === "on" }) });
-    const body = await response.json(); setBusy(false);
-    if (!response.ok) { setError(body.error?.message ?? "Product could not be updated."); return; }
-    setSelectedProduct(null); await load();
+    if (!selectedProduct || productUpdateRequest.current || productUpdateUncertain) return;
+    productUpdateRequest.current = true;
+    setBusy(true); setProductUpdateMessage("");
+    const id = selectedProduct.id;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20_000);
+    const input = { sku: String(formData.get("sku") ?? "").trim(), name: String(formData.get("name") ?? "").trim(), category: String(formData.get("category") ?? "").trim(), barcode: formData.get("barcode") || undefined, imageUrl: formData.get("imageUrl") || null, costPrice: Number(formData.get("costPrice")), sellingPrice: Number(formData.get("sellingPrice")), reorderPoint: Number(formData.get("reorderPoint")), active: formData.get("active") === "on" };
+    try {
+      const response = await fetch(`/api/v1/operations/products/${id}`, { method: "PATCH", signal: controller.signal, headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
+      const body = await response.json();
+      if ([400, 401, 403, 404, 422, 429].includes(response.status)) {
+        setProductUpdateMessage(typeof body.error?.message === "string" ? body.error.message : "Product was not updated. Check the details and your access, then try again.");
+        return;
+      }
+      const saved = body.data;
+      if (!response.ok || saved?.id !== id || saved.facilityId !== selectedProduct.facilityId || saved.sku !== input.sku || saved.name !== input.name || saved.category !== input.category || Number(saved.costPrice) !== input.costPrice || Number(saved.sellingPrice) !== input.sellingPrice || saved.reorderPoint !== input.reorderPoint || saved.active !== input.active) throw new Error("Unconfirmed product update");
+      setSelectedProduct(null);
+      setProductUpdateMessage("Product updated.");
+      await load();
+    } catch {
+      setProductUpdateUncertain(true);
+      setProductUpdateMessage("We could not confirm the product changes. Reload the catalogue and check the details before editing again.");
+    } finally {
+      clearTimeout(timeout); productUpdateRequest.current = false; setBusy(false);
+    }
   }
-
   async function moveStock(formData: FormData) {
     if (stockRequest.current || stockUncertain) return;
     stockRequest.current = true;
@@ -374,7 +395,7 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
 
   const merchandiseModals = <>
     {showProduct ? <div className="modal-backdrop"><div className="modal-card" role="dialog" aria-modal="true"><p className="eyebrow">Merchandise catalogue</p><h2>Add a product</h2><form onSubmit={(event) => { event.preventDefault(); void createProduct(new FormData(event.currentTarget)); }} className="invite-form">{productCreationMessage ? <div role="alert"><p>{productCreationMessage}</p>{productCreationUncertain ? <button type="button" className="button button-primary" onClick={() => window.location.reload()}>Reload catalogue</button> : null}</div> : null}<label>Facility<select name="facilityId" required><option value="">Choose facility</option>{data?.facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}</select></label><label>SKU<input name="sku" required maxLength={60}/></label><label>Product name<input name="name" required maxLength={160}/></label><label>Category<input name="category" required placeholder="Boxes, protection, locks…"/></label><label>Barcode<input name="barcode"/></label><div className="form-grid two"><label>Cost price<input name="costPrice" type="number" min="0" step="0.01" defaultValue="0" required/></label><label>Selling price<input name="sellingPrice" type="number" min="0" step="0.01" required/></label><label>Opening stock<input name="quantityOnHand" type="number" min="0" step="1" defaultValue="0" required/></label><label>Reorder point<input name="reorderPoint" type="number" min="0" step="1" defaultValue="0" required/></label></div><div className="form-actions"><button type="button" className="button button-secondary" onClick={() => setShowProduct(false)}>Cancel</button><button className="button button-primary" disabled={busy || productCreationUncertain}>{busy ? "Saving…" : "Add product"}</button></div></form></div></div> : null}
-    {selectedProduct ? <ProductEditorModal product={selectedProduct} busy={busy} close={() => setSelectedProduct(null)} save={updateProduct}/> : null}
+    {selectedProduct ? <ProductEditorModal product={selectedProduct} busy={busy} message={productUpdateMessage} uncertain={productUpdateUncertain} close={() => setSelectedProduct(null)} save={updateProduct}/> : null}
     {showStock ? <div className="modal-backdrop"><div className="modal-card" role="dialog" aria-modal="true"><p className="eyebrow">Stock control</p><h2>Record stock movement</h2><form onSubmit={(event) => { event.preventDefault(); void moveStock(new FormData(event.currentTarget)); }} className="invite-form">{stockMessage ? <div role="alert"><p>{stockMessage}</p>{stockUncertain ? <button type="button" className="button button-primary" onClick={() => window.location.reload()}>Reload inventory</button> : null}</div> : null}<label>Product<select name="productId" required><option value="">Choose product</option>{data?.products.map((product) => <option key={product.id} value={product.id}>{product.facility.name} · {product.name} · {product.quantityOnHand - product.quantityReserved} available</option>)}</select></label><label>Movement<select name="type" defaultValue="RECEIPT"><option>RECEIPT</option><option>ADJUSTMENT</option><option>DAMAGE</option><option>RETURN</option></select></label><label>Quantity<input name="quantity" type="number" step="1" required/></label><label>Unit cost<input name="unitCost" type="number" min="0" step="0.01"/></label><label>Supplier/reference<input name="reference"/></label><label>Reason<input name="reason"/></label><div className="form-actions"><button type="button" className="button button-secondary" onClick={() => setShowStock(false)}>Cancel</button><button className="button button-primary" disabled={busy || stockUncertain}>{busy ? "Saving…" : "Record movement"}</button></div></form></div></div> : null}
     {showPackage && !draftPackage ? <div className="modal-backdrop"><div className="modal-card package-facility-dialog" role="dialog" aria-modal="true"><p className="eyebrow">Package studio</p><h2>Where will this package be sold?</h2><p className="modal-copy">Choose a facility so we can show the correct products, prices and available stock.</p><label>Facility<select value={packageFacilityId} onChange={(event) => setPackageFacilityId(event.target.value)}><option value="">Choose facility</option>{data?.facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}</select></label><div className="form-actions"><button type="button" className="button button-secondary" onClick={() => { setShowPackage(false); setPackageFacilityId(""); }}>Cancel</button></div></div></div> : null}
     {showPackage && draftPackage && data ? <PackageEditorModal mode="create" storagePackage={draftPackage} products={data.products} busy={busy} close={() => { setShowPackage(false); setPackageFacilityId(""); }} save={createPackage}/> : null}
@@ -384,6 +405,7 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
   if (view === "merchandise") return <div className="page-stack">
     <PageHeader eyebrow="Operations · Merchandise" title="Merchandise" description="A dedicated catalogue, stock and package workspace for everything sold alongside a Stor24 unit." action={<span className="inline-actions"><button className="button button-secondary" disabled={busy || stockUncertain} onClick={() => setShowStock(true)}>Move stock</button><button className="button button-primary" disabled={busy || productCreationUncertain} onClick={() => setShowProduct(true)}><Plus size={16}/> Add product</button></span>} />
     <details className="panel"><summary>Customer purchases · collection and delivery</summary><MerchandiseOrderQueue /></details>
+    {productUpdateMessage && !selectedProduct ? <div role={productUpdateUncertain ? "alert" : "status"}><p>{productUpdateMessage}</p>{productUpdateUncertain ? <button className="button button-primary" onClick={() => window.location.reload()}>Reload catalogue</button> : null}</div> : null}
     {productCreationMessage && !showProduct ? <div role={productCreationUncertain ? "alert" : "status"}><p>{productCreationMessage}</p>{productCreationUncertain ? <button className="button button-primary" onClick={() => window.location.reload()}>Reload catalogue</button> : null}</div> : null}
     {stockMessage && !showStock ? <div role={stockUncertain ? "alert" : "status"}><p>{stockMessage}</p>{stockUncertain ? <button className="button button-primary" onClick={() => window.location.reload()}>Reload inventory</button> : null}</div> : null}
     {error ? <p className="form-error">{error}</p> : null}{readRecovery}
