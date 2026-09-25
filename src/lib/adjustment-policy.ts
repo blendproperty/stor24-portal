@@ -20,14 +20,24 @@ export function adjustmentDelta(kind: string, amount: number) {
   return ["CREDIT", "WRITE_OFF"].includes(kind) ? -amount : amount;
 }
 export function refundLimits(config: unknown) {
-  const raw = config as { defaults?: { Refunds?: { minimumRefund?: unknown; maximumRefund?: unknown } } } | null;
-  const settings = raw?.defaults?.Refunds;
-  const parse = (v: unknown) => {
-    if (v === undefined) return 0;
-    if ((typeof v !== "number" && typeof v !== "string") || !Number.isFinite(Number(v)) || Number(v) < 0) throw new Error("ADJUSTMENT_POLICY_REVIEW");
-    return cents(Number(v));
+  const record = (value: unknown): Record<string, unknown> => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("ADJUSTMENT_POLICY_REVIEW");
+    return value as Record<string, unknown>;
   };
-  return { minimum: parse(settings?.minimumRefund), maximum: parse(settings?.maximumRefund) };
+  const defaults = config == null ? undefined : record(config).defaults;
+  const group = defaults === undefined ? undefined : record(defaults).Refunds;
+  const settings = group === undefined ? {} : record(group);
+  const parse = (value: unknown) => {
+    if (value === undefined || value === "") return 0;
+    // Policy amounts must be decimal cents, not coercible values or rounded fractions.
+    if ((typeof value !== "number" && typeof value !== "string") || !/^\d+(?:\.\d{1,2})?$/.test(String(value))) throw new Error("ADJUSTMENT_POLICY_REVIEW");
+    const amount = Number(value), result = Math.round(amount * 100);
+    if (!Number.isFinite(amount) || !Number.isSafeInteger(result)) throw new Error("ADJUSTMENT_POLICY_REVIEW");
+    return result;
+  };
+  const minimum = parse(settings.minimumRefund), maximum = parse(settings.maximumRefund);
+  if (maximum > 0 && minimum > maximum) throw new Error("ADJUSTMENT_POLICY_REVIEW");
+  return { minimum, maximum };
 }
 export const adjustmentMessages: Record<string, string> = {
   ADJUSTMENT_UNPAID_CONFIRMATION: "Confirm that no external payout occurred before cancelling this approved refund.",

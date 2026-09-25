@@ -69,6 +69,31 @@ test("isolated PostgreSQL controlled adjustments", async t => {
       await assert.rejects(decideAdjustment(f.reviewer, r.id, "approve", "CI approval"), /CHANGED/);
       assert.equal(await balance(f.account.id), "115");
     });
+    await t.test("malformed refund limits block preview, request and payout without changing money", async () => {
+      const f = await fixture(200), input = { ...f.input, kind: "REFUND", amount: "60", sourceEntryId: f.receipt!.id };
+      const profile = await db.configurationProfile.create({ data: { organisationId: f.org.id, facilityId: f.facility.id, domain: "PROGRAM_DEFAULTS", name: "Default", status: "READY", config: {} } });
+      const original = await previewAdjustment(f.scope, input);
+      for (const config of [[], { defaults: { Refunds: [] } }, { defaults: { Refunds: { maximumRefund: 0.004 } } }, { defaults: { Refunds: { minimumRefund: 80, maximumRefund: 50 } } }]) {
+        await db.configurationProfile.update({ where: { id: profile.id }, data: { config } });
+        await assert.rejects(previewAdjustment(f.scope, input), /ADJUSTMENT_POLICY_REVIEW/);
+        await assert.rejects(requestAdjustment(f.scope, input, original.fingerprint, randomUUID()), /ADJUSTMENT_POLICY_REVIEW/);
+        assert.equal(await db.financialAdjustment.count({ where: { accountId: f.account.id } }), 0);
+      }
+      await db.configurationProfile.update({ where: { id: profile.id }, data: { config: {} } });
+      const r = await request(f, input);
+      await decideAdjustment(f.reviewer, r.id, "approve", "CI authorised refund");
+      const auditCount = await db.auditEvent.count({ where: { entityId: r.id } });
+      await db.configurationProfile.update({ where: { id: profile.id }, data: { config: { defaults: { Refunds: { maximumRefund: 0.004 } } } } });
+      await assert.rejects(recordRefundPayout(f.reviewer, r.id, "CI-not-paid", southAfricaDateKey(new Date())), /ADJUSTMENT_POLICY_REVIEW/);
+      assert.equal(await balance(f.account.id), "-85");
+      assert.equal((await db.financialAdjustment.findUniqueOrThrow({ where: { id: r.id } })).status, "APPROVED");
+      assert.equal((await db.payment.findUniqueOrThrow({ where: { id: f.payment!.id } })).status, "SUCCEEDED");
+      assert.equal(await db.ledgerEntry.count({ where: { accountId: f.account.id } }), 2);
+      assert.equal(await db.auditEvent.count({ where: { entityId: r.id } }), auditCount);
+      await db.configurationProfile.update({ where: { id: profile.id }, data: { config: {} } });
+      assert.equal((await recordRefundPayout(f.reviewer, r.id, "CI-recovered", southAfricaDateKey(new Date()))).status, "POSTED");
+      assert.equal(await balance(f.account.id), "-25");
+    });
     await t.test("refund approval does not move balance; external recording is once and bounded", async () => {
       const f = await fixture(200), input = { ...f.input, kind: "REFUND", amount: "60", sourceEntryId: f.receipt!.id }, r = await request(f, input);
       await decideAdjustment(f.reviewer, r.id, "approve", "CI payout approval"); assert.equal(await balance(f.account.id), "-85");

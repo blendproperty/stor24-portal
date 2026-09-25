@@ -1,5 +1,7 @@
 # STOR24 delivery checklist
 
+25 September refund policy checkpoint: malformed policies, sub-cent ceilings and inconsistent minimum/maximum limits require finance review; absent/blank/zero settings retain prior behaviour. Prepatch reproduction and 448 tests/typecheck/lint pass; real database checks and promotion pending. No real payments or balances changed; finance and staff acceptance remain open.
+
 25 September verified release checkpoint: [settings delivery evidence and manager walkthrough](UNATTENDED_DELIVERY_2026-09-25.md) records PR273–275, all required checks passed, exact deployed images and read-only health verification. Latest image ffa048542 healthy at 05:55:50 UTC after a safe retry of an SSH connection timeout. Excel E032–E034 reconciled; all 14 acceptance gates remain open. No real settings, account or access changes were tested.
 
 25 September availability checkpoint: setup identifies connected rules and planning-only preferences; desktop/mobile browser checks, typecheck and lint pass. Promotion pending. PR273 deployed and exact image/readiness verified at 05:41:15 UTC; PR274 passed required checks and merged 85ce43c, rollout pending. All programme acceptance gates remain open.

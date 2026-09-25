@@ -1,4 +1,11 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Refund policy validation — 25 September 2026
+
+- **Implementation:** refund policy parsing now rejects malformed root/default/group structures, non-decimal/coercible values, sub-cent amounts and a positive maximum below the minimum. Missing policies and explicitly blank/zero limits retain their prior unlimited meaning. Valid decimal strings/numbers remain supported; no policy values, balances or payments are changed by this code.
+- **Testing:** prepatch test proved an array policy silently became unlimited. After fix, malformed structures and a 0.004 maximum are rejected instead of rounding away; decimal cent boundaries and missing/blank limits pass. All 448 unit tests, typecheck and focused lint pass. Added isolated PostgreSQL preview/request/payout rejection with unchanged adjustment status, balance, payment, ledger and audit, plus recovery after restoring valid policy; required CI pending.
+- **Commit/push:** enclosing refund-policy-validation PR records this candidate.
+- **Merge/deployment/configuration/live verification:** pending. Tests use synthetic data only. No external payout or real account mutation performed. Finance policy and staff acceptance remain open.
+- **Session:** Brett authorised a new two-hour unattended window at 06:04 UTC, ending 08:04 UTC (10:04 Johannesburg). Existing heartbeat updated to this finite window. PR276 evidence checkpoint merged 4319f68a32d23b2d6a7098ed3bec09286ae5a761; CI 36100665062, SQL 36100665013 and security 36100665058 passed. Main CI 36100862688 and deployment 36101037449 passed; exact image 4319f68a3 healthy/service and database readiness verified at 06:04:09 UTC. Excel E035 records the same; all 14 priorities remain unaccepted.
 ## Settings delivery checkpoint — 25 September 2026
 
 - **Implementation:** [the settings delivery record](docs/UNATTENDED_DELIVERY_2026-09-25.md) documents atomic configuration/audit saves, enforced move-out date rules and clear connected/planning status in setup, with a manager acceptance walkthrough. This checkpoint changes documentation only.
