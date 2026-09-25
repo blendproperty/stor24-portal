@@ -1,4 +1,11 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Pending-order read recovery — 25 September 2026
+
+- **Implementation:** the customer portal explicitly shows pending-order loading, bounds reads to 20 seconds, and offers a read-only retry after failure. Results are tied to account/unit scope so switching units immediately hides previous orders and ignores late responses. Successful empty results remain empty. No order, payment or provider mutation is introduced.
+- **Testing:** actual-component synthetic browser cases pass failed read/retry, timeout, malformed result, empty success and unit-switch/late-response isolation at 1440/390/320px; every request is GET and no unhandled page errors occur. Typecheck and focused lint pass. Required browser CI added.
+- **Commit/push/merge:** enclosing PR records candidate promotion. **Deployment/configuration/live verification:** pending. Customer/staff/provider acceptance remains open.
+- **Prior evidence:** PR288 documentation source 5b13eba361612604a17385230053086ef0fae87a passed every required check and merged 31e85ea18bec1cb268e6ec210d6b118cee893193; its deployment is pending. PR287 remains verified live with Excel E046 aligned.
+
 ## Unattended continuation and account-security recovery — 25 September 2026
 
 - **Authorisation:** Brett requested unattended implementation/testing for the rest of today. Existing heartbeat reactivated through 18:00 UTC (20:00 Johannesburg); synthetic transactions only and all existing business/provider/legal acceptance gates preserved.
