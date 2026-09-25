@@ -1,5 +1,6 @@
 import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
+import type { Prisma } from "@/generated/prisma/client";
 import { recordDailyClose } from "@/lib/daily-close-service";
 import { createTaskSchema, dailyCloseSchema, maintenanceSchema, productSchema, stockMovementSchema, storagePackageSchema, unitNoteSchema } from "@/lib/validators";
 
@@ -44,6 +45,15 @@ export async function POST(request: Request) {
     let result: unknown;
     let audited = false;
     const entityType = body.kind ?? "unknown";
+    const createAudited = async <T extends { id: string }>(create: (tx: Prisma.TransactionClient) => Promise<T>) => {
+      const saved = await db.$transaction(async tx => {
+        const record = await create(tx);
+        await tx.auditEvent.create({ data: { organisationId, actorId: user.id, action: `${entityType}.create`, entityType, entityId: record.id, after: JSON.parse(JSON.stringify(record)) } });
+        return record;
+      });
+      audited = true;
+      return saved;
+    };
 
     if (body.kind === "task") {
       const input = createTaskSchema.parse(body.payload);
@@ -51,13 +61,13 @@ export async function POST(request: Request) {
         return Response.json({ error: { code: "FACILITY_REQUIRED", message: "Choose a permitted facility for this task." } }, { status: 400 });
       }
       if (input.facilityId) await ensureFacility(input.facilityId);
-      result = await db.task.create({ data: { organisationId, createdById: user.id, ...input, dueAt: input.dueAt ? new Date(input.dueAt) : undefined } });
+      result = await createAudited(tx => tx.task.create({ data: { organisationId, createdById: user.id, ...input, dueAt: input.dueAt ? new Date(input.dueAt) : undefined } }));
     } else if (body.kind === "unitNote") {
       const input = unitNoteSchema.parse(body.payload);
       await ensureFacility(input.facilityId);
       const unit = await db.unit.findFirst({ where: { id: input.unitId, facilityId: input.facilityId, facility: { organisationId } } });
       if (!unit) throw new Error("FORBIDDEN");
-      result = await db.unitNote.create({ data: { organisationId, authorId: user.id, ...input } });
+      result = await createAudited(tx => tx.unitNote.create({ data: { organisationId, authorId: user.id, ...input } }));
     } else if (body.kind === "maintenance") {
       const input = maintenanceSchema.parse(body.payload);
       await ensureFacility(input.facilityId);
@@ -79,7 +89,7 @@ export async function POST(request: Request) {
     } else if (body.kind === "product") {
       const input = productSchema.parse(body.payload);
       await ensureFacility(input.facilityId);
-      result = await db.product.create({ data: { organisationId, ...input } });
+      result = await createAudited(tx => tx.product.create({ data: { organisationId, ...input } }));
     } else if (body.kind === "stockMovement") {
       const input = stockMovementSchema.parse(body.payload);
       result = await db.$transaction(async (tx) => {
@@ -88,7 +98,7 @@ export async function POST(request: Request) {
         await requirePermission("inventory.manage", product.facilityId);
         const delta = ["SALE", "DAMAGE"].includes(input.type) ? -Math.abs(input.quantity) : input.quantity;
         const claimed = await tx.product.updateMany({
-          where: { id: product.id, organisationId, ...(delta < 0 ? { quantityOnHand: { gte: -delta } } : {}) },
+          where: { id: product.id, organisationId, quantityOnHand: { gte: -delta } },
           data: { quantityOnHand: { increment: delta } },
         });
         if (claimed.count !== 1) throw new Error("INSUFFICIENT_STOCK");
@@ -103,10 +113,10 @@ export async function POST(request: Request) {
       const productCount = await db.product.count({ where: { id: { in: input.items.map((item) => item.productId) }, organisationId, facilityId: input.facilityId, active: true } });
       if (productCount !== input.items.length) return Response.json({ error: { code: "INVALID_PACKAGE_PRODUCTS", message: "Every package item must be an active product at the selected facility." } }, { status: 422 });
       const { items, ...packageData } = input;
-      result = await db.storagePackage.create({
+      result = await createAudited(tx => tx.storagePackage.create({
         data: { organisationId, ...packageData, items: { create: items } },
         include: { items: { include: { product: true } } },
-      });
+      }));
     } else if (body.kind === "dailyClose") {
       const input = dailyCloseSchema.parse(body.payload);
       await ensureFacility(input.facilityId);

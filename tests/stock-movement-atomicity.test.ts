@@ -14,8 +14,9 @@ test("stock movement, quantity and audit roll back together", async () => {
  const output=await build({entryPoints:['src/app/api/v1/operations/route.ts'],bundle:true,write:false,platform:'node',format:'cjs',packages:'external',plugins:[{name:'fixture',setup(b){b.onResolve({filter:/^@\/lib\/(db|auth-guards)$/},a=>({path:a.path,namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},a=>({contents:a.path.endsWith('/db')?'export const db=__db;':"export const requirePermission=async()=>({organisationId:'org',user:{id:'actor'}});export const authErrorResponse=e=>Response.json({error:e.message},{status:500});"}));}}]});
  const loaded={exports:{} as {POST:(r:Request)=>Promise<Response>}};
  new Function('require','module','exports','__db',output.outputFiles[0].text)(createRequire(import.meta.url),loaded,loaded.exports,database);
- const send=(quantity=4)=>loaded.exports.POST(new Request('https://example.invalid/operations',{method:'POST',body:JSON.stringify({kind:'stockMovement',payload:{productId:'cmstockproduct0000000000001',type:'DAMAGE',quantity}})}));
+ const send=(quantity=4,type="DAMAGE")=>loaded.exports.POST(new Request('https://example.invalid/operations',{method:'POST',body:JSON.stringify({kind:'stockMovement',payload:{productId:'cmstockproduct0000000000001',type,quantity}})}));
  assert.equal((await send()).status,500);assert.equal(state.quantity,5);assert.equal(state.movements.length,0);assert.equal(state.audits.length,0);
  state.failAudit=false;assert.equal((await send()).status,201);assert.equal(state.quantity,1);assert.equal(state.movements.length,1);assert.equal(state.audits.length,1);
  assert.equal((await send()).status,409);assert.equal(state.quantity,1);assert.equal(state.movements.length,1);assert.equal(state.audits.length,1);
+ state.quantity=-2;assert.equal((await send(1,'RECEIPT')).status,409);assert.equal(state.quantity,-2);assert.equal((await send(2,'RECEIPT')).status,201);assert.equal(state.quantity,0);
 });
