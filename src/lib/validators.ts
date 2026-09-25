@@ -224,9 +224,9 @@ export const noticeSchema = z
 export const moveOutSchema = z.object({
   tenancyId: id,
   movedOutAt: z.coerce.date(),
-  finalCharge: money.default(0),
+  finalCharge: money.multipleOf(0.01, "Use at most two decimal places.").default(0),
   depositAction: z.enum(["NONE", "REFUND_DUE", "APPLY_TO_BALANCE"]).default("NONE"),
-  depositAmount: money.default(0),
+  depositAmount: money.multipleOf(0.01, "Use at most two decimal places.").default(0),
   idempotencyKey: z.string().trim().min(8).max(120).regex(/^[A-Za-z0-9:_-]+$/),
   notes: z.string().trim().min(3).max(2000),
 }).superRefine((value, ctx) => {

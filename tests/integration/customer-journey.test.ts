@@ -198,6 +198,11 @@ test("isolated PostgreSQL connected customer journey", async t => {
       const leaving = { tenancyId, movedOutAt, finalCharge: 25, depositAction: "NONE" as const, depositAmount: 0, idempotencyKey: randomUUID(), notes: "Synthetic test only; outstanding credit requires finance acceptance." };
       const datePolicy = await db.configurationProfile.create({ data: { organisationId: org.id, facilityId: facility.id, domain: "PROGRAM_DEFAULTS", name: "Default", status: "READY", config: { defaults: { "Move Out": { moveOutDate: "today" } } } } });
       const balanceBefore = (await db.account.findUniqueOrThrow({ where: { id: account.id } })).balance.toString();
+      const ledgerCount = await db.ledgerEntry.count({ where: { accountId: account.id } });
+      for (const patch of [{ finalCharge: 0.005 }, { depositAction: "REFUND_DUE" as const, depositAmount: 0.005 }]) {
+        await assert.rejects(moveOut(scope, { ...leaving, ...patch }), e => e instanceof Error && e.name === "ZodError");
+      }
+      assert.equal(await db.ledgerEntry.count({ where: { accountId: account.id } }), ledgerCount);
       const future = new Date(movedOutAt.getTime() + 86_400_000);
       await assert.rejects(moveOut(scope, { ...leaving, movedOutAt: future }), /MOVE_OUT_DATE_RESTRICTED/);
       assert.equal((await db.account.findUniqueOrThrow({ where: { id: account.id } })).balance.toString(), balanceBefore);

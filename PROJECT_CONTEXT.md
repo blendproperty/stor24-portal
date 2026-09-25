@@ -1,4 +1,11 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Move-out amount precision — 25 September 2026
+
+- **Implementation:** final charges and deposit amounts must be exact cents within existing limits. The move-out service now validates its complete input before any database read, access work or financial mutation, preserving existing schema defaults and deposit-action consistency checks. No fee, refund or proration policy is introduced.
+- **Testing:** prepatch regressions accepted 0.005 and reached the database on a direct service call. After repair, invalid amounts fail before reads; actual endpoint returns field-level 422 validation. Valid cents, numeric form strings, zero and maximum boundary remain accepted. All 451 tests, typecheck and focused lint pass. Added PostgreSQL full-journey rejection cases checking unchanged ledger/account/unit/tenancy/audit before valid completion and replay; required CI pending.
+- **Commit/push:** enclosing move-out-cent-precision PR records this candidate.
+- **Merge/deployment/configuration/live verification:** pending. No real move-out, payment, balance, access or settings mutation used as a test. Staff, finance and provider acceptance remain open.
+- **Prior release:** PR277 passed every required check on da035fb8faddf1606fc11ce959bf4e1c7ea89733 (CI 36101447086, SQL 36101447112 and security 36101447067), then merged ece54015ff760588ee77ed8459b626359ade49c4. Deployment/live verification is still pending.
 ## Refund policy validation — 25 September 2026
 
 - **Implementation:** refund policy parsing now rejects malformed root/default/group structures, non-decimal/coercible values, sub-cent amounts and a positive maximum below the minimum. Missing policies and explicitly blank/zero limits retain their prior unlimited meaning. Valid decimal strings/numbers remain supported; no policy values, balances or payments are changed by this code.

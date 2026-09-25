@@ -1,5 +1,7 @@
 # STOR24 delivery checklist
 
+25 September move-out precision checkpoint: sub-cent charges/deposits rejected by the API and direct service before database/access work. Failing-before proof and 451 tests/typecheck/lint pass; PostgreSQL/required CI and promotion pending. Refund policy PR277 passed all checks and merged ece54015, deployment pending. All acceptance gates remain open.
+
 25 September refund policy checkpoint: malformed policies, sub-cent ceilings and inconsistent minimum/maximum limits require finance review; absent/blank/zero settings retain prior behaviour. Prepatch reproduction and 448 tests/typecheck/lint pass; real database checks and promotion pending. No real payments or balances changed; finance and staff acceptance remain open.
 
 25 September verified release checkpoint: [settings delivery evidence and manager walkthrough](UNATTENDED_DELIVERY_2026-09-25.md) records PR273–275, all required checks passed, exact deployed images and read-only health verification. Latest image ffa048542 healthy at 05:55:50 UTC after a safe retry of an SSH connection timeout. Excel E032–E034 reconciled; all 14 acceptance gates remain open. No real settings, account or access changes were tested.
