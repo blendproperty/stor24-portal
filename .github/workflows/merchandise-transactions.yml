@@ -33,6 +33,7 @@ jobs:
       - run: npm run db:generate
       - run: node scripts/bootstrap-empty-database.mjs
       - run: npx tsx --test tests/integration/security-boundaries.test.ts
+      - run: npx tsx --test tests/integration/request-rate-limit.test.ts
       - run: npx tsx --test tests/integration/account-payment-retry.test.ts
       - run: npx tsx --test tests/integration/daily-close.test.ts
       - run: npx tsx --test tests/integration/configuration-atomicity.test.ts
