@@ -33,6 +33,9 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
   const [taskCreationMessage, setTaskCreationMessage] = useState("");
   const [taskCreationUncertain, setTaskCreationUncertain] = useState(false);
   const [showMaintenance, setShowMaintenance] = useState(false);
+  const maintenanceRequest = useRef(false);
+  const [maintenanceMessage, setMaintenanceMessage] = useState("");
+  const [maintenanceUncertain, setMaintenanceUncertain] = useState(false);
   const [maintenanceFacilityId, setMaintenanceFacilityId] = useState("");
   const [showProduct, setShowProduct] = useState(false);
   const [showStock, setShowStock] = useState(false);
@@ -175,16 +178,33 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
   }
 
   async function updateMaintenance(id: string, status: "IN_PROGRESS" | "COMPLETED" | "CANCELLED") {
+    if (maintenanceRequest.current || maintenanceUncertain) return;
+    maintenanceRequest.current = true;
     setBusy(true);
-    const response = await fetch(`/api/v1/operations/maintenance/${id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    const payload = await response.json();
-    setBusy(false);
-    if (!response.ok) { setError(payload.error?.message ?? "Maintenance request could not be updated."); return; }
-    await load();
+    setMaintenanceMessage("");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20_000);
+    try {
+      const response = await fetch(`/api/v1/operations/maintenance/${id}`, {
+        method: "PATCH", signal: controller.signal,
+        headers: { "content-type": "application/json" }, body: JSON.stringify({ status }),
+      });
+      const payload = await response.json();
+      if ([400, 401, 403, 404, 422, 429].includes(response.status)) {
+        setMaintenanceMessage(typeof payload.error?.message === "string" ? payload.error.message : "Maintenance was not updated. Check your access and try again.");
+        return;
+      }
+      if (!response.ok || payload.data?.id !== id || payload.data.status !== status) throw new Error("Unconfirmed maintenance change");
+      setData(current => current ? { ...current, maintenance: current.maintenance.map(item => item.id === id ? { ...item, status } : item) } : current);
+      await load();
+    } catch {
+      setMaintenanceUncertain(true);
+      setMaintenanceMessage("We could not confirm the maintenance change. Reload and check the request status and unit availability before making another change.");
+    } finally {
+      clearTimeout(timeout);
+      maintenanceRequest.current = false;
+      setBusy(false);
+    }
   }
 
   async function createInventory(kind: "product" | "stockMovement" | "storagePackage", payload: Record<string, unknown>) {
@@ -275,6 +295,7 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
 
   return <div className="page-stack">
     <PageHeader eyebrow="Facility workflows" title="Operations centre" description="Database-backed work queues, maintenance and end-of-day control for Stor24." action={<button className="button button-primary" onClick={() => setShowTask(true)}><Plus size={16}/> New task</button>} />
+    {maintenanceMessage ? <div role="alert"><p>{maintenanceMessage}</p>{maintenanceUncertain ? <button className="button button-primary" onClick={() => window.location.reload()}>Reload maintenance status</button> : null}</div> : null}
     {taskMessage ? <div role={taskNeedsCheck ? "alert" : "status"}><p>{taskMessage}</p>{taskNeedsCheck ? <button className="button button-primary" disabled={taskBusy} onClick={checkTaskStatus}>{taskBusy ? "Checking…" : "Check task status"}</button> : null}</div> : null}
     {error ? <p className="form-error">{error}</p> : null}{readRecovery}
     <section className="summary-strip">
@@ -291,8 +312,8 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
       <article className="panel panel-spacious"><div className="panel-heading"><div><p className="eyebrow">Work queues</p><h2>Assigned operational tasks</h2></div><ClipboardList size={21}/></div>
         <div className="work-list">{openTasks.length ? openTasks.map((task) => <div className="work-row" key={task.id}><span className={`work-icon ${task.priority === "URGENT" ? "work-icon-danger" : task.priority === "HIGH" ? "work-icon-warning" : ""}`}><ClipboardList size={18}/></span><div className="work-copy"><strong>{task.title}</strong><small>{task.facility?.name ?? "Portfolio"} · {task.assignee?.name ?? "Unassigned"} · {task.dueAt ? `${formatSouthAfricaDateTime(task.dueAt)} SAST` : "No due date"}</small>{task.description && <details><summary>View request details</summary><p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{task.description}</p>{task.customerId && <Link href={`/tenants?customer=${encodeURIComponent(task.customerId)}`}>Open customer record →</Link>}</details>}</div><button className="text-button" disabled={taskBusy || taskNeedsCheck} onClick={() => completeTask(task.id)}>{taskBusy ? "Please wait…" : "Complete"}</button></div>) : <div className="empty-state"><CheckCircle2 size={32}/><strong>No open tasks</strong><p>Create a task to start the facility work queue.</p></div>}</div>
       </article>
-      <article className="panel panel-spacious"><div className="panel-heading"><div><p className="eyebrow">Service required</p><h2>Maintenance queue</h2></div><button className="button button-secondary" onClick={() => setShowMaintenance(true)}><Plus size={16}/> New request</button></div>
-        <div className="work-list">{service.length ? service.map((item) => <div className="work-row" key={item.id}><span className="work-icon work-icon-warning"><Wrench size={18}/></span><span className="work-copy"><strong>{item.title}</strong><small>{item.facility.name}{item.unit ? ` · Unit ${item.unit.number}` : ""}</small></span><StatusPill tone={item.priority === "URGENT" ? "danger" : "warning"}>{item.status}</StatusPill><span className="inline-actions">{item.status !== "IN_PROGRESS" ? <button className="text-button" disabled={busy} onClick={() => updateMaintenance(item.id, "IN_PROGRESS")}>Start</button> : null}<button className="text-button" disabled={busy} onClick={() => updateMaintenance(item.id, "COMPLETED")}>Complete</button><button className="text-button" disabled={busy} onClick={() => updateMaintenance(item.id, "CANCELLED")}>Cancel</button></span></div>) : <div className="empty-state"><Wrench size={32}/><strong>No service requests</strong><p>Unit and facility maintenance will appear here.</p></div>}</div>
+      <article className="panel panel-spacious"><div className="panel-heading"><div><p className="eyebrow">Service required</p><h2>Maintenance queue</h2></div><button className="button button-secondary" disabled={busy || maintenanceUncertain} onClick={() => setShowMaintenance(true)}><Plus size={16}/> New request</button></div>
+        <div className="work-list">{service.length ? service.map((item) => <div className="work-row" key={item.id}><span className="work-icon work-icon-warning"><Wrench size={18}/></span><span className="work-copy"><strong>{item.title}</strong><small>{item.facility.name}{item.unit ? ` · Unit ${item.unit.number}` : ""}</small></span><StatusPill tone={item.priority === "URGENT" ? "danger" : "warning"}>{item.status}</StatusPill><span className="inline-actions">{item.status !== "IN_PROGRESS" ? <button className="text-button" disabled={busy || maintenanceUncertain} onClick={() => updateMaintenance(item.id, "IN_PROGRESS")}>Start</button> : null}<button className="text-button" disabled={busy || maintenanceUncertain} onClick={() => updateMaintenance(item.id, "COMPLETED")}>Complete</button><button className="text-button" disabled={busy || maintenanceUncertain} onClick={() => updateMaintenance(item.id, "CANCELLED")}>Cancel</button></span></div>) : <div className="empty-state"><Wrench size={32}/><strong>No service requests</strong><p>Unit and facility maintenance will appear here.</p></div>}</div>
       </article>
     </section>
     <section className="dashboard-grid">
