@@ -96,3 +96,17 @@ PR294 source6506c975f29f3036e11825da361b1cf56db9b4db merged14c7c7c7ed7a390a65d7b
 The next candidate addresses false empty operations/merchandise screens after failed initial reads. It is not yet deployed at this checkpoint. Other mutation forms and the original legal/provider/finance/recovery gates remain open.
 
 
+
+## Inventory and operations recovery checkpoint — 16:44 UTC
+
+PR295–301 are deployed. Operations reads no longer present failed retrieval as an empty queue; denied reads remove displayed records and explain sign-in or administrator access. Task and maintenance creation/status forms recover from failed confirmations. Manual stock and product creation retain rejected input, guard duplicate clicks and require read-only review after uncertain outcomes. Exact source, required checks, merge, deployment and live evidence is retained in PROJECT_CONTEXT.md and Excel E054–E060.
+
+Latest PR301 source d4829fbb54eb1fb4c8c8efd0c08ac76ceacd0109 merged9f06205978d0760cd0ea5275b2ba992159d14643 after CI36161617061/SQL36161617070/security36161617181 passed. Main CI36162080052/deploy36162451490 passed. Image stor24-crm:9f0620597 healthy, service/database verified16:44:33.239 UTC. All462 unit tests/typecheck/focused lint passed, plus actual-component recovery fixtures at1440/390/320px. Fixtures use synthetic data and omit the production font/shell; they do not establish staff or financial acceptance.
+
+- [ ] As a restricted manager, confirm denied operations/merchandise access explains contacting the administrator and does not retain previously displayed records.
+- [ ] Using approved test records, create and complete a task; create and progress maintenance; verify correct unit availability and audit history.
+- [ ] Review lost-response evidence: forms must retain rejected input and uncertain outcomes must require reading current records rather than silently repeating a change. Do not deliberately fault production.
+- [ ] With approved inventory test records, check signed stock movements and product opening quantity against audit history. Confirm mobile guidance is understandable.
+- [ ] Product update and package create/update failure recovery remain separate pending work. Stock reservation policy and server cross-request idempotency remain open.
+
+No real payments, customer messages, production balance/stock changes or operational switches were used in these rehearsals. All14 programme acceptance gates remain open; legal, provider, finance, Google ownership/rotation, recovery and staff approvals are unchanged. Excel export/reimport and independent XML checks pass, with the known native exit-after-export limitation. New PR links remain recorded despite the app's100-attachment cap.
