@@ -36,6 +36,7 @@ jobs:
       - run: node scripts/test-task-create-recovery.mjs
       - run: node scripts/test-maintenance-status-recovery.mjs
       - run: node scripts/test-maintenance-create-recovery.mjs
+      - run: node scripts/test-stock-form-recovery.mjs
       - run: node scripts/test-login-redirect.mjs
       - run: node scripts/test-whatsapp-retry.mjs
       - run: node scripts/test-collections.mjs
@@ -62,6 +63,7 @@ jobs:
             output/task-create-recovery/
             output/maintenance-status-recovery/
             output/maintenance-create-recovery/
+            output/stock-form-recovery/
             output/password-form-recovery/
             output/monthly-billing/
             output/debit-orders/
