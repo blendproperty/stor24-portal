@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowRight, Eye, EyeOff, KeyRound, LockKeyhole, Mail, ShieldCheck, UserRound } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { loginDestination } from "@/lib/login-destination";
 
 type Props =
   | { mode: "login" }
@@ -38,8 +39,7 @@ export function PortalAuthForm(props: Props) {
       return;
     }
     if (payload.data?.mfaRequired) { setMfaRequired(true); return; }
-    const next = setup ? "/" : searchParams.get("next") || "/";
-    router.replace(next.startsWith("/") ? next : "/");
+    router.replace(setup ? "/" : loginDestination(searchParams.get("next")));
     router.refresh();
   }
 
