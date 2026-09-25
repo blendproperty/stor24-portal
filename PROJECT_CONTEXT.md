@@ -1,4 +1,11 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Completed-purchase read recovery — 25 September 2026
+
+- **Implementation:** completed-purchase reads time out after 20 seconds, show a clear retry message for failed or malformed responses, and release the existing refresh button. Booking packages remain visible. Existing unit/account remount isolation is preserved. No financial or order mutation changes.
+- **Testing:** actual-component synthetic browser cases pass timeout, network failure, malformed data, successful/empty results, unit switching and retained booking package at 1440/390/320px; requests are GET-only with no page errors. The fixture stubs Next image/link rendering; it does not test image optimisation or provider payments. Typecheck and focused lint passed. Required CI browser check added; promotion pending.
+- **Commit/push/merge/deployment/live verification:** enclosing PR records candidate promotion; not yet deployed. Customer/staff/finance/provider acceptance remains open.
+- **Prior verified releases:** PR289 source 7ee44f81ee5cfe51e15f2cc3ce640917be3de357 passed CI36140696966, PostgreSQL36140697084 and security36140697024, merged 588a0769da2871dc09c2ad9406a6c26af5a18cea. Main CI36141006806 and deployment36141267296 passed. Exact image stor24-crm:588a0769d healthy and service/database readiness verified 13:35:32 UTC. PR288 deployment36140710369 passed; image31e85ea18 healthy/readiness verified13:26:49 UTC. Excel E047/E048 tracks these releases; no acceptance gate closed.
+
 ## Pending-order read recovery — 25 September 2026
 
 - **Implementation:** the customer portal explicitly shows pending-order loading, bounds reads to 20 seconds, and offers a read-only retry after failure. Results are tied to account/unit scope so switching units immediately hides previous orders and ignores late responses. Successful empty results remain empty. No order, payment or provider mutation is introduced.
