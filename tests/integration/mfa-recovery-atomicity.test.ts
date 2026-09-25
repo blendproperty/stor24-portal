@@ -5,6 +5,8 @@ import { hash } from "bcryptjs";
 import { db } from "../../src/lib/db";
 import { encryptMfaSecret, hashRecoveryCodes, totpCode } from "../../src/lib/mfa";
 import { mfaRequest, mfaRoutesFixture } from "../helpers/mfa-routes-fixture";
+import { mfaLoginFixture } from "../helpers/mfa-login-fixture";
+import { hashResetToken } from "../../src/lib/password-reset";
 
 test("isolated PostgreSQL MFA one-time recovery and credential lifecycle", async t => {
   assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci");
@@ -17,10 +19,64 @@ test("isolated PostgreSQL MFA one-time recovery and credential lifecycle", async
     const user = await db.user.create({ data: { organisationId: org.id, name: "Synthetic MFA", email: `${key}@example.invalid`, passwordHash: await hash(password, 4) } });
     await db.mfaCredential.create({ data: { userId: user.id, enabledAt: enabled ? new Date() : null, secretEncrypted: encryptMfaSecret(secret), recoveryCodeHashes: enabled ? hashRecoveryCodes(codes) : [] } });
     const sessions: { sessionVersion: number }[] = []; let clears = 0;
-    const routes = await mfaRoutesFixture(db, { getSession: async () => ({ userId: user.id, sessionVersion: user.sessionVersion }), setSession: async value => { sessions.push(value as { sessionVersion: number }); }, getChallenge: async () => user.id, clearChallenge: async () => { clears++; } });
+    const routes = await mfaRoutesFixture(db, { getSession: async () => ({ userId: user.id, sessionVersion: user.sessionVersion }), setSession: async value => { sessions.push(value as { sessionVersion: number }); }, getChallenge: async () => ({ userId: user.id, sessionVersion: user.sessionVersion }), clearChallenge: async () => { clears++; } });
     return { org, user, routes, sessions, clears: () => clears, credential: () => db.mfaCredential.findUnique({ where: { userId: user.id } }) };
   }
   try {
+    await t.test("password reset and change revoke signed pending challenges without consuming recovery codes", async () => {
+      for (const action of ["reset", "change"]) {
+        const f = await fixture();
+        const login = await mfaLoginFixture(db, { userId: f.user.id, sessionVersion: f.user.sessionVersion });
+        assert.equal((await login.login(mfaRequest({ email: f.user.email, password }))).status, 200);
+        assert.deepEqual(await login.getMfaChallenge(), { userId: f.user.id, sessionVersion: f.user.sessionVersion });
+        const newPassword = "New-Synthetic-Password-2026!";
+        if (action === "reset") {
+          const token = randomUUID();
+          await db.passwordResetToken.create({ data: { userId: f.user.id, organisationId: f.org.id, tokenHash: hashResetToken(token), expiresAt: new Date(Date.now() + 60_000) } });
+          assert.equal((await login.resetPassword(mfaRequest({ token, password: newPassword }))).status, 200);
+        } else assert.equal((await login.changePassword(mfaRequest({ currentPassword: password, password: newPassword }))).status, 200);
+        const before = await db.auditEvent.count({ where: { actorId: f.user.id } });
+        for (const code of [codes[0], totpCode(secret)]) assert.equal((await login.verify(mfaRequest({ code }))).status, 401);
+        assert.equal(login.sessions.length, 0); assert.deepEqual((await f.credential())!.recoveryCodeHashes, hashRecoveryCodes(codes));
+        assert.equal(await db.auditEvent.count({ where: { actorId: f.user.id } }), before);
+        assert.equal((await login.login(mfaRequest({ email: f.user.email, password: newPassword }))).status, 200);
+        assert.equal((await login.verify(mfaRequest({ code: codes[0] }))).status, 200);
+        assert.equal(login.sessions[0].sessionVersion, f.user.sessionVersion + 1);
+      }
+    });
+    await t.test("revocation and verification serialize in both User-lock orderings", async () => {
+      const f = await fixture();
+      const login = await mfaLoginFixture(db);
+      await login.setMfaChallenge(f.user.id, f.user.sessionVersion);
+      let locked!: () => void, release!: () => void;
+      const reached = new Promise<void>(r => { locked = r; }), resume = new Promise<void>(r => { release = r; });
+      const revocation = db.$transaction(async tx => {
+        await tx.user.update({ where: { id: f.user.id }, data: { sessionVersion: { increment: 1 } } });
+        locked(); await resume;
+      });
+      await reached;
+      const denied = login.verify(mfaRequest({ code: codes[0] }));
+      release(); await revocation;
+      assert.equal((await denied).status, 401); assert.equal(login.sessions.length, 0);
+      assert.deepEqual((await f.credential())!.recoveryCodeHashes, hashRecoveryCodes(codes));
+
+      const other = await fixture();
+      let auditReached!: () => void, releaseAudit!: () => void;
+      const audited = new Promise<void>(r => { auditReached = r; }), finish = new Promise<void>(r => { releaseAudit = r; });
+      const database = { $transaction: <T>(operation: (tx: unknown) => Promise<T>) => db.$transaction(async tx => operation(new Proxy(tx, { get(target, prop) {
+        if (prop !== "auditEvent") return Reflect.get(target, prop);
+        return { create: async (args: Parameters<typeof tx.auditEvent.create>[0]) => { const value = await tx.auditEvent.create(args); if (args.data.action === "user.login.succeeded") { auditReached(); await finish; } return value; } };
+      } }))) };
+      const first = await mfaLoginFixture(database);
+      await first.setMfaChallenge(other.user.id, other.user.sessionVersion);
+      const admitted = first.verify(mfaRequest({ code: codes[0] }));
+      await audited;
+      const invalidate = db.user.update({ where: { id: other.user.id }, data: { sessionVersion: { increment: 1 } } }).then(value => value);
+      releaseAudit();
+      assert.equal((await admitted).status, 200);
+      const current = await invalidate;
+      assert.equal(first.sessions.length, 1); assert.notEqual(first.sessions[0].sessionVersion, current.sessionVersion);
+    });
     await t.test("same code creates one session; different concurrent codes are both consumed", async () => {
       const f = await fixture();
       const responses = await Promise.all(Array.from({ length: 8 }, () => f.routes.verify(mfaRequest({ code: codes[0] }))));

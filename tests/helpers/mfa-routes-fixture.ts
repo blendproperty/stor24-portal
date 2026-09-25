@@ -1,7 +1,8 @@
 import { build } from "esbuild";
 import { createRequire } from "node:module";
+import type { MfaChallenge } from "../../src/lib/mfa-challenge";
 
-export async function mfaRoutesFixture(database: unknown, hooks: { getSession: () => Promise<unknown>; setSession: (value: unknown) => Promise<void>; getChallenge: () => Promise<string | null>; clearChallenge: () => Promise<void> }) {
+export async function mfaRoutesFixture(database: unknown, hooks: { getSession: () => Promise<unknown>; setSession: (value: unknown) => Promise<void>; getChallenge: () => Promise<MfaChallenge | null>; clearChallenge: () => Promise<void> }) {
   const root = process.cwd().replaceAll("\\", "/");
   const output = await build({ stdin: { contents: 'export {POST as verify} from "./src/app/api/auth/mfa/verify/route";export {POST as manage} from "./src/app/api/auth/mfa/route";export {encryptMfaSecret,hashRecoveryCodes,totpCode} from "./src/lib/mfa";', loader: "ts", resolveDir: process.cwd() }, bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "mfa-fixture", setup(b) {
     b.onResolve({ filter: /^@\/lib\/(db|session|mfa-challenge|request-security)$/ }, a => ({ path: a.path, namespace: "fixture" }));

@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   }
 
   if (user.mfaCredential?.enabledAt) {
-    await setMfaChallenge(user.id);
+    await setMfaChallenge(user.id, user.sessionVersion);
     await db.auditEvent.create({ data: { organisationId: user.organisationId, actorId: user.id, action: "user.login.mfa_required", entityType: "User", entityId: user.id, ipHash: privacyHash(ip) } });
     return Response.json({ data: { mfaRequired: true } });
   }

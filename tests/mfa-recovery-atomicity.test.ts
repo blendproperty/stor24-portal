@@ -26,7 +26,7 @@ test("actual MFA routes serialize one-time recovery and roll back audit failures
     const snapshot = { credential: structuredClone(credential), audits: [...audits], version };
     try { return await operation(tx); } catch (error) { credential = snapshot.credential; audits = snapshot.audits; version = snapshot.version; throw error; } finally { release(); }
   } };
-  const routes = await mfaRoutesFixture(db, { getSession: async () => ({ userId: "synthetic", sessionVersion: version }), getChallenge: async () => "synthetic", setSession: async () => { sessions++; }, clearChallenge: async () => { cleared++; } });
+  const routes = await mfaRoutesFixture(db, { getSession: async () => ({ userId: "synthetic", sessionVersion: version }), getChallenge: async () => ({ userId: "synthetic", sessionVersion: 0 }), setSession: async () => { sessions++; }, clearChallenge: async () => { cleared++; } });
   const secret = "JBSWY3DPEHPK3PXP", codes = ["ABCDE-12345", "ABCDE-67890"];
   const reset = () => { credential = { enabledAt: new Date(), secretEncrypted: routes.encryptMfaSecret(secret), recoveryCodeHashes: routes.hashRecoveryCodes(codes) }; audits = []; sessions = 0; cleared = 0; failAudit = false; };
   reset();
