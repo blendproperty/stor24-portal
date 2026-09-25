@@ -3,6 +3,7 @@ import { unitIsOperational, floorMapSelection } from "@/lib/floor-availability";
 import { createHash } from "node:crypto";
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { moveOutSchema } from "@/lib/validators";
 import { assertMoveOutDatePolicy } from "@/lib/move-out-date-policy";
 import { welcomeTenantWhenReady } from "@/lib/tenant-welcome-email";
 import { facilityWhere, requireFacility, type RequestScope } from "@/lib/scope";
@@ -1102,6 +1103,7 @@ export async function moveOut(
     notes: string;
   },
 ) {
+  input = moveOutSchema.parse(input);
   const existing = await db.tenancy.findFirst({
     where: { id: input.tenancyId, facility: facilityWhere(scope) },
     include: {
