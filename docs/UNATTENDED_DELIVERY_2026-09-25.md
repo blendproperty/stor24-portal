@@ -110,3 +110,17 @@ Latest PR301 source d4829fbb54eb1fb4c8c8efd0c08ac76ceacd0109 merged9f06205978d07
 - [ ] Product update and package create/update failure recovery remain separate pending work. Stock reservation policy and server cross-request idempotency remain open.
 
 No real payments, customer messages, production balance/stock changes or operational switches were used in these rehearsals. All14 programme acceptance gates remain open; legal, provider, finance, Google ownership/rotation, recovery and staff approvals are unchanged. Excel export/reimport and independent XML checks pass, with the known native exit-after-export limitation. New PR links remain recorded despite the app's100-attachment cap.
+
+## Afternoon final acceptance handoff — 17:43 UTC
+
+PR303–305 product edit, package create and package edit recovery are deployed. Latest sourcee663e50f90d5f4aacb2032fba326a1e2cc35c672 mergedf2c5b9865afa91ac8fda7800c750ea084eb202ae after CI36167728811/SQL36167728801/security36167728717 passed. MainCI36168320591/deploy36168748677 passed; exact image stor24-crm:f2c5b98 healthy/service/database verified17:43:22.345 UTC. All462 unit tests/typecheck/lint and desktop/mobile synthetic recovery tests passed. Earlier “pending” statements above describe their checkpoint time, not current release state.
+
+Complete these with Brett or the facility manager before acceptance:
+
+1. Review permission behaviour as a restricted manager: unavailable sections give administrator/sign-in guidance and do not retain stale displayed records after denial.
+2. Use approved synthetic inventory records to create/edit a product and create/edit a package. Confirm name, SKU/code, price, active status, contents/quantities and audit history; existing booking snapshots must remain unchanged.
+3. Review the supplied network-loss/rejection evidence. Rejected inputs stay available; uncertain saves require catalogue review without automatic replay. Check the recovery guidance on a phone. Do not inject production faults.
+4. Rehearse one approved task and maintenance request through creation and completion; confirm audit and unit availability, then an approved daily close against source totals.
+5. Finish the customer journey with approved identity/agreement/payment/access arrangements, active tenancy and move-out; reconcile documents, balances, stock/unit availability and audit. Provider and legal approvals cannot be inferred from these technical tests.
+
+Every programme priority remains open for acceptance. The finance/source-data, legal/biometric, provider/device, Google rotation, billing schedule credential and production recovery/alert gates listed earlier remain unresolved. Automated tests and healthy deployment do not certify GAPP/CIA compliance. Read-only GitHub checks at approximately17:38 UTC found zero open dependency/code/secret alerts, without proving historical credential rotation.
