@@ -1,4 +1,11 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Atomic stock movements and audit — 25 September 2026
+
+- **Implementation:** manual stock movements claim quantity with a conditional database update, requiring enough current stock for deductions. Quantity, movement record and audit commit in the same transaction. Existing movement signs, permissions and response shape remain; reserved-stock policy and cross-request idempotency are unchanged.
+- **Testing:** actual-route synthetic audit-failure reproduction previously retained a stock deduction without its audit. Candidate rolls back quantity/movement/audit, permits valid recovery, and rejects insufficient stock without writes. All 460 unit tests, typecheck/focused lint pass. The existing facility-authority fixture now models conditional updates; denied-path assertions are preserved. Required isolated PostgreSQL test synchronises two requests after both read the same stock, then checks one deduction, one conflict and one audit; also checks real audit-constraint rollback and receipt recovery. Required CI pending; no real inventory changed.
+- **Commit/push/merge/deployment/live verification:** enclosing PR records candidate promotion; not yet deployed. Staff inventory/finance acceptance remains open.
+- **Prior release:** PR291 source 8ce8b84847a16354c08cb84106d17c911f63d7e4 passed all required CI36144302761, PostgreSQL36144302685 (including task rollback) and security36144302727; merged ef5a9fc9b0ac178f9e5cbb9e58b7ab8523101171. Main CI36145205161 passed. Deployment36145492653 attempt1 timed out connecting SSH before remote execution; prior image remained healthy. Attempt2 passed; exact image stor24-crm:ef5a9fc9b healthy and service/database readiness verified14:12:56 UTC. Runner connection reliability remains open. No operational/provider switches changed.
+
 ## Task status and audit atomicity — 25 September 2026
 
 - **Implementation:** task status changes and their audit records now commit in one transaction. Failed audit creation rolls back status/completion time. Existing permission checks, response shape and status rules are preserved. Concurrent-edit policy and UI mutation recovery remain separate work.
