@@ -1,4 +1,11 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Task status and audit atomicity — 25 September 2026
+
+- **Implementation:** task status changes and their audit records now commit in one transaction. Failed audit creation rolls back status/completion time. Existing permission checks, response shape and status rules are preserved. Concurrent-edit policy and UI mutation recovery remain separate work.
+- **Testing:** actual-route synthetic reproduction previously left the task COMPLETED after returning an audit-failure error. Candidate preserves OPEN/no audit on failure, then commits the valid retry with one audit. All 459 unit tests, typecheck and focused lint pass. Added real isolated PostgreSQL completion/reopening rollback and recovery test to required CI; pending. No real operations task changed.
+- **Commit/push/merge/deployment/live verification:** candidate promotion tracked by enclosing PR; not yet deployed. Staff operational acceptance remains open.
+- **Prior verified release:** PR290 source cf4f540eb8d52263b083f1a8efdfaf7adca3ec5e passed CI36142336134, PostgreSQL36142336252, security36142336178 and CodeQL; merged 58d85e8a445c4e7baa2c80e4a40a3ef272376b88. Main CI36143558197 and deployment36143817650 passed. Exact image stor24-crm:58d85e8a4 healthy and service/database readiness verified 13:54:50 UTC. No customer/payment/provider switches changed; all acceptance gates remain open.
+
 ## Completed-purchase read recovery — 25 September 2026
 
 - **Implementation:** completed-purchase reads time out after 20 seconds, show a clear retry message for failed or malformed responses, and release the existing refresh button. Booking packages remain visible. Existing unit/account remount isolation is preserved. No financial or order mutation changes.
