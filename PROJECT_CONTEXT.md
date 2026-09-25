@@ -1,4 +1,11 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Unattended continuation and account-security recovery — 25 September 2026
+
+- **Authorisation:** Brett requested unattended implementation/testing for the rest of today. Existing heartbeat reactivated through 18:00 UTC (20:00 Johannesburg); synthetic transactions only and all existing business/provider/legal acceptance gates preserved.
+- **Implementation:** account-security settings now handle failed/malformed initial loads with an explicit read-only retry. Mutations have a synchronous in-flight guard and 20-second timeout. Uncertain responses hide mutation controls and direct staff to sign in and inspect the current state; requests are never automatically repeated. Successful recovery-code regeneration updates the confirmed count without a second read that could hide the successful result. Backend credential/session policies are unchanged.
+- **Testing:** baseline main content passed all 458 unit tests, typecheck, lint (existing warnings) and production build. Actual monthly-billing, company-settings failure/recovery and six-stage move-in browser fixtures passed. New actual-component MFA settings fixture covers failed initial load/retry, lost or malformed mutation confirmation, timeout, correctable validation and legitimate enrollment at 1440/390/320px with no unhandled page errors. Candidate typecheck and focused lint passed (existing full-page navigation warning remains).
+- **Commit/push/merge:** candidate promotion recorded by enclosing PR; not yet merged. **Deployment/configuration/live verification:** pending; no production account security or operational switches changed. Staff UAT remains open. Final tracker reconciliation follows verified promotion.
+
 ## Verified finance and security delivery checkpoint — 25 September 2026
 
 - **Implementation:** [delivery evidence and staff acceptance steps](docs/UNATTENDED_DELIVERY_2026-09-25.md) consolidate PR277–285: refund policy and move-out cent validation; atomic shared attempt limits; one-time MFA recovery/lifecycle; pending-login and password-change revocation; password-form recovery; local-only sign-in return links; bounded SSH connection retries. This checkpoint changes documentation only.
