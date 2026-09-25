@@ -44,16 +44,17 @@ function ImagePicker({ initialValue, label, title, badge }: { initialValue?: str
   </div>;
 }
 
-export function ProductEditorModal({ product, busy, close, save }: { product: MerchandiseProduct; busy: boolean; close: () => void; save: (data: FormData) => void | Promise<void> }) {
+export function ProductEditorModal({ product, busy, close, save, message, uncertain = false }: { product: MerchandiseProduct; busy: boolean; message?: string; uncertain?: boolean; close: () => void; save: (data: FormData) => void | Promise<void> }) {
   return <div className="modal-backdrop"><div className="modal-card merch-editor merch-product-editor" role="dialog" aria-modal="true" aria-labelledby="product-editor-title">
     <button type="button" className="modal-close" onClick={close} aria-label="Close"><X size={18}/></button>
     <div className="merch-editor-heading"><div><p className="eyebrow">Merchandise catalogue</p><h2 id="product-editor-title">{product.name}</h2><p>{product.facility.name} · {product.quantityOnHand - product.quantityReserved} ready to sell</p></div><span className="merch-sku">{product.sku}</span></div>
-    <form action={save} className="merch-editor-form">
+    <form onSubmit={(event) => { event.preventDefault(); void save(new FormData(event.currentTarget)); }} className="merch-editor-form">
       <div className="merch-editor-layout">
+        {message ? <div role="alert" style={{ gridColumn: "1 / -1" }}><p>{message}</p>{uncertain ? <button type="button" className="button button-primary" onClick={() => window.location.reload()}>Reload catalogue</button> : null}</div> : null}
         <aside><ImagePicker initialValue={product.imageUrl} label="product image"/><div className="merch-stock-card"><span>Available stock</span><strong>{product.quantityOnHand - product.quantityReserved}</strong><small>Use Move stock for audited corrections.</small></div></aside>
         <div className="merch-fields"><div className="form-grid two"><label>SKU<input name="sku" required maxLength={60} defaultValue={product.sku}/></label><label>Product name<input name="name" required maxLength={160} defaultValue={product.name}/></label><label>Category<input name="category" required defaultValue={product.category}/></label><label>Barcode<input name="barcode" defaultValue={product.barcode ?? ""}/></label><label>Cost price<span className="money-input"><b>R</b><input name="costPrice" type="number" min="0" step="0.01" defaultValue={product.costPrice} required/></span></label><label>Selling price<span className="money-input"><b>R</b><input name="sellingPrice" type="number" min="0" step="0.01" defaultValue={product.sellingPrice} required/></span></label><label>Reorder point<input name="reorderPoint" type="number" min="0" step="1" defaultValue={product.reorderPoint} required/></label></div><label className="premium-switch"><input name="active" type="checkbox" defaultChecked={product.active}/><span><Check size={14}/></span><strong>Active product<small>Available for packages and sales</small></strong></label></div>
       </div>
-      <div className="merch-editor-footer"><button type="button" className="button button-secondary" onClick={close}>Cancel</button><button className="button button-primary" disabled={busy}>{busy ? "Saving…" : "Save product"}</button></div>
+      <div className="merch-editor-footer"><button type="button" className="button button-secondary" onClick={close}>Cancel</button><button className="button button-primary" disabled={busy || uncertain}>{busy ? "Saving…" : "Save product"}</button></div>
     </form>
   </div></div>;
 }
