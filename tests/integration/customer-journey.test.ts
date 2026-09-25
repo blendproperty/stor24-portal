@@ -196,9 +196,19 @@ test("isolated PostgreSQL connected customer journey", async t => {
       const movedOutAt = new Date();
       await giveNotice(scope, { tenancyId, noticeDate: movedOutAt, plannedMoveOut: movedOutAt });
       const leaving = { tenancyId, movedOutAt, finalCharge: 25, depositAction: "NONE" as const, depositAmount: 0, idempotencyKey: randomUUID(), notes: "Synthetic test only; outstanding credit requires finance acceptance." };
+      const datePolicy = await db.configurationProfile.create({ data: { organisationId: org.id, facilityId: facility.id, domain: "PROGRAM_DEFAULTS", name: "Default", status: "READY", config: { defaults: { "Move Out": { moveOutDate: "today" } } } } });
+      const balanceBefore = (await db.account.findUniqueOrThrow({ where: { id: account.id } })).balance.toString();
+      const future = new Date(movedOutAt.getTime() + 86_400_000);
+      await assert.rejects(moveOut(scope, { ...leaving, movedOutAt: future }), /MOVE_OUT_DATE_RESTRICTED/);
+      assert.equal((await db.account.findUniqueOrThrow({ where: { id: account.id } })).balance.toString(), balanceBefore);
+      assert.equal((await db.tenancy.findUniqueOrThrow({ where: { id: tenancyId } })).status, "NOTICE_GIVEN");
+      assert.equal((await db.unit.findUniqueOrThrow({ where: { id: unit.id } })).status, "OCCUPIED");
+      assert.equal(await db.auditEvent.count({ where: { entityId: tenancyId, action: "tenancy.moved_out" } }), 0);
       const result = await moveOut(scope, leaving);
       assert.equal(result.tenancy.status, "CLOSED");
       assert.deepEqual(result.releasedUnits, [{ unitId: unit.id, status: "AVAILABLE" }]);
+      await db.configurationProfile.update({ where: { id: datePolicy.id }, data: { config: { defaults: { "Move Out": { moveOutDate: "invalid" } } } } });
+      // A confirmed idempotent replay is independent of later date/policy changes.
       assert.equal((await moveOut(scope, leaving)).replayed, true);
       await assert.rejects(moveOut(scope, { ...leaving, finalCharge: 26 }), /CONFLICT/);
       const balance = (await db.account.findUniqueOrThrow({ where: { id: account.id } })).balance;

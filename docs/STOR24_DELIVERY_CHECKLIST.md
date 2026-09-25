@@ -1,5 +1,7 @@
 # STOR24 delivery checklist
 
+25 September move-out policy checkpoint: P06/P01 enforces explicitly saved date restrictions before access, inventory or finance work, while confirmed replays remain valid. Actual-service before/after proof and 447 tests/typecheck/lint pass; PostgreSQL/required CI and promotion pending. PR273 configuration rollback passed checks and merged 719ae269; rollout pending. No real settings or customer workflow changed during tests; all acceptance gates remain open.
+
 25 September configuration integrity checkpoint: P06/CIA-I3 configuration, connector, charge and discount saves now roll back if their audit cannot be recorded. Before/after actual-route proof; 443 tests/typecheck/lint pass. Real PostgreSQL and required CI/promotion pending. No production settings changed; runtime-default enforcement and all programme acceptance remain open.
 
 24 September final release verification: evidence PR271 merged ad75699283db6573a19cbeb09196e0b9f2057afe after all checks. Main CI 36051702893 and deployment 36051927992 passed; exact image ad7569928 healthy/public readiness verified at 20:01:50 UTC. Documentation-only difference from the already verified PR270 application. Canonical evidence and Excel retain all acceptance gates.
