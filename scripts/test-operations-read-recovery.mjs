@@ -25,11 +25,11 @@ try {
    return route.fulfill({json:{data:{tasks:mode==='populated'?[{id:'synthetic-task',title:'Synthetic task',status:'OPEN',priority:'NORMAL',dueAt:null}]:[],maintenance:[],products:[],storagePackages:[],dailyCloses:[],notes:[],facilities:[{id:"synthetic-facility",name:"Synthetic facility",units:[]}]}}});
   });
   await page.goto(`http://127.0.0.1:${server.address().port}?view=${view}`);
-  const retry=page.getByRole('button',{name:'Retry loading',exact:true});
+  const retry=page.getByRole('button',{name:/^(Retry loading|Check access again)$/});
   await expect(page.getByRole('alert')).toContainText('could not be loaded');
   await expect(page.getByText('No open tasks',{exact:true})).toHaveCount(0);
   await expect(page.getByText('No products match these filters.',{exact:true})).toHaveCount(0);
-  for(const failure of ['malformed','bad-json','denied']){mode=failure;await retry.click();await expect(page.getByRole('alert')).toContainText('could not be loaded');}
+  for(const failure of ['malformed','bad-json','denied']){mode=failure;await retry.click();await expect(page.getByRole('alert')).toContainText(failure==='denied'?'contact your administrator':'could not be loaded');}
   mode='hold';await page.clock.install();await retry.click();await expect(page.getByRole('status')).toContainText('Loading operations data');
   await page.clock.fastForward(21000);await expect(page.getByRole('alert')).toBeVisible();await pending.abort().catch(()=>{});
   await page.screenshot({path:`output/operations-read-recovery/${view}-${width}.png`,fullPage:true});
