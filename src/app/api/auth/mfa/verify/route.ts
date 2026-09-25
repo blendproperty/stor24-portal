@@ -8,13 +8,14 @@ export async function POST(request: Request) {
   if (!sameOrigin(request)) return Response.json({ error: "Request rejected." }, { status: 403 });
   const ip = requestIp(request);
   if (await rateLimit(`mfa-login:${privacyHash(ip)}`, 8, 15 * 60 * 1000)) return Response.json({ error: "Too many attempts. Try again in 15 minutes." }, { status: 429 });
-  const userId = await getMfaChallenge();
-  if (!userId) return Response.json({ error: "Your verification session expired. Sign in again." }, { status: 401 });
+  const challenge = await getMfaChallenge();
+  if (!challenge) return Response.json({ error: "Your verification session expired. Sign in again." }, { status: 401 });
+  const { userId } = challenge;
   const body = await request.json().catch(() => ({}));
   const code = typeof body.code === "string" ? body.code.trim() : "";
   const result = await withMfaUserLock(userId, async tx => {
     const user = await tx.user.findUnique({ where: { id: userId }, include: { roleAssignments: { include: { role: true } }, mfaCredential: true } });
-    if (!user?.active || !user.mfaCredential?.enabledAt) return { ok: false as const, response: Response.json({ error: "Your verification session is no longer valid." }, { status: 401 }) };
+    if (!user?.active || user.sessionVersion !== challenge.sessionVersion || !user.mfaCredential?.enabledAt) return { ok: false as const, response: Response.json({ error: "Your verification session is no longer valid." }, { status: 401 }) };
     const recoveryHashes = Array.isArray(user.mfaCredential.recoveryCodeHashes) ? user.mfaCredential.recoveryCodeHashes.filter((value): value is string => typeof value === "string") : [];
     const remaining = consumeRecoveryCode(recoveryHashes, code);
     const validTotp = verifyTotp(decryptMfaSecret(user.mfaCredential.secretEncrypted), code);
