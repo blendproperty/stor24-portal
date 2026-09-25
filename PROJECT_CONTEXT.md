@@ -1,4 +1,11 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Configuration save and audit atomicity — 25 September 2026
+
+- **Implementation:** generic configuration saves now commit their data and audit in one database transaction for profiles, connector details, charge definitions and discount plans. An audit failure rolls back both new records and updates. Existing permissions, validation, dedicated Hikvision configuration boundary and response shape remain; this does not activate stored policy defaults or providers.
+- **Testing:** actual-route synthetic reproduction previously retained a new profile after an audit error. After the fix, create/update failure and recovery pass for all four kinds, with one saved row and one audit per successful request. Denied, unsupported and dedicated-provider paths do not write. All 443 unit tests, typecheck and focused lint pass. Added real PostgreSQL audit-rejection/rollback/recovery cases to required CI; CI pending.
+- **Commit/push:** enclosing configuration-atomic-audit PR records this candidate.
+- **Merge/deployment/configuration/live verification:** not yet verified for this change. No production settings, financial definitions, access switches or provider configuration were edited. Concurrent configuration-edit policy and downstream default enforcement remain separate work; staff/finance/legal/provider/recovery acceptance stays open.
+- **Continuation:** Brett authorised further unattended technical work on 25 September. Prior source/evidence releases through PR272 are merged on main dac6a7439b25bf32a234ecac2de6c5babb6ff3b3; working tree was clean before this item. The previous finite four-hour automation remains paused; this is active authorised work, not an invented extension of that schedule.
 ## Evening delivery consolidation — 24 September 2026
 
 - **Implementation:** [the evening delivery record](docs/UNATTENDED_DELIVERY_2026-09-24.md) consolidates security, finance, daily-close/settings and communications work, with 28 verified merge commits from PR243–270 and concrete next acceptance walkthroughs. Latest source PR270 adds all-channel delivery visibility while restricting unassigned messages to permitted customers. No further application behaviour is changed by this documentation checkpoint.
