@@ -23,9 +23,14 @@ export function ProgramDefaults({ initial, busy, stores, currentStoreId, onSave 
   const set = (key: string, value: Value) => setDefaults((current) => ({ ...current, [active]: { ...(current[active] ?? {}), [key]: value } }));
 
   return <div className="company-form program-defaults-workspace">
-    <div className="panel-heading"><div><p className="eyebrow">General setup</p><h2>Program defaults</h2><p className="panel-subtitle">Store-specific operational rules reproduced from the first SiteLink Program Defaults row.</p></div><Settings2 className="positive-icon"/></div>
+    <div className="panel-heading"><div><p className="eyebrow">General setup</p><h2>Program defaults</h2><p className="panel-subtitle">Store preferences and supported operational rules. Check the status below before relying on a setting.</p></div><Settings2 className="positive-icon"/></div>
     <div className="program-tabs" role="tablist">{tabs.map((tab) => <button type="button" role="tab" aria-selected={active === tab} className={active === tab ? "active" : ""} onClick={() => setActive(tab)} key={tab}>{tab}</button>)}</div>
-    <p className="defaults-scope-note">Website attributes remain in their dedicated setup section. IP enforcement belongs in platform security, and unattended billing batches will only be exposed when live payment and invoicing workers are available.</p>
+    <div className="defaults-scope-note" role="note" aria-label="Settings availability">
+      {active === "Move Out" ? <><strong>Date rules are connected.</strong> Saved move-out date restrictions, backdating limits and current-month rules are checked before a new move-out. Other preferences in this group are saved for planning and do not change the workflow.</>
+        : active === "Refunds" ? <><strong>Refund limits are connected.</strong> Saved minimum and maximum amounts are checked by the reviewed refund workflow. Other preferences in this group are saved for planning and do not change the workflow.</>
+        : active === "Move In" ? <><strong>Authorised countersigning is connected.</strong> Automatic countersigning also requires the BlendSign provider and company authorisation. Other preferences in this group are saved for planning and do not change the workflow.</>
+        : <><strong>Planning preferences.</strong> Values in this group can be saved, but are not connected to operational workflows. Saving them does not enable access, billing, messaging or security controls.</>}
+    </div>
     <div className="program-default-panel"><ProgramPanel tab={active} values={settings} set={set} paymentTypes={paymentTypes} setPaymentTypes={setPaymentTypes} smsMessages={smsMessages} setSmsMessages={setSmsMessages} responseLists={responseLists} setResponseLists={setResponseLists} stores={stores} currentStoreId={currentStoreId}/></div>
     <div className="form-footer"><button type="button" className="button button-primary" disabled={busy} onClick={() => onSave({ activeGroup: active, defaults, paymentTypes, smsMessages, responseLists })}>{busy ? "Saving…" : "Save program defaults"}</button></div>
   </div>;
