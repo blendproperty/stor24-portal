@@ -25,12 +25,13 @@ function UnitPurchases({ unitKey, unitId, unitNumber, accountId, canShop, bookin
     if (!accountId) return;
     let disposed = false;
     const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20_000);
     fetch(`/api/tenant/orders?account=${encodeURIComponent(accountId)}&unit=${encodeURIComponent(unitId)}`, { cache: "no-store", signal: controller.signal }).then(async response => {
       const body = await response.json();
-      if (!response.ok) throw new Error(body.error || "Your purchases could not be loaded.");
+      if (!response.ok || !Array.isArray(body.data)) throw new Error("Your purchases could not be loaded. Refresh purchase status to try again.");
       if (!disposed) setPurchases(body.data.filter((order: Purchase) => order.unitId === unitId));
-    }).catch(error => { if (!disposed) setError(error.message); }).finally(() => { if (!disposed) setLoading(false); });
-    return () => { disposed = true; controller.abort(); };
+    }).catch(() => { if (!disposed) setError("Your purchases could not be loaded. Refresh purchase status to try again."); }).finally(() => { clearTimeout(timeout); if (!disposed) setLoading(false); });
+    return () => { disposed = true; controller.abort(); clearTimeout(timeout); };
   }, [accountId, unitId, refresh]);
   return <section className="tenant-card"><span className="tenant-eyebrow">PACKED. SORTED. YOURS.</span><h2>Your packing supplies</h2><p>Booking packages and separate purchases for Unit {unitNumber}.</p>
     {bookingPackages.map(booking => booking.packageSelection && <article className="tenant-request" key={booking.id} aria-label={`Booking package ${booking.packageSelection.packageName}`}>
