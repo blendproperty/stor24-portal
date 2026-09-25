@@ -22,6 +22,7 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [readFailed, setReadFailed] = useState(false);
+  const [readAccess, setReadAccess] = useState<"denied" | "signed-out" | null>(null);
   const readRequest = useRef<AbortController | null>(null);
   const taskRequest = useRef(false);
   const [taskBusy, setTaskBusy] = useState(false);
@@ -46,14 +47,35 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
   const [productQuery, setProductQuery] = useState("");
   const [productCategory, setProductCategory] = useState("ALL");
 
+  const handleReadAccessFailure = useCallback((status: number) => {
+    if (status !== 401 && status !== 403) return false;
+    setData(null);
+    setReadFailed(false);
+    setReadAccess(status === 403 ? "denied" : "signed-out");
+    setError(status === 403 ? "You do not have access to this workspace. If you require access, please contact your administrator." : "Please sign in again to view this workspace.");
+    setShowTask(false);
+    setShowMaintenance(false);
+    setShowProduct(false);
+    setShowStock(false);
+    setShowPackage(false);
+    setSelectedProduct(null);
+    setSelectedPackage(null);
+    setMaintenanceFacilityId("");
+    setPackageFacilityId("");
+    return true;
+  }, []);
+
   const load = useCallback(async () => {
     readRequest.current?.abort();
     const controller = new AbortController();
     readRequest.current = controller;
     setLoading(true);
+    setReadAccess(null);
     const timeout = setTimeout(() => controller.abort(), 20_000);
     try {
       const response = await fetch("/api/v1/operations", { cache: "no-store", signal: controller.signal });
+      if (readRequest.current !== controller) return;
+      if (handleReadAccessFailure(response.status)) return;
       const payload = await response.json();
       if (!response.ok || !payload.data || !["tasks", "maintenance", "products", "storagePackages", "dailyCloses", "notes", "facilities"].every(key => Array.isArray(payload.data[key]))) throw new Error("Operations data unavailable");
       if (readRequest.current !== controller) return;
@@ -71,7 +93,7 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
         setLoading(false);
       }
     }
-  }, []);
+  }, [handleReadAccessFailure]);
   useEffect(() => {
     let cancelled = false;
     void Promise.resolve().then(() => { if (!cancelled) void load(); });
@@ -137,6 +159,7 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
     const timeout = setTimeout(() => controller.abort(), 20_000);
     try {
       const response = await fetch("/api/v1/operations", { cache: "no-store", signal: controller.signal });
+      if (handleReadAccessFailure(response.status)) return;
       const payload = await response.json();
       const tasks = payload.data?.tasks;
       if (!response.ok || !Array.isArray(tasks) || tasks.some(task => typeof task.id !== "string" || typeof task.title !== "string" || !["OPEN", "IN_PROGRESS", "WAITING", "COMPLETED", "CANCELLED"].includes(task.status))) throw new Error("Task status unavailable");
@@ -274,7 +297,7 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
   if (!data) return <div className="page-stack">
     <PageHeader eyebrow="Facility workflows" title={view === "merchandise" ? "Merchandise" : "Operations centre"} description="Work queues and facility records." />
     <section className="panel panel-spacious">
-      {loading ? <p role="status">Loading operations data…</p> : <><p role="alert">{error}</p><button className="button button-primary" onClick={() => void load()}>Retry loading</button></>}
+      {loading ? <p role="status">Loading operations data…</p> : <><p role="alert">{error}</p>{readAccess === "signed-out" ? <Link className="button button-primary" href="/login">Sign in</Link> : <button className="button button-primary" onClick={() => void load()}>{readAccess === "denied" ? "Check access again" : "Retry loading"}</button>}</>}
     </section>
   </div>;
 
