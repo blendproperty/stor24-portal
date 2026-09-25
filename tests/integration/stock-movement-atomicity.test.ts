@@ -45,5 +45,11 @@ test("isolated PostgreSQL stock claims prevent negative stock and roll back fail
   assert.equal((await db.product.findUniqueOrThrow({where:{id:product.id}})).quantityOnHand,4);
   assert.equal(await db.stockMovement.count({where:{productId:product.id}}),2);
   assert.equal(await db.auditEvent.count({where:{organisationId:org.id,action:'stockMovement.create'}}),2);
+  await db.product.update({where:{id:product.id},data:{quantityOnHand:-2}});
+  assert.equal((await send('RECEIPT',1)).status,409);
+  assert.equal((await db.product.findUniqueOrThrow({where:{id:product.id}})).quantityOnHand,-2);
+  assert.equal(await db.stockMovement.count({where:{productId:product.id}}),2);
+  assert.equal((await send('RECEIPT',2)).status,201);
+  assert.equal((await db.product.findUniqueOrThrow({where:{id:product.id}})).quantityOnHand,0);
  }finally{if(constrained)await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_stock_audit_failure');await db.$disconnect();}
 });
