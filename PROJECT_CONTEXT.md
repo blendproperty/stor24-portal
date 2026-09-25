@@ -1,4 +1,11 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Product creation failure recovery — 25 September 2026
+
+- **Implementation:** product creation retains rejected input, bounds requests to 20 seconds and guards duplicate submissions. Confirmation must match saved ID, facility, SKU, name and opening quantity. Uncertain outcomes block resubmission after closing the modal and offer read-only catalogue reload. Backend policies and server cross-request idempotency are unchanged.
+- **Testing:** prepatch network failure reproduced an unhandled error. Actual-component tests at1440/390/320px pass rejection/input retention, duplicate/timeout/malformed/mismatched/conflict/500/lost confirmation, closed-modal block, GET reload, success and failed-refresh recovery. All462 tests/typecheck/focused lint and stock-form/access regressions pass. Fixture screenshot inspected; production font/shell are not represented. Required CI and staff acceptance remain open.
+- **Commit/push/merge/deployment/live verification:** candidate promotion pending; tracked by enclosing PR. No production inventory changed.
+- **Prior verified release:** PR300 source4fe05d3adccc480b8ecf6211b19333a2332bcd8b passed CI36159537564 (stock browser step checked), SQL36159537482 and security36159537481; merged8e66dcc864e309cc19a86640947552b969c1515d. Main CI36160172680/deploy36160547978 passed. Exact image stor24-crm:8e66dcc86 healthy/service/database verified16:27:10.269 UTC. Excel E059 updated/rendered/export-reimport passed with known native exit-after-export limitation. All acceptance gates remain open.
+
 ## Manual stock-form failure recovery — 25 September 2026
 
 - **Implementation:** manual stock submission catches network/JSON/server failures, bounds requests to20 seconds and guards duplicate clicks. Known validation/access/insufficient-stock rejection retains input. Confirmation must match saved ID, product, movement type and signed quantity. Uncertain outcomes block resubmission even after closing the modal and require inventory/audit review via read-only reload. Confirmed saves show an explicit recorded message; later read failure can be retried without another movement. Backend stock sign, reservation and audit rules are unchanged; server cross-request idempotency remains separate.
