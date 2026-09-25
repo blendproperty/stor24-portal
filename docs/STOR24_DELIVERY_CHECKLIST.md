@@ -1,5 +1,7 @@
 # STOR24 delivery checklist
 
+25 September verified security/finance checkpoint: [release evidence and staff check-off steps](UNATTENDED_DELIVERY_2026-09-25.md) consolidate PR277–285. Latest 458 tests and all required checks passed; exact image 0778701b2 healthy/readiness verified at 09:15:47 UTC. Excel E036–E044 reconciled with zero accepted priorities. Staff/finance/legal/provider/recovery gates remain open; transient rollout and SSH reliability follow-ups recorded.
+
 25 September password-change checkpoint: stale credential/version changes reject before reset-token or audit mutations; valid changes preserve existing behavior. Actual-route before/after proof, 457 tests/typecheck/lint passed; independent candidate review found no concrete issue; real PostgreSQL CI remains pending. PR282 deployed as 07e127321 and live health verified at 08:55:42 UTC. All acceptance gates remain open.
 
 25 September pending-login revocation checkpoint: MFA challenges bind the password snapshot's session version; stale challenges reject before consuming codes or issuing sessions. Actual signed-route before/after proof and 456 tests/typecheck/lint pass; PostgreSQL reset/change/lock-order CI and promotion pending. PR280 deployed/verified at 06:35:10 UTC; PR281 passed all checks and merged, rollout in progress. Staff/security acceptance remains open.
