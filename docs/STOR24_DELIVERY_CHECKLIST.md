@@ -1,5 +1,7 @@
 # STOR24 delivery checklist
 
+25 September verified release checkpoint: [settings delivery evidence and manager walkthrough](UNATTENDED_DELIVERY_2026-09-25.md) records PR273–275, all required checks passed, exact deployed images and read-only health verification. Latest image ffa048542 healthy at 05:55:50 UTC after a safe retry of an SSH connection timeout. Excel E032–E034 reconciled; all 14 acceptance gates remain open. No real settings, account or access changes were tested.
+
 25 September availability checkpoint: setup identifies connected rules and planning-only preferences; desktop/mobile browser checks, typecheck and lint pass. Promotion pending. PR273 deployed and exact image/readiness verified at 05:41:15 UTC; PR274 passed required checks and merged 85ce43c, rollout pending. All programme acceptance gates remain open.
 
 25 September move-out policy checkpoint: P06/P01 enforces explicitly saved date restrictions before access, inventory or finance work, while confirmed replays remain valid. Actual-service before/after proof and 447 tests/typecheck/lint pass; PostgreSQL/required CI and promotion pending. PR273 configuration rollback passed checks and merged 719ae269; rollout pending. No real settings or customer workflow changed during tests; all acceptance gates remain open.
