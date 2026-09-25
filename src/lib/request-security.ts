@@ -25,14 +25,18 @@ export function sameOrigin(request: Request) {
   return allowed.has(origin);
 }
 
+/** Atomically claim an attempt; a denied request leaves the fixed window unchanged. */
 export async function rateLimit(key: string, limit: number, windowMs: number) {
-  const now = new Date();
-  const existing = await db.rateLimitBucket.findUnique({ where: { key } });
-  if (!existing || existing.resetAt <= now) {
-    await db.rateLimitBucket.upsert({ where: { key }, create: { key, count: 1, resetAt: new Date(now.getTime() + windowMs) }, update: { count: 1, resetAt: new Date(now.getTime() + windowMs) } });
-    return false;
-  }
-  if (existing.count >= limit) return true;
-  await db.rateLimitBucket.update({ where: { key }, data: { count: { increment: 1 } } });
-  return false;
+  if (!Number.isInteger(limit) || limit < 1 || limit > 2_147_483_647 || !Number.isSafeInteger(windowMs) || windowMs < 1) throw new Error("INVALID_RATE_LIMIT");
+  const now = new Date(), resetAt = new Date(now.getTime() + windowMs);
+  if (!Number.isFinite(resetAt.getTime())) throw new Error("INVALID_RATE_LIMIT");
+  const rows = await db.$queryRaw<{ count: number }[]>`
+    INSERT INTO "RateLimitBucket" ("key", "count", "resetAt", "updatedAt") VALUES (${key}, 1, ${resetAt}, ${now})
+    ON CONFLICT ("key") DO UPDATE SET
+      "count" = CASE WHEN "RateLimitBucket"."resetAt" <= ${now} THEN 1 ELSE "RateLimitBucket"."count" + 1 END,
+      "resetAt" = CASE WHEN "RateLimitBucket"."resetAt" <= ${now} THEN ${resetAt} ELSE "RateLimitBucket"."resetAt" END,
+      "updatedAt" = ${now}
+    WHERE "RateLimitBucket"."resetAt" <= ${now} OR "RateLimitBucket"."count" < ${limit}
+    RETURNING "count"`;
+  return rows.length === 0;
 }

@@ -1,5 +1,7 @@
 # STOR24 delivery checklist
 
+25 September attempt-limit checkpoint: old shared helper admitted 40 concurrent attempts against a limit of five. Atomic claim candidate preserves fixed windows and caller responses; 453 tests/typecheck/lint and independent review pass. Real PostgreSQL concurrency/required CI and promotion pending; no live attack simulation. PR277 deployed/verified and PR278 merged after checks. All programme acceptance remains open.
+
 25 September move-out precision checkpoint: sub-cent charges/deposits rejected by the API and direct service before database/access work. Failing-before proof and 451 tests/typecheck/lint pass; PostgreSQL/required CI and promotion pending. Refund policy PR277 passed all checks and merged ece54015, deployment pending. All acceptance gates remain open.
 
 25 September refund policy checkpoint: malformed policies, sub-cent ceilings and inconsistent minimum/maximum limits require finance review; absent/blank/zero settings retain prior behaviour. Prepatch reproduction and 448 tests/typecheck/lint pass; real database checks and promotion pending. No real payments or balances changed; finance and staff acceptance remain open.
