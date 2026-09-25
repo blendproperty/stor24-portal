@@ -30,6 +30,7 @@ jobs:
       - run: node scripts/test-mfa-settings-recovery.mjs
       - run: node scripts/test-pending-order-recovery.mjs
       - run: node scripts/test-purchase-read-recovery.mjs
+      - run: node scripts/test-task-completion-recovery.mjs
       - run: node scripts/test-login-redirect.mjs
       - run: node scripts/test-whatsapp-retry.mjs
       - run: node scripts/test-collections.mjs
@@ -50,6 +51,7 @@ jobs:
           path: |
             output/guided-help/
             output/company-setup-recovery/
+            output/task-completion-recovery/
             output/password-form-recovery/
             output/monthly-billing/
             output/debit-orders/
