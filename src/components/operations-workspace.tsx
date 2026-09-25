@@ -153,28 +153,43 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
   }
 
   async function createMaintenance(formData: FormData) {
+    if (maintenanceRequest.current || maintenanceUncertain) return;
+    maintenanceRequest.current = true;
     setBusy(true);
-    const response = await fetch("/api/v1/operations", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        kind: "maintenance",
-        payload: {
-          facilityId: formData.get("facilityId"),
-          unitId: formData.get("unitId") || undefined,
-          title: formData.get("title"),
+    setMaintenanceMessage("");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20_000);
+    try {
+      const title = String(formData.get("title") ?? "").trim();
+      const facilityId = String(formData.get("facilityId") ?? "");
+      const unitId = formData.get("unitId") || null;
+      const response = await fetch("/api/v1/operations", {
+        method: "POST", signal: controller.signal,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ kind: "maintenance", payload: {
+          facilityId, unitId: unitId || undefined, title,
           description: formData.get("description") || undefined,
           priority: formData.get("priority"),
           dueAt: formData.get("dueAt") ? new Date(String(formData.get("dueAt"))).toISOString() : undefined,
-        },
-      }),
-    });
-    const payload = await response.json();
-    setBusy(false);
-    if (!response.ok) { setError(payload.error?.message ?? "Maintenance request could not be created."); return; }
-    setShowMaintenance(false);
-    setMaintenanceFacilityId("");
-    await load();
+        } }),
+      });
+      const payload = await response.json();
+      if ([400, 401, 403, 404, 422, 429].includes(response.status)) {
+        setMaintenanceMessage(typeof payload.error?.message === "string" ? payload.error.message : "Request was not saved. Check the details and your access, then try again.");
+        return;
+      }
+      if (!response.ok || typeof payload.data?.id !== "string" || !payload.data.id || payload.data.title !== title || payload.data.facilityId !== facilityId || payload.data.unitId !== unitId) throw new Error("Unconfirmed maintenance creation");
+      setShowMaintenance(false);
+      setMaintenanceFacilityId("");
+      await load();
+    } catch {
+      setMaintenanceUncertain(true);
+      setMaintenanceMessage("We could not confirm whether this maintenance request was saved. Reload and check the request list and unit availability before creating it again.");
+    } finally {
+      clearTimeout(timeout);
+      maintenanceRequest.current = false;
+      setBusy(false);
+    }
   }
 
   async function updateMaintenance(id: string, status: "IN_PROGRESS" | "COMPLETED" | "CANCELLED") {
@@ -295,7 +310,7 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
 
   return <div className="page-stack">
     <PageHeader eyebrow="Facility workflows" title="Operations centre" description="Database-backed work queues, maintenance and end-of-day control for Stor24." action={<button className="button button-primary" onClick={() => setShowTask(true)}><Plus size={16}/> New task</button>} />
-    {maintenanceMessage ? <div role="alert"><p>{maintenanceMessage}</p>{maintenanceUncertain ? <button className="button button-primary" onClick={() => window.location.reload()}>Reload maintenance status</button> : null}</div> : null}
+    {maintenanceMessage && !showMaintenance ? <div role="alert"><p>{maintenanceMessage}</p>{maintenanceUncertain ? <button className="button button-primary" onClick={() => window.location.reload()}>Reload maintenance status</button> : null}</div> : null}
     {taskMessage ? <div role={taskNeedsCheck ? "alert" : "status"}><p>{taskMessage}</p>{taskNeedsCheck ? <button className="button button-primary" disabled={taskBusy} onClick={checkTaskStatus}>{taskBusy ? "Checking…" : "Check task status"}</button> : null}</div> : null}
     {error ? <p className="form-error">{error}</p> : null}{readRecovery}
     <section className="summary-strip">
@@ -320,6 +335,6 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
       <article className="panel"><div className="hub-heading"><div><h2>End-of-day control</h2><p>Recorded close snapshots and cash variance.</p></div><RefreshCw size={20}/></div><div className="table-wrap"><table className="data-table"><thead><tr><th>Date</th><th>Facility</th><th>Status</th><th>Variance</th></tr></thead><tbody>{data?.dailyCloses.length ? data.dailyCloses.map((close) => <tr key={close.id}><td>{formatSouthAfricaDate(close.businessDate)}</td><td>{close.facility.name}</td><td><StatusPill tone={close.status === "CLOSED" ? "positive" : "warning"}>{close.status}</StatusPill></td><td>{close.variance ?? "—"}</td></tr>) : <tr><td colSpan={4} className="empty-cell">No daily closes recorded.</td></tr>}</tbody></table></div></article>
     </section>
     {showTask ? <div className="modal-backdrop"><div className="modal-card" role="dialog" aria-modal="true"><p className="eyebrow">Work queue</p><h2>Create operational task</h2><form onSubmit={(event) => { event.preventDefault(); void createTask(new FormData(event.currentTarget)); }} className="invite-form">{taskCreationMessage ? <div role="alert"><p>{taskCreationMessage}</p>{taskCreationUncertain ? <button type="button" className="button button-primary" onClick={() => window.location.reload()}>Reload task list</button> : null}</div> : null}<label>Facility<select name="facilityId" required><option value="">Choose facility</option>{data?.facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}</select></label><label>Title<input name="title" required minLength={2}/></label><label>Description<textarea name="description" rows={4}/></label><label>Priority<select name="priority" defaultValue="NORMAL"><option>LOW</option><option>NORMAL</option><option>HIGH</option><option>URGENT</option></select></label><label>Due date<input name="dueAt" type="datetime-local"/></label><div className="form-actions"><button type="button" className="button button-secondary" onClick={() => setShowTask(false)}>Cancel</button><button className="button button-primary" disabled={busy || taskCreationUncertain || !data?.facilities.length}>{busy ? "Saving…" : "Create task"}</button></div></form></div></div> : null}
-    {showMaintenance ? <div className="modal-backdrop"><div className="modal-card" role="dialog" aria-modal="true"><p className="eyebrow">Unit availability</p><h2>Create maintenance request</h2><p className="panel-subtitle">Selecting a unit immediately removes it from bookable availability until all linked maintenance is complete.</p><form action={createMaintenance} className="invite-form"><label>Facility<select name="facilityId" required value={maintenanceFacilityId} onChange={(event) => setMaintenanceFacilityId(event.target.value)}><option value="">Choose facility</option>{data?.facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}</select></label><label>Unit (optional)<select name="unitId" defaultValue=""><option value="">Facility-level request</option>{data?.facilities.find((facility) => facility.id === maintenanceFacilityId)?.units.map((unit) => <option key={unit.id} value={unit.id}>Unit {unit.number}{unit.status === "SERVICE" ? " · already in service" : ""}</option>)}</select></label><label>Title<input name="title" required minLength={2}/></label><label>Description<textarea name="description" rows={4}/></label><label>Priority<select name="priority" defaultValue="NORMAL"><option>LOW</option><option>NORMAL</option><option>HIGH</option><option>URGENT</option></select></label><label>Due date<input name="dueAt" type="datetime-local"/></label><div className="form-actions"><button type="button" className="button button-secondary" onClick={() => { setShowMaintenance(false); setMaintenanceFacilityId(""); }}>Cancel</button><button className="button button-primary" disabled={busy || !maintenanceFacilityId}>{busy ? "Saving…" : "Create request"}</button></div></form></div></div> : null}
+    {showMaintenance ? <div className="modal-backdrop"><div className="modal-card" role="dialog" aria-modal="true"><p className="eyebrow">Unit availability</p><h2>Create maintenance request</h2><p className="panel-subtitle">Selecting a unit immediately removes it from bookable availability until all linked maintenance is complete.</p><form onSubmit={(event) => { event.preventDefault(); void createMaintenance(new FormData(event.currentTarget)); }} className="invite-form">{maintenanceMessage ? <div role="alert"><p>{maintenanceMessage}</p>{maintenanceUncertain ? <button type="button" className="button button-primary" onClick={() => window.location.reload()}>Reload maintenance status</button> : null}</div> : null}<label>Facility<select name="facilityId" required value={maintenanceFacilityId} onChange={(event) => setMaintenanceFacilityId(event.target.value)}><option value="">Choose facility</option>{data?.facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}</select></label><label>Unit (optional)<select name="unitId" defaultValue=""><option value="">Facility-level request</option>{data?.facilities.find((facility) => facility.id === maintenanceFacilityId)?.units.map((unit) => <option key={unit.id} value={unit.id}>Unit {unit.number}{unit.status === "SERVICE" ? " · already in service" : ""}</option>)}</select></label><label>Title<input name="title" required minLength={2}/></label><label>Description<textarea name="description" rows={4}/></label><label>Priority<select name="priority" defaultValue="NORMAL"><option>LOW</option><option>NORMAL</option><option>HIGH</option><option>URGENT</option></select></label><label>Due date<input name="dueAt" type="datetime-local"/></label><div className="form-actions"><button type="button" className="button button-secondary" onClick={() => { setShowMaintenance(false); setMaintenanceFacilityId(""); }}>Cancel</button><button className="button button-primary" disabled={busy || maintenanceUncertain || !maintenanceFacilityId}>{busy ? "Saving…" : "Create request"}</button></div></form></div></div> : null}
   </div>;
 }
