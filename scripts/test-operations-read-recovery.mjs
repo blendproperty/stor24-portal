@@ -16,7 +16,7 @@ try {
   await page.route('**/api/v1/operations/merchandise-orders',route=>route.fulfill({json:{data:[]}}));
   await page.route('**/api/v1/operations',route=>{
    methods.push(route.request().method());
-   if(route.request().method()==='POST'){mode='fail';return route.fulfill({status:201,json:{data:{id:'synthetic-new-task'}}});}
+   if(route.request().method()==='POST'){mode='fail';return route.fulfill({status:201,json:{data:{id:'synthetic-new-task',title:'Synthetic added'}}});}
    if(mode==='fail')return route.abort();
    if(mode==='hold'){pending=route;return;}
    if(mode==='bad-json')return route.fulfill({body:'not json'});
@@ -39,5 +39,3 @@ try {
  }
  console.log('PASS: operations and merchandise failed read, malformed JSON/data, forbidden response, timeout, empty/populated recovery at1440/390/320px; GET-only retries, synthetic post-save read recovery, no false empty state or unhandled page errors.');
 } finally {await browser.close();await new Promise(r=>server.close(r));}
-
-
