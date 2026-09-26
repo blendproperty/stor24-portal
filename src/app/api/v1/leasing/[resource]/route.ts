@@ -392,11 +392,13 @@ export async function DELETE(
       });
     } else if (resource === "facilities") {
       if (!scope.unrestrictedFacilities) throw new Error("FORBIDDEN");
-      const entity = await db.facility.findFirst({
-        where: { id, ...facilityWhere(scope) },
+      return await db.$transaction(async tx => {
+        const entity = await tx.facility.findFirst({ where: { id, ...facilityWhere(scope) } });
+        if (!entity) throw new Error("NOT_FOUND");
+        await tx.facility.update({ where: { id }, data: { active: false } });
+        await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "facilities.deleted", entityType: "facilities", entityId: id } });
+        return new Response(null, { status: 204 });
       });
-      if (!entity) throw new Error("NOT_FOUND");
-      await db.facility.update({ where: { id }, data: { active: false } });
     } else {
       const model =
         resource === "unit-types"

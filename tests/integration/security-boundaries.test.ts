@@ -298,6 +298,34 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
       assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "customers.deleted", actorId: actor.id } }), 1);
       assert.ok(await db.customer.findUnique({ where: { id: foreignCustomer.id } }));
     });
+    await t.test("facility DELETE rolls back deactivation on audit failure then retries once", async () => {
+      const actor = await db.user.create({ data: { organisationId: org.id, email: `${key}-deactivate@example.invalid`, name: "Synthetic deactivation reviewer", passwordHash: "synthetic-not-a-real-password-hash" } });
+      const role = await db.role.create({ data: { organisationId: org.id, name: "Facility deactivation atomicity", permissions: ["inventory.manage"] } });
+      await db.roleAssignment.create({ data: { userId: actor.id, roleId: role.id, facilityId: null } });
+      const own = await db.facility.create({ data: { organisationId: org.id, code: "deactivate-test", name: "Synthetic facility" } });
+      const foreignFacility = await db.facility.create({ data: { organisationId: other.id, code: "foreign-deactivate", name: "Foreign facility" } });
+      const output = await build({ entryPoints: ["src/app/api/v1/leasing/[resource]/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "customer-session", setup(builder) {
+        builder.onResolve({ filter: /^@\/lib\/(db|session)$/ }, args => ({ path: args.path, namespace: "fixture" }));
+        builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
+      } }] });
+      const loaded = { exports: {} as { DELETE: (request: Request, context: { params: Promise<{ resource: string }> }) => Promise<Response> } };
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: actor.id, sessionVersion: actor.sessionVersion });
+      const remove = (id = own.id) => loaded.exports.DELETE(new Request(`https://example.invalid/api/v1/leasing/facilities?id=${id}`, { method: "DELETE", headers: { origin: "https://example.invalid" } }), { params: Promise.resolve({ resource: "facilities" }) });
+      assert.equal((await remove(foreignFacility.id)).status, 404);
+      await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_facility_deactivate_failure CHECK (false) NOT VALID');
+      try {
+        assert.equal((await remove()).status, 500);
+        assert.equal((await db.facility.findUniqueOrThrow({ where: { id: own.id } })).active, true);
+        assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "facilities.deleted" } }), 0);
+      } finally { await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_facility_deactivate_failure'); }
+      await db.roleAssignment.updateMany({ where: { userId: actor.id }, data: { facilityId: a.id } });
+      assert.equal((await remove()).status, 403);
+      await db.roleAssignment.updateMany({ where: { userId: actor.id }, data: { facilityId: null } });
+      assert.equal((await remove()).status, 204);
+      assert.equal((await db.facility.findUniqueOrThrow({ where: { id: own.id } })).active, false);
+      assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "facilities.deleted", actorId: actor.id } }), 1);
+      assert.ok(await db.facility.findUnique({ where: { id: foreignFacility.id } }));
+    });
     await t.test("lead PATCH retains stage and notes on audit failure then retries once", async () => {
       const role = await db.role.create({ data: { organisationId: org.id, name: "Lead atomicity", permissions: ["operations.manage"] } });
       await db.roleAssignment.create({ data: { userId: user.id, roleId: role.id, facilityId: a.id } });
