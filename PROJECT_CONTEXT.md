@@ -1,4 +1,12 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Readiness acceptance checkpoint — 26 September 2026
+
+- **Implementation:** documentation-only consolidation links the 18 verified delivered components to an ordered staff review checklist in docs/STAFF_ACCEPTANCE_2026-09-26.md. Includes final PR325 deployment evidence. No application or configuration change.
+- **Testing:** evidence cross-checked against current canonical context and Excel E066–E084. Required checks for this documentation promotion pending. No staff acceptance claimed.
+- **Commit/push/merge:** candidate on codex/readiness-acceptance-checkpoint; pending promotion.
+- **Deployment/live:** baseline PR325 image2782b1706 verified healthy15:56:34.578UTC; this checkpoint deployment pending.
+- **Outstanding:** all14 programme acceptance gates preserved, including staff/legal/provider/finance/security/recovery approvals.
+
 ## Unit edit and map audit transaction — 26 September 2026
 
 - **Implementation:** unit renames, linked map-label synchronisation and the existing before/after audit now share one transaction. Ordinary unit edits also commit with their audit. The redundant outer PATCH audit is removed because every resource branch now records its audit within its own transaction. Existing duplicate-number, linked occupancy/reservation, status, unit-type and facility checks are preserved. No allocation policy, replay or concurrency guarantee added.
