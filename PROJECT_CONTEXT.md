@@ -1,4 +1,13 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Facility deactivation audit transaction — 26 September 2026
+
+- **Implementation:** existing facility DELETE deactivation and facilities.deleted audit now share a transaction. Audit failure restores active state. Organisation-wide inventory permission and organisation scope remain unchanged. No live facility deactivated or new deactivation policy introduced.
+- **Testing:** actual prepatch synthetic audit failure left active=false despite500. Candidate478 tests/typecheck/focused lint pass rollback/retry and restricted/foreign organisation rejection. Required PostgreSQL rollback/one-audit retry and role/org checks added; CI pending.
+- **Commit/push:** candidate on codex/facility-deactivation-audit includes PR327 final evidence; pending commit.
+- **Merge:** pending required checks.
+- **Deployment/live verification:** pending. No migration or live configuration change; all14 acceptance gates remain open.
+- **Staff acceptance:** review isolated rollback evidence and permission behaviour; do not deactivate a live facility for testing.
+
 ## Unused customer deletion audit transaction — 26 September 2026
 
 - **Implementation:** existing customer DELETE now checks scope/history, deletes and records customers.deleted within one transaction. Audit failure restores the customer. Existing tenancy/reservation protection and permission rules remain; no deletion eligibility/retention policy added and no production records deleted.

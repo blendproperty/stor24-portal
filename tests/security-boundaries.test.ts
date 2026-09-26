@@ -581,3 +581,19 @@ test("customer DELETE rolls back when audit fails and protects tenancy history",
   assert.equal((await remove("customer-b")).status, 403);
   assert.equal((await remove()).status, 204); assert.equal(rows.some(row => row.id === "customer-a"), false); assert.equal(audits, 1);
 });
+
+test("facility DELETE rolls back deactivation when audit fails", async () => {
+  const state = fixture(); state.grant("inventory.manage", null);
+  const facility = state.tables.facility[0]; facility.active = true;
+  state.db.facility.update = async ({ data }: Row) => Object.assign(facility, data);
+  let fail = true; let audits = 0;
+  state.db.auditEvent.create = async () => { if (fail) throw new Error("SYNTHETIC_AUDIT_FAILURE"); audits++; return {}; };
+  state.db.$transaction = async (fn: (client: Row) => Promise<unknown>) => { const before = structuredClone(facility); try { return await fn(state.db); } catch (error) { Object.assign(facility, before); throw error; } };
+  const api = await load("./src/app/api/v1/leasing/[resource]/route.ts", state);
+  const remove = (id = facility.id) => api.DELETE(new Request(`https://example.invalid/api/v1/leasing/facilities?id=${id}`, { method: "DELETE", headers: { origin: "https://example.invalid" } }), context("facilities"));
+  assert.equal((await remove()).status, 500); assert.equal(facility.active, true); assert.equal(audits, 0);
+  fail = false; assert.equal((await remove("foreign")).status, 404);
+  state.tables.user[0].roleAssignments = []; state.grant("inventory.manage"); assert.equal((await remove()).status, 403);
+  state.tables.user[0].roleAssignments = []; state.grant("inventory.manage", null);
+  assert.equal((await remove()).status, 204); assert.equal(facility.active, false); assert.equal(audits, 1);
+});
