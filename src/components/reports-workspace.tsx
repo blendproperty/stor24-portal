@@ -56,7 +56,7 @@ export function ReportsWorkspace({ reports, facilities, initialFrom, initialTo, 
   return (
     <div className="report-workspace">
       <section className="panel panel-spacious report-parameters">
-        <div className="panel-heading"><div><h2>Report parameters</h2><p className="panel-subtitle">Choose your report, dates and facility, then download a CSV.</p></div><Filter className="muted-icon" /></div>
+        <div className="panel-heading"><div><h2>Report parameters</h2><p className="panel-subtitle">Choose your report, dates and facility, then download a CSV. Date filters use South African time (SAST).</p></div><Filter className="muted-icon" /></div>
         {isAgeing ? <p>Ageing uses all account entries up to the selected South African date. Current recorded balances and holds are labelled separately; accounts needing reconciliation have blank ageing amounts.</p> : null}
         <div className="parameter-grid">
           <label>Report<select disabled={busy} value={reportKey} onChange={(event) => setReportKey(event.target.value)}>{reports.map((report) => <option value={report.key} key={report.key}>{report.name}</option>)}</select></label>

@@ -431,3 +431,13 @@ test("receivables export uses approved ageing and shows review states instead of
   assert.match(unapproved.reviewReason, /terms/i); assert.equal(unapproved.days91Plus, null); assert.equal(unapproved.overdue, null);
   assert.deepEqual(state.writes, []);
 });
+
+test("report date windows include SAST midnight and exclude the next SAST day", async () => {
+  const state = fixture();
+  const records = ["2026-09-24T21:59:59.999Z", "2026-09-24T22:00:00.000Z", "2026-09-25T21:59:59.999Z", "2026-09-25T22:00:00.000Z"].map((v, i) => ({ createdAt: new Date(v), facility: { name: "A" }, customer: null, assignedTo: null, source: `boundary-${i}`, stage: "NEW", expectedMoveIn: null, nextActionAt: null }));
+  state.db.lead = { findMany: async ({ where }: Row) => records.filter(r => r.createdAt >= where.createdAt.gte && r.createdAt <= where.createdAt.lte) };
+  const api = await load("./src/lib/report-data-service.ts", state);
+  const rows = await api.buildReportRows({ userId: "staff", organisationId: "org", facilityIds: ["a"], unrestrictedFacilities: false }, { reportKey: "lead-conversion", from: "2026-09-25", to: "2026-09-25", format: "JSON", groupBy: "day" });
+  assert.deepEqual(rows.map((r: Row) => r.source), ["boundary-1", "boundary-2"]);
+  assert.deepEqual(state.writes, []);
+});
