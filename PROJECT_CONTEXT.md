@@ -1,4 +1,13 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Unused customer deletion audit transaction — 26 September 2026
+
+- **Implementation:** existing customer DELETE now checks scope/history, deletes and records customers.deleted within one transaction. Audit failure restores the customer. Existing tenancy/reservation protection and permission rules remain; no deletion eligibility/retention policy added and no production records deleted.
+- **Testing:** actual prepatch synthetic audit failure removed the customer despite500. Candidate477 tests/typecheck/focused lint pass rollback/retry and tenancy/reservation/facility denial. Required PostgreSQL rollback/one-audit retry/foreign organisation test added; CI pending. Synthetic test actor is isolated.
+- **Commit/push:** candidate on codex/customer-delete-audit includes PR326 final evidence; pending commit.
+- **Merge:** pending required checks.
+- **Deployment/live verification:** pending. No migration or live data/configuration change; all14 acceptance gates remain open.
+- **Staff acceptance:** review isolated deletion rollback evidence and existing history restrictions. Do not delete live customer records for acceptance; legal retention/erasure approval remains separate.
+
 ## Readiness acceptance checkpoint — 26 September 2026
 
 - **Implementation:** documentation-only consolidation links the 18 verified delivered components to an ordered staff review checklist in docs/STAFF_ACCEPTANCE_2026-09-26.md. Includes final PR325 deployment evidence. No application or configuration change.

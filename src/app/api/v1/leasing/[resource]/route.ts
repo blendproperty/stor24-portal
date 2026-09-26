@@ -378,15 +378,18 @@ export async function DELETE(
     const force = requestUrl.searchParams.get("force") === "true";
     if (!id) throw new Error("NOT_FOUND");
     if (resource === "customers") {
-      await requireLeasingCustomer(scope, id);
-      const entity = await db.customer.findFirst({
-        where: { id, organisationId: scope.organisationId },
-        include: { tenancies: true, reservations: true },
+      return await db.$transaction(async tx => {
+        await requireLeasingCustomer(scope, id, tx);
+        const entity = await tx.customer.findFirst({
+          where: { id, organisationId: scope.organisationId },
+          include: { tenancies: true, reservations: true },
+        });
+        if (!entity) throw new Error("NOT_FOUND");
+        if (entity.tenancies.length || entity.reservations.length) throw new Error("CONFLICT");
+        await tx.customer.delete({ where: { id } });
+        await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "customers.deleted", entityType: "customers", entityId: id } });
+        return new Response(null, { status: 204 });
       });
-      if (!entity) throw new Error("NOT_FOUND");
-      if (entity.tenancies.length || entity.reservations.length)
-        throw new Error("CONFLICT");
-      await db.customer.delete({ where: { id } });
     } else if (resource === "facilities") {
       if (!scope.unrestrictedFacilities) throw new Error("FORBIDDEN");
       const entity = await db.facility.findFirst({

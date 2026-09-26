@@ -564,3 +564,20 @@ test("unit PATCH rolls back number map and rate when audit fails", async () => {
   unit.reservations = [{ id: "held" }]; assert.equal((await patch({ status: "AVAILABLE" })).status, 409);
   assert.equal((await patch({ facilityId: "b" })).status, 403); assert.equal(audits.length, 2);
 });
+
+test("customer DELETE rolls back when audit fails and protects tenancy history", async () => {
+  const state = fixture(); state.grant("operations.manage");
+  const rows = state.tables.customer;
+  state.db.customer.delete = async ({ where }: Row) => rows.splice(rows.findIndex(row => row.id === where.id), 1)[0];
+  let fail = true; let audits = 0;
+  state.db.auditEvent.create = async () => { if (fail) throw new Error("SYNTHETIC_AUDIT_FAILURE"); audits++; return {}; };
+  state.db.$transaction = async (fn: (client: Row) => Promise<unknown>) => { const before = structuredClone(rows); try { return await fn(state.db); } catch (error) { rows.splice(0, rows.length, ...before); throw error; } };
+  const api = await load("./src/app/api/v1/leasing/[resource]/route.ts", state);
+  const remove = (id = "customer-a") => api.DELETE(new Request(`https://example.invalid/api/v1/leasing/customers?id=${id}`, { method: "DELETE", headers: { origin: "https://example.invalid" } }), context("customers"));
+  assert.equal((await remove()).status, 500); assert.ok(rows.some(row => row.id === "customer-a")); assert.equal(audits, 0);
+  fail = false; const own = () => rows.find(row => row.id === "customer-a")!;
+  own().tenancies = [{ id: "history" }]; assert.equal((await remove()).status, 409); own().tenancies = [];
+  own().reservations = [{ facilityId: "a" }]; assert.equal((await remove()).status, 409); own().reservations = [];
+  assert.equal((await remove("customer-b")).status, 403);
+  assert.equal((await remove()).status, 204); assert.equal(rows.some(row => row.id === "customer-a"), false); assert.equal(audits, 1);
+});
