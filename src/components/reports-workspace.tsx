@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, Filter, LockKeyhole } from "lucide-react";
-import type { ReportDefinition } from "@/lib/reporting";
+import { isCurrentSnapshotReport, type ReportDefinition } from "@/lib/reporting";
 
 export function ReportsWorkspace({ reports, facilities, initialFrom, initialTo, canExport }: { reports: readonly ReportDefinition[]; facilities: { id: string; name: string }[]; initialFrom: string; initialTo: string; canExport: boolean }) {
   const [group, setGroup] = useState("All");
@@ -18,7 +18,7 @@ export function ReportsWorkspace({ reports, facilities, initialFrom, initialTo, 
   useEffect(() => () => request.current?.abort(), []);
   const groups = useMemo(() => ["All", ...new Set(reports.map((report) => report.group))], [reports]);
   const visible = group === "All" ? reports : reports.filter((report) => report.group === group);
-  const isSnapshot = ["occupancy-revenue", "unit-availability", "integration-health"].includes(reportKey);
+  const isSnapshot = isCurrentSnapshotReport(reportKey);
   const isAgeing = reportKey === "receivables-ageing";
   const exportHref = `/api/v1/reports/export?${new URLSearchParams({ reportKey, from: isSnapshot ? initialTo : isAgeing ? to : from, to: isSnapshot ? initialTo : to, format: "CSV", groupBy: "month", ...(facilityId ? { facilityId } : {}) })}`;
 

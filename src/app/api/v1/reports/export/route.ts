@@ -1,6 +1,6 @@
 import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
 import { buildReportRows } from "@/lib/report-data-service";
-import { findPermittedReport, reportParametersSchema, toCsv } from "@/lib/reporting";
+import { findPermittedReport, isCurrentSnapshotReport, reportParametersSchema, toCsv } from "@/lib/reporting";
 import { requirePermissionScope } from "@/lib/scope";
 
 export const dynamic = "force-dynamic";
@@ -27,14 +27,15 @@ export async function GET(request: Request) {
       scope.unrestrictedFacilities = false;
     }
     if (!scope.unrestrictedFacilities && scope.facilityIds.length === 0) throw new Error("FORBIDDEN");
+    const isSnapshot = isCurrentSnapshotReport(definition.key);
     const rows = await buildReportRows(scope, parsed.data);
     if (parsed.data.format === "JSON") {
-      return Response.json({ data: rows, meta: { parameters: parsed.data, source: "stor24-production-database" } });
+      return Response.json({ data: rows, meta: { parameters: parsed.data, currentSnapshot: isSnapshot, source: "stor24-production-database" } });
     }
     return new Response(toCsv(rows), {
       headers: {
         "content-type": "text/csv; charset=utf-8",
-        "content-disposition": `attachment; filename="${definition.key}-${parsed.data.from}-${parsed.data.to}.csv"`,
+        "content-disposition": `attachment; filename="${definition.key}-${isSnapshot ? "current" : `${parsed.data.from}-${parsed.data.to}`}.csv"`,
         "x-stor24-data-classification": "live-operational-data",
       },
     });

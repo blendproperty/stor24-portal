@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { hasPermission } from "@/lib/permissions";
 
+export function isCurrentSnapshotReport(key: string) {
+  return ["occupancy-revenue", "unit-availability", "integration-health"].includes(key);
+}
+
 export type ReportDefinition = {
   key: string;
   name: string;
