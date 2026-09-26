@@ -302,8 +302,9 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
       assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "leads.updated" } }), 1);
     });
     await t.test("unit type PATCH retains dimensions on audit failure then retries once", async () => {
+      const typeActor = await db.user.create({ data: { organisationId: org.id, email: `${key}-type@example.invalid`, name: "Synthetic type reviewer", passwordHash: "synthetic-not-a-real-password-hash" } });
       const role = await db.role.create({ data: { organisationId: org.id, name: "Unit type atomicity", permissions: ["inventory.manage"] } });
-      await db.roleAssignment.create({ data: { userId: user.id, roleId: role.id, facilityId: a.id } });
+      await db.roleAssignment.create({ data: { userId: typeActor.id, roleId: role.id, facilityId: a.id } });
       const own = await db.unitType.create({ data: { facilityId: a.id, name: "Atomic type", areaSqMetres: 100 } });
       const otherType = await db.unitType.create({ data: { facilityId: b.id, name: "Other atomic type" } });
       const output = await build({ entryPoints: ["src/app/api/v1/leasing/[resource]/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "unit-type-session", setup(builder) {
@@ -311,7 +312,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
         builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
       } }] });
       const loaded = { exports: {} as { PATCH: (request: Request, context: { params: Promise<{ resource: string }> }) => Promise<Response> } };
-      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: user.id, sessionVersion: user.sessionVersion });
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: typeActor.id, sessionVersion: typeActor.sessionVersion });
       const patch = (id = own.id, data: Record<string, unknown> = { areaSqMetres: 200 }) => loaded.exports.PATCH(new Request("https://example.invalid/api/v1/leasing/unit-types", { method: "PATCH", headers: { origin: "https://example.invalid", "content-type": "application/json" }, body: JSON.stringify({ id, data }) }), { params: Promise.resolve({ resource: "unit-types" }) });
       assert.equal((await patch(otherType.id)).status, 403);
       await db.unitType.create({ data: { facilityId: a.id, name: "Existing atomic type" } });
@@ -325,7 +326,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
       } finally { await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_type_patch_failure'); }
       assert.equal((await patch()).status, 200);
       const saved = await db.unitType.findUniqueOrThrow({ where: { id: own.id } }); assert.equal(Number(saved.areaSqMetres), 200);
-      assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "unit-types.updated", actorId: user.id } }), 1);
+      assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "unit-types.updated", actorId: typeActor.id } }), 1);
       assert.equal((await patch(own.id, { facilityId: b.id })).status, 403);
       assert.equal((await patch(own.id, { areaSqMetres: -1 })).status, 422);
       assert.equal(Number((await db.unitType.findUniqueOrThrow({ where: { id: own.id } })).areaSqMetres), 200);

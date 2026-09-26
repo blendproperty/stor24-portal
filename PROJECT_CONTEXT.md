@@ -2,7 +2,7 @@
 ## Unit-type edit audit transaction — 26 September 2026
 
 - **Implementation:** unit-type PATCH commits its edit and existing unit-types.updated audit in one transaction. Existing facility scope, fixed facility and duplicate-name checks remain unchanged. No pricing, availability, concurrency or request replay policy is added.
-- **Testing:** actual prepatch audit failure returned500 but retained altered area. Candidate473 tests/typecheck/focused ESLint pass rollback, valid retry, facility and invalid-dimension rejection. Required PostgreSQL rollback/retry, duplicate-name and scope test added; CI pending. Synthetic data only.
+- **Testing:** actual prepatch audit failure returned500 but retained altered area. Candidate473 tests/typecheck/focused ESLint pass rollback, valid retry, facility and invalid-dimension rejection. Initial SQL scope assertion exposed shared fixture grants from earlier tests; isolated the unit-type actor to its own facility grant. Required PostgreSQL rollback/retry, duplicate-name and scope test rerun pending. Synthetic data only.
 - **Commit/push:** candidate on codex/unit-type-audit-atomicity, including final PR321 evidence; commit pending.
 - **Merge:** pending required checks.
 - **Deployment/configuration/live verification:** pending. No migration/configuration change. All14 acceptance gates remain open.
