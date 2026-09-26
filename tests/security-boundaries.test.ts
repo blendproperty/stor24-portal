@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { build } from "esbuild";
 import { createRequire } from "node:module";
+import { Prisma } from "../src/generated/prisma/client";
 
 // Execute the real routes, validators, guards and services against synthetic
 // records. Only persistence and the signed-session reader are substituted.
@@ -56,6 +57,8 @@ async function load(entry: string, state: ReturnType<typeof fixture>) {
     stdin: { contents: `export * from ${JSON.stringify(entry)};`, resolveDir: process.cwd(), loader: "ts" },
     bundle: true, write: false, platform: "node", format: "cjs", packages: "external",
     plugins: [{ name: "synthetic-persistence", setup(builder) {
+      builder.onResolve({ filter: /^@\/generated\/prisma\/client$/ }, () => ({ path: "prisma", namespace: "prisma-runtime" }));
+      builder.onLoad({ filter: /.*/, namespace: "prisma-runtime" }, () => ({ contents: "export const Prisma=__prisma;" }));
       builder.onResolve({ filter: /^@\/lib\/(db|session)$/ }, args => ({ path: args.path, namespace: "fixture" }));
       builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__fixture.db;" : "export const getSession=async()=>__fixture.session;" }));
       builder.onResolve({ filter: /^@\/lib\/integrations\/twilio-provider$/ }, args => ({ path: args.path, namespace: "provider" }));
@@ -63,7 +66,7 @@ async function load(entry: string, state: ReturnType<typeof fixture>) {
     } }],
   });
   const loaded = { exports: {} as Row };
-  new Function("require", "module", "exports", "__fixture", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, state);
+  new Function("require", "module", "exports", "__fixture", "__prisma", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, state, Prisma);
   return loaded.exports;
 }
 
@@ -401,5 +404,30 @@ test("report exports require overlapping export and report facility grants", asy
   assert.equal((await read()).status, 200);
   assert.deepEqual(state.queries.filter(q => q.model === "unit").at(-1)?.where.facility, { organisationId: "org" });
   assert.equal((await read("foreign")).status, 403);
+  assert.deepEqual(state.writes, []);
+});
+
+test("receivables export uses approved ageing and shows review states instead of plausible buckets", async () => {
+  const state = fixture();
+  const account: Row = { id: "age-account", accountNumber: "AGE-SYN", balance: "100", currency: "ZAR", customer: { firstName: "Synthetic", lastName: "Ageing", companyName: null }, tenancy: { facilityId: "a", facility: { name: "A" } }, ledgerEntries: [{ id: "charge", type: "CHARGE", amount: "100", description: "Synthetic rent", effectiveAt: new Date("2020-01-01T00:00:00+02:00"), metadata: null }], payments: [], adjustments: [], debitInstructions: [], collectionCase: { terms: { dueDays: 0, allocation: "OLDEST_DUE_FIRST", approvalReference: "Synthetic approved terms", overrides: [] }, activities: [], promises: [] } };
+  state.db.account = { findMany: async () => [account] };
+  state.db.tenancy = { findMany: async () => [{ ...account.tenancy, customer: account.customer, account, occupancies: [], status: "ACTIVE" }] };
+  const api = await load("./src/lib/report-data-service.ts", state);
+  const scope = { userId: "staff", organisationId: "org", facilityIds: ["a"], unrestrictedFacilities: false };
+  const parameters = { reportKey: "receivables-ageing", from: "2020-04-01", to: "2020-04-02", format: "JSON", groupBy: "month" };
+  const [row] = await api.buildReportRows(scope, parameters);
+  assert.equal(row.days91Plus, "100.00"); assert.equal(row.asOfSast, "2020-04-02"); assert.equal(row.currentRecordedBalance, "100"); assert.equal(row.reviewReason, null);
+  account.balance = "0";
+  account.ledgerEntries.push({ id: "later-credit", type: "CREDIT", amount: "100", description: "Later synthetic credit", effectiveAt: new Date("2020-03-01T00:00:00+02:00"), metadata: { sourceEntryId: "charge" } });
+  const [historical] = await api.buildReportRows(scope, { ...parameters, to: "2020-02-02", from: "2020-02-01" });
+  assert.equal(historical.currentRecordedBalance, "0"); assert.equal(historical.days31To60, "100.00");
+  account.ledgerEntries.pop(); account.balance = "50";
+  account.ledgerEntries.push({ id: "unverified", type: "PAYMENT", amount: "50", description: "Unverified receipt", effectiveAt: new Date("2020-02-01"), metadata: null });
+  const [quarantined] = await api.buildReportRows(scope, parameters);
+  assert.match(quarantined.reviewReason, /reconciliation/i); assert.equal(quarantined.days91Plus, null); assert.equal(quarantined.credit, null);
+  account.ledgerEntries.pop(); account.balance = "100";
+  account.collectionCase.terms.approvalReference = "";
+  const [unapproved] = await api.buildReportRows(scope, parameters);
+  assert.match(unapproved.reviewReason, /terms/i); assert.equal(unapproved.days91Plus, null); assert.equal(unapproved.overdue, null);
   assert.deepEqual(state.writes, []);
 });

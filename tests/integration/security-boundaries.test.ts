@@ -3,6 +3,7 @@ import test from "node:test";
 import { build } from "esbuild";
 import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
+import { Prisma } from "../../src/generated/prisma/client";
 import { db } from "../../src/lib/db";
 import { requireFacility } from "../../src/lib/scope";
 import { createCustomer, createLead, requireLeasingCustomer } from "../../src/lib/leasing-service";
@@ -216,11 +217,13 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
         await db.roleAssignment.createMany({ data: [{ userId: actor.id, roleId: exportRole.id, facilityId: exportId }, { userId: actor.id, roleId: reportRole.id, facilityId: viewId }] });
       };
       const output = await build({ entryPoints: ["src/app/api/v1/reports/export/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "report-session", setup(builder) {
+        builder.onResolve({ filter: /^@\/generated\/prisma\/client$/ }, () => ({ path: "prisma", namespace: "prisma-runtime" }));
+        builder.onLoad({ filter: /.*/, namespace: "prisma-runtime" }, () => ({ contents: "export const Prisma=__prisma;" }));
         builder.onResolve({ filter: /^@\/lib\/(db|session)$/ }, args => ({ path: args.path, namespace: "fixture" }));
         builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
       } }] });
       const loaded = { exports: {} as { GET: (request: Request) => Promise<Response> } };
-      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: actor.id, sessionVersion: actor.sessionVersion });
+      new Function("require", "module", "exports", "__db", "__session", "__prisma", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: actor.id, sessionVersion: actor.sessionVersion }, Prisma);
       const read = (facilityId = "", format = "JSON") => loaded.exports.GET(new Request(`https://example.invalid/api/v1/reports/export?reportKey=unit-availability&from=2026-09-01&to=2026-09-26&format=${format}${facilityId ? `&facilityId=${facilityId}` : ""}`));
       await grants(a.id, b.id);
       assert.equal((await read(b.id)).status, 403); assert.equal((await read()).status, 403);

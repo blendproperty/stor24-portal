@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { collectionsWorkspace } from "@/lib/collections-service";
 import { requireFacility, type RequestScope } from "@/lib/scope";
 import type { ReportParameters } from "@/lib/reporting";
 
@@ -33,8 +34,17 @@ export async function buildReportRows(scope: RequestScope, parameters: ReportPar
       const leads = await db.lead.findMany({ where: { facility, createdAt: { gte: from, lte: to } }, include: { facility: { select: { name: true } }, customer: { select: { firstName: true, lastName: true, companyName: true } }, assignedTo: { select: { name: true } } }, orderBy: { createdAt: "asc" } });
       return leads.map((lead) => ({ facility: lead.facility.name, createdAt: lead.createdAt.toISOString(), source: lead.source, stage: lead.stage, customer: lead.customer?.companyName || [lead.customer?.firstName, lead.customer?.lastName].filter(Boolean).join(" ") || "Unlinked", assignedTo: lead.assignedTo?.name ?? "Unassigned", expectedMoveIn: lead.expectedMoveIn?.toISOString() ?? null, nextActionAt: lead.nextActionAt?.toISOString() ?? null }));
     }
+    case "receivables-ageing": {
+      const reportScope = parameters.facilityId ? { ...scope, facilityIds: [parameters.facilityId], unrestrictedFacilities: false } : scope;
+      const data = await collectionsWorkspace(reportScope, parameters.to);
+      return data.rows.map(row => {
+        const amount = (cents: number) => row.ageing.issue ? null : (cents / 100).toFixed(2);
+        return { asOfSast: data.asOf, facility: row.facility, account: row.accountNumber, customer: row.name, currentRecordedBalance: row.currentBalance,
+          current: amount(row.ageing.buckets[0]), days1To30: amount(row.ageing.buckets[1]), days31To60: amount(row.ageing.buckets[2]), days61To90: amount(row.ageing.buckets[3]), days91Plus: amount(row.ageing.buckets[4]), overdue: amount(row.ageing.overdue), credit: amount(row.ageing.credit),
+          reviewReason: row.ageing.issue, currentHold: row.hold, ageingBasis: row.terms ? `Approved ${row.terms.dueDays} days; oldest due first; ${row.terms.approvalReference}` : "No approved terms" };
+      });
+    }
     case "rent-roll":
-    case "receivables-ageing":
     case "collections-performance": {
       const tenancies = await db.tenancy.findMany({ where: { facility, status: { in: ["ACTIVE", "NOTICE_GIVEN"] }, ...(parameters.reportKey === "rent-roll" ? {} : { account: { balance: { gt: 0 } } }) }, include: { facility: { select: { name: true } }, customer: { select: { firstName: true, lastName: true, companyName: true } }, account: { include: { ledgerEntries: { where: { effectiveAt: { gte: from, lte: to } }, orderBy: { effectiveAt: "asc" } } } }, occupancies: { where: { status: { in: ["ACTIVE", "NOTICE_GIVEN"] } }, include: { unit: { select: { number: true } } }, take: 1 } }, orderBy: { facilityId: "asc" } });
       return tenancies.map((item) => ({ facility: item.facility.name, account: item.account.accountNumber, customer: item.customer.companyName || [item.customer.firstName, item.customer.lastName].filter(Boolean).join(" "), unit: item.occupancies[0]?.unit.number ?? null, tenancyStatus: item.status, monthlyRate: item.occupancies[0] ? Number(item.occupancies[0].monthlyRate) : null, balance: Number(item.account.balance), periodLedgerEntries: item.account.ledgerEntries.length, oldestPeriodEntry: item.account.ledgerEntries[0]?.effectiveAt.toISOString() ?? null }));

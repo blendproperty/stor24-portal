@@ -39,6 +39,8 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
+    if (error instanceof Error && error.message === "COLLECTION_DATE") return Response.json({ error: { code: "VALIDATION_ERROR", message: "Choose an ageing date on or before today in South Africa." } }, { status: 422 });
+    if (error instanceof Error && error.message === "COLLECTION_LIMIT") return Response.json({ error: { code: "REPORT_LIMIT", message: "This ageing report exceeds the account limit. Select a smaller facility scope." } }, { status: 422 });
     if (error instanceof Error && error.message === "FACILITY_FORBIDDEN") return Response.json({ error: { code: "REPORT_FORBIDDEN", message: "You do not have report access to this facility. Please contact your administrator." } }, { status: 403 });
     return authErrorResponse(error);
   }
