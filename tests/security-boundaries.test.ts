@@ -379,3 +379,27 @@ test("report routes return controlled access failures and preserve read-only fac
   assert.equal((await read()).status, 401); assert.equal((await catalog.GET()).status, 401);
   assert.deepEqual(state.writes, []);
 });
+
+test("report exports require overlapping export and report facility grants", async () => {
+  const state = fixture(); state.grant("reports.export", "a"); state.grant("reports.view", "b");
+  const api = await load("./src/app/api/v1/reports/export/route.ts", state);
+  const read = (facility = "", format = "JSON") => api.GET(new Request(`https://example.test/api/v1/reports/export?reportKey=unit-availability&from=2026-09-01&to=2026-09-26&format=${format}${facility ? `&facilityId=${facility}` : ""}`));
+  assert.equal((await read("b")).status, 403, "View in B plus export in A must not permit exporting B");
+  assert.equal((await read()).status, 403, "Disjoint grants must not export all report facilities");
+  assert.equal(state.queries.filter(q => q.model === "unit").length, 0);
+  state.grant("reports.view", "a");
+  assert.equal((await read("a", "CSV")).status, 200);
+  assert.equal((await read("b")).status, 403);
+  assert.equal((await read()).status, 200);
+  assert.deepEqual(state.queries.filter(q => q.model === "unit").at(-1)?.where.facility, { organisationId: "org", id: { in: ["a"] } });
+  for (const [exportScope, reportScope] of [[null, "b"], ["b", null]] as const) {
+    state.tables.user[0].roleAssignments = []; state.grant("reports.export", exportScope); state.grant("reports.view", reportScope);
+    assert.equal((await read("a")).status, 403); assert.equal((await read("b")).status, 200); assert.equal((await read()).status, 200);
+    assert.deepEqual(state.queries.filter(q => q.model === "unit").at(-1)?.where.facility, { organisationId: "org", id: { in: ["b"] } });
+  }
+  state.tables.user[0].roleAssignments = []; state.grant("reports.export", null); state.grant("reports.view", null);
+  assert.equal((await read()).status, 200);
+  assert.deepEqual(state.queries.filter(q => q.model === "unit").at(-1)?.where.facility, { organisationId: "org" });
+  assert.equal((await read("foreign")).status, 403);
+  assert.deepEqual(state.writes, []);
+});

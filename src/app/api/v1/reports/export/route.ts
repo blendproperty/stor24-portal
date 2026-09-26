@@ -20,7 +20,14 @@ export async function GET(request: Request) {
       return Response.json({ error: { code: "REPORT_FORBIDDEN", message: "This report is not available to your role." } }, { status: 403 });
     }
 
-    const rows = await buildReportRows(await requirePermissionScope(definition.permission), parsed.data);
+    const scope = await requirePermissionScope(definition.permission);
+    // Export is a separate facility-scoped capability; neither grant may widen the other.
+    if (session.allowedFacilityIds !== null) {
+      scope.facilityIds = [...new Set(session.allowedFacilityIds)].filter(id => scope.unrestrictedFacilities || scope.facilityIds.includes(id));
+      scope.unrestrictedFacilities = false;
+    }
+    if (!scope.unrestrictedFacilities && scope.facilityIds.length === 0) throw new Error("FORBIDDEN");
+    const rows = await buildReportRows(scope, parsed.data);
     if (parsed.data.format === "JSON") {
       return Response.json({ data: rows, meta: { parameters: parsed.data, source: "stor24-production-database" } });
     }
