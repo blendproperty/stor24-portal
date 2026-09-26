@@ -1,4 +1,12 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Final readiness evidence checkpoint — 26 September 2026
+
+- **Implementation:** documentation-only promotion of PR329 final deployment evidence and staff checklist covering21 verified components. No application, data or configuration change.
+- **Testing:** evidence reconciled with ExcelE066–E088 and current canonical entries. Reuses479-test functional baseline and required isolated database/browser/journey/restore evidence. Required promotion checks pending.
+- **Commit/push:** candidate on codex/readiness-final-checkpoint; pending commit.
+- **Merge/deployment/live verification:** pending for this evidence release. Latest verified functional production is PR329/image13330163b at17:08:31.671UTC.
+- **Acceptance:** all14 programme gates remain open. Technical delivery does not establish staff/legal/provider/finance/security acceptance or95percent readiness. No production mutations performed.
+
 ## Lead deletion audit transaction — 26 September 2026
 
 - **Implementation:** existing lead DELETE and leads.deleted audit now share a transaction. Audit failure restores the lead. Existing facility permission checks remain unchanged. No deletion eligibility or retention policy change; no live lead deleted.
