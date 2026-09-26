@@ -4,7 +4,7 @@
 - **Implementation:** documentation-only consolidation links the 18 verified delivered components to an ordered staff review checklist in docs/STAFF_ACCEPTANCE_2026-09-26.md. Includes final PR325 deployment evidence. No application or configuration change.
 - **Testing:** evidence cross-checked against current canonical context and Excel E066–E084. All nine checks passed for this documentation promotion: CI36253837018/SQL36253837029/security36253837015. Read-only GitHub alert lists around16:00UTC returned zero open dependency/code/secret alerts; this does not prove historical credential rotation or compliance. No staff acceptance claimed.
 - **Commit/push/merge:** PR326 source31be4f67e6336df1e9c3d6fbe01dca86f1ea1940 merged9c6d312f3dacdc5a769a001a0ebab232c1260598. Checklist and final PR325 evidence are on main.
-- **Deployment/live:** baseline PR325 image2782b1706 verified healthy15:56:34.578UTC; this checkpoint deployment pending.
+- **Deployment/live:** mainCI36254206823 and deploy36254518088 passed. Exact image stor24-crm:9c6d312f3 healthy; service/database readiness verified2026-09-26T16:12:38.384Z. ExcelE085 records the documentation release; no new functional component or acceptance claimed.
 - **Outstanding:** all14 programme acceptance gates preserved, including staff/legal/provider/finance/security/recovery approvals.
 
 ## Unit edit and map audit transaction — 26 September 2026
