@@ -2,9 +2,8 @@
 ## Unit edit and map audit transaction — 26 September 2026
 
 - **Implementation:** unit renames, linked map-label synchronisation and the existing before/after audit now share one transaction. Ordinary unit edits also commit with their audit. The redundant outer PATCH audit is removed because every resource branch now records its audit within its own transaction. Existing duplicate-number, linked occupancy/reservation, status, unit-type and facility checks are preserved. No allocation policy, replay or concurrency guarantee added.
-- **Testing:** actual prepatch audit failure retained changed unit number/map label. Candidate476 tests/typecheck/focused lint pass rename/map/rate rollback, valid retries, original before/after audit payload and linked/status/facility rejection. Required PostgreSQL rename/map/rate rollback and retry added; CI pending. Synthetic records only.
-- **Commit/push:** candidate on codex/unit-edit-audit includes PR324 final evidence; pending commit.
-- **Merge:** pending required checks.
+- **Testing:** actual prepatch audit failure retained changed unit number/map label. Candidate476 tests/typecheck/focused lint pass rename/map/rate rollback, valid retries, original before/after audit payload and linked/status/facility rejection. Required PostgreSQL rename/map/rate rollback and retry explicitly passed in SQL36252902919/job108434148633. Synthetic records only.
+- **Commit/push/merge:** PR325 source2c414ebd4161e71472885a2bbc08ed213add040e passed all nine checks CI36252902887/SQL36252902919/security36252902862. Merged2782b1706ee3b5e63b8abe261e275a2be80cae86 including PR324 final evidence.
 - **Deployment/live verification:** pending. No migration or live data/configuration changes; all14 acceptance gates remain open.
 - **Staff acceptance:** review a permitted synthetic unit rename and matching map label/audit, then a normal edit. Preserve linked-unit availability restrictions; use isolated failure evidence.
 
