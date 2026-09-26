@@ -276,7 +276,7 @@ test("operations response limits every staff relation to display identity", asyn
 test("stock movements require inventory authority at the product's actual facility", async () => {
   const state = fixture(); state.grant("inventory.manage", "a"); state.grant("reports.view", "b");
   const productId = "c1234567890123456789012345";
-  const product = { id: productId, organisationId: "org", facilityId: "b", quantityOnHand: 10 };
+  const product = { id: productId, organisationId: "org", facilityId: "b", quantityOnHand: 10, quantityReserved: 0 };
   state.db.product = {
     findFirst: async ({ where }: Row) => matches(product, where) ? product : null,
     updateMany: async ({ where, data }: Row) => {

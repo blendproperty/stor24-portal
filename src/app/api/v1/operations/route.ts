@@ -112,7 +112,12 @@ export async function POST(request: Request) {
         }
         const delta = ["SALE", "DAMAGE"].includes(input.type) ? -Math.abs(input.quantity) : input.quantity;
         const claimed = await tx.product.updateMany({
-          where: { id: product.id, organisationId, quantityOnHand: { gte: -delta } },
+          where: {
+            id: product.id, organisationId,
+            // A changed hold invalidates this read; do not consume newly reserved stock.
+            ...(delta < 0 ? { quantityReserved: product.quantityReserved } : {}),
+            quantityOnHand: { gte: (delta < 0 ? Math.max(0, product.quantityReserved) : 0) - delta },
+          },
           data: { quantityOnHand: { increment: delta } },
         });
         if (claimed.count !== 1) throw new Error("INSUFFICIENT_STOCK");
@@ -148,7 +153,7 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof Error && error.message === "STOCK_REQUEST_CONFLICT") return Response.json({ error: { code: error.message, message: "This request already recorded a different stock movement. Reload inventory and review its audit history before starting a new movement." } }, { status: 409 });
     if (error instanceof Error && error.message === "DAILY_CLOSE_ALREADY_CLOSED") return Response.json({ error: { code: error.message, message: "This day is already closed. Its recorded totals cannot be overwritten. Ask finance to review any correction." } }, { status: 409 });
-    if (error instanceof Error && error.message === "INSUFFICIENT_STOCK") return Response.json({ error: { code: error.message, message: "This movement would make stock negative." } }, { status: 409 });
+    if (error instanceof Error && error.message === "INSUFFICIENT_STOCK") return Response.json({ error: { code: error.message, message: "Available stock is insufficient or reservations changed. Reload inventory and review reserved quantities before recording this movement." } }, { status: 409 });
     if (error instanceof Error && error.message === "UNIT_NOT_AVAILABLE") return Response.json({ error: { code: error.message, message: "Only an available unit can be placed into service." } }, { status: 409 });
     return authErrorResponse(error);
   }

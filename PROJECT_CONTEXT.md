@@ -1,4 +1,11 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Reserved-stock deduction guard — 26 September 2026
+
+- **Implementation:** negative manual stock movements require enough unreserved quantity and the same reservation count observed at the read. A concurrent hold change rejects the deduction for review. Positive receipts retain the existing non-negative-result rule, allowing recovery of historical stock discrepancies without cancelling reservations. No automatic hold release, physical-loss reconciliation or new transfer workflow is introduced.
+- **Testing:** actual prepatch route accepted a deduction leaving1 on hand against4 reserved; candidate returns409 with5 on hand and no movement/audit. All464 unit tests/typecheck/focused lint and stock-form desktop/mobile recovery pass. Required SQL test adds SALE/DAMAGE/negative ADJUSTMENT/TRANSFER rejection, available-only sale, receipt and a forced reservation update between read and claim, then recovery after releasing the synthetic hold. Existing historical-negative-stock and keyed-replay tests retained. Real SQL/required CI pending.
+- **Commit/push/merge/deployment/live verification:** candidate promotion pending in enclosing PR; no production inventory transactions performed.
+- **Prior verified release:** PR307 sourcee07ccda78640a4d45c8493360a66b70bcb879857 passed CI36233121294/SQL36233121319/security36233121277, including eight-request replay and synthetic backup/restore; merged527d83ff37fe29f56199371a5eac12f814388aee. MainCI36233596584/deploy36233809359 passed. Exact image stor24-crm:527d83ff healthy/service/database verified2026-09-26T09:50:05.673Z. Read-only database inspection confirmed migration20260926094000_stock_request_replay, both columns and unique index. ExcelE066 records release; keyless/new-key requests remain outside replay protection. All14 acceptance gates remain open.
+
 ## Production readiness continuation — 26 September 2026
 
 - **Authorisation/scope:** Brett authorised unattended work today toward95% production readiness. Resume one bounded repair at a time through20:00 Johannesburg. Prioritise request replay, reserved stock, daily-close reconciliation, isolated recovery and connected synthetic journey evidence. Do not assign a readiness percentage without an agreed denominator or close staff/legal/provider/finance gates from automated tests.

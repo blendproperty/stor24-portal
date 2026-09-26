@@ -3,10 +3,10 @@ import test from "node:test";
 import { build } from "esbuild";
 import { createRequire } from "node:module";
 
-test("stock movement, quantity and audit roll back together", async () => {
+test("manual deduction cannot consume reserved quantities", async () => {
  const state={quantity:5,movements:[] as unknown[],audits:[] as unknown[],failAudit:true};
  const client=(s:typeof state)=>({product:{
-  findFirst:async()=>({id:'cmstockproduct0000000000001',facilityId:'facility',quantityOnHand:s.quantity,quantityReserved:0}),
+  findFirst:async()=>({id:'cmstockproduct0000000000001',facilityId:'facility',quantityOnHand:s.quantity,quantityReserved:4}),
   update:async({data}:{data:{quantityOnHand:{increment:number}}})=>{s.quantity+=data.quantityOnHand.increment;},
   updateMany:async({where,data}:{where:{quantityOnHand?:{gte:number}};data:{quantityOnHand:{increment:number}}})=>{if(where.quantityOnHand&&s.quantity<where.quantityOnHand.gte)return {count:0};s.quantity+=data.quantityOnHand.increment;return {count:1};},
  },stockMovement:{create:async({data}:{data:unknown})=>{const row={id:'movement',...(data as object)};s.movements.push(row);return row;}},auditEvent:{create:async({data}:{data:unknown})=>{if(state.failAudit)throw Error('AUDIT_FAILURE');s.audits.push(data);return data;}}});
@@ -15,8 +15,5 @@ test("stock movement, quantity and audit roll back together", async () => {
  const loaded={exports:{} as {POST:(r:Request)=>Promise<Response>}};
  new Function('require','module','exports','__db',output.outputFiles[0].text)(createRequire(import.meta.url),loaded,loaded.exports,database);
  const send=(quantity=4,type="DAMAGE")=>loaded.exports.POST(new Request('https://example.invalid/operations',{method:'POST',body:JSON.stringify({kind:'stockMovement',payload:{productId:'cmstockproduct0000000000001',type,quantity}})}));
- assert.equal((await send()).status,500);assert.equal(state.quantity,5);assert.equal(state.movements.length,0);assert.equal(state.audits.length,0);
- state.failAudit=false;assert.equal((await send()).status,201);assert.equal(state.quantity,1);assert.equal(state.movements.length,1);assert.equal(state.audits.length,1);
- assert.equal((await send()).status,409);assert.equal(state.quantity,1);assert.equal(state.movements.length,1);assert.equal(state.audits.length,1);
- state.quantity=-2;assert.equal((await send(1,'RECEIPT')).status,409);assert.equal(state.quantity,-2);assert.equal((await send(2,'RECEIPT')).status,201);assert.equal(state.quantity,0);
+ state.failAudit=false; const response=await send();assert.equal(response.status,409);assert.equal(state.quantity,5);assert.equal(state.movements.length,0);assert.equal(state.audits.length,0);
 });

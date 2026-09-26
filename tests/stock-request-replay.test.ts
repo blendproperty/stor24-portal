@@ -6,7 +6,7 @@ import { createRequire } from "node:module";
 test("keyed stock replay rolls back and rejects changed details without repeating writes", async () => {
  const state={quantity:5,movements:[] as Array<Record<string, unknown>>,audits:[] as unknown[],failAudit:true};
  const client=(s:typeof state)=>({$executeRaw:async()=>1,product:{
-  findFirst:async()=>({id:'cmstockproduct0000000000001',facilityId:'facility',quantityOnHand:s.quantity}),
+  findFirst:async()=>({id:'cmstockproduct0000000000001',facilityId:'facility',quantityOnHand:s.quantity,quantityReserved:0}),
   update:async({data}:{data:{quantityOnHand:{increment:number}}})=>{s.quantity+=data.quantityOnHand.increment;},
   updateMany:async({where,data}:{where:{quantityOnHand?:{gte:number}};data:{quantityOnHand:{increment:number}}})=>{if(where.quantityOnHand&&s.quantity<where.quantityOnHand.gte)return {count:0};s.quantity+=data.quantityOnHand.increment;return {count:1};},
  },stockMovement:{findUnique:async({where}:{where:{idempotencyKey:string}})=>s.movements.find(row=>row.idempotencyKey===where.idempotencyKey)??null,create:async({data}:{data:unknown})=>{const row={id:'movement',...(data as object)};s.movements.push(row);return row;}},auditEvent:{create:async({data}:{data:unknown})=>{if(state.failAudit)throw Error('AUDIT_FAILURE');s.audits.push(data);return data;}}});
