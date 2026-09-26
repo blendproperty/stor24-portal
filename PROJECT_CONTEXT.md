@@ -1,4 +1,13 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Lead deletion audit transaction — 26 September 2026
+
+- **Implementation:** existing lead DELETE and leads.deleted audit now share a transaction. Audit failure restores the lead. Existing facility permission checks remain unchanged. No deletion eligibility or retention policy change; no live lead deleted.
+- **Testing:** actual prepatch synthetic audit failure removed the lead despite500. Candidate479 tests/typecheck/focused lint pass rollback/retry and facility denial. Required isolated PostgreSQL rollback/one-audit retry/foreign-facility test added; CI pending.
+- **Commit/push:** candidate on codex/lead-delete-audit includes PR328 final evidence and updated staff checklist; pending commit.
+- **Merge:** pending required checks.
+- **Deployment/live verification:** pending. No migration/configuration change; all14 programme acceptance gates remain open.
+- **Staff acceptance:** review isolated rollback and facility denial evidence; do not delete live leads for testing.
+
 ## Facility deactivation audit transaction — 26 September 2026
 
 - **Implementation:** existing facility DELETE deactivation and facilities.deleted audit now share a transaction. Audit failure restores active state. Organisation-wide inventory permission and organisation scope remain unchanged. No live facility deactivated or new deactivation policy introduced.

@@ -413,6 +413,13 @@ export async function DELETE(
       })) as { facilityId: string } | null;
       if (!entity) throw new Error("NOT_FOUND");
       await requireFacility(scope, entity.facilityId);
+      if (resource === "leads") {
+        return await db.$transaction(async tx => {
+          await tx.lead.delete({ where: { id } });
+          await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "leads.deleted", entityType: "leads", entityId: id } });
+          return new Response(null, { status: 204 });
+        });
+      }
       if (resource === "units") {
         if (!force) {
           await db.unit.update({
