@@ -1,13 +1,14 @@
 import { createHash } from "node:crypto";
 import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
+import { currentRoleAccess } from "@/lib/current-role-access";
 import type { Prisma } from "@/generated/prisma/client";
 import { recordDailyClose } from "@/lib/daily-close-service";
 import { createTaskSchema, dailyCloseSchema, maintenanceSchema, productSchema, stockMovementSchema, storagePackageSchema, unitNoteSchema } from "@/lib/validators";
 
 export async function GET() {
   try {
-    const { organisationId, allowedFacilityIds } = await requirePermission("operations.view");
+    const { organisationId, allowedFacilityIds, user } = await requirePermission("operations.view");
     const facilityScope = allowedFacilityIds ? { in: allowedFacilityIds } : undefined;
     const [tasks, notes, maintenance, products, storagePackages, dailyCloses, facilities] = await Promise.all([
       db.task.findMany({ where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { facility: true, assignee: { select: { id: true, name: true } } }, orderBy: [{ status: "asc" }, { dueAt: "asc" }], take: 100 }),
@@ -30,7 +31,8 @@ export async function GET() {
         orderBy: { name: "asc" },
       }),
     ]);
-    return Response.json({ data: { tasks, notes, maintenance, products, storagePackages, dailyCloses, facilities } });
+    const dailyCloseFacilityIds = facilities.filter(facility => currentRoleAccess(user.roleAssignments, "daily_close.perform", facility.id).allowed).map(facility => facility.id);
+    return Response.json({ data: { tasks, notes, maintenance, products, storagePackages, dailyCloses, facilities, dailyCloseFacilityIds } });
   } catch (error) { return authErrorResponse(error); }
 }
 

@@ -207,3 +207,14 @@
 .floor-availability-switch:disabled { cursor: wait; opacity: .6; }
 
 .unit-floor-held { display: block; margin-top: 6px; font-size: 12px; color: #76532b; }
+
+.daily-close-panel { min-width: 0; }
+.daily-close-entry { margin: 0; padding: 20px; min-width: 0; }
+.daily-close-form > * { min-width: 0; }
+.daily-close-form .daily-close-wide { grid-column: 1 / -1; }
+.daily-close-form .daily-close-check { display: flex; align-items: flex-start; gap: 10px; }
+.daily-close-form .daily-close-check input { width: 18px; height: 18px; margin: 0; flex-shrink: 0; }
+.daily-close-feedback { margin: 16px 0; overflow-wrap: anywhere; }
+.daily-close-form input, .daily-close-form select, .daily-close-form textarea { min-width: 0; font-size: 16px; }
+.daily-close-form .form-actions { grid-column: 1 / -1; flex-wrap: wrap; }
+@media (max-width: 700px) { .daily-close-form { grid-template-columns: minmax(0, 1fr); } }

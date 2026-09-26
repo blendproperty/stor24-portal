@@ -155,7 +155,8 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
         builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const requirePermission=async()=>__auth; export const authErrorResponse=(error)=>{throw error};" }));
       } }] });
       const loaded = { exports: {} as { GET: () => Promise<Response> } };
-      new Function("require", "module", "exports", "__db", "__auth", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { organisationId: org.id, allowedFacilityIds: [a.id] });
+      const authUser = await db.user.findUniqueOrThrow({ where: { id: user.id }, include: { roleAssignments: { include: { role: true } } } });
+      new Function("require", "module", "exports", "__db", "__auth", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { organisationId: org.id, allowedFacilityIds: [a.id], user: authUser });
       const response = await loaded.exports.GET(); assert.equal(response.status, 200);
       const { data } = await response.json();
       for (const [collection, relation] of [["tasks", "assignee"], ["notes", "author"], ["maintenance", "assignedTo"], ["dailyCloses", "closedBy"]]) {
