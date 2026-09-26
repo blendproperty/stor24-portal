@@ -4,7 +4,7 @@
 - **Implementation:** unit-type PATCH commits its edit and existing unit-types.updated audit in one transaction. Existing facility scope, fixed facility and duplicate-name checks remain unchanged. No pricing, availability, concurrency or request replay policy is added.
 - **Testing:** actual prepatch audit failure returned500 but retained altered area. Candidate473 tests/typecheck/focused ESLint pass rollback, valid retry, facility and invalid-dimension rejection. Initial SQL scope assertion exposed shared fixture grants from earlier tests; isolated the unit-type actor to its own facility grant. Required PostgreSQL rollback/retry, duplicate-name and scope test explicitly passed in SQL36249744456/job108425424691. Synthetic data only.
 - **Commit/push/merge:** corrected source114af083621dc82f70ab9de8be821442f926c449 passed all nine checks CI36249744338/SQL36249744456/security36249744287; PR322 merged6f51321abb068ca01b21ffbb8634a61fc39fa249, including final PR321 evidence.
-- **Deployment/configuration/live verification:** pending. No migration/configuration change. All14 acceptance gates remain open.
+- **Deployment/configuration/live verification:** mainCI36250111283 and deploy36250395350 passed. Exact image stor24-crm:6f51321ab healthy; service/database readiness verified2026-09-26T15:02:46.500Z. No migration/configuration or production data change. ExcelE081 and PR322 delivered component record verification; staff acceptance and all14 programme gates remain open.
 - **Staff acceptance:** review a permitted synthetic unit-type edit, reload and confirm the matching audit. Do not induce database failures in production.
 
 ## Lead edit audit transaction — 26 September 2026
