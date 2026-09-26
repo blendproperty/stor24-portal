@@ -141,6 +141,8 @@ export const customerSchema = z
     (v) => v.companyName || (v.firstName && v.lastName),
     "Provide a person or company name.",
   );
+export const customerPatchSchema = z.object(customerSchema.shape).partial();
+
 export const leadSchema = z.object({
   facilityId: id,
   customerId: id.optional(),

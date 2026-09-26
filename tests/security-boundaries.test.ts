@@ -455,3 +455,19 @@ test("current snapshot report rows identify capture time despite historical para
   }
   assert.deepEqual(state.writes, []);
 });
+
+test("customer PATCH rolls back edited contacts and consent when audit fails", async () => {
+  const state = fixture(); state.grant("operations.manage");
+  const customer = state.tables.customer[0]; customer.firstName = "Before"; customer.lastName = "Synthetic"; customer.communicationConsent = { email: false };
+  state.db.customer.update = async ({ data }: Row) => Object.assign(customer, data);
+  let fail = true; let audits = 0;
+  state.db.auditEvent.create = async () => { if (fail) throw new Error("SYNTHETIC_AUDIT_FAILURE"); audits++; return {}; };
+  state.db.$transaction = async (fn: (client: Row) => Promise<unknown>) => { const before = structuredClone(customer); try { return await fn(state.db); } catch (error) { Object.keys(customer).forEach(k => delete customer[k]); Object.assign(customer, before); throw error; } };
+  const api = await load("./src/app/api/v1/leasing/[resource]/route.ts", state);
+  const patch = () => api.PATCH(request("PATCH", { id: customer.id, data: { firstName: "After", communicationConsent: { email: true } } }), context("customers"));
+  assert.equal((await patch()).status, 500); assert.equal(customer.firstName, "Before"); assert.equal(customer.communicationConsent.email, false); assert.equal(audits, 0);
+  fail = false; assert.equal((await patch()).status, 200); assert.equal(customer.firstName, "After"); assert.equal(customer.communicationConsent.email, true); assert.equal(audits, 1);
+  assert.equal((await api.PATCH(request("PATCH", { id: customer.id, data: { firstName: "", lastName: "", companyName: "" } }), context("customers"))).status, 422);
+  assert.equal(customer.firstName, "After"); assert.equal(audits, 1);
+  assert.equal((await api.PATCH(request("PATCH", { id: "customer-b", data: { firstName: "Forbidden" } }), context("customers"))).status, 403);
+});
