@@ -597,3 +597,18 @@ test("facility DELETE rolls back deactivation when audit fails", async () => {
   state.tables.user[0].roleAssignments = []; state.grant("inventory.manage", null);
   assert.equal((await remove()).status, 204); assert.equal(facility.active, false); assert.equal(audits, 1);
 });
+
+test("lead DELETE rolls back when audit fails and preserves facility scope", async () => {
+  const state = fixture(); state.grant("operations.manage");
+  const rows = state.tables.lead;
+  state.db.lead.delete = async ({ where }: Row) => rows.splice(rows.findIndex(row => row.id === where.id), 1)[0];
+  let fail = true; let audits = 0;
+  state.db.auditEvent.create = async () => { if (fail) throw new Error("SYNTHETIC_AUDIT_FAILURE"); audits++; return {}; };
+  state.db.$transaction = async (fn: (client: Row) => Promise<unknown>) => { const before = structuredClone(rows); try { return await fn(state.db); } catch (error) { rows.splice(0, rows.length, ...before); throw error; } };
+  const api = await load("./src/app/api/v1/leasing/[resource]/route.ts", state);
+  const remove = (id = "lead-a") => api.DELETE(new Request(`https://example.invalid/api/v1/leasing/leads?id=${id}`, { method: "DELETE", headers: { origin: "https://example.invalid" } }), context("leads"));
+  assert.equal((await remove()).status, 500); assert.ok(rows.some(row => row.id === "lead-a")); assert.equal(audits, 0);
+  fail = false; rows.push({ id: "lead-b", facilityId: "b" });
+  assert.equal((await remove("lead-b")).status, 403);
+  assert.equal((await remove()).status, 204); assert.equal(rows.some(row => row.id === "lead-a"), false); assert.equal(audits, 1);
+});
