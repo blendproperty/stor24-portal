@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { z } from "zod";
 import {
   ArrowRightLeft,
   ArrowLeft,
@@ -72,6 +73,19 @@ type Facility = {
   }[];
 };
 type Data = { accounts: Account[]; facilities: Facility[] };
+const readMoney = z.string().min(1).refine(value => Number.isFinite(Number(value)));
+const readDate = z.string().refine(value => Number.isFinite(Date.parse(value)));
+const readUnit = z.object({ number: z.string(), unitType: z.object({ name: z.string() }) });
+const accountsReadSchema = z.object({
+  accounts: z.array(z.object({
+    id: z.string(), accountNumber: z.string(), balance: readMoney, currency: z.string(), financialReviewRequired: z.boolean().optional(),
+    customer: z.object({ firstName: z.string().nullable().optional(), lastName: z.string().nullable().optional(), companyName: z.string().nullable().optional(), email: z.string().nullable().optional(), phone: z.string().nullable().optional() }),
+    tenancy: z.object({ id: z.string(), status: z.string(), facilityId: z.string(), facility: z.object({ name: z.string() }), documents: z.array(z.object({ id: z.string(), status: z.string(), signedAt: readDate.nullable(), provider: z.string().nullable().optional(), externalId: z.string().nullable().optional() })), occupancies: z.array(z.object({ status: z.string(), unit: readUnit, monthlyRate: readMoney })) }).nullable(),
+    ledgerEntries: z.array(z.object({ id: z.string(), type: z.string(), amount: readMoney, description: z.string(), effectiveAt: readDate })),
+    payments: z.array(z.object({ id: z.string(), amount: readMoney, method: z.string(), status: z.string(), processedAt: readDate.nullable(), createdAt: readDate })),
+  })),
+  facilities: z.array(z.object({ id: z.string(), name: z.string(), units: z.array(readUnit.extend({ id: z.string(), monthlyRate: readMoney })) })),
+});
 type Dialog = "payment" | "transfer" | "moveOut" | null;
 
 const money = (value: string | number) =>
@@ -114,46 +128,48 @@ export function AccountsWorkspace({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [readBusy, setReadBusy] = useState(true);
+  const [readError, setReadError] = useState("");
+  const [readAccess, setReadAccess] = useState<"signed-out" | "denied" | null>(null);
+  const readRequest = useRef<AbortController | null>(null);
   const load = useCallback(async () => {
-    const response = await fetch("/api/v1/accounts", { cache: "no-store" });
-    const payload = await response.json();
-    if (!response.ok) {
-      setError(payload.error?.message ?? "Accounts could not be loaded.");
-      return;
-    }
-    setData(payload.data);
-    setSelectedId((current) => current || payload.data.accounts[0]?.id || "");
-  }, []);
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/v1/accounts", { cache: "no-store" })
-      .then(async (response) => ({ response, payload: await response.json() }))
-      .then(({ response, payload }) => {
-        if (cancelled) return;
-        if (!response.ok)
-          setError(payload.error?.message ?? "Accounts could not be loaded.");
-        else {
-          setData(payload.data);
-          const linkedAccount = initialAccountId
-            ? payload.data.accounts.find(
-                (account: Account) => account.id === initialAccountId,
-              )
-            : initialDocumentId
-              ? payload.data.accounts.find((account: Account) =>
-                  account.tenancy?.documents.some(
-                    (document) => document.id === initialDocumentId,
-                  ),
-                )
-              : undefined;
-          setSelectedId(
-            linkedAccount?.id || payload.data.accounts[0]?.id || "",
-          );
-        }
+    readRequest.current?.abort();
+    const controller = new AbortController(); readRequest.current = controller;
+    setReadBusy(true); setReadError(""); setReadAccess(null); setData(null); setDialog(null);
+    const timeout = setTimeout(() => controller.abort(), 20_000);
+    try {
+      const response = await fetch("/api/v1/accounts", { cache: "no-store", signal: controller.signal });
+      if (readRequest.current !== controller) return false;
+      if (response.status === 401 || response.status === 403) {
+        setReadAccess(response.status === 401 ? "signed-out" : "denied");
+        setReadError(response.status === 401 ? "Your session has ended. Sign in again to view accounts." : "Account access is unavailable. Please contact your administrator if you require access.");
+        return false;
+      }
+      if (!response.ok) throw new Error("ACCOUNTS_READ_FAILED");
+      const payload = await response.json();
+      if (!accountsReadSchema.safeParse(payload.data).success) throw new Error("INVALID_ACCOUNTS_RESPONSE");
+      if (controller.signal.aborted || readRequest.current !== controller) return false;
+      const next = payload.data as Data;
+      setData(next);
+      if (!next.accounts.length) setDetailOpen(false);
+      setSelectedId(current => {
+        if (next.accounts.some(account => account.id === current)) return current;
+        const linked = initialAccountId ? next.accounts.find(account => account.id === initialAccountId) : initialDocumentId ? next.accounts.find(account => account.tenancy?.documents.some(document => document.id === initialDocumentId)) : undefined;
+        return linked?.id || next.accounts[0]?.id || "";
       });
-    return () => {
-      cancelled = true;
-    };
+      return true;
+    } catch {
+      if (readRequest.current === controller) setReadError("Accounts could not be loaded. Reload accounts to try again. No account action will be repeated.");
+      return false;
+    } finally {
+      clearTimeout(timeout);
+      if (readRequest.current === controller) { readRequest.current = null; setReadBusy(false); }
+    }
   }, [initialAccountId, initialDocumentId]);
+  useEffect(() => {
+    const start = setTimeout(() => void load(), 0);
+    return () => { clearTimeout(start); readRequest.current?.abort(); readRequest.current = null; };
+  }, [load]);
   const selected =
     data?.accounts.find((account) => account.id === selectedId) ?? null;
   const visible = useMemo(
@@ -278,6 +294,10 @@ export function AccountsWorkspace({
           </Link>
         }
       />
+      <section className="panel panel-spacious">
+        {readError ? <p role="alert">{readError}</p> : null}
+        {readAccess === "signed-out" ? <Link className="button button-primary" href="/login?next=%2Faccounts">Sign in again</Link> : <button className="button button-secondary" disabled={readBusy || busy || !!dialog} onClick={() => void load()}>{readBusy ? "Loading accounts…" : "Reload accounts"}</button>}
+      </section>
       {error && !dialog ? <p className="form-error" role="alert">{error}</p> : null}
       {notice ? <p className="form-success">{notice}</p> : null}
       <section className="summary-strip">
@@ -303,7 +323,7 @@ export function AccountsWorkspace({
               onChange={(event) => setSearch(event.target.value)}
             />
           </label>
-          {!data ? <p className="empty-cell" role="status">{error || "Loading accounts…"}</p> : visible.length ? (
+          {!data ? <p className="empty-cell" role="status">{readBusy ? "Loading accounts…" : "Account data is unavailable."}</p> : visible.length ? (
             visible.map((account) => (
               <button
                 type="button"

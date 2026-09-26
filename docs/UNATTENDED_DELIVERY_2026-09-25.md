@@ -128,3 +128,11 @@ Every programme priority remains open for acceptance. The finance/source-data, l
 ## Report export recovery acceptance — 26 September 2026
 
 PR312 deployed as adb18b440afe5907e64c4ec58681881b29b9a42b after all required checks; exact image/database readiness verified26September11:22:26.847 UTC. Use approved synthetic report data. Export CSV should preserve selected dates/facility when a request fails, explain empty results, and prepare a matching CSV on success. A manager without export access sees a disabled action and administrator guidance; expired access offers sign-in. Compare report contents with approved source records before finance acceptance. Automated failure injection runs only in isolated fixtures; report calculations and business acceptance are unchanged.
+
+## Report facility permission acceptance — 26 September 2026
+
+PR313 is deployed as78c65a2ab4078722bad1c3dcb3a336694344abe3; all required checks and exact image/service/database readiness passed at11:40:17.922UTC. An export requires both export and report-view authority for that facility. With approved synthetic staff roles, verify disjoint permissions reject the export and overlapping permissions export only the shared facilities. Automated PostgreSQL checks cover populated CSV and JSON output, including global/local grant combinations and foreign-organisation exclusion. Staff role acceptance remains open.
+
+## Accounts read recovery acceptance — 26 September 2026
+
+Verify the release state before staff testing. With approved synthetic accounts, confirm initial loading, empty results, selected-account links and a read-only reload. Missing access must hide balances and actions and explain contacting the administrator; an expired session offers sign-in. After a confirmed action and failed refresh, reload must only read saved accounts. Failure injection stays in isolated fixtures; no real payment is needed to run automated acceptance. Existing receipt request-key behavior and financial sign-off remain separate.

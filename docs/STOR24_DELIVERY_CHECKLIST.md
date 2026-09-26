@@ -1,4 +1,21 @@
 # STOR24 delivery checklist
+## Current stage interpretation — 26 September 2026
+
+Build, automated tests, commit/push, merge, deployment and staff acceptance are separate stages. **Waiting for staff acceptance alone does not make Build Partial.** The broad priority rows cover the full stated scope; a verified component does not imply every remaining component in that priority is implemented. Review explicit outstanding development separately from legal/provider/configuration and acceptance gates.
+
+The Excel Delivery tracker now shows these recent delivered components below the programme rows. All were built, tested, committed, merged, deployed and runtime-verified. Staff acceptance remains pending. Exact source/check/merge/deployment/health evidence is in PROJECT_CONTEXT.md and the indicated Evidence log record.
+
+| Delivered component | Release | Evidence | Build | Automated tests | Deployment | Staff acceptance |
+|---|---|---|---|---|---|---|
+| Manual stock request replay | PR307 | E066 | Built | Passed | Verified | Pending |
+| Reserved-stock deduction guard | PR308 | E067 | Built | Passed | Verified | Pending |
+| Manual daily-close form | PR310 | E069 | Built | Passed | Verified | Pending |
+| Saved daily-close review | PR311 | E070 | Built | Passed | Verified | Pending |
+| Report download recovery | PR312 | E071 | Built | Passed | Verified | Pending |
+| Report export facility permissions | PR313 | E072 | Built | Passed | Verified | Pending |
+
+This is the recent26September release subset. Earlier releases remain in the Evidence log. All14 programme acceptance gates remain open; no readiness percentage is inferred.
+
 
 25 September verified security/finance checkpoint: [release evidence and staff check-off steps](UNATTENDED_DELIVERY_2026-09-25.md) consolidate PR277–285. Latest 458 tests and all required checks passed; exact image 0778701b2 healthy/readiness verified at 09:15:47 UTC. Excel E036–E044 reconciled with zero accepted priorities. Staff/finance/legal/provider/recovery gates remain open; transient rollout and SSH reliability follow-ups recorded.
 
