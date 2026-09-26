@@ -503,3 +503,20 @@ test("unit type PATCH rolls back dimensions when audit fails", async () => {
   assert.equal((await patch(unitType.id, { facilityId: "b" })).status, 403);
   assert.equal((await patch(unitType.id, { areaSqMetres: -1 })).status, 422); assert.equal(audits, 1);
 });
+
+test("facility PATCH rolls back name when audit fails", async () => {
+  const state = fixture(); state.grant("inventory.manage", null);
+  const facility = state.tables.facility[0]; facility.name = "Before";
+  state.db.facility.update = async ({ data }: Row) => Object.assign(facility, data);
+  let fail = true; let audits = 0;
+  state.db.auditEvent.create = async () => { if (fail) throw new Error("SYNTHETIC_AUDIT_FAILURE"); audits++; return {}; };
+  state.db.$transaction = async (fn: (client: Row) => Promise<unknown>) => { const before = structuredClone(facility); try { return await fn(state.db); } catch (error) { Object.keys(facility).forEach(k => delete facility[k]); Object.assign(facility, before); throw error; } };
+  const api = await load("./src/app/api/v1/leasing/[resource]/route.ts", state);
+  const patch = (id = facility.id, data = { name: "After" } as Row) => api.PATCH(request("PATCH", { id, data }), context("facilities"));
+  assert.equal((await patch()).status, 500); assert.equal(facility.name, "Before"); assert.equal(audits, 0);
+  fail = false; assert.equal((await patch()).status, 200); assert.equal(facility.name, "After"); assert.equal(audits, 1);
+  assert.equal((await patch("foreign")).status, 404);
+  assert.equal((await patch(facility.id, { publicBookingEnabled: true })).status, 422);
+  state.tables.user[0].roleAssignments = []; state.grant("inventory.manage");
+  assert.equal((await patch()).status, 403); assert.equal(audits, 1);
+});

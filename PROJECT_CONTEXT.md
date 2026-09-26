@@ -1,11 +1,19 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Facility edit audit transaction — 26 September 2026
+
+- **Implementation:** facility PATCH saves settings and the existing facilities.updated audit in one transaction. Organisation-wide permission, organisation boundary, required public slug and duplicate slug guards are preserved. No live settings, booking flags, migration or policy changed.
+- **Testing:** actual prepatch synthetic audit failure left the facility name changed despite500. Candidate474 unit tests/typecheck/focused lint pass rollback/retry, foreign organisation denial, restricted-role denial and slug-required rejection. Required PostgreSQL rollback/one-audit retry/slug conflict/role tests added; CI pending.
+- **Commit/push:** candidate on codex/facility-edit-audit includes PR322 final evidence; pending commit.
+- **Merge:** pending required checks.
+- **Deployment/live verification:** pending. All14 acceptance gates remain open; request replay and concurrent validation are not claimed.
+- **Staff acceptance:** review a permitted synthetic facility edit and its audit. Do not switch live booking availability or provoke database faults for testing.
+
 ## Unit-type edit audit transaction — 26 September 2026
 
 - **Implementation:** unit-type PATCH commits its edit and existing unit-types.updated audit in one transaction. Existing facility scope, fixed facility and duplicate-name checks remain unchanged. No pricing, availability, concurrency or request replay policy is added.
-- **Testing:** actual prepatch audit failure returned500 but retained altered area. Candidate473 tests/typecheck/focused ESLint pass rollback, valid retry, facility and invalid-dimension rejection. Initial SQL scope assertion exposed shared fixture grants from earlier tests; isolated the unit-type actor to its own facility grant. Required PostgreSQL rollback/retry, duplicate-name and scope test rerun pending. Synthetic data only.
-- **Commit/push:** candidate on codex/unit-type-audit-atomicity, including final PR321 evidence; commit pending.
-- **Merge:** pending required checks.
-- **Deployment/configuration/live verification:** pending. No migration/configuration change. All14 acceptance gates remain open.
+- **Testing:** actual prepatch audit failure returned500 but retained altered area. Candidate473 tests/typecheck/focused ESLint pass rollback, valid retry, facility and invalid-dimension rejection. Initial SQL scope assertion exposed shared fixture grants from earlier tests; isolated the unit-type actor to its own facility grant. Required PostgreSQL rollback/retry, duplicate-name and scope test explicitly passed in SQL36249744456/job108425424691. Synthetic data only.
+- **Commit/push/merge:** corrected source114af083621dc82f70ab9de8be821442f926c449 passed all nine checks CI36249744338/SQL36249744456/security36249744287; PR322 merged6f51321abb068ca01b21ffbb8634a61fc39fa249, including final PR321 evidence.
+- **Deployment/configuration/live verification:** mainCI36250111283 and deploy36250395350 passed. Exact image stor24-crm:6f51321ab healthy; service/database readiness verified2026-09-26T15:02:46.500Z. No migration/configuration or production data change. ExcelE081 and PR322 delivered component record verification; staff acceptance and all14 programme gates remain open.
 - **Staff acceptance:** review a permitted synthetic unit-type edit, reload and confirm the matching audit. Do not induce database failures in production.
 
 ## Lead edit audit transaction — 26 September 2026
