@@ -44,6 +44,7 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
   const [productCreationUncertain, setProductCreationUncertain] = useState(false);
   const [showStock, setShowStock] = useState(false);
   const stockRequest = useRef(false);
+  const stockRequestKey = useRef<string | null>(null);
   const [stockMessage, setStockMessage] = useState("");
   const [stockUncertain, setStockUncertain] = useState(false);
   const [showPackage, setShowPackage] = useState(false);
@@ -355,7 +356,8 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
       const type = String(formData.get("type") ?? "");
       const quantity = Number(formData.get("quantity"));
       const delta = ["SALE", "DAMAGE"].includes(type) ? -Math.abs(quantity) : quantity;
-      const response = await fetch("/api/v1/operations", { method: "POST", signal: controller.signal, headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "stockMovement", payload: { productId, type, quantity, unitCost: formData.get("unitCost") ? Number(formData.get("unitCost")) : undefined, reason: formData.get("reason") || undefined, reference: formData.get("reference") || undefined } }) });
+      stockRequestKey.current ??= crypto.randomUUID();
+      const response = await fetch("/api/v1/operations", { method: "POST", signal: controller.signal, headers: { "content-type": "application/json", "idempotency-key": stockRequestKey.current }, body: JSON.stringify({ kind: "stockMovement", payload: { productId, type, quantity, unitCost: formData.get("unitCost") ? Number(formData.get("unitCost")) : undefined, reason: formData.get("reason") || undefined, reference: formData.get("reference") || undefined } }) });
       const body = await response.json();
       if ([400, 401, 403, 404, 409, 422, 429].includes(response.status)) {
         setStockMessage(typeof body.error?.message === "string" ? body.error.message : "Stock movement was not recorded. Check the details and available quantity, then try again.");
@@ -364,6 +366,7 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
       if (!response.ok || typeof body.data?.id !== "string" || !body.data.id || body.data.productId !== productId || body.data.type !== type || body.data.quantity !== delta) throw new Error("Unconfirmed stock movement");
       setShowStock(false);
       setStockMessage("Stock movement recorded.");
+      stockRequestKey.current = null;
       await load();
     } catch {
       setStockUncertain(true);
