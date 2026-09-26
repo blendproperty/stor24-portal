@@ -1,10 +1,18 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Current report snapshot clarity — 26 September 2026
+
+- **Implementation:** occupancy, unit availability and integration health are explicitly current snapshots. Their date controls are hidden, exports use a current filename and every row includes snapshotTakenAt in UTC. Catalog copy describes the data actually returned rather than implying historical revenue, forecasts or webhook backlog. This labels existing current-state queries; it does not invent historical reconstruction or alter metrics, availability, provider configuration or permission scope.
+- **Testing:** actual prepatch browser test reproduced misleading date controls on a current snapshot. Candidate470 unit tests/typecheck/focused lint and actual report1440/390/320px regression pass, including current filename and hidden dates after selecting historical ageing dates. Actual-service test covers timestamped output for all three snapshot types with historical parameters and no writes. Required populated SQL export test now asserts current snapshot timestamps; CI pending.
+- **Commit/push/merge:** candidate uncommitted; final PR316 release evidence is already pushed on this branch and will be included.
+- **Deployment/live:** unchanged PR316 image4f6ca226 healthy/service/database12:58:33.724UTC. Release and staff/finance acceptance remain pending; all14 gates stay open.
+- **Staff acceptance:** distinguish current snapshot reports from dated activity and ageing; check export capture timestamp and compare records with approved source data. Capture time is the query start, not a transaction-consistent historical reconstruction.
+
 ## Report SAST date boundaries — 26 September 2026
 
 - **Implementation:** report date filters now interpret selected days in South African time rather than UTC. This covers move activity, lead creation, period ledger entries and insurance acknowledgement cutoffs. Report screen states SAST. Current snapshot reports and approved ageing policy are unchanged; export/view facility intersection remains enforced.
-- **Testing:** prepatch actual-service synthetic test excluded SAST00:00 and included next-day00:00. Candidate469 tests/typecheck/focused lint pass; actual report browser1440/390/320px regression passes. Required PostgreSQL four-boundary/scoped fixture pending. No production transactions or customer exports used.
-- **Commit/push/merge:** candidate not yet committed or merged; includes final PR315 deployment evidence already pushed on this branch.
-- **Deployment/live:** unchanged PR315 imagee0348143 healthy/service/database12:41:19.061UTC. Release checks and finance/staff acceptance remain pending; all14 acceptance gates remain open.
+- **Testing:** prepatch actual-service synthetic test excluded SAST00:00 and included next-day00:00. Candidate469 tests/typecheck/focused lint pass; actual report browser1440/390/320px regression passes. Required PostgreSQL four-boundary/scoped test explicitly passed in SQL36242947407. No production transactions or customer exports used.
+- **Commit/push/merge:** PR316 source3c3867cd1cf27921747b91ab05d156818aeb6d69 passed all nine checks: CI36242947454, SQL36242947407 and security36242947483. Merged4f6ca22646e0dbe27e108e35efe3c7a4500db4fa, including final PR315 release evidence.
+- **Deployment/live:** Main CI36243274596 and deploy36243537477 passed. Exact image stor24-crm:4f6ca226 healthy; service/database readiness verified2026-09-26T12:58:33.724Z. ExcelE075 records the verified release and PR316 is added to delivered components. Finance/staff acceptance and all14 acceptance gates remain open.
 - **Staff acceptance:** compare a permitted synthetic single-day export with source timestamps immediately before/at both SAST midnights. Existing current-state snapshots are not historical reconstructions.
 
 ## Receivables ageing export — 26 September 2026
