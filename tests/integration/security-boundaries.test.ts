@@ -203,5 +203,37 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
       assert.equal(JSON.stringify(rows).includes("passwordHash"), false);
       assert.equal(JSON.stringify(rows).includes("synthetic-not-a-real-password-hash"), false);
     });
+    await t.test("report exports intersect export and report grants with populated PostgreSQL rows", async () => {
+      const actor = await db.user.create({ data: { organisationId: org.id, email: `${key}-reports@example.invalid`, name: "Synthetic exporter", passwordHash: "synthetic" } });
+      const exportRole = await db.role.create({ data: { organisationId: org.id, name: "Export fixture", permissions: ["reports.export"] } });
+      const reportRole = await db.role.create({ data: { organisationId: org.id, name: "View fixture", permissions: ["reports.view"] } });
+      for (const [facility, number] of [[a, "SYN-A"], [b, "SYN-B"], [foreign, "SYN-FOREIGN"]] as const) {
+        const type = await db.unitType.create({ data: { facilityId: facility.id, name: "Report fixture", features: [] } });
+        await db.unit.create({ data: { facilityId: facility.id, unitTypeId: type.id, number, monthlyRate: 1 } });
+      }
+      const grants = async (exportId: string | null, viewId: string | null) => {
+        await db.roleAssignment.deleteMany({ where: { userId: actor.id } });
+        await db.roleAssignment.createMany({ data: [{ userId: actor.id, roleId: exportRole.id, facilityId: exportId }, { userId: actor.id, roleId: reportRole.id, facilityId: viewId }] });
+      };
+      const output = await build({ entryPoints: ["src/app/api/v1/reports/export/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "report-session", setup(builder) {
+        builder.onResolve({ filter: /^@\/lib\/(db|session)$/ }, args => ({ path: args.path, namespace: "fixture" }));
+        builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
+      } }] });
+      const loaded = { exports: {} as { GET: (request: Request) => Promise<Response> } };
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: actor.id, sessionVersion: actor.sessionVersion });
+      const read = (facilityId = "", format = "JSON") => loaded.exports.GET(new Request(`https://example.invalid/api/v1/reports/export?reportKey=unit-availability&from=2026-09-01&to=2026-09-26&format=${format}${facilityId ? `&facilityId=${facilityId}` : ""}`));
+      await grants(a.id, b.id);
+      assert.equal((await read(b.id)).status, 403); assert.equal((await read()).status, 403);
+      for (const [exportId, viewId] of [[a.id, a.id], [null, a.id], [a.id, null]] as const) {
+        await grants(exportId, viewId);
+        assert.equal((await read(b.id)).status, 403);
+        const response = await read(); assert.equal(response.status, 200);
+        const { data } = await response.json(); assert.ok(data.some((row: { unit: string }) => row.unit === "SYN-A"));
+        assert.ok(data.every((row: { facility: string }) => row.facility === "A"));
+        const csv = await read("", "CSV"); assert.equal(csv.status, 200); const body = await csv.text(); assert.match(body, /SYN-A/); assert.doesNotMatch(body, /SYN-B|SYN-FOREIGN/);
+      }
+      await grants(null, null); const all = await read(); assert.equal(all.status, 200); const body = await all.text(); assert.match(body, /SYN-A/); assert.match(body, /SYN-B/); assert.doesNotMatch(body, /SYN-FOREIGN/);
+      assert.equal((await read(foreign.id)).status, 403);
+    });
   } finally { await db.$disconnect(); }
 });

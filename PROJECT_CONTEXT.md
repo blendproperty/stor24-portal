@@ -1,4 +1,11 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Report export facility intersection — 26 September 2026
+
+- **Implementation:** report exports intersect the current export capability's facilities with the report-specific permission facilities. An organisation-wide grant on one side cannot widen a restricted grant on the other. Disjoint grants fail closed; explicit excluded facilities retain403. CSV and JSON use the same restricted scope, with organisation isolation unchanged.
+- **Testing:** prepatch actual handler accepted an export forB with export permission only atA and view permission atB (200 instead of403). Candidate467 tests/typecheck/focused lint and existing report-export browser recovery at1440/390/320px pass. Actual-route regression covers disjoint/overlapping/global-local/global-global grants, invalid foreign facility and no writes. New required isolated PostgreSQL test uses populatedA/B/foreign units and real route/guards/service, checks both CSV and JSON contents and both global/local combinations. SQL and required GitHub checks remain pending; no production data was queried for the reproduction.
+- **Commit/push/merge:** candidate on codex/report-readiness-continuation with final PR312 evidence. Not merged or deployed yet.
+- **Deployment/live:** verified production remains PR312 mergeadb18b440afe5907e64c4ec58681881b29b9a42b, imageadb18b44 healthy/service/database11:22:26.847 UTC. No schema/configuration changes or production business mutations. Staff role acceptance, report source reconciliation and all14 programme gates remain open.
+
 ## Report export recovery — 26 September 2026
 
 - **Implementation:** CSV export stays on the report screen, retains report/date/facility selections after failure and prevents duplicate in-flight requests. Empty results are explicit; only a CSV response produces a download. A 30-second client timeout permits safe read-only retry. Expired access offers sign-in; denied access disables export and offers administrator guidance/read-only access reload. Catalog/export routes return controlled authentication, facility and internal-error responses while retaining current permission and facility guards.
