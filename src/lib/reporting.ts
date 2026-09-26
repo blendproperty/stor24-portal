@@ -11,15 +11,15 @@ export type ReportDefinition = {
 };
 
 export const reportDefinitions: readonly ReportDefinition[] = [
-  { key: "occupancy-revenue", name: "Occupancy & revenue", group: "Operations", description: "Physical/economic occupancy, occupied area, revenue and achieved rate.", permission: "reports.view", formats: ["CSV", "JSON"] },
-  { key: "unit-availability", name: "Unit availability", group: "Operations", description: "Availability, reservations, service states and short-term forecast.", permission: "reports.view", formats: ["CSV", "JSON"] },
+  { key: "occupancy-revenue", name: "Occupancy & revenue", group: "Operations", description: "Current unit occupancy and monthly contracted/potential rent snapshot.", permission: "reports.view", formats: ["CSV", "JSON"] },
+  { key: "unit-availability", name: "Unit availability", group: "Operations", description: "Current unit states, rates and recorded reservation hold expiry.", permission: "reports.view", formats: ["CSV", "JSON"] },
   { key: "move-activity", name: "Move activity", group: "Operations", description: "Move-ins, move-outs, transfers, notices and net rentals.", permission: "reports.view", formats: ["CSV", "JSON"] },
   { key: "lead-conversion", name: "Lead conversion", group: "Sales", description: "Source, stage velocity, conversion and loss reasons.", permission: "reports.sales", formats: ["CSV", "JSON"] },
   { key: "rent-roll", name: "Rent roll & tenant ledger", group: "Finance", description: "Rates, balances and account activity.", permission: "reports.financial", formats: ["CSV", "JSON"] },
   { key: "receivables-ageing", name: "Receivables ageing", group: "Finance", description: "Approved-terms ageing at the selected SAST date, with reconciliation exceptions.", permission: "reports.financial", formats: ["CSV", "JSON"] },
   { key: "collections-performance", name: "Collections workload", group: "Collections", description: "Current positive balances and period account activity requiring collections attention.", permission: "reports.collections", formats: ["CSV", "JSON"] },
   { key: "insurance-participation", name: "Insurance participation", group: "Operations", description: "Tenant cover, waivers, snapshotted premiums and outstanding decisions.", permission: "reports.view", formats: ["CSV", "JSON"] },
-  { key: "integration-health", name: "Integration health", group: "Integrations", description: "Connection state, failures, webhook backlog and retries.", permission: "integrations.view", formats: ["CSV", "JSON"] },
+  { key: "integration-health", name: "Integration health", group: "Integrations", description: "Current connection state, last health checks and recorded failures.", permission: "integrations.view", formats: ["CSV", "JSON"] },
 ] as const;
 
 export const reportParametersSchema = z.object({

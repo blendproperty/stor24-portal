@@ -12,6 +12,8 @@ export async function buildReportRows(scope: RequestScope, parameters: ReportPar
   const to = new Date(`${parameters.to}T23:59:59.999+02:00`);
   const facility = { organisationId: scope.organisationId, ...(facilityId ? { id: facilityId } : {}) };
 
+  const snapshotTakenAt = new Date().toISOString();
+
   switch (parameters.reportKey) {
     case "occupancy-revenue": {
       const facilities = await db.facility.findMany({ where: facility, include: { units: { include: { unitType: true, occupancies: { where: { status: { in: ["ACTIVE", "NOTICE_GIVEN"] } }, select: { monthlyRate: true } } } } }, orderBy: { name: "asc" } });
@@ -19,12 +21,12 @@ export async function buildReportRows(scope: RequestScope, parameters: ReportPar
         const occupied = item.units.filter((unit) => unit.occupancies.length);
         const potentialRent = item.units.reduce((sum, unit) => sum + Number(unit.monthlyRate), 0);
         const achievedRent = occupied.reduce((sum, unit) => sum + Number(unit.occupancies[0].monthlyRate), 0);
-        return { facility: item.name, totalUnits: item.units.length, occupiedUnits: occupied.length, physicalOccupancyPercent: item.units.length ? Number((occupied.length / item.units.length * 100).toFixed(2)) : 0, monthlyOccupiedRent: achievedRent, potentialMonthlyRent: potentialRent, economicOccupancyPercent: potentialRent ? Number((achievedRent / potentialRent * 100).toFixed(2)) : 0 };
+        return { snapshotTakenAt, facility: item.name, totalUnits: item.units.length, occupiedUnits: occupied.length, physicalOccupancyPercent: item.units.length ? Number((occupied.length / item.units.length * 100).toFixed(2)) : 0, monthlyOccupiedRent: achievedRent, potentialMonthlyRent: potentialRent, economicOccupancyPercent: potentialRent ? Number((achievedRent / potentialRent * 100).toFixed(2)) : 0 };
       });
     }
     case "unit-availability": {
       const units = await db.unit.findMany({ where: { facility }, include: { facility: { select: { name: true } }, unitType: { select: { name: true, areaSqMetres: true } }, reservations: { where: { status: "ACTIVE" }, select: { holdExpiresAt: true }, take: 1 } }, orderBy: [{ facilityId: "asc" }, { number: "asc" }] });
-      return units.map((unit) => ({ facility: unit.facility.name, unit: unit.number, type: unit.unitType.name, areaSqMetres: unit.unitType.areaSqMetres === null ? null : Number(unit.unitType.areaSqMetres), status: unit.status, monthlyRate: Number(unit.monthlyRate), activeHoldExpiresAt: unit.reservations[0]?.holdExpiresAt?.toISOString() ?? null }));
+      return units.map((unit) => ({ snapshotTakenAt, facility: unit.facility.name, unit: unit.number, type: unit.unitType.name, areaSqMetres: unit.unitType.areaSqMetres === null ? null : Number(unit.unitType.areaSqMetres), status: unit.status, monthlyRate: Number(unit.monthlyRate), activeHoldExpiresAt: unit.reservations[0]?.holdExpiresAt?.toISOString() ?? null }));
     }
     case "move-activity": {
       const occupancies = await db.occupancy.findMany({ where: { tenancy: { facility }, OR: [{ startDate: { gte: from, lte: to } }, { endDate: { gte: from, lte: to } }] }, include: { unit: { select: { number: true } }, tenancy: { include: { facility: { select: { name: true } }, customer: { select: { firstName: true, lastName: true, companyName: true } }, account: { select: { accountNumber: true } } } } }, orderBy: { startDate: "asc" } });
@@ -55,7 +57,7 @@ export async function buildReportRows(scope: RequestScope, parameters: ReportPar
     }
     case "integration-health": {
       const connections = await db.integrationConnection.findMany({ where: { organisationId: scope.organisationId, ...(facilityId ? { facilityId } : {}) }, include: { facility: { select: { name: true } } }, orderBy: [{ category: "asc" }, { provider: "asc" }] });
-      return connections.map((item) => ({ facility: item.facility?.name ?? "Organisation-wide", category: item.category, provider: item.provider, status: item.status, lastHealthAt: item.lastHealthAt?.toISOString() ?? null, lastSuccessAt: item.lastSuccessAt?.toISOString() ?? null, lastFailureAt: item.lastFailureAt?.toISOString() ?? null, consecutiveFailures: item.consecutiveFailures, failureCode: item.failureCode, failureMessage: item.failureMessage }));
+      return connections.map((item) => ({ snapshotTakenAt, facility: item.facility?.name ?? "Organisation-wide", category: item.category, provider: item.provider, status: item.status, lastHealthAt: item.lastHealthAt?.toISOString() ?? null, lastSuccessAt: item.lastSuccessAt?.toISOString() ?? null, lastFailureAt: item.lastFailureAt?.toISOString() ?? null, consecutiveFailures: item.consecutiveFailures, failureCode: item.failureCode, failureMessage: item.failureMessage }));
     }
     default:
       throw new Error("REPORT_NOT_IMPLEMENTED");

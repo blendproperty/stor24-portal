@@ -234,6 +234,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
         const response = await read(); assert.equal(response.status, 200);
         const { data } = await response.json(); assert.ok(data.some((row: { unit: string }) => row.unit === "SYN-A"));
         assert.ok(data.every((row: { facility: string }) => row.facility === "A"));
+        assert.ok(data.every((row: { snapshotTakenAt: string }) => Number.isFinite(Date.parse(row.snapshotTakenAt)) && Math.abs(Date.now() - Date.parse(row.snapshotTakenAt)) < 60000));
         const csv = await read("", "CSV"); assert.equal(csv.status, 200); const body = await csv.text(); assert.match(body, /SYN-A/); assert.doesNotMatch(body, /SYN-B|SYN-FOREIGN/);
       }
       await grants(null, null); const all = await read(); assert.equal(all.status, 200); const body = await all.text(); assert.match(body, /SYN-A/); assert.match(body, /SYN-B/); assert.doesNotMatch(body, /SYN-FOREIGN/);

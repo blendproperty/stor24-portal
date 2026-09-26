@@ -441,3 +441,17 @@ test("report date windows include SAST midnight and exclude the next SAST day", 
   assert.deepEqual(rows.map((r: Row) => r.source), ["boundary-1", "boundary-2"]);
   assert.deepEqual(state.writes, []);
 });
+
+test("current snapshot report rows identify capture time despite historical parameters", async () => {
+  const state = fixture();
+  state.db.facility.findMany = async () => [{ name: "A", units: [{ monthlyRate: 100, occupancies: [{ monthlyRate: 90 }] }] }];
+  state.db.unit = { findMany: async () => [{ facility: { name: "A" }, number: "SYN", unitType: { name: "Synthetic", areaSqMetres: null }, monthlyRate: 100, status: "AVAILABLE", reservations: [] }] };
+  state.db.integrationConnection = { findMany: async () => [{ facility: null, category: "Synthetic", provider: "Fixture", status: "DISABLED", consecutiveFailures: 0, failureCode: null, failureMessage: null }] };
+  const api = await load("./src/lib/report-data-service.ts", state);
+  for (const reportKey of ["occupancy-revenue", "unit-availability", "integration-health"]) {
+    const start = Date.now();
+    const [row] = await api.buildReportRows({ userId: "staff", organisationId: "org", facilityIds: ["a"], unrestrictedFacilities: false }, { reportKey, from: "2020-01-01", to: "2020-01-31", format: "JSON", groupBy: "month" });
+    assert.ok(Date.parse(row.snapshotTakenAt) >= start && Date.parse(row.snapshotTakenAt) <= Date.now());
+  }
+  assert.deepEqual(state.writes, []);
+});

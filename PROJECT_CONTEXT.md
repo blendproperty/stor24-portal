@@ -1,4 +1,12 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Current report snapshot clarity — 26 September 2026
+
+- **Implementation:** occupancy, unit availability and integration health are explicitly current snapshots. Their date controls are hidden, exports use a current filename and every row includes snapshotTakenAt in UTC. Catalog copy describes the data actually returned rather than implying historical revenue, forecasts or webhook backlog. This labels existing current-state queries; it does not invent historical reconstruction or alter metrics, availability, provider configuration or permission scope.
+- **Testing:** actual prepatch browser test reproduced misleading date controls on a current snapshot. Candidate470 unit tests/typecheck/focused lint and actual report1440/390/320px regression pass, including current filename and hidden dates after selecting historical ageing dates. Actual-service test covers timestamped output for all three snapshot types with historical parameters and no writes. Required populated SQL export test now asserts current snapshot timestamps; CI pending.
+- **Commit/push/merge:** candidate uncommitted; final PR316 release evidence is already pushed on this branch and will be included.
+- **Deployment/live:** unchanged PR316 image4f6ca226 healthy/service/database12:58:33.724UTC. Release and staff/finance acceptance remain pending; all14 gates stay open.
+- **Staff acceptance:** distinguish current snapshot reports from dated activity and ageing; check export capture timestamp and compare records with approved source data. Capture time is the query start, not a transaction-consistent historical reconstruction.
+
 ## Report SAST date boundaries — 26 September 2026
 
 - **Implementation:** report date filters now interpret selected days in South African time rather than UTC. This covers move activity, lead creation, period ledger entries and insurance acknowledgement cutoffs. Report screen states SAST. Current snapshot reports and approved ageing policy are unchanged; export/view facility intersection remains enforced.
