@@ -4,7 +4,7 @@
 - **Implementation:** lead PATCH now saves the edit and existing leads.updated audit in one transaction, returning only after commit. Existing resource/facility/customer/unit-type/assignee checks remain before the write. Other leasing branches and business policy are unchanged; no concurrency or request replay guarantee added.
 - **Testing:** prepatch actual-route synthetic audit failure returned500 but left stage CONTACTED and edited notes. Candidate472 unit tests, typecheck and focused ESLint passed rollback/retry and foreign facility/customer/unit-type/assignee rejection. Required real PostgreSQL audit-constraint rollback and valid retry/one-audit test explicitly passed in SQL36248475558 (job108421957444). No production mutations.
 - **Commit/push/merge:** PR321 source3c900f694ddf1cf684c8eee8c833d4ca88f263d7 passed all nine checks: CI36248475550/SQL36248475558/security36248475555. Merged e938454b5ad136b1bcfa6e24359f549d95a51c28, including PR320 final release evidence.
-- **Deployment/configuration/live verification:** pending. No migration or configuration change. All14 acceptance gates remain open.
+- **Deployment/configuration/live verification:** mainCI36248855329 and deploy36249225035 passed. Exact image stor24-crm:e938454b5 healthy; service/database readiness verified2026-09-26T14:41:14.188Z. No migration, configuration or production data changes. ExcelE080 records the release, with PR321 delivered component pending staff acceptance. All14 acceptance gates remain open.
 - **Staff acceptance:** use an approved synthetic lead to edit stage/notes, reload and verify one matching audit. Audit failure tests run only in isolation.
 
 ## Customer edit validation and audit transaction — 26 September 2026
