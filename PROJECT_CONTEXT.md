@@ -4,7 +4,7 @@
 - **Implementation:** reservation PATCH now records its existing reservations.updated audit inside the transaction that checks the operational floor and saves the edit. Existing permission, facility/customer checks and facility/unit locks remain. No allocation, quote policy or request replay guarantee added.
 - **Testing:** prepatch actual-route synthetic audit failure left an altered quote despite500. Candidate475 tests/typecheck/focused lint pass rollback/retry and closed-floor/facility rejection. Required PostgreSQL rollback/one-audit retry and closed-floor check explicitly passed in SQL36251835344/job108431196411. All test mutations are isolated synthetic records.
 - **Commit/push/merge:** PR324 source36a8b7620e717d966969836d2a333db2ed75682f passed all nine checks CI36251835346/SQL36251835344/security36251835349. Mergedc83f356093eeb1a41a146d68ca0a41e8f8ec54ec including PR323 final evidence.
-- **Deployment/live verification:** pending. No migration or live data/configuration changes; all14 acceptance gates remain open.
+- **Deployment/live verification:** mainCI36252155300 and deploy36252472315 passed. Exact image stor24-crm:c83f35609 healthy; service/database readiness verified2026-09-26T15:38:07.987Z. ExcelE083 and PR324 delivered component record verification. No migration or live data/configuration changes; staff acceptance and all14 programme gates remain open.
 - **Staff acceptance:** review a permitted synthetic reservation edit and matching audit. Keep non-operational floors blocked and use isolated failure evidence.
 
 ## Facility edit audit transaction — 26 September 2026
