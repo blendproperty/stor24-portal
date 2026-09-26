@@ -2,9 +2,9 @@
 ## Lead deletion audit transaction — 26 September 2026
 
 - **Implementation:** existing lead DELETE and leads.deleted audit now share a transaction. Audit failure restores the lead. Existing facility permission checks remain unchanged. No deletion eligibility or retention policy change; no live lead deleted.
-- **Testing:** actual prepatch synthetic audit failure removed the lead despite500. Candidate479 tests/typecheck/focused lint pass rollback/retry and facility denial. Required isolated PostgreSQL rollback/one-audit retry/foreign-facility test added; CI pending.
-- **Commit/push:** candidate on codex/lead-delete-audit includes PR328 final evidence and updated staff checklist; pending commit.
-- **Merge:** pending required checks.
+- **Testing:** actual prepatch synthetic audit failure removed the lead despite500. Candidate479 tests/typecheck/focused lint pass rollback/retry and facility denial. Required isolated PostgreSQL rollback/one-audit retry/foreign-facility test explicitly passed in SQL36257243478/job108446248268.
+- **Commit/push:** PR329 source9384c2f5dcbad15f43b6c4eedeeb6841ece5285c passed all nine checks CI36257243525/SQL36257243478/security36257243449. Includes PR328 final evidence and updated staff checklist.
+- **Merge:** merged13330163b2599fd3a2c36441188a866edf793dd4. MainCI36257578447 running.
 - **Deployment/live verification:** pending. No migration/configuration change; all14 programme acceptance gates remain open.
 - **Staff acceptance:** review isolated rollback and facility denial evidence; do not delete live leads for testing.
 
