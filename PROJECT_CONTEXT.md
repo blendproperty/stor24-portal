@@ -1,4 +1,13 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Remaining DELETE audit review — 26 September 2026, 17:28 UTC
+
+- **Review scope:** read-only source inspection against deployed main b6de14378c85c07096dbfc0653355cc7399c26af. No application changes or production mutations.
+- **Code observations, not reproduced findings:** src/app/api/v1/leasing/[resource]/route.ts still writes the shared DELETE audit at line516 after unit status update (line425), forced unit removal transaction (line451), reservation cancellation (line460), and unit-type removal/related cleanup (lines500–513). Those operations do not include the shared audit in their transaction. PR327–329 cover customers, facilities and leads only.
+- **Required next validation:** isolate each resource; inject audit failure and prove persisted state/related rows; test valid retry produces one matching audit. Preserve owner-only force removal, linked reservation/occupancy history blocks, assigned-unit handling, facility scope and cancellation policy. Use synthetic PostgreSQL records only. Review concurrency and request replay separately.
+- **Testing:** static inspection only; no new automated tests or live business acceptance. Existing479-test release baseline is unchanged. These candidates must not be described as remediated or as independently reproduced vulnerabilities.
+- **Commit/push:** recorded on codex/readiness-handoff-evidence; review evidence pending commit. No new PR/promotion required for this read-only checkpoint; latest deployed release remains PR330. ExcelE090 records the open candidates; no delivered component added.
+- **Outstanding:** all14 programme acceptance gates remain open, including staff, legal/provider and source-finance acceptance.
+
 ## Final readiness evidence checkpoint — 26 September 2026
 
 - **Implementation:** documentation-only promotion of PR329 final deployment evidence and staff checklist covering21 verified components. No application, data or configuration change.
