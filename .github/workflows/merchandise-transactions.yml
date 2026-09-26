@@ -41,6 +41,7 @@ jobs:
       - run: npx tsx --test tests/integration/configuration-atomicity.test.ts
       - run: npx tsx --test tests/integration/task-status-atomicity.test.ts
       - run: npx tsx --test tests/integration/stock-movement-atomicity.test.ts
+      - run: npx tsx --test tests/integration/stock-request-replay.test.ts
       - run: npx tsx --test tests/integration/operations-create-atomicity.test.ts
       - run: npx tsx --test tests/integration/billing-delivery.test.ts
       - run: npx tsx --test tests/integration/twilio-status-replay.test.ts

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
@@ -92,17 +93,30 @@ export async function POST(request: Request) {
       result = await createAudited(tx => tx.product.create({ data: { organisationId, ...input } }));
     } else if (body.kind === "stockMovement") {
       const input = stockMovementSchema.parse(body.payload);
+      const requestKey = request.headers.get("idempotency-key");
+      if (requestKey !== null && !/^[A-Za-z0-9_-]{16,128}$/.test(requestKey)) return Response.json({ error: { code: "INVALID_REQUEST_KEY", message: "Reload the stock form before recording this movement." } }, { status: 400 });
+      // Scope the opaque client key to both tenant and actor; never trust it as authority.
+      const idempotencyKey = requestKey === null ? undefined : createHash("sha256").update(JSON.stringify([organisationId, user.id, requestKey])).digest("hex");
+      const requestHash = idempotencyKey ? createHash("sha256").update(JSON.stringify(input)).digest("hex") : undefined;
       result = await db.$transaction(async (tx) => {
         const product = await tx.product.findFirst({ where: { id: input.productId, organisationId } });
         if (!product) throw new Error("FORBIDDEN");
         await requirePermission("inventory.manage", product.facilityId);
+        if (idempotencyKey) {
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${idempotencyKey}, 0))`;
+          const existing = await tx.stockMovement.findUnique({ where: { idempotencyKey } });
+          if (existing) {
+            if (existing.requestHash !== requestHash) throw new Error("STOCK_REQUEST_CONFLICT");
+            return existing;
+          }
+        }
         const delta = ["SALE", "DAMAGE"].includes(input.type) ? -Math.abs(input.quantity) : input.quantity;
         const claimed = await tx.product.updateMany({
           where: { id: product.id, organisationId, quantityOnHand: { gte: -delta } },
           data: { quantityOnHand: { increment: delta } },
         });
         if (claimed.count !== 1) throw new Error("INSUFFICIENT_STOCK");
-        const movement = await tx.stockMovement.create({ data: { ...input, quantity: delta, createdById: user.id } });
+        const movement = await tx.stockMovement.create({ data: { ...input, quantity: delta, createdById: user.id, idempotencyKey, requestHash } });
         await tx.auditEvent.create({ data: { organisationId, actorId: user.id, action: "stockMovement.create", entityType: "stockMovement", entityId: movement.id, after: JSON.parse(JSON.stringify(movement)) } });
         return movement;
       });
@@ -132,6 +146,7 @@ export async function POST(request: Request) {
     if (!audited) await db.auditEvent.create({ data: { organisationId, actorId: user.id, action: `${entityType}.create`, entityType, entityId, after: JSON.parse(JSON.stringify(result)) } });
     return Response.json({ data: result }, { status: 201 });
   } catch (error) {
+    if (error instanceof Error && error.message === "STOCK_REQUEST_CONFLICT") return Response.json({ error: { code: error.message, message: "This request already recorded a different stock movement. Reload inventory and review its audit history before starting a new movement." } }, { status: 409 });
     if (error instanceof Error && error.message === "DAILY_CLOSE_ALREADY_CLOSED") return Response.json({ error: { code: error.message, message: "This day is already closed. Its recorded totals cannot be overwritten. Ask finance to review any correction." } }, { status: 409 });
     if (error instanceof Error && error.message === "INSUFFICIENT_STOCK") return Response.json({ error: { code: error.message, message: "This movement would make stock negative." } }, { status: 409 });
     if (error instanceof Error && error.message === "UNIT_NOT_AVAILABLE") return Response.json({ error: { code: error.message, message: "Only an available unit can be placed into service." } }, { status: 409 });

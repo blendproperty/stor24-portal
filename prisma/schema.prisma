@@ -1514,6 +1514,8 @@ model ReservationPackage {
 
 model StockMovement {
   id          String            @id @default(cuid())
+  idempotencyKey String?        @unique
+  requestHash String?
   productId   String
   product     Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
   type        StockMovementType

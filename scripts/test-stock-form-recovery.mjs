@@ -16,7 +16,7 @@ try {
   await page.route('**/api/v1/operations/merchandise-orders',route=>route.fulfill({json:{data:[]}}));
   await page.route('**/api/v1/operations',route=>{
    if(route.request().method()==='GET')return readFail?route.abort():route.fulfill({json:{data:{tasks:[],maintenance:[],products:[{id:'synthetic-product',facilityId:'synthetic-facility',sku:'TEST',name:'Synthetic product',category:'Test',barcode:null,imageUrl:null,costPrice:'1',sellingPrice:'2',quantityOnHand:quantity,quantityReserved:0,reorderPoint:0,active:true,facility:{name:'Synthetic facility'}}],storagePackages:[],dailyCloses:[],notes:[],facilities:[]}}});
-   assert.equal(route.request().method(),'POST');posts++;const input=route.request().postDataJSON();assert.equal(input.kind,'stockMovement');const p=input.payload;const delta=['SALE','DAMAGE'].includes(p.type)?-Math.abs(p.quantity):p.quantity;
+   assert.equal(route.request().method(),'POST');assert.match(route.request().headers()['idempotency-key'],/^[a-f0-9-]{36}$/);posts++;const input=route.request().postDataJSON();assert.equal(input.kind,'stockMovement');const p=input.payload;const delta=['SALE','DAMAGE'].includes(p.type)?-Math.abs(p.quantity):p.quantity;
    if(mode==='hold'){pending=route;return;}
    if(mode==='validation')return route.fulfill({status:400,json:{error:{message:'Check the movement details.'}}});
    if(mode==='denied')return route.fulfill({status:403,json:{error:{message:'Access denied.'}}});
