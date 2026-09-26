@@ -18,12 +18,13 @@ export function ReportsWorkspace({ reports, facilities, initialFrom, initialTo, 
   useEffect(() => () => request.current?.abort(), []);
   const groups = useMemo(() => ["All", ...new Set(reports.map((report) => report.group))], [reports]);
   const visible = group === "All" ? reports : reports.filter((report) => report.group === group);
-  const exportHref = `/api/v1/reports/export?${new URLSearchParams({ reportKey, from, to, format: "CSV", groupBy: "month", ...(facilityId ? { facilityId } : {}) })}`;
+  const isAgeing = reportKey === "receivables-ageing";
+  const exportHref = `/api/v1/reports/export?${new URLSearchParams({ reportKey, from: isAgeing ? to : from, to, format: "CSV", groupBy: "month", ...(facilityId ? { facilityId } : {}) })}`;
 
   async function exportCsv() {
     if (request.current || !canExport || access) return;
     setMessage(""); setFailed(false);
-    if (!reportKey || !from || !to || from > to) { setFailed(true); setMessage("Choose a report and a valid date range before exporting."); return; }
+    if (!reportKey || !to || (!isAgeing && (!from || from > to))) { setFailed(true); setMessage("Choose a report and a valid date range before exporting."); return; }
     const controller = new AbortController(); request.current = controller; setBusy(true);
     const timeout = setTimeout(() => controller.abort(), 30_000);
     try {
@@ -43,7 +44,7 @@ export function ReportsWorkspace({ reports, facilities, initialFrom, initialTo, 
       const url = URL.createObjectURL(blob);
       try {
         const link = document.createElement("a");
-        link.href = url; link.download = `stor24-${reportKey}-${from}-${to}.csv`;
+        link.href = url; link.download = isAgeing ? `stor24-${reportKey}-as-of-${to}.csv` : `stor24-${reportKey}-${from}-${to}.csv`;
         document.body.appendChild(link); link.click(); link.remove();
         setMessage("CSV download prepared. Check your browser downloads.");
       } finally { setTimeout(() => URL.revokeObjectURL(url), 5_000); }
@@ -56,10 +57,11 @@ export function ReportsWorkspace({ reports, facilities, initialFrom, initialTo, 
     <div className="report-workspace">
       <section className="panel panel-spacious report-parameters">
         <div className="panel-heading"><div><h2>Report parameters</h2><p className="panel-subtitle">Choose your report, dates and facility, then download a CSV.</p></div><Filter className="muted-icon" /></div>
+        {isAgeing ? <p>Ageing uses all account entries up to the selected South African date. Current recorded balances and holds are labelled separately; accounts needing reconciliation have blank ageing amounts.</p> : null}
         <div className="parameter-grid">
           <label>Report<select disabled={busy} value={reportKey} onChange={(event) => setReportKey(event.target.value)}>{reports.map((report) => <option value={report.key} key={report.key}>{report.name}</option>)}</select></label>
-          <label>From<input disabled={busy} type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label>
-          <label>To<input disabled={busy} type="date" value={to} onChange={(event) => setTo(event.target.value)} /></label>
+          {!isAgeing ? <label>From<input disabled={busy} type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label> : null}
+          <label>{isAgeing ? "As of (SAST)" : "To"}<input disabled={busy} type="date" value={to} onChange={(event) => setTo(event.target.value)} /></label>
           <label>Facility<select disabled={busy} value={facilityId} onChange={(event) => setFacilityId(event.target.value)}><option value="">All permitted facilities</option>{facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}</select></label>
         </div>
         <div className="report-actions">

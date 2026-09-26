@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { db } from "../../src/lib/db";
 import { collectionsWorkspace, updateCollection } from "../../src/lib/collections-service";
 import { collectionCsv } from "../../src/lib/collections-view";
+import { buildReportRows } from "../../src/lib/report-data-service";
 import { southAfricaDateKey } from "../../src/lib/south-africa-time";
 import type { CollectionAction } from "../../src/lib/collections-policy";
 test("isolated PostgreSQL aged collections", async t => {
@@ -27,7 +28,13 @@ test("isolated PostgreSQL aged collections", async t => {
   const terms = async (f: Awaited<ReturnType<typeof fixture>>) => updateCollection(f.scope, { ...await base(f), action: "terms", terms: { dueDays: 0, allocation: "OLDEST_DUE_FIRST", approvalReference: "CI approved agreement", overrides: [] }, confirm: true });
   try {
     await t.test("missing terms excluded; approved terms produce 91+ age without financial writes", async () => {
-      const f = await fixture(); assert.match((await row(f)).ageing.issue!, /terms/); await terms(f);
+      const f = await fixture(); assert.match((await row(f)).ageing.issue!, /terms/);
+      const parameters = { reportKey: "receivables-ageing", from: today, to: today, format: "JSON" as const, groupBy: "month" as const };
+      const [missing] = await buildReportRows(f.scope, parameters); assert.match(String(missing.reviewReason), /terms/); assert.equal(missing.days91Plus, null);
+      await terms(f);
+      const [exported] = await buildReportRows(f.scope, parameters); assert.equal(exported.days91Plus, "100.00"); assert.equal(exported.currentRecordedBalance, "100"); assert.equal(exported.asOfSast, today);
+      assert.equal((await buildReportRows({ ...f.scope, facilityIds: [] }, parameters)).length, 0);
+      const excluded = await fixture(); await assert.rejects(buildReportRows(f.scope, { ...parameters, facilityId: excluded.facility.id }), /FACILITY_FORBIDDEN/);
       const r = await row(f); assert.equal(r.ageing.issue, null); assert.equal(r.ageing.buckets[4], 10000);
       assert.equal(await db.ledgerEntry.count({ where: { accountId: f.account.id } }), 1); assert.equal(await db.payment.count({ where: { accountId: f.account.id } }), 0);
       assert.equal((await db.account.findUniqueOrThrow({ where: { id: f.account.id } })).balance.toString(), "100");
