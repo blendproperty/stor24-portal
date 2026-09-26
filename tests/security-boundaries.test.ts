@@ -520,3 +520,24 @@ test("facility PATCH rolls back name when audit fails", async () => {
   state.tables.user[0].roleAssignments = []; state.grant("inventory.manage");
   assert.equal((await patch()).status, 403); assert.equal(audits, 1);
 });
+
+test("reservation PATCH rolls back quote when audit fails and retains floor guard", async () => {
+  const state = fixture(); state.grant("reservations.manage");
+  const reservation = { id: "reservation-a", facilityId: "a", unitId: "unit-a", quotedRate: 100 };
+  state.tables.reservation.push(reservation);
+  const facility = { closedFloors: [] as string[] };
+  state.tables.unit.push({ id: "unit-a", facilityId: "a", floor: "first floor", facility });
+  state.db.$queryRaw = async () => [];
+  state.db.reservation.findUniqueOrThrow = async () => reservation;
+  state.db.reservation.update = async ({ data }: Row) => Object.assign(reservation, data);
+  let fail = true; let audits = 0;
+  state.db.auditEvent.create = async () => { if (fail) throw new Error("SYNTHETIC_AUDIT_FAILURE"); audits++; return {}; };
+  state.db.$transaction = async (fn: (client: Row) => Promise<unknown>) => { const before = structuredClone(reservation); try { return await fn(state.db); } catch (error) { Object.assign(reservation, before); throw error; } };
+  const api = await load("./src/app/api/v1/leasing/[resource]/route.ts", state);
+  const patch = (data = { quotedRate: 200 } as Row) => api.PATCH(request("PATCH", { id: reservation.id, data }), context("reservations"));
+  assert.equal((await patch()).status, 500); assert.equal(reservation.quotedRate, 100); assert.equal(audits, 0);
+  fail = false; assert.equal((await patch()).status, 200); assert.equal(reservation.quotedRate, 200); assert.equal(audits, 1);
+  facility.closedFloors = ["first floor"]; assert.equal((await patch({ quotedRate: 300 })).status, 409);
+  assert.equal(reservation.quotedRate, 200); assert.equal(audits, 1);
+  assert.equal((await patch({ facilityId: "b" })).status, 403);
+});

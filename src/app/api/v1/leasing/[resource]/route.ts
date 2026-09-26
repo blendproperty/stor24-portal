@@ -339,8 +339,11 @@ export async function PATCH(
         entity = await db.$transaction(async tx => {
           const reservation = await tx.reservation.findUniqueOrThrow({ where: { id: current.id } });
           await requireOperationalUnit(tx, current.facilityId, patch.unitId ?? reservation.unitId);
-          return tx.reservation.update({ where: { id: current.id }, data });
+          const saved = await tx.reservation.update({ where: { id: current.id }, data });
+          await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "reservations.updated", entityType: "reservations", entityId: current.id } });
+          return saved;
         });
+        return Response.json({ data: entity });
       } else {
         entity = await (model as typeof db.unit).update({
           where: { id: current.id },
