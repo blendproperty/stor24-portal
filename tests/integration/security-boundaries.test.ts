@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "../../src/generated/prisma/client";
 import { db } from "../../src/lib/db";
+import { buildReportRows } from "../../src/lib/report-data-service";
 import { requireFacility } from "../../src/lib/scope";
 import { createCustomer, createLead, requireLeasingCustomer } from "../../src/lib/leasing-service";
 import { listIdentityLinks } from "../../src/lib/mel-integration-status-service";
@@ -237,6 +238,13 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
       }
       await grants(null, null); const all = await read(); assert.equal(all.status, 200); const body = await all.text(); assert.match(body, /SYN-A/); assert.match(body, /SYN-B/); assert.doesNotMatch(body, /SYN-FOREIGN/);
       assert.equal((await read(foreign.id)).status, 403);
+    });
+    await t.test("report date filters respect both SAST midnight boundaries in PostgreSQL", async () => {
+      const stamps = ["2026-09-24T21:59:59.999Z", "2026-09-24T22:00:00.000Z", "2026-09-25T21:59:59.999Z", "2026-09-25T22:00:00.000Z"];
+      for (const [i, stamp] of stamps.entries()) await db.lead.create({ data: { facilityId: a.id, source: `SAST-${i}`, createdAt: new Date(stamp) } });
+      await db.lead.create({ data: { facilityId: b.id, source: "SAST-other", createdAt: new Date(stamps[1]) } });
+      const rows = await buildReportRows({ userId: user.id, organisationId: org.id, facilityIds: [a.id], unrestrictedFacilities: false }, { reportKey: "lead-conversion", from: "2026-09-25", to: "2026-09-25", format: "JSON", groupBy: "day" });
+      assert.deepEqual(rows.map(row => row.source), ["SAST-1", "SAST-2"]);
     });
   } finally { await db.$disconnect(); }
 });

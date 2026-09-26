@@ -8,8 +8,8 @@ export type ReportRow = Record<string, string | number | boolean | null>;
 export async function buildReportRows(scope: RequestScope, parameters: ReportParameters): Promise<ReportRow[]> {
   if (parameters.facilityId) await requireFacility(scope, parameters.facilityId);
   const facilityId = parameters.facilityId ? parameters.facilityId : scope.unrestrictedFacilities ? undefined : { in: scope.facilityIds };
-  const from = new Date(`${parameters.from}T00:00:00.000Z`);
-  const to = new Date(`${parameters.to}T23:59:59.999Z`);
+  const from = new Date(`${parameters.from}T00:00:00.000+02:00`);
+  const to = new Date(`${parameters.to}T23:59:59.999+02:00`);
   const facility = { organisationId: scope.organisationId, ...(facilityId ? { id: facilityId } : {}) };
 
   switch (parameters.reportKey) {

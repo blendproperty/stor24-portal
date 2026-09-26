@@ -1,4 +1,12 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Report SAST date boundaries — 26 September 2026
+
+- **Implementation:** report date filters now interpret selected days in South African time rather than UTC. This covers move activity, lead creation, period ledger entries and insurance acknowledgement cutoffs. Report screen states SAST. Current snapshot reports and approved ageing policy are unchanged; export/view facility intersection remains enforced.
+- **Testing:** prepatch actual-service synthetic test excluded SAST00:00 and included next-day00:00. Candidate469 tests/typecheck/focused lint pass; actual report browser1440/390/320px regression passes. Required PostgreSQL four-boundary/scoped fixture pending. No production transactions or customer exports used.
+- **Commit/push/merge:** candidate not yet committed or merged; includes final PR315 deployment evidence already pushed on this branch.
+- **Deployment/live:** unchanged PR315 imagee0348143 healthy/service/database12:41:19.061UTC. Release checks and finance/staff acceptance remain pending; all14 acceptance gates remain open.
+- **Staff acceptance:** compare a permitted synthetic single-day export with source timestamps immediately before/at both SAST midnights. Existing current-state snapshots are not historical reconstructions.
+
 ## Receivables ageing export — 26 September 2026
 
 - **Implementation:** the ageing export now reuses the existing Collections calculation and approved terms, receipt evidence, reversal/refund reconciliation and SAST as-of policy. It emits current/1–30/31–60/61–90/91+ buckets, overdue and credit; quarantined accounts have blank amounts and an explicit review reason. Current recorded balance and current holds are labelled separately from historical ageing. The report screen uses one As of (SAST) date. Existing export/view facility intersection remains enforced; no finance policy or posting changes.
