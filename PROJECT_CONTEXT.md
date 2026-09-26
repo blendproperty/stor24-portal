@@ -2,9 +2,9 @@
 ## Final readiness evidence checkpoint — 26 September 2026
 
 - **Implementation:** documentation-only promotion of PR329 final deployment evidence and staff checklist covering21 verified components. No application, data or configuration change.
-- **Testing:** evidence reconciled with ExcelE066–E088 and current canonical entries. Reuses479-test functional baseline and required isolated database/browser/journey/restore evidence. Required promotion checks pending.
-- **Commit/push:** candidate on codex/readiness-final-checkpoint; pending commit.
-- **Merge/deployment/live verification:** pending for this evidence release. Latest verified functional production is PR329/image13330163b at17:08:31.671UTC.
+- **Testing:** evidence reconciled with ExcelE066–E088 and current canonical entries. Reuses479-test functional baseline and required isolated database/browser/journey/restore evidence. All nine promotion checks passed: CI36258108642/SQL36258108690/security36258108656.
+- **Commit/push:** PR330 sourceaafe8d4237c9822684596203d6973d397117dc5d mergedb6de14378c85c07096dbfc0653355cc7399c26af. Checklist and PR329 final evidence are on main.
+- **Deployment/live verification:** mainCI36258510014 and deploy36258821928 passed. Exact image stor24-crm:b6de14378 healthy; service/database readiness verified2026-09-26T17:24:56.195Z. ExcelE089 records this documentation release; no new functional component or staff acceptance.
 - **Acceptance:** all14 programme gates remain open. Technical delivery does not establish staff/legal/provider/finance/security acceptance or95percent readiness. No production mutations performed.
 
 ## Lead deletion audit transaction — 26 September 2026
