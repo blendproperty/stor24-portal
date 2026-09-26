@@ -1,4 +1,13 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Unit-type edit audit transaction — 26 September 2026
+
+- **Implementation:** unit-type PATCH commits its edit and existing unit-types.updated audit in one transaction. Existing facility scope, fixed facility and duplicate-name checks remain unchanged. No pricing, availability, concurrency or request replay policy is added.
+- **Testing:** actual prepatch audit failure returned500 but retained altered area. Candidate473 tests/typecheck/focused ESLint pass rollback, valid retry, facility and invalid-dimension rejection. Required PostgreSQL rollback/retry, duplicate-name and scope test added; CI pending. Synthetic data only.
+- **Commit/push:** candidate on codex/unit-type-audit-atomicity, including final PR321 evidence; commit pending.
+- **Merge:** pending required checks.
+- **Deployment/configuration/live verification:** pending. No migration/configuration change. All14 acceptance gates remain open.
+- **Staff acceptance:** review a permitted synthetic unit-type edit, reload and confirm the matching audit. Do not induce database failures in production.
+
 ## Lead edit audit transaction — 26 September 2026
 
 - **Implementation:** lead PATCH now saves the edit and existing leads.updated audit in one transaction, returning only after commit. Existing resource/facility/customer/unit-type/assignee checks remain before the write. Other leasing branches and business policy are unchanged; no concurrency or request replay guarantee added.
