@@ -1,4 +1,11 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Accounts read recovery — 26 September 2026
+
+- **Implementation:** Accounts handles failed, malformed and timed-out reads with a reachable read-only reload. Current account data and action forms are cleared during reads; denied access hides stale records and gives administrator guidance, while expired sessions offer sign-in. Successful results are validated before rendering; selection and deep links are retained when available. Empty results return mobile users to the list. Confirmed financial actions keep their saved notice if the following read fails; reload never repeats a POST. Receipt/transfer/move-out mutation policies are unchanged.
+- **Testing:** prepatch actual component showed permanent Loading accounts, an unhandled network error and no retry. Candidate467 tests/typecheck/focused lint and actual component1440/390/320px pass for initial/refresh errors, malformed/nested payloads,20-second timeout, empty data,401/403, hidden stale balances, restored access and confirmed synthetic payment followed by failed read/GET-only recovery. Existing payment request-key retry browser regression passes. Test caught mobile empty-list hiding and it was corrected. Screenshot inspected; fixture omits production shell/font. Required CI/browser/database/security and staff acceptance remain pending.
+- **Commit/push/merge:** candidate on codex/security-readiness-continuation, alongside final PR313 evidence and clarified tracker stage documentation. Not yet merged or deployed.
+- **Deployment/live:** production remains verified PR313 image78c65a2a healthy/service/database11:40:17.922UTC. No production account reads containing customer data or financial mutations used for testing. All14 acceptance gates remain open.
+
 ## Delivery-stage clarity — 26 September 2026
 
 - **Implementation:** the existing Excel Delivery tracker now has a dated delivered-component section for PR307,308,310,311,312,313. Each shows Built, automated tests Passed, Pushed, Merged, Deployed and verified runtime health independently of Pending staff acceptance. Evidence references E066/E067/E069-E072 retain exact release checks and timestamps. Historical releases remain in Evidence log; this section is explicitly the recent26September subset, not a complete feature inventory.
