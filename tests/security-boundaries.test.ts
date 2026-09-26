@@ -273,6 +273,23 @@ test("operations response limits every staff relation to display identity", asyn
   assert.equal(state.writes.length, 0);
 });
 
+test("daily-close form facilities follow current scoped permission and never a cached owner role", async () => {
+  const state = fixture(); state.grant("operations.view", null); state.grant("daily_close.perform", "a");
+  state.session.role = "Organisation owner";
+  for (const model of ["task", "unitNote", "maintenanceRequest", "product", "storagePackage", "dailyClose"]) state.db[model] = { findMany: async () => [] };
+  state.db.facility.findMany = async () => [{ id: "a", name: "A" }, { id: "b", name: "B" }];
+  const api = await load("./src/app/api/v1/operations/route.ts", state);
+  assert.deepEqual((await (await api.GET()).json()).data.dailyCloseFacilityIds, ["a"]);
+  assert.equal((await api.POST(request("POST", { kind: "dailyClose", payload: { facilityId: "c3333333333333333333333333", businessDate: "2026-09-26", expectedCash: 0, countedCash: 0, checks: [{ key: "review", label: "Synthetic review", complete: true }] } }))).status, 403);
+  state.tables.user[0].roleAssignments = []; state.grant("operations.view", null);
+  assert.deepEqual((await (await api.GET()).json()).data.dailyCloseFacilityIds, []);
+  state.grant("daily_close.perform", null);
+  assert.deepEqual((await (await api.GET()).json()).data.dailyCloseFacilityIds, ["a", "b"]);
+  state.tables.user[0].roleAssignments = []; state.grant("*", null, "Organisation owner");
+  assert.deepEqual((await (await api.GET()).json()).data.dailyCloseFacilityIds, ["a", "b"]);
+  assert.equal(state.writes.length, 0);
+});
+
 test("stock movements require inventory authority at the product's actual facility", async () => {
   const state = fixture(); state.grant("inventory.manage", "a"); state.grant("reports.view", "b");
   const productId = "c1234567890123456789012345";
