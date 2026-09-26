@@ -487,3 +487,19 @@ test("lead PATCH rolls back stage and notes when audit fails", async () => {
   for (const data of [{ facilityId: "b" }, { customerId: "customer-b" }, { desiredUnitTypeId: "type-b" }, { assignedToId: "missing" }]) assert.equal((await patch(lead.id, data)).status, 403);
   assert.equal((await patch("lead-b")).status, 403); assert.equal(audits, 1);
 });
+
+test("unit type PATCH rolls back dimensions when audit fails", async () => {
+  const state = fixture(); state.grant("inventory.manage");
+  const unitType = state.tables.unitType[0]; unitType.areaSqMetres = 100;
+  state.db.unitType.update = async ({ data }: Row) => Object.assign(unitType, data);
+  let fail = true; let audits = 0;
+  state.db.auditEvent.create = async () => { if (fail) throw new Error("SYNTHETIC_AUDIT_FAILURE"); audits++; return {}; };
+  state.db.$transaction = async (fn: (client: Row) => Promise<unknown>) => { const before = structuredClone(unitType); try { return await fn(state.db); } catch (error) { Object.keys(unitType).forEach(k => delete unitType[k]); Object.assign(unitType, before); throw error; } };
+  const api = await load("./src/app/api/v1/leasing/[resource]/route.ts", state);
+  const patch = (id = unitType.id, data = { areaSqMetres: 200 } as Row) => api.PATCH(request("PATCH", { id, data }), context("unit-types"));
+  assert.equal((await patch()).status, 500); assert.equal(unitType.areaSqMetres, 100); assert.equal(audits, 0);
+  fail = false; assert.equal((await patch()).status, 200); assert.equal(unitType.areaSqMetres, 200); assert.equal(audits, 1);
+  assert.equal((await patch("type-b")).status, 403);
+  assert.equal((await patch(unitType.id, { facilityId: "b" })).status, 403);
+  assert.equal((await patch(unitType.id, { areaSqMetres: -1 })).status, 422); assert.equal(audits, 1);
+});
