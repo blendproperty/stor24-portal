@@ -1,4 +1,12 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Customer records read recovery — 26 September 2026
+
+- **Implementation:** Customers & tenants now distinguishes loading/read failure from an empty directory, validates nested read results and offers a20-second bounded read-only reload. Refresh clears displayed records/editors; denied access hides stale private details and gives administrator guidance, while expired sessions link back to tenants sign-in. Existing selection/deep links are retained when present. Confirmed saves retain their success notice if refresh fails; reload never repeats a mutation. Customer create/edit mutation recovery is separate and unchanged. Scoped mobile grid/input sizing prevents directory overflow.
+- **Testing:** prepatch actual component reproduced false No customer records found, no retry and an unhandled failed GET. Candidate470 unit tests/typecheck/focused lint and actual customer component1440/390/320px pass network/server/malformed/nested errors, timeout, empty/success, deep link, denied private-data clearing, sign-in and synthetic saved-record/failed-refresh/GET-only retry. Screenshot inspected; fixture omits production shell/font. New required browser CI step added; full required checks pending.
+- **Commit/push/merge:** candidate uncommitted; final PR317 release evidence already pushed on this branch will be included.
+- **Deployment/live:** unchanged PR317 image99a7facaa healthy/service/database13:17:14.834UTC. No production customer mutations or messages. Staff role acceptance, mutation recovery and all14 programme gates remain open.
+- **Staff acceptance:** open a permitted customer deep link, reload and confirm the same record. Review denied-access guidance with the intended manager role; verify current contacts and consent against approved sources. Automated failure simulations remain isolated.
+
 ## Current report snapshot clarity — 26 September 2026
 
 - **Implementation:** occupancy, unit availability and integration health are explicitly current snapshots. Their date controls are hidden, exports use a current filename and every row includes snapshotTakenAt in UTC. Catalog copy describes the data actually returned rather than implying historical revenue, forecasts or webhook backlog. This labels existing current-state queries; it does not invent historical reconstruction or alter metrics, availability, provider configuration or permission scope.

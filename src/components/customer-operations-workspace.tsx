@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { customerReadSchema } from "@/lib/customer-read-schema";
 import Link from "next/link";
 import { Building2, Download, Pencil, Plus, Search, UserRound, X } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
@@ -35,8 +36,36 @@ export function CustomerOperationsWorkspace({ initialCustomerId = "" }: { initia
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const load = useCallback(async () => { const response = await fetch("/api/v1/leasing/customers", { cache: "no-store" }); const payload = await response.json(); if (!response.ok) { setError(payload.error?.message ?? "Customer records could not be loaded."); return; } setCustomers(payload.data); setSelectedId((current) => current || payload.data[0]?.id || ""); }, []);
-  useEffect(() => { let cancelled = false; fetch("/api/v1/leasing/customers", { cache: "no-store" }).then(async (response) => ({ response, payload: await response.json() })).then(({ response, payload }) => { if (cancelled) return; if (!response.ok) setError(payload.error?.message ?? "Customer records could not be loaded."); else { setCustomers(payload.data); setSelectedId(initialCustomerId || payload.data[0]?.id || ""); } }); return () => { cancelled = true; }; }, [initialCustomerId]);
+  const [readBusy, setReadBusy] = useState(true);
+  const [readError, setReadError] = useState("");
+  const [readAccess, setReadAccess] = useState<"signed-out" | "denied" | null>(null);
+  const readRequest = useRef<AbortController | null>(null);
+  const load = useCallback(async () => {
+    readRequest.current?.abort();
+    const controller = new AbortController(); readRequest.current = controller;
+    setReadBusy(true); setReadError(""); setReadAccess(null); setCustomers([]); setEditing(null);
+    const timeout = setTimeout(() => controller.abort(), 20_000);
+    try {
+      const response = await fetch("/api/v1/leasing/customers", { cache: "no-store", signal: controller.signal });
+      if (readRequest.current !== controller) return;
+      if (response.status === 401 || response.status === 403) {
+        setReadAccess(response.status === 401 ? "signed-out" : "denied");
+        setReadError(response.status === 401 ? "Your session has ended. Sign in again to view customer records." : "Customer access is unavailable. Please contact your administrator if you require access."); return;
+      }
+      if (!response.ok) throw new Error("CUSTOMER_READ_FAILED");
+      const payload = customerReadSchema.parse(await response.json());
+      if (readRequest.current !== controller) return;
+      if (controller.signal.aborted) throw new Error("CUSTOMER_READ_TIMEOUT");
+      setCustomers(payload.data);
+      setSelectedId(current => payload.data.some(c => c.id === current) ? current : payload.data.some(c => c.id === initialCustomerId) ? initialCustomerId : payload.data[0]?.id ?? "");
+    } catch {
+      if (readRequest.current === controller) setReadError("Customer records could not be loaded. Reload to try again.");
+    } finally {
+      clearTimeout(timeout);
+      if (readRequest.current === controller) { readRequest.current = null; setReadBusy(false); }
+    }
+  }, [initialCustomerId]);
+  useEffect(() => { const timer = setTimeout(() => void load(), 0); return () => { clearTimeout(timer); readRequest.current?.abort(); readRequest.current = null; }; }, [load]);
   const selected = customers.find((customer) => customer.id === selectedId) ?? null;
   const visible = useMemo(() => customers.filter((customer) => `${nameOf(customer)} ${customer.email ?? ""} ${customer.phone ?? ""} ${customer.identityRef ?? ""}`.toLowerCase().includes(search.toLowerCase())), [customers, search]);
   const activeTenants = customers.filter((customer) => customer.tenancies.some((tenancy) => ["ACTIVE", "NOTICE_GIVEN"].includes(tenancy.status))).length;
@@ -56,9 +85,11 @@ export function CustomerOperationsWorkspace({ initialCustomerId = "" }: { initia
     setEditing(null); setNotice(current ? "Customer details updated." : "Customer created."); await load(); setSelectedId(result.data.id);
   }
 
-  return <div className="page-stack"><PageHeader eyebrow="Operations centre" title="Customers & tenants" description="Operational customer records, contacts, consent, occupancy and activity across all permitted stores." action={<div className="form-actions"><Link href="/operations/move-in" className="button button-secondary">Move in</Link><button className="button button-primary" onClick={() => { setEditing("new"); setError(""); }}><Plus size={16}/>Add customer</button></div>}/>
+  return <div className="page-stack customers-workspace"><PageHeader eyebrow="Operations centre" title="Customers & tenants" description="Operational customer records, contacts, consent, occupancy and activity across all permitted stores." action={<div className="form-actions"><Link href="/operations/move-in" className="button button-secondary">Move in</Link><button className="button button-primary" disabled={readBusy || !!readError} onClick={() => { setEditing("new"); setError(""); }}><Plus size={16}/>Add customer</button></div>}/>
     {error && !editing ? <p className="form-error">{error}</p> : null}{notice ? <p className="form-success">{notice}</p> : null}
-    <section className="summary-strip">{[["Customers", customers.length], ["Active tenants", activeTenants], ["Reservations", customers.reduce((sum, item) => sum + item.reservations.filter((reservation) => reservation.status === "ACTIVE").length, 0)], ["Leads", customers.reduce((sum, item) => sum + item.leads.length, 0)]].map(([label, count]) => <div className="summary-cell" key={label}><span>{label}</span><strong>{count}</strong></div>)}</section>
+    <div className="form-actions"><button className="button button-secondary" disabled={readBusy || busy} onClick={() => void load()}>{readBusy ? "Loading customer records…" : "Reload customer records"}</button></div>
+    {readError ? <div role="alert"><p>{readError}</p>{readAccess === "signed-out" ? <Link className="button button-primary" href="/login?next=%2Ftenants">Sign in again</Link> : null}</div> : null}
+    {!readBusy && !readError ? <><section className="summary-strip">{[["Customers", customers.length], ["Active tenants", activeTenants], ["Reservations", customers.reduce((sum, item) => sum + item.reservations.filter((reservation) => reservation.status === "ACTIVE").length, 0)], ["Leads", customers.reduce((sum, item) => sum + item.leads.length, 0)]].map(([label, count]) => <div className="summary-cell" key={label}><span>{label}</span><strong>{count}</strong></div>)}</section>
     <section className="accounts-layout"><aside className="panel accounts-list"><label className="toolbar-search"><Search size={16}/><input placeholder="Search name, contact or ID" value={search} onChange={(event) => setSearch(event.target.value)}/></label>{visible.map((customer) => <button type="button" className={selectedId === customer.id ? "account-list-row active" : "account-list-row"} onClick={() => setSelectedId(customer.id)} key={customer.id}><span><strong>{nameOf(customer)}</strong><small>{customer.phone || customer.email || "No contact details"}</small></span>{customer.type === "BUSINESS" ? <Building2 size={17}/> : <UserRound size={17}/>}</button>)}{!visible.length ? <p className="empty-cell">No customer records found.</p> : null}</aside>
       <article className="panel panel-spacious customer-detail">{selected ? <><div className="panel-heading"><div><p className="eyebrow">{selected.type === "BUSINESS" ? "Business customer" : "Individual customer"}</p><h2>{nameOf(selected)}</h2><p className="panel-subtitle">{selected.email || "No email"} · {selected.phone || "No phone"}</p></div><button className="button button-secondary" onClick={() => { setEditing(selected); setError(""); }}><Pencil size={15}/>Edit details</button></div>
         <div className="customer-record-grid"><Info title="Identity"><Line label="SA ID / passport" text={selected.identityRef}/><Line label="Date of birth" text={selected.dateOfBirth ? new Date(selected.dateOfBirth).toLocaleDateString("en-ZA") : null}/><Line label="Tax number" text={selected.taxNumber}/></Info><Info title="Primary address"><Line label="Address" text={[selected.billingAddress?.line1, selected.billingAddress?.line2].filter(Boolean).join(", ")}/><Line label="Location" text={[selected.billingAddress?.city, selected.billingAddress?.province, selected.billingAddress?.postalCode].filter(Boolean).join(", ")}/><Line label="Country" text={selected.billingAddress?.country}/></Info><Info title="Alternate contact"><Line label="Name" text={selected.alternateContact?.name}/><Line label="Phone" text={selected.alternateContact?.phone}/><Line label="Relationship" text={selected.alternateContact?.relationship}/></Info><Info title="Emergency contact"><Line label="Name" text={selected.emergencyContact?.name}/><Line label="Phone" text={selected.emergencyContact?.phone}/><Line label="Relationship" text={selected.emergencyContact?.relationship}/></Info></div>
@@ -68,6 +99,7 @@ export function CustomerOperationsWorkspace({ initialCustomerId = "" }: { initia
         <h3>Debit-order mandates</h3>{selected.reservations.filter(r => r.publicLease?.mandate).map(r => <div key={r.id} className="form-section"><p>Unit {r.unit.number} · {r.publicLease!.mandate!.reference} · {r.publicLease!.mandate!.status.replaceAll("_", " ")}</p>{r.publicLease!.mandate!.signedPdfSha256 ? <a className="button button-secondary" href={`/api/v1/public-leases/${r.publicLease!.id}/mandate-pdf`}><Download size={14}/>Download signed mandate</a> : <p>Signed mandate PDF not yet attached.</p>}<p>Mandate status is separate from collection and move-in readiness.</p></div>)}
         {selected.notes ? <section className="customer-notes"><h3>Operational notes</h3><p>{selected.notes}</p></section> : null}</> : <div className="empty-state"><UserRound size={34}/><strong>No customer selected</strong><p>Add the first real customer or choose an existing record.</p></div>}</article>
     </section>
+    </> : null}
     {editing ? <CustomerDialog customer={editing === "new" ? null : editing} busy={busy} error={error} close={() => setEditing(null)} save={saveCustomer}/> : null}
   </div>;
 }

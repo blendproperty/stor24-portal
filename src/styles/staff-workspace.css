@@ -232,3 +232,7 @@
 .daily-close-snapshot li { margin-bottom: 10px; }
 .daily-close-snapshot li strong { display: block; font-size: 12px; }
 @media(max-width: 480px) { .daily-close-snapshot dl { grid-template-columns: minmax(0,1fr); } }
+
+.customers-workspace .accounts-list, .customers-workspace .customer-detail, .customers-workspace .toolbar-search, .customers-workspace .toolbar-search input { min-width: 0; }
+.customers-workspace .toolbar-search input { width: 100%; }
+@media (max-width: 980px) { .customers-workspace .accounts-layout { grid-template-columns: minmax(0, 1fr); } }
