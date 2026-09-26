@@ -1,4 +1,13 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Facility edit audit transaction — 26 September 2026
+
+- **Implementation:** facility PATCH saves settings and the existing facilities.updated audit in one transaction. Organisation-wide permission, organisation boundary, required public slug and duplicate slug guards are preserved. No live settings, booking flags, migration or policy changed.
+- **Testing:** actual prepatch synthetic audit failure left the facility name changed despite500. Candidate474 unit tests/typecheck/focused lint pass rollback/retry, foreign organisation denial, restricted-role denial and slug-required rejection. Required PostgreSQL rollback/one-audit retry/slug conflict/role tests added; CI pending.
+- **Commit/push:** candidate on codex/facility-edit-audit includes PR322 final evidence; pending commit.
+- **Merge:** pending required checks.
+- **Deployment/live verification:** pending. All14 acceptance gates remain open; request replay and concurrent validation are not claimed.
+- **Staff acceptance:** review a permitted synthetic facility edit and its audit. Do not switch live booking availability or provoke database faults for testing.
+
 ## Unit-type edit audit transaction — 26 September 2026
 
 - **Implementation:** unit-type PATCH commits its edit and existing unit-types.updated audit in one transaction. Existing facility scope, fixed facility and duplicate-name checks remain unchanged. No pricing, availability, concurrency or request replay policy is added.

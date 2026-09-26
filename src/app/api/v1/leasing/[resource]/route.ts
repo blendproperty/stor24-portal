@@ -187,7 +187,12 @@ export async function PATCH(
           { status: 409 },
         );
       }
-      entity = await db.facility.update({ where: { id: current.id }, data });
+      const updated = await db.$transaction(async tx => {
+        const saved = await tx.facility.update({ where: { id: current.id }, data });
+        await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "facilities.updated", entityType: "facilities", entityId: current.id } });
+        return saved;
+      });
+      return Response.json({ data: updated });
     } else if (resource === "customers") {
       const customerId = body.id;
       return await db.$transaction(async tx => {

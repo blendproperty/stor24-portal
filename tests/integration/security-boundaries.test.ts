@@ -332,5 +332,37 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
       assert.equal(Number((await db.unitType.findUniqueOrThrow({ where: { id: own.id } })).areaSqMetres), 200);
       assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "unit-types.updated" } }), 1);
     });
+    await t.test("facility PATCH retains name on audit failure then retries once", async () => {
+      const facilityActor = await db.user.create({ data: { organisationId: org.id, email: `${key}-facility@example.invalid`, name: "Synthetic facility reviewer", passwordHash: "synthetic-not-a-real-password-hash" } });
+      const role = await db.role.create({ data: { organisationId: org.id, name: "Facility atomicity", permissions: ["inventory.manage"] } });
+      await db.roleAssignment.create({ data: { userId: facilityActor.id, roleId: role.id, facilityId: null } });
+      const own = await db.facility.create({ data: { organisationId: org.id, code: "atomic", name: "Before" } });
+      const otherFacility = await db.facility.create({ data: { organisationId: other.id, code: "other-atomic", name: "Other atomic facility" } });
+      const output = await build({ entryPoints: ["src/app/api/v1/leasing/[resource]/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "unit-type-session", setup(builder) {
+        builder.onResolve({ filter: /^@\/lib\/(db|session)$/ }, args => ({ path: args.path, namespace: "fixture" }));
+        builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
+      } }] });
+      const loaded = { exports: {} as { PATCH: (request: Request, context: { params: Promise<{ resource: string }> }) => Promise<Response> } };
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: facilityActor.id, sessionVersion: facilityActor.sessionVersion });
+      const patch = (id = own.id, data: Record<string, unknown> = { name: "After" }) => loaded.exports.PATCH(new Request("https://example.invalid/api/v1/leasing/facilities", { method: "PATCH", headers: { origin: "https://example.invalid", "content-type": "application/json" }, body: JSON.stringify({ id, data }) }), { params: Promise.resolve({ resource: "facilities" }) });
+      assert.equal((await patch(otherFacility.id)).status, 404);
+      await db.facility.create({ data: { organisationId: org.id, code: "slug-test", name: "Slug conflict", publicSlug: `${key}-taken` } });
+      assert.equal((await patch(own.id, { publicSlug: `${key}-taken` })).status, 409);
+      await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_facility_patch_failure CHECK (false) NOT VALID');
+      try {
+        assert.equal((await patch()).status, 500);
+        const unchanged = await db.facility.findUniqueOrThrow({ where: { id: own.id } });
+        assert.equal(unchanged.name, "Before");
+        assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "facilities.updated" } }), 0);
+      } finally { await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_facility_patch_failure'); }
+      assert.equal((await patch()).status, 200);
+      const saved = await db.facility.findUniqueOrThrow({ where: { id: own.id } }); assert.equal(saved.name, "After");
+      assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "facilities.updated", actorId: facilityActor.id } }), 1);
+      assert.equal((await patch(own.id, { publicBookingEnabled: true })).status, 422);
+      await db.roleAssignment.updateMany({ where: { userId: facilityActor.id }, data: { facilityId: a.id } });
+      assert.equal((await patch()).status, 403);
+      assert.equal((await db.facility.findUniqueOrThrow({ where: { id: own.id } })).name, "After");
+      assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "facilities.updated" } }), 1);
+    });
   } finally { await db.$disconnect(); }
 });
