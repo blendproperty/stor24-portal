@@ -4,7 +4,7 @@
 - **Implementation:** facility PATCH saves settings and the existing facilities.updated audit in one transaction. Organisation-wide permission, organisation boundary, required public slug and duplicate slug guards are preserved. No live settings, booking flags, migration or policy changed.
 - **Testing:** actual prepatch synthetic audit failure left the facility name changed despite500. Candidate474 unit tests/typecheck/focused lint pass rollback/retry, foreign organisation denial, restricted-role denial and slug-required rejection. Required PostgreSQL rollback/one-audit retry/slug conflict/role tests explicitly passed in SQL36250777594/job108428268941.
 - **Commit/push/merge:** PR323 sourcecf55d589482a0fd0201c6b93d4dd4258bc24ef93 passed all nine checks CI36250777593/SQL36250777594/security36250777632. Merged6c8f999e545e89f3abb6dd3cf02ddd8b84fe15b2 including PR322 final evidence.
-- **Deployment/live verification:** pending. All14 acceptance gates remain open; request replay and concurrent validation are not claimed.
+- **Deployment/live verification:** mainCI36251113485 and deploy36251425028 passed. Exact image stor24-crm:6c8f999e5 healthy; service/database readiness verified2026-09-26T15:20:10.901Z. ExcelE082 and PR323 delivered component record verification; staff acceptance and all14 programme gates remain open. No live settings changed; request replay and concurrent validation are not claimed.
 - **Staff acceptance:** review a permitted synthetic facility edit and its audit. Do not switch live booking availability or provoke database faults for testing.
 
 ## Unit-type edit audit transaction — 26 September 2026
