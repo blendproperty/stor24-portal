@@ -1,10 +1,19 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Unused customer deletion audit transaction — 26 September 2026
+
+- **Implementation:** existing customer DELETE now checks scope/history, deletes and records customers.deleted within one transaction. Audit failure restores the customer. Existing tenancy/reservation protection and permission rules remain; no deletion eligibility/retention policy added and no production records deleted.
+- **Testing:** actual prepatch synthetic audit failure removed the customer despite500. Candidate477 tests/typecheck/focused lint pass rollback/retry and tenancy/reservation/facility denial. Required PostgreSQL rollback/one-audit retry/foreign organisation test added; CI pending. Synthetic test actor is isolated.
+- **Commit/push:** candidate on codex/customer-delete-audit includes PR326 final evidence; pending commit.
+- **Merge:** pending required checks.
+- **Deployment/live verification:** pending. No migration or live data/configuration change; all14 acceptance gates remain open.
+- **Staff acceptance:** review isolated deletion rollback evidence and existing history restrictions. Do not delete live customer records for acceptance; legal retention/erasure approval remains separate.
+
 ## Readiness acceptance checkpoint — 26 September 2026
 
 - **Implementation:** documentation-only consolidation links the 18 verified delivered components to an ordered staff review checklist in docs/STAFF_ACCEPTANCE_2026-09-26.md. Includes final PR325 deployment evidence. No application or configuration change.
-- **Testing:** evidence cross-checked against current canonical context and Excel E066–E084. Required checks for this documentation promotion pending. No staff acceptance claimed.
-- **Commit/push/merge:** candidate on codex/readiness-acceptance-checkpoint; pending promotion.
-- **Deployment/live:** baseline PR325 image2782b1706 verified healthy15:56:34.578UTC; this checkpoint deployment pending.
+- **Testing:** evidence cross-checked against current canonical context and Excel E066–E084. All nine checks passed for this documentation promotion: CI36253837018/SQL36253837029/security36253837015. Read-only GitHub alert lists around16:00UTC returned zero open dependency/code/secret alerts; this does not prove historical credential rotation or compliance. No staff acceptance claimed.
+- **Commit/push/merge:** PR326 source31be4f67e6336df1e9c3d6fbe01dca86f1ea1940 merged9c6d312f3dacdc5a769a001a0ebab232c1260598. Checklist and final PR325 evidence are on main.
+- **Deployment/live:** mainCI36254206823 and deploy36254518088 passed. Exact image stor24-crm:9c6d312f3 healthy; service/database readiness verified2026-09-26T16:12:38.384Z. ExcelE085 records the documentation release; no new functional component or acceptance claimed.
 - **Outstanding:** all14 programme acceptance gates preserved, including staff/legal/provider/finance/security/recovery approvals.
 
 ## Unit edit and map audit transaction — 26 September 2026
