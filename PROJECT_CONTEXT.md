@@ -1,4 +1,10 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Readiness evidence checkpoint — 26 September 2026
+
+- **Implementation/testing:** PR309 is documentation only. All nine checks passed: CI36234847129, SQL36234847110, security36234847106. Prior stock safeguards and all acceptance boundaries are preserved.
+- **Commit/push/merge:** source df913b92da6687dfd353a05a4c244b10161a58b5 merged as f778e9b3a44aff8f004f3dbf912f1d03bc643291. Canonical PROJECT_CONTEXT.md verified on the remote source branch before promotion.
+- **Deployment/live verification:** main CI36235086044 and deploy36235298692 passed. Exact image stor24-crm:f778e9b3 healthy; service/database readiness verified2026-09-26T10:18:33.950Z. No configuration or production transaction changes. ExcelE068 updated; all14 acceptance gates remain open.
+
 ## Reserved-stock deduction guard — 26 September 2026
 
 - **Implementation:** negative manual stock movements require enough unreserved quantity and the same reservation count observed at the read. A concurrent hold change rejects the deduction for review. Positive receipts retain the existing non-negative-result rule, allowing recovery of historical stock discrepancies without cancelling reservations. No automatic hold release, physical-loss reconciliation or new transfer workflow is introduced.
