@@ -1,4 +1,11 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Delivery-stage clarity — 26 September 2026
+
+- **Implementation:** the existing Excel Delivery tracker now has a dated delivered-component section for PR307,308,310,311,312,313. Each shows Built, automated tests Passed, Pushed, Merged, Deployed and verified runtime health independently of Pending staff acceptance. Evidence references E066/E067/E069-E072 retain exact release checks and timestamps. Historical releases remain in Evidence log; this section is explicitly the recent26September subset, not a complete feature inventory.
+- **Status rule:** a priority's Build stage assesses implementation scope. Staff/legal/provider acceptance alone must not make completed implementation Partial. Existing whole-priority statuses are not mass-upgraded: unresolved scope, configuration, source reconciliation and acceptance remain documented separately. A future full stage reassessment needs evidence for that whole stage, not a successful individual release.
+- **Testing:** workbook recalculation/error scan, row/journey preservation, zero accepted, component-to-evidence mapping and export/reimport equality passed. Rendered stage explanation and component rows inspected. Known native exit-after-export limitation remains; independent XML validation required at final checkpoint.
+- **Commit/merge/deployment:** documentation-only checkpoint on codex/security-readiness-continuation; promotion pending. Application remains verified PR313 image78c65a2a healthy/service/database11:40:17.922UTC. No application, configuration or production business data changes in this tracker clarification. All14 acceptance gates remain open.
+
 ## Report export facility intersection — 26 September 2026
 
 - **Implementation:** report exports intersect the current export capability's facilities with the report-specific permission facilities. An organisation-wide grant on one side cannot widen a restricted grant on the other. Disjoint grants fail closed; explicit excluded facilities retain403. CSV and JSON use the same restricted scope, with organisation isolation unchanged.
