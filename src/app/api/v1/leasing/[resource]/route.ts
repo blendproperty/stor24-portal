@@ -316,8 +316,10 @@ export async function PATCH(
             where: { unitId: current.id },
             data: { label: nextNumber },
           });
+          await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "units.updated", entityType: "units", entityId: current.id, before: auditBefore, after: auditAfter } });
           return updated;
         });
+        return Response.json({ data: entity });
       } else if (resource === "unit-types") {
         const updated = await db.$transaction(async tx => {
           const saved = await tx.unitType.update({ where: { id: current.id }, data });
@@ -345,24 +347,14 @@ export async function PATCH(
         });
         return Response.json({ data: entity });
       } else {
-        entity = await (model as typeof db.unit).update({
-          where: { id: current.id },
-          data,
+        entity = await db.$transaction(async tx => {
+          const saved = await tx.unit.update({ where: { id: current.id }, data });
+          await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "units.updated", entityType: "units", entityId: current.id } });
+          return saved;
         });
+        return Response.json({ data: entity });
       }
     }
-    await db.auditEvent.create({
-      data: {
-        organisationId: scope.organisationId,
-        actorId: scope.userId,
-        action: `${resource}.updated`,
-        entityType: resource,
-        entityId: body.id,
-        before: auditBefore,
-        after: auditAfter,
-      },
-    });
-    return Response.json({ data: entity });
   } catch (error) {
     return apiError(error);
   }
