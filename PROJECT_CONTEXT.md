@@ -4,7 +4,7 @@
 - **Implementation:** existing customer DELETE now checks scope/history, deletes and records customers.deleted within one transaction. Audit failure restores the customer. Existing tenancy/reservation protection and permission rules remain; no deletion eligibility/retention policy added and no production records deleted.
 - **Testing:** actual prepatch synthetic audit failure removed the customer despite500. Candidate477 tests/typecheck/focused lint pass rollback/retry and tenancy/reservation/facility denial. Required PostgreSQL rollback/one-audit retry/foreign organisation test explicitly passed in SQL36254889203/job108439677404. Synthetic test actor is isolated.
 - **Commit/push/merge:** PR327 source8c2baf33ea9fa8eaefe48f81560cad9450f14a27 passed all nine checks CI36254889228/SQL36254889203/security36254889260. Merged6c1b36f76a46e445d03d4e176f5113d15b941230 including PR326 final evidence.
-- **Deployment/live verification:** pending. No migration or live data/configuration change; all14 acceptance gates remain open.
+- **Deployment/live verification:** mainCI36255222558 and deploy36255536144 passed. Exact image stor24-crm:6c1b36f76 healthy; service/database readiness verified2026-09-26T16:30:09.613Z. ExcelE086 and PR327 delivered component record verification. No migration or live data/configuration change; staff/legal acceptance and all14 programme gates remain open.
 - **Staff acceptance:** review isolated deletion rollback evidence and existing history restrictions. Do not delete live customer records for acceptance; legal retention/erasure approval remains separate.
 
 ## Readiness acceptance checkpoint — 26 September 2026
