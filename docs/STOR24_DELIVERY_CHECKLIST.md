@@ -13,6 +13,7 @@ The Excel Delivery tracker now shows these recent delivered components below the
 | Saved daily-close review | PR311 | E070 | Built | Passed | Verified | Pending |
 | Report download recovery | PR312 | E071 | Built | Passed | Verified | Pending |
 | Report export facility permissions | PR313 | E072 | Built | Passed | Verified | Pending |
+| Accounts read recovery | PR314 | E073 | Built | Passed | Verified | Pending |
 
 This is the recent26September release subset. Earlier releases remain in the Evidence log. All14 programme acceptance gates remain open; no readiness percentage is inferred.
 
