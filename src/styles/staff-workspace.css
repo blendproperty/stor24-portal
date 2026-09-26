@@ -218,3 +218,17 @@
 .daily-close-form input, .daily-close-form select, .daily-close-form textarea { min-width: 0; font-size: 16px; }
 .daily-close-form .form-actions { grid-column: 1 / -1; flex-wrap: wrap; }
 @media (max-width: 700px) { .daily-close-form { grid-template-columns: minmax(0, 1fr); } }
+.daily-close-history { padding: 0 20px 20px; }
+.daily-close-record { border-top: 1px solid var(--line); padding: 14px 0; }
+.daily-close-record summary { cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.daily-close-record summary > span { min-width: 0; overflow-wrap: anywhere; }
+.daily-close-snapshot { margin-top: 18px; overflow-wrap: anywhere; }
+.daily-close-snapshot dl { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }
+.daily-close-snapshot dt { color: var(--muted); font-size: 12px; }
+.daily-close-snapshot dd { margin: 5px 0 0; font-weight: 700; }
+.daily-close-snapshot h3 { margin: 18px 0 8px; font-size: 14px; }
+.daily-close-notes { white-space: pre-wrap; }
+.daily-close-snapshot ul { padding-left: 18px; }
+.daily-close-snapshot li { margin-bottom: 10px; }
+.daily-close-snapshot li strong { display: block; font-size: 12px; }
+@media(max-width: 480px) { .daily-close-snapshot dl { grid-template-columns: minmax(0,1fr); } }
