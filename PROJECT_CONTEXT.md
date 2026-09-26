@@ -2,9 +2,8 @@
 ## Lead edit audit transaction — 26 September 2026
 
 - **Implementation:** lead PATCH now saves the edit and existing leads.updated audit in one transaction, returning only after commit. Existing resource/facility/customer/unit-type/assignee checks remain before the write. Other leasing branches and business policy are unchanged; no concurrency or request replay guarantee added.
-- **Testing:** prepatch actual-route synthetic audit failure returned500 but left stage CONTACTED and edited notes. Candidate472 unit tests, typecheck and focused ESLint passed rollback/retry and foreign facility/customer/unit-type/assignee rejection. Added required real PostgreSQL audit-constraint rollback and valid retry/one-audit test; CI pending. No production mutations.
-- **Commit/push:** candidate on codex/lead-update-atomicity, including PR320 final release evidence; commit pending.
-- **Merge:** pending required checks including real SQL.
+- **Testing:** prepatch actual-route synthetic audit failure returned500 but left stage CONTACTED and edited notes. Candidate472 unit tests, typecheck and focused ESLint passed rollback/retry and foreign facility/customer/unit-type/assignee rejection. Required real PostgreSQL audit-constraint rollback and valid retry/one-audit test explicitly passed in SQL36248475558 (job108421957444). No production mutations.
+- **Commit/push/merge:** PR321 source3c900f694ddf1cf684c8eee8c833d4ca88f263d7 passed all nine checks: CI36248475550/SQL36248475558/security36248475555. Merged e938454b5ad136b1bcfa6e24359f549d95a51c28, including PR320 final release evidence.
 - **Deployment/configuration/live verification:** pending. No migration or configuration change. All14 acceptance gates remain open.
 - **Staff acceptance:** use an approved synthetic lead to edit stage/notes, reload and verify one matching audit. Audit failure tests run only in isolation.
 
@@ -2276,7 +2275,3 @@ A CRM capability is complete only when it is database-backed, scoped, permission
 - Deployment/configuration: CRM run 34438007430 attempt 1 timed out connecting SSH before execution; attempt 2 succeeded and logs confirm migration 20260910110000_debit_order_preferences applied. Website run 34438380340 succeeded. Provider configuration and transaction enablement were not changed.
 - Live read-only verification: the existing customer test booking still returns SIGNED / DEBIT_ORDER, setupAvailable true and no saved preferences. Its actual phone-sized page shows first-date/monthly-day fields and zero download links. Zero booking POSTs were made in this check. Real preference-save/database readback remains customer UAT.
 - NOT COMPLETE: automated Netcash bank-mandate creation, signed mandate retrieval and verified provider completion/reconciliation are not implemented or tested by this slice. No collection is authorised. Provider integration and approved first-payment/recurring-collection rules remain prerequisites to full debit-order checkout. Previous legal, financial, provider, data, training, activation and approval gates remain open.
-
-
-
-
