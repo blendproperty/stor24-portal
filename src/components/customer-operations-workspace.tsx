@@ -34,6 +34,9 @@ export function CustomerOperationsWorkspace({ initialCustomerId = "" }: { initia
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<Customer | "new" | null>(null);
   const [busy, setBusy] = useState(false);
+  const [saveBlocked, setSaveBlocked] = useState(false);
+  const saveRequest = useRef<AbortController | null>(null);
+  const uncertainSave = "We could not confirm whether the customer was saved. Review customer records before trying again. After checking, reload this page to start another save.";
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [readBusy, setReadBusy] = useState(true);
@@ -71,6 +74,7 @@ export function CustomerOperationsWorkspace({ initialCustomerId = "" }: { initia
   const activeTenants = customers.filter((customer) => customer.tenancies.some((tenancy) => ["ACTIVE", "NOTICE_GIVEN"].includes(tenancy.status))).length;
 
   async function saveCustomer(form: FormData) {
+    if (saveRequest.current || saveBlocked) return;
     const current = editing === "new" ? null : editing;
     const payload = {
       type: value(form, "type"), firstName: value(form, "firstName") || undefined, lastName: value(form, "lastName") || undefined, companyName: value(form, "companyName") || undefined,
@@ -78,14 +82,28 @@ export function CustomerOperationsWorkspace({ initialCustomerId = "" }: { initia
       billingAddress: record(form, "address_", ["line1", "line2", "city", "province", "postalCode", "country"]), alternateContact: record(form, "alternate_", ["name", "phone", "email", "relationship"]), workContact: record(form, "work_", ["company", "contact", "phone", "email"]), emergencyContact: record(form, "emergency_", ["name", "phone", "relationship"]),
       communicationConsent: { email: form.get("consentEmail") === "on", sms: form.get("consentSms") === "on", phone: form.get("consentPhone") === "on", whatsapp: form.get("consentWhatsapp") === "on", recordedAt: new Date().toISOString(), source: "STAFF_RECORDED" }, notes: value(form, "notes") || undefined,
     };
+    const controller = new AbortController(); saveRequest.current = controller;
     setBusy(true); setError(""); setNotice("");
-    const response = await fetch("/api/v1/leasing/customers", { method: current ? "PATCH" : "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(current ? { id: current.id, data: payload } : payload) });
-    const result = await response.json(); setBusy(false);
-    if (!response.ok) { setError(result.error?.message ?? "The customer record could not be saved."); return; }
-    setEditing(null); setNotice(current ? "Customer details updated." : "Customer created."); await load(); setSelectedId(result.data.id);
+    const timer = setTimeout(() => controller.abort(), 20_000);
+    try {
+      const response = await fetch("/api/v1/leasing/customers", { method: current ? "PATCH" : "POST", signal: controller.signal, headers: { "content-type": "application/json" }, body: JSON.stringify(current ? { id: current.id, data: payload } : payload) });
+      if ([400, 401, 403, 404, 409, 422].includes(response.status)) {
+        setError(response.status === 401 ? "Your session has ended. Sign in again before saving." : response.status === 403 ? "You do not have permission to save customer details. Please contact your administrator." : "The customer was not saved. Review your details and try again."); return;
+      }
+      if (!response.ok) throw new Error("CUSTOMER_SAVE_UNCERTAIN");
+      const result = await response.json();
+      const saved = result?.data;
+      const same = (actual: unknown, expected: unknown): boolean => {
+        if (expected && typeof expected === "object") return !!actual && typeof actual === "object" && Object.keys(actual).length === Object.keys(expected).length && Object.entries(expected).every(([key, item]) => same((actual as Record<string, unknown>)[key], item));
+        return actual === expected;
+      };
+      if (controller.signal.aborted || !saved || typeof saved.id !== "string" || !saved.id || (current && saved.id !== current.id) || !Object.entries(payload).every(([key, expected]) => expected === undefined || (key === "dateOfBirth" ? typeof saved[key] === "string" && saved[key].slice(0, 10) === expected : same(saved[key], expected)))) throw new Error("CUSTOMER_CONFIRMATION_INVALID");
+      setEditing(null); setNotice(current ? "Customer details updated." : "Customer created."); await load(); setSelectedId(saved.id);
+    } catch { setSaveBlocked(true); setError(uncertainSave); }
+    finally { clearTimeout(timer); saveRequest.current = null; setBusy(false); }
   }
 
-  return <div className="page-stack customers-workspace"><PageHeader eyebrow="Operations centre" title="Customers & tenants" description="Operational customer records, contacts, consent, occupancy and activity across all permitted stores." action={<div className="form-actions"><Link href="/operations/move-in" className="button button-secondary">Move in</Link><button className="button button-primary" disabled={readBusy || !!readError} onClick={() => { setEditing("new"); setError(""); }}><Plus size={16}/>Add customer</button></div>}/>
+  return <div className="page-stack customers-workspace"><PageHeader eyebrow="Operations centre" title="Customers & tenants" description="Operational customer records, contacts, consent, occupancy and activity across all permitted stores." action={<div className="form-actions"><Link href="/operations/move-in" className="button button-secondary">Move in</Link><button className="button button-primary" disabled={readBusy || !!readError || busy} onClick={() => { setEditing("new"); setError(""); }}><Plus size={16}/>Add customer</button></div>}/>
     {error && !editing ? <p className="form-error">{error}</p> : null}{notice ? <p className="form-success">{notice}</p> : null}
     <div className="form-actions"><button className="button button-secondary" disabled={readBusy || busy} onClick={() => void load()}>{readBusy ? "Loading customer records…" : "Reload customer records"}</button></div>
     {readError ? <div role="alert"><p>{readError}</p>{readAccess === "signed-out" ? <Link className="button button-primary" href="/login?next=%2Ftenants">Sign in again</Link> : null}</div> : null}
@@ -100,13 +118,13 @@ export function CustomerOperationsWorkspace({ initialCustomerId = "" }: { initia
         {selected.notes ? <section className="customer-notes"><h3>Operational notes</h3><p>{selected.notes}</p></section> : null}</> : <div className="empty-state"><UserRound size={34}/><strong>No customer selected</strong><p>Add the first real customer or choose an existing record.</p></div>}</article>
     </section>
     </> : null}
-    {editing ? <CustomerDialog customer={editing === "new" ? null : editing} busy={busy} error={error} close={() => setEditing(null)} save={saveCustomer}/> : null}
+    {editing ? <CustomerDialog customer={editing === "new" ? null : editing} busy={busy} blocked={saveBlocked} review={() => void load()} error={saveBlocked ? uncertainSave : error} close={() => { if (!busy) setEditing(null); }} save={saveCustomer}/> : null}
   </div>;
 }
 
 function Info({ title, children }: { title: string; children: React.ReactNode }) { return <section><h3>{title}</h3>{children}</section>; }
 function Line({ label, text }: { label: string; text?: string | null }) { return <div><span>{label}</span><strong>{text || "—"}</strong></div>; }
-function CustomerDialog({ customer, busy, error, close, save }: { customer: Customer | null; busy: boolean; error: string; close: () => void; save: (data: FormData) => void }) {
+function CustomerDialog({ customer, busy, blocked, review, error, close, save }: { customer: Customer | null; busy: boolean; blocked: boolean; review: () => void; error: string; close: () => void; save: (data: FormData) => void }) {
   const address = customer?.billingAddress ?? {}; const alternate = customer?.alternateContact ?? {}; const work = customer?.workContact ?? {}; const emergency = customer?.emergencyContact ?? {};
   const [province, setProvince] = useState(address.province || "");
   const [city, setCity] = useState(address.city || "");
@@ -114,12 +132,12 @@ function CustomerDialog({ customer, busy, error, close, save }: { customer: Cust
   const cities = SOUTH_AFRICAN_LOCATIONS[province as keyof typeof SOUTH_AFRICAN_LOCATIONS] ?? [];
   const chooseProvince = (nextProvince: string) => { setProvince(nextProvince); setCity(""); setPostalCode(""); };
   const chooseCity = (nextCity: string) => { setCity(nextCity); setPostalCode(cities.find(([name]) => name === nextCity)?.[1] ?? ""); };
-  return <div className="modal-backdrop"><div className="modal-card customer-modal" role="dialog" aria-modal="true"><button className="modal-close" onClick={close}><X size={18}/></button><p className="eyebrow">Operational record</p><h2>{customer ? "Edit customer" : "Add customer"}</h2><form action={save} className="customer-form"><fieldset><legend>Customer</legend><label>Customer type<select name="type" defaultValue={customer?.type ?? "INDIVIDUAL"}><option value="INDIVIDUAL">Individual</option><option value="BUSINESS">Business</option></select></label><Field name="firstName" label="First name" value={customer?.firstName}/><Field name="lastName" label="Last name" value={customer?.lastName}/><Field name="companyName" label="Company name" value={customer?.companyName}/><Field name="phone" label="Mobile / phone" value={customer?.phone}/><Field name="email" label="Email" type="email" value={customer?.email}/><Field name="identityRef" label="SA ID or passport number" value={customer?.identityRef}/><Field name="dateOfBirth" label="Date of birth" type="date" value={customer?.dateOfBirth?.slice(0,10)}/><Field name="taxNumber" label="Tax number" value={customer?.taxNumber}/></fieldset>
+  return <div className="modal-backdrop"><div className="modal-card customer-modal" role="dialog" aria-modal="true"><button className="modal-close" onClick={close}><X size={18}/></button><p className="eyebrow">Operational record</p><h2>{customer ? "Edit customer" : "Add customer"}</h2><form onSubmit={(event) => { event.preventDefault(); save(new FormData(event.currentTarget)); }} className="customer-form"><fieldset><legend>Customer</legend><label>Customer type<select name="type" defaultValue={customer?.type ?? "INDIVIDUAL"}><option value="INDIVIDUAL">Individual</option><option value="BUSINESS">Business</option></select></label><Field name="firstName" label="First name" value={customer?.firstName}/><Field name="lastName" label="Last name" value={customer?.lastName}/><Field name="companyName" label="Company name" value={customer?.companyName}/><Field name="phone" label="Mobile / phone" value={customer?.phone}/><Field name="email" label="Email" type="email" value={customer?.email}/><Field name="identityRef" label="SA ID or passport number" value={customer?.identityRef}/><Field name="dateOfBirth" label="Date of birth" type="date" value={customer?.dateOfBirth?.slice(0,10)}/><Field name="taxNumber" label="Tax number" value={customer?.taxNumber}/></fieldset>
     <fieldset><legend>Primary address</legend><Field name="address_line1" label="Street address" value={address.line1}/><Field name="address_line2" label="Address line 2" value={address.line2}/><SelectField name="address_province" label="Province" value={province} options={Object.keys(SOUTH_AFRICAN_LOCATIONS)} onChange={chooseProvince}/><SelectField name="address_city" label="City" value={city} options={cities.map(([name]) => name)} onChange={chooseCity} disabled={!province}/><label>Postal code<input name="address_postalCode" value={postalCode} onChange={(event) => setPostalCode(event.target.value)} inputMode="numeric"/></label><Field name="address_country" label="Country" value={address.country || "South Africa"}/></fieldset>
     <fieldset><legend>Alternate contact</legend><Field name="alternate_name" label="Name" value={alternate.name}/><SelectField name="alternate_relationship" label="Relationship" value={alternate.relationship || ""} options={RELATIONSHIPS}/><Field name="alternate_phone" label="Phone" value={alternate.phone}/><Field name="alternate_email" label="Email" type="email" value={alternate.email}/></fieldset>
     <fieldset><legend>Emergency and work</legend><Field name="emergency_name" label="Emergency contact" value={emergency.name}/><SelectField name="emergency_relationship" label="Relationship" value={emergency.relationship || ""} options={RELATIONSHIPS}/><Field name="emergency_phone" label="Emergency phone" value={emergency.phone}/><Field name="work_company" label="Employer / company" value={work.company}/><Field name="work_contact" label="Work contact" value={work.contact}/><Field name="work_phone" label="Work phone" value={work.phone}/><Field name="work_email" label="Work email" type="email" value={work.email}/></fieldset>
     <fieldset className="customer-form-wide"><legend>Consent and notes</legend><label className="check-label"><input type="checkbox" name="consentEmail" defaultChecked={customer?.communicationConsent?.email}/><span>Email communication consent</span></label><label className="check-label"><input type="checkbox" name="consentSms" defaultChecked={customer?.communicationConsent?.sms}/><span>SMS communication consent</span></label><label className="check-label"><input type="checkbox" name="consentWhatsapp" defaultChecked={customer?.communicationConsent?.whatsapp}/><span>WhatsApp consent (customer explicitly agreed to receive Stor24 WhatsApp messages)</span></label><label className="check-label"><input type="checkbox" name="consentPhone" defaultChecked={customer?.communicationConsent?.phone}/><span>Phone communication consent</span></label><label className="customer-notes-input">Operational notes<textarea name="notes" rows={4} defaultValue={customer?.notes ?? ""}/></label></fieldset>
-    {error ? <p className="form-error customer-form-wide">{error}</p> : null}<div className="form-actions customer-form-wide"><button type="button" className="button button-secondary" onClick={close}>Cancel</button><button className="button button-primary" disabled={busy}>{busy ? "Saving…" : "Save customer"}</button></div></form></div></div>;
+    {error ? <div role="alert" className="form-error customer-form-wide"><p>{error}</p>{blocked ? <button type="button" className="button button-secondary" onClick={review}>Review customer records</button> : null}</div> : null}<div className="form-actions customer-form-wide"><button type="button" className="button button-secondary" onClick={close}>Cancel</button><button className="button button-primary" disabled={busy || blocked}>{busy ? "Saving…" : "Save customer"}</button></div></form></div></div>;
 }
 function Field({ label, value: initial, ...props }: Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "defaultValue"> & { label: string; value?: string | null }) { return <label>{label}<input defaultValue={initial ?? ""} {...props}/></label>; }
 function SelectField({ label, value, options, onChange, ...props }: { label: string; value: string; options: string[]; onChange?: (value: string) => void } & Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "value" | "onChange">) {

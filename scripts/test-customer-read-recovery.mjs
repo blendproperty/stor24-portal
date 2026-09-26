@@ -13,7 +13,7 @@ const customer={id:'syn-2',type:'INDIVIDUAL',firstName:'Synthetic',lastName:'Cus
 try {for(const width of [1440,390,320]) {
  const page=await browser.newPage({viewport:{width,height:1000}});const errors=[];let mode='network',reads=0,writes=0;page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/api/v1/leasing/customers',async route=>{
-  if(route.request().method()!=='GET'){writes++;mode='500';return route.fulfill({status:200,json:{data:{id:'syn-2'}}});} reads++;
+  if(route.request().method()!=='GET'){writes++;mode='500';const raw=route.request().postDataJSON();return route.fulfill({status:200,json:{data:{...(raw.data??raw),id:'syn-2'}}});} reads++;
   if(mode==='network')return route.abort();if(mode==='hold')return;
   if(['401','403','500'].includes(mode))return route.fulfill({status:Number(mode),json:{error:{message:'Fixture'}}});
   if(mode==='malformed')return route.fulfill({json:{data:{}}});
