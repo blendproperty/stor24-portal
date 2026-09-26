@@ -124,3 +124,7 @@ Complete these with Brett or the facility manager before acceptance:
 5. Finish the customer journey with approved identity/agreement/payment/access arrangements, active tenancy and move-out; reconcile documents, balances, stock/unit availability and audit. Provider and legal approvals cannot be inferred from these technical tests.
 
 Every programme priority remains open for acceptance. The finance/source-data, legal/biometric, provider/device, Google rotation, billing schedule credential and production recovery/alert gates listed earlier remain unresolved. Automated tests and healthy deployment do not certify GAPP/CIA compliance. Read-only GitHub checks at approximately17:38 UTC found zero open dependency/code/secret alerts, without proving historical credential rotation.
+
+## Report export recovery acceptance — 26 September 2026
+
+Candidate: verify the release state in PROJECT_CONTEXT.md before testing. Use approved synthetic report data. Export CSV should preserve selected dates/facility when a request fails, explain empty results, and prepare a matching CSV on success. A manager without export access sees a disabled action and administrator guidance; expired access offers sign-in. Compare report contents with approved source records before finance acceptance. Automated failure injection runs only in isolated fixtures; report calculations and business acceptance are unchanged.

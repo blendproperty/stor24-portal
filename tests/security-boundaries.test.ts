@@ -353,3 +353,29 @@ test("daily-close API preserves closed snapshots and returns a useful conflict",
   assert.equal((await api.POST(request("POST", { kind: "dailyClose", payload: { ...payload, checks: [{ key: "review", label: "Synthetic check", complete: false }] } }))).status, 409);
   assert.equal(state.writes.length, writeCount);
 });
+
+test("report routes return controlled access failures and preserve read-only facility scoping", async () => {
+  const state = fixture();
+  const api = await load("./src/app/api/v1/reports/export/route.ts", state);
+  const catalog = await load("./src/app/api/v1/reports/route.ts", state);
+  const read = (extra = "") => api.GET(new Request(`https://example.test/api/v1/reports/export?reportKey=unit-availability&from=2026-09-01&to=2026-09-26${extra}`));
+  assert.equal((await read()).status, 403);
+  state.grant("reports.export"); state.grant("reports.view");
+  assert.equal((await read("&facilityId=b")).status, 403);
+  assert.equal(state.queries.filter(q => q.model === "unit").length, 0);
+  assert.equal((await read("&reportKey=rent-roll")).status, 403);
+  assert.equal((await read("&from=2026-10-01")).status, 422);
+  const csv = await read("&facilityId=a");
+  assert.equal(csv.status, 200); assert.match(csv.headers.get("content-type")!, /text\/csv/);
+  assert.equal(await csv.text(), "");
+  const json = await read("&format=JSON");
+  assert.equal(json.status, 200); assert.deepEqual((await json.json()).data, []);
+  assert.deepEqual(state.queries.filter(q => q.model === "unit").at(-1)?.where.facility, { organisationId: "org", id: { in: ["a"] } });
+  state.db.unit.findMany = async () => { throw new Error("private database details"); };
+  const failed = await read(); assert.equal(failed.status, 500); assert.doesNotMatch(await failed.text(), /private database/);
+  state.tables.user[0].active = false;
+  assert.equal((await read()).status, 401); assert.equal((await catalog.GET()).status, 401);
+  state.tables.user[0].active = true; state.tables.user[0].sessionVersion = 2;
+  assert.equal((await read()).status, 401); assert.equal((await catalog.GET()).status, 401);
+  assert.deepEqual(state.writes, []);
+});
