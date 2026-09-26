@@ -364,5 +364,38 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
       assert.equal((await db.facility.findUniqueOrThrow({ where: { id: own.id } })).name, "After");
       assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "facilities.updated" } }), 1);
     });
+    await t.test("reservation PATCH retains quote on audit failure then retries once", async () => {
+      const reservationActor = await db.user.create({ data: { organisationId: org.id, email: `${key}-reservation@example.invalid`, name: "Synthetic reservation reviewer", passwordHash: "synthetic-not-a-real-password-hash" } });
+      const role = await db.role.create({ data: { organisationId: org.id, name: "Reservation atomicity", permissions: ["reservations.manage"] } });
+      await db.roleAssignment.create({ data: { userId: reservationActor.id, roleId: role.id, facilityId: a.id } });
+      const customer = await db.customer.create({ data: { organisationId: org.id, firstName: "Synthetic" } });
+      const type = await db.unitType.create({ data: { facilityId: a.id, name: "Reservation audit type" } });
+      const unit = await db.unit.create({ data: { facilityId: a.id, unitTypeId: type.id, number: "RES-AUDIT", monthlyRate: 100, floor: "first floor" } });
+      const own = await db.reservation.create({ data: { facilityId: a.id, customerId: customer.id, unitId: unit.id, quotedRate: 100 } });
+      const output = await build({ entryPoints: ["src/app/api/v1/leasing/[resource]/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "unit-type-session", setup(builder) {
+        builder.onResolve({ filter: /^@\/lib\/(db|session)$/ }, args => ({ path: args.path, namespace: "fixture" }));
+        builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
+      } }] });
+      const loaded = { exports: {} as { PATCH: (request: Request, context: { params: Promise<{ resource: string }> }) => Promise<Response> } };
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: reservationActor.id, sessionVersion: reservationActor.sessionVersion });
+      const patch = (id = own.id, data: Record<string, unknown> = { quotedRate: 200 }) => loaded.exports.PATCH(new Request("https://example.invalid/api/v1/leasing/reservations", { method: "PATCH", headers: { origin: "https://example.invalid", "content-type": "application/json" }, body: JSON.stringify({ id, data }) }), { params: Promise.resolve({ resource: "reservations" }) });
+      await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_reservation_patch_failure CHECK (false) NOT VALID');
+      try {
+        assert.equal((await patch()).status, 500);
+        const unchanged = await db.reservation.findUniqueOrThrow({ where: { id: own.id } });
+        assert.equal(Number(unchanged.quotedRate), 100);
+        assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "reservations.updated" } }), 0);
+      } finally { await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_reservation_patch_failure'); }
+      assert.equal((await patch()).status, 200);
+      const saved = await db.reservation.findUniqueOrThrow({ where: { id: own.id } }); assert.equal(Number(saved.quotedRate), 200);
+      assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "reservations.updated", actorId: reservationActor.id } }), 1);
+      assert.equal((await patch(own.id, { facilityId: b.id })).status, 403);
+      const previous = await db.facility.findUniqueOrThrow({ where: { id: a.id } });
+      await db.facility.update({ where: { id: a.id }, data: { closedFloors: ["first floor"] } });
+      try { assert.equal((await patch(own.id, { quotedRate: 300 })).status, 409); }
+      finally { await db.facility.update({ where: { id: a.id }, data: { closedFloors: previous.closedFloors } }); }
+      assert.equal(Number((await db.reservation.findUniqueOrThrow({ where: { id: own.id } })).quotedRate), 200);
+      assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "reservations.updated" } }), 1);
+    });
   } finally { await db.$disconnect(); }
 });

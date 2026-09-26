@@ -1,4 +1,13 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Reservation edit audit transaction — 26 September 2026
+
+- **Implementation:** reservation PATCH now records its existing reservations.updated audit inside the transaction that checks the operational floor and saves the edit. Existing permission, facility/customer checks and facility/unit locks remain. No allocation, quote policy or request replay guarantee added.
+- **Testing:** prepatch actual-route synthetic audit failure left an altered quote despite500. Candidate475 tests/typecheck/focused lint pass rollback/retry and closed-floor/facility rejection. Required PostgreSQL rollback/one-audit retry and closed-floor check added; CI pending. All test mutations are isolated synthetic records.
+- **Commit/push:** candidate on codex/reservation-edit-audit includes PR323 final evidence; pending commit.
+- **Merge:** pending required checks.
+- **Deployment/live verification:** pending. No migration or live data/configuration changes; all14 acceptance gates remain open.
+- **Staff acceptance:** review a permitted synthetic reservation edit and matching audit. Keep non-operational floors blocked and use isolated failure evidence.
+
 ## Facility edit audit transaction — 26 September 2026
 
 - **Implementation:** facility PATCH saves settings and the existing facilities.updated audit in one transaction. Organisation-wide permission, organisation boundary, required public slug and duplicate slug guards are preserved. No live settings, booking flags, migration or policy changed.
