@@ -4,7 +4,7 @@
 - **Implementation:** report date filters now interpret selected days in South African time rather than UTC. This covers move activity, lead creation, period ledger entries and insurance acknowledgement cutoffs. Report screen states SAST. Current snapshot reports and approved ageing policy are unchanged; export/view facility intersection remains enforced.
 - **Testing:** prepatch actual-service synthetic test excluded SAST00:00 and included next-day00:00. Candidate469 tests/typecheck/focused lint pass; actual report browser1440/390/320px regression passes. Required PostgreSQL four-boundary/scoped test explicitly passed in SQL36242947407. No production transactions or customer exports used.
 - **Commit/push/merge:** PR316 source3c3867cd1cf27921747b91ab05d156818aeb6d69 passed all nine checks: CI36242947454, SQL36242947407 and security36242947483. Merged4f6ca22646e0dbe27e108e35efe3c7a4500db4fa, including final PR315 release evidence.
-- **Deployment/live:** unchanged PR315 imagee0348143 healthy/service/database12:41:19.061UTC. Main CI36243274596 and deployment verification remain pending. Finance/staff acceptance and all14 acceptance gates remain open.
+- **Deployment/live:** Main CI36243274596 and deploy36243537477 passed. Exact image stor24-crm:4f6ca226 healthy; service/database readiness verified2026-09-26T12:58:33.724Z. ExcelE075 records the verified release and PR316 is added to delivered components. Finance/staff acceptance and all14 acceptance gates remain open.
 - **Staff acceptance:** compare a permitted synthetic single-day export with source timestamps immediately before/at both SAST midnights. Existing current-state snapshots are not historical reconstructions.
 
 ## Receivables ageing export — 26 September 2026
