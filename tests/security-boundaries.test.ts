@@ -541,3 +541,26 @@ test("reservation PATCH rolls back quote when audit fails and retains floor guar
   assert.equal(reservation.quotedRate, 200); assert.equal(audits, 1);
   assert.equal((await patch({ facilityId: "b" })).status, 403);
 });
+
+test("unit PATCH rolls back number map and rate when audit fails", async () => {
+  const state = fixture(); state.grant("inventory.manage");
+  const unit: Row = { id: "unit-a", facilityId: "a", number: "Before", monthlyRate: 100, occupancies: [], reservations: [] };
+  state.tables.unit.push(unit);
+  const map = { label: "Before" };
+  state.db.unit.findFirst = async ({ where }: Row) => where.id === unit.id ? unit : null;
+  state.db.unit.update = async ({ data }: Row) => Object.assign(unit, data);
+  state.db.mapElement = { updateMany: async ({ data }: Row) => { Object.assign(map, data); return { count: 1 }; } };
+  let fail = true; const audits: Row[] = [];
+  state.db.auditEvent.create = async ({ data }: Row) => { if (fail) throw new Error("SYNTHETIC_AUDIT_FAILURE"); audits.push(data); return {}; };
+  state.db.$transaction = async (fn: (client: Row) => Promise<unknown>) => { const before = structuredClone(unit), label = map.label; try { return await fn(state.db); } catch (error) { Object.assign(unit, before); map.label = label; throw error; } };
+  const api = await load("./src/app/api/v1/leasing/[resource]/route.ts", state);
+  const patch = (data: Row) => api.PATCH(request("PATCH", { id: unit.id, data }), context("units"));
+  assert.equal((await patch({ number: "After", monthlyRate: 200 })).status, 500); assert.equal(unit.number, "Before"); assert.equal(map.label, "Before"); assert.equal(unit.monthlyRate, 100);
+  fail = false; assert.equal((await patch({ number: "After", monthlyRate: 200 })).status, 200); assert.equal(map.label, "After"); assert.equal(audits.length, 1);
+  assert.deepEqual(audits[0].before, { number: "Before" }); assert.deepEqual(audits[0].after, { number: "After", mapLabelSynchronized: true });
+  fail = true; assert.equal((await patch({ monthlyRate: 300 })).status, 500); assert.equal(unit.monthlyRate, 200);
+  fail = false; assert.equal((await patch({ monthlyRate: 300 })).status, 200); assert.equal(audits.length, 2);
+  assert.equal((await patch({ status: "OCCUPIED" })).status, 409);
+  unit.reservations = [{ id: "held" }]; assert.equal((await patch({ status: "AVAILABLE" })).status, 409);
+  assert.equal((await patch({ facilityId: "b" })).status, 403); assert.equal(audits.length, 2);
+});

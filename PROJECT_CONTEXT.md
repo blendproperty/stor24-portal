@@ -1,4 +1,13 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Unit edit and map audit transaction — 26 September 2026
+
+- **Implementation:** unit renames, linked map-label synchronisation and the existing before/after audit now share one transaction. Ordinary unit edits also commit with their audit. The redundant outer PATCH audit is removed because every resource branch now records its audit within its own transaction. Existing duplicate-number, linked occupancy/reservation, status, unit-type and facility checks are preserved. No allocation policy, replay or concurrency guarantee added.
+- **Testing:** actual prepatch audit failure retained changed unit number/map label. Candidate476 tests/typecheck/focused lint pass rename/map/rate rollback, valid retries, original before/after audit payload and linked/status/facility rejection. Required PostgreSQL rename/map/rate rollback and retry added; CI pending. Synthetic records only.
+- **Commit/push:** candidate on codex/unit-edit-audit includes PR324 final evidence; pending commit.
+- **Merge:** pending required checks.
+- **Deployment/live verification:** pending. No migration or live data/configuration changes; all14 acceptance gates remain open.
+- **Staff acceptance:** review a permitted synthetic unit rename and matching map label/audit, then a normal edit. Preserve linked-unit availability restrictions; use isolated failure evidence.
+
 ## Reservation edit audit transaction — 26 September 2026
 
 - **Implementation:** reservation PATCH now records its existing reservations.updated audit inside the transaction that checks the operational floor and saves the edit. Existing permission, facility/customer checks and facility/unit locks remain. No allocation, quote policy or request replay guarantee added.

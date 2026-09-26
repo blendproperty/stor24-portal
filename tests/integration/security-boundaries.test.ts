@@ -397,5 +397,43 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
       assert.equal(Number((await db.reservation.findUniqueOrThrow({ where: { id: own.id } })).quotedRate), 200);
       assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "reservations.updated" } }), 1);
     });
+    await t.test("unit PATCH retains number map and rate on audit failure then retries once", async () => {
+      const unitActor = await db.user.create({ data: { organisationId: org.id, email: `${key}-unit@example.invalid`, name: "Synthetic unit reviewer", passwordHash: "synthetic-not-a-real-password-hash" } });
+      const role = await db.role.create({ data: { organisationId: org.id, name: "Unit atomicity", permissions: ["inventory.manage"] } });
+      await db.roleAssignment.create({ data: { userId: unitActor.id, roleId: role.id, facilityId: a.id } });
+      const type = await db.unitType.create({ data: { facilityId: a.id, name: "Unit audit type" } });
+      const own = await db.unit.create({ data: { facilityId: a.id, unitTypeId: type.id, number: "Before-audit", monthlyRate: 100 } });
+      const map = await db.facilityMap.create({ data: { facilityId: a.id, name: "Audit map" } });
+      const element = await db.mapElement.create({ data: { mapId: map.id, unitId: own.id, type: "UNIT", x: 0, y: 0, width: 10, height: 10, label: "Before-audit" } });
+      const output = await build({ entryPoints: ["src/app/api/v1/leasing/[resource]/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "unit-type-session", setup(builder) {
+        builder.onResolve({ filter: /^@\/lib\/(db|session)$/ }, args => ({ path: args.path, namespace: "fixture" }));
+        builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
+      } }] });
+      const loaded = { exports: {} as { PATCH: (request: Request, context: { params: Promise<{ resource: string }> }) => Promise<Response> } };
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: unitActor.id, sessionVersion: unitActor.sessionVersion });
+      const patch = (id = own.id, data: Record<string, unknown> = { number: "After-audit", monthlyRate: 200 }) => loaded.exports.PATCH(new Request("https://example.invalid/api/v1/leasing/units", { method: "PATCH", headers: { origin: "https://example.invalid", "content-type": "application/json" }, body: JSON.stringify({ id, data }) }), { params: Promise.resolve({ resource: "units" }) });
+      await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_unit_patch_failure CHECK (false) NOT VALID');
+      try {
+        assert.equal((await patch()).status, 500);
+        const unchanged = await db.unit.findUniqueOrThrow({ where: { id: own.id } });
+        assert.equal(Number(unchanged.monthlyRate), 100); assert.equal(unchanged.number, "Before-audit");
+        assert.equal((await db.mapElement.findUniqueOrThrow({ where: { id: element.id } })).label, "Before-audit");
+        assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "units.updated" } }), 0);
+      } finally { await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_unit_patch_failure'); }
+      assert.equal((await patch()).status, 200);
+      const saved = await db.unit.findUniqueOrThrow({ where: { id: own.id } }); assert.equal(Number(saved.monthlyRate), 200); assert.equal(saved.number, "After-audit");
+      assert.equal((await db.mapElement.findUniqueOrThrow({ where: { id: element.id } })).label, "After-audit");
+      assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "units.updated", actorId: unitActor.id } }), 1);
+      assert.equal((await patch(own.id, { facilityId: b.id })).status, 403);
+      const audit = await db.auditEvent.findFirstOrThrow({ where: { entityId: own.id, action: "units.updated" } });
+      assert.deepEqual(audit.before, { number: "Before-audit" }); assert.deepEqual(audit.after, { number: "After-audit", mapLabelSynchronized: true });
+      await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_unit_patch_failure CHECK (false) NOT VALID');
+      try { assert.equal((await patch(own.id, { monthlyRate: 300 })).status, 500); }
+      finally { await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_unit_patch_failure'); }
+      assert.equal(Number((await db.unit.findUniqueOrThrow({ where: { id: own.id } })).monthlyRate), 200);
+      assert.equal((await patch(own.id, { monthlyRate: 300 })).status, 200);
+      assert.equal((await patch(own.id, { status: "OCCUPIED" })).status, 409);
+      assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "units.updated" } }), 2);
+    });
   } finally { await db.$disconnect(); }
 });
