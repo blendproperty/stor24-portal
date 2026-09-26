@@ -34,6 +34,7 @@ jobs:
       - run: node scripts/test-operations-read-recovery.mjs
       - run: node scripts/test-operations-access-recovery.mjs
       - run: node scripts/test-daily-close-form.mjs
+      - run: node scripts/test-daily-close-history.mjs
       - run: node scripts/test-task-create-recovery.mjs
       - run: node scripts/test-maintenance-status-recovery.mjs
       - run: node scripts/test-maintenance-create-recovery.mjs
@@ -65,6 +66,7 @@ jobs:
             output/task-completion-recovery/
             output/operations-read-recovery/
             output/daily-close-form/
+            output/daily-close-history/
             output/operations-access-recovery/
             output/task-create-recovery/
             output/maintenance-status-recovery/
