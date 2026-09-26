@@ -1,4 +1,12 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Customer edit validation and audit transaction — 26 September 2026
+
+- **Implementation:** customer PATCH uses a partial field schema without calling unsupported partial() on a refined object. The existing person-or-company-name requirement is checked against the resulting record. The scoped customer read, update and existing customers.updated audit now share a transaction; audit failure rolls back the edit. Existing resource permissions, organisation/facility/new-customer scope and unrelated leasing branches remain unchanged. No server request replay guarantee is introduced.
+- **Testing:** prepatch actual route returned500 even for a valid customer edit; direct schema check reproduced the refined-schema partial error. After correcting validation, synthetic audit failure reproduced an edit left saved. Candidate471 unit tests/typecheck/focused lint pass rollback/retry, preserved consent, required name and foreign-facility denial. Existing customer-save desktop/mobile regression checked separately. Required PostgreSQL adds real audit constraint failure, unchanged contact/consent, zero audit, valid retry with one audit and invalid-name/facility rejection; CI pending. All mutations are synthetic.
+- **Commit/push/merge:** candidate uncommitted; final PR319 evidence already pushed on this branch will be included.
+- **Deployment/live:** unchanged PR319 imagec6f75927b healthy/service/database13:57:05.453UTC. Release, staff acceptance, server replay and other leasing atomicity remain open; all14 programme gates preserved.
+- **Staff acceptance:** edit an approved synthetic customer's details/consent, reload and check the saved record and audit. Do not trigger a production audit failure; use isolated rollback evidence. Repeated independent requests are not deduplicated.
+
 ## Customer save confirmation and recovery — 26 September 2026
 
 - **Implementation:** customer create/edit saves retain form inputs on rejected requests, block duplicate in-flight clicks, time out after20 seconds and validate returned identity plus submitted fields/contacts/consent before confirming success. Network, server or mismatched confirmations block another save across modal reopening; read-only Review customer records closes the editor and reloads without repeating the mutation. Staff must review before reloading the page for a new attempt. Existing create/edit permission, scope and business policies are unchanged. This is a client recovery guard, not server idempotency or audit atomicity.

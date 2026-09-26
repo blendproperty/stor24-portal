@@ -247,5 +247,31 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
       const rows = await buildReportRows({ userId: user.id, organisationId: org.id, facilityIds: [a.id], unrestrictedFacilities: false }, { reportKey: "lead-conversion", from: "2026-09-25", to: "2026-09-25", format: "JSON", groupBy: "day" });
       assert.deepEqual(rows.map(row => row.source), ["SAST-1", "SAST-2"]);
     });
+    await t.test("customer PATCH retains contact and consent on audit failure then retries once", async () => {
+      const role = await db.role.create({ data: { organisationId: org.id, name: "Customer atomicity", permissions: ["operations.manage"] } });
+      await db.roleAssignment.create({ data: { userId: user.id, roleId: role.id, facilityId: a.id } });
+      const own = await db.customer.create({ data: { organisationId: org.id, firstName: "Before", lastName: "Synthetic", communicationConsent: { email: false }, leads: { create: { facilityId: a.id, source: "CI" } } } });
+      const otherCustomer = await db.customer.create({ data: { organisationId: org.id, firstName: "Other", lastName: "Synthetic", leads: { create: { facilityId: b.id, source: "CI" } } } });
+      const output = await build({ entryPoints: ["src/app/api/v1/leasing/[resource]/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "customer-session", setup(builder) {
+        builder.onResolve({ filter: /^@\/lib\/(db|session)$/ }, args => ({ path: args.path, namespace: "fixture" }));
+        builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
+      } }] });
+      const loaded = { exports: {} as { PATCH: (request: Request, context: { params: Promise<{ resource: string }> }) => Promise<Response> } };
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: user.id, sessionVersion: user.sessionVersion });
+      const patch = (id = own.id, data: Record<string, unknown> = { firstName: "After", communicationConsent: { email: true } }) => loaded.exports.PATCH(new Request("https://example.invalid/api/v1/leasing/customers", { method: "PATCH", headers: { origin: "https://example.invalid", "content-type": "application/json" }, body: JSON.stringify({ id, data }) }), { params: Promise.resolve({ resource: "customers" }) });
+      assert.equal((await patch(otherCustomer.id)).status, 403);
+      await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_customer_patch_failure CHECK (false) NOT VALID');
+      try {
+        assert.equal((await patch()).status, 500);
+        const unchanged = await db.customer.findUniqueOrThrow({ where: { id: own.id } });
+        assert.equal(unchanged.firstName, "Before"); assert.deepEqual(unchanged.communicationConsent, { email: false });
+        assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "customers.updated" } }), 0);
+      } finally { await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_customer_patch_failure'); }
+      assert.equal((await patch()).status, 200);
+      const saved = await db.customer.findUniqueOrThrow({ where: { id: own.id } }); assert.equal(saved.firstName, "After"); assert.equal((saved.communicationConsent as { email: boolean }).email, true);
+      assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "customers.updated", actorId: user.id } }), 1);
+      assert.equal((await patch(own.id, { firstName: "", lastName: "", companyName: "" })).status, 422);
+      assert.equal((await db.customer.findUniqueOrThrow({ where: { id: own.id } })).firstName, "After");
+    });
   } finally { await db.$disconnect(); }
 });

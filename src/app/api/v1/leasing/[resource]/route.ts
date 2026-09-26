@@ -14,6 +14,7 @@ import {
 import { facilityWhere, requireFacility, requirePermissionScope } from "@/lib/scope";
 import {
   customerSchema,
+  customerPatchSchema,
   facilitySchema,
   leadSchema,
   reservationSchema,
@@ -135,7 +136,7 @@ export async function PATCH(
     const rawData = body.data && typeof body.data === "object" && !Array.isArray(body.data)
       ? body.data as Record<string, unknown>
       : {};
-    const parsed = schemas[resource].partial().safeParse(rawData);
+    const parsed = (resource === "customers" ? customerPatchSchema : schemas[resource].partial()).safeParse(rawData);
     if (!parsed.success)
       return Response.json(
         {
@@ -188,8 +189,15 @@ export async function PATCH(
       }
       entity = await db.facility.update({ where: { id: current.id }, data });
     } else if (resource === "customers") {
-      const current = await requireLeasingCustomer(scope, body.id);
-      entity = await db.customer.update({ where: { id: current.id }, data });
+      const customerId = body.id;
+      return await db.$transaction(async tx => {
+        const current = await requireLeasingCustomer(scope, customerId, tx);
+        const next = { ...current, ...(data as Record<string, unknown>) };
+        if (!next.companyName && !(next.firstName && next.lastName)) return Response.json({ error: { code: "VALIDATION_ERROR", message: "Provide a person or company name." } }, { status: 422 });
+        const updated = await tx.customer.update({ where: { id: current.id }, data });
+        await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "customers.updated", entityType: "customers", entityId: current.id } });
+        return Response.json({ data: updated });
+      });
     } else {
       const model =
         resource === "unit-types"
