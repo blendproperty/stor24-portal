@@ -471,3 +471,19 @@ test("customer PATCH rolls back edited contacts and consent when audit fails", a
   assert.equal(customer.firstName, "After"); assert.equal(audits, 1);
   assert.equal((await api.PATCH(request("PATCH", { id: "customer-b", data: { firstName: "Forbidden" } }), context("customers"))).status, 403);
 });
+
+test("lead PATCH rolls back stage and notes when audit fails", async () => {
+  const state = fixture(); state.grant("operations.manage");
+  const lead = state.tables.lead[0]; Object.assign(lead, { stage: "NEW", notes: "Before" });
+  state.tables.lead.push({ id: "lead-b", facilityId: "b" });
+  state.db.lead.update = async ({ data }: Row) => Object.assign(lead, data);
+  let fail = true; let audits = 0;
+  state.db.auditEvent.create = async () => { if (fail) throw new Error("SYNTHETIC_AUDIT_FAILURE"); audits++; return {}; };
+  state.db.$transaction = async (fn: (client: Row) => Promise<unknown>) => { const before = structuredClone(lead); try { return await fn(state.db); } catch (error) { Object.keys(lead).forEach(k => delete lead[k]); Object.assign(lead, before); throw error; } };
+  const api = await load("./src/app/api/v1/leasing/[resource]/route.ts", state);
+  const patch = (id = lead.id, data = { stage: "CONTACTED", notes: "After" } as Row) => api.PATCH(request("PATCH", { id, data }), context("leads"));
+  assert.equal((await patch()).status, 500); assert.equal(lead.stage, "NEW"); assert.equal(lead.notes, "Before"); assert.equal(audits, 0);
+  fail = false; assert.equal((await patch()).status, 200); assert.equal(lead.stage, "CONTACTED"); assert.equal(lead.notes, "After"); assert.equal(audits, 1);
+  for (const data of [{ facilityId: "b" }, { customerId: "customer-b" }, { desiredUnitTypeId: "type-b" }, { assignedToId: "missing" }]) assert.equal((await patch(lead.id, data)).status, 403);
+  assert.equal((await patch("lead-b")).status, 403); assert.equal(audits, 1);
+});

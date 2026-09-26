@@ -1,10 +1,19 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Lead edit audit transaction — 26 September 2026
+
+- **Implementation:** lead PATCH now saves the edit and existing leads.updated audit in one transaction, returning only after commit. Existing resource/facility/customer/unit-type/assignee checks remain before the write. Other leasing branches and business policy are unchanged; no concurrency or request replay guarantee added.
+- **Testing:** prepatch actual-route synthetic audit failure returned500 but left stage CONTACTED and edited notes. Candidate472 unit tests, typecheck and focused ESLint passed rollback/retry and foreign facility/customer/unit-type/assignee rejection. Added required real PostgreSQL audit-constraint rollback and valid retry/one-audit test; CI pending. No production mutations.
+- **Commit/push:** candidate on codex/lead-update-atomicity, including PR320 final release evidence; commit pending.
+- **Merge:** pending required checks including real SQL.
+- **Deployment/configuration/live verification:** pending. No migration or configuration change. All14 acceptance gates remain open.
+- **Staff acceptance:** use an approved synthetic lead to edit stage/notes, reload and verify one matching audit. Audit failure tests run only in isolation.
+
 ## Customer edit validation and audit transaction — 26 September 2026
 
 - **Implementation:** customer PATCH uses a partial field schema without calling unsupported partial() on a refined object. The existing person-or-company-name requirement is checked against the resulting record. The scoped customer read, update and existing customers.updated audit now share a transaction; audit failure rolls back the edit. Existing resource permissions, organisation/facility/new-customer scope and unrelated leasing branches remain unchanged. No server request replay guarantee is introduced.
-- **Testing:** prepatch actual route returned500 even for a valid customer edit; direct schema check reproduced the refined-schema partial error. After correcting validation, synthetic audit failure reproduced an edit left saved. Candidate471 unit tests/typecheck/focused lint pass rollback/retry, preserved consent, required name and foreign-facility denial. Existing customer-save desktop/mobile regression checked separately. Required PostgreSQL adds real audit constraint failure, unchanged contact/consent, zero audit, valid retry with one audit and invalid-name/facility rejection; CI pending. All mutations are synthetic.
-- **Commit/push/merge:** candidate uncommitted; final PR319 evidence already pushed on this branch will be included.
-- **Deployment/live:** unchanged PR319 imagec6f75927b healthy/service/database13:57:05.453UTC. Release, staff acceptance, server replay and other leasing atomicity remain open; all14 programme gates preserved.
+- **Testing:** prepatch actual route returned500 even for a valid customer edit; direct schema check reproduced the refined-schema partial error. After correcting validation, synthetic audit failure reproduced an edit left saved. Candidate471 unit tests/typecheck/focused lint pass rollback/retry, preserved consent, required name and foreign-facility denial. Existing customer-save desktop/mobile regression checked separately. Required PostgreSQL audit-constraint failure, unchanged contact/consent, zero audit, valid retry with one audit and invalid-name/facility rejection explicitly passed in SQL36247227367. All mutations are synthetic.
+- **Commit/push/merge:** PR320 source3bef961d6c5a75813c95b5e5b96d0ca48f11694a passed all nine checks: CI36247227337, SQL36247227367 and security36247227332. Merged703f6d0cb7d17b807b6474c7b1f76b54b9f30e06 including final PR319 release evidence.
+- **Deployment/live:** Main CI36247586765 and deploy36247907234 passed. Exact image stor24-crm:703f6d0cb healthy; service/database readiness verified2026-09-26T14:18:10.617Z. ExcelE079 records release and PR320 is a verified delivered component. Staff acceptance, server replay and other leasing atomicity remain open; all14 programme gates preserved.
 - **Staff acceptance:** edit an approved synthetic customer's details/consent, reload and check the saved record and audit. Do not trigger a production audit failure; use isolated rollback evidence. Repeated independent requests are not deduplicated.
 
 ## Customer save confirmation and recovery — 26 September 2026
@@ -2267,6 +2276,7 @@ A CRM capability is complete only when it is database-backed, scoped, permission
 - Deployment/configuration: CRM run 34438007430 attempt 1 timed out connecting SSH before execution; attempt 2 succeeded and logs confirm migration 20260910110000_debit_order_preferences applied. Website run 34438380340 succeeded. Provider configuration and transaction enablement were not changed.
 - Live read-only verification: the existing customer test booking still returns SIGNED / DEBIT_ORDER, setupAvailable true and no saved preferences. Its actual phone-sized page shows first-date/monthly-day fields and zero download links. Zero booking POSTs were made in this check. Real preference-save/database readback remains customer UAT.
 - NOT COMPLETE: automated Netcash bank-mandate creation, signed mandate retrieval and verified provider completion/reconciliation are not implemented or tested by this slice. No collection is authorised. Provider integration and approved first-payment/recurring-collection rules remain prerequisites to full debit-order checkout. Previous legal, financial, provider, data, training, activation and approval gates remain open.
+
 
 
 

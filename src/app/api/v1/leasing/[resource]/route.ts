@@ -313,6 +313,13 @@ export async function PATCH(
           });
           return updated;
         });
+      } else if (resource === "leads") {
+        const updated = await db.$transaction(async tx => {
+          const saved = await tx.lead.update({ where: { id: current.id }, data });
+          await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "leads.updated", entityType: "leads", entityId: current.id } });
+          return saved;
+        });
+        return Response.json({ data: updated });
       } else if (resource === "reservations") {
         await requirePermission("reservations.manage", current.facilityId);
         const patch = data as { facilityId?: string; unitId?: string };

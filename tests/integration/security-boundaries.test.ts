@@ -273,5 +273,33 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
       assert.equal((await patch(own.id, { firstName: "", lastName: "", companyName: "" })).status, 422);
       assert.equal((await db.customer.findUniqueOrThrow({ where: { id: own.id } })).firstName, "After");
     });
+    await t.test("lead PATCH retains stage and notes on audit failure then retries once", async () => {
+      const role = await db.role.create({ data: { organisationId: org.id, name: "Lead atomicity", permissions: ["operations.manage"] } });
+      await db.roleAssignment.create({ data: { userId: user.id, roleId: role.id, facilityId: a.id } });
+      const own = await db.lead.create({ data: { facilityId: a.id, source: "CI", stage: "NEW", notes: "Before" } });
+      const otherCustomer = await db.lead.create({ data: { facilityId: b.id, source: "CI" } });
+      const output = await build({ entryPoints: ["src/app/api/v1/leasing/[resource]/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "customer-session", setup(builder) {
+        builder.onResolve({ filter: /^@\/lib\/(db|session)$/ }, args => ({ path: args.path, namespace: "fixture" }));
+        builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
+      } }] });
+      const loaded = { exports: {} as { PATCH: (request: Request, context: { params: Promise<{ resource: string }> }) => Promise<Response> } };
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: user.id, sessionVersion: user.sessionVersion });
+      const patch = (id = own.id, data: Record<string, unknown> = { stage: "CONTACTED", notes: "After" }) => loaded.exports.PATCH(new Request("https://example.invalid/api/v1/leasing/leads", { method: "PATCH", headers: { origin: "https://example.invalid", "content-type": "application/json" }, body: JSON.stringify({ id, data }) }), { params: Promise.resolve({ resource: "leads" }) });
+      assert.equal((await patch(otherCustomer.id)).status, 403);
+      await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_lead_patch_failure CHECK (false) NOT VALID');
+      try {
+        assert.equal((await patch()).status, 500);
+        const unchanged = await db.lead.findUniqueOrThrow({ where: { id: own.id } });
+        assert.equal(unchanged.stage, "NEW"); assert.equal(unchanged.notes, "Before");
+        assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "leads.updated" } }), 0);
+      } finally { await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_lead_patch_failure'); }
+      assert.equal((await patch()).status, 200);
+      const saved = await db.lead.findUniqueOrThrow({ where: { id: own.id } }); assert.equal(saved.stage, "CONTACTED"); assert.equal(saved.notes, "After");
+      assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "leads.updated", actorId: user.id } }), 1);
+      assert.equal((await patch(own.id, { facilityId: b.id })).status, 403);
+      assert.equal((await patch(own.id, { stage: "INVALID" })).status, 422);
+      assert.equal((await db.lead.findUniqueOrThrow({ where: { id: own.id } })).stage, "CONTACTED");
+      assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "leads.updated" } }), 1);
+    });
   } finally { await db.$disconnect(); }
 });
