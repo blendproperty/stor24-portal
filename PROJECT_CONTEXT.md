@@ -4,8 +4,8 @@
 - **Implementation:** existing facility DELETE deactivation and facilities.deleted audit now share a transaction. Audit failure restores active state. Organisation-wide inventory permission and organisation scope remain unchanged. No live facility deactivated or new deactivation policy introduced.
 - **Testing:** actual prepatch synthetic audit failure left active=false despite500. Candidate478 tests/typecheck/focused lint pass rollback/retry and restricted/foreign organisation rejection. Required PostgreSQL rollback/one-audit retry and role/org checks explicitly passed in SQL36256137250/job108443168251.
 - **Commit/push:** PR328 source0a197d168d2d00cde90af164a0b43d6fa9969171 passed all nine checks CI36256137094/SQL36256137250/security36256137125. Includes PR327 final evidence.
-- **Merge:** merged6a11e04a2641095419a730c7c48ed25a1ca6382f. MainCI36256511716 running.
-- **Deployment/live verification:** pending. No migration or live configuration change; all14 acceptance gates remain open.
+- **Merge:** merged6a11e04a2641095419a730c7c48ed25a1ca6382f. MainCI36256511716 passed.
+- **Deployment/live verification:** deploy36256833780 passed. Exact image stor24-crm:6a11e04a2 healthy; service/database readiness verified2026-09-26T16:51:59.548Z. ExcelE087 and PR328 delivered component record verification. No migration or live configuration change; all14 acceptance gates remain open.
 - **Staff acceptance:** review isolated rollback evidence and permission behaviour; do not deactivate a live facility for testing.
 
 ## Unused customer deletion audit transaction — 26 September 2026
