@@ -1,4 +1,11 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Delivery tracker status clarification — 27 September 2026
+
+- **Implementation:** workbook status review separates Build status, Test evidence, Remaining build/configuration and Your acceptance. P01 customer workflow and P12 supported offline recovery are Complete for implementation based on recorded scope, with staff/provider/device validation still open. Partial now has explicit remaining work; P09 commercial decisions and P13 launch preparation remain Not started. No programme acceptance granted. Fixed stock evidence incorrectly mapped to P05 MRI by moving it to P07 merchandise and restoring MRI-specific gaps.
+- **Testing:** existing artifact-tool builder exported/reimported successfully; stage values, all21 delivered components, existing journey checks and zero accepted preserved. Formula scan passed; affected ranges rendered for review. Native process still exits after successful export, as previously recorded; no native Excel interaction claimed.
+- **Commit/push:** this records a local workbook-only change and its persistent builder inputs; canonical note committed/pushed on the handoff branch. Workbook is STOR24-delivery-tracker-priority-2.xlsx in the existing outputs folder.
+- **Merge/deployment/configuration/live verification:** no application change or new deployment. PR330 remains the last recorded deployment; no new production health claim. All14 acceptance gates remain open. Final PR330 evidence and this tracker note are on the handoff branch, not main.
+
 ## Remaining DELETE audit review — 26 September 2026, 17:28 UTC
 
 - **Review scope:** read-only source inspection against deployed main b6de14378c85c07096dbfc0653355cc7399c26af. No application changes or production mutations.
