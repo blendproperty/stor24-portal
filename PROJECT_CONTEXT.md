@@ -1,4 +1,10 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Cancelled-hold release confirmation recovery — 28 September 2026
+
+- **Implementation:** store-wide and single-unit release use shared synchronous request locking,20second timeout, denied-data clearing and persistent uncertain-result blocking. Confirmation validates facility, unit numbers, unique non-overlapping outcomes and checked count. Confirmed release/protection/empty notices precede GET refresh. The first confirmation step no longer claims a server review already occurred. Existing backend active-reservation/occupancy/test-artifact/audit rules unchanged; no new replay/concurrency guarantee.
+- **Testing:** prepatch actual network failure threw and left controls busy. Candidate store/unit flows1440/390/320px passed network/timeout/duplicate/401/403/409/500/malformed/wrong facility-unit/duplicate-overlapping outcomes/count/lost result/GET review/protected/empty/success-refresh failure.493 tests/typecheck/focused lint and rate/read regressions passed; narrow recovery screenshot checked. Required CI pending.
+- **Commit/push:** candidate pending, carries PR350 final evidence. **Merge:** pending. **Deployment/configuration:** pending; no schema/configuration change. **Live verification:** pending. No production holds released; all14 acceptance gates remain open. UAT reset recovery remains separate.
+
 ## Bulk rate audit transaction — 28 September 2026
 
 - **Implementation:** all grouped standard unit-rate updates and their shared audit entry now use one database transaction. Existing owner/organisation checks, pricing model, missing-area skip and reservation/tenancy pricing policy unchanged. No replay or concurrency-policy guarantee added.
