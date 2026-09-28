@@ -1,4 +1,13 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Unit inventory read recovery — 28 September 2026
+
+- **Implementation:** preserves initial server-provided inventory; refresh validates all three nested read payloads, bounds requests at20seconds and exposes a GET-only retry. Unavailable data hides actions/editors;401/403 clears records and gives sign-in/administrator guidance. Confirmed save notices survive generic read failures. Existing floor/availability policies and account links preserved; mutation confirmation/replay recovery remains separate.
+- **Testing:** synthetic actual component reproduced confirmed unit-type save followed by unhandled refresh failure and lost confirmation. Candidate1440/390/320px network/server/malformed/nested payload/timeout/denial/empty/populated/account-link/closed-floor and GET-only recovery pass; exactly one synthetic POST.492 tests/typecheck/lint and floor/premium workspace regressions passed. Mobile recovery screenshot inspected; isolated fixture is not full production branding proof.
+- **Commit/push:** implementation ef0dc75 pushed on codex/unit-inventory-read-recovery, includes PR343 final evidence; this context checkpoint follows before PR checks.
+- **Merge:** pending required checks.
+- **Deployment/configuration:** pending; no schema/configuration change.
+- **Live verification:** pending; no production unit/facility mutations. All14 acceptance gates remain open.
+
 ## Reservation lifecycle confirmation recovery — 28 September 2026
 
 - **Implementation:** cancel/extend/expire share synchronous request guard,20second timeout, permission-denial clearing and matching reservation/facility/unit/status confirmation. Extension verifies exact expiry; cancellation/expiry require explicit boolean release result. Uncertain outcomes block writes across GET-only status review; explicit reload after checking remains required. Existing backend eligibility/locking/release policies unchanged.
