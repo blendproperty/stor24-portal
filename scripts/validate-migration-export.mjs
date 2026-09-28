@@ -51,7 +51,20 @@ function idSet(rows, file, errors) {
 }
 
 function requireReference(rows, field, targets, file, errors) {
-  for (const row of rows) if (row[field] && !targets.has(row[field])) errors.push(`${file}: ${row.legacy_id} references missing ${field} ${row[field]}`);
+  for (const row of rows) {
+    if (!row[field]) errors.push(`${file}: ${row.legacy_id} missing required reference ${field}`);
+    else if (!targets.has(row[field])) errors.push(`${file}: ${row.legacy_id} references missing ${field} ${row[field]}`);
+  }
+}
+
+function requireSameFacility(rows, field, targets, file, errors) {
+  const byId = new Map(targets.map(row => [row.legacy_id, row]));
+  for (const row of rows) {
+    const target = byId.get(row[field]);
+    if (target && row.facility_legacy_id && target.facility_legacy_id && row.facility_legacy_id !== target.facility_legacy_id) {
+      errors.push(`${file}: ${row.legacy_id} ${field} ${row[field]} belongs to a different facility`);
+    }
+  }
 }
 
 const sourceDirectory = resolve(process.argv[2] ?? "migration/templates");
@@ -67,10 +80,12 @@ const ids = Object.fromEntries(Object.entries(data).map(([name, rows]) => [name,
 requireReference(data.unit_types, "facility_legacy_id", ids.facilities, "unit_types.csv", errors);
 requireReference(data.units, "facility_legacy_id", ids.facilities, "units.csv", errors);
 requireReference(data.units, "unit_type_legacy_id", ids.unit_types, "units.csv", errors);
+requireSameFacility(data.units, "unit_type_legacy_id", data.unit_types, "units.csv", errors);
 for (const file of ["tenancies", "reservations"]) {
   requireReference(data[file], "facility_legacy_id", ids.facilities, `${file}.csv`, errors);
   requireReference(data[file], "customer_legacy_id", ids.customers, `${file}.csv`, errors);
   requireReference(data[file], "unit_legacy_id", ids.units, `${file}.csv`, errors);
+  requireSameFacility(data[file], "unit_legacy_id", data.units, `${file}.csv`, errors);
 }
 
 const report = { generatedAt: new Date().toISOString(), sourceDirectory, valid: errors.length === 0, counts: Object.fromEntries(Object.entries(data).map(([name, rows]) => [name, rows.length])), errors };

@@ -23,7 +23,7 @@ Run:
 npm run migration:validate -- "C:\approved\stor24-export" "C:\approved\stor24-export\validation.json"
 ```
 
-The command fails on missing files or columns, duplicate legacy identifiers and broken facility, unit-type, unit or customer references. Retain `validation.json` as rehearsal evidence.
+The command fails on missing files or columns, duplicate legacy identifiers, blank required relationships and broken facility, unit-type, unit or customer references. A unit must share its unit type's facility; a tenancy or reservation must share its unit's facility. Optional customer contact fields remain optional. Retain `validation.json` as rehearsal evidence. This read-only validation does not import records, validate financial balances or establish production migration acceptance.
 
 ## Rehearsal gates
 
