@@ -2,9 +2,9 @@
 ## Migration relationship validation — 28 September 2026
 
 - **Implementation:** offline CSV preflight rejects blank required facility/type/customer/unit relationships and cross-facility unit-type, tenancy-unit and reservation-unit links. Optional customer contact fields remain optional. No import, production mutation or financial/policy approval added.
-- **Testing:** executable synthetic CSV cases reproduced false valid=true before patch. Candidate485 tests passed; typecheck/focused lint passed after test-case type annotation. Required CI pending. Existing real journey/database/restore suites retained.
-- **Commit/push:** candidate on codex/migration-reference-validation includes PR333 final evidence; pending commit.
-- **Merge/deployment/live:** pending. No schema or runtime configuration change. Source export, migration rehearsal, financial reconciliation and all14 acceptance gates remain open.
+- **Testing:** executable synthetic CSV cases reproduced false valid=true before patch. Candidate485 tests passed; typecheck/focused lint passed after test-case type annotation. All nine checks passed: CI36375812796/SQL36375812788/security36375812781. Existing real journey/database/restore suites retained.
+- **Commit/push:** PR334 source26d0bab2234d0fcf535ee9a003e74ca32af37aa9 includes PR333 final evidence; mergedaa3fd46a0b711105677943d86d0ecb7bf8eeb284.
+- **Deployment/live:** mainCI36376247220/deploy36376613800 passed. Exact image stor24-crm:aa3fd46a0 healthy; service/database readiness verified2026-09-28T04:12:59.659Z. ExcelE094 records the25th component; P13 build now Partial for delivered preflight tooling, not migration acceptance. No schema or runtime configuration change. Source export, migration rehearsal, financial reconciliation and all14 acceptance gates remain open.
 ## Unit-type removal audit transaction — 28 September 2026
 
 - **Implementation:** unit-type deletion and existing owner-authorised linked-unit/lead/maintenance cleanup now share the unit-types.deleted audit transaction. Existing assigned-unit, owner, history and facility guards retained. No live records changed or removal-policy/replay guarantee added.
