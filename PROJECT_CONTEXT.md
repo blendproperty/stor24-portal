@@ -4,7 +4,7 @@
 - **Implementation:** cancellation and its existing reservations.deleted audit now commit together. Audit failure restores the prior status; facility permission and existing cancellation policy unchanged. No live reservations changed.
 - **Testing:** actual prepatch synthetic audit failure left CANCELLED despite500. Candidate480 unit tests passed rollback/retry and foreign-facility rejection. Required isolated PostgreSQL rollback/one-audit retry explicitly passed in SQL36371841915/job108769659323. Initial SQL fixture used wrong unit rate field; corrected to monthlyRate before promotion. Type/lint and all nine required checks passed: CI36371841940/SQL36371841915/security36371841861.
 - **Commit/push:** PR331 sourcea73c78c429d13565de114ecffd8c389abca19a92 merged719ea91350ff4b83ac966fe7d561997ecf343154. Includes final PR330 evidence and tracker clarification.
-- **Deployment/live:** mainCI36372303304 running; deployment pending. No migration/configuration change. All14 acceptance gates remain open; no request replay or broader cancellation-policy guarantee.
+- **Deployment/live:** mainCI36372303304 and deploy36372697382 passed. Exact image stor24-crm:719ea9135 healthy; service/database readiness verified2026-09-28T03:12:45.765Z. ExcelE091 and PR331 delivered component record verification. No migration/configuration change. All14 acceptance gates remain open; no request replay or broader cancellation-policy guarantee.
 - **Session:** Brett authorised remaining build work until18:00 Johannesburg28September; automate bounded verified repairs, preserve provider/legal/finance approvals and record staff acceptance separately.
 
 ## Delivery tracker status clarification — 27 September 2026
