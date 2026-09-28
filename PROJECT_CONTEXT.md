@@ -1,12 +1,20 @@
 # STOR 24 CRM and Operations Platform — Project Context
-## Inventory create/edit confirmation recovery — 28 September 2026
+## Inventory removal confirmation recovery — 28 September 2026
 
-- **Implementation:** unit and unit-type create/edit forms retain rejected input, guard simultaneous submission and use20second bounded requests. Success requires matching identity, facility and submitted fields, including numeric rates/areas and features. Uncertain responses block repeat saves across modal reopen and GET-only review; explicit reload after review remains required.401/403 clears private inventory. Editing uses the record's fixed facility. Existing server audit/floor/availability policy is unchanged; client guards do not establish server replay protection.
-- **Testing:** actual prepatch network failure threw and left saving stuck. All four flows passed1440/390/320px rejection/input retention, duplicates, timeout, network/server/malformed/mismatched facility/value/edit identity, denial, reopened block, GET-only review, success and saved-refresh failure. Mobile action overflow reproduced, wrapping/min-width fixed, modal and full-page width/action visibility checked and screenshot inspected.492 tests/typecheck/lint and inventory read/floor/premium regressions passed. Required CI pending.
-- **Commit/push:** candidate codex/inventory-save-recovery includes PR344 final evidence and staff acceptance appendix; pending commit.
+- **Implementation:** unit/type removal shares synchronous request locking,20second timeout, denial clearing and uncertain-result blocking with inventory saves. Only the existing API's204 confirms removal; other unexpected success bodies remain uncertain. Known restrictions remain actionable; assigned-unit cleanup is offered only for the documented409 flag with a positive integer count. Confirmed removal notice precedes GET refresh, so read failure cannot hide completion. Native confirmation, owner/history/facility/audit rules and forced cleanup policy unchanged; no backend replay guarantee added.
+- **Testing:** actual prepatch network failure threw and left controls busy. Unit, type and type-with-unused-units flows passed1440/390/320px network/timeout/duplicate/401/403/409/500/unexpected200, confirmed204, reopened block, GET-only review and confirmed-removal/read-failure.492 tests/typecheck/lint passed; inventory save/read/floor regressions passed. Mobile recovery screenshot inspected; isolated fixture is not production branding or staff acceptance. Required CI pending.
+- **Commit/push:** candidate codex/inventory-removal-recovery includes PR345 final evidence; pending commit.
 - **Merge:** pending required checks.
 - **Deployment/configuration:** pending; no schema/configuration change.
-- **Live verification:** pending; no production mutations. All14 acceptance gates remain open. Delete/rate/reset/renumber confirmation recovery remains separate.
+- **Live verification:** pending; no production removals or mutations. All14 acceptance gates remain open. Rate/reset/renumber confirmation recovery remains separate.
+
+## Inventory create/edit confirmation recovery — 28 September 2026
+
+- **Implementation:** unit and unit-type create/edit forms retain rejected input, guard simultaneous submission and use20second bounded requests. Success requires matching identity, facility and submitted fields, including numeric rates/areas and features. Uncertain responses block repeat saves across modal reopen and GET-only review; explicit reload after review remains required.401/403 clears private inventory. Editing uses the record's fixed facility. Existing server audit/floor/availability policy unchanged; client guards do not establish server replay protection.
+- **Testing:** actual prepatch network failure threw and left saving stuck. All four flows passed1440/390/320px rejection/input retention, duplicates, timeout, network/server/malformed/mismatched facility/value/edit identity,403, reopened block, GET review, success and saved-refresh failure. Mobile modal/actionbar overflow caught and wrapping/min-width fixed; page/modal width/action visibility and screenshot checked.492 tests/typecheck/lint and inventory read/floor/premium regressions passed. Final fixtures use API tax fraction0.15; rerun passed. All nine checks CI36396654487/SQL36396654394/security36396654405 passed; new browser step explicitly passed. Isolated fixture is not full branded production/staff acceptance.
+- **Commit/push and merge:** PR345 finalsourceecb1a76b1c8f4cb3761ab7b9c5b1fca5bf781ca1 mergeddce9b93d920c6a8b3549fa779d4e18f8b9f7e3c5, including PR344 final evidence and staff appendix.
+- **Deployment/configuration:** mainCI36397464279/deploy36398217349 passed; no schema/configuration change.
+- **Live verification:** exact image stor24-crm:dce9b93d9 healthy; service/database readiness verified2026-09-28T08:37:20.215Z. ExcelE105 records36th delivered component. No production mutations; all14 acceptance gates remain open. Delete/rate/reset/renumber confirmation recovery remains separate.
 
 ## Unit inventory read recovery — 28 September 2026
 

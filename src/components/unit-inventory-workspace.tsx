@@ -280,7 +280,7 @@ export function UnitInventoryWorkspace({
       if (facilityId && !stores.some(store => store.id === facilityId)) setFacilityId(stores[0]?.id ?? "");
       setReadDenied(false);
     } catch {
-      if (readRequest.current === controller) setReadError("Inventory could not be refreshed. Refresh inventory to check the latest records; this will not repeat a save.");
+      if (readRequest.current === controller) setReadError("Inventory could not be refreshed. Refresh inventory to check the latest records; this only reads records.");
     } finally {
       clearTimeout(timer);
       if (readRequest.current === controller) { readRequest.current = null; setReadBusy(false); }
@@ -364,51 +364,59 @@ export function UnitInventoryWorkspace({
     }
   }
 
-  async function deleteUnitType(unitType: UnitType, confirmed = false, force = false) {
-    if (saveBlocked || saveRequest.current) return;
-    if (!confirmed && !window.confirm(`Delete the ${unitType.name} unit type?`)) return;
-    setBusy(true);
-    setError("");
-    setNotice("");
-    const response = await fetch(
-      `/api/v1/leasing/unit-types?id=${encodeURIComponent(unitType.id)}${force ? "&force=true" : ""}`,
-      { method: "DELETE" },
-    );
-    const result = await response.json().catch(() => ({}));
-    setBusy(false);
-    if (!response.ok) {
-      setForceDeleteCount(result.error?.canForceDelete ? Number(result.error.assigned || 0) : 0);
-      setError(
-        result.error?.message ?? "The unit type could not be deleted.",
-      );
-      if (result.error?.canForceDelete) setDialog({ kind: "type", unitType });
-      return;
+  async function removeInventory(entity: Unit | UnitType, resource: "units" | "unit-types", force: boolean) {
+    if (busy || saveBlocked || saveRequest.current) return;
+    const controller = new AbortController();
+    saveRequest.current = controller;
+    const timer = setTimeout(() => controller.abort(), 20_000);
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const response = await fetch(`/api/v1/leasing/${resource}?id=${encodeURIComponent(entity.id)}${force ? "&force=true" : ""}`, { method: "DELETE", signal: controller.signal });
+      if (saveRequest.current !== controller) return;
+      if ([401, 403].includes(response.status)) {
+        setFacilities([]); setDialog(null); setRenumberDialog(false); setUatResetPreview(null);
+        setFacilityId(""); setTypeId(""); setQuery(""); setNotice(""); setReadDenied(true);
+        setReadError(response.status === 401 ? "Sign in again to manage unit inventory." : "You do not have access to remove this inventory. Please contact your administrator if you require access.");
+        return;
+      }
+      if (response.status !== 204) {
+        const result = await response.json().catch(() => null);
+        if (saveRequest.current !== controller) return;
+        if ([400, 404, 409, 422].includes(response.status)) {
+          setError(typeof result?.error?.message === "string" ? result.error.message : "The inventory record could not be removed. Review its restrictions before trying again.");
+          setForceDeleteCount(0);
+          if (resource === "unit-types" && response.status === 409 && result?.error?.canForceDelete === true && Number.isSafeInteger(result.error.assigned) && result.error.assigned > 0) {
+            setForceDeleteCount(result.error.assigned);
+            setDialog({ kind: "type", unitType: entity as UnitType });
+          }
+          return;
+        }
+        throw new Error("Unconfirmed inventory removal");
+      }
+      setForceDeleteCount(0);
+      if (resource === "unit-types" && typeId === entity.id) setTypeId("");
+      setDialog(null);
+      setNotice(resource === "units" ? `Unit ${(entity as Unit).number} permanently deleted.` : "Unit type deleted.");
+      await refresh();
+    } catch {
+      if (saveRequest.current === controller) {
+        setSaveBlocked(true);
+        setError("We could not confirm whether this inventory removal completed. Review inventory before doing anything further. Reload the page only after checking the result.");
+      }
+    } finally {
+      clearTimeout(timer);
+      if (saveRequest.current === controller) { saveRequest.current = null; setBusy(false); }
     }
-    setForceDeleteCount(0);
-    if (typeId === unitType.id) setTypeId("");
-    await refresh();
-    setDialog(null);
-    setNotice("Unit type deleted.");
+  }
+
+  async function deleteUnitType(unitType: UnitType, confirmed = false, force = false) {
+    if (busy || saveBlocked || saveRequest.current) return;
+    if (!confirmed && !window.confirm(`Delete the ${unitType.name} unit type?`)) return;
+    await removeInventory(unitType, "unit-types", force);
   }
 
   async function deleteUnit(unit: Unit) {
-    if (saveBlocked || saveRequest.current) return;
-    setBusy(true);
-    setError("");
-    setNotice("");
-    const response = await fetch(
-      `/api/v1/leasing/units?id=${encodeURIComponent(unit.id)}&force=true`,
-      { method: "DELETE" },
-    );
-    const result = await response.json().catch(() => ({}));
-    setBusy(false);
-    if (!response.ok) {
-      setError(result.error?.message ?? "The unit could not be permanently deleted.");
-      return;
-    }
-    await refresh();
-    setDialog(null);
-    setNotice(`Unit ${unit.number} permanently deleted.`);
+    await removeInventory(unit, "units", true);
   }
 
   if (readBusy || readError) return (
@@ -490,9 +498,9 @@ export function UnitInventoryWorkspace({
           </div>
         }
       />
-    {saveBlocked && <div className="notice"><p role={dialog ? undefined : "alert"}>We could not confirm the inventory save. Review the records before reloading this page; repeated saves are blocked.</p><button className="button button-secondary" onClick={() => void refresh()}>Review inventory</button></div>}
+    {saveBlocked && <div className="notice"><p role={dialog ? undefined : "alert"}>We could not confirm the inventory change. Review the records before reloading this page; repeat saves and removals are blocked.</p><button className="button button-secondary" onClick={() => void refresh()}>Review inventory</button></div>}
     {notice ? <p className="form-success" role="status">{notice}</p> : null}
-    {error && !dialog ? <p className="form-error">{error}</p> : null}
+    {error && !dialog ? <p role={saveBlocked ? undefined : "alert"} className="form-error">{error}</p> : null}
       {uatResetPreview ? (
         <section className="panel uat-reset-preview" aria-label="UAT reset preview">
           <div>
@@ -749,7 +757,7 @@ export function UnitInventoryWorkspace({
           facilities={facilities}
           defaultFacilityId={facilityId || facilities[0]?.id || ""}
           busy={busy}
-          error={saveBlocked ? "We could not confirm whether this inventory change was saved. Review inventory before doing anything further. Reload the page only after checking the result." : error}
+          error={saveBlocked ? "We could not confirm whether this inventory change completed. Review inventory before doing anything further. Reload the page only after checking the result." : error}
           close={() => setDialog(null)}
           submit={submit}
           deleteUnitType={deleteUnitType}
