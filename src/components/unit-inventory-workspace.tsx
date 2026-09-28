@@ -771,6 +771,11 @@ export function UnitInventoryWorkspace({
       {renumberDialog && selectedFacility ? (
         <RenumberUnitsDialog
           facility={selectedFacility}
+          denied={(status) => {
+            setFacilities([]); setRenumberDialog(false); setNotice("");
+            setReadDenied(true);
+            setReadError(status === 401 ? "Sign in again to view inventory." : "You do not have access to this inventory. Please contact your administrator.");
+          }}
           close={() => setRenumberDialog(false)}
           applied={async (message) => {
             await refresh();
@@ -786,11 +791,15 @@ function RenumberUnitsDialog({
   facility,
   close,
   applied,
+  denied,
 }: {
   facility: Facility;
   close: () => void;
   applied: (message: string) => Promise<void>;
+  denied: (status: number) => void;
 }) {
+  const previewRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => previewRequest.current?.abort(), []);
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<{
@@ -825,10 +834,49 @@ function RenumberUnitsDialog({
       : [];
   });
 
+  async function checkPreview() {
+    if (previewRequest.current || busy || !proposedChanges.length) return;
+    const controller = new AbortController();
+    previewRequest.current = controller;
+    const timeout = setTimeout(() => controller.abort(), 20_000);
+    setBusy(true); setError(""); setSuccess(""); setPreview(null);
+    try {
+      const response = await fetch("/api/v1/leasing/units/renumber", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ facilityId: facility.id, action: "preview", changes: proposedChanges }),
+        signal: controller.signal,
+      });
+      if (response.status === 401 || response.status === 403) { denied(response.status); return; }
+      const payload = await response.json();
+      if (!response.ok) {
+        const message = z.object({ error: z.object({ message: z.string() }) }).safeParse(payload);
+        setError(message.success && [400, 404, 409, 422].includes(response.status)
+          ? message.data.error.message : "The unit numbers could not be checked. Try Preview changes again. Nothing has been saved.");
+        return;
+      }
+      const result = z.object({ data: z.object({
+        changes: z.array(z.object({ unitId: z.string(), oldNumber: z.string(), newNumber: z.string() })),
+        mappedCount: z.number().int().nonnegative(), unitCount: z.number().int().positive(),
+      }) }).safeParse(payload);
+      if (!result.success) throw new Error("Invalid preview");
+      const data = result.data.data;
+      if (data.unitCount !== proposedChanges.length || data.changes.length !== proposedChanges.length ||
+        new Set(data.changes.map(change => change.unitId)).size !== proposedChanges.length ||
+        !data.changes.every(change => proposedChanges.some(request => request.unitId === change.unitId && request.newNumber === change.newNumber) &&
+          facility.units.some(unit => unit.id === change.unitId && unit.number === change.oldNumber))) throw new Error("Mismatched preview");
+      setPreview(data);
+    } catch {
+      setError("The unit numbers could not be checked. Try Preview changes again. Nothing has been saved.");
+    } finally {
+      clearTimeout(timeout); previewRequest.current = null; setBusy(false);
+    }
+  }
+
   async function send(
     action: "preview" | "apply",
     changes = proposedChanges,
   ) {
+    if (action === "preview") { await checkPreview(); return; }
     setBusy(true);
     setError("");
     setSuccess("");
@@ -841,10 +889,6 @@ function RenumberUnitsDialog({
     setBusy(false);
     if (!response.ok) {
       setError(payload.error?.message ?? "The unit numbers could not be checked.");
-      return;
-    }
-    if (action === "preview") {
-      setPreview(payload.data);
       return;
     }
     const count = Number(payload.data.changes.length);
@@ -881,7 +925,7 @@ function RenumberUnitsDialog({
           <ShieldCheck size={17} /> Nothing is saved until the preview passes all
           duplicate and collision checks.
         </p>
-        {error ? <p className="form-error">{error}</p> : null}
+        {error ? <p className="form-error" role="alert">{error}</p> : null}
         {success ? <p className="form-success">{success}</p> : null}
         <label className="renumber-search">
           Find a unit
@@ -907,6 +951,7 @@ function RenumberUnitsDialog({
                 aria-label={`New number for unit ${unit.number}`}
                 value={draft[unit.id] ?? ""}
                 placeholder={unit.number}
+                disabled={busy}
                 maxLength={40}
                 onChange={(event) => {
                   setDraft((current) => ({

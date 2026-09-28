@@ -1,4 +1,10 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Renumber preview recovery — 28 September 2026
+
+- **Implementation:** read-only renumber preview uses a synchronous request guard,20second timeout, retained numbers and actionable retry. Invalid/mismatched unit IDs, old/new numbers, duplicate changes and counts cannot enable Apply. Starting another preview clears the previous result; editing is disabled while checking. Denied access clears private inventory and gives sign-in/administrator guidance. Mobile action wrapping keeps Close/Preview/Apply reachable. Existing apply/undo API, allocation/map policy and mutation confirmation recovery remain separate.
+- **Testing:** prepatch actual component network failure threw and left controls busy. Candidate1440/390/320px network/server/timeout/409/401/403/malformed/mismatched fields/duplicates/stale-preview clearing passed with no mutation requests. Mobile clipped Close button caught, wrapping corrected and all action viewport bounds/screenshot retested.492 unit tests/typecheck/direct ESLint and inventory save/read/floor regressions passed. Required CI pending.
+- **Commit/push:** candidate pending; carries PR346 final evidence. **Merge:** pending. **Deployment/configuration:** pending; no schema/configuration change. **Live verification:** not yet performed for this candidate. No production renumbering; all14 acceptance gates remain open. Isolated component screenshots are not branded production or staff acceptance.
+
 ## Inventory removal confirmation recovery — 28 September 2026
 
 - **Implementation:** unit/type removal shares synchronous request locking,20second timeout, denial clearing and uncertain-result blocking with inventory saves. Only the existing API's204 confirms removal; other unexpected success bodies remain uncertain. Known restrictions remain actionable; assigned-unit cleanup is offered only for the documented409 flag with positive integer count. Confirmed removal notice precedes GET refresh, so read failure cannot hide completion. Native confirmation, owner/history/facility/audit and forced cleanup policy unchanged; no backend replay guarantee added.
