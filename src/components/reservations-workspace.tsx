@@ -71,6 +71,10 @@ export function ReservationsWorkspace() {
   const [busy, setBusy] = useState(false);
   const [createBlocked, setCreateBlocked] = useState(false);
   const createRequest = useRef<AbortController | null>(null);
+  const lifecycleRequest = useRef<AbortController | null>(null);
+  const [lifecycleBusy, setLifecycleBusy] = useState(false);
+  const [lifecycleBlocked, setLifecycleBlocked] = useState(false);
+  const uncertainLifecycle = "We could not confirm the reservation change. Review its current status before trying again. After checking, reload this page to start another change.";
   const uncertainCreate = "We could not confirm whether the reservation was created. Review reservations before trying again. After checking the unit, reload this page to start another save.";
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -130,7 +134,7 @@ export function ReservationsWorkspace() {
     [data.reservations, facilityId, status, query],
   );
   async function create(form: FormData) {
-    if (createRequest.current || createBlocked || !loaded || readBusy) return;
+    if (createRequest.current || lifecycleRequest.current || lifecycleBlocked || createBlocked || !loaded || readBusy) return;
     const input = {
       facilityId: String(form.get("facilityId") ?? ""), customerId: String(form.get("customerId") ?? ""), unitId: String(form.get("unitId") ?? ""), quotedRate: String(form.get("quotedRate") ?? ""),
       holdExpiresAt: String(form.get("holdExpiresAt") ?? "") || undefined, intendedMoveIn: String(form.get("intendedMoveIn") ?? "") || undefined,
@@ -166,33 +170,49 @@ export function ReservationsWorkspace() {
       clearTimeout(timer); createRequest.current = null; setBusy(false);
     }
   }
+  async function changeReservation(item: Reservation, action: "CANCEL" | "EXTEND" | "EXPIRE", details: { holdExpiresAt?: string; reason?: string } = {}) {
+    if (lifecycleRequest.current || createRequest.current || lifecycleBlocked || readBusy || !loaded) return;
+    const controller = new AbortController(); lifecycleRequest.current = controller;
+    setLifecycleBusy(true); setError(""); setNotice("");
+    const timer = setTimeout(() => controller.abort(), 20_000);
+    try {
+      const response = await fetch(action === "CANCEL" ? `/api/v1/reservations?id=${encodeURIComponent(item.id)}` : "/api/v1/reservations", {
+        method: action === "CANCEL" ? "DELETE" : "PATCH", signal: controller.signal,
+        ...(action === "CANCEL" ? {} : { headers: { "content-type": "application/json" }, body: JSON.stringify({ action, reservationId: item.id, ...details }) }),
+      });
+      if (response.status === 401 || response.status === 403) {
+        setData(emptyData); setLoaded(false); setDialog(false); setFacilityId(""); setQuery(""); setSignedOut(response.status === 401);
+        setReadError(response.status === 401 ? "Your session has ended. Sign in again to manage reservations." : "Reservation access is unavailable. Please contact your administrator if you require access."); return;
+      }
+      if ([400, 404, 409, 422].includes(response.status)) {
+        setError(response.status === 409 ? action === "EXTEND" ? "Choose a future date later than the current hold expiry." : action === "EXPIRE" ? "Only an active overdue reservation can be expired." : "This reservation could not be cancelled. Refresh its current status before trying again." : "Check the reservation details and try again."); return;
+      }
+      if (!response.ok) throw new Error("RESERVATION_CHANGE_UNCERTAIN");
+      const common = z.object({ id: z.literal(item.id), facilityId: z.literal(item.facility.id), unitId: z.literal(item.unit.id) });
+      const schema = action === "EXTEND" ? common.extend({ status: z.literal("ACTIVE"), holdExpiresAt: z.literal(new Date(details.holdExpiresAt!).toISOString()) }) : common.extend({ status: z.literal(action === "CANCEL" ? "CANCELLED" : "EXPIRED"), unitReleased: z.boolean() });
+      const result = schema.parse((await response.json()).data);
+      if (controller.signal.aborted) throw new Error("RESERVATION_CHANGE_TIMEOUT");
+      const verb = action === "CANCEL" ? "cancelled" : "expired";
+      setNotice("holdExpiresAt" in result ? `Reservation for unit ${item.unit.number} extended to ${formatDate(result.holdExpiresAt)}.` : result.unitReleased ? `Reservation ${verb}. Unit ${item.unit.number} is available again.` : `Reservation ${verb}, but unit ${item.unit.number} remains protected by another active reservation or occupancy. Review it under Units & rates.`);
+      await load();
+    } catch {
+      setLifecycleBlocked(true); setError(uncertainLifecycle);
+    } finally {
+      clearTimeout(timer); lifecycleRequest.current = null; setLifecycleBusy(false);
+    }
+  }
   async function cancel(item: Reservation) {
+    if (lifecycleRequest.current || lifecycleBlocked) return;
     if (
       !confirm(
         `Cancel the reservation for unit ${item.unit.number} and release the unit?`,
       )
     )
       return;
-    setError("");
-    const response = await fetch(
-      `/api/v1/reservations?id=${encodeURIComponent(item.id)}`,
-      { method: "DELETE" },
-    );
-    const payload = await response.json();
-    if (!response.ok) {
-      setError(
-        payload.error?.message ?? "The reservation could not be cancelled.",
-      );
-      return;
-    }
-    setNotice(
-      payload.data.unitReleased
-        ? `Reservation cancelled. Unit ${item.unit.number} is available again.`
-        : `Reservation cancelled, but unit ${item.unit.number} remains protected by another active reservation or occupancy. Review it under Units & rates.`,
-    );
-    await load();
+    await changeReservation(item, "CANCEL");
   }
   async function extend(item: Reservation) {
+    if (lifecycleRequest.current || lifecycleBlocked) return;
     const current = item.holdExpiresAt ? item.holdExpiresAt.slice(0, 10) : "";
     const date = prompt(
       "Extend the hold until which date? Use YYYY-MM-DD.",
@@ -201,33 +221,10 @@ export function ReservationsWorkspace() {
     if (!date) return;
     const reason = prompt("Record the reason for this extension.");
     if (!reason) return;
-    setError("");
-    const response = await fetch("/api/v1/reservations", {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        action: "EXTEND",
-        reservationId: item.id,
-        holdExpiresAt: `${date}T23:59:59.999+02:00`,
-        reason,
-      }),
-    });
-    const payload = await response.json();
-    if (!response.ok) {
-      setError(
-        response.status === 409
-          ? "Choose a future date later than the current hold expiry."
-          : (payload.error?.message ??
-              "The reservation could not be extended."),
-      );
-      return;
-    }
-    setNotice(
-      `Reservation for unit ${item.unit.number} extended to ${formatDate(payload.data.holdExpiresAt)}.`,
-    );
-    await load();
+    await changeReservation(item, "EXTEND", { holdExpiresAt: `${date}T23:59:59.999+02:00`, reason });
   }
   async function expire(item: Reservation) {
+    if (lifecycleRequest.current || lifecycleBlocked) return;
     if (
       !confirm(
         `Expire the overdue reservation for unit ${item.unit.number} and release the unit?`,
@@ -239,31 +236,7 @@ export function ReservationsWorkspace() {
       "Hold expired without conversion",
     );
     if (!reason) return;
-    setError("");
-    const response = await fetch("/api/v1/reservations", {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        action: "EXPIRE",
-        reservationId: item.id,
-        reason,
-      }),
-    });
-    const payload = await response.json();
-    if (!response.ok) {
-      setError(
-        response.status === 409
-          ? "Only an active overdue reservation can be expired."
-          : (payload.error?.message ?? "The reservation could not be expired."),
-      );
-      return;
-    }
-    setNotice(
-      payload.data.unitReleased
-        ? `Reservation expired. Unit ${item.unit.number} is available again.`
-        : `Reservation expired, but unit ${item.unit.number} remains protected by another active reservation or occupancy.`,
-    );
-    await load();
+    await changeReservation(item, "EXPIRE", { reason });
   }
   return (
     <div className="page-stack reservations-workspace">
@@ -280,6 +253,7 @@ export function ReservationsWorkspace() {
               setError("");
             }}
             disabled={
+              lifecycleBusy || lifecycleBlocked ||
               !data.facilities.some((facility) => facility.units.length) ||
               !data.customers.length
             }
@@ -290,13 +264,15 @@ export function ReservationsWorkspace() {
         }
       />
       <div>
-        <button className="button button-secondary" disabled={readBusy || busy} onClick={() => void load()}>Refresh reservations</button>
+        <button className="button button-secondary" disabled={readBusy || busy || lifecycleBusy} onClick={() => void load()}>Refresh reservations</button>
         {readBusy ? <p role="status">Loading reservations…</p> : null}
         {readError ? <p className="form-error" role="alert">{readError}</p> : null}
         {signedOut ? <Link className="button button-primary" href="/login">Sign in</Link> : null}
       </div>
-      {error && !dialog ? <p className="form-error">{error}</p> : null}
-      {notice ? <p className="form-success">{notice}</p> : null}
+      {error && !dialog ? <p className="form-error" role="alert">{error}</p> : null}
+      {lifecycleBlocked ? <button className="button button-secondary" disabled={readBusy || lifecycleBusy} onClick={() => void load()}>Review reservation status</button> : null}
+      {lifecycleBusy ? <p role="status">Saving reservation change…</p> : null}
+      {notice ? <p className="form-success" role="status">{notice}</p> : null}
       <section className="summary-strip">
         {[
           [
@@ -435,6 +411,7 @@ export function ReservationsWorkspace() {
                             <button
                               className="text-button"
                               onClick={() => void extend(item)}
+                              disabled={lifecycleBusy || lifecycleBlocked || busy}
                             >
                               Extend
                             </button>
@@ -442,6 +419,7 @@ export function ReservationsWorkspace() {
                               <button
                                 className="text-button danger"
                                 onClick={() => void expire(item)}
+                                disabled={lifecycleBusy || lifecycleBlocked || busy}
                               >
                                 Expire
                               </button>
@@ -449,6 +427,7 @@ export function ReservationsWorkspace() {
                             <button
                               className="text-button danger"
                               onClick={() => void cancel(item)}
+                              disabled={lifecycleBusy || lifecycleBlocked || busy}
                             >
                               Cancel
                             </button>

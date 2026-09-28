@@ -17,7 +17,7 @@ try {for(const width of [1440,390,320]) {
  page.on("pageerror",e=>errors.push(e.message));
  await page.route("**/api/v1/reservations*",route=>{
   methods.push(route.request().method());
-  if(route.request().method()==="DELETE"){mode="network";return route.fulfill({json:{data:{unitReleased:true}}});}
+  if(route.request().method()==="DELETE"){mode="network";return route.fulfill({json:{data:{id:"reservation",facilityId:"store",unitId:"unit",status:"CANCELLED",unitReleased:true}}});}
   if(mode==="network")return route.abort();
   if(mode==="hold"){pending=route;return;}
   if(mode==="401"||mode==="403"||mode==="500")return route.fulfill({status:Number(mode),json:{error:{message:"Synthetic"}}});
