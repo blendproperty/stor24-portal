@@ -1,10 +1,16 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Migration relationship validation — 28 September 2026
+
+- **Implementation:** offline CSV preflight rejects blank required facility/type/customer/unit relationships and cross-facility unit-type, tenancy-unit and reservation-unit links. Optional customer contact fields remain optional. No import, production mutation or financial/policy approval added.
+- **Testing:** executable synthetic CSV cases reproduced false valid=true before patch. Candidate485 tests passed; typecheck/focused lint passed after test-case type annotation. Required CI pending. Existing real journey/database/restore suites retained.
+- **Commit/push:** candidate on codex/migration-reference-validation includes PR333 final evidence; pending commit.
+- **Merge/deployment/live:** pending. No schema or runtime configuration change. Source export, migration rehearsal, financial reconciliation and all14 acceptance gates remain open.
 ## Unit-type removal audit transaction — 28 September 2026
 
 - **Implementation:** unit-type deletion and existing owner-authorised linked-unit/lead/maintenance cleanup now share the unit-types.deleted audit transaction. Existing assigned-unit, owner, history and facility guards retained. No live records changed or removal-policy/replay guarantee added.
-- **Testing:** actual prepatch route deleted an unused type despite audit failure500. Candidate482 unit tests/typecheck/focused lint passed; required real PostgreSQL unused-type and forced linked cleanup rollback/retry and guard coverage added, pending CI.
-- **Commit/push:** candidate on codex/unit-type-delete-audit includes PR332 final deployment evidence; pending commit.
-- **Merge/deployment/live:** pending; no migration/configuration change. All14 programme acceptance gates remain open.
+- **Testing:** actual prepatch route deleted an unused type despite audit failure500. Candidate482 unit tests/typecheck/focused lint passed; required real PostgreSQL unused-type and forced linked cleanup rollback/retry and guard coverage explicitly passed in SQL36374727824/job108778118938. All nine checks passed: CI36374727779/SQL36374727824/security36374727796.
+- **Commit/push:** PR333 source4b42e5a86c107dbbc6052ca0f443efa1940bca9b includes PR332 final evidence; merged131721c5ef1ca47c9d18abd2d4bda03ddad97089.
+- **Deployment/live:** mainCI36375035221/deploy36375380505 passed. Exact image stor24-crm:131721c5e healthy; service/database readiness verified2026-09-28T03:54:31.599Z. ExcelE093 and24th component record delivery. No migration/configuration change. All14 programme acceptance gates remain open.
 ## Unit removal audit transaction — 28 September 2026
 
 - **Implementation:** existing unavailable-status change or owner-authorised permanent unit removal, maintenance unlink and units.deleted audit share a transaction. Existing owner, history and facility guards retained. No live units changed; no removal-policy or concurrency guarantee added.
