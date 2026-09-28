@@ -1,10 +1,17 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Unit removal audit transaction — 28 September 2026
+
+- **Implementation:** existing unavailable-status change or owner-authorised permanent unit removal, maintenance unlink and units.deleted audit share a transaction. Existing owner, history and facility guards retained. No live units changed; no removal-policy or concurrency guarantee added.
+- **Testing:** actual prepatch synthetic audit failure retained UNAVAILABLE despite500; candidate481 tests/typecheck/focused lint passed. Required PostgreSQL status rollback/retry and forced unit/maintenance rollback/retry with owner/history/facility tests added; pending CI. Initial SQL run36373157950 stopped at duplicate owner-role fixture; reuse the existing synthetic owner role without changing its grants, then rerun all required checks.
+- **Commit/push:** candidate on codex/unit-delete-audit includes PR331 final evidence; pending commit.
+- **Merge/deployment/live:** pending. No schema/configuration change. All14 acceptance gates remain open; unit-type DELETE remains a separate candidate.
+
 ## Reservation cancellation audit transaction — 28 September 2026
 
 - **Implementation:** cancellation and its existing reservations.deleted audit now commit together. Audit failure restores the prior status; facility permission and existing cancellation policy unchanged. No live reservations changed.
-- **Testing:** actual prepatch synthetic audit failure left CANCELLED despite500. Candidate480 unit tests passed rollback/retry and foreign-facility rejection. Required isolated PostgreSQL rollback/one-audit retry added. Initial SQL fixture used wrong unit rate field; corrected to monthlyRate before promotion. Type/lint and required CI must pass.
-- **Commit/push:** candidate on codex/reservation-cancel-audit includes final PR330 evidence and tracker clarification; pending commit.
-- **Merge/deployment/live:** pending. No migration/configuration change. All14 acceptance gates remain open; no request replay or broader cancellation-policy guarantee.
+- **Testing:** actual prepatch synthetic audit failure left CANCELLED despite500. Candidate480 unit tests passed rollback/retry and foreign-facility rejection. Required isolated PostgreSQL rollback/one-audit retry explicitly passed in SQL36371841915/job108769659323. Initial SQL fixture used wrong unit rate field; corrected to monthlyRate before promotion. Type/lint and all nine required checks passed: CI36371841940/SQL36371841915/security36371841861.
+- **Commit/push:** PR331 sourcea73c78c429d13565de114ecffd8c389abca19a92 merged719ea91350ff4b83ac966fe7d561997ecf343154. Includes final PR330 evidence and tracker clarification.
+- **Deployment/live:** mainCI36372303304 and deploy36372697382 passed. Exact image stor24-crm:719ea9135 healthy; service/database readiness verified2026-09-28T03:12:45.765Z. ExcelE091 and PR331 delivered component record verification. No migration/configuration change. All14 acceptance gates remain open; no request replay or broader cancellation-policy guarantee.
 - **Session:** Brett authorised remaining build work until18:00 Johannesburg28September; automate bounded verified repairs, preserve provider/legal/finance approvals and record staff acceptance separately.
 
 ## Delivery tracker status clarification — 27 September 2026
