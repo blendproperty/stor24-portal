@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, open, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
 
@@ -84,6 +84,11 @@ function requireSameFacility(rows, field, targets, file, errors) {
 
 const sourceDirectory = resolve(process.argv[2] ?? "migration/templates");
 const outputPath = resolve(process.argv[3] ?? "migration-validation.json");
+const sourcePaths = Object.keys(contracts).map(name => resolve(sourceDirectory, `${name}.csv`));
+const pathKey = path => process.platform === "win32" ? path.toLowerCase() : path;
+if (sourcePaths.some(path => pathKey(path) === pathKey(outputPath))) {
+  throw new Error("Report output cannot overwrite a source file");
+}
 const errors = []; const data = {}; const sourceFiles = {};
 for (const [name, required] of Object.entries(contracts)) {
   const file = `${name}.csv`;
@@ -125,6 +130,25 @@ const reconciliation = {
   customersWithoutContracts: valid ? data.customers.filter(row => !contractsByCustomer.has(row.legacy_id)).length : null,
 };
 const report = { generatedAt: new Date().toISOString(), sourceDirectory, valid, sourceFiles, counts: Object.fromEntries(Object.entries(data).map(([name, rows]) => [name, rows.length])), reconciliation, errors };
-await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+// Open without truncating, then compare the actual file identity. This also
+// protects source files reached through symlinks or hard links.
+const output = await open(outputPath, "r+").catch(error => {
+  if (error.code !== "ENOENT") throw error;
+  return open(outputPath, "wx");
+});
+try {
+  const outputIdentity = await output.stat();
+  for (const path of sourcePaths) {
+    const sourceIdentity = await stat(path).catch(error => {
+      if (error.code !== "ENOENT") throw error;
+      return null;
+    });
+    if (sourceIdentity && sourceIdentity.dev === outputIdentity.dev && sourceIdentity.ino === outputIdentity.ino) {
+      throw new Error("Report output cannot overwrite a source file");
+    }
+  }
+  await output.truncate(0);
+  await output.writeFile(`${JSON.stringify(report, null, 2)}\n`, "utf8");
+} finally { await output.close(); }
 console.log(JSON.stringify(report, null, 2));
 if (errors.length) process.exitCode = 1;

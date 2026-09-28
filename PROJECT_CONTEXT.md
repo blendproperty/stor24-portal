@@ -1,4 +1,10 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Migration source-file preservation — 28 September 2026
+
+- **Implementation:** report output rejects source paths and compares the opened output file identity against source files before truncation, covering existing hard-link/symlink aliases. Normal reports remain replaceable. Source-directory access controls/backups still required; no hostile filesystem race guarantee.
+- **Testing:** synthetic prepatch direct output overwrote a source CSV and exited0. Candidate490 tests/typecheck/focused lint passed. CLI direct-path/hard-link byte preservation and replacement of a longer prior report passed; no real export used. Required CI pending.
+- **Commit/push:** candidate on codex/migration-source-preservation includes PR336 final evidence; pending commit.
+- **Merge/deployment/live:** pending. No production data, schema or configuration changes; all14 acceptance gates remain open.
 ## Migration source reconciliation evidence — 28 September 2026
 
 - **Implementation:** read-only preflight reports exact-byte SHA-256/size for each readable CSV and validated per-facility record/distinct linked-customer counts, plus customers without contracts. Invalid packages have null reconciliation counts. All statuses count; cross-facility customers are not additive. No import or financial acceptance implied.
