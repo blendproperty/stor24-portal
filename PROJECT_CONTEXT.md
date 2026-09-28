@@ -2,9 +2,10 @@
 ## Reservations read recovery — 28 September 2026
 
 - **Implementation:** shared initial/refresh read validates nested payloads, times out after20seconds, distinguishes unavailable/loading/empty data and exposes GET-only refresh. Reads clear stale records/editors; denied access gives sign-in/administrator guidance and clears private notices. Confirmed mutation notices survive generic follow-up read failures. Server reservation policies and mutation retry guarantees unchanged.
-- **Testing:** prepatch actual component network failure produced an unhandled error and false empty message. Candidate1440/390/320px network/server/malformed/nested-shape/timeout/401/403/empty/populated/deep-link and cancellation-success/read-failure recovery pass; exactly one synthetic DELETE, remaining requests GET. Mobile empty state removed from scrolled table and retested.492 tests/typecheck/lint and premium workspace regression passed. Required browser CI pending.
-- **Commit/push:** candidate codex/reservations-read-recovery includes PR340 final evidence; pending commit.
-- **Merge/deployment/live:** pending. No production customer/reservation mutations; all14 acceptance gates remain open.
+- **Testing:** prepatch actual component network failure produced an unhandled error and false empty message. Candidate1440/390/320px network/server/malformed/nested-shape/timeout/401/403/empty/populated/deep-link and cancellation-success/read-failure recovery passed; exactly one synthetic DELETE, remaining requests GET. Mobile empty state removed from scrolled table and retested.492 tests/typecheck/lint and premium workspace regression passed. All nine required checks CI36386278070/SQL36386277924/security36386277990 passed; new browser step explicitly passed.
+- **Commit/push and merge:** PR341 sourcef31e5a263fb5b27d016e017adf9b2774d8c367b1 mergeddfa45c91d4ee75228d965a63e972b565ff0120d4, including PR340 final evidence.
+- **Deployment/configuration:** mainCI36386778668/deploy36387356170 passed. No schema/configuration change.
+- **Live verification:** exact image stor24-crm:dfa45c91d healthy; service/database readiness verified2026-09-28T06:39:27.715Z. ExcelE101 records32nd delivered component. No production reservation/customer mutations. Staff acceptance/all14 gates remain open; create/edit mutation recovery remains separate work.
 ## Migration business-key preflight — 28 September 2026
 
 - **Implementation:** source preflight rejects duplicate facility codes and facility-scoped unit-type names/unit numbers with distinct legacy IDs, matching existing database unique keys. Exact case and leading zeros preserved. No target database import or policy change.
