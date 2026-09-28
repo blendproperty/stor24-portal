@@ -1,4 +1,10 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## CEO presentation freeze — 28 September 2026
+
+- Brett shortened the deadline to14:30 Johannesburg for the15:00 CEO presentation. New feature work is frozen; test-reset recovery is postponed. No configuration or production data changes authorised by this presentation preparation.
+- Read-only remote check confirmed main dc5a5aacc5f285de42a04efdeae565f093b864d8 and evidence branch3023b70c02e562debfcc731675e452e2ad2c8dfb. Prior PR351 deployment/health evidence below remains dated11:28UTC; no new live verification is claimed here.
+- Added docs/CEO_WALKTHROUGH_2026-09-28.md using existing move-in step labels/routes and staff acceptance checklist. Documentation only; no application implementation or test rerun. Commit/push pending; no merge or deployment planned for this presentation note. ExcelE111 remains42 delivered components, all14 acceptance gates open, unchanged by this documentation.
+
 ## Cancelled-hold release confirmation recovery — 28 September 2026
 
 - **Implementation:** store-wide and single-unit release use shared synchronous request locking,20second timeout, denied-data clearing and persistent uncertain-result blocking. Confirmation validates facility, unit numbers, unique non-overlapping outcomes and checked count. Confirmed release/protection/empty notices precede GET refresh. The first confirmation step no longer claims a server review already occurred. Existing backend active-reservation/occupancy/test-artifact/audit rules unchanged; no new replay/concurrency guarantee.
