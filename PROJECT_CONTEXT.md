@@ -1,6 +1,8 @@
 # STOR 24 CRM and Operations Platform — Project Context
 ## CEO presentation freeze — 28 September 2026
 
+- **Final read-only handoff:** at2026-09-28T12:15:47.222Z (14:15 Johannesburg), exact stor24-crm:dc5a5aacc remained healthy and service/database returned ok; remote main remains dc5a5aacc5f285de42a04efdeae565f093b864d8. No new code, deployment or configuration. ExcelE111 retains the same verified release and42 delivered components; no acceptance status changes. Work is wrapped up before14:30; automatic continuation is being paused for the15:00 presentation.
+
 - Brett shortened the deadline to14:30 Johannesburg for the15:00 CEO presentation. New feature work is frozen; test-reset recovery is postponed. No configuration or production data changes authorised by this presentation preparation.
 - Read-only remote check confirmed main dc5a5aacc5f285de42a04efdeae565f093b864d8 and evidence branch3023b70c02e562debfcc731675e452e2ad2c8dfb. Prior PR351 deployment/health evidence below remains dated11:28UTC; no new live verification is claimed here.
 - Added docs/CEO_WALKTHROUGH_2026-09-28.md using existing move-in step labels/routes and staff acceptance checklist. Documentation only; no application implementation or test rerun. Walkthrough and freeze note committed/pushed171b307 to codex/hold-release-evidence; no merge or deployment planned for this presentation note. ExcelE111 remains42 delivered components, all14 acceptance gates open, unchanged by this documentation.
