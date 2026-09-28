@@ -1,10 +1,20 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Unit inventory read recovery — 28 September 2026
+
+- **Implementation:** preserves initial server-provided inventory; refresh validates all three nested read payloads, bounds requests at20seconds and exposes a GET-only retry. Unavailable data hides actions/editors;401/403 clears records and gives sign-in/administrator guidance. Confirmed save notices survive generic read failures. Existing floor/availability policies and account links preserved; mutation confirmation/replay recovery remains separate.
+- **Testing:** synthetic actual component reproduced confirmed unit-type save followed by unhandled refresh failure and lost confirmation. Candidate1440/390/320px network/server/malformed/nested payload/timeout/denial/empty/populated/account-link/closed-floor and GET-only recovery pass; exactly one synthetic POST.492 tests/typecheck/lint and floor/premium workspace regressions passed. Mobile recovery screenshot inspected; isolated fixture is not full production branding proof. Initial CI36393356660 caught a Windows-encoded ellipsis in the new loading message; corrected to UTF-8 before promotion, full checks rerun.
+- **Commit/push:** implementation ef0dc75 pushed on codex/unit-inventory-read-recovery, includes PR343 final evidence; this context checkpoint follows before PR checks.
+- **Merge:** pending required checks.
+- **Deployment/configuration:** pending; no schema/configuration change.
+- **Live verification:** pending; no production unit/facility mutations. All14 acceptance gates remain open.
+
 ## Reservation lifecycle confirmation recovery — 28 September 2026
 
 - **Implementation:** cancel/extend/expire share synchronous request guard,20second timeout, permission-denial clearing and matching reservation/facility/unit/status confirmation. Extension verifies exact expiry; cancellation/expiry require explicit boolean release result. Uncertain outcomes block writes across GET-only status review; explicit reload after checking remains required. Existing backend eligibility/locking/release policies unchanged.
-- **Testing:** actual prepatch network failure produced unhandled page error. Candidate1440/390/320px all three actions cover conflict/denial/network/server/malformed/wrong identity-unit-status-detail/timeout/duplicate/GET review/confirmed release-retention and saved-refresh failure.492 tests/typecheck/lint pass; read/create/premium regressions passed. Existing read fixture corrected to full actual cancellation response. Required new browser CI pending.
-- **Commit/push:** candidate codex/reservation-lifecycle-recovery includes PR342 final evidence; pending commit.
-- **Merge/deployment/live:** pending. No production changes to reservations/customers/units; all14 acceptance gates remain open. Client guards are not server replay guarantees.
+- **Testing:** prepatch network failure produced unhandled page error. All three actions passed1440/390/320px conflict/denial/network/server/malformed/wrong identity-unit-status-detail/timeout/duplicate/GET review/confirmed release-retention and saved-refresh failure.492 tests/typecheck/lint and read/create/premium regressions passed. Initial CI36390191798 failed ambiguous status locator; corrected and rerun. All nine corrected checks CI36390681606/SQL36390681690/security36390681612 passed; new browser step explicitly passed.
+- **Commit/push and merge:** PR343 corrected sourcec86f78a1f9626e09527f9a063f90e91e00fe4f2d merged6ae8b3bc4e728467766d0e4438f1061342290d37, including PR342 final evidence.
+- **Deployment/configuration:** mainCI36391382442/deploy36391918300 passed; no schema/configuration change.
+- **Live verification:** exact image stor24-crm:6ae8b3bc4 healthy; service/database readiness verified2026-09-28T07:31:42.99Z. ExcelE103 records34th delivered component. No production changes to reservations/customers/units; all14 acceptance gates remain open. Client guards are not server replay guarantees.
 ## Reservation creation recovery — 28 September 2026
 
 - **Implementation:** explicit form submit retains rejected entries; synchronous request guard/20second timeout and matching identity/rate/date/status confirmation prevent false success. Uncertain outcomes block repeated saves across modal reopen and offer GET-only review; reload remains an explicit manual step after checking. Denial clears private records. Existing server facility/unit allocation locks, floor and scope policies unchanged; no new server idempotency guarantee.
