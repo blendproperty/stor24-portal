@@ -463,53 +463,57 @@ export async function DELETE(
         });
       } else {
         if (resource === "unit-types") {
-          const assigned = await db.unit.count({ where: { unitTypeId: id } });
-          if (assigned && !force)
-            return Response.json(
-              {
-                error: {
-                  code: "UNIT_TYPE_IN_USE",
-                  message: `This unit type is used by ${assigned} unit${assigned === 1 ? "" : "s"}. An organisation owner can delete the type and its unused units.`,
-                  assigned,
-                  canForceDelete: true,
-                },
-              },
-              { status: 409 },
-            );
-          if (assigned && force) {
-            await requireOwner();
-            const protectedUnits = await db.unit.count({
-              where: {
-                unitTypeId: id,
-                OR: [
-                  { reservations: { some: {} } },
-                  { occupancies: { some: {} } },
-                ],
-              },
-            });
-            if (protectedUnits)
+          return await db.$transaction(async tx => {
+            const assigned = await tx.unit.count({ where: { unitTypeId: id } });
+            if (assigned && !force)
               return Response.json(
                 {
                   error: {
-                    code: "UNIT_TYPE_HAS_HISTORY",
-                    message: `${protectedUnits} assigned unit${protectedUnits === 1 ? " has" : "s have"} reservation or occupancy history and cannot be deleted. Reassign those units first.`,
+                    code: "UNIT_TYPE_IN_USE",
+                    message: `This unit type is used by ${assigned} unit${assigned === 1 ? "" : "s"}. An organisation owner can delete the type and its unused units.`,
+                    assigned,
+                    canForceDelete: true,
                   },
                 },
                 { status: 409 },
               );
-            await db.$transaction([
-              db.lead.updateMany({
-                where: { desiredUnitTypeId: id },
-                data: { desiredUnitTypeId: null },
-              }),
-              db.maintenanceRequest.updateMany({
-                where: { unit: { unitTypeId: id } },
-                data: { unitId: null },
-              }),
-              db.unit.deleteMany({ where: { unitTypeId: id } }),
-              db.unitType.delete({ where: { id } }),
-            ]);
-          } else await (model as typeof db.unit).delete({ where: { id } });
+            if (assigned && force) {
+              await requireOwner();
+              const protectedUnits = await tx.unit.count({
+                where: {
+                  unitTypeId: id,
+                  OR: [
+                    { reservations: { some: {} } },
+                    { occupancies: { some: {} } },
+                  ],
+                },
+              });
+              if (protectedUnits)
+                return Response.json(
+                  {
+                    error: {
+                      code: "UNIT_TYPE_HAS_HISTORY",
+                      message: `${protectedUnits} assigned unit${protectedUnits === 1 ? " has" : "s have"} reservation or occupancy history and cannot be deleted. Reassign those units first.`,
+                    },
+                  },
+                  { status: 409 },
+                );
+
+                await tx.lead.updateMany({
+                  where: { desiredUnitTypeId: id },
+                  data: { desiredUnitTypeId: null },
+                });
+                await tx.maintenanceRequest.updateMany({
+                  where: { unit: { unitTypeId: id } },
+                  data: { unitId: null },
+                });
+                await tx.unit.deleteMany({ where: { unitTypeId: id } });
+                await tx.unitType.delete({ where: { id } });
+
+            } else await tx.unitType.delete({ where: { id } });
+            await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "unit-types.deleted", entityType: "unit-types", entityId: id } });
+            return new Response(null, { status: 204 });
+          });
         } else await (model as typeof db.unit).delete({ where: { id } });
       }
     }

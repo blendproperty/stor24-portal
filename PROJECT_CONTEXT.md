@@ -1,4 +1,10 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Unit-type removal audit transaction — 28 September 2026
+
+- **Implementation:** unit-type deletion and existing owner-authorised linked-unit/lead/maintenance cleanup now share the unit-types.deleted audit transaction. Existing assigned-unit, owner, history and facility guards retained. No live records changed or removal-policy/replay guarantee added.
+- **Testing:** actual prepatch route deleted an unused type despite audit failure500. Candidate482 unit tests/typecheck/focused lint passed; required real PostgreSQL unused-type and forced linked cleanup rollback/retry and guard coverage added, pending CI.
+- **Commit/push:** candidate on codex/unit-type-delete-audit includes PR332 final deployment evidence; pending commit.
+- **Merge/deployment/live:** pending; no migration/configuration change. All14 programme acceptance gates remain open.
 ## Unit removal audit transaction — 28 September 2026
 
 - **Implementation:** existing unavailable-status change or owner-authorised permanent unit removal, maintenance unlink and units.deleted audit share a transaction. Existing owner, history and facility guards retained. No live units changed; no removal-policy or concurrency guarantee added.
