@@ -1,9 +1,22 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Statement return to move-in — 28 September 2026
+
+- **Implementation:** Brett requested this navigation fix during attended Priority1 acceptance. Statement page resolves its scoped account and matching active/converted reservation server-side, then shows an orange Back to move-in checks link retaining that reservation. Accounts return remains. No payment, balance, permission or handover-policy changes.
+- **Testing:** actual statement component returns to the matching reservation at1440/390/320px; mobile link bounds/screenshot verified.493 unit tests/typecheck/focused ESLint passed. Required CI pending. No production payment recorded during this fix.
+- **Commit/push:** candidate pending. **Merge/deployment/live verification:** pending. This explicitly requested repair follows the earlier presentation freeze. Priority1 acceptance and all other gates remain open; the completed demo does not accept the live journey.
+## CEO presentation freeze — 28 September 2026
+
+- **Final read-only handoff:** at2026-09-28T12:15:47.222Z (14:15 Johannesburg), exact stor24-crm:dc5a5aacc remained healthy and service/database returned ok; remote main remains dc5a5aacc5f285de42a04efdeae565f093b864d8. No new code, deployment or configuration. ExcelE111 retains the same verified release and42 delivered components; no acceptance status changes. Work is wrapped up before14:30; automatic continuation is being paused for the15:00 presentation.
+
+- Brett shortened the deadline to14:30 Johannesburg for the15:00 CEO presentation. New feature work is frozen; test-reset recovery is postponed. No configuration or production data changes authorised by this presentation preparation.
+- Read-only remote check confirmed main dc5a5aacc5f285de42a04efdeae565f093b864d8 and evidence branch3023b70c02e562debfcc731675e452e2ad2c8dfb. Prior PR351 deployment/health evidence below remains dated11:28UTC; no new live verification is claimed here.
+- Added docs/CEO_WALKTHROUGH_2026-09-28.md using existing move-in step labels/routes and staff acceptance checklist. Documentation only; no application implementation or test rerun. Walkthrough and freeze note committed/pushed171b307 to codex/hold-release-evidence; no merge or deployment planned for this presentation note. ExcelE111 remains42 delivered components, all14 acceptance gates open, unchanged by this documentation.
+
 ## Cancelled-hold release confirmation recovery — 28 September 2026
 
 - **Implementation:** store-wide and single-unit release use shared synchronous request locking,20second timeout, denied-data clearing and persistent uncertain-result blocking. Confirmation validates facility, unit numbers, unique non-overlapping outcomes and checked count. Confirmed release/protection/empty notices precede GET refresh. The first confirmation step no longer claims a server review already occurred. Existing backend active-reservation/occupancy/test-artifact/audit rules unchanged; no new replay/concurrency guarantee.
-- **Testing:** prepatch actual network failure threw and left controls busy. Candidate store/unit flows1440/390/320px passed network/timeout/duplicate/401/403/409/500/malformed/wrong facility-unit/duplicate-overlapping outcomes/count/lost result/GET review/protected/empty/success-refresh failure.493 tests/typecheck/focused lint and rate/read regressions passed; narrow recovery screenshot checked. Required CI pending.
-- **Commit/push:** candidate pending, carries PR350 final evidence. **Merge:** pending. **Deployment/configuration:** pending; no schema/configuration change. **Live verification:** pending. No production holds released; all14 acceptance gates remain open. UAT reset recovery remains separate.
+- **Testing:** prepatch actual network failure threw and left controls busy. Candidate store/unit flows1440/390/320px passed network/timeout/duplicate/401/403/409/500/malformed/wrong facility-unit/duplicate-overlapping outcomes/count/lost result/GET review/protected/empty/success-refresh failure.493 tests/typecheck/focused lint and rate/read regressions passed; narrow recovery screenshot checked. All nine checks CI36413549582/SQL36413549592/security36413549651 passed; new browser step explicitly passed.
+- **Commit/push:** PR351 source2f293ef67ecabb8f2c3a238e3f3208b910331dee, carries PR350 final evidence. **Merge:** dc5a5aacc5f285de42a04efdeae565f093b864d8. **Deployment/configuration:** mainCI36414647012/deploy36415588808 passed; no schema/configuration change. **Live verification:** exact image stor24-crm:dc5a5aacc healthy; service/database readiness verified2026-09-28T11:28:00.58Z. ExcelE111 records42nd delivered component. No production holds released; all14 acceptance gates remain open. UAT reset recovery remains separate.
 
 ## Bulk rate audit transaction — 28 September 2026
 
