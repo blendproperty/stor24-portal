@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync, rmSync, linkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -23,6 +23,8 @@ function validate(overrides: Record<string, string> = {}, headers: Record<string
       writeFileSync(join(directory, `${name}.csv`), `${header}\n${data}\n`);
     }
     const output = join(directory, "result.json");
+    // Every normal invocation must safely replace an existing, longer report.
+    writeFileSync(output, "stale report".repeat(1000));
     const customerBytes = readFileSync(join(directory, "customers.csv"));
     const run = spawnSync(process.execPath, [resolve("scripts/validate-migration-export.mjs"), directory, output], { encoding: "utf8" });
     assert.equal(run.error, undefined);
@@ -56,6 +58,26 @@ test("invalid migration package never offers ready reconciliation counts", () =>
   const result = validate({ units: "ua,a,tb,1,AVAILABLE,100\nub,b,tb,1,AVAILABLE,100" });
   assert.equal(result.report.valid, false);
   assert.deepEqual(result.report.reconciliation, { ready: false, byFacility: null, customersWithoutContracts: null });
+});
+
+test("migration report refuses source paths and hard-link aliases without changing bytes", () => {
+  for (const alias of [false, true]) {
+    const directory = mkdtempSync(join(tmpdir(), "stor24-source-preserve-"));
+    try {
+      for (const [name, data] of Object.entries(rows)) {
+        const header = readFileSync(resolve("migration/templates", `${name}.csv`), "utf8").trim();
+        writeFileSync(join(directory, `${name}.csv`), `${header}\n${data}\n`);
+      }
+      const source = join(directory, "customers.csv");
+      const output = alias ? join(directory, "report.json") : source;
+      if (alias) linkSync(source, output);
+      const before = readFileSync(source);
+      const run = spawnSync(process.execPath, [resolve("scripts/validate-migration-export.mjs"), directory, output], { encoding: "utf8" });
+      assert.equal(run.status, 1);
+      assert.deepEqual(readFileSync(source), before);
+      assert.match(run.stderr, /source file/);
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  }
 });
 
 test("migration validator rejects malformed CSV instead of approving truncated data", () => {

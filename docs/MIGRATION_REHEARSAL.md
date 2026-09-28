@@ -15,6 +15,8 @@ Copy the six legacy extracts into a new, access-controlled directory using the e
 
 Do not commit populated extracts. They contain customer information.
 
+Choose a separate JSON report path. The validator rejects source-file output paths and existing aliases that resolve to a source file, including hard links, before truncating any report. Normal existing report files may be refreshed. Keep source exports in an access-controlled directory; this guard does not replace filesystem access controls or backups.
+
 ## Validate before any import
 
 Run:
