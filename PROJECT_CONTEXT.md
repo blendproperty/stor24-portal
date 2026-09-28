@@ -1,4 +1,10 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Merchandise supply queue read recovery — 28 September 2026
+
+- **Implementation:** paid-supplies queue separates loading/failed/empty states, validates nested response data, times reads out after20seconds and offers GET-only refresh. Denied reads clear private data/confirmation and show administrator/sign-in guidance; failed or loading reads disable supply actions. Existing fulfilment policy and mutation confirmation remain separate work.
+- **Testing:** actual prepatch component showed Failed to fetch alongside No orders to display and no retry. Candidate browser network/malformed/401/403/timeout/empty/populated/stale-action recovery passed1440/390/320px without page errors/overflow; screenshot inspected (isolated fixture, not full production branding).490 tests/typecheck/lint and operations-read/access regressions passed. Effect scheduling lint issue fixed/retested. New required browser CI step added; pending checks.
+- **Commit/push:** candidate on codex/merchandise-queue-read-recovery includes PR337 final evidence; pending commit.
+- **Merge/deployment/live:** pending. No production orders/stock changed or new fulfilment/replay guarantee. All14 gates remain open.
 ## Migration source-file preservation — 28 September 2026
 
 - **Implementation:** report output rejects source paths and compares the opened output file identity against source files before truncation, covering existing hard-link/symlink aliases. Normal reports remain replaceable. Source-directory access controls/backups still required; no hostile filesystem race guarantee.
