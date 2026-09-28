@@ -41,6 +41,8 @@ CSV parsing rejects unclosed or misplaced quotes, text after a closing quote, du
 
 ## Cut-over controls
 
+The validation report fingerprints each readable source file with its exact-byte SHA-256 and size. For a valid package, `reconciliation.byFacility` records source unit-type, unit, tenancy and reservation counts plus distinct linked customers; `customersWithoutContracts` records customers without any source tenancy/reservation. Linked customers may appear at multiple facilities, so do not sum that column as a global customer total. All contract statuses are counted. Compare these counts to the source owner's totals and the later rehearsal database; they are not financial totals or proof of import success. `reconciliation.ready` means source count evidence is available, not launch approval. Invalid packages have null reconciliation counts and remain blocked. Preserve the source extraction timestamp separately; the report generation time is not extraction time.
+
 - Announce a legacy-system data freeze with a named owner and timestamp.
 - Take a fresh full export after the freeze; do not reuse rehearsal data.
 - Validate and reconcile before switching users to STOR24.
