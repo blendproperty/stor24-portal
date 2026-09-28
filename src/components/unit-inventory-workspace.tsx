@@ -110,6 +110,9 @@ export function UnitInventoryWorkspace({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [saveBlocked, setSaveBlocked] = useState(false);
+  const saveRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => { saveRequest.current?.abort(); saveRequest.current = null; }, []);
   const [forceDeleteCount, setForceDeleteCount] = useState(0);
   const [renumberDialog, setRenumberDialog] = useState(false);
   const [confirmingRelease, setConfirmingRelease] = useState(false);
@@ -155,6 +158,7 @@ export function UnitInventoryWorkspace({
   );
 
   async function applyMidrandMarketRates() {
+    if (saveBlocked || saveRequest.current) return;
     if (!selectedFacility || !window.confirm(`Apply the August 2026 Midrand market rate curve to all ${selectedFacility.units.length} standard unit rates at ${selectedFacility.name}? Existing tenancy rents and reservation quotes will not change.`)) return;
     setBusy(true);
     setError("");
@@ -175,6 +179,7 @@ export function UnitInventoryWorkspace({
   }
 
   async function releaseOrphanedReservations(unit?: Unit) {
+    if (saveBlocked || saveRequest.current) return;
     if (!selectedFacility) return;
     if (!unit && !confirmingRelease) {
       setConfirmingRelease(true);
@@ -209,6 +214,7 @@ export function UnitInventoryWorkspace({
   }
 
   async function uatReset(action: "preview" | "reset") {
+    if (saveBlocked || saveRequest.current) return;
     setBusy(true);
     setError("");
     setNotice("");
@@ -282,10 +288,10 @@ export function UnitInventoryWorkspace({
   }
 
   async function submit(form: FormData) {
-    if (!dialog) return;
+    if (!dialog || busy || saveBlocked || saveRequest.current) return;
     const isType = dialog.kind === "type";
     const editing = isType ? dialog.unitType : dialog.unit;
-    const targetFacility = String(form.get("facilityId") ?? facilityId);
+    const targetFacility = String(editing?.facilityId ?? form.get("facilityId") ?? facilityId);
     const width = Number(form.get("widthMetres") || 0);
     const length = Number(form.get("lengthMetres") || 0);
     const area = Number(form.get("areaSqMetres") || 0);
@@ -311,42 +317,55 @@ export function UnitInventoryWorkspace({
           taxRate: Number(form.get("taxRate") || 15) / 100,
           status: editing ? form.get("status") : "AVAILABLE",
         };
-    setBusy(true);
-    setError("");
-    setNotice("");
-    const resource = isType ? "unit-types" : "units";
-    const response = await fetch(`/api/v1/leasing/${resource}`, {
-      method: editing ? "PATCH" : "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(
-        editing ? { id: editing.id, data: payload } : payload,
-      ),
-    });
-    const result = await response.json().catch(() => ({}));
-    setBusy(false);
-    if (!response.ok) {
-      setError(
-        result.error?.message ??
-          (response.status === 409
-            ? "This change conflicts with an existing inventory record."
-            : "The inventory record could not be saved."),
-      );
-      return;
+    const controller = new AbortController();
+    saveRequest.current = controller;
+    const timer = setTimeout(() => controller.abort(), 20_000);
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const resource = isType ? "unit-types" : "units";
+      const response = await fetch(`/api/v1/leasing/${resource}`, {
+        method: editing ? "PATCH" : "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify(editing ? { id: editing.id, data: payload } : payload), signal: controller.signal,
+      });
+      if (saveRequest.current !== controller) return;
+      if ([401, 403].includes(response.status)) {
+        setFacilities([]); setDialog(null); setRenumberDialog(false); setUatResetPreview(null);
+        setFacilityId(""); setTypeId(""); setQuery(""); setNotice(""); setReadDenied(true);
+        setReadError(response.status === 401 ? "Sign in again to manage unit inventory." : "You do not have access to save inventory. Please contact your administrator if you require access.");
+        return;
+      }
+      const result = await response.json().catch(() => null);
+      if (saveRequest.current !== controller) return;
+      if ([400, 404, 409, 422].includes(response.status)) {
+        setError(typeof result?.error?.message === "string" ? result.error.message : "The inventory record was not saved. Check the entries and try again.");
+        return;
+      }
+      const saved = result?.data;
+      const numeric = new Set(["widthMetres", "lengthMetres", "areaSqMetres", "monthlyRate", "taxRate"]);
+      const matching = saved && typeof saved.id === "string" && saved.id.length > 0 && (!editing || saved.id === editing.id)
+        && Object.entries(payload).every(([key, value]) => {
+          if (value === undefined) return true;
+          if (numeric.has(key)) return ["string", "number"].includes(typeof saved[key]) && String(saved[key]).trim() !== "" && Number.isFinite(Number(saved[key])) && Number(saved[key]) === Number(value);
+          if (Array.isArray(value)) return Array.isArray(saved[key]) && JSON.stringify(saved[key]) === JSON.stringify(value);
+          return saved[key] === (typeof value === "string" ? value.trim() : value);
+        });
+      if (!response.ok || !matching) throw new Error("Unconfirmed inventory save");
+      setDialog(null);
+      setNotice(isType ? editing ? "Unit type updated." : "Unit type added." : editing ? "Unit updated." : "Unit added.");
+      await refresh();
+    } catch {
+      if (saveRequest.current === controller) {
+        setSaveBlocked(true);
+        setError("We could not confirm whether this inventory change was saved. Review inventory before doing anything further. Reload the page only after checking the result.");
+      }
+    } finally {
+      clearTimeout(timer);
+      if (saveRequest.current === controller) { saveRequest.current = null; setBusy(false); }
     }
-    await refresh();
-    setDialog(null);
-    setNotice(
-      isType
-        ? editing
-          ? "Unit type updated."
-          : "Unit type added."
-        : editing
-          ? "Unit updated."
-          : "Unit added.",
-    );
   }
 
   async function deleteUnitType(unitType: UnitType, confirmed = false, force = false) {
+    if (saveBlocked || saveRequest.current) return;
     if (!confirmed && !window.confirm(`Delete the ${unitType.name} unit type?`)) return;
     setBusy(true);
     setError("");
@@ -373,6 +392,7 @@ export function UnitInventoryWorkspace({
   }
 
   async function deleteUnit(unit: Unit) {
+    if (saveBlocked || saveRequest.current) return;
     setBusy(true);
     setError("");
     setNotice("");
@@ -412,7 +432,7 @@ export function UnitInventoryWorkspace({
             <button
               className="button button-danger"
               onClick={() => void uatReset("preview")}
-              disabled={busy}
+              disabled={busy || saveBlocked}
             >
               <Trash2 size={15} />
               Reset UAT customers
@@ -420,7 +440,7 @@ export function UnitInventoryWorkspace({
             <button
               className={`button ${confirmingRelease ? "button-primary" : "button-secondary"}`}
               onClick={() => void releaseOrphanedReservations()}
-              disabled={!selectedFacility?.units.some((unit) => unit.status === "RESERVED") || busy}
+              disabled={!selectedFacility?.units.some((unit) => unit.status === "RESERVED") || busy || saveBlocked}
             >
               <ShieldCheck size={15} />
               {confirmingRelease ? "Confirm safe release" : "Release cancelled holds"}
@@ -428,7 +448,7 @@ export function UnitInventoryWorkspace({
             <button
               className="button button-secondary"
               onClick={() => void applyMidrandMarketRates()}
-              disabled={!selectedFacility?.units.length || busy}
+              disabled={!selectedFacility?.units.length || busy || saveBlocked}
             >
               <BadgeDollarSign size={15} />
               Apply Midrand rates
@@ -439,7 +459,7 @@ export function UnitInventoryWorkspace({
                 setRenumberDialog(true);
                 setError("");
               }}
-              disabled={!selectedFacility?.units.length}
+              disabled={!selectedFacility?.units.length || busy || saveBlocked}
             >
               <ListOrdered size={15} />
               Renumber units
@@ -470,7 +490,8 @@ export function UnitInventoryWorkspace({
           </div>
         }
       />
-    {notice ? <p className="form-success">{notice}</p> : null}
+    {saveBlocked && <div className="notice"><p role={dialog ? undefined : "alert"}>We could not confirm the inventory save. Review the records before reloading this page; repeated saves are blocked.</p><button className="button button-secondary" onClick={() => void refresh()}>Review inventory</button></div>}
+    {notice ? <p className="form-success" role="status">{notice}</p> : null}
     {error && !dialog ? <p className="form-error">{error}</p> : null}
       {uatResetPreview ? (
         <section className="panel uat-reset-preview" aria-label="UAT reset preview">
@@ -713,7 +734,7 @@ export function UnitInventoryWorkspace({
                 </button>
                 <div className="inventory-type-actions">
                   <button type="button" className="text-button" onClick={() => { setDialog({ kind: "type", unitType: type }); setError(""); }}><Pencil size={14}/>Edit</button>
-                  <button type="button" className="text-button danger" disabled={busy} title={assigned > 0 ? `${assigned} unit${assigned === 1 ? " is" : "s are"} assigned to this type. Reassign those units before deleting it.` : `Delete ${type.name}`} onClick={() => void deleteUnitType(type)}><Trash2 size={14}/>Delete</button>
+                  <button type="button" className="text-button danger" disabled={busy || saveBlocked} title={assigned > 0 ? `${assigned} unit${assigned === 1 ? " is" : "s are"} assigned to this type. Reassign those units before deleting it.` : `Delete ${type.name}`} onClick={() => void deleteUnitType(type)}><Trash2 size={14}/>Delete</button>
                 </div>
               </div>
             ))
@@ -728,13 +749,15 @@ export function UnitInventoryWorkspace({
           facilities={facilities}
           defaultFacilityId={facilityId || facilities[0]?.id || ""}
           busy={busy}
-          error={error}
+          error={saveBlocked ? "We could not confirm whether this inventory change was saved. Review inventory before doing anything further. Reload the page only after checking the result." : error}
           close={() => setDialog(null)}
           submit={submit}
           deleteUnitType={deleteUnitType}
           deleteUnit={deleteUnit}
           releaseOrphanedReservations={releaseOrphanedReservations}
           forceDeleteCount={forceDeleteCount}
+          blocked={saveBlocked}
+          review={() => void refresh()}
         />
       ) : null}
       {renumberDialog && selectedFacility ? (
@@ -958,11 +981,15 @@ function InventoryDialog({
   deleteUnit,
   releaseOrphanedReservations,
   forceDeleteCount,
+  blocked,
+  review,
 }: {
   state: DialogState;
   facilities: Facility[];
   defaultFacilityId: string;
   busy: boolean;
+  blocked: boolean;
+  review: () => void;
   error: string;
   close: () => void;
   submit: (form: FormData) => void;
@@ -994,7 +1021,7 @@ function InventoryDialog({
         role="dialog"
         aria-modal="true"
       >
-        <button className="modal-close" onClick={close}>
+        <button className="modal-close" disabled={busy} onClick={close}>
           <X size={18} />
         </button>
         <p className="eyebrow">Unit inventory</p>
@@ -1007,8 +1034,8 @@ function InventoryDialog({
               ? `Edit unit ${editingUnit.number}`
               : "Add unit"}
         </h2>
-        {error ? <p className="form-error inventory-dialog-error">{error}</p> : null}
-        <form action={submit} className="inventory-form">
+        {error ? <p role="alert" className="form-error inventory-dialog-error">{error}</p> : null}
+        <form onSubmit={event => { event.preventDefault(); submit(new FormData(event.currentTarget)); }} className="inventory-form">
           <label>
             Store
             <select
@@ -1161,7 +1188,7 @@ function InventoryDialog({
               {editingUnit?.status === "RESERVED" ? (
                 <div className="inventory-form-wide managed-status-recovery">
                   <p>This status is protected from manual editing. Use the guarded check to release it only when no active reservation or occupancy remains.</p>
-                  <button type="button" className="button button-secondary" disabled={busy} onClick={() => void releaseOrphanedReservations(editingUnit)}>
+                  <button type="button" className="button button-secondary" disabled={busy || blocked} onClick={() => void releaseOrphanedReservations(editingUnit)}>
                     <ShieldCheck size={15} /> Check and release cancelled hold
                   </button>
                 </div>
@@ -1169,12 +1196,13 @@ function InventoryDialog({
             </>
           )}
           <div className="form-actions inventory-form-wide">
+            {blocked && <button type="button" className="button button-secondary" onClick={review}>Review inventory</button>}
             {editingType ? (
               <button
                 type="button"
                 className="button button-danger"
                 onClick={() => confirmingDelete ? deleteUnitType(editingType, true) : setConfirmingDelete(true)}
-                disabled={busy}
+                disabled={busy || blocked}
               >
                 <Trash2 size={15} /> {confirmingDelete ? `Confirm delete ${editingType.name}` : "Delete type"}
               </button>
@@ -1184,7 +1212,7 @@ function InventoryDialog({
                 type="button"
                 className="button button-danger"
                 onClick={() => deleteUnitType(editingType, true, true)}
-                disabled={busy}
+                disabled={busy || blocked}
               >
                 <Trash2 size={15} /> Delete type and {forceDeleteCount} unused unit{forceDeleteCount === 1 ? "" : "s"}
               </button>
@@ -1194,7 +1222,7 @@ function InventoryDialog({
                 type="button"
                 className="button button-danger"
                 onClick={() => confirmingDelete ? deleteUnit(editingUnit) : setConfirmingDelete(true)}
-                disabled={busy}
+                disabled={busy || blocked}
               >
                 <Trash2 size={15} /> {confirmingDelete ? `Confirm permanent deletion of unit ${editingUnit.number}` : "Delete unit permanently"}
               </button>
@@ -1202,11 +1230,12 @@ function InventoryDialog({
             <button
               type="button"
               className="button button-secondary"
+              disabled={busy}
               onClick={close}
             >
               Cancel
             </button>
-            <button className="button button-primary" disabled={busy}>
+            <button className="button button-primary" disabled={busy || blocked}>
               {busy ? "Saving…" : "Save"}
             </button>
           </div>

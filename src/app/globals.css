@@ -2316,6 +2316,8 @@ a.module-card:focus-visible {
 }
 .inventory-modal { width: min(720px,calc(100vw - 30px)); }
 .inventory-dialog-error { margin: 12px 0 0; }
+.inventory-modal .form-actions, .unit-inventory-workspace > .page-header > .form-actions { flex-wrap: wrap; }
+.unit-inventory-workspace, .unit-inventory-workspace .inventory-layout > * { min-width: 0; }
 .managed-status-recovery { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px; border: 1px solid #f0c6ad; border-radius: 12px; background: #fff8f3; }
 .managed-status-recovery p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .managed-status-recovery .button { flex: 0 0 auto; }

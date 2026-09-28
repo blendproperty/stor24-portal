@@ -1,4 +1,13 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Inventory create/edit confirmation recovery — 28 September 2026
+
+- **Implementation:** unit and unit-type create/edit forms retain rejected input, guard simultaneous submission and use20second bounded requests. Success requires matching identity, facility and submitted fields, including numeric rates/areas and features. Uncertain responses block repeat saves across modal reopen and GET-only review; explicit reload after review remains required.401/403 clears private inventory. Editing uses the record's fixed facility. Existing server audit/floor/availability policy is unchanged; client guards do not establish server replay protection.
+- **Testing:** actual prepatch network failure threw and left saving stuck. All four flows passed1440/390/320px rejection/input retention, duplicates, timeout, network/server/malformed/mismatched facility/value/edit identity, denial, reopened block, GET-only review, success and saved-refresh failure. Mobile action overflow reproduced, wrapping/min-width fixed, modal and full-page width/action visibility checked and screenshot inspected.492 tests/typecheck/lint and inventory read/floor/premium regressions passed. Required CI pending.
+- **Commit/push:** candidate codex/inventory-save-recovery includes PR344 final evidence and staff acceptance appendix; pending commit.
+- **Merge:** pending required checks.
+- **Deployment/configuration:** pending; no schema/configuration change.
+- **Live verification:** pending; no production mutations. All14 acceptance gates remain open. Delete/rate/reset/renumber confirmation recovery remains separate.
+
 ## Unit inventory read recovery — 28 September 2026
 
 - **Implementation:** preserves initial server-provided inventory; refresh validates all three nested read payloads, bounds requests at20seconds and exposes a GET-only retry. Unavailable data hides actions/editors;401/403 clears records and gives sign-in/administrator guidance. Confirmed save notices survive generic read failures. Existing floor/availability policies and account links preserved; mutation confirmation/replay recovery remains separate.
