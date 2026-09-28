@@ -1,10 +1,17 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Migration business-key preflight — 28 September 2026
+
+- **Implementation:** source preflight rejects duplicate facility codes and facility-scoped unit-type names/unit numbers with distinct legacy IDs, matching existing database unique keys. Exact case and leading zeros preserved. No target database import or policy change.
+- **Testing:** actual synthetic CLI previously approved duplicate facility codes. Candidate492 unit tests passed; focused duplicate and valid cross-facility/case/leading-zero cases pass. Test-case type annotation corrected after local typecheck; final typecheck/lint passed. Required CI pending.
+- **Commit/push:** candidate on codex/migration-business-keys includes PR339 final evidence; pending commit.
+- **Merge/deployment/live:** pending. Source-only checks cannot prove target collision freedom or migration acceptance. All14 programme gates remain open.
 ## Merchandise supply confirmation recovery — 28 September 2026
 
-- **Implementation:** supply POST has a synchronous duplicate guard/20second timeout and validates matching order, FULFILLED status and timestamp before claiming success. Uncertain outcomes block repeat action until GET refresh; known rejections remain actionable, denied access clears records. Confirmed supply updates local status before refresh, preserving saved confirmation if the read fails. Existing server row-lock/replay and stock policy unchanged.
-- **Testing:** actual prepatch malformed response falsely showed Supply recorded. Candidate browser malformed JSON/identity/status/date, network/server/timeout/lost response, duplicate clicks, rejection/denial, GET-only recovery and saved-refresh failure pass1440/390/320px; screenshot inspected.490 tests/typecheck/lint and queue/operations-read regressions passed. Required new browser CI step pending.
-- **Commit/push:** candidate on codex/merchandise-supply-confirmation includes PR338 final evidence; pending commit.
-- **Merge/deployment/live:** pending. No live supply/stock transaction or provider changes; all14 acceptance gates remain open.
+- **Implementation:** supply POST has a synchronous duplicate guard/20-second timeout and validates matching order, FULFILLED status and timestamp before claiming success. Uncertain outcomes block repeat action until GET refresh; denied access clears records. Confirmed supply updates local status before refresh. Existing server row-lock/replay and stock policy unchanged.
+- **Testing:** prepatch malformed response falsely showed Supply recorded. Actual component recovery/denial/duplicate/lost response/GET-only recovery and saved-refresh failure passed at1440/390/320px;490 tests/typecheck/lint and read regressions passed. Initial CI36382800080 failed an ambiguous test status locator; corrected and rerun. Corrected source passed all nine checks CI36383098167/SQL36383098197/security36383098180, including new browser step.
+- **Commit/push and merge:** PR339 source9c27eba53a497d57501f6a63c74b05bffa655dc1 mergedbc05fe36d04458a631c47ac4a050175dc2773d66.
+- **Deployment/configuration:** mainCI36383571782/deploy36383946374 passed; no configuration or schema change.
+- **Live verification:** exact image stor24-crm:bc05fe36d healthy; service/database readiness verified2026-09-28T05:56:19.389Z. ExcelE099 records the30th delivered component. No production supply/stock transactions performed. Staff acceptance and all14 programme gates remain open.
 ## Merchandise supply queue read recovery — 28 September 2026
 
 - **Implementation:** paid-supplies queue separates loading/failed/empty states, validates nested response data, times reads out after20seconds and offers GET-only refresh. Denied reads clear private data/confirmation and show administrator/sign-in guidance; failed or loading reads disable supply actions. Existing fulfilment policy and mutation confirmation remain separate work.

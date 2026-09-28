@@ -29,6 +29,8 @@ The command fails on missing files or columns, duplicate legacy identifiers, bla
 
 ## Rehearsal gates
 
+Each export package targets one organisation. Preflight rejects duplicate facility codes within the package, duplicate unit-type names within a facility and duplicate unit numbers within a facility, matching the database's existing unique keys. Comparison is case-sensitive after the validator's normal surrounding-whitespace trimming; `01` and `1` remain distinct unit numbers. This checks collisions within the export only, not collisions with an existing target database. Rehearsal must still verify legacy-ID mappings and target conflicts.
+
 CSV parsing rejects unclosed or misplaced quotes, text after a closing quote, duplicate/empty headers and rows whose column counts differ from the header. Quoted commas, escaped double quotes and quoted multiline fields are supported. A parse error makes the package invalid; do not interpret an invalid report's counts as a complete export.
 
 1. Record the source-system extraction timestamp in SAST and source row counts.

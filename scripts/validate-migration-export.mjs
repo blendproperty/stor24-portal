@@ -72,6 +72,18 @@ function requireReference(rows, field, targets, file, errors) {
   }
 }
 
+function requireUniqueKey(rows, fields, file, errors) {
+  const seen = new Map();
+  for (const row of rows) {
+    // Match the database's case-sensitive composite keys, without coercing
+    // unit numbers (for example, 01 and 1 are distinct identifiers).
+    const key = JSON.stringify(fields.map(field => row[field]));
+    const prior = seen.get(key);
+    if (prior !== undefined) errors.push(`${file}: ${row.legacy_id} duplicate business key (${fields.join(", ")}) also used by ${prior}`);
+    else seen.set(key, row.legacy_id);
+  }
+}
+
 function requireSameFacility(rows, field, targets, file, errors) {
   const byId = new Map(targets.map(row => [row.legacy_id, row]));
   for (const row of rows) {
@@ -101,6 +113,10 @@ for (const [name, required] of Object.entries(contracts)) {
 }
 
 const ids = Object.fromEntries(Object.entries(data).map(([name, rows]) => [name, idSet(rows, `${name}.csv`, errors)]));
+// One export package targets one organisation; facility codes are unique there.
+requireUniqueKey(data.facilities, ["code"], "facilities.csv", errors);
+requireUniqueKey(data.unit_types, ["facility_legacy_id", "name"], "unit_types.csv", errors);
+requireUniqueKey(data.units, ["facility_legacy_id", "number"], "units.csv", errors);
 requireReference(data.unit_types, "facility_legacy_id", ids.facilities, "unit_types.csv", errors);
 requireReference(data.units, "facility_legacy_id", ids.facilities, "units.csv", errors);
 requireReference(data.units, "unit_type_legacy_id", ids.unit_types, "units.csv", errors);
