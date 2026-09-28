@@ -2,11 +2,25 @@
 
 Technical delivery is recorded separately from business acceptance. No programme priority is accepted by this checklist. All 14 acceptance gates remain open. Use approved synthetic records and authorised staff roles; do not change live operational switches or deliberately cause production failures.
 
-## Verified baseline
+## Verified baseline at 26 September
 
 Latest functional release: PR329, source `9384c2f5dcbad15f43b6c4eedeeb6841ece5285c`, merge `13330163b2599fd3a2c36441188a866edf793dd4`. Required CI36257243525, SQL36257243478 and security36257243449 passed. Main CI36257578447 and deployment36257859001 passed. Exact image `stor24-crm:13330163b` was healthy with service/database readiness at 17:08:31.671 UTC. The suite has 479 passing unit tests plus required database and browser checks. Browser fixtures use synthetic data and do not establish branded production or staff acceptance.
 
 Exact earlier release evidence remains in PROJECT_CONTEXT.md and Excel E066–E088. The spreadsheet records 21 delivered components. Its delivered-component section distinguishes Built, Tested, Merged and Deployed from Pending staff acceptance. Older dated checkpoint notes describe their state at that time.
+
+## Additional builds for review — 28 September
+
+PR331–343 are deployed; exact evidence is recorded in PROJECT_CONTEXT.md and Excel E091–E103. PR344 inventory read recovery is also deployed: exact b83fae9e3 healthy, service/database verified08:04:56.342UTC; Excel E104. These additions do not accept any programme priority.
+
+| Check | Safe acceptance action / evidence | Releases |
+|---|---|---|
+| Reservation cancellation and inventory removal | Review isolated real-database audit failure/rollback and valid retry evidence. Owner, history and facility restrictions must still reject prohibited removal. Do not remove production units or types to test this. | PR331–333 |
+| Migration preflight | Run an authorised export copy through preflight. Review required links, facility relationships, CSV structure, unique business keys and source hashes/counts. Keep source files unchanged. Passing preflight does not prove import, target reconciliation or finance totals. | PR334–337,340 |
+| Merchandise supply | On approved synthetic orders, verify queue, permission guidance, one confirmed supply and read-only recovery after an uncertain response. Compare fulfilment and stock evidence. Do not supply a real order for testing. | PR338–339 |
+| Reservations | On approved synthetic records, verify create, cancel, extend and expire confirmations, retained rejected inputs and unit-release versus protected-hold messages. Uncertain outcomes require status review before any further write. | PR341–343 |
+| Inventory refresh | Confirm initial units and closed-floor labels. Review the supplied desktop/mobile synthetic failure evidence: a successful save remains confirmed when refresh fails, Refresh inventory only reads, and denied reads hide records with administrator/sign-in guidance. No production fault injection or floor switching required. | PR344; E104 |
+
+For each accepted staff check record reviewer, date, synthetic record reference and observed result in the existing tracker. Browser fixtures and automated checks are evidence to review, not a substitute for staff acceptance. Unit save/delete/rate/reset mutation confirmation recovery beyond read refresh remains separate work.
 
 ## Review in this order
 
