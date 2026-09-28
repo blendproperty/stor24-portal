@@ -29,7 +29,7 @@ try {for(const width of [1440,390,320]) for(const mode of ['bad-json','denied','
  await page.getByRole('button',{name:'Confirm supplied',exact:true}).evaluate(button=>{button.click();button.click();});
  if(mode==='timeout'){await page.clock.fastForward(21000);await pending?.abort().catch(()=>{});}
  if(mode==='success-refresh-failure'){
-  await expect(page.getByRole('status')).toContainText('Supply recorded');await expect(page.getByRole('alert')).toContainText('could not be loaded');await expect(page.getByText('Supplied',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Record collection / delivery',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('status').filter({hasText:'Supply recorded'})).toContainText('Supply recorded');await expect(page.getByRole('alert')).toContainText('could not be loaded');await expect(page.getByText('Supplied',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Record collection / delivery',exact:true})).toHaveCount(0);
  }else if(mode==='denied'||mode==='expired'){
   await expect(page.getByText('Synthetic Customer',{exact:true})).toHaveCount(0);await expect(page.getByRole('alert').filter({hasText:mode==='denied'?'administrator':'sign in'})).toBeVisible();
  }else if(mode==='rejected'){
