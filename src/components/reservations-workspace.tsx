@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { z } from "zod";
 import Link from "next/link";
 import { CalendarCheck, Plus, Search, X } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
@@ -46,6 +47,16 @@ const customerName = (customer: Customer) =>
   [customer.firstName, customer.lastName].filter(Boolean).join(" ") ||
   "Unnamed customer";
 const formatDate = (date: string | null) => formatSouthAfricaDateTime(date);
+const money = z.string().min(1).refine(value => Number.isFinite(Number(value)));
+const date = z.string().datetime({ offset: true });
+const customerSchema = z.object({ id: z.string().min(1), firstName: z.string().nullable(), lastName: z.string().nullable(), companyName: z.string().nullable(), email: z.string().nullable(), phone: z.string().nullable() });
+const unitSchema = z.object({ id: z.string().min(1), facilityId: z.string().min(1), number: z.string(), monthlyRate: money, unitType: z.object({ name: z.string(), areaSqMetres: money.nullable() }) });
+const reservationReadSchema = z.object({ data: z.object({
+  facilities: z.array(z.object({ id: z.string().min(1), name: z.string(), units: z.array(unitSchema) })),
+  customers: z.array(customerSchema),
+  reservations: z.array(z.object({ id: z.string().min(1), status: z.enum(["ACTIVE", "CONVERTED", "CANCELLED", "EXPIRED"]), quotedRate: money, holdExpiresAt: date.nullable(), intendedMoveIn: date.nullable(), createdAt: date, facility: z.object({ id: z.string().min(1), name: z.string() }), customer: customerSchema, unit: unitSchema, lead: z.object({ id: z.string() }).nullable(), convertedTenancy: z.object({ id: z.string() }).nullable() })),
+}) });
+const emptyData: Payload = { facilities: [], customers: [], reservations: [] };
 
 export function ReservationsWorkspace() {
   const [data, setData] = useState<Payload>({
@@ -60,35 +71,41 @@ export function ReservationsWorkspace() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [readBusy, setReadBusy] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [readError, setReadError] = useState("");
+  const [signedOut, setSignedOut] = useState(false);
+  const readRequest = useRef<AbortController | null>(null);
   const load = useCallback(async () => {
-    const response = await fetch("/api/v1/reservations", { cache: "no-store" });
-    const payload = await response.json();
-    if (!response.ok) {
-      setError(payload.error?.message ?? "Reservations could not be loaded.");
-      return;
+    readRequest.current?.abort();
+    const controller = new AbortController(); readRequest.current = controller;
+    setReadBusy(true); setLoaded(false); setReadError(""); setSignedOut(false); setData(emptyData); setDialog(false);
+    const timer = setTimeout(() => controller.abort(), 20_000);
+    try {
+      const response = await fetch("/api/v1/reservations", { cache: "no-store", signal: controller.signal });
+      if (readRequest.current !== controller) return;
+      if (response.status === 401 || response.status === 403) {
+        setSignedOut(response.status === 401);
+        setReadError(response.status === 401 ? "Your session has ended. Sign in again to view reservations." : "Reservation access is unavailable. Please contact your administrator if you require access.");
+        setError(""); setNotice(""); setFacilityId(""); setQuery(""); return;
+      }
+      if (!response.ok) throw new Error("RESERVATIONS_READ_FAILED");
+      const payload = reservationReadSchema.parse(await response.json());
+      if (readRequest.current !== controller) return;
+      if (controller.signal.aborted) throw new Error("RESERVATIONS_READ_TIMEOUT");
+      setData(payload.data); setLoaded(true);
+      setFacilityId(current => payload.data.facilities.some(f => f.id === current) ? current : payload.data.facilities[0]?.id ?? "");
+    } catch {
+      if (readRequest.current === controller) setReadError("Reservations could not be loaded. Refresh to try again.");
+    } finally {
+      clearTimeout(timer);
+      if (readRequest.current === controller) { readRequest.current = null; setReadBusy(false); }
     }
-    setData(payload.data);
-    setFacilityId((current) => current || payload.data.facilities[0]?.id || "");
   }, []);
   useEffect(() => {
-    let active = true;
-    fetch("/api/v1/reservations", { cache: "no-store" })
-      .then(async (response) => ({ response, payload: await response.json() }))
-      .then(({ response, payload }) => {
-        if (!active) return;
-        if (!response.ok) {
-          setError(
-            payload.error?.message ?? "Reservations could not be loaded.",
-          );
-          return;
-        }
-        setData(payload.data);
-        setFacilityId(payload.data.facilities[0]?.id || "");
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+    const timer = setTimeout(() => void load(), 0);
+    return () => { clearTimeout(timer); readRequest.current?.abort(); readRequest.current = null; };
+  }, [load]);
   const [now] = useState(() => Date.now());
   const expiring = data.reservations.filter(
     (item) =>
@@ -262,6 +279,12 @@ export function ReservationsWorkspace() {
           </button>
         }
       />
+      <div>
+        <button className="button button-secondary" disabled={readBusy || busy} onClick={() => void load()}>Refresh reservations</button>
+        {readBusy ? <p role="status">Loading reservations…</p> : null}
+        {readError ? <p className="form-error" role="alert">{readError}</p> : null}
+        {signedOut ? <Link className="button button-primary" href="/login">Sign in</Link> : null}
+      </div>
       {error && !dialog ? <p className="form-error">{error}</p> : null}
       {notice ? <p className="form-success">{notice}</p> : null}
       <section className="summary-strip">
@@ -286,7 +309,7 @@ export function ReservationsWorkspace() {
         ].map(([label, count]) => (
           <div className="summary-cell" key={label}>
             <span>{label}</span>
-            <strong>{count}</strong>
+            <strong>{loaded ? count : "—"}</strong>
           </div>
         ))}
       </section>
@@ -332,7 +355,7 @@ export function ReservationsWorkspace() {
         </label>
       </section>
       <section className="panel" data-guide="reservation-list">
-        <div className="table-wrap">
+        {!visible.length ? <p className="empty-cell">{loaded ? "No reservations match these filters." : readBusy ? "Loading reservations…" : "Reservation records are unavailable."}</p> : <div className="table-wrap">
           <table className="data-table">
             <thead>
               <tr>
@@ -428,13 +451,13 @@ export function ReservationsWorkspace() {
               ) : (
                 <tr>
                   <td colSpan={8} className="empty-cell">
-                    No reservations match these filters.
+                    {loaded ? "No reservations match these filters." : readBusy ? "Loading reservations…" : "Reservation records are unavailable."}
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
-        </div>
+        </div>}
       </section>
       {dialog ? (
         <ReservationDialog

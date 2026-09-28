@@ -1,10 +1,17 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Reservations read recovery — 28 September 2026
+
+- **Implementation:** shared initial/refresh read validates nested payloads, times out after20seconds, distinguishes unavailable/loading/empty data and exposes GET-only refresh. Reads clear stale records/editors; denied access gives sign-in/administrator guidance and clears private notices. Confirmed mutation notices survive generic follow-up read failures. Server reservation policies and mutation retry guarantees unchanged.
+- **Testing:** prepatch actual component network failure produced an unhandled error and false empty message. Candidate1440/390/320px network/server/malformed/nested-shape/timeout/401/403/empty/populated/deep-link and cancellation-success/read-failure recovery pass; exactly one synthetic DELETE, remaining requests GET. Mobile empty state removed from scrolled table and retested.492 tests/typecheck/lint and premium workspace regression passed. Required browser CI pending.
+- **Commit/push:** candidate codex/reservations-read-recovery includes PR340 final evidence; pending commit.
+- **Merge/deployment/live:** pending. No production customer/reservation mutations; all14 acceptance gates remain open.
 ## Migration business-key preflight — 28 September 2026
 
 - **Implementation:** source preflight rejects duplicate facility codes and facility-scoped unit-type names/unit numbers with distinct legacy IDs, matching existing database unique keys. Exact case and leading zeros preserved. No target database import or policy change.
-- **Testing:** actual synthetic CLI previously approved duplicate facility codes. Candidate492 unit tests passed; focused duplicate and valid cross-facility/case/leading-zero cases pass. Test-case type annotation corrected after local typecheck; final typecheck/lint passed. Required CI pending.
-- **Commit/push:** candidate on codex/migration-business-keys includes PR339 final evidence; pending commit.
-- **Merge/deployment/live:** pending. Source-only checks cannot prove target collision freedom or migration acceptance. All14 programme gates remain open.
+- **Testing:** synthetic CLI previously approved duplicate facility codes.492 tests, typecheck and focused lint passed after a test-case type annotation correction; duplicate and valid cross-facility/case/leading-zero cases covered. All nine required checks passed CI36384552384/SQL36384552454/security36384552385.
+- **Commit/push and merge:** PR340 source22beb5ca842d358a99a9ed65102cdacffccb07ad merged1a30c37ffc9883469d265efed3eaa26eabaed2b1, including PR339 final evidence.
+- **Deployment/configuration:** mainCI36385003893/deploy36385493878 passed. No schema/configuration change.
+- **Live verification:** exact image stor24-crm:1a30c37ff healthy; service/database readiness verified2026-09-28T06:17:44.318Z. ExcelE100 records31st delivered component. Source-only checks do not prove target collision freedom or authorised migration rehearsal. All14 acceptance gates remain open.
 ## Merchandise supply confirmation recovery — 28 September 2026
 
 - **Implementation:** supply POST has a synchronous duplicate guard/20-second timeout and validates matching order, FULFILLED status and timestamp before claiming success. Uncertain outcomes block repeat action until GET refresh; denied access clears records. Confirmed supply updates local status before refresh. Existing server row-lock/replay and stock policy unchanged.
