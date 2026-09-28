@@ -1,4 +1,10 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Migration CSV structure validation — 28 September 2026
+
+- **Implementation:** offline preflight rejects malformed quoting, duplicate/empty headers and mismatched row widths instead of approving truncated records. Standard escaped quotes, quoted commas and multiline values remain supported. No import or production mutation.
+- **Testing:** actual CLI synthetic unclosed quote falsely returned valid=true before patch. Candidate487 tests/typecheck/focused lint passed; executable malformed/valid CSV regressions included. Required CI pending.
+- **Commit/push:** candidate on codex/migration-csv-validation includes PR334 final release evidence; pending commit.
+- **Merge/deployment/live:** pending. No schema/configuration change; authorised source export, rehearsal, finance and all14 acceptance gates remain open.
 ## Migration relationship validation — 28 September 2026
 
 - **Implementation:** offline CSV preflight rejects blank required facility/type/customer/unit relationships and cross-facility unit-type, tenancy-unit and reservation-unit links. Optional customer contact fields remain optional. No import, production mutation or financial/policy approval added.

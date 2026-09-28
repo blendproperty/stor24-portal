@@ -14,11 +14,11 @@ const rows: Record<string, string> = {
   reservations: "r,b,c,ub,ACTIVE,100,2026-10-01,2026-10-01",
 };
 
-function validate(overrides: Record<string, string> = {}) {
+function validate(overrides: Record<string, string> = {}, headers: Record<string, string> = {}) {
   const directory = mkdtempSync(join(tmpdir(), "stor24-migration-test-"));
   try {
     for (const [name, data] of Object.entries({ ...rows, ...overrides })) {
-      const header = readFileSync(resolve("migration/templates", `${name}.csv`), "utf8").trim();
+      const header = headers[name] ?? readFileSync(resolve("migration/templates", `${name}.csv`), "utf8").trim();
       writeFileSync(join(directory, `${name}.csv`), `${header}\n${data}\n`);
     }
     const output = join(directory, "result.json");
@@ -32,6 +32,24 @@ test("migration validator accepts linked facilities with optional customer field
   const result = validate();
   assert.equal(result.status, 0); assert.equal(result.report.valid, true);
   assert.equal(result.report.counts.units, 2);
+});
+
+test("migration validator rejects malformed CSV instead of approving truncated data", () => {
+  for (const customer of ['c,"Synthetic,Customer,,,', 'c,Syn"thetic,Customer,,,', 'c,"Synthetic"junk,Customer,,,', 'c,Synthetic,Customer,,', 'c,Synthetic,Customer,,,,extra']) {
+    const result = validate({ customers: customer });
+    assert.equal(result.status, 1, customer); assert.equal(result.report.valid, false);
+    assert.match(result.report.errors.join("\n"), /CSV|column count/);
+  }
+  for (const header of ['legacy_id,first_name,last_name,company_name,email,phone,phone', 'legacy_id,first_name,last_name,company_name,email,phone,']) {
+    const result = validate({ customers: 'c,Synthetic,Customer,,,,' }, { customers: header });
+    assert.equal(result.status, 1); assert.match(result.report.errors.join("\n"), /header/);
+  }
+});
+
+test("migration validator accepts escaped quotes, quoted commas and multiline fields", () => {
+  const result = validate({ customers: 'c,"Syn,""thetic""","Customer\nName",,,' });
+  assert.equal(result.status, 0); assert.equal(result.report.valid, true);
+  assert.equal(result.report.counts.customers, 1);
 });
 
 test("migration validator rejects every blank required relationship", () => {

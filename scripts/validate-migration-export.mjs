@@ -11,27 +11,41 @@ const contracts = {
 };
 
 function parseCsv(source) {
-  const rows = []; let row = []; let value = ""; let quoted = false;
+  const rows = []; let row = []; let value = ""; let quoted = false; let closedQuote = false;
   for (let index = 0; index < source.length; index += 1) {
     const character = source[index];
     if (character === '"' && quoted && source[index + 1] === '"') { value += '"'; index += 1; }
-    else if (character === '"') quoted = !quoted;
-    else if (character === "," && !quoted) { row.push(value); value = ""; }
+    else if (character === '"') {
+      if (quoted) { quoted = false; closedQuote = true; }
+      else if (!value && !closedQuote) quoted = true;
+      else throw new Error("CSV quote must start at the beginning of a field");
+    }
+    else if (character === "," && !quoted) { row.push(value); value = ""; closedQuote = false; }
     else if ((character === "\n" || character === "\r") && !quoted) {
       if (character === "\r" && source[index + 1] === "\n") index += 1;
-      row.push(value); value = "";
+      row.push(value); value = ""; closedQuote = false;
       if (row.some((cell) => cell.trim())) rows.push(row);
       row = [];
-    } else value += character;
+    } else {
+      if (closedQuote) throw new Error("CSV has characters after a closing quote");
+      value += character;
+    }
   }
+  if (quoted) throw new Error("CSV has an unclosed quoted field");
   if (value || row.length) { row.push(value); if (row.some((cell) => cell.trim())) rows.push(row); }
   return rows;
 }
 
 function records(rows, required, file, errors) {
   const header = rows[0]?.map((value) => value.trim()) ?? [];
+  if (header.some(field => !field)) errors.push(`${file}: empty header column`);
+  if (new Set(header).size !== header.length) errors.push(`${file}: duplicate header column`);
   for (const field of required) if (!header.includes(field)) errors.push(`${file}: missing required column ${field}`);
   return rows.slice(1).flatMap((values, rowIndex) => {
+    if (values.length !== header.length) {
+      errors.push(`${file}: row ${rowIndex + 2} column count ${values.length} does not match header ${header.length}`);
+      return [];
+    }
     const record = Object.fromEntries(header.map((field, index) => [field, values[index]?.trim() ?? ""]));
     if (!record.legacy_id) {
       errors.push(`${file}: row ${rowIndex + 2} has no legacy_id`);
