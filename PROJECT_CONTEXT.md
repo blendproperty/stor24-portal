@@ -1,4 +1,10 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Merchandise supply confirmation recovery — 28 September 2026
+
+- **Implementation:** supply POST has a synchronous duplicate guard/20second timeout and validates matching order, FULFILLED status and timestamp before claiming success. Uncertain outcomes block repeat action until GET refresh; known rejections remain actionable, denied access clears records. Confirmed supply updates local status before refresh, preserving saved confirmation if the read fails. Existing server row-lock/replay and stock policy unchanged.
+- **Testing:** actual prepatch malformed response falsely showed Supply recorded. Candidate browser malformed JSON/identity/status/date, network/server/timeout/lost response, duplicate clicks, rejection/denial, GET-only recovery and saved-refresh failure pass1440/390/320px; screenshot inspected.490 tests/typecheck/lint and queue/operations-read regressions passed. Required new browser CI step pending.
+- **Commit/push:** candidate on codex/merchandise-supply-confirmation includes PR338 final evidence; pending commit.
+- **Merge/deployment/live:** pending. No live supply/stock transaction or provider changes; all14 acceptance gates remain open.
 ## Merchandise supply queue read recovery — 28 September 2026
 
 - **Implementation:** paid-supplies queue separates loading/failed/empty states, validates nested response data, times reads out after20seconds and offers GET-only refresh. Denied reads clear private data/confirmation and show administrator/sign-in guidance; failed or loading reads disable supply actions. Existing fulfilment policy and mutation confirmation remain separate work.
