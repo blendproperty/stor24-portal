@@ -2,9 +2,9 @@
 ## Unit removal audit transaction — 28 September 2026
 
 - **Implementation:** existing unavailable-status change or owner-authorised permanent unit removal, maintenance unlink and units.deleted audit share a transaction. Existing owner, history and facility guards retained. No live units changed; no removal-policy or concurrency guarantee added.
-- **Testing:** actual prepatch synthetic audit failure retained UNAVAILABLE despite500; candidate481 tests/typecheck/focused lint passed. Required PostgreSQL status rollback/retry and forced unit/maintenance rollback/retry with owner/history/facility tests added; pending CI. Initial SQL run36373157950 stopped at duplicate owner-role fixture; reuse the existing synthetic owner role without changing its grants, then rerun all required checks.
-- **Commit/push:** candidate on codex/unit-delete-audit includes PR331 final evidence; pending commit.
-- **Merge/deployment/live:** pending. No schema/configuration change. All14 acceptance gates remain open; unit-type DELETE remains a separate candidate.
+- **Testing:** actual prepatch synthetic audit failure retained UNAVAILABLE despite500; candidate481 tests/typecheck/focused lint passed. Required PostgreSQL status rollback/retry and forced unit/maintenance rollback/retry with owner/history/facility tests passed in SQL36373326443/job108773988323. All nine checks passed: CI36373326447/SQL36373326443/security36373326427. Initial SQL run36373157950 stopped at duplicate owner-role fixture; reuse the existing synthetic owner role without changing its grants, then rerun all required checks.
+- **Commit/push:** PR332 corrected source30cc9d0ec095ad626df73f34c6041ec037ed58b5 includes PR331 final evidence; mergedb278de1b5346b88ad706ede3dccce9d51d6ec89e.
+- **Deployment/live:** mainCI36373923307 and deploy36374281688 passed. Exact image stor24-crm:b278de1b5 healthy; service/database readiness verified2026-09-28T03:36:52.194Z. ExcelE092 records final evidence and the23rd delivered component. No schema/configuration change. All14 acceptance gates remain open; unit-type DELETE remains a separate candidate.
 
 ## Reservation cancellation audit transaction — 28 September 2026
 
