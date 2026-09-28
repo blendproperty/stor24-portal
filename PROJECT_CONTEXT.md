@@ -2,9 +2,9 @@
 ## Reservation cancellation audit transaction — 28 September 2026
 
 - **Implementation:** cancellation and its existing reservations.deleted audit now commit together. Audit failure restores the prior status; facility permission and existing cancellation policy unchanged. No live reservations changed.
-- **Testing:** actual prepatch synthetic audit failure left CANCELLED despite500. Candidate480 unit tests passed rollback/retry and foreign-facility rejection. Required isolated PostgreSQL rollback/one-audit retry added. Initial SQL fixture used wrong unit rate field; corrected to monthlyRate before promotion. Type/lint and required CI must pass.
-- **Commit/push:** candidate on codex/reservation-cancel-audit includes final PR330 evidence and tracker clarification; pending commit.
-- **Merge/deployment/live:** pending. No migration/configuration change. All14 acceptance gates remain open; no request replay or broader cancellation-policy guarantee.
+- **Testing:** actual prepatch synthetic audit failure left CANCELLED despite500. Candidate480 unit tests passed rollback/retry and foreign-facility rejection. Required isolated PostgreSQL rollback/one-audit retry explicitly passed in SQL36371841915/job108769659323. Initial SQL fixture used wrong unit rate field; corrected to monthlyRate before promotion. Type/lint and all nine required checks passed: CI36371841940/SQL36371841915/security36371841861.
+- **Commit/push:** PR331 sourcea73c78c429d13565de114ecffd8c389abca19a92 merged719ea91350ff4b83ac966fe7d561997ecf343154. Includes final PR330 evidence and tracker clarification.
+- **Deployment/live:** mainCI36372303304 running; deployment pending. No migration/configuration change. All14 acceptance gates remain open; no request replay or broader cancellation-policy guarantee.
 - **Session:** Brett authorised remaining build work until18:00 Johannesburg28September; automate bounded verified repairs, preserve provider/legal/finance approvals and record staff acceptance separately.
 
 ## Delivery tracker status clarification — 27 September 2026
