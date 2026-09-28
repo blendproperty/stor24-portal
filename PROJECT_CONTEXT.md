@@ -1,4 +1,12 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Reservation cancellation audit transaction — 28 September 2026
+
+- **Implementation:** cancellation and its existing reservations.deleted audit now commit together. Audit failure restores the prior status; facility permission and existing cancellation policy unchanged. No live reservations changed.
+- **Testing:** actual prepatch synthetic audit failure left CANCELLED despite500. Candidate480 unit tests passed rollback/retry and foreign-facility rejection. Required isolated PostgreSQL rollback/one-audit retry added. Initial SQL fixture used wrong unit rate field; corrected to monthlyRate before promotion. Type/lint and required CI must pass.
+- **Commit/push:** candidate on codex/reservation-cancel-audit includes final PR330 evidence and tracker clarification; pending commit.
+- **Merge/deployment/live:** pending. No migration/configuration change. All14 acceptance gates remain open; no request replay or broader cancellation-policy guarantee.
+- **Session:** Brett authorised remaining build work until18:00 Johannesburg28September; automate bounded verified repairs, preserve provider/legal/finance approvals and record staff acceptance separately.
+
 ## Delivery tracker status clarification — 27 September 2026
 
 - **Implementation:** workbook status review separates Build status, Test evidence, Remaining build/configuration and Your acceptance. P01 customer workflow and P12 supported offline recovery are Complete for implementation based on recorded scope, with staff/provider/device validation still open. Partial now has explicit remaining work; P09 commercial decisions and P13 launch preparation remain Not started. No programme acceptance granted. Fixed stock evidence incorrectly mapped to P05 MRI by moving it to P07 merchandise and restoring MRI-specific gaps.

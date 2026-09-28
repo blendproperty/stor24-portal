@@ -457,9 +457,10 @@ export async function DELETE(
           ]);
         }
       } else if (resource === "reservations") {
-        await db.reservation.update({
-          where: { id },
-          data: { status: "CANCELLED" },
+        return await db.$transaction(async tx => {
+          await tx.reservation.update({ where: { id }, data: { status: "CANCELLED" } });
+          await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "reservations.deleted", entityType: "reservations", entityId: id } });
+          return new Response(null, { status: 204 });
         });
       } else {
         if (resource === "unit-types") {
