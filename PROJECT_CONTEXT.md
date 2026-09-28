@@ -1,10 +1,34 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Reservation cancellation audit transaction — 28 September 2026
+
+- **Implementation:** cancellation and its existing reservations.deleted audit now commit together. Audit failure restores the prior status; facility permission and existing cancellation policy unchanged. No live reservations changed.
+- **Testing:** actual prepatch synthetic audit failure left CANCELLED despite500. Candidate480 unit tests passed rollback/retry and foreign-facility rejection. Required isolated PostgreSQL rollback/one-audit retry added. Initial SQL fixture used wrong unit rate field; corrected to monthlyRate before promotion. Type/lint and required CI must pass.
+- **Commit/push:** candidate on codex/reservation-cancel-audit includes final PR330 evidence and tracker clarification; pending commit.
+- **Merge/deployment/live:** pending. No migration/configuration change. All14 acceptance gates remain open; no request replay or broader cancellation-policy guarantee.
+- **Session:** Brett authorised remaining build work until18:00 Johannesburg28September; automate bounded verified repairs, preserve provider/legal/finance approvals and record staff acceptance separately.
+
+## Delivery tracker status clarification — 27 September 2026
+
+- **Implementation:** workbook status review separates Build status, Test evidence, Remaining build/configuration and Your acceptance. P01 customer workflow and P12 supported offline recovery are Complete for implementation based on recorded scope, with staff/provider/device validation still open. Partial now has explicit remaining work; P09 commercial decisions and P13 launch preparation remain Not started. No programme acceptance granted. Fixed stock evidence incorrectly mapped to P05 MRI by moving it to P07 merchandise and restoring MRI-specific gaps.
+- **Testing:** existing artifact-tool builder exported/reimported successfully; stage values, all21 delivered components, existing journey checks and zero accepted preserved. Formula scan passed; affected ranges rendered for review. Native process still exits after successful export, as previously recorded; no native Excel interaction claimed.
+- **Commit/push:** this records a local workbook-only change and its persistent builder inputs; canonical note committed/pushed on the handoff branch. Workbook is STOR24-delivery-tracker-priority-2.xlsx in the existing outputs folder.
+- **Merge/deployment/configuration/live verification:** no application change or new deployment. PR330 remains the last recorded deployment; no new production health claim. All14 acceptance gates remain open. Final PR330 evidence and this tracker note are on the handoff branch, not main.
+
+## Remaining DELETE audit review — 26 September 2026, 17:28 UTC
+
+- **Review scope:** read-only source inspection against deployed main b6de14378c85c07096dbfc0653355cc7399c26af. No application changes or production mutations.
+- **Code observations, not reproduced findings:** src/app/api/v1/leasing/[resource]/route.ts still writes the shared DELETE audit at line516 after unit status update (line425), forced unit removal transaction (line451), reservation cancellation (line460), and unit-type removal/related cleanup (lines500–513). Those operations do not include the shared audit in their transaction. PR327–329 cover customers, facilities and leads only.
+- **Required next validation:** isolate each resource; inject audit failure and prove persisted state/related rows; test valid retry produces one matching audit. Preserve owner-only force removal, linked reservation/occupancy history blocks, assigned-unit handling, facility scope and cancellation policy. Use synthetic PostgreSQL records only. Review concurrency and request replay separately.
+- **Testing:** static inspection only; no new automated tests or live business acceptance. Existing479-test release baseline is unchanged. These candidates must not be described as remediated or as independently reproduced vulnerabilities.
+- **Commit/push:** review evidence committed/pushed as d2d87d71e01f243ef433721471d87422464b7e77 on codex/readiness-handoff-evidence. No new PR/promotion required for this read-only checkpoint; latest deployed release remains PR330. ExcelE090 records the open candidates; no delivered component added.
+- **Outstanding:** all14 programme acceptance gates remain open, including staff, legal/provider and source-finance acceptance.
+
 ## Final readiness evidence checkpoint — 26 September 2026
 
 - **Implementation:** documentation-only promotion of PR329 final deployment evidence and staff checklist covering21 verified components. No application, data or configuration change.
-- **Testing:** evidence reconciled with ExcelE066–E088 and current canonical entries. Reuses479-test functional baseline and required isolated database/browser/journey/restore evidence. Required promotion checks pending.
-- **Commit/push:** candidate on codex/readiness-final-checkpoint; pending commit.
-- **Merge/deployment/live verification:** pending for this evidence release. Latest verified functional production is PR329/image13330163b at17:08:31.671UTC.
+- **Testing:** evidence reconciled with ExcelE066–E088 and current canonical entries. Reuses479-test functional baseline and required isolated database/browser/journey/restore evidence. All nine promotion checks passed: CI36258108642/SQL36258108690/security36258108656.
+- **Commit/push:** PR330 sourceaafe8d4237c9822684596203d6973d397117dc5d mergedb6de14378c85c07096dbfc0653355cc7399c26af. Checklist and PR329 final evidence are on main.
+- **Deployment/live verification:** mainCI36258510014 and deploy36258821928 passed. Exact image stor24-crm:b6de14378 healthy; service/database readiness verified2026-09-26T17:24:56.195Z. ExcelE089 records this documentation release; no new functional component or staff acceptance.
 - **Acceptance:** all14 programme gates remain open. Technical delivery does not establish staff/legal/provider/finance/security acceptance or95percent readiness. No production mutations performed.
 
 ## Lead deletion audit transaction — 26 September 2026
