@@ -1,4 +1,10 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Bulk inventory rate confirmation recovery — 28 September 2026
+
+- **Implementation:** existing market-rate action uses shared synchronous request locking,20second timeout and persistent uncertain-result blocking. Confirmation validates facility/model, integer counts and finite ordered rates. Denial clears private records; known rejections remain retryable. Confirmed notice precedes GET refresh and includes skipped-area count. Existing pricing/owner/tenancy/quote policy unchanged; no backend replay guarantee added.
+- **Testing:** actual prepatch network failure threw and left controls busy. Candidate1440/390/320px network/timeout/duplicate/denial/rejection/malformed/wrong facility-model/count/range/lost result/GET review and confirmed-save/read-failure passed.492 tests/typecheck/direct ESLint and renumber save/undo plus inventory read regressions passed; mobile screenshot checked. Required CI pending.
+- **Commit/push:** candidate pending, carries PR348 final evidence. **Merge:** pending. **Deployment/configuration:** pending; no schema/configuration change. **Live verification:** pending. No production rate changes; all14 acceptance gates open. Source inspection separately identifies unit-rates audit outside its update transaction; static candidate only, requires isolated audit-failure/SQL rollback proof before a backend fix. Reset/release recovery remains separate.
+
 ## Renumber save/undo confirmation recovery — 28 September 2026
 
 - **Implementation:** apply/undo share inventory's synchronous request reference,20second timeout and persistent uncertain-result block. Success requires matching unit IDs/old/new numbers, map count, audit ID and inverse undo plan. Known rejections retain input;401/403 clears private records. Confirmed notice precedes refresh; facility-scoped Undo survives modal close/refresh during this page session. Uncertain results offer GET-only review and block repeat changes until explicit reload. Existing backend transaction/map/permission policy unchanged; no server replay guarantee added.
