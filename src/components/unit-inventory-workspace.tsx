@@ -115,6 +115,7 @@ export function UnitInventoryWorkspace({
   useEffect(() => () => { saveRequest.current?.abort(); saveRequest.current = null; }, []);
   const [forceDeleteCount, setForceDeleteCount] = useState(0);
   const [renumberDialog, setRenumberDialog] = useState(false);
+  const [renumberUndo, setRenumberUndo] = useState<{ facilityId: string; changes: Array<{ unitId: string; newNumber: string }> } | null>(null);
   const [confirmingRelease, setConfirmingRelease] = useState(false);
   const [uatResetPreview, setUatResetPreview] = useState<UatResetPreview | null>(null);
   const [uatResetConfirmation, setUatResetConfirmation] = useState("");
@@ -771,15 +772,21 @@ export function UnitInventoryWorkspace({
       {renumberDialog && selectedFacility ? (
         <RenumberUnitsDialog
           facility={selectedFacility}
+          requestRef={saveRequest}
+          blocked={saveBlocked}
+          uncertain={() => setSaveBlocked(true)}
+          review={() => void refresh()}
+          undoChanges={renumberUndo?.facilityId === selectedFacility.id ? renumberUndo.changes : null}
+          rememberUndo={(changes) => setRenumberUndo(changes ? { facilityId: selectedFacility.id, changes } : null)}
           denied={(status) => {
-            setFacilities([]); setRenumberDialog(false); setNotice("");
+            setFacilities([]); setRenumberDialog(false); setNotice(""); setRenumberUndo(null);
             setReadDenied(true);
             setReadError(status === 401 ? "Sign in again to view inventory." : "You do not have access to this inventory. Please contact your administrator.");
           }}
           close={() => setRenumberDialog(false)}
           applied={async (message) => {
-            await refresh();
             setNotice(message);
+            await refresh();
           }}
         />
       ) : null}
@@ -792,11 +799,18 @@ function RenumberUnitsDialog({
   close,
   applied,
   denied,
+  requestRef, blocked, uncertain, review, undoChanges, rememberUndo,
 }: {
   facility: Facility;
   close: () => void;
   applied: (message: string) => Promise<void>;
   denied: (status: number) => void;
+  requestRef: { current: AbortController | null };
+  blocked: boolean;
+  uncertain: () => void;
+  review: () => void;
+  undoChanges: Array<{ unitId: string; newNumber: string }> | null;
+  rememberUndo: (changes: Array<{ unitId: string; newNumber: string }> | null) => void;
 }) {
   const previewRequest = useRef<AbortController | null>(null);
   useEffect(() => () => previewRequest.current?.abort(), []);
@@ -806,9 +820,6 @@ function RenumberUnitsDialog({
     changes: RenumberChange[];
     mappedCount: number;
   } | null>(null);
-  const [undoChanges, setUndoChanges] = useState<
-    Array<{ unitId: string; newNumber: string }> | null
-  >(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -835,7 +846,7 @@ function RenumberUnitsDialog({
   });
 
   async function checkPreview() {
-    if (previewRequest.current || busy || !proposedChanges.length) return;
+    if (previewRequest.current || requestRef.current || blocked || busy || !proposedChanges.length) return;
     const controller = new AbortController();
     previewRequest.current = controller;
     const timeout = setTimeout(() => controller.abort(), 20_000);
@@ -877,31 +888,41 @@ function RenumberUnitsDialog({
     changes = proposedChanges,
   ) {
     if (action === "preview") { await checkPreview(); return; }
-    setBusy(true);
-    setError("");
-    setSuccess("");
-    const response = await fetch("/api/v1/leasing/units/renumber", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ facilityId: facility.id, action, changes }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    setBusy(false);
-    if (!response.ok) {
-      setError(payload.error?.message ?? "The unit numbers could not be checked.");
-      return;
+    if (requestRef.current || previewRequest.current || busy || blocked || !changes.length) return;
+    const controller = new AbortController(); requestRef.current = controller;
+    const timeout = setTimeout(() => controller.abort(), 20_000);
+    setBusy(true); setError(""); setSuccess("");
+    try {
+      const response = await fetch("/api/v1/leasing/units/renumber", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ facilityId: facility.id, action, changes }), signal: controller.signal,
+      });
+      if (response.status === 401 || response.status === 403) { denied(response.status); return; }
+      const payload = await response.json();
+      if ([400, 404, 409, 422].includes(response.status)) {
+        const failure = z.object({ error: z.object({ message: z.string() }) }).safeParse(payload);
+        setError(failure.success ? failure.data.error.message : "The change was rejected. Review the numbers and preview again.");
+        setPreview(null); return;
+      }
+      const result = z.object({ data: z.object({
+        changes: z.array(z.object({ unitId: z.string(), oldNumber: z.string(), newNumber: z.string() })),
+        syncedMapLabels: z.number().int().nonnegative(), auditEventId: z.string().min(1),
+        undoChanges: z.array(z.object({ unitId: z.string(), newNumber: z.string() })),
+      }) }).safeParse(payload);
+      if (!response.ok || !result.success) throw new Error("Unconfirmed renumbering");
+      const data = result.data.data;
+      if (data.changes.length !== changes.length || new Set(data.changes.map(change => change.unitId)).size !== changes.length ||
+        !data.changes.every(change => changes.some(input => input.unitId === change.unitId && input.newNumber === change.newNumber) &&
+          facility.units.some(unit => unit.id === change.unitId && unit.number === change.oldNumber)) ||
+        data.undoChanges.length !== changes.length || new Set(data.undoChanges.map(change => change.unitId)).size !== changes.length ||
+        !data.undoChanges.every(change => data.changes.some(saved => saved.unitId === change.unitId && saved.oldNumber === change.newNumber))) throw new Error("Mismatched renumbering");
+      rememberUndo(data.undoChanges); setDraft({}); setPreview(null);
+      await applied(`${data.changes.length} unit${data.changes.length === 1 ? "" : "s"} renumbered without changing the saved map layout.`);
+    } catch {
+      uncertain(); setError("");
+    } finally {
+      clearTimeout(timeout); requestRef.current = null; setBusy(false);
     }
-    const count = Number(payload.data.changes.length);
-    const mapCount = Number(payload.data.syncedMapLabels);
-    setUndoChanges(payload.data.undoChanges);
-    setDraft({});
-    setPreview(null);
-    setSuccess(
-      `${count} unit${count === 1 ? "" : "s"} renumbered. ${mapCount} map label${mapCount === 1 ? "" : "s"} synchronised.`,
-    );
-    await applied(
-      `${count} unit${count === 1 ? "" : "s"} renumbered without changing the saved map layout.`,
-    );
   }
 
   async function undo() {
@@ -912,7 +933,7 @@ function RenumberUnitsDialog({
   return (
     <div className="modal-backdrop">
       <div className="modal-card renumber-modal" role="dialog" aria-modal="true">
-        <button className="modal-close" onClick={close}>
+        <button className="modal-close" onClick={close} disabled={busy}>
           <X size={18} />
         </button>
         <p className="eyebrow">Unit inventory</p>
@@ -927,6 +948,7 @@ function RenumberUnitsDialog({
         </p>
         {error ? <p className="form-error" role="alert">{error}</p> : null}
         {success ? <p className="form-success">{success}</p> : null}
+        {blocked ? <div role="alert" className="form-error">We could not confirm the renumbering. Review inventory before reloading this page; repeat changes are blocked.<div className="form-actions"><button className="button button-secondary" onClick={review}>Review inventory</button></div></div> : null}
         <label className="renumber-search">
           Find a unit
           <span className="toolbar-search">
@@ -951,7 +973,7 @@ function RenumberUnitsDialog({
                 aria-label={`New number for unit ${unit.number}`}
                 value={draft[unit.id] ?? ""}
                 placeholder={unit.number}
-                disabled={busy}
+                disabled={busy || blocked}
                 maxLength={40}
                 onChange={(event) => {
                   setDraft((current) => ({
@@ -959,7 +981,7 @@ function RenumberUnitsDialog({
                     [unit.id]: event.target.value,
                   }));
                   setPreview(null);
-                  setUndoChanges(null);
+                  rememberUndo(null);
                   setSuccess("");
                 }}
               />
@@ -992,19 +1014,19 @@ function RenumberUnitsDialog({
               type="button"
               className="button button-secondary"
               onClick={undo}
-              disabled={busy}
+              disabled={busy || blocked}
             >
               <RotateCcw size={15} /> Undo last renumbering
             </button>
           ) : null}
-          <button type="button" className="button button-secondary" onClick={close}>
+          <button type="button" className="button button-secondary" onClick={close} disabled={busy}>
             Close
           </button>
           <button
             type="button"
             className="button button-secondary"
             onClick={() => send("preview")}
-            disabled={busy || !proposedChanges.length}
+            disabled={busy || blocked || !proposedChanges.length}
           >
             Preview changes
           </button>
@@ -1012,7 +1034,7 @@ function RenumberUnitsDialog({
             type="button"
             className="button button-primary"
             onClick={() => send("apply")}
-            disabled={busy || !preview}
+            disabled={busy || blocked || !preview}
           >
             {busy ? "Saving…" : "Apply renumbering"}
           </button>

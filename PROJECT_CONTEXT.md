@@ -1,4 +1,10 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Renumber save/undo confirmation recovery — 28 September 2026
+
+- **Implementation:** apply/undo share inventory's synchronous request reference,20second timeout and persistent uncertain-result block. Success requires matching unit IDs/old/new numbers, map count, audit ID and inverse undo plan. Known rejections retain input;401/403 clears private records. Confirmed notice precedes refresh; facility-scoped Undo survives modal close/refresh during this page session. Uncertain results offer GET-only review and block repeat changes until explicit reload. Existing backend transaction/map/permission policy unchanged; no server replay guarantee added.
+- **Testing:** prepatch actual apply network failure threw and left controls busy. Synthetic apply/undo at1440/390/320px passed rejection/denial/duplicate/timeout/network/server/malformed/mismatched identity/numbers/undo/audit/count/lost confirmation/GET review/confirmed refresh failure, plus mobile modal/action bounds and screenshot.492 tests/typecheck/direct ESLint and preview/removal/read regressions passed. Lint request-ref naming corrected before promotion. Required CI pending.
+- **Commit/push:** candidate pending, carries PR347 final evidence. **Merge:** pending. **Deployment/configuration:** pending; no schema/configuration change. **Live verification:** pending. No production renumbering; all14 acceptance gates open. Isolated browser evidence is not staff acceptance; rate/reset recovery remains separate.
+
 ## Renumber preview recovery — 28 September 2026
 
 - **Implementation:** read-only renumber preview uses a synchronous request guard,20second timeout, retained numbers and actionable retry. Invalid/mismatched unit IDs, old/new numbers, duplicate changes and counts cannot enable Apply. Starting another preview clears the previous result; editing is disabled while checking. Denied access clears private inventory and gives sign-in/administrator guidance. Mobile action wrapping keeps Close/Preview/Apply reachable. Existing apply/undo API, allocation/map policy and mutation confirmation recovery remain separate.
