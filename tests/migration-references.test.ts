@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 
 const rows: Record<string, string> = {
   facilities: "a,Alpha,A,Africa/Johannesburg\nb,Beta,B,Africa/Johannesburg",
@@ -22,9 +23,10 @@ function validate(overrides: Record<string, string> = {}, headers: Record<string
       writeFileSync(join(directory, `${name}.csv`), `${header}\n${data}\n`);
     }
     const output = join(directory, "result.json");
+    const customerBytes = readFileSync(join(directory, "customers.csv"));
     const run = spawnSync(process.execPath, [resolve("scripts/validate-migration-export.mjs"), directory, output], { encoding: "utf8" });
     assert.equal(run.error, undefined);
-    return { status: run.status, report: JSON.parse(readFileSync(output, "utf8")) };
+    return { status: run.status, report: JSON.parse(readFileSync(output, "utf8")), customerHash: createHash("sha256").update(customerBytes).digest("hex"), customerSize: customerBytes.length };
   } finally { rmSync(directory, { recursive: true, force: true }); }
 }
 
@@ -32,6 +34,28 @@ test("migration validator accepts linked facilities with optional customer field
   const result = validate();
   assert.equal(result.status, 0); assert.equal(result.report.valid, true);
   assert.equal(result.report.counts.units, 2);
+});
+
+test("migration report fingerprints source bytes and supplies facility count evidence", () => {
+  const result = validate();
+  assert.equal(result.report.sourceFiles["customers.csv"].sha256, result.customerHash);
+  assert.equal(result.report.sourceFiles["customers.csv"].bytes, result.customerSize);
+  assert.equal(Object.keys(result.report.sourceFiles).length, 6);
+  assert.equal(result.report.reconciliation.ready, true);
+  assert.deepEqual(result.report.reconciliation.byFacility, [
+    { facilityLegacyId: "a", unitTypes: 1, units: 1, tenancies: 1, reservations: 0, linkedCustomers: 1 },
+    { facilityLegacyId: "b", unitTypes: 1, units: 1, tenancies: 0, reservations: 1, linkedCustomers: 1 },
+  ]);
+  assert.equal(result.report.reconciliation.customersWithoutContracts, 0);
+  const changed = validate({ customers: rows.customers + "\nother,Other,Customer,,," });
+  assert.notEqual(changed.report.sourceFiles["customers.csv"].sha256, result.customerHash);
+  assert.equal(changed.report.reconciliation.customersWithoutContracts, 1);
+});
+
+test("invalid migration package never offers ready reconciliation counts", () => {
+  const result = validate({ units: "ua,a,tb,1,AVAILABLE,100\nub,b,tb,1,AVAILABLE,100" });
+  assert.equal(result.report.valid, false);
+  assert.deepEqual(result.report.reconciliation, { ready: false, byFacility: null, customersWithoutContracts: null });
 });
 
 test("migration validator rejects malformed CSV instead of approving truncated data", () => {

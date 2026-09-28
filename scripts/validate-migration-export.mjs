@@ -1,5 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { createHash } from "node:crypto";
 
 const contracts = {
   facilities: ["legacy_id", "name", "code", "timezone"],
@@ -83,10 +84,14 @@ function requireSameFacility(rows, field, targets, file, errors) {
 
 const sourceDirectory = resolve(process.argv[2] ?? "migration/templates");
 const outputPath = resolve(process.argv[3] ?? "migration-validation.json");
-const errors = []; const data = {};
+const errors = []; const data = {}; const sourceFiles = {};
 for (const [name, required] of Object.entries(contracts)) {
   const file = `${name}.csv`;
-  try { data[name] = records(parseCsv(await readFile(resolve(sourceDirectory, file), "utf8")), required, file, errors); }
+  try {
+    const bytes = await readFile(resolve(sourceDirectory, file));
+    sourceFiles[file] = { sha256: createHash("sha256").update(bytes).digest("hex"), bytes: bytes.length };
+    data[name] = records(parseCsv(bytes.toString("utf8")), required, file, errors);
+  }
   catch (error) { errors.push(`${file}: ${error instanceof Error ? error.message : "could not be read"}`); data[name] = []; }
 }
 
@@ -102,7 +107,24 @@ for (const file of ["tenancies", "reservations"]) {
   requireSameFacility(data[file], "unit_legacy_id", data.units, `${file}.csv`, errors);
 }
 
-const report = { generatedAt: new Date().toISOString(), sourceDirectory, valid: errors.length === 0, counts: Object.fromEntries(Object.entries(data).map(([name, rows]) => [name, rows.length])), errors };
+const valid = errors.length === 0;
+const contractsByCustomer = new Set([...data.tenancies, ...data.reservations].map(row => row.customer_legacy_id));
+const reconciliation = {
+  ready: valid,
+  byFacility: valid ? data.facilities.map(facility => {
+    const local = name => data[name].filter(row => row.facility_legacy_id === facility.legacy_id);
+    return {
+      facilityLegacyId: facility.legacy_id,
+      unitTypes: local("unit_types").length,
+      units: local("units").length,
+      tenancies: local("tenancies").length,
+      reservations: local("reservations").length,
+      linkedCustomers: new Set([...local("tenancies"), ...local("reservations")].map(row => row.customer_legacy_id)).size,
+    };
+  }) : null,
+  customersWithoutContracts: valid ? data.customers.filter(row => !contractsByCustomer.has(row.legacy_id)).length : null,
+};
+const report = { generatedAt: new Date().toISOString(), sourceDirectory, valid, sourceFiles, counts: Object.fromEntries(Object.entries(data).map(([name, rows]) => [name, rows.length])), reconciliation, errors };
 await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
 console.log(JSON.stringify(report, null, 2));
 if (errors.length) process.exitCode = 1;
