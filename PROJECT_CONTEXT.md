@@ -1,4 +1,11 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Unit removal audit transaction — 28 September 2026
+
+- **Implementation:** existing unavailable-status change or owner-authorised permanent unit removal, maintenance unlink and units.deleted audit share a transaction. Existing owner, history and facility guards retained. No live units changed; no removal-policy or concurrency guarantee added.
+- **Testing:** actual prepatch synthetic audit failure retained UNAVAILABLE despite500; candidate481 tests/typecheck/focused lint passed. Required PostgreSQL status rollback/retry and forced unit/maintenance rollback/retry with owner/history/facility tests added; pending CI.
+- **Commit/push:** candidate on codex/unit-delete-audit includes PR331 final evidence; pending commit.
+- **Merge/deployment/live:** pending. No schema/configuration change. All14 acceptance gates remain open; unit-type DELETE remains a separate candidate.
+
 ## Reservation cancellation audit transaction — 28 September 2026
 
 - **Implementation:** cancellation and its existing reservations.deleted audit now commit together. Audit failure restores the prior status; facility permission and existing cancellation policy unchanged. No live reservations changed.

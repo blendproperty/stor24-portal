@@ -421,41 +421,40 @@ export async function DELETE(
         });
       }
       if (resource === "units") {
-        if (!force) {
-          await db.unit.update({
-            where: { id },
-            data: { status: "UNAVAILABLE" },
-          });
-        } else {
-          await requireOwner();
-          const linked = await db.unit.findUnique({
-            where: { id },
-            select: {
-              _count: { select: { reservations: true, occupancies: true } },
-            },
-          });
-          const historyCount =
-            (linked?._count.reservations ?? 0) +
-            (linked?._count.occupancies ?? 0);
-          if (historyCount)
-            return Response.json(
-              {
-                error: {
-                  code: "UNIT_HAS_HISTORY",
-                  message:
-                    "This unit has reservation or occupancy history and cannot be permanently deleted.",
-                },
+        return await db.$transaction(async tx => {
+          if (!force) {
+            await tx.unit.update({
+              where: { id },
+              data: { status: "UNAVAILABLE" },
+            });
+          } else {
+            await requireOwner();
+            const linked = await tx.unit.findUnique({
+              where: { id },
+              select: {
+                _count: { select: { reservations: true, occupancies: true } },
               },
-              { status: 409 },
-            );
-          await db.$transaction([
-            db.maintenanceRequest.updateMany({
-              where: { unitId: id },
-              data: { unitId: null },
-            }),
-            db.unit.delete({ where: { id } }),
-          ]);
-        }
+            });
+            const historyCount =
+              (linked?._count.reservations ?? 0) +
+              (linked?._count.occupancies ?? 0);
+            if (historyCount)
+              return Response.json(
+                {
+                  error: {
+                    code: "UNIT_HAS_HISTORY",
+                    message:
+                      "This unit has reservation or occupancy history and cannot be permanently deleted.",
+                  },
+                },
+                { status: 409 },
+              );
+            await tx.maintenanceRequest.updateMany({ where: { unitId: id }, data: { unitId: null } });
+            await tx.unit.delete({ where: { id } });
+          }
+          await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "units.deleted", entityType: "units", entityId: id } });
+          return new Response(null, { status: 204 });
+        });
       } else if (resource === "reservations") {
         return await db.$transaction(async tx => {
           await tx.reservation.update({ where: { id }, data: { status: "CANCELLED" } });

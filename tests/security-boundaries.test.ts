@@ -627,3 +627,18 @@ test("reservation cancellation rolls back when audit fails", async () => {
   fail = false; assert.equal((await cancel("cancel-b")).status, 403);
   assert.equal((await cancel()).status, 204); assert.equal(reservation.status, "CANCELLED"); assert.equal(audits, 1);
 });
+
+test("unit removal rolls back when audit fails", async () => {
+  const state = fixture(); state.grant("inventory.manage");
+  const unit = { id: "cancel-a", facilityId: "a", status: "AVAILABLE" };
+  state.tables.unit.push(unit, { id: "cancel-b", facilityId: "b", status: "AVAILABLE" });
+  state.db.unit.update = async ({ data }: Row) => Object.assign(unit, data);
+  let fail = true; let audits = 0;
+  state.db.auditEvent.create = async () => { if (fail) throw new Error("SYNTHETIC_AUDIT_FAILURE"); audits++; return {}; };
+  state.db.$transaction = async (fn: (client: Row) => Promise<unknown>) => { const before = structuredClone(unit); try { return await fn(state.db); } catch (error) { Object.assign(unit, before); throw error; } };
+  const api = await load("./src/app/api/v1/leasing/[resource]/route.ts", state);
+  const cancel = (id = unit.id) => api.DELETE(new Request(`https://example.invalid/api/v1/leasing/units?id=${id}`, { method: "DELETE", headers: { origin: "https://example.invalid" } }), context("units"));
+  assert.equal((await cancel()).status, 500); assert.equal(unit.status, "AVAILABLE"); assert.equal(audits, 0);
+  fail = false; assert.equal((await cancel("cancel-b")).status, 403);
+  assert.equal((await cancel()).status, 204); assert.equal(unit.status, "UNAVAILABLE"); assert.equal(audits, 1);
+});
