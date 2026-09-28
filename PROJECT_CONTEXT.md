@@ -2,9 +2,9 @@
 ## Migration source-file preservation — 28 September 2026
 
 - **Implementation:** report output rejects source paths and compares the opened output file identity against source files before truncation, covering existing hard-link/symlink aliases. Normal reports remain replaceable. Source-directory access controls/backups still required; no hostile filesystem race guarantee.
-- **Testing:** synthetic prepatch direct output overwrote a source CSV and exited0. Candidate490 tests/typecheck/focused lint passed. CLI direct-path/hard-link byte preservation and replacement of a longer prior report passed; no real export used. Required CI pending.
-- **Commit/push:** candidate on codex/migration-source-preservation includes PR336 final evidence; pending commit.
-- **Merge/deployment/live:** pending. No production data, schema or configuration changes; all14 acceptance gates remain open.
+- **Testing:** synthetic prepatch direct output overwrote a source CSV and exited0. Candidate490 tests/typecheck/focused lint passed. CLI direct-path/hard-link byte preservation and replacement of a longer prior report passed; no real export used. All nine checks passed: CI36379747906/SQL36379747891/security36379747980.
+- **Commit/push:** PR337 source22e2e39f80d842429e4638fed162a00d612bc2b4 includes PR336 final evidence; merged0d3a61ad7ed5a4f4e5263c052a5700719773e0f6.
+- **Deployment/live:** mainCI36380120481/deploy36380454312 passed. Exact image stor24-crm:0d3a61ad7 healthy; service/database readiness verified2026-09-28T05:08:59.755Z. ExcelE097 and28th component record delivery. No production data, schema or configuration changes; all14 acceptance gates remain open.
 ## Migration source reconciliation evidence — 28 September 2026
 
 - **Implementation:** read-only preflight reports exact-byte SHA-256/size for each readable CSV and validated per-facility record/distinct linked-customer counts, plus customers without contracts. Invalid packages have null reconciliation counts. All statuses count; cross-facility customers are not additive. No import or financial acceptance implied.
