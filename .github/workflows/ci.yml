@@ -40,6 +40,7 @@ jobs:
       - run: node scripts/test-reservation-create-recovery.mjs
       - run: node scripts/test-reservation-lifecycle-recovery.mjs
       - run: node scripts/test-unit-inventory-read-recovery.mjs
+      - run: node scripts/test-inventory-save-recovery.mjs
       - run: node scripts/test-merchandise-supply-confirmation.mjs
       - run: node scripts/test-operations-access-recovery.mjs
       - run: node scripts/test-daily-close-form.mjs
@@ -80,6 +81,7 @@ jobs:
             output/reservation-create-recovery/
             output/reservation-lifecycle-recovery/
             output/unit-inventory-read-recovery/
+            output/inventory-save-recovery/
             output/merchandise-supply-confirmation/
             output/daily-close-form/
             output/daily-close-history/

@@ -1,12 +1,20 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Inventory create/edit confirmation recovery — 28 September 2026
+
+- **Implementation:** unit and unit-type create/edit forms retain rejected input, guard simultaneous submission and use20second bounded requests. Success requires matching identity, facility and submitted fields, including numeric rates/areas and features. Uncertain responses block repeat saves across modal reopen and GET-only review; explicit reload after review remains required.401/403 clears private inventory. Editing uses the record's fixed facility. Existing server audit/floor/availability policy is unchanged; client guards do not establish server replay protection.
+- **Testing:** actual prepatch network failure threw and left saving stuck. All four flows passed1440/390/320px rejection/input retention, duplicates, timeout, network/server/malformed/mismatched facility/value/edit identity, denial, reopened block, GET-only review, success and saved-refresh failure. Mobile action overflow reproduced, wrapping/min-width fixed, modal and full-page width/action visibility checked and screenshot inspected.492 tests/typecheck/lint and inventory read/floor/premium regressions passed. Required CI pending.
+- **Commit/push:** candidate codex/inventory-save-recovery includes PR344 final evidence and staff acceptance appendix; pending commit.
+- **Merge:** pending required checks.
+- **Deployment/configuration:** pending; no schema/configuration change.
+- **Live verification:** pending; no production mutations. All14 acceptance gates remain open. Delete/rate/reset/renumber confirmation recovery remains separate.
+
 ## Unit inventory read recovery — 28 September 2026
 
 - **Implementation:** preserves initial server-provided inventory; refresh validates all three nested read payloads, bounds requests at20seconds and exposes a GET-only retry. Unavailable data hides actions/editors;401/403 clears records and gives sign-in/administrator guidance. Confirmed save notices survive generic read failures. Existing floor/availability policies and account links preserved; mutation confirmation/replay recovery remains separate.
-- **Testing:** synthetic actual component reproduced confirmed unit-type save followed by unhandled refresh failure and lost confirmation. Candidate1440/390/320px network/server/malformed/nested payload/timeout/denial/empty/populated/account-link/closed-floor and GET-only recovery pass; exactly one synthetic POST.492 tests/typecheck/lint and floor/premium workspace regressions passed. Mobile recovery screenshot inspected; isolated fixture is not full production branding proof. Initial CI36393356660 caught a Windows-encoded ellipsis in the new loading message; corrected to UTF-8 before promotion, full checks rerun.
-- **Commit/push:** implementation ef0dc75 pushed on codex/unit-inventory-read-recovery, includes PR343 final evidence; this context checkpoint follows before PR checks.
-- **Merge:** pending required checks.
-- **Deployment/configuration:** pending; no schema/configuration change.
-- **Live verification:** pending; no production unit/facility mutations. All14 acceptance gates remain open.
+- **Testing:** synthetic actual component reproduced confirmed unit-type save followed by unhandled refresh failure and lost confirmation. Candidate1440/390/320px network/server/malformed/nested payload/timeout/denial/empty/populated/account-link/closed-floor and GET-only recovery passed; exactly one synthetic POST.492 tests/typecheck/lint, local production build and floor/premium workspace regressions passed. Initial CI36393356660 caught Windows-encoded loading copy; corrected UTF-8/line endings before promotion. All nine corrected checks CI36393650455/SQL36393650431/security36393650439 passed; new browser step explicitly passed. Isolated screenshots are not full production branding proof.
+- **Commit/push and merge:** PR344 corrected sourcedaef33c2e6a4f5f30fedb32f2e85ce03420bbfc5 mergedb83fae9e3ce9cbbdbb594c72e62902179d53ac32, including PR343 final evidence.
+- **Deployment/configuration:** mainCI36394333136/deploy36395008383 passed; no schema/configuration change.
+- **Live verification:** exact image stor24-crm:b83fae9e3 healthy; service/database readiness verified2026-09-28T08:04:56.342Z. ExcelE104 records35th delivered component. No production unit/facility mutations; all14 acceptance gates remain open. Inventory create/edit/delete/rate/reset mutation recovery beyond read refresh remains separate.
 
 ## Reservation lifecycle confirmation recovery — 28 September 2026
 
