@@ -1,4 +1,13 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Inventory removal confirmation recovery — 28 September 2026
+
+- **Implementation:** unit/type removal shares synchronous request locking,20second timeout, denial clearing and uncertain-result blocking with inventory saves. Only the existing API's204 confirms removal; other unexpected success bodies remain uncertain. Known restrictions remain actionable; assigned-unit cleanup is offered only for the documented409 flag with a positive integer count. Confirmed removal notice precedes GET refresh, so read failure cannot hide completion. Native confirmation, owner/history/facility/audit rules and forced cleanup policy unchanged; no backend replay guarantee added.
+- **Testing:** actual prepatch network failure threw and left controls busy. Unit, type and type-with-unused-units flows passed1440/390/320px network/timeout/duplicate/401/403/409/500/unexpected200, confirmed204, reopened block, GET-only review and confirmed-removal/read-failure.492 tests/typecheck/lint passed; inventory save/read/floor regressions passed. Mobile recovery screenshot inspected; isolated fixture is not production branding or staff acceptance. Required CI pending.
+- **Commit/push:** candidate codex/inventory-removal-recovery includes PR345 final evidence; pending commit.
+- **Merge:** pending required checks.
+- **Deployment/configuration:** pending; no schema/configuration change.
+- **Live verification:** pending; no production removals or mutations. All14 acceptance gates remain open. Rate/reset/renumber confirmation recovery remains separate.
+
 ## Inventory create/edit confirmation recovery — 28 September 2026
 
 - **Implementation:** unit and unit-type create/edit forms retain rejected input, guard simultaneous submission and use20second bounded requests. Success requires matching identity, facility and submitted fields, including numeric rates/areas and features. Uncertain responses block repeat saves across modal reopen and GET-only review; explicit reload after review remains required.401/403 clears private inventory. Editing uses the record's fixed facility. Existing server audit/floor/availability policy unchanged; client guards do not establish server replay protection.
