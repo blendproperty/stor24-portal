@@ -19,8 +19,9 @@ PR331–343 are deployed; exact evidence is recorded in PROJECT_CONTEXT.md and E
 | Merchandise supply | On approved synthetic orders, verify queue, permission guidance, one confirmed supply and read-only recovery after an uncertain response. Compare fulfilment and stock evidence. Do not supply a real order for testing. | PR338–339 |
 | Reservations | On approved synthetic records, verify create, cancel, extend and expire confirmations, retained rejected inputs and unit-release versus protected-hold messages. Uncertain outcomes require status review before any further write. | PR341–343 |
 | Inventory refresh | Confirm initial units and closed-floor labels. Review the supplied desktop/mobile synthetic failure evidence: a successful save remains confirmed when refresh fails, Refresh inventory only reads, and denied reads hide records with administrator/sign-in guidance. No production fault injection or floor switching required. | PR344; E104 |
+| Inventory create/edit | On approved synthetic records, create and edit a unit and a unit type. Confirm saved values and matching audit. Review isolated rejection and uncertain-response evidence: entries remain after rejection; uncertain results disable Save even after closing/reopening and require GET-only review. Check the wrapped mobile action controls. | PR345; E105; exact dce9b93d9 healthy08:37:20.215UTC |
 
-For each accepted staff check record reviewer, date, synthetic record reference and observed result in the existing tracker. Browser fixtures and automated checks are evidence to review, not a substitute for staff acceptance. Unit save/delete/rate/reset mutation confirmation recovery beyond read refresh remains separate work.
+For each accepted staff check record reviewer, date, synthetic record reference and observed result in the existing tracker. Browser fixtures and automated checks are evidence to review, not a substitute for staff acceptance. Unit create/edit recovery is covered by PR345; delete/rate/reset/renumber confirmation recovery remains separate work.
 
 ## Review in this order
 
