@@ -161,22 +161,37 @@ export function UnitInventoryWorkspace({
   async function applyMidrandMarketRates() {
     if (saveBlocked || saveRequest.current) return;
     if (!selectedFacility || !window.confirm(`Apply the August 2026 Midrand market rate curve to all ${selectedFacility.units.length} standard unit rates at ${selectedFacility.name}? Existing tenancy rents and reservation quotes will not change.`)) return;
-    setBusy(true);
-    setError("");
-    setNotice("");
-    const response = await fetch("/api/v1/leasing/unit-rates", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ facilityId: selectedFacility.id, modelVersion: "MIDRAND_2026_08_V1" }),
-    });
-    const result = await response.json().catch(() => ({}));
-    setBusy(false);
-    if (!response.ok) {
-      setError(result.error?.message ?? "The market rates could not be applied.");
-      return;
+    const controller = new AbortController(); saveRequest.current = controller;
+    const timer = setTimeout(() => controller.abort(), 20_000);
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const response = await fetch("/api/v1/leasing/unit-rates", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ facilityId: selectedFacility.id, modelVersion: "MIDRAND_2026_08_V1" }), signal: controller.signal,
+      });
+      if (response.status === 401 || response.status === 403) {
+        setFacilities([]); setDialog(null); setRenumberDialog(false); setRenumberUndo(null); setUatResetPreview(null);
+        setReadDenied(true); setReadError(response.status === 401 ? "Sign in again to view inventory." : "You do not have access to change these rates. Please contact your administrator."); return;
+      }
+      const payload = await response.json();
+      if ([400, 404, 409, 422].includes(response.status)) {
+        const failure = z.object({ error: z.object({ message: z.string() }) }).safeParse(payload);
+        setError(failure.success ? failure.data.error.message : "The rate update was rejected. Review inventory before trying again."); return;
+      }
+      const result = z.object({ data: z.object({
+        facilityId: z.literal(selectedFacility.id), modelVersion: z.literal("MIDRAND_2026_08_V1"),
+        updated: z.number().int().nonnegative(), skipped: z.number().int().nonnegative(),
+        minimumRate: z.number().finite().nonnegative(), maximumRate: z.number().finite().nonnegative(),
+      }) }).safeParse(payload);
+      if (!response.ok || !result.success || result.data.data.maximumRate < result.data.data.minimumRate) throw new Error("Unconfirmed rate update");
+      const data = result.data.data;
+      setNotice(`${data.updated} unit rates updated. Range ${money(String(data.minimumRate))} to ${money(String(data.maximumRate))}.${data.skipped ? ` ${data.skipped} units without rentable areas were skipped.` : ""}`);
+      await refresh();
+    } catch {
+      setSaveBlocked(true); setError("We could not confirm whether the rate update completed. Review inventory before reloading this page.");
+    } finally {
+      clearTimeout(timer); saveRequest.current = null; setBusy(false);
     }
-    await refresh();
-    setNotice(`${result.data.updated} unit rates updated. Range ${money(String(result.data.minimumRate))} to ${money(String(result.data.maximumRate))}.`);
   }
 
   async function releaseOrphanedReservations(unit?: Unit) {

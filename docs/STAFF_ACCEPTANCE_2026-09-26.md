@@ -24,7 +24,9 @@ PR331–343 are deployed; exact evidence is recorded in PROJECT_CONTEXT.md and E
 
 | Renumber preview recovery | Review synthetic preview evidence: entered numbers survive failed previews; mismatched results cannot enable Apply; denial clears inventory; Close and Preview remain reachable on mobile. Do not apply changes to live unit numbers for this check. | PR347; E107; exact6220df339 healthy09:35:28.502UTC |
 
-For each accepted staff check record reviewer, date, synthetic record reference and observed result in the existing tracker. Browser fixtures and automated checks are evidence to review, not a substitute for staff acceptance. Unit create/edit recovery is covered by PR345; removal recovery is covered by PR346; preview recovery is covered by PR347; rate/reset and renumber apply/undo confirmation recovery remain separate work.
+| Renumber save/undo recovery | Review synthetic apply and undo evidence: confirmed changes retain Undo after refresh in the same page session; uncertain results block repeats and offer read-only review. Saved confirmation survives a failed refresh. Do not renumber live units for testing. | PR348; E108; exactc29902b7f healthy10:03:36.676UTC |
+
+For each accepted staff check record reviewer, date, synthetic record reference and observed result in the existing tracker. Browser fixtures and automated checks are evidence to review, not a substitute for staff acceptance. Unit create/edit recovery is covered by PR345; removal recovery is covered by PR346; preview recovery is covered by PR347; apply/undo recovery is covered by PR348; rate/reset recovery remains separate work.
 
 ## Review in this order
 
