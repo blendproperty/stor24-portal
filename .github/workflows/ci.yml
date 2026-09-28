@@ -36,6 +36,7 @@ jobs:
       - run: node scripts/test-task-completion-recovery.mjs
       - run: node scripts/test-operations-read-recovery.mjs
       - run: node scripts/test-merchandise-queue-read.mjs
+      - run: node scripts/test-merchandise-supply-confirmation.mjs
       - run: node scripts/test-operations-access-recovery.mjs
       - run: node scripts/test-daily-close-form.mjs
       - run: node scripts/test-daily-close-history.mjs
@@ -71,6 +72,7 @@ jobs:
             output/task-completion-recovery/
             output/operations-read-recovery/
             output/merchandise-queue-read/
+            output/merchandise-supply-confirmation/
             output/daily-close-form/
             output/daily-close-history/
             output/report-export-recovery/
