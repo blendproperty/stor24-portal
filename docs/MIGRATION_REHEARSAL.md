@@ -27,6 +27,8 @@ The command fails on missing files or columns, duplicate legacy identifiers, bla
 
 ## Rehearsal gates
 
+CSV parsing rejects unclosed or misplaced quotes, text after a closing quote, duplicate/empty headers and rows whose column counts differ from the header. Quoted commas, escaped double quotes and quoted multiline fields are supported. A parse error makes the package invalid; do not interpret an invalid report's counts as a complete export.
+
 1. Record the source-system extraction timestamp in SAST and source row counts.
 2. Validate the untouched export. Correct source data or an explicitly versioned transformation; never hand-edit the only copy.
 3. Back up PostgreSQL and record the backup filename and SHA-256 digest.
