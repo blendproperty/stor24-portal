@@ -69,6 +69,9 @@ export function ReservationsWorkspace() {
   const [query, setQuery] = useState("");
   const [dialog, setDialog] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [createBlocked, setCreateBlocked] = useState(false);
+  const createRequest = useRef<AbortController | null>(null);
+  const uncertainCreate = "We could not confirm whether the reservation was created. Review reservations before trying again. After checking the unit, reload this page to start another save.";
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [readBusy, setReadBusy] = useState(true);
@@ -127,34 +130,41 @@ export function ReservationsWorkspace() {
     [data.reservations, facilityId, status, query],
   );
   async function create(form: FormData) {
+    if (createRequest.current || createBlocked || !loaded || readBusy) return;
+    const input = {
+      facilityId: String(form.get("facilityId") ?? ""), customerId: String(form.get("customerId") ?? ""), unitId: String(form.get("unitId") ?? ""), quotedRate: String(form.get("quotedRate") ?? ""),
+      holdExpiresAt: String(form.get("holdExpiresAt") ?? "") || undefined, intendedMoveIn: String(form.get("intendedMoveIn") ?? "") || undefined,
+    };
+    const controller = new AbortController(); createRequest.current = controller;
+    const timer = setTimeout(() => controller.abort(), 20_000);
     setBusy(true);
     setError("");
     setNotice("");
-    const response = await fetch("/api/v1/reservations", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        facilityId: form.get("facilityId"),
-        customerId: form.get("customerId"),
-        unitId: form.get("unitId"),
-        quotedRate: form.get("quotedRate"),
-        holdExpiresAt: form.get("holdExpiresAt") || undefined,
-        intendedMoveIn: form.get("intendedMoveIn") || undefined,
-      }),
-    });
-    const payload = await response.json();
-    setBusy(false);
-    if (!response.ok) {
-      setError(
-        response.status === 409
-          ? "That unit is no longer available. Refresh and choose another unit."
-          : (payload.error?.message ?? "The reservation could not be created."),
-      );
-      return;
+    try {
+      const response = await fetch("/api/v1/reservations", { method: "POST", signal: controller.signal, headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
+      if (response.status === 401 || response.status === 403) {
+        setDialog(false); setData(emptyData); setLoaded(false); setFacilityId(""); setQuery(""); setSignedOut(response.status === 401);
+        setReadError(response.status === 401 ? "Your session has ended. Sign in again to create reservations." : "Reservation access is unavailable. Please contact your administrator if you require access."); return;
+      }
+      if ([400, 404, 409, 422].includes(response.status)) {
+        setError(response.status === 409 ? "That unit is no longer available. Refresh and choose another unit." : "Check the reservation details and try again."); return;
+      }
+      if (!response.ok) throw new Error("RESERVATION_SAVE_UNCERTAIN");
+      const confirmation = z.object({ data: z.object({
+        id: z.string().min(1), status: z.literal("ACTIVE"), facilityId: z.literal(input.facilityId), customerId: z.literal(input.customerId), unitId: z.literal(input.unitId),
+        quotedRate: money.refine(value => Number(value) === Number(input.quotedRate)),
+        holdExpiresAt: input.holdExpiresAt ? z.literal(new Date(input.holdExpiresAt).toISOString()) : z.null(),
+        intendedMoveIn: input.intendedMoveIn ? z.literal(new Date(input.intendedMoveIn).toISOString()) : z.null(),
+      }) });
+      confirmation.parse(await response.json());
+      if (controller.signal.aborted) throw new Error("RESERVATION_SAVE_TIMEOUT");
+      setDialog(false); setNotice("Reservation created and the unit is now held.");
+      await load();
+    } catch {
+      setCreateBlocked(true); setError(uncertainCreate);
+    } finally {
+      clearTimeout(timer); createRequest.current = null; setBusy(false);
     }
-    setDialog(false);
-    setNotice("Reservation created and the unit is now held.");
-    await load();
   }
   async function cancel(item: Reservation) {
     if (
@@ -464,7 +474,9 @@ export function ReservationsWorkspace() {
           data={data}
           defaultFacilityId={facilityId || data.facilities[0]?.id || ""}
           busy={busy}
-          error={error}
+          error={createBlocked ? uncertainCreate : error}
+          blocked={createBlocked}
+          review={() => void load()}
           close={() => setDialog(false)}
           create={create}
         />
@@ -480,6 +492,8 @@ function ReservationDialog({
   error,
   close,
   create,
+  blocked,
+  review,
 }: {
   data: Payload;
   defaultFacilityId: string;
@@ -487,6 +501,8 @@ function ReservationDialog({
   error: string;
   close: () => void;
   create: (form: FormData) => void;
+  blocked: boolean;
+  review: () => void;
 }) {
   const [facilityId, setFacilityId] = useState(defaultFacilityId);
   const units =
@@ -499,12 +515,12 @@ function ReservationDialog({
   return (
     <div className="modal-backdrop">
       <div className="modal-card reservation-modal">
-        <button className="modal-close" onClick={close}>
+        <button className="modal-close" onClick={close} disabled={busy} aria-label="Close reservation form">
           <X size={18} />
         </button>
         <p className="eyebrow">Inventory hold</p>
         <h2>New reservation</h2>
-        <form action={create} className="inventory-form">
+        <form onSubmit={event => { event.preventDefault(); create(new FormData(event.currentTarget)); }} className="inventory-form">
           <label>
             Store
             <select
@@ -580,23 +596,25 @@ function ReservationDialog({
             <input name="intendedMoveIn" type="date" />
           </label>
           {error ? (
-            <p className="form-error inventory-form-wide">{error}</p>
+            <p className="form-error inventory-form-wide" role="alert">{error}</p>
           ) : null}
           <div className="form-actions inventory-form-wide">
             <button
               type="button"
               className="button button-secondary"
               onClick={close}
+              disabled={busy}
             >
               Cancel
             </button>
             <button
               className="button button-primary"
-              disabled={busy || !units.length}
+              disabled={busy || blocked || !units.length}
             >
               <CalendarCheck size={15} />
               {busy ? "Reserving…" : "Reserve unit"}
             </button>
+            {blocked ? <button type="button" className="button button-secondary" onClick={review}>Review reservations</button> : null}
           </div>
         </form>
       </div>

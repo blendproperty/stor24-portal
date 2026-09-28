@@ -1,4 +1,10 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Reservation creation recovery — 28 September 2026
+
+- **Implementation:** explicit form submit retains rejected entries; synchronous request guard/20second timeout and matching identity/rate/date/status confirmation prevent false success. Uncertain outcomes block repeated saves across modal reopen and offer GET-only review; reload remains an explicit manual step after checking. Denial clears private records. Server availability/floor/scope policies unchanged; no server idempotency or concurrency guarantee added.
+- **Testing:** prepatch actual component network failure caused unhandled page error. Candidate1440/390/320px rejected inputs/conflict/denial/duplicate/timeout/malformed/mismatched facility-customer-unit-rate-date/lost result/reopened block/GET review/success-refresh failure passed. Mobile uncertain-action overflow caught, action wrapping fixed and modal width/action visibility retested; screenshot inspected.492 tests/typecheck/lint plus reservations-read/premium regressions passed. Required browser CI pending.
+- **Commit/push:** candidate codex/reservation-create-recovery includes PR341 final evidence; pending commit.
+- **Merge/deployment/live:** pending. No production reservation/customer transactions; all14 acceptance gates remain open.
 ## Reservations read recovery — 28 September 2026
 
 - **Implementation:** shared initial/refresh read validates nested payloads, times out after20seconds, distinguishes unavailable/loading/empty data and exposes GET-only refresh. Reads clear stale records/editors; denied access gives sign-in/administrator guidance and clears private notices. Confirmed mutation notices survive generic follow-up read failures. Server reservation policies and mutation retry guarantees unchanged.
