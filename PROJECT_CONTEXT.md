@@ -1,4 +1,10 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Reservations read recovery — 28 September 2026
+
+- **Implementation:** shared initial/refresh read validates nested payloads, times out after20seconds, distinguishes unavailable/loading/empty data and exposes GET-only refresh. Reads clear stale records/editors; denied access gives sign-in/administrator guidance and clears private notices. Confirmed mutation notices survive generic follow-up read failures. Server reservation policies and mutation retry guarantees unchanged.
+- **Testing:** prepatch actual component network failure produced an unhandled error and false empty message. Candidate1440/390/320px network/server/malformed/nested-shape/timeout/401/403/empty/populated/deep-link and cancellation-success/read-failure recovery pass; exactly one synthetic DELETE, remaining requests GET. Mobile empty state removed from scrolled table and retested.492 tests/typecheck/lint and premium workspace regression passed. Required browser CI pending.
+- **Commit/push:** candidate codex/reservations-read-recovery includes PR340 final evidence; pending commit.
+- **Merge/deployment/live:** pending. No production customer/reservation mutations; all14 acceptance gates remain open.
 ## Migration business-key preflight — 28 September 2026
 
 - **Implementation:** source preflight rejects duplicate facility codes and facility-scoped unit-type names/unit numbers with distinct legacy IDs, matching existing database unique keys. Exact case and leading zeros preserved. No target database import or policy change.
