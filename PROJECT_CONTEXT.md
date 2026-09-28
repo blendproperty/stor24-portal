@@ -2,8 +2,10 @@
 ## Bulk rate audit transaction — 28 September 2026
 
 - **Implementation:** all grouped standard unit-rate updates and their shared audit entry now use one database transaction. Existing owner/organisation checks, pricing model, missing-area skip and reservation/tenancy pricing policy unchanged. No replay or concurrency-policy guarantee added.
-- **Testing:** actual prepatch route returned500 on synthetic audit failure but changed100/200 rates to1450/2100. Candidate rolls back both and preserves skipped55, then successful retry creates one audit.493 tests/typecheck/focused ESLint passed; SQL fixture field corrected before promotion. Required real PostgreSQL constraint-failure rollback/retry test includes owner/org denial, two rate groups, missing-area skip and unchanged reservation quote; CI pending.
-- **Commit/push:** candidate pending, carries PR349 final evidence. **Merge:** pending. **Deployment/configuration:** pending; no schema/configuration change. **Live verification:** pending. No production rate updates; all14 acceptance gates remain open. Reset/release recovery remains separate.
+- **Testing:** actual prepatch route returned500 on synthetic audit failure but changed100/200 rates to1450/2100. Candidate rolls back both and preserves skipped55, then successful retry creates one audit.493 tests/typecheck/focused ESLint passed; SQL fixture field corrected before promotion. Required real PostgreSQL constraint-failure rollback/retry test includes owner/org denial, two rate groups, missing-area skip and unchanged reservation quote; SQLjob108890499837 explicitly passed. All nine checks CI36410879492/SQL36410879537/security36410879506 passed.
+- **Commit/push and merge:** PR350 source2e88e443d15ef568562359103169cfead25e34e0 merged900d954bbc29fe39ab18aeb30b983f0a9db6083b, including PR349 final evidence.
+- **Deployment/configuration:** mainCI36411754738/deploy36412634865 passed; no schema/configuration change.
+- **Live verification:** exact image stor24-crm:900d954bb healthy; service/database readiness verified2026-09-28T10:58:46.865Z. ExcelE110 records41st delivered component. No production rate updates; all14 acceptance gates remain open. Reset/release recovery remains separate.
 
 ## Bulk inventory rate confirmation recovery — 28 September 2026
 
