@@ -6,7 +6,7 @@ import { formatSouthAfricaDate, southAfricaDateKey } from "@/lib/south-africa-ti
 
 type Statement = { accountNumber: string; customerName: string; facilityName: string; currency: string; from: string; to: string; generatedAt: string; openingBalance: string; closingBalance: string; rows: { id: string; date: string; description: string; type: string; debit: string; credit: string; balance: string }[] };
 
-export function AccountStatementWorkspace({ accountId }: { accountId: string }) {
+export function AccountStatementWorkspace({ accountId, moveInReservationId }: { accountId: string; moveInReservationId?: string }) {
   const today = southAfricaDateKey(new Date());
   const [from, setFrom] = useState(`${today.slice(0, 7)}-01`);
   const [to, setTo] = useState(today);
@@ -49,7 +49,10 @@ export function AccountStatementWorkspace({ accountId }: { accountId: string }) 
   }
   return <section className="statement-workspace">
     <div className="statement-controls">
-      <Link href={`/operations/accounts?accountId=${encodeURIComponent(accountId)}`}>← Back to accounts</Link>
+      <nav aria-label="Statement navigation" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16 }}>
+        {moveInReservationId && <Link className="button button-primary" href={`/operations/move-in?reservation=${encodeURIComponent(moveInReservationId)}`}>← Back to move-in checks</Link>}
+        <Link href={`/operations/accounts?accountId=${encodeURIComponent(accountId)}`}>← Back to accounts</Link>
+      </nav>
       <h1>Everything accounted for.</h1>
       <p>View or download a statement without creating charges. Email delivery requires a separate confirmation and uses the customer’s verified email.</p>
       <button type="button" className="button button-secondary" disabled={busy} onClick={() => void emailWelcome()}>Send / resend My STOR24 welcome</button>

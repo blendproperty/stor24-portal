@@ -1,4 +1,9 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Statement return to move-in — 28 September 2026
+
+- **Implementation:** Brett requested this navigation fix during attended Priority1 acceptance. Statement page resolves its scoped account and matching active/converted reservation server-side, then shows an orange Back to move-in checks link retaining that reservation. Accounts return remains. No payment, balance, permission or handover-policy changes.
+- **Testing:** actual statement component returns to the matching reservation at1440/390/320px; mobile link bounds/screenshot verified.493 unit tests/typecheck/focused ESLint passed. Required CI pending. No production payment recorded during this fix.
+- **Commit/push:** candidate pending. **Merge/deployment/live verification:** pending. This explicitly requested repair follows the earlier presentation freeze. Priority1 acceptance and all other gates remain open; the completed demo does not accept the live journey.
 ## CEO presentation freeze — 28 September 2026
 
 - **Final read-only handoff:** at2026-09-28T12:15:47.222Z (14:15 Johannesburg), exact stor24-crm:dc5a5aacc remained healthy and service/database returned ok; remote main remains dc5a5aacc5f285de42a04efdeae565f093b864d8. No new code, deployment or configuration. ExcelE111 retains the same verified release and42 delivered components; no acceptance status changes. Work is wrapped up before14:30; automatic continuation is being paused for the15:00 presentation.
