@@ -26,9 +26,11 @@ PR331–343 are deployed; exact evidence is recorded in PROJECT_CONTEXT.md and E
 
 | Renumber save/undo recovery | Review synthetic apply and undo evidence: confirmed changes retain Undo after refresh in the same page session; uncertain results block repeats and offer read-only review. Saved confirmation survives a failed refresh. Do not renumber live units for testing. | PR348; E108; exactc29902b7f healthy10:03:36.676UTC |
 
-| Bulk rate confirmation recovery | Review synthetic duplicate/timeout/denial/mismatched confirmation evidence. Uncertain results require read-only review; a confirmed update remains visible if refresh fails. Do not change live rates for acceptance. Backend audit transaction is a separate open candidate. | PR349; E109; exact174d13e85 healthy10:31:36.249UTC |
+| Bulk rate confirmation recovery | Review synthetic duplicate/timeout/denial/mismatched confirmation evidence. Uncertain results require read-only review; a confirmed update remains visible if refresh fails. Do not change live rates for acceptance. Backend audit transaction is delivered separately by PR350. | PR349; E109; exact174d13e85 healthy10:31:36.249UTC |
 
-For each accepted staff check record reviewer, date, synthetic record reference and observed result in the existing tracker. Browser fixtures and automated checks are evidence to review, not a substitute for staff acceptance. Unit create/edit recovery is covered by PR345; removal recovery is covered by PR346; preview recovery is covered by PR347; apply/undo recovery is covered by PR348; rate confirmation recovery is covered by PR349; reset/release recovery and the separate rate audit transaction candidate remain open.
+| Bulk rate audit transaction | Review isolated real-database rollback/retry evidence: rejected audit preserves both rate groups; valid retry creates one audit; skipped units and reservation quotes remain unchanged. Do not update live rates for acceptance. | PR350; E110; exact900d954bb healthy10:58:46.865UTC |
+
+For each accepted staff check record reviewer, date, synthetic record reference and observed result in the existing tracker. Browser fixtures and automated checks are evidence to review, not a substitute for staff acceptance. Unit create/edit recovery is covered by PR345; removal recovery is covered by PR346; preview recovery is covered by PR347; apply/undo recovery is covered by PR348; rate confirmation recovery is covered by PR349; rate audit transaction is covered by PR350; reset/release recovery remains open.
 
 ## Review in this order
 

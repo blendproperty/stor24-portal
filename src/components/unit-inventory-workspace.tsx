@@ -199,34 +199,45 @@ export function UnitInventoryWorkspace({
     if (!selectedFacility) return;
     if (!unit && !confirmingRelease) {
       setConfirmingRelease(true);
-      setNotice("Review complete: click Confirm safe release to clean only cancelled test holds. Genuine customer records remain protected.");
+      setNotice("Click Confirm safe release to check cancelled holds. The server will preserve units with active reservations or protected occupancy.");
       return;
     }
     if (unit && !window.confirm(`Check unit ${unit.number} and release it only when no active reservation and no protected occupancy remains?`)) return;
-    setBusy(true);
-    setError("");
-    setNotice("");
-    const response = await fetch("/api/v1/leasing/units/release-orphans", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ facilityId: selectedFacility.id, unitId: unit?.id }),
-    });
-    const result = await response.json().catch(() => ({}));
-    setBusy(false);
-    setConfirmingRelease(false);
-    if (!response.ok) {
-      setError(result.error?.message ?? "The reserved-unit check could not be completed.");
-      return;
+    const controller = new AbortController(); saveRequest.current = controller;
+    const timer = setTimeout(() => controller.abort(), 20_000);
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const response = await fetch("/api/v1/leasing/units/release-orphans", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ facilityId: selectedFacility.id, unitId: unit?.id }), signal: controller.signal,
+      });
+      if (response.status === 401 || response.status === 403) {
+        setFacilities([]); setDialog(null); setRenumberDialog(false); setRenumberUndo(null); setUatResetPreview(null);
+        setReadDenied(true); setReadError(response.status === 401 ? "Sign in again to view inventory." : "You do not have access to release these holds. Please contact your administrator."); return;
+      }
+      const payload = await response.json();
+      if ([400, 404, 409, 422].includes(response.status)) {
+        const failure = z.object({ error: z.object({ message: z.string() }) }).safeParse(payload);
+        setError(failure.success ? failure.data.error.message : "The hold check was rejected. Review inventory before trying again."); return;
+      }
+      const result = z.object({ data: z.object({
+        facilityId: z.literal(selectedFacility.id), checked: z.number().int().nonnegative(),
+        released: z.array(z.string().min(1)), blocked: z.array(z.object({ unit: z.string().min(1), reasons: z.array(z.string().min(1)).min(1) })),
+      }) }).safeParse(payload);
+      if (!response.ok || !result.success) throw new Error("Unconfirmed hold release");
+      const { checked, released, blocked } = result.data.data;
+      const numbers = [...released, ...blocked.map(item => item.unit)];
+      if (numbers.length > checked || new Set(numbers).size !== numbers.length ||
+        (unit && checked > 1) || !numbers.every(number => unit ? number === unit.number : selectedFacility.units.some(candidate => candidate.number === number))) throw new Error("Mismatched hold release");
+      setNotice(released.length
+        ? `${released.length} orphaned reserved unit${released.length === 1 ? "" : "s"} released: ${released.join(", ")}.${blocked.length ? ` ${blocked.length} protected by active records.` : ""}`
+        : blocked.length ? `Nothing released. ${blocked.map(item => `Unit ${item.unit}: ${item.reasons.join(" and ")}`).join("; ")}.` : "No orphaned reserved units were found.");
+      await refresh();
+    } catch {
+      setSaveBlocked(true); setError("We could not confirm whether the hold release completed. Review inventory before reloading this page.");
+    } finally {
+      clearTimeout(timer); saveRequest.current = null; setBusy(false); setConfirmingRelease(false);
     }
-    await refresh();
-    const released = result.data.released as string[];
-    const blocked = result.data.blocked as Array<{ unit: string; reasons: string[] }>;
-    if (unit && released.length) setDialog(null);
-    setNotice(released.length
-      ? `${released.length} orphaned reserved unit${released.length === 1 ? "" : "s"} released: ${released.join(", ")}.${blocked.length ? ` ${blocked.length} protected by active records.` : ""}`
-      : blocked.length
-        ? `Nothing released. ${blocked.map((item) => `Unit ${item.unit}: ${item.reasons.join(" and ")}`).join("; ")}.`
-        : "No orphaned reserved units were found.");
   }
 
   async function uatReset(action: "preview" | "reset") {
