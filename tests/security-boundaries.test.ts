@@ -662,3 +662,22 @@ test("unit type removal rolls back when audit fails", async () => {
   fail = false; assert.equal((await remove("type-b")).status, 403);
   assert.equal((await remove()).status, 204); assert.equal(state.tables.unitType.some(row => row.id === "type-a"), false); assert.equal(audits, 1);
 });
+
+
+test("bulk market rates roll back on audit failure and retry once", async () => {
+  const state = fixture(); state.grant("*", null, "Organisation owner");
+  const units = state.tables.unit;
+  units.push({ id: "rate-a", facilityId: "a", monthlyRate: 100, floor: "Ground", unitType: { areaSqMetres: 9 } }, { id: "rate-b", facilityId: "a", monthlyRate: 200, floor: "First", unitType: { areaSqMetres: 18 } }, { id: "skip", facilityId: "a", monthlyRate: 55, unitType: { areaSqMetres: null } });
+  state.db.unit.updateMany = async ({ where, data }: Row) => { const selected = units.filter(unit => matches(unit, where)); selected.forEach(unit => Object.assign(unit, data)); return { count: selected.length }; };
+  let fail = true; let audits = 0;
+  state.db.auditEvent.create = async () => { if (fail) throw new Error("SYNTHETIC_AUDIT_FAILURE"); audits++; return {}; };
+  state.db.$transaction = async (fn: ((client: Row) => Promise<unknown>) | Promise<unknown>[]) => { const before = structuredClone(units); try { return Array.isArray(fn) ? await Promise.all(fn) : await fn(state.db); } catch (error) { units.splice(0, units.length, ...before); throw error; } };
+  const api = await load("./src/app/api/v1/leasing/unit-rates/route.ts", state);
+  const apply = (facilityId = "a") => api.POST(request("POST", { facilityId, modelVersion: "MIDRAND_2026_08_V1" }));
+  assert.equal((await apply()).status, 500); assert.deepEqual(units.map(unit => unit.monthlyRate), [100, 200, 55]); assert.equal(audits, 0);
+  fail = false; assert.equal((await apply("foreign")).status, 404);
+  state.tables.user[0].roleAssignments = []; state.grant("inventory.manage", null); assert.equal((await apply()).status, 403);
+  state.tables.user[0].roleAssignments = []; state.grant("*", null, "Organisation owner");
+  const response = await apply(); assert.equal(response.status, 200); const result = await response.json();
+  assert.equal(result.data.updated, 2); assert.equal(result.data.skipped, 1); assert.equal(units[2].monthlyRate, 55); assert.equal(audits, 1);
+});
