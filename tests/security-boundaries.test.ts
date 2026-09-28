@@ -642,3 +642,23 @@ test("unit removal rolls back when audit fails", async () => {
   fail = false; assert.equal((await cancel("cancel-b")).status, 403);
   assert.equal((await cancel()).status, 204); assert.equal(unit.status, "UNAVAILABLE"); assert.equal(audits, 1);
 });
+
+test("unit type removal rolls back when audit fails", async () => {
+  const state = fixture(); state.grant("inventory.manage");
+  state.db.unit.count = async () => 0;
+  state.db.unitType.delete = async ({ where }: Row) => {
+    const index = state.tables.unitType.findIndex(row => row.id === where.id);
+    return state.tables.unitType.splice(index, 1)[0];
+  };
+  let fail = true; let audits = 0;
+  state.db.auditEvent.create = async () => { if (fail) throw new Error("SYNTHETIC_AUDIT_FAILURE"); audits++; return {}; };
+  state.db.$transaction = async (fn: (client: Row) => Promise<unknown>) => {
+    const before = structuredClone(state.tables.unitType);
+    try { return await fn(state.db); } catch (error) { state.tables.unitType.splice(0, state.tables.unitType.length, ...before); throw error; }
+  };
+  const api = await load("./src/app/api/v1/leasing/[resource]/route.ts", state);
+  const remove = (id = "type-a") => api.DELETE(new Request(`https://example.invalid/api/v1/leasing/unit-types?id=${id}`, { method: "DELETE", headers: { origin: "https://example.invalid" } }), context("unit-types"));
+  assert.equal((await remove()).status, 500); assert.ok(state.tables.unitType.find(row => row.id === "type-a")); assert.equal(audits, 0);
+  fail = false; assert.equal((await remove("type-b")).status, 403);
+  assert.equal((await remove()).status, 204); assert.equal(state.tables.unitType.some(row => row.id === "type-a"), false); assert.equal(audits, 1);
+});

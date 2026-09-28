@@ -399,6 +399,59 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
       assert.equal((await db.maintenanceRequest.findUniqueOrThrow({ where: { id: maintenance.id } })).unitId, null);
       assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "units.deleted", actorId: actor.id } }), 2);
     });
+    await t.test("unit type removal rolls back type and linked cleanup on audit failure", async () => {
+      const actor = await db.user.create({ data: { organisationId: org.id, email: `${key}-type-remove@example.invalid`, name: "Synthetic deletion reviewer", passwordHash: "synthetic-not-a-real-password-hash" } });
+      const role = await db.role.create({ data: { organisationId: org.id, name: "Type removal atomicity", permissions: ["inventory.manage"] } });
+      await db.roleAssignment.create({ data: { userId: actor.id, roleId: role.id, facilityId: a.id } });
+      const type = await db.unitType.create({ data: { facilityId: a.id, name: "Remove type group" } });
+      const own = await db.unit.create({ data: { facilityId: a.id, unitTypeId: type.id, number: "TYPE-REMOVE", monthlyRate: 100 } });
+      const otherType = await db.unitType.create({ data: { facilityId: b.id, name: "Remove other type group" } });
+      const foreignCustomer = await db.unit.create({ data: { facilityId: b.id, unitTypeId: otherType.id, number: "TYPE-REMOVE-OTHER", monthlyRate: 100 } });
+      const maintenance = await db.maintenanceRequest.create({ data: { organisationId: org.id, facilityId: a.id, unitId: own.id, title: "Synthetic maintenance" } });
+      const output = await build({ entryPoints: ["src/app/api/v1/leasing/[resource]/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "customer-session", setup(builder) {
+        builder.onResolve({ filter: /^@\/lib\/(db|session)$/ }, args => ({ path: args.path, namespace: "fixture" }));
+        builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
+      } }] });
+      const loaded = { exports: {} as { DELETE: (request: Request, context: { params: Promise<{ resource: string }> }) => Promise<Response> } };
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: actor.id, sessionVersion: actor.sessionVersion });
+      const remove = (id = type.id, force = false) => loaded.exports.DELETE(new Request(`https://example.invalid/api/v1/leasing/unit-types?id=${id}&force=${force}`, { method: "DELETE", headers: { origin: "https://example.invalid" } }), { params: Promise.resolve({ resource: "unit-types" }) });
+      assert.equal((await remove(otherType.id)).status, 403);
+      const empty = await db.unitType.create({ data: { facilityId: a.id, name: "Empty remove type" } });
+      await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_type_remove_failure CHECK (false) NOT VALID');
+      try {
+        assert.equal((await remove(empty.id)).status, 500);
+        assert.ok(await db.unitType.findUnique({ where: { id: empty.id } }));
+        assert.equal(await db.auditEvent.count({ where: { entityId: empty.id, action: "unit-types.deleted" } }), 0);
+      } finally { await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_type_remove_failure'); }
+      assert.equal((await remove(empty.id)).status, 204);
+      assert.equal(await db.unitType.findUnique({ where: { id: empty.id } }), null);
+      assert.equal(await db.auditEvent.count({ where: { entityId: empty.id, action: "unit-types.deleted", actorId: actor.id } }), 1);
+      assert.equal((await remove()).status, 409);
+      const lead = await db.lead.create({ data: { facilityId: a.id, source: "CI", desiredUnitTypeId: type.id } });
+      assert.equal((await remove(type.id, true)).status, 403);
+      const ownerRole = await db.role.findFirstOrThrow({ where: { organisationId: org.id, name: "Organisation owner" } });
+      await db.roleAssignment.create({ data: { userId: actor.id, roleId: ownerRole.id, facilityId: null } });
+      const customer = await db.customer.create({ data: { organisationId: org.id, firstName: "Synthetic history" } });
+      const held = await db.reservation.create({ data: { facilityId: a.id, customerId: customer.id, unitId: own.id, quotedRate: 100 } });
+      assert.equal((await remove(type.id, true)).status, 409);
+      await db.reservation.delete({ where: { id: held.id } });
+      await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_type_force_remove_failure CHECK (false) NOT VALID');
+      try {
+        assert.equal((await remove(type.id, true)).status, 500);
+        assert.ok(await db.unit.findUnique({ where: { id: own.id } }));
+        assert.equal((await db.maintenanceRequest.findUniqueOrThrow({ where: { id: maintenance.id } })).unitId, own.id);
+        assert.ok(await db.unitType.findUnique({ where: { id: type.id } }));
+        assert.equal((await db.lead.findUniqueOrThrow({ where: { id: lead.id } })).desiredUnitTypeId, type.id);
+        assert.equal(await db.auditEvent.count({ where: { entityId: type.id, action: "unit-types.deleted" } }), 0);
+      } finally { await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_type_force_remove_failure'); }
+      assert.equal((await remove(type.id, true)).status, 204);
+      assert.equal(await db.unit.findUnique({ where: { id: own.id } }), null);
+      assert.equal((await db.maintenanceRequest.findUniqueOrThrow({ where: { id: maintenance.id } })).unitId, null);
+      assert.equal(await db.unitType.findUnique({ where: { id: type.id } }), null);
+      assert.equal((await db.lead.findUniqueOrThrow({ where: { id: lead.id } })).desiredUnitTypeId, null);
+      assert.ok(await db.unit.findUnique({ where: { id: foreignCustomer.id } }));
+      assert.equal(await db.auditEvent.count({ where: { entityId: type.id, action: "unit-types.deleted", actorId: actor.id } }), 1);
+    });
     await t.test("facility DELETE rolls back deactivation on audit failure then retries once", async () => {
       const actor = await db.user.create({ data: { organisationId: org.id, email: `${key}-deactivate@example.invalid`, name: "Synthetic deactivation reviewer", passwordHash: "synthetic-not-a-real-password-hash" } });
       const role = await db.role.create({ data: { organisationId: org.id, name: "Facility deactivation atomicity", permissions: ["inventory.manage"] } });
