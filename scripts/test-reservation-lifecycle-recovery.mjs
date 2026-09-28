@@ -31,7 +31,7 @@ try {for(const width of [1440,390,320]){for(const action of ["Cancel","Extend","
  if(process.env.REPRO_ONLY){await page.waitForTimeout(400);assert.ok(errors.length);console.log("REPRO: lifecycle network failure produced unhandled error");await page.close();break;}
  if(mode==="timeout"){await expect.poll(()=>Boolean(pending)).toBe(true);await page.clock.fastForward(20_001);await pending.abort().catch(()=>{});await page.clock.resume();}
  if(["success","retained","refresh-fail"].includes(mode)){
-  await expect(page.getByRole("status").filter({hasText:/Reservation (cancelled|expired|for unit)/})).toBeVisible();if(mode==="retained"&&action!=="Extend")await expect(page.getByRole("status")).toContainText("remains protected");
+  await expect(page.getByRole("status").filter({hasText:/Reservation (cancelled|expired|for unit)/})).toBeVisible();if(mode==="retained"&&action!=="Extend")await expect(page.getByRole("status").filter({hasText:"remains protected"})).toBeVisible();
   if(readFail){await expect(page.getByRole("alert")).toContainText("could not be loaded");readFail=false;await page.getByRole("button",{name:"Refresh reservations",exact:true}).click();}
  }else if(mode==="403"){await expect(page.getByRole("alert")).toContainText("administrator");await expect(page.getByText("synthetic@example.invalid")).toHaveCount(0);}
  else if(mode==="409"){await expect(page.getByRole("alert")).toBeVisible();await expect(button).toBeEnabled();}
