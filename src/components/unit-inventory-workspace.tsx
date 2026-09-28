@@ -2,7 +2,8 @@
 
 import { FloorAvailabilityControls } from "@/components/floor-availability-controls";
 import { unitIsOperational } from "@/lib/floor-availability";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { z } from "zod";
 import Link from "next/link";
 import {
   ListOrdered,
@@ -75,6 +76,11 @@ type UatResetPreview = {
   unitsReleased: number;
 };
 
+const decimalRead = z.string().refine(value => value.trim() !== "" && Number.isFinite(Number(value)));
+const typeRead = z.object({ id: z.string().min(1), facilityId: z.string().min(1), name: z.string(), widthMetres: decimalRead.nullable(), lengthMetres: decimalRead.nullable(), areaSqMetres: decimalRead.nullable(), features: z.array(z.string()) });
+const facilityRead = z.object({ id: z.string().min(1), name: z.string(), code: z.string(), closedFloors: z.array(z.string()).optional(), maps: z.array(z.object({ name: z.string() })).optional() });
+const unitRead = z.object({ id: z.string().min(1), facilityId: z.string().min(1), unitTypeId: z.string().min(1), number: z.string(), floor: z.string().nullable(), zone: z.string().nullable(), status: z.string().min(1), monthlyRate: decimalRead, taxRate: decimalRead, unitType: typeRead, mapElements: z.array(z.object({ map: z.object({ name: z.string() }) })).optional() });
+
 const editableStatuses = ["AVAILABLE", "SERVICE", "UNAVAILABLE"];
 const statusLabel = (status: string) =>
   status
@@ -90,6 +96,11 @@ export function UnitInventoryWorkspace({
   initialFacilities: Facility[];
 }) {
   const [facilities, setFacilities] = useState(initialFacilities);
+  const [readBusy, setReadBusy] = useState(false);
+  const [readError, setReadError] = useState("");
+  const [readDenied, setReadDenied] = useState(false);
+  const readRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => { readRequest.current?.abort(); readRequest.current = null; }, []);
   const [facilityId, setFacilityId] = useState(initialFacilities[0]?.id ?? "");
   const [typeId, setTypeId] = useState("");
   const [status, setStatus] = useState("");
@@ -226,32 +237,48 @@ export function UnitInventoryWorkspace({
   }
 
   async function refresh() {
-    const accountByUnitId = new Map(
-      facilities.flatMap((facility) => facility.units.map((unit) => [unit.id, unit.accountId] as const)),
-    );
-    const [facilityResponse, typeResponse, unitResponse] = await Promise.all([
-      fetch("/api/v1/leasing/facilities", { cache: "no-store" }),
-      fetch("/api/v1/leasing/unit-types", { cache: "no-store" }),
-      fetch("/api/v1/leasing/units", { cache: "no-store" }),
-    ]);
-    const [facilityPayload, typePayload, unitPayload] = await Promise.all([
-      facilityResponse.json(),
-      typeResponse.json(),
-      unitResponse.json(),
-    ]);
-    if (!facilityResponse.ok || !typeResponse.ok || !unitResponse.ok)
-      throw new Error("Inventory could not be refreshed.");
-    setFacilities(
-      facilityPayload.data.map((facility: Facility) => ({
-        ...facility,
-        unitTypes: typePayload.data.filter(
-          (type: UnitType) => type.facilityId === facility.id,
-        ),
-        units: unitPayload.data.filter(
-          (unit: Unit) => unit.facilityId === facility.id,
-        ).map((unit: Unit) => ({ ...unit, accountId: accountByUnitId.get(unit.id) ?? null })),
-      })),
-    );
+    if (readRequest.current) return;
+    const controller = new AbortController();
+    readRequest.current = controller;
+    const timer = setTimeout(() => controller.abort(), 20_000);
+    const accountByUnitId = new Map(facilities.flatMap(facility => facility.units.map(unit => [unit.id, unit.accountId] as const)));
+    setReadBusy(true);
+    if (readDenied) setNotice("");
+    setReadError("");
+    setDialog(null);
+    setRenumberDialog(false);
+    setUatResetPreview(null);
+    setUatResetConfirmation("");
+    setConfirmingRelease(false);
+    try {
+      const reads = await Promise.allSettled(["facilities", "unit-types", "units"].map(resource => fetch(`/api/v1/leasing/${resource}`, { cache: "no-store", signal: controller.signal })));
+      if (readRequest.current !== controller) return;
+      const denied = reads.find(result => result.status === "fulfilled" && [401, 403].includes(result.value.status));
+      if (denied?.status === "fulfilled") {
+        setFacilities([]);
+        setFacilityId(""); setTypeId(""); setStatus(""); setQuery("");
+        setNotice(""); setError(""); setReadDenied(true);
+        setReadError(denied.value.status === 401 ? "Sign in again to view unit inventory." : "You do not have access to this inventory. Please contact your administrator if you require access.");
+        return;
+      }
+      const responses = reads.map(result => {
+        if (result.status !== "fulfilled" || !result.value.ok) throw new Error("Inventory read failed");
+        return result.value;
+      });
+      const payloads = await Promise.all(responses.map(response => response.json()));
+      if (readRequest.current !== controller) return;
+      const stores = z.object({ data: z.array(facilityRead) }).parse(payloads[0]).data;
+      const types = z.object({ data: z.array(typeRead) }).parse(payloads[1]).data;
+      const units = z.object({ data: z.array(unitRead) }).parse(payloads[2]).data;
+      setFacilities(stores.map(facility => ({ ...facility, unitTypes: types.filter(type => type.facilityId === facility.id), units: units.filter(unit => unit.facilityId === facility.id).map(unit => ({ ...unit, accountId: accountByUnitId.get(unit.id) ?? null })) })));
+      if (facilityId && !stores.some(store => store.id === facilityId)) setFacilityId(stores[0]?.id ?? "");
+      setReadDenied(false);
+    } catch {
+      if (readRequest.current === controller) setReadError("Inventory could not be refreshed. Refresh inventory to check the latest records; this will not repeat a save.");
+    } finally {
+      clearTimeout(timer);
+      if (readRequest.current === controller) { readRequest.current = null; setReadBusy(false); }
+    }
   }
 
   async function submit(form: FormData) {
@@ -364,6 +391,15 @@ export function UnitInventoryWorkspace({
     setNotice(`Unit ${unit.number} permanently deleted.`);
   }
 
+  if (readBusy || readError) return (
+    <div className="page-stack unit-inventory-workspace">
+      <PageHeader eyebrow="Inventory" title="Units & availability" description="Refresh inventory to confirm the latest unit records." />
+      {!readDenied && notice && <p className="notice" role="status">{notice}</p>}
+      {readBusy ? <p role="status">Refreshing inventory…</p> : <p className="notice error" role="alert">{readError}</p>}
+      <div className="form-actions"><button className="button button-primary" disabled={readBusy} onClick={() => void refresh()}>Refresh inventory</button></div>
+    </div>
+  );
+
   return (
     <div className="page-stack unit-inventory-workspace">
       <PageHeader
@@ -372,6 +408,7 @@ export function UnitInventoryWorkspace({
         description="Store-scoped unit register, physical attributes, availability and operational rates."
         action={
           <div className="form-actions">
+            <button className="button button-secondary" disabled={busy} onClick={() => void refresh()}>Refresh inventory</button>
             <button
               className="button button-danger"
               onClick={() => void uatReset("preview")}
