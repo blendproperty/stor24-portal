@@ -2,9 +2,11 @@
 ## Merchandise supply queue read recovery — 28 September 2026
 
 - **Implementation:** paid-supplies queue separates loading/failed/empty states, validates nested response data, times reads out after20seconds and offers GET-only refresh. Denied reads clear private data/confirmation and show administrator/sign-in guidance; failed or loading reads disable supply actions. Existing fulfilment policy and mutation confirmation remain separate work.
-- **Testing:** actual prepatch component showed Failed to fetch alongside No orders to display and no retry. Candidate browser network/malformed/401/403/timeout/empty/populated/stale-action recovery passed1440/390/320px without page errors/overflow; screenshot inspected (isolated fixture, not full production branding).490 tests/typecheck/lint and operations-read/access regressions passed. Effect scheduling lint issue fixed/retested. New required browser CI step added; pending checks.
-- **Commit/push:** candidate on codex/merchandise-queue-read-recovery includes PR337 final evidence; pending commit.
-- **Merge/deployment/live:** pending. No production orders/stock changed or new fulfilment/replay guarantee. All14 gates remain open.
+- **Testing:** actual prepatch component showed Failed to fetch alongside No orders to display and no retry. Candidate browser network/malformed/401/403/timeout/empty/populated/stale-action recovery passed1440/390/320px without page errors/overflow; screenshot inspected (isolated fixture, not full production branding).490 tests/typecheck/lint and operations-read/access regressions passed. Effect scheduling lint issue fixed/retested. New required browser CI step explicitly passed; all nine checks passed: CI36381222626/SQL36381222540/security36381222546.
+- **Commit/push:** PR338 sourcee55db4b52ccfb774f926e70acc653b903cdedd3a includes PR337 final evidence; merged2c1b8ad9b3de5d6f45985d0ce96a7841998364a1.
+- **Deployment/live:** mainCI36381737455/deploy36382139970 passed. Exact image stor24-crm:2c1b8ad9b healthy; service/database readiness verified2026-09-28T05:31:51.022Z. ExcelE098 and29th component record delivery. No production orders/stock changed or new fulfilment/replay guarantee. All14 gates remain open.
+- **Tracker reconciliation:** identified DELETE audit candidates are delivered PR331–333; broader credential/recovery gates remain. Source review confirms approved monthly fees/discounts/insurance already implemented (21 September context); do not label that supported scope as unbuilt. Finance acceptance and scheduling remain open.
+
 ## Migration source-file preservation — 28 September 2026
 
 - **Implementation:** report output rejects source paths and compares the opened output file identity against source files before truncation, covering existing hard-link/symlink aliases. Normal reports remain replaceable. Source-directory access controls/backups still required; no hostile filesystem race guarantee.
