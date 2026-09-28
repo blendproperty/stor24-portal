@@ -323,6 +323,40 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
       assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "leads.deleted", actorId: actor.id } }), 1);
       assert.ok(await db.lead.findUnique({ where: { id: foreignCustomer.id } }));
     });
+    await t.test("bulk rates and audit roll back together then retry once", async () => {
+      const actor = await db.user.create({ data: { organisationId: org.id, email: `${key}-rates@example.invalid`, name: "Synthetic rate reviewer", passwordHash: "synthetic-not-a-real-password-hash" } });
+      const ownerRole = await db.role.findFirstOrThrow({ where: { organisationId: org.id, name: "Organisation owner" } });
+      const assignment = await db.roleAssignment.create({ data: { userId: actor.id, roleId: ownerRole.id, facilityId: null } });
+      const facility = await db.facility.create({ data: { organisationId: org.id, name: "Rate transaction CI", code: `rate-${key}` } });
+      const small = await db.unitType.create({ data: { facilityId: facility.id, name: "Rate small", areaSqMetres: 9 } });
+      const large = await db.unitType.create({ data: { facilityId: facility.id, name: "Rate large", areaSqMetres: 18 } });
+      const missing = await db.unitType.create({ data: { facilityId: facility.id, name: "Rate missing" } });
+      const one = await db.unit.create({ data: { facilityId: facility.id, unitTypeId: small.id, number: "RATE1", floor: "Ground", monthlyRate: 100 } });
+      const two = await db.unit.create({ data: { facilityId: facility.id, unitTypeId: large.id, number: "RATE2", floor: "First", monthlyRate: 200 } });
+      const skipped = await db.unit.create({ data: { facilityId: facility.id, unitTypeId: missing.id, number: "RATE0", monthlyRate: 55 } });
+      const customer = await db.customer.create({ data: { organisationId: org.id, firstName: "Synthetic rate customer" } });
+      const quote = await db.reservation.create({ data: { facilityId: facility.id, customerId: customer.id, unitId: one.id, quotedRate: 99 } });
+      const output = await build({ entryPoints: ["src/app/api/v1/leasing/unit-rates/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "rate-session", setup(builder) {
+        builder.onResolve({ filter: /^@\/lib\/(db|session)$/ }, args => ({ path: args.path, namespace: "fixture" }));
+        builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
+      } }] });
+      const loaded = { exports: {} as { POST: (request: Request) => Promise<Response> } };
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: actor.id, sessionVersion: actor.sessionVersion });
+      const apply = (facilityId = facility.id) => loaded.exports.POST(new Request("https://example.invalid/api/v1/leasing/unit-rates", { method: "POST", headers: { origin: "https://example.invalid", "content-type": "application/json" }, body: JSON.stringify({ facilityId, modelVersion: "MIDRAND_2026_08_V1" }) }));
+      const rates = async () => Promise.all([one, two, skipped].map(async unit => Number((await db.unit.findUniqueOrThrow({ where: { id: unit.id } })).monthlyRate)));
+      assert.equal((await apply(foreign.id)).status, 404);
+      await db.roleAssignment.delete({ where: { id: assignment.id } }); assert.equal((await apply()).status, 403);
+      await db.roleAssignment.create({ data: { userId: actor.id, roleId: ownerRole.id, facilityId: null } });
+      await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_rate_audit_failure CHECK (false) NOT VALID');
+      try {
+        assert.equal((await apply()).status, 500); assert.deepEqual(await rates(), [100, 200, 55]);
+        assert.equal(await db.auditEvent.count({ where: { entityId: facility.id, action: "units.market_rates.applied" } }), 0);
+      } finally { await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_rate_audit_failure'); }
+      const response = await apply(); assert.equal(response.status, 200); const result = await response.json();
+      assert.equal(result.data.updated, 2); assert.equal(result.data.skipped, 1); assert.deepEqual(await rates(), [1450, 2100, 55]);
+      assert.equal(Number((await db.reservation.findUniqueOrThrow({ where: { id: quote.id } })).quotedRate), 99);
+      assert.equal(await db.auditEvent.count({ where: { entityId: facility.id, action: "units.market_rates.applied", actorId: actor.id } }), 1);
+    });
     await t.test("reservation cancellation rolls back on audit failure then retries once", async () => {
       const actor = await db.user.create({ data: { organisationId: org.id, email: `${key}-cancel@example.invalid`, name: "Synthetic deletion reviewer", passwordHash: "synthetic-not-a-real-password-hash" } });
       const role = await db.role.create({ data: { organisationId: org.id, name: "Reservation cancel atomicity", permissions: ["reservations.manage"] } });

@@ -1,9 +1,17 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Bulk rate audit transaction — 28 September 2026
+
+- **Implementation:** all grouped standard unit-rate updates and their shared audit entry now use one database transaction. Existing owner/organisation checks, pricing model, missing-area skip and reservation/tenancy pricing policy unchanged. No replay or concurrency-policy guarantee added.
+- **Testing:** actual prepatch route returned500 on synthetic audit failure but changed100/200 rates to1450/2100. Candidate rolls back both and preserves skipped55, then successful retry creates one audit.493 tests/typecheck/focused ESLint passed; SQL fixture field corrected before promotion. Required real PostgreSQL constraint-failure rollback/retry test includes owner/org denial, two rate groups, missing-area skip and unchanged reservation quote; CI pending.
+- **Commit/push:** candidate pending, carries PR349 final evidence. **Merge:** pending. **Deployment/configuration:** pending; no schema/configuration change. **Live verification:** pending. No production rate updates; all14 acceptance gates remain open. Reset/release recovery remains separate.
+
 ## Bulk inventory rate confirmation recovery — 28 September 2026
 
 - **Implementation:** existing market-rate action uses shared synchronous request locking,20second timeout and persistent uncertain-result blocking. Confirmation validates facility/model, integer counts and finite ordered rates. Denial clears private records; known rejections remain retryable. Confirmed notice precedes GET refresh and includes skipped-area count. Existing pricing/owner/tenancy/quote policy unchanged; no backend replay guarantee added.
-- **Testing:** actual prepatch network failure threw and left controls busy. Candidate1440/390/320px network/timeout/duplicate/denial/rejection/malformed/wrong facility-model/count/range/lost result/GET review and confirmed-save/read-failure passed.492 tests/typecheck/direct ESLint and renumber save/undo plus inventory read regressions passed; mobile screenshot checked. Required CI pending.
-- **Commit/push:** candidate pending, carries PR348 final evidence. **Merge:** pending. **Deployment/configuration:** pending; no schema/configuration change. **Live verification:** pending. No production rate changes; all14 acceptance gates open. Source inspection separately identifies unit-rates audit outside its update transaction; static candidate only, requires isolated audit-failure/SQL rollback proof before a backend fix. Reset/release recovery remains separate.
+- **Testing:** actual prepatch network failure threw and left controls busy. Candidate1440/390/320px network/timeout/duplicate/denial/rejection/malformed/wrong facility-model/count/range/lost result/GET review and confirmed-save/read-failure passed.492 tests/typecheck/direct ESLint and renumber save/undo plus inventory read regressions passed; mobile screenshot checked. All nine checks CI36408091831/SQL36408091538/security36408091730 passed; new browser step explicitly passed.
+- **Commit/push and merge:** PR349 sourceebf42eba6dab7fb867c004333793b1af940484cf merged174d13e8550c928f5fdc7b9ba74af89acf75b654, including PR348 final evidence.
+- **Deployment/configuration:** mainCI36409106206/deploy36410009378 passed; no schema/configuration change.
+- **Live verification:** exact image stor24-crm:174d13e85 healthy; service/database readiness verified2026-09-28T10:31:36.249Z. ExcelE109 records40th delivered component. No production rate changes; all14 acceptance gates open. Source inspection separately identifies unit-rates audit outside its update transaction; static candidate only, requires isolated audit-failure/SQL rollback proof before a backend fix. Reset/release recovery remains separate.
 
 ## Renumber save/undo confirmation recovery — 28 September 2026
 

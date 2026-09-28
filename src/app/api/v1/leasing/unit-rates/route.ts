@@ -25,10 +25,15 @@ export async function POST(request: Request) {
       groups.set(rate, [...(groups.get(rate) ?? []), unit.id]);
     }
     if (!groups.size) return Response.json({ error: { code: "UNIT_AREAS_REQUIRED", message: "No units at this store have a rentable area." } }, { status: 422 });
-    const updates = [...groups.entries()].map(([monthlyRate, ids]) => db.unit.updateMany({ where: { id: { in: ids }, facilityId: facility.id }, data: { monthlyRate } }));
-    const results = await db.$transaction(updates);
-    const updated = results.reduce((sum, result) => sum + result.count, 0);
-    await db.auditEvent.create({ data: { organisationId: actor.user.organisationId, actorId: actor.userId, facilityId: facility.id, action: "units.market_rates.applied", entityType: "Facility", entityId: facility.id, after: { modelVersion: parsed.data.modelVersion, updated, skipped: skipped.length, minimumRate: Math.min(...groups.keys()), maximumRate: Math.max(...groups.keys()) } } });
+    const updated = await db.$transaction(async (tx) => {
+      let updated = 0;
+      for (const [monthlyRate, ids] of groups) {
+        const result = await tx.unit.updateMany({ where: { id: { in: ids }, facilityId: facility.id }, data: { monthlyRate } });
+        updated += result.count;
+      }
+      await tx.auditEvent.create({ data: { organisationId: actor.user.organisationId, actorId: actor.userId, facilityId: facility.id, action: "units.market_rates.applied", entityType: "Facility", entityId: facility.id, after: { modelVersion: parsed.data.modelVersion, updated, skipped: skipped.length, minimumRate: Math.min(...groups.keys()), maximumRate: Math.max(...groups.keys()) } } });
+      return updated;
+    });
     return Response.json({ data: { facilityId: facility.id, facilityName: facility.name, modelVersion: parsed.data.modelVersion, updated, skipped: skipped.length, minimumRate: Math.min(...groups.keys()), maximumRate: Math.max(...groups.keys()) } });
   } catch (error) {
     return apiError(error);
