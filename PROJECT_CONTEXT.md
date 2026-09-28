@@ -2,9 +2,9 @@
 ## Migration source reconciliation evidence — 28 September 2026
 
 - **Implementation:** read-only preflight reports exact-byte SHA-256/size for each readable CSV and validated per-facility record/distinct linked-customer counts, plus customers without contracts. Invalid packages have null reconciliation counts. All statuses count; cross-facility customers are not additive. No import or financial acceptance implied.
-- **Testing:** executable synthetic CLI tests proved missing evidence before implementation; candidate489 tests/typecheck/focused lint passed. Hash comparison, changed source, shared customer, unlinked customer and invalid package cases covered. Required CI pending.
-- **Commit/push:** candidate on codex/migration-reconciliation-evidence includes PR335 final evidence; pending commit.
-- **Merge/deployment/live:** pending. No schema/configuration or production data changes. Authorised source export, import/reconciliation rehearsal and all14 gates remain open.
+- **Testing:** executable synthetic CLI tests proved missing evidence before implementation; candidate489 tests/typecheck/focused lint passed. Hash comparison, changed source, shared customer, unlinked customer and invalid package cases covered. All nine checks passed: CI36378408609/SQL36378408762/security36378408725.
+- **Commit/push:** PR336 source7fef5767d3546cb8af5c49d3af6fc72e7db335ed includes PR335 final evidence; mergedc1592f8976775ed42254e35b3c5b015cbce4461c.
+- **Deployment/live:** mainCI36378867455/deploy36379217971 passed. Exact image stor24-crm:c1592f897 healthy; service/database readiness verified2026-09-28T04:50:25.827Z. ExcelE096 and27th component record delivery. No schema/configuration or production data changes. Authorised source export, import/reconciliation rehearsal and all14 gates remain open.
 ## Migration CSV structure validation — 28 September 2026
 
 - **Implementation:** offline preflight rejects malformed quoting, duplicate/empty headers and mismatched row widths instead of approving truncated records. Standard escaped quotes, quoted commas and multiline values remain supported. No import or production mutation.
