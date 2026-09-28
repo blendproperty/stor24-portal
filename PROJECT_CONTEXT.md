@@ -1,4 +1,10 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Migration business-key preflight — 28 September 2026
+
+- **Implementation:** source preflight rejects duplicate facility codes and facility-scoped unit-type names/unit numbers with distinct legacy IDs, matching existing database unique keys. Exact case and leading zeros preserved. No target database import or policy change.
+- **Testing:** actual synthetic CLI previously approved duplicate facility codes. Candidate492 unit tests passed; focused duplicate and valid cross-facility/case/leading-zero cases pass. Test-case type annotation corrected after local typecheck; final typecheck/lint passed. Required CI pending.
+- **Commit/push:** candidate on codex/migration-business-keys includes PR339 final evidence; pending commit.
+- **Merge/deployment/live:** pending. Source-only checks cannot prove target collision freedom or migration acceptance. All14 programme gates remain open.
 ## Merchandise supply confirmation recovery — 28 September 2026
 
 - **Implementation:** supply POST has a synchronous duplicate guard/20-second timeout and validates matching order, FULFILLED status and timestamp before claiming success. Uncertain outcomes block repeat action until GET refresh; denied access clears records. Confirmed supply updates local status before refresh. Existing server row-lock/replay and stock policy unchanged.

@@ -38,6 +38,30 @@ test("migration validator accepts linked facilities with optional customer field
   assert.equal(result.report.counts.units, 2);
 });
 
+test("migration rejects duplicate database business keys even with distinct legacy IDs", () => {
+  const cases: Record<string, string>[] = [
+    { facilities: "a,Alpha,A,Africa/Johannesburg\nb,Beta,A,Africa/Johannesburg" },
+    { unit_types: rows.unit_types + "\ntc,a,Small,3,3,9" },
+    { units: rows.units + "\nuc,a,ta,1,AVAILABLE,100" },
+  ];
+  for (const overrides of cases) {
+    const result = validate(overrides);
+    assert.equal(result.status, 1);
+    assert.equal(result.report.valid, false);
+    assert.ok(result.report.errors.some((error: string) => error.includes("duplicate business key")));
+    assert.equal(result.report.reconciliation.ready, false);
+  }
+});
+
+test("migration business keys preserve facility scope and exact case", () => {
+  const result = validate({
+    unit_types: rows.unit_types + "\ntc,a,small,3,3,9",
+    units: rows.units + "\nuc,a,tc,01,AVAILABLE,100",
+  });
+  assert.equal(result.status, 0);
+  assert.equal(result.report.valid, true);
+});
+
 test("migration report fingerprints source bytes and supplies facility count evidence", () => {
   const result = validate();
   assert.equal(result.report.sourceFiles["customers.csv"].sha256, result.customerHash);
