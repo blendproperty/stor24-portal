@@ -22,7 +22,9 @@ PR331–343 are deployed; exact evidence is recorded in PROJECT_CONTEXT.md and E
 | Inventory create/edit | On approved synthetic records, create and edit a unit and a unit type. Confirm saved values and matching audit. Review isolated rejection and uncertain-response evidence: entries remain after rejection; uncertain results disable Save even after closing/reopening and require GET-only review. Check the wrapped mobile action controls. | PR345; E105; exact dce9b93d9 healthy08:37:20.215UTC |
 | Inventory removal recovery | Review isolated unit/type/owner-cleanup evidence: restrictions remain visible, uncertain results block repeats across GET review, and only the documented removal confirmation produces success. A following read failure must retain the removal confirmation. Do not remove production inventory for acceptance. | PR346; E106; exact3265e6f61 healthy09:05:39.52UTC |
 
-For each accepted staff check record reviewer, date, synthetic record reference and observed result in the existing tracker. Browser fixtures and automated checks are evidence to review, not a substitute for staff acceptance. Unit create/edit recovery is covered by PR345; removal recovery is covered by PR346; rate/reset/renumber confirmation recovery remains separate work.
+| Renumber preview recovery | Review synthetic preview evidence: entered numbers survive failed previews; mismatched results cannot enable Apply; denial clears inventory; Close and Preview remain reachable on mobile. Do not apply changes to live unit numbers for this check. | PR347; E107; exact6220df339 healthy09:35:28.502UTC |
+
+For each accepted staff check record reviewer, date, synthetic record reference and observed result in the existing tracker. Browser fixtures and automated checks are evidence to review, not a substitute for staff acceptance. Unit create/edit recovery is covered by PR345; removal recovery is covered by PR346; preview recovery is covered by PR347; rate/reset and renumber apply/undo confirmation recovery remain separate work.
 
 ## Review in this order
 
