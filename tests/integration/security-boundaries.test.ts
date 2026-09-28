@@ -381,7 +381,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
       assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "units.deleted", actorId: actor.id } }), 1);
       assert.ok(await db.unit.findUnique({ where: { id: foreignCustomer.id } }));
       assert.equal((await remove(own.id, true)).status, 403);
-      const ownerRole = await db.role.create({ data: { organisationId: org.id, name: "Organisation owner", permissions: [] } });
+      const ownerRole = await db.role.findFirstOrThrow({ where: { organisationId: org.id, name: "Organisation owner" } });
       await db.roleAssignment.create({ data: { userId: actor.id, roleId: ownerRole.id, facilityId: null } });
       const customer = await db.customer.create({ data: { organisationId: org.id, firstName: "Synthetic history" } });
       const held = await db.reservation.create({ data: { facilityId: a.id, customerId: customer.id, unitId: own.id, quotedRate: 100 } });
