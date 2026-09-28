@@ -1,4 +1,10 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Reservation lifecycle confirmation recovery — 28 September 2026
+
+- **Implementation:** cancel/extend/expire share synchronous request guard,20second timeout, permission-denial clearing and matching reservation/facility/unit/status confirmation. Extension verifies exact expiry; cancellation/expiry require explicit boolean release result. Uncertain outcomes block writes across GET-only status review; explicit reload after checking remains required. Existing backend eligibility/locking/release policies unchanged.
+- **Testing:** actual prepatch network failure produced unhandled page error. Candidate1440/390/320px all three actions cover conflict/denial/network/server/malformed/wrong identity-unit-status-detail/timeout/duplicate/GET review/confirmed release-retention and saved-refresh failure.492 tests/typecheck/lint pass; read/create/premium regressions passed. Existing read fixture corrected to full actual cancellation response. Required new browser CI pending.
+- **Commit/push:** candidate codex/reservation-lifecycle-recovery includes PR342 final evidence; pending commit.
+- **Merge/deployment/live:** pending. No production changes to reservations/customers/units; all14 acceptance gates remain open. Client guards are not server replay guarantees.
 ## Reservation creation recovery — 28 September 2026
 
 - **Implementation:** explicit form submit retains rejected entries; synchronous request guard/20second timeout and matching identity/rate/date/status confirmation prevent false success. Uncertain outcomes block repeated saves across modal reopen and offer GET-only review; reload remains an explicit manual step after checking. Denial clears private records. Existing server facility/unit allocation locks, floor and scope policies unchanged; no new server idempotency guarantee.
