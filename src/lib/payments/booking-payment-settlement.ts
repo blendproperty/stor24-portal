@@ -1,3 +1,4 @@
+import { queueBookingConfirmation } from "./booking-confirmation-email";
 import { db } from "@/lib/db";
 import { isTestPayment } from "./payment-evidence";
 
@@ -14,7 +15,8 @@ export async function settleVerifiedBookingPayment(paymentId: string, evidence: 
     if (payment.status === "SUCCEEDED" || payment.status === "TEST_SUCCEEDED") return { financial: !test, terminal: true };
     if (!evidence.accepted) return { financial: false, terminal: false }; // May be asynchronous EFT; never downgrade success.
     await tx.payment.update({ where: { id: paymentId }, data: { status: test ? "TEST_SUCCEEDED" : "SUCCEEDED", processedAt: new Date(), failureCode: null } });
-    if (test) return { financial: false, terminal: true }; // No ledger, balance, receipt or finance export.
+    await queueBookingConfirmation(tx, paymentId, test);
+    if (test) return { financial: false, terminal: true }; // No ledger, balance, financial receipt or finance export.
     await tx.ledgerEntry.create({ data: { accountId: payment.accountId, type: "PAYMENT", amount: payment.amount, description: `Netcash payment received (${payment.method})`, effectiveAt: new Date(), externalRef: `netcash-payment:${payment.id}`, metadata: { provider: "NETCASH", paymentId: payment.id, requestTrace: evidence.requestTrace, verifiedStatus: true, environment: payment.environment } } });
     await tx.account.update({ where: { id: payment.accountId }, data: { balance: { decrement: payment.amount } } });
     return { financial: true, terminal: true };

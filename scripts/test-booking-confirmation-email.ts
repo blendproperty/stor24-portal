@@ -1,0 +1,5 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { chromium } from '@playwright/test';
+import assert from 'node:assert/strict';
+import { bookingConfirmationMessage } from '../src/lib/payments/booking-confirmation-email';
+(async()=>{await mkdir('output/booking-confirmation',{recursive:true});const browser=await chromium.launch();try{for(const width of [600,390,320]){const page=await browser.newPage({viewport:{width,height:1000}});const message=bookingConfirmationMessage({to:'synthetic@example.invalid',reference:'ST24-SYNTHETIC',unit:'107',amount:'2199.00',test:true});await page.setContent(message.html);assert.equal(await page.getByRole('link',{name:'View My STOR24'}).count(),1);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:`output/booking-confirmation/email-${width}.png`,fullPage:true});await writeFile('output/booking-confirmation/preview.html',message.html);await page.close();}console.log('Email render passed600/390/320px');}finally{await browser.close();}})();

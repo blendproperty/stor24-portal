@@ -1,3 +1,4 @@
+import { deliverBookingConfirmation } from "../../src/lib/payments/booking-confirmation-email";
 import { seedApprovedPhoto } from "./helpers/approved-photo";
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -39,6 +40,49 @@ test("isolated PostgreSQL signed reservation handover", async t => {
     assert.equal((await db.unit.findUniqueOrThrow({ where: { id: f.unit.id } })).status, "RESERVED");
   }
   try {
+    await t.test("verified sandbox confirmation is queued once and sends once without financial changes", async () => {
+      const f = await fixture();
+      await db.customer.update({where:{id:f.customer.id},data:{email:"confirmation@example.invalid",emailVerifiedAt:new Date()}});
+      await db.reservation.update({where:{id:f.reservation.id},data:{publicReference:`CI-${randomUUID()}`}});
+      await db.payment.update({where:{id:f.payment.id},data:{provider:"NETCASH",providerRef:f.payment.id,status:"TEST_PENDING",environment:"sandbox"}});
+      const evidence={reference:f.payment.id,amount:100,accepted:true,requestTrace:"CI-confirmation"};
+      await Promise.all(Array.from({length:4},()=>settleVerifiedBookingPayment(f.payment.id,evidence)));
+      assert.equal(await db.webhookOutbox.count({where:{aggregateId:f.payment.id}}),1);
+      assert.equal((await db.account.findUniqueOrThrow({where:{id:f.account.id}})).balance.toString(),"-100");
+      assert.equal(await db.ledgerEntry.count({where:{accountId:f.account.id}}),1);
+      let sends=0;
+      const send=async(message: {subject:string;text:string;to:string})=>{sends++;assert.match(message.subject,/\[TEST\]/);assert.match(message.text,/no money received/);assert.match(message.text,new RegExp(f.unit.number));assert.equal(message.to,"confirmation@example.invalid");};
+      await Promise.all(Array.from({length:4},()=>deliverBookingConfirmation(f.payment.id,send)));
+      assert.equal(sends,1);
+      assert.equal((await db.webhookOutbox.findUniqueOrThrow({where:{idempotencyKey:`booking-confirmation:${f.payment.id}`}})).status,"SUCCEEDED");
+      await unchanged(f);
+    });
+    await t.test("failed confirmation is retained for review and never automatically duplicated", async () => {
+      const f=await fixture();
+      await db.customer.update({where:{id:f.customer.id},data:{email:"confirmation@example.invalid",emailVerifiedAt:new Date()}});
+      await db.reservation.update({where:{id:f.reservation.id},data:{publicReference:`CI-${randomUUID()}`}});
+      await db.payment.update({where:{id:f.payment.id},data:{provider:"NETCASH",providerRef:f.payment.id,status:"TEST_PENDING",environment:"sandbox"}});
+      await settleVerifiedBookingPayment(f.payment.id,{reference:f.payment.id,amount:100,accepted:true,requestTrace:"CI-failed-email"});
+      let sends=0;const send=async()=>{sends++;throw new Error("ambiguous provider response");};
+      await deliverBookingConfirmation(f.payment.id,send);await deliverBookingConfirmation(f.payment.id,send);
+      assert.equal(sends,1);
+      assert.equal((await db.payment.findUniqueOrThrow({where:{id:f.payment.id}})).status,"TEST_SUCCEEDED");
+      assert.equal((await db.webhookOutbox.findUniqueOrThrow({where:{idempotencyKey:`booking-confirmation:${f.payment.id}`}})).failureCode,"EMAIL_DELIVERY_REVIEW");
+    });
+    await t.test("live confirmation follows verified settlement; rejected evidence cannot queue mail", async () => {
+      const f=await fixture();
+      await db.customer.update({where:{id:f.customer.id},data:{email:"live@example.invalid",emailVerifiedAt:new Date()}});
+      await db.reservation.update({where:{id:f.reservation.id},data:{publicReference:`CI-${randomUUID()}`}});
+      await db.payment.update({where:{id:f.payment.id},data:{provider:"NETCASH",providerRef:f.payment.id,status:"PENDING",environment:"live"}});
+      const evidence={reference:f.payment.id,amount:100,accepted:true,requestTrace:"CI-live-email"};
+      await assert.rejects(settleVerifiedBookingPayment(f.payment.id,{...evidence,amount:99}),/MISMATCH/);
+      await settleVerifiedBookingPayment(f.payment.id,{...evidence,accepted:false});
+      assert.equal(await db.webhookOutbox.count({where:{aggregateId:f.payment.id}}),0);
+      await settleVerifiedBookingPayment(f.payment.id,evidence);
+      assert.equal((await db.account.findUniqueOrThrow({where:{id:f.account.id}})).balance.toString(),"-200");
+      await deliverBookingConfirmation(f.payment.id,async message=>{assert.doesNotMatch(message.subject,/\[TEST\]/);assert.match(message.text,/not a tax invoice/);});
+      assert.equal((await db.webhookOutbox.findUniqueOrThrow({where:{idempotencyKey:`booking-confirmation:${f.payment.id}`}})).status,"SUCCEEDED");
+    });
     await t.test("concurrent confirmation preserves the signed PDF, exact account, balance and payments", async () => {
       const f = await fixture();
       assert.equal((await getReservationMoveInReadiness(f.scope, f.reservation.id)).ready, true);
