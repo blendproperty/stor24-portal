@@ -31,11 +31,27 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=root_default
-      - traefik.http.routers.stor24-crm.rule=Host(`${APP_HOST:-stor24-site.srv938083.hstgr.cloud}`)
+      - traefik.http.routers.stor24-crm.rule=Host(`${APP_HOST:-portal.stor24.co.za}`)
       - traefik.http.routers.stor24-crm.entrypoints=websecure
       - traefik.http.routers.stor24-crm.tls=true
       - traefik.http.routers.stor24-crm.tls.certresolver=mytlschallenge
       - traefik.http.services.stor24-crm.loadbalancer.server.port=3000
+      # Preserve API/webhook delivery on the previous hostname during migration.
+      - traefik.http.routers.stor24-crm-legacy.rule=Host(`stor24-site.srv938083.hstgr.cloud`)
+      - traefik.http.routers.stor24-crm-legacy.entrypoints=websecure
+      - traefik.http.routers.stor24-crm-legacy.tls=true
+      - traefik.http.routers.stor24-crm-legacy.tls.certresolver=mytlschallenge
+      - traefik.http.routers.stor24-crm-legacy.service=stor24-crm
+      - traefik.http.routers.stor24-crm-navigation.rule=Host(`stor24-site.srv938083.hstgr.cloud`) && (Method(`GET`) || Method(`HEAD`)) && !PathPrefix(`/api/`)
+      - traefik.http.routers.stor24-crm-navigation.entrypoints=websecure
+      - traefik.http.routers.stor24-crm-navigation.tls=true
+      - traefik.http.routers.stor24-crm-navigation.tls.certresolver=mytlschallenge
+      - traefik.http.routers.stor24-crm-navigation.service=stor24-crm
+      - traefik.http.routers.stor24-crm-navigation.priority=100
+      - traefik.http.routers.stor24-crm-navigation.middlewares=stor24-portal-domain
+      - traefik.http.middlewares.stor24-portal-domain.redirectregex.regex=^https://stor24-site[.]srv938083[.]hstgr[.]cloud/(.*)
+      - traefik.http.middlewares.stor24-portal-domain.redirectregex.replacement=https://portal.stor24.co.za/$${1}
+      - traefik.http.middlewares.stor24-portal-domain.redirectregex.permanent=true
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
       interval: 30s

@@ -34,7 +34,7 @@ test("browser return cannot mark a mandate signed or store posted banking data",
   try {
     const response = await providerReturn(new Request("https://crm.example/api/webhooks/netcash/mandate", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ AccountRef: "ST24-test", Field1: correlation, MandateSuccessful: "1", BankAccountNo: "FAKE_BANK_DATA", MandatePDFLink: "https://evil.example/key" }) }));
     assert.equal(response.status, 303);
-    assert.equal(response.headers.get("location"), "https://stor4.srv938083.hstgr.cloud/book/debit-order/test-signing-token");
+    assert.equal(response.headers.get("location"), "https://stor24.co.za/book/debit-order/test-signing-token");
     assert.equal(write.mock.callCount(), 0); assert.equal(network.mock.callCount(), 0);
     assert.equal(await response.text(), "");
   } finally { lookup.mock.restore(); write.mock.restore(); network.mock.restore(); }

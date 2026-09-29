@@ -11,11 +11,19 @@ export function validTwilioSignature(request: Request, entries: ReadonlyArray<re
   if (!token || !supplied || !appUrl) return false;
   const suffix = new URL(request.url).search;
   const sorted = [...entries].sort(([leftKey, leftValue], [rightKey, rightValue]) => leftKey.localeCompare(rightKey) || leftValue.localeCompare(rightValue));
-  const source = `${appUrl}${routePath}${suffix}${sorted.map(([key, value]) => `${key}${value}`).join("")}`;
-  const expected = createHmac("sha1", token).update(source).digest("base64");
   const left = Buffer.from(supplied);
-  const right = Buffer.from(expected);
-  return left.length === right.length && timingSafeEqual(left, right);
+  // In-flight/provider-configured callbacks can retain the previous hostname.
+  // Only server-configured origins are trusted, never forwarded request headers.
+  const origins = [appUrl, process.env.TWILIO_LEGACY_WEBHOOK_ORIGIN].filter((value): value is string => Boolean(value));
+  return origins.some(value => {
+    try {
+      const url = new URL(value);
+      if (!["https:", "http:"].includes(url.protocol) || url.origin !== value.replace(/\/$/, "")) return false;
+      const source = `${url.origin}${routePath}${suffix}${sorted.map(([key, entry]) => `${key}${entry}`).join("")}`;
+      const right = Buffer.from(createHmac("sha1", token).update(source).digest("base64"));
+      return left.length === right.length && timingSafeEqual(left, right);
+    } catch { return false; }
+  });
 }
 
 export function formObject(entries: ReadonlyArray<readonly [string, string]>) {
