@@ -1,4 +1,10 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Booking test payment — 29 September 2026
+
+- **Implementation:** Brett explicitly confirmed adding a test-payment option on the selected actual booking. Separate training-only audit receipt; no Payment, LedgerEntry, balance, booking, tenancy or access write. Current owner/manager facility access and owner-controlled training switch checked server-side. Organisation lock serializes receipt and training switch; one receipt per booking/generation, matching retries reuse it and changed amounts conflict. Disabling/restarting invalidates the current simulation. Real handover gates remain unchanged.
+- **Testing:** 494 unit tests and typecheck passed. Actual component1440/390/320px covers training off, confirmation, denied access, duplicates, timeout/lost/malformed/mismatched results and GET-only recovery. Mobile screenshot checked. Required real PostgreSQL isolation/replay/disabled/stale/facility/audit-failure test added; CI pending. No actual booking test receipt submitted yet.
+- **Commit/push, merge, deployment/configuration, live verification:** candidate pending. No training switch changed. All programme acceptance gates remain open. This implements the authorised payment simulation only, not a real handover bypass or full linked training journey. Carries PR352 final evidence from its evidence branch.
+
 ## Statement return to move-in — 28 September 2026
 
 - **Implementation:** Brett requested this navigation fix during attended Priority1 acceptance. Statement page resolves its scoped account and matching active/converted reservation server-side, then shows an orange Back to move-in checks link retaining that reservation. Accounts return remains. No payment, balance, permission or handover-policy changes.
