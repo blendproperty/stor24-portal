@@ -47,6 +47,7 @@ jobs:
       - run: node scripts/test-inventory-rate-recovery.mjs
       - run: node scripts/test-hold-release-recovery.mjs
       - run: node scripts/test-statement-return.mjs
+      - run: node scripts/test-booking-test-payment.mjs
       - run: node scripts/test-merchandise-supply-confirmation.mjs
       - run: node scripts/test-operations-access-recovery.mjs
       - run: node scripts/test-daily-close-form.mjs
