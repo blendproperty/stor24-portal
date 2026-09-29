@@ -18,7 +18,7 @@ export function BookingTestPayment({ reservationId, requiredAmount }: { reservat
       const parsed = bookingTestPaymentSnapshotSchema.safeParse((await response.json()).data);
       if (!response.ok || !parsed.success || parsed.data.reservationId !== reservationId) throw new Error();
       setData(parsed.data); setError("");
-      if (parsed.data.receipt || !parsed.data.enabled) setUncertain(false);
+      setUncertain(false); // A fresh read permits a deliberate retry; the server deduplicates the booking/session.
     } catch { setData(null); setError("Test-payment status could not be loaded. Check status before continuing."); }
     finally { requestLock.current = false; setBusy(false); }
   }, [reservationId]);
