@@ -1,4 +1,10 @@
 # STOR 24 CRM and Operations Platform — Project Context
+## Verified booking confirmation email — 29 September 2026
+
+- **Implementation:** after first independently verified booking payment, transaction queues one immutable email per payment to the verified customer email for the matching signed reservation. Branded booking/unit/amount/next-step summary separates sandbox TEST/no money received from live confirmation; neither grants keys/access. Webhook atomically claims queued email; duplicate callbacks cannot resend. Ambiguous failure recorded FAILED for provider review; process interruption after claim remains PROCESSING and must not be blindly retried. Pending delivery can be resumed by a duplicate callback. No historical payment backfill or automatic resend; Unit107 previous transaction is not retroactively emailed. No claim of inbox delivery from provider acceptance.
+- **Testing:**495 unit tests passed, focused lint/typecheck and600/390/320px HTML render passed. Required real PostgreSQL tests added for concurrent settlement/one email, failure/no duplicate, unchanged test ledger/access, invalid evidence rejection and live confirmation. CI pending. No customer email sent during development.
+- **Commit/push:** pending on codex/payment-confirmation-email. **Merge:** pending. **Deployment/configuration:** pending; no provider/training/payment switch change. **Live verification:** pending. All staff/provider/legal/finance acceptance gates remain open. Unit107 test booking remains the attended UAT record.
+
 ## Booking test payment — 29 September 2026
 
 - **Implementation:** Brett explicitly confirmed adding a test-payment option on the selected actual booking. Separate training-only audit receipt; no Payment, LedgerEntry, balance, booking, tenancy or access write. Current owner/manager facility access and owner-controlled training switch checked server-side. Organisation lock serializes receipt and training switch; one receipt per booking/generation, matching retries reuse it and changed amounts conflict. Disabling/restarting invalidates the current simulation. Real handover gates remain unchanged.

@@ -1,3 +1,4 @@
+import { deliverBookingConfirmation } from "@/lib/payments/booking-confirmation-email";
 /**
  * Inbound Netcash Pay Now Notify endpoint.
  *
@@ -83,7 +84,10 @@ export async function POST(request: Request) {
     // Failed merchandise verification/settlement can be retried; order locks and
     // unique ledger references prevent double posting on concurrent deliveries.
     inbox = await db.webhookInbox.findFirst({ where: { organisationId: account.customer.organisationId, provider: "NETCASH", externalEventId, status: { in: ["PENDING", "FAILED"] } } });
-    if (!inbox) return NextResponse.json({ received: true, matched: true, duplicate: true });
+    if (!inbox) {
+      await deliverBookingConfirmation(payment.id).catch(() => undefined);
+      return NextResponse.json({ received: true, matched: true, duplicate: true });
+    }
   }
 
   if (!requestTrace) {
@@ -140,6 +144,7 @@ export async function POST(request: Request) {
 
   try {
     const result = await settleVerifiedBookingPayment(payment.id, { reference: verified.reference!, amount: Number(verified.amount), accepted: verified.accepted, requestTrace });
+    if (result.terminal && verified.accepted) await deliverBookingConfirmation(payment.id).catch(() => undefined);
     if (result.financial && verified.accepted) await enqueueMriExport(payment.id).catch(() => undefined);
     await db.webhookInbox.update({ where: { id: inbox.id }, data: { status: result.terminal ? "SUCCEEDED" : "PENDING", processedAt: result.terminal ? new Date() : null } });
   } catch {
