@@ -29,7 +29,7 @@ export async function trainingSnapshot(userId: string, facilityId?: string) {
   const run = selected && control?.enabled ? await db.moveInTrainingRun.findFirst({where:{organisationId:access.organisationId,userId,facilityId:selected,generation:control.generation}}) : null;
   return { enabled:control?.enabled ?? false, controlVersion:control?.version ?? 0, canToggle, facilities:access.facilities, facilityId:selected ?? "", run:run ? {version:run.version,state:run.state as TrainingState} : null };
 }
-export type TrainingSnapshot = Awaited<ReturnType<typeof trainingSnapshot>>;
+export type TrainingSnapshot = Awaited<ReturnType<typeof trainingSnapshot>> & { booking?: { reservationId: string; generation: number; unitNumber: string; requiredAmount: number } };
 export async function trainingCommand(userId: string, input: TrainingAction, sampleValidated = false) {
   const access = await trainingAccess(db,userId);
   await db.$transaction(async tx => {
