@@ -3,6 +3,7 @@ import { sameOrigin } from "@/lib/request-security";
 import { boundedPhotoForm } from "@/lib/facial-photo-security";
 import { trainingActionSchema } from "@/lib/move-in-training-contract";
 import { trainingSnapshot, trainingCommand, trainingSample, validateTrainingSample } from "@/lib/move-in-training";
+import { bookingMoveInTrainingSnapshot, bookingMoveInTrainingCommand } from "@/lib/booking-move-in-training";
 const headers = { "Cache-Control":"no-store, private", "X-Content-Type-Options":"nosniff" };
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,7 +15,8 @@ function errorResponse(error: unknown) {
 export async function GET(request: Request) {
   try {
     const auth = await requireSession(); const url = new URL(request.url);
-    const data = await trainingSnapshot(auth.user.id,url.searchParams.get("facility") ?? undefined);
+    const reservationId = url.searchParams.get("reservation");
+    const data = reservationId ? await bookingMoveInTrainingSnapshot(auth.user.id, reservationId) : await trainingSnapshot(auth.user.id,url.searchParams.get("facility") ?? undefined);
     if (url.searchParams.get("sample") === "true") {
       if (!data.enabled) throw new Error("TRAINING_DISABLED");
       return new Response(new Uint8Array(await trainingSample()),{headers:{...headers,"Content-Type":"image/png","Content-Disposition":'attachment; filename="stor24-training.png"'}});
@@ -31,11 +33,12 @@ export async function POST(request: Request) {
     if (request.headers.get("content-type")?.startsWith("multipart/form-data")) {
       if (!access.enabled) throw new Error("TRAINING_DISABLED");
       const form = await boundedPhotoForm(request), image = form.get("image");
-      const input = trainingActionSchema.parse({action:"photo",facilityId:form.get("facilityId"),version:Number(form.get("version"))});
+      const input = trainingActionSchema.parse({action:"photo",facilityId:form.get("facilityId"),version:Number(form.get("version")), reservationId:form.get("reservationId") ?? undefined, generation:form.has("generation") ? Number(form.get("generation")) : undefined});
       if (!(image instanceof File)) throw new Error("TRAINING_SAMPLE_REQUIRED");
       await validateTrainingSample(image);
-      return Response.json({data:await trainingCommand(auth.user.id,input,true)},{headers});
+      return Response.json({data:await ("reservationId" in input && input.reservationId ? bookingMoveInTrainingCommand(auth.user.id,input,true) : trainingCommand(auth.user.id,input,true))},{headers});
     }
-    return Response.json({data:await trainingCommand(auth.user.id,trainingActionSchema.parse(await request.json()))},{headers});
+    const input = trainingActionSchema.parse(await request.json());
+    return Response.json({data:await ("reservationId" in input && input.reservationId ? bookingMoveInTrainingCommand(auth.user.id,input) : trainingCommand(auth.user.id,input))},{headers});
   } catch(error) { return errorResponse(error); }
 }

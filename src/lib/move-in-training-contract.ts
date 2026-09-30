@@ -1,27 +1,27 @@
 import { z } from "zod";
 export const trainingActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("toggle"), enabled: z.boolean(), version: z.number().int().nonnegative() }),
-  z.object({ action: z.literal("start"), facilityId: z.string().min(1) }),
-  z.object({ action: z.enum(["unit", "agreement", "payment", "identity", "photo", "preview", "approve", "reject", "handover", "reset"]), facilityId: z.string().min(1), version: z.number().int().positive(), value: z.string().max(100).optional() }),
+  z.object({ action: z.literal("start"), facilityId: z.string().min(1), reservationId: z.string().min(1).max(100).optional(), generation: z.number().int().nonnegative().optional() }),
+  z.object({ action: z.enum(["unit", "agreement", "payment", "identity", "photo", "preview", "approve", "reject", "handover", "reset"]), facilityId: z.string().min(1), version: z.number().int().positive(), reservationId: z.string().min(1).max(100).optional(), generation: z.number().int().nonnegative().optional(), value: z.string().max(100).optional() }),
 ]);
 export type TrainingAction = z.infer<typeof trainingActionSchema>;
-export type TrainingState = { unit: string | null; agreement: boolean; paid: number; identity: boolean; photo: "MISSING" | "WAITING_REVIEW" | "REJECTED" | "APPROVED"; previewed: boolean; handedOverAt: string | null };
+export type TrainingState = { unit: string | null; bookingRequired?: number; agreement: boolean; paid: number; identity: boolean; photo: "MISSING" | "WAITING_REVIEW" | "REJECTED" | "APPROVED"; previewed: boolean; handedOverAt: string | null };
 export const initialTrainingState = (): TrainingState => ({ unit:null, agreement:false, paid:0, identity:false, photo:"MISSING", previewed:false, handedOverAt:null });
 export const trainingUnits = [{ id:"DEMO-01", name:"Demo unit 01", rent:100 }, { id:"DEMO-02", name:"Demo unit 02", rent:150 }];
-export function trainingRequired(state: TrainingState) { return trainingUnits.find(unit => unit.id === state.unit)?.rent ?? 0; }
+export function trainingRequired(state: TrainingState) { return state.bookingRequired ?? trainingUnits.find(unit => unit.id === state.unit)?.rent ?? 0; }
 export function trainingReady(state: TrainingState) { return Boolean(state.unit && state.agreement && state.paid >= trainingRequired(state) && state.identity && state.photo === "APPROVED"); }
 export function advanceTraining(state: TrainingState, action: string, value?: string): TrainingState {
   const next = { ...state };
   if (state.handedOverAt) throw new Error("TRAINING_FINISHED");
   if (action === "unit") {
-    if (!trainingUnits.some(unit => unit.id === value) || state.agreement) throw new Error("TRAINING_STEP_REQUIRED");
+    if (state.bookingRequired !== undefined || !trainingUnits.some(unit => unit.id === value) || state.agreement) throw new Error("TRAINING_STEP_REQUIRED");
     next.unit = value!;
   } else if (action === "agreement") {
     if (!state.unit || value !== "confirmed") throw new Error("TRAINING_STEP_REQUIRED");
     next.agreement = true;
   } else if (action === "payment") {
     const amount = Number(value);
-    if (!state.agreement || !Number.isFinite(amount) || amount <= 0 || amount > 10000 || Math.abs(amount*100-Math.round(amount*100)) > 0.00001) throw new Error("TRAINING_STEP_REQUIRED");
+    if (!state.agreement || !Number.isFinite(amount) || amount <= 0 || amount > (state.bookingRequired ?? 10000) || Math.abs(amount*100-Math.round(amount*100)) > 0.00001) throw new Error("TRAINING_STEP_REQUIRED");
     next.paid = Math.round((state.paid + amount)*100)/100;
   } else if (action === "identity") {
     if (!state.agreement || state.paid < trainingRequired(state) || value !== "confirmed") throw new Error("TRAINING_STEP_REQUIRED");

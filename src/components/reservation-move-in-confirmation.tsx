@@ -3,6 +3,7 @@
 import { southAfricaDateKey } from "@/lib/south-africa-time";
 import { MoveInProgressNav } from "./move-in-progress-nav";
 import type { MoveInProgress } from "@/lib/move-in-progress";
+import { MoveInTraining } from "./move-in-training";
 import { BookingTestPayment } from "./booking-test-payment";
 import { ReservationPaymentForm } from "./reservation-payment-form";
 import { useState } from "react";
@@ -13,6 +14,7 @@ import { confirmReservationMoveInAction } from "@/app/actions/leasing";
 export function ReservationMoveInConfirmation({ reservationId, customerName, unitNumber, readiness, canRecordPayment = false, canReviewIdentity = false, canReviewPhoto = false, progress, onBack }: {
   progress?: MoveInProgress; canReviewPhoto?: boolean; canReviewIdentity?: boolean; canRecordPayment?: boolean; reservationId: string; customerName: string; unitNumber: string; readiness: ReservationMoveInReadiness; onBack: () => void;
 }) {
+  const [testing, setTesting] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const money = (amount: number) => `R ${amount.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`;
@@ -23,7 +25,8 @@ export function ReservationMoveInConfirmation({ reservationId, customerName, uni
   const photoDone = progress?.photoReviewed ?? false;
   const identityLabel = identityDone ? progress?.identityAccepted ? "Accepted" : "Checked at handover" : progress?.identityStatus === "REPLACEMENT_REQUIRED" ? "Replacement needed" : progress?.identityStatus === "AWAITING_REVIEW" ? "Awaiting review" : "Check required";
   const photoLabel = photoDone ? "Reviewed" : progress?.photoStatus === "WAITING_REVIEW" ? "Awaiting review" : progress?.photoCollectionEnabled ? "Capture needed" : "Collection on hold";
-  return <><MoveInProgressNav steps={[
+  if (testing) return <MoveInTraining key={reservationId} reservationId={reservationId} onReturn={() => setTesting(false)} />;
+  return <>{!handedOver && <aside className="training-entry"><div><strong>Test this booking</strong><p>Practise all six move-in stages using unit {unitNumber}. Test checks cannot release real keys or access.</p></div><button className="button button-secondary" onClick={() => setTesting(true)}>Test this booking</button></aside>}<MoveInProgressNav steps={[
     { label: "Select unit", icon: Warehouse, status: `Unit ${unitNumber} selected`, complete: true, onClick: onBack },
     { label: "Agreement", icon: FileCheck2, status: readiness.signed ? "Signed" : "Not signed", complete: readiness.signed, blocked: overdue, href: "#move-in-agreement" },
     { label: "Payment", icon: Wallet, status: readiness.paymentVerified ? "Verified" : readiness.testPayment ? "Test payment only" : "Record payment", complete: readiness.paymentVerified, blocked: readiness.testPayment || overdue, href: "#move-in-payment" },

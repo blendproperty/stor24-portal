@@ -20,12 +20,41 @@ try{
   await page.getByRole("spinbutton",{name:"Test payment amount"}).fill("0.02");await page.getByRole("button",{name:"Record test payment"}).click();
   await page.getByRole("button",{name:"Check ID To do",exact:true}).click();await expect(page.getByRole("button",{name:"Confirm demo ID checked"})).toBeDisabled();
   await page.getByRole("button",{name:"Payment To do",exact:true}).click();await page.getByRole("spinbutton",{name:"Test payment amount"}).fill("99.98");await page.getByRole("button",{name:"Record test payment"}).click();await page.getByRole("button",{name:"Confirm demo ID checked"}).click();
-  await page.getByLabel("Upload supplied sample").setInputFiles({name:"sample.png",mimeType:"image/png",buffer:sample});await page.getByRole("button",{name:"Open sample for review"}).click();await page.getByRole("button",{name:"Request replacement"}).click();
-  await page.getByLabel("Upload supplied sample").setInputFiles({name:"sample.png",mimeType:"image/png",buffer:sample});await page.getByRole("button",{name:"Open sample for review"}).click();await page.getByRole("button",{name:"Approve training photo"}).click();
+  await expect(page.getByLabel("Upload supplied sample")).toBeEnabled();await page.getByLabel("Upload supplied sample").setInputFiles({name:"sample.png",mimeType:"image/png",buffer:sample});await page.getByRole("button",{name:"Open sample for review"}).click();await page.getByRole("button",{name:"Request replacement"}).click();
+  await expect(page.getByLabel("Upload supplied sample")).toBeEnabled();await page.getByLabel("Upload supplied sample").setInputFiles({name:"sample.png",mimeType:"image/png",buffer:sample});await page.getByRole("button",{name:"Open sample for review"}).click();await page.getByRole("button",{name:"Approve training photo"}).click();
   await page.getByRole("checkbox",{name:"I am confirming a training key handover only."}).check();await page.getByRole("button",{name:"Record training handover"}).click();await expect(page.getByRole("heading",{name:"Training handover complete"})).toBeVisible();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.screenshot({path:`output/training/complete-${width}.png`,fullPage:true});
   await page.getByRole("switch",{name:"Enable manager training"}).click();await expect(page.getByRole("switch",{name:"Enable manager training"})).not.toBeChecked();await page.goto(base+"?enabled=false");await expect(page.getByRole("heading",{name:"Training is switched off"})).toBeVisible();
   await page.goto(base+"?role=manager");await expect(page.getByRole("switch")).toHaveCount(0);await expect(page.getByRole("link",{name:"Start training",exact:true})).toBeVisible();assert.deepEqual(errors,[]);await page.close();
+ }
+ for(const width of [1440,390,320]) {
+  const page=await browser.newPage({viewport:{width,height:1000}}),errors=[];
+  page.on("pageerror",e=>errors.push(e.message));
+  await page.goto(base+"?linked=true");
+  await expect(page.getByRole("heading",{name:"Test move-in · Unit 107"})).toBeVisible();
+  await page.getByRole("button",{name:"Start test on this booking"}).click();
+  await expect(page.getByRole("button",{name:"Complete Agreement Test completed",exact:true})).toBeVisible();
+  await page.getByRole("button",{name:"Payment To do",exact:true}).click();
+  await expect(page.getByText("Required R2199.00 · Test receipts R0.00 · Test balance R2199.00",{exact:true})).toBeVisible();
+  await page.getByRole("spinbutton",{name:"Test payment amount"}).fill("2199");
+  await page.getByRole("button",{name:"Record test payment",exact:true}).click();
+  const payment=page.getByRole("button",{name:"Complete Payment Test completed",exact:true});
+  await expect(payment).toBeVisible();
+  assert.equal(await payment.evaluate(e=>e.closest("li").classList.contains("is-complete")),true);
+  await page.getByRole("button",{name:"Confirm demo ID checked",exact:true}).click();
+  await expect(page.getByLabel("Upload supplied sample")).toBeEnabled();await page.getByLabel("Upload supplied sample").setInputFiles({name:"sample.png",mimeType:"image/png",buffer:sample});
+  await page.getByRole("button",{name:"Open sample for review",exact:true}).click();
+  await page.getByRole("button",{name:"Approve training photo",exact:true}).click();
+  await page.getByRole("checkbox",{name:"I am confirming a training key handover only."}).check();
+  await page.getByRole("button",{name:"Record training handover",exact:true}).click();
+  await expect(page.getByText("Booking test complete · Test audit saved. Real tenancy and unit status unchanged.",{exact:true})).toBeVisible();
+  assert.equal(await page.locator('.move-in-progress li.is-complete').count(),6);
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),true);
+  await page.screenshot({path:`output/training/booking-107-${width}.png`,fullPage:true});
+  await page.goto(base+"?linked=true&paid=true");
+  await page.getByRole("button",{name:"Start test on this booking"}).click();
+  await expect(page.getByRole("button",{name:"Complete Payment Test completed",exact:true})).toBeVisible();
+  assert.deepEqual(errors,[]);await page.close();
  }
  console.log("PASS owner toggle, manager read-only availability, partial-payment block, sample replacement/approval, saved demo handover and 1440/390/320px bounds");
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
