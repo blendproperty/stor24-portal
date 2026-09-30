@@ -15,7 +15,7 @@ const server=createServer(async(req,res)=>{
  if (/^\/brand\/Satoshi-Handover-(400|700)\.woff2$/.test(req.url)) {res.setHeader("Content-Type","font/woff2");return res.end(await readFile(`public${req.url}`));}
  if(req.url==="/fixture.js"){res.setHeader("Content-Type","text/javascript");return res.end(bundle.outputFiles[0].text);}
  for(const header of securityHeaders) res.setHeader(header.key,header.value);
- res.setHeader("Content-Type","text/html");res.end(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:24px;background:#f5f4ec}*{box-sizing:border-box}${css}</style></head><body><div id="root"></div><script type="module" src="/fixture.js"></script></body></html>`);
+ res.setHeader("Content-Type","text/html");res.end(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:24px;background:#f5f4ec}*{box-sizing:border-box}p,h1,h2{margin:0}${css}</style></head><body><div id="root"></div><script type="module" src="/fixture.js"></script></body></html>`);
 });
 await new Promise(resolve=>server.listen(0,"127.0.0.1",resolve));
 const browser=await chromium.launch(); const page=await browser.newPage(), errors=[];page.on("pageerror",error=>errors.push(error.message));
@@ -71,6 +71,13 @@ try {
   await expect(back).toHaveAttribute("href","/operations/move-in?reservation=booking-106");
   await back.focus(); await expect(back).toBeFocused();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  const metadata=await page.locator('.identity-review__metadata').boundingBox();
+  const actions=await page.locator('.identity-review__actions').boundingBox();
+  const acceptance=await page.locator('.identity-review__acceptance').boundingBox();
+  const replacement=await page.locator('.identity-review__replacement').boundingBox();
+  assert.ok(actions.y-(metadata.y+metadata.height)>=23, `metadata spacing ${width}`);
+  assert.ok(acceptance.y-(actions.y+actions.height)>=23, `review spacing ${width}`);
+  assert.ok(replacement.y-(acceptance.y+acceptance.height)>=23, `replacement spacing ${width}`);
   await page.screenshot({path:`output/identity/booking-review-${width}.png`,fullPage:true});
  }
  assert.equal(previews,previewsBefore); assert.equal(writes,1);
