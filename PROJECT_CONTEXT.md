@@ -1,5 +1,15 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Identity review spacing — 30 September 2026
+
+- **Implementation:** explicit 8px booking metadata gaps, 24px preview/review section gaps and 16px acceptance/replacement action gaps; replacement separated by a divider. Fixes reliance on default paragraph margins after the shared reset. No review decisions, private-preview rules, payments or booking data changed. Wider page-by-page spacing review remains open.
+- **Testing:** existing identity browser suite passed with reset paragraph margins at 1440/390/320px, explicit section-gap assertions, private two-page viewing, stale-review rejection, broken-image blocking and responsive bounds. TypeScript and diff whitespace checks passed; mobile screenshot inspected.
+- **Commit and push:** source 492143b pushed on codex/identity-review-spacing from canonical main 2cd874972da1beb8e0e8ebdc65b5184622c4bf19. Context follow-up included before PR promotion; unrelated checkouts preserved.
+- **Merge:** pending protected-branch checks and promotion.
+- **Deployment and configuration:** pending; no configuration changes required.
+- **Live production verification:** pending; synthetic browser checks do not prove deployment.
+- **Open gates:** actual-record unit107 workflow correction remains pending after user clarified all current data is test data. Existing provider, legal/privacy, finance/MRI, data, training, UAT, recovery and approval gates remain open. Full test-data cleanup is a later task.
+
 ## Controlled move-in test on the selected booking — 30 September 2026
 
 - **Implementation:** Test this booking opens all six test stages in the selected booking's move-in screen, retaining its actual unit and required amount. Starts from the booking's signed-agreement status and current-generation training payment audit. Test progress is labelled Test completed and turns green independently of live readiness. Saved, per-booking/per-staff test history lives only in training AuditEvent records; no schema migration or writes to Payment, LedgerEntry, Account, Reservation, Unit, Occupancy, Tenancy, identity/photo submissions or access providers. Synthetic sample only for photo practice. Returning to live checks preserves the booking and all real release gates.
