@@ -1,0 +1,25 @@
+{
+  "verifiedAtUtc": "2026-09-30T10:37:53.763052+00:00",
+  "internalUnitsVerified": 139,
+  "areaCorrections": 74,
+  "internalAreaSqm": 2042,
+  "unchangedGroundInternal": 65,
+  "unchangedOtherFloors": 388,
+  "unchangedOutdoorUnits": {
+    "530": 29.6,
+    "531": 29.6,
+    "532": 29.6
+  },
+  "unchangedExistingTypes": 69,
+  "newAreaSpecificTypes": 42,
+  "unchangedMapElements": 1240,
+  "unchangedMapCount": 3,
+  "ratesStatusTaxNumbersIdsUnchanged": true,
+  "auditId": "asbuilt-4e1c3d2effb64ab7bdec3fc526b1c736",
+  "sourceSha256": "f2edd3d319ddd0047af92b2a453676964d587a643382956cb962f8296b443eb7",
+  "publicApiMatchedAreas": 139,
+  "publicMapMatchedAreas": 139,
+  "browserVerifiedUnit": "114",
+  "browserVerifiedSqm": 49,
+  "staffMapVisualCheck": "pending sign-in"
+}
