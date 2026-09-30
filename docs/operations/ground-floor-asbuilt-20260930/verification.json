@@ -16,5 +16,10 @@
   "unchangedMapCount": 3,
   "ratesStatusTaxNumbersIdsUnchanged": true,
   "auditId": "asbuilt-4e1c3d2effb64ab7bdec3fc526b1c736",
-  "sourceSha256": "f2edd3d319ddd0047af92b2a453676964d587a643382956cb962f8296b443eb7"
+  "sourceSha256": "f2edd3d319ddd0047af92b2a453676964d587a643382956cb962f8296b443eb7",
+  "publicApiMatchedAreas": 139,
+  "publicMapMatchedAreas": 139,
+  "browserVerifiedUnit": "114",
+  "browserVerifiedSqm": 49,
+  "staffMapVisualCheck": "pending sign-in"
 }
