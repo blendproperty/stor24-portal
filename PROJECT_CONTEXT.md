@@ -1,5 +1,15 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Midpoint ground-floor as-built area correction — 30 September 2026
+
+- **Implementation:** applied the user-supplied 29 September revision A as-built areas to 74 of 139 internal ground-floor units. All 139 matched; 65 already correct. Total internal area 2,016 → 2,042 m². Outdoor 530–532 remain 29.6 m² each. Created 42 dedicated area types rather than altering shared types; new unverified dimensions are null. No rates, statuses, occupancy, reservations, unit identity, upper-floor data or map geometry changes. [Source mapping and evidence](docs/operations/ground-floor-asbuilt-20260930/README.md).
+- **Testing:** exact PostgreSQL transaction passed once with rollback, then commit; scope/snapshot/update-count/area assertions and protected-field, shared-type, geometry, reservation/occupancy checks passed. Fresh readback verified all 139 areas, 388 upper-floor records, three outdoor records, 69 existing types, three maps and 1,240 elements. Full backup catalogue readable; protected scoped rollback retained. Application source is unchanged; no application test rerun is claimed.
+- **Commit and push:** evidence prepared on codex/ground-floor-asbuilt-20260930 from canonical origin/main 77640e6d8aa9faa5123b815f6c1f919165186029; commit/push pending at preparation. Original dirty checkouts preserved.
+- **Merge:** evidence PR pending. Canonical remote PROJECT_CONTEXT.md presence will be checked before handoff.
+- **Deployment and configuration:** production data transaction committed 30 September 2026; audit asbuilt-4e1c3d2effb64ab7bdec3fc526b1c736. Protected backup and exact SQL in /root/stor24-asbuilt-20260930. No application deployment, restart, environment, provider or training switch changes; runtime source remains 5f597570ae225ff525c683ee354fce6a4461a3ea.
+- **Live production verification:** full inventory readback passed at 2026-09-30T10:37:53Z; canonical HTTPS health service/database ok at 10:37:54Z. Authenticated map visual check pending portal sign-in, requested from Brett. Database result is verified; staff visual acceptance is not claimed.
+- **Open gates:** existing provider, legal/privacy, finance/MRI, data, training, recovery, UAT and approval gates remain open. As-built area correction does not certify a survey, amend signed leases, recalculate prices or accept operational readiness. No tracker acceptance changes.
+
 ## Portal domain migration - 29 September 2026
 
 - **Implementation:** canonical staff/customer hostname is https://portal.stor24.co.za. Tracked Compose retains legacy APIs and provider callbacks, redirecting only non-API GET/HEAD navigation with path/query intact. Twilio validates authentic signatures against APP_URL and one explicit server-configured legacy origin; forwarded-host claims cannot expand trust. Customer/email/contact and Netcash mandate-return links use the proper STOR24 domains. See docs/PORTAL_DOMAIN_CUTOVER_2026-09-29.md for configuration and rollback.
