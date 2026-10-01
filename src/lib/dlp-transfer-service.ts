@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
-import { privacyHash, rateLimit } from "@/lib/request-security";
+import { dlpRecipientHash, rateLimit } from "@/lib/request-security";
 import { DLP_POLICY_VERSION, inspectReportExport, dlpPrivateHeaders } from "@/lib/dlp-policy";
 
 export type DlpContext = { organisationId: string; facilityId?: string; actorId?: string; resourceId: string; approvedRecipient?: string };
@@ -16,12 +16,12 @@ export async function guardDlpTransfer(input: DlpTransfer) {
   if (input.channel !== "DOWNLOAD" && (!input.recipient || !input.approvedRecipient || input.recipient.trim().toLowerCase() !== input.approvedRecipient.trim().toLowerCase())) reasons.add("RECIPIENT_MISMATCH");
   // Scope the shared counter to the actual actor or destination. It survives
   // restarts and correlates split transfers without storing raw recipients.
-  const principal = input.actorId ?? (input.recipient ? privacyHash(input.recipient.trim().toLowerCase()) : input.resourceId);
+  const principal = input.actorId ?? (input.recipient ? dlpRecipientHash(input.recipient.trim().toLowerCase()) : input.resourceId);
   if (await rateLimit(`dlp:${input.organisationId}:${input.channel}:${principal}`, 60, 3600000)) reasons.add("TRANSFER_RATE_LIMIT");
   const allowed = reasons.size === 0;
   await db.auditEvent.create({ data: { organisationId: input.organisationId, facilityId: input.facilityId, actorId: input.actorId,
     entityType: "DlpTransfer", entityId: input.resourceId, requestId, action: allowed ? "dlp.transfer.allowed" : "dlp.transfer.blocked",
-    after: { policyVersion: DLP_POLICY_VERSION, classification: input.classification, channel: input.channel, byteCount: bytes, reasons: [...reasons].sort(), ...(input.recipient ? { recipientHash: privacyHash(input.recipient.trim().toLowerCase()) } : {}) },
+    after: { policyVersion: DLP_POLICY_VERSION, classification: input.classification, channel: input.channel, byteCount: bytes, reasons: [...reasons].sort(), ...(input.recipient ? { recipientHash: dlpRecipientHash(input.recipient.trim().toLowerCase()) } : {}) },
   } });
   if (!allowed) throw new Error("DLP_TRANSFER_BLOCKED");
   return { ...dlpPrivateHeaders, "x-stor24-data-classification": input.classification, "x-stor24-dlp-policy": DLP_POLICY_VERSION, "x-request-id": requestId };

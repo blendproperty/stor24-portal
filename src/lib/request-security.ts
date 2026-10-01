@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { db } from "@/lib/db";
 
 export function requestIp(request: Request) {
@@ -6,6 +6,13 @@ export function requestIp(request: Request) {
 }
 export function privacyHash(value: string) {
   return createHash("sha256").update(`${process.env.AUTH_SECRET}:${value}`).digest("hex");
+}
+
+/** Keyed address pseudonym for DLP correlation, never password storage. */
+export function dlpRecipientHash(address: string) {
+  const key = process.env.AUTH_SECRET;
+  if (!key || key.length < 32) throw new Error("DLP_HASH_KEY_REQUIRED");
+  return createHmac("sha256", key).update("stor24-dlp-recipient:").update(address).digest("hex");
 }
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
