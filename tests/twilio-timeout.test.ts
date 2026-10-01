@@ -11,7 +11,7 @@ test("Twilio SMS and WhatsApp requests have a bounded deadline without automatic
   const context = { organisationId: "synthetic", idempotencyKey: "synthetic" };
   const message = { recipient: "+27000000001", body: "Synthetic only" };
   for (const kind of ["sms", "whatsapp", "template"]) {
-    const send = () => kind === "sms" ? new TwilioSmsProvider().send(message, context) : kind === "whatsapp" ? new TwilioWhatsAppProvider().send(message, context) : new TwilioWhatsAppProvider().sendTemplate(message.recipient, "HX" + "0".repeat(32), { "1": "Synthetic only" }, context);
+    const send = () => kind === "sms" ? new TwilioSmsProvider(async () => ({} as Awaited<ReturnType<typeof import("../src/lib/dlp-transfer-service").guardDlpTransfer>>)).send(message, context) : kind === "whatsapp" ? new TwilioWhatsAppProvider(async () => ({} as Awaited<ReturnType<typeof import("../src/lib/dlp-transfer-service").guardDlpTransfer>>)).send(message, context) : new TwilioWhatsAppProvider(async () => ({} as Awaited<ReturnType<typeof import("../src/lib/dlp-transfer-service").guardDlpTransfer>>)).sendTemplate(message.recipient, "HX" + "0".repeat(32), { "1": "Synthetic only" }, context);
     await t.test(`${kind}: successful request preserves form and supplies deadline`, async t => {
       let calls = 0, deadlines = 0; const controller = new AbortController();
       t.mock.method(AbortSignal, "timeout", (ms: number) => { assert.equal(ms, 15_000); deadlines++; return controller.signal; });

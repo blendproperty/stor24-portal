@@ -1,4 +1,5 @@
 import { requirePermissionScope } from "@/lib/scope";
+import { protectDlpResponse } from "@/lib/dlp-transfer-service";
 import { sameOrigin } from "@/lib/request-security";
 import { identityError } from "@/lib/identity-document-response";
 import { listIdentityDocuments, previewIdentity, reviewIdentity } from "@/lib/identity-document-service";
@@ -10,7 +11,7 @@ export async function GET(request: Request) {
     const scope = await requirePermissionScope("identity.review"), url = new URL(request.url);
     if (url.searchParams.get("preview") === "true") {
       const bytes = await previewIdentity(scope, url.searchParams.get("id") ?? "", Number(url.searchParams.get("version")), Number(url.searchParams.get("page")));
-      return new Response(new Uint8Array(bytes), { headers: { ...headers, "Content-Type": "image/jpeg", "Content-Disposition": "inline", "Content-Security-Policy": "default-src 'none'; sandbox" } });
+      return await protectDlpResponse(new Response(new Uint8Array(bytes), { headers: { ...headers, "Content-Type": "image/jpeg", "Content-Disposition": "inline", "Content-Security-Policy": "default-src 'none'; sandbox" } }), { organisationId: scope.organisationId, actorId: scope.userId, resourceId: url.searchParams.get("id") ?? "" });
     }
     return Response.json({ data: await listIdentityDocuments(scope, url.searchParams.get("reservation") || undefined) }, { headers });
   } catch (error) { return identityError(error); }

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { guardDlpTransfer } from "@/lib/dlp-transfer-service";
 import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 
@@ -10,8 +11,9 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     const { id } = await context.params;
     const lease = await db.publicReservationLease.findFirst({ where: { id, status: "SIGNED", signedPdf: { not: null }, reservation: { customer: { organisationId: auth.organisationId }, ...(auth.allowedFacilityIds ? { facilityId: { in: auth.allowedFacilityIds } } : {}) } }, include: { reservation: true } });
     if (!lease?.signedPdf) return Response.json({ error: { message: "Signed agreement not found." } }, { status: 404 });
+    const dlp = await guardDlpTransfer({ organisationId: auth.organisationId, actorId: auth.user.id, facilityId: lease.reservation.facilityId, resourceId: lease.id, channel: "DOWNLOAD", classification: "restricted", byteLength: lease.signedPdf.byteLength });
     const requestId = `LEASE-${randomUUID().slice(0, 8).toUpperCase()}`;
     await db.auditEvent.create({ data: { organisationId: auth.organisationId, facilityId: lease.reservation.facilityId, actorId: auth.user.id, action: "public_lease.signed_pdf_downloaded", entityType: "PublicReservationLease", entityId: lease.id, requestId } });
-    return new Response(lease.signedPdf, { headers: { "content-type": "application/pdf", "content-disposition": `attachment; filename="stor24-${lease.reservation.publicReference}-signed-agreement.pdf"`, "cache-control": "private, no-store, max-age=0", "x-content-type-options": "nosniff", "x-request-id": requestId, "x-document-sha256": lease.signedPdfSha256 ?? "" } });
+    return new Response(lease.signedPdf, { headers: { ...dlp, "content-type": "application/pdf", "content-disposition": `attachment; filename="stor24-${lease.reservation.publicReference}-signed-agreement.pdf"`, "cache-control": "private, no-store, max-age=0", "x-content-type-options": "nosniff", "x-request-id": requestId, "x-document-sha256": lease.signedPdfSha256 ?? "" } });
   } catch (error) { return authErrorResponse(error); }
 }

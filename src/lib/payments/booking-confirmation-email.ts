@@ -33,7 +33,8 @@ export async function deliverBookingConfirmation(paymentId: string, send = (mess
   if (!claimed.count) return;
   const entry = await db.webhookOutbox.findUniqueOrThrow({ where: { idempotencyKey } });
   try {
-    await send(bookingConfirmationMessage(entry.payload as BookingConfirmation));
+    const message = bookingConfirmationMessage(entry.payload as BookingConfirmation);
+    await send({ ...message, dlp: { organisationId: entry.organisationId, facilityId: entry.facilityId ?? undefined, resourceId: paymentId, approvedRecipient: message.to } });
     await db.webhookOutbox.update({ where: { id: entry.id }, data: { status: "SUCCEEDED", deliveredAt: new Date() } });
   } catch {
     await db.webhookOutbox.update({ where: { id: entry.id }, data: { status: "FAILED", failureCode: "EMAIL_DELIVERY_REVIEW", failureMessage: "Delivery not confirmed. Review provider delivery before any resend." } });

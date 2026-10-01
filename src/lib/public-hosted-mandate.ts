@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import { guardDlpTransfer } from "@/lib/dlp-transfer-service";
 import { PDFDocument } from "pdf-lib";
 import { db } from "@/lib/db";
 import { debitConnectionFingerprint } from "./payments/netcash-debit-batch";
@@ -115,5 +116,6 @@ export async function hostedMandatePdf(token: string) {
   const lease = await findLease(token);
   const m = lease.mandate;
   if (!m?.signedPdf || !m.signedPdfSha256 || createHash("sha256").update(m.signedPdf).digest("hex") !== m.signedPdfSha256) throw new Error("MANDATE_PDF_PENDING");
-  return { pdf: m.signedPdf, reference: m.reference };
+  const dlp = await guardDlpTransfer({ organisationId: lease.reservation.customer.organisationId, facilityId: lease.reservation.facilityId, resourceId: m.id, channel: "DOWNLOAD", classification: "restricted", byteLength: m.signedPdf.byteLength });
+  return { pdf: m.signedPdf, reference: m.reference, dlpHeaders: dlp };
 }

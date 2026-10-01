@@ -123,7 +123,7 @@ export async function POST(request: Request) {
   const appUrl = process.env.APP_URL || new URL(request.url).origin;
   const inviteUrl = `${appUrl}/invite/${token}`;
   try {
-    await emailProvider().send({ to: invitation.email, ...invitationEmail({ name: invitation.name, invitedByName: invitation.invitedByName, roleName: invitation.roleName, inviteUrl, expiresAt: invitation.expiresAt }) });
+    await emailProvider().send({ to: invitation.email, dlp: { organisationId: actor.user.organisationId, actorId: actor.user.id, resourceId: invitation.id, approvedRecipient: invitation.email }, ...invitationEmail({ name: invitation.name, invitedByName: invitation.invitedByName, roleName: invitation.roleName, inviteUrl, expiresAt: invitation.expiresAt }) });
   } catch {
     await db.userInvitation.update({ where: { id: invitation.id }, data: { status: "REVOKED", revokedAt: new Date() } });
     return Response.json({ error: { code: "DELIVERY_FAILED", message: "The invitation email could not be delivered. Check the email provider configuration and retry." } }, { status: 503 });

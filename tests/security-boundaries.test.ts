@@ -36,6 +36,7 @@ function fixture() {
   };
   const writes: Row[] = [], queries: Row[] = [], sends: unknown[][] = [];
   const db: Row = {};
+  db.$queryRaw = async () => [{ count: 1 }]; // Separate limiter tests cover SQL concurrency.
   for (const [model, rows] of Object.entries(tables)) db[model] = {
     findFirst: async (args: Row) => { queries.push({ model, ...args }); return rows.find(row => matches(row, args.where)) ?? null; },
     findUnique: async (args: Row) => rows.find(row => matches(row, args.where)) ?? null,

@@ -26,6 +26,9 @@ services:
     environment:
       NODE_ENV: production
       TENANT_PORTAL_ORGANISATION_SLUG: ${TENANT_PORTAL_ORGANISATION_SLUG:-stor24}
+      DLP_BACKUP_STATUS_PATH: /app/dlp-backup-status
+    volumes:
+      - /opt/backups/stor24-dlp/status:/app/dlp-backup-status:ro
     ports:
       - "127.0.0.1:${APP_PORT:-3014}:3000"
     labels:

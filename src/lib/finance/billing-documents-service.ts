@@ -185,7 +185,7 @@ export async function sendInvoiceEmail(input: { accountId: string; organisationI
 
   const commsIdempotencyKey = `${document.idempotencyKey}:EMAIL`;
   try {
-    await emailProvider().send({ to: context.customer.email, subject: `Invoice ${invoiceNumber} from Stor24`, text: `Invoice ${invoiceNumber} — see the attached details. Total due reflects your current account balance.`, html });
+    await emailProvider().send({ to: context.customer.email, dlp: { organisationId: context.organisationId, facilityId: context.facilityId, actorId: input.actorId, resourceId: document.id, approvedRecipient: context.customer.email }, subject: `Invoice ${invoiceNumber} from Stor24`, text: `Invoice ${invoiceNumber} — see the attached details. Total due reflects your current account balance.`, html });
     const log = await db.communicationLog.upsert({
       where: { idempotencyKey: commsIdempotencyKey },
       create: { organisationId: context.organisationId, facilityId: context.facilityId, customerId: context.customer.id, channel: "EMAIL", direction: "OUTBOUND", messageType: "INVOICE", recipientHash: createHash("sha256").update(context.customer.email).digest("hex"), status: "SUCCEEDED", idempotencyKey: commsIdempotencyKey, sentAt: new Date(), metadata: { documentId: document.id, invoiceNumber } },
@@ -261,7 +261,7 @@ export async function sendStatementEmail(input: { accountId: string; organisatio
 
   const commsIdempotencyKey = `${document.idempotencyKey}:EMAIL`;
   try {
-    await emailProvider().send({ to: context.customer.email, subject: `Your Stor24 statement (${statementNumber})`, text: `Statement ${statementNumber} for the period ${fromDay} to ${toDay}. Closing balance: R${closingBalance.toFixed(2)}.`, html });
+    await emailProvider().send({ to: context.customer.email, dlp: { organisationId: context.organisationId, facilityId: context.facilityId, actorId: input.actorId, resourceId: document.id, approvedRecipient: context.customer.email }, subject: `Your Stor24 statement (${statementNumber})`, text: `Statement ${statementNumber} for the period ${fromDay} to ${toDay}. Closing balance: R${closingBalance.toFixed(2)}.`, html });
     const log = await db.communicationLog.upsert({
       where: { idempotencyKey: commsIdempotencyKey },
       create: { organisationId: context.organisationId, facilityId: context.facilityId, customerId: context.customer.id, channel: "EMAIL", direction: "OUTBOUND", messageType: "STATEMENT", recipientHash: createHash("sha256").update(context.customer.email).digest("hex"), status: "SUCCEEDED", idempotencyKey: commsIdempotencyKey, sentAt: new Date(), metadata: { documentId: document.id, statementNumber } },

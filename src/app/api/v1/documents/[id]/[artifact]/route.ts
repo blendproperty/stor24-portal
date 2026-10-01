@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { protectDlpResponse } from "@/lib/dlp-transfer-service";
 import { fetchBlendSignArtifact, type BlendSignArtifact } from "@/lib/blendsign-client";
 import { db } from "@/lib/db";
 import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
@@ -36,13 +37,13 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     }
     const body = await upstream.arrayBuffer();
     await db.auditEvent.create({ data: { organisationId: auth.organisationId, facilityId: document.tenancy.facilityId, actorId: auth.user.id, action: `document.${artifact}.downloaded`, entityType: "Document", entityId: document.id, requestId } });
-    return new Response(body, { headers: {
+    return await protectDlpResponse(new Response(body, { headers: {
       "content-type": "application/pdf",
       "content-disposition": upstream.headers.get("content-disposition") ?? `attachment; filename="stor24-${artifact}.pdf"`,
       "cache-control": "private, no-store, max-age=0",
       "x-content-type-options": "nosniff",
       "x-request-id": requestId,
-    } });
+    } }), { organisationId: auth.organisationId, facilityId: document.tenancy.facilityId, actorId: auth.user.id, resourceId: document.id });
   } catch (error) {
     return authErrorResponse(error);
   }

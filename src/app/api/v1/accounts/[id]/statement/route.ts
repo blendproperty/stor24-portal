@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { protectDlpResponse } from "@/lib/dlp-transfer-service";
 import { testPaymentReviewAccounts } from "@/lib/payments/test-payment-review";
 import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
 import { buildAccountStatement, statementPeriod, statementAccountScope } from "@/lib/finance/account-statement";
@@ -22,7 +23,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     if (query.get("format") === "pdf") {
       const bytes = await renderAccountStatementPdf({ ...statement, from, to, generatedAt: new Date().toISOString(), accountNumber: account.accountNumber, currency: account.currency, customerName: account.customer.companyName || [account.customer.firstName, account.customer.lastName].filter(Boolean).join(" "), facilityName: account.tenancy?.facility.name ?? "STOR24" });
       await db.auditEvent.create({ data: { organisationId: auth.organisationId, actorId: auth.user.id, action: "account.statement_downloaded", entityType: "Account", entityId: id } });
-      return tenantPdf(bytes, `stor24-statement-${from}-${to}.pdf`);
+      return await protectDlpResponse(tenantPdf(bytes, `stor24-statement-${from}-${to}.pdf`), { organisationId: auth.organisationId, actorId: auth.user.id, resourceId: id });
     }
     return Response.json({ data: { ...statement, from, to, generatedAt: new Date().toISOString(), accountNumber: account.accountNumber, currency: account.currency, customerName: account.customer.companyName || [account.customer.firstName, account.customer.lastName].filter(Boolean).join(" "), facilityName: account.tenancy?.facility.name ?? "STOR24" } }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {

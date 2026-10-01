@@ -1,50 +1,34 @@
-# Data loss prevention — implementation and rollout
+# Data loss prevention — application and server controls
 
-Date: 1 October 2026. Application report-export slice; full DLP programme remains open.
+Date: 1 October 2026. Policy 2026-10-01.2. Microsoft 365 DLP remains open by Brett's explicit instruction after the signed-in account was denied administrator access.
 
-## Enforced application boundary
+## Mandatory application boundaries
 
-`GET /api/v1/reports/export` checks CSV and JSON through the same policy after existing current-role, organisation and intersected facility permissions. All nine known reports are confidential. Unknown report categories, non-scalar content, detected restricted fields/credential patterns/payment-card patterns, more than 5,000 rows or more than 5 MiB of UTF-8 JSON row data block release. These are conservative per-export limits, not aggregate exfiltration detection. The actual CSV/JSON response can include encoding overhead beyond the row-data limit.
+Reports (CSV and JSON) preserve current-role, organisation and intersected facility permissions. Known reports are confidential. Unknown categories, restricted field names, nested data, detected credentials/payment-card patterns, more than 5,000 rows or more than 5 MiB UTF-8 row data block release. Encoding overhead can increase the final response size.
 
-The policy is versioned in code. No browser switch or environment variable disables it. Changes require code review and validation. Matching relies on deterministic field names and high-confidence patterns; it is not a guarantee that every secret, identity number or bank detail embedded in arbitrary text will be recognised. Legitimate numeric strings can match card rules and require review. Do not weaken a rule solely to bypass an unexplained block.
+Private documents, signed agreements, mandates, statements, invoices, identity/photo previews and collection/settlement exports pass the shared transfer guard after existing exact-resource ownership/access checks. Transfers above 20 MiB block. CSV/HTML content is inspected; signed PDFs/images preserve their original bytes and use access, size, rate and audit controls rather than binary OCR/content discovery. Public legal terms and synthetic training images are explicit non-sensitive exemptions. This is not a general file-system scanner or arbitrary API content scanner.
 
-Before returning bytes, the system persists an organisation-scoped `AuditEvent` with actor, report key, optional selected facility, request reference, policy version, classification, row count and reason codes. No row content, raw matches, credentials or customer details are copied into DLP event metadata. If persistence fails, no report is released. `allowed` records a release decision, not proof that a user received the download. Permission failures occur before DLP evaluation and are not represented as successful policy decisions.
+Application email requires a scoped DLP context and an approved recipient. Application SMS/WhatsApp enforce the same transfer boundary before provider calls. Text is inspected for high-confidence credentials/card patterns and configured secrets. A recipient must match the server-authorised recipient. This prevents a mismatched destination; it does not independently certify a recipient selected by an authorised business workflow. Providers never receive DLP metadata. WhatsApp stores a hash of template variables for replay comparison instead of new raw variables; historical metadata is unchanged.
 
-Responses use no-store, nosniff and no-referrer headers and include policy/classification/request references. These headers do not become enforceable file metadata after saving a download. Existing CSV formula escaping remains in force.
+A durable PostgreSQL counter limits transfers to 60 per hour per organisation/channel/actor, or destination hash/resource for anonymous/customer flows. Reports and staff downloads share the DOWNLOAD counter. This bounds repeated transfers but is not comprehensive cross-channel anomaly detection.
 
-`/audit/data-protection` requires `audit.view`, scopes records to the current organisation and displays the most recent 100 DLP decisions. `/audit` displays safe rule details. This is a review view, not an automatic incident notification service or tamper-proof external log archive.
+Every allowed or blocked evaluation persists a safe AuditEvent before release. Database/limiter/audit outage blocks the transfer. Events record policy, classification, resource, request, actor/scope, counts, reason codes and destination hashes where relevant. They exclude raw matches/message content/recipients. Permission failures occur before the guard. Allowed means permission to release, not delivered/read confirmation. All private API responses have no-store/nosniff/no-referrer headers. Classification headers do not provide persistent file labels after download.
 
-## Operator response
+The organisation/facility-scoped Data protection page shows the latest 100 DLP decisions and backup evidence. System audit shows safe reasons. Use request references to investigate; never paste sensitive matches into tickets. Audit records share the application database and are not an independent immutable archive. Current rules are mandatory versioned code; no production bypass switch exists.
 
-1. Use the request reference to locate a blocked event in System audit. Never paste blocked content or raw secrets into tickets.
-2. For size limits, choose a smaller permitted facility/date scope. Repeated smaller exports are not automatically correlated in this slice.
-3. For restricted content, review the source and report projection with the security owner. Remove inappropriate source content or correct the approved projection; do not authorise unrestricted release.
-4. For an audit outage, restore database availability and investigate before retrying. The release remains blocked until the decision can be persisted.
+## Encrypted server backups and restore proof
 
-## Remaining programme gates
+scripts/dlp-backup.sh streams PostgreSQL custom dumps directly through AES256 GPG encryption, verifies decryption/archive structure and writes checksum plus sanitized status. No new plaintext database dump is written. Archives are root-only under /opt/backups/stor24-dlp; the separate passphrase is root-only under /root/.config/stor24-dlp. The application mounts only sanitized status read-only. Existing historical deployment backups are preserved until approved retention handling.
 
-Owner clarification (1 October 2026): Brett indicated that IT support may manage Microsoft 365 and staff computers, but the administrator is not confirmed. No external message or tenant/device change has been made.
+The deployment workflow runs an encrypted predeployment backup before migration and installs a daily systemd backup timer (01:00 UTC / 03:00 South Africa, up to five minutes randomized delay). Monitor production checks encrypted backup freshness (26-hour limit); failed GitHub runs expose an operational failure, subject to repository notification settings. The Data protection page marks stale/unavailable status unverified.
 
-- Application coverage: inventory all other egress paths, including signed-document and billing PDFs, MRI export, scheduled reports, attachments, staff search/API responses, email, SMS, WhatsApp and offline capture. Their existing access/privacy controls are not proof of a shared DLP boundary.
-- Identity and financial policy: accountable approval of permitted recipients, classification, retention/deletion, sharing exceptions, employee training and incident ownership. Do not confuse security pattern detection with approved POPIA processing.
-- File-level enforcement: persistent sensitivity labels, encryption and recipient restrictions need integration with the organisation's file/document platform. A classification HTTP header or file name alone is insufficient.
-- Mail/network/cloud: verify tenant licensing and administrative access, configure the selected DLP service, test approved external recipients and block/quarantine paths. Application code cannot police forwarding from Outlook or copying between independent cloud repositories.
-- Endpoint: managed-device enrolment and platform DLP policies for USB, printing, clipboard and personal uploads require IT configuration and physical-device UAT.
-- Monitoring: repeated/bulk exfiltration correlation, alert routing, incident acknowledgement, retention and independent audit archiving remain unimplemented.
-- Availability: backup encryption, immutable/off-site copies, retention, recovery objectives and witnessed restoration drills remain separate, unverified recovery work.
-- Release: PR review, CI, deployment, read-only policy verification and controlled synthetic blocked/allowed export UAT remain required. Never insert real bank, card, identity or credential data to test detection.
+scripts/dlp-restore-proof.sh verifies a supplied archive/checksum and restores it into a disposable PostgreSQL container with no network, ports or production data mounts. It checks schema and readability of seven core tables and removes that container. This proves restoration/readability of that archive, not full business recovery/UAT or a snapshot-by-snapshot row comparison. The original production database is not modified by this restore exercise. scripts/verify-dlp-live.ts performs a separately opted-in synthetic application proof, using a newly created disposable organisation and a 90-second test session; it sends no customer message and cleans up only its own synthetic records.
 
-## Validation evidence
+## Remaining gates
 
-Automated tests use synthetic report data and mock database/auth boundaries. They prove shared CSV/JSON enforcement, restricted-data blocks, nested-content rejection, row/byte limits, private response headers, organisation/actor audit attribution, no sensitive-content audit copies, denial before DLP and fail-closed audit outages. They do not prove live database persistence, cloud configuration or device enforcement.
+- Microsoft tenant email, SharePoint/OneDrive/cloud and endpoint DLP: administrator access, appropriate licensing, policy setup and real managed-device validation remain open. User instructed application/server work to proceed and Microsoft DLP to remain open.
+- Off-site encrypted copies, independent key escrow, immutable retention, storage-capacity policy and disaster recovery objectives remain open. Local encryption cannot recover from loss of the server and its key. No off-site destination was configured.
+- Approved sensitivity labels/sharing exceptions, incident owner/escalation, independent audit retention, staff training and operational UAT remain open.
+- Existing provider, legal/privacy, finance, data, training and business approval gates remain open. MRI/provider activation, payments, access and consent switches are not enabled by this change.
 
-## IT handover and acceptance checklist
-
-1. Confirm the accountable security owner, Microsoft 365 tenant administrator, cloud repositories, managed-device inventory and available DLP licensing. Return only configuration evidence, never credentials.
-2. Agree classifications and permitted sharing: personal records, identity copies, biometric information, financial exports and public material. Define approved recipients, exceptions, retention and incident response with the business/privacy owner.
-3. Configure file sensitivity labels and recipient restrictions. Prove with synthetic material that restrictions survive a copy/move and an unauthorised user cannot open the protected file.
-4. Configure email and cloud policies. Prove an approved internal recipient succeeds and an unauthorised external send/download is blocked or quarantined, with a traceable incident.
-5. Enrol pilot computers and configure endpoint policy. Test USB copy, personal-cloud upload, printing and clipboard according to the approved policy; record actual device results and offline behaviour.
-6. Assign incident monitoring and acknowledgement. Test that a meaningful alert reaches the responsible person, contains no unnecessary sensitive payload and has an escalation path.
-7. Verify encrypted/off-site backup arrangements and perform a witnessed restoration against agreed recovery objectives.
-8. Conduct staff UAT and training before broader enforcement. Link dated evidence and remaining exceptions to canonical PROJECT_CONTEXT.md. Do not mark the whole DLP programme complete from application tests alone.
+Acceptance evidence is maintained in canonical PROJECT_CONTEXT.md, separating local validation, remote CI, merge, configuration/deployment and live proof. Do not mark the complete organisational DLP programme closed from this application/server implementation.

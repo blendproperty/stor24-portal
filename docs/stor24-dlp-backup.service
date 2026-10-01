@@ -1,0 +1,10 @@
+[Unit]
+Description=STOR24 encrypted database backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/bin/bash /opt/stor24-crm/scripts/dlp-backup.sh
+TimeoutStartSec=1800

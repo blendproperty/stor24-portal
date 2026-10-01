@@ -12,8 +12,8 @@ function guide(id: string, title: string, category: string, route: string, scree
 
 export const extendedGuides: WorkflowGuide[] = [
   guide("data-protection", "Review data protection decisions", "Reports and oversight", "/audit/data-protection", "Data protection", "Review the report export policy, investigate blocks and understand the current coverage.", [
-    ["Check the policy and coverage", "Read the current policy version and export limits. The application checks CSV and JSON reports. Email, cloud repositories, file labels and staff-device controls are separate work; this page does not claim those controls are enabled.", ".panel-spacious"],
-    ["Locate a decision", "The table shows the most recent 100 decisions within your organisation and permitted facility scope. Match the request reference from the blocked export to System audit. An allowed decision records permission to release a report, not proof of delivery.", ".data-table"],
+    ["Check the policy and coverage", "Read the current policy version and export limits. The application checks reports, private downloads and messages sent through its providers. Microsoft email/cloud policies and staff-device controls remain open. The backup panel shows local encryption and restore evidence; off-site recovery remains open.", ".panel-spacious"],
+    ["Locate a decision", "The table shows the most recent 100 decisions within your organisation and permitted facility scope. Match the request reference from the blocked export to System audit. An allowed decision records permission to release a transfer, not proof of delivery.", ".data-table"],
     ["Investigate without copying sensitive content", "Use the request reference and safe reason codes to involve your administrator. Never paste blocked customer or credential data into messages. An audit outage blocks export until persistence recovers; the tutorial cannot override a block.", ".data-table"],
   ]),
   guide("access-restricted", "Understand restricted access", "Workspace", "/access-restricted", "Access restricted", "Understand your permissions and request the access needed for your work.", [

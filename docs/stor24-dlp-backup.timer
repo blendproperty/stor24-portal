@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily STOR24 encrypted backup
+
+[Timer]
+OnCalendar=*-*-* 01:00:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+Unit=stor24-dlp-backup.service
+
+[Install]
+WantedBy=timers.target

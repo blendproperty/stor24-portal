@@ -39,7 +39,7 @@ export default async function AuditPage() {
     const href = targetHref(event.entityType, event.entityId);
     const target = <>{event.entityType}<span className="secondary-cell">{event.entityId}</span></>;
     const dlp = event.action.startsWith("dlp.") && event.after && typeof event.after === "object" && !Array.isArray(event.after) ? event.after as Record<string, unknown> : null;
-    const details = dlp ? `Classification: ${String(dlp.classification)} | Rows: ${String(dlp.rowCount)} | Policy: ${String(dlp.policyVersion)} | ${Array.isArray(dlp.reasons) && dlp.reasons.length ? dlp.reasons.join(", ") : "Policy passed"}` : netcashDetails(event.action, event.after);
+    const details = dlp ? `Classification: ${String(dlp.classification)} | ${typeof dlp.channel === "string" ? dlp.channel : "Report"} | ${typeof dlp.rowCount === "number" ? `${dlp.rowCount} rows` : `${String(dlp.byteCount)} bytes`} | Policy: ${String(dlp.policyVersion)} | ${Array.isArray(dlp.reasons) && dlp.reasons.length ? dlp.reasons.join(", ") : "Policy passed"}` : netcashDetails(event.action, event.after);
     return <tr key={event.id}><td>{formatSouthAfricaDateTime(event.occurredAt)}</td><td className="primary-cell">{event.action}</td><td>{event.actor?.name ?? "System"}<span className="secondary-cell">{event.actor?.email ?? "Automated or unavailable"}</span></td><td>{href ? <Link href={href} className="primary-cell">{target}</Link> : target}</td><td>{details ?? "—"}</td><td>{event.requestId ?? "—"}</td></tr>;
   }) : <tr><td colSpan={6} className="empty-cell">No system audit events have been recorded.</td></tr>}</tbody></table></div></section></div>;
 }
