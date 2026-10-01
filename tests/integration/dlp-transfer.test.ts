@@ -8,7 +8,7 @@ test("isolated PostgreSQL persists DLP decisions, bounds concurrent split downlo
   assert.equal(process.env.MERCHANDISE_DB_TEST,"isolated-ci");
   const target=new URL(process.env.DATABASE_URL!);
   assert.equal(target.hostname,"localhost");assert.equal(target.pathname,"/merchandise_ci");
-  process.env.AUTH_SECRET = "synthetic-isolated-ci-dlp-key-32-characters";
+  process.env.AUTH_SECRET = randomUUID() + randomUUID();
   const nonce=randomUUID(), org=await db.organisation.create({data:{name:"Synthetic DLP CI",slug:nonce}});
   const actor=await db.user.create({data:{organisationId:org.id,name:"Synthetic DLP CI",email:`${nonce}@example.invalid`}});
   let auditConstraint=false;
