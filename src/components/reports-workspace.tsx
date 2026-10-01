@@ -36,6 +36,9 @@ export function ReportsWorkspace({ reports, facilities, initialFrom, initialTo, 
       }
       if (!response.ok) {
         const payload = await response.json();
+        if (response.status === 422 && payload.error?.code === "DLP_EXPORT_BLOCKED") {
+          setFailed(true); setMessage(`Data protection blocked this export. Contact your administrator.${typeof payload.error.requestId === "string" ? ` Request reference: ${payload.error.requestId.slice(0, 100)}` : ""}`); return;
+        }
         setFailed(true); setMessage(response.status === 422 && typeof payload.error?.message === "string" ? payload.error.message : "The report could not be prepared. Your selections are retained; please try again."); return;
       }
       if (response.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "text/csv") throw new Error("INVALID_EXPORT");
@@ -60,6 +63,7 @@ export function ReportsWorkspace({ reports, facilities, initialFrom, initialTo, 
         <div className="panel-heading"><div><h2>Report parameters</h2><p className="panel-subtitle">Choose your report, dates and facility, then download a CSV. Date filters use South African time (SAST).</p></div><Filter className="muted-icon" /></div>
         {isSnapshot ? <p>Current snapshot: this report shows the records available when exported, not a historical date range. The export includes its snapshot timestamp.</p> : null}
         {isAgeing ? <p>Ageing uses all account entries up to the selected South African date. Current recorded balances and holds are labelled separately; accounts needing reconciliation have blank ageing amounts.</p> : null}
+        <p className="permission-note"><LockKeyhole size={15}/> Exports are confidential and checked by data protection. Share only with authorised recipients. Export decisions are recorded in the system audit.</p>
         <div className="parameter-grid">
           <label>Report<select disabled={busy} value={reportKey} onChange={(event) => setReportKey(event.target.value)}>{reports.map((report) => <option value={report.key} key={report.key}>{report.name}</option>)}</select></label>
           {!isAgeing && !isSnapshot ? <label>From<input disabled={busy} type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label> : null}

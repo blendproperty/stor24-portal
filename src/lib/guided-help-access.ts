@@ -44,6 +44,7 @@ export const guideAccessRules: Record<string, Rule> = {
   reports: rule("reports.view|reports.financial|reports.sales|reports.collections", ["", "reports.export", "reports.export", "ledger.view"]),
   graphs: rule("reports.view", ["", "", "ledger.view,payments.view", "inventory.view"]),
   audit: rule("audit.view", ["", "", "ledger.view,integrations.manage", ""]),
+  "data-protection": rule("audit.view", ["", "", ""]),
   company: rule("configuration.view,configuration.manage", ["inventory.manage", "", "", "", ""]),
   "tenant-defaults": rule("configuration.view,configuration.manage", ["", "", "", ""]),
   "program-defaults": rule("configuration.view,configuration.manage", Array(20).fill("")),

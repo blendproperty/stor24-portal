@@ -380,7 +380,8 @@ test("report routes return controlled access failures and preserve read-only fac
   assert.equal((await read()).status, 401); assert.equal((await catalog.GET()).status, 401);
   state.tables.user[0].active = true; state.tables.user[0].sessionVersion = 2;
   assert.equal((await read()).status, 401); assert.equal((await catalog.GET()).status, 401);
-  assert.deepEqual(state.writes, []);
+  assert.equal(state.writes.length, 2);
+  assert.ok(state.writes.every(row => row.model === "auditEvent" && row.data.action === "dlp.export.allowed" && row.data.organisationId === "org"));
 });
 
 test("report exports require overlapping export and report facility grants", async () => {
@@ -404,7 +405,8 @@ test("report exports require overlapping export and report facility grants", asy
   assert.equal((await read()).status, 200);
   assert.deepEqual(state.queries.filter(q => q.model === "unit").at(-1)?.where.facility, { organisationId: "org" });
   assert.equal((await read("foreign")).status, 403);
-  assert.deepEqual(state.writes, []);
+  assert.equal(state.writes.length, 7);
+  assert.ok(state.writes.every(row => row.model === "auditEvent" && row.data.action === "dlp.export.allowed" && row.data.organisationId === "org"));
 });
 
 test("receivables export uses approved ageing and shows review states instead of plausible buckets", async () => {

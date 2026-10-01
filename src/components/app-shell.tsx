@@ -63,6 +63,7 @@ const navigation = [
   { href: "/map", label: "Facility map", icon: LandPlot },
   { href: "/phone", label: "Phone integration", icon: PhoneCall },
   { href: "/audit", label: "System audit", icon: ScrollText },
+  { href: "/audit/data-protection", label: "Data protection", icon: ShieldCheck },
   { href: "/offline-workspace.html", label: "Offline workspace", icon: WifiOff },
   { href: "/offline-readiness", label: "Offline readiness", icon: ShieldCheck },
 ];

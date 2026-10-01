@@ -2,6 +2,8 @@ import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
 import { buildReportRows } from "@/lib/report-data-service";
 import { findPermittedReport, isCurrentSnapshotReport, reportParametersSchema, toCsv } from "@/lib/reporting";
 import { requirePermissionScope } from "@/lib/scope";
+import { guardReportExport } from "@/lib/dlp-export-service";
+import { dlpPrivateHeaders } from "@/lib/dlp-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -29,14 +31,17 @@ export async function GET(request: Request) {
     if (!scope.unrestrictedFacilities && scope.facilityIds.length === 0) throw new Error("FORBIDDEN");
     const isSnapshot = isCurrentSnapshotReport(definition.key);
     const rows = await buildReportRows(scope, parsed.data);
+    const decision = await guardReportExport({ organisationId: session.organisationId, actorId: session.user.id, reportKey: definition.key, facilityId: parsed.data.facilityId, rows });
+    const headers = { ...dlpPrivateHeaders, "x-stor24-data-classification": decision.classification, "x-stor24-dlp-policy": decision.policyVersion, "x-request-id": decision.requestId };
+    if (!decision.allowed) return Response.json({ error: { code: "DLP_EXPORT_BLOCKED", message: "Data protection blocked this export. Contact your administrator with the request reference.", requestId: decision.requestId } }, { status: 422, headers });
     if (parsed.data.format === "JSON") {
-      return Response.json({ data: rows, meta: { parameters: parsed.data, currentSnapshot: isSnapshot, source: "stor24-production-database" } });
+      return Response.json({ data: rows, meta: { parameters: parsed.data, currentSnapshot: isSnapshot, source: "stor24-production-database", classification: decision.classification, policyVersion: decision.policyVersion, requestId: decision.requestId } }, { headers });
     }
     return new Response(toCsv(rows), {
       headers: {
         "content-type": "text/csv; charset=utf-8",
         "content-disposition": `attachment; filename="${definition.key}-${isSnapshot ? "current" : `${parsed.data.from}-${parsed.data.to}`}.csv"`,
-        "x-stor24-data-classification": "live-operational-data",
+        ...headers,
       },
     });
   } catch (error) {
