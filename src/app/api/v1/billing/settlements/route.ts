@@ -1,3 +1,4 @@
+import { protectDlpResponse } from "@/lib/dlp-transfer-service";
 import { z } from "zod";
 import { requirePermissionScope } from "@/lib/scope";
 import { sameOrigin, rateLimit } from "@/lib/request-security";
@@ -41,7 +42,7 @@ export async function GET(request: Request) {
     const id = params.has("id") ? z.string().cuid().parse(params.get("id")) : null;
     if (exporting) {
       if (!id) return Response.json({ error: "Choose a statement." }, { status: 400 });
-      return new Response(await settlementCsv(scope, id), { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": 'attachment; filename="settlement-review.csv"', "cache-control": "no-store", "x-content-type-options": "nosniff" } });
+      return await protectDlpResponse(new Response(await settlementCsv(scope, id), { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": 'attachment; filename="settlement-review.csv"', "cache-control": "no-store", "x-content-type-options": "nosniff" } }), { organisationId: scope.organisationId, actorId: scope.userId, resourceId: id }, "confidential");
     }
     return Response.json(id ? await settlementDetail(scope, id) : await settlementWorkspace(scope), { headers: { "cache-control": "no-store" } });
   } catch (e) { return failure(e); }

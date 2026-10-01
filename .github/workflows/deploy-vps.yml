@@ -59,8 +59,9 @@ jobs:
                integration_key=\$(openssl rand -hex 32); \
                printf 'INTEGRATION_CONFIG_ENCRYPTION_KEY=%s\n' \"\$integration_key\" >> .env; \
              fi && \
-             mkdir -p /opt/backups && \
-             docker exec stor24-crm-postgres-1 pg_dump -U stor24 -d stor24_crm | gzip > /opt/backups/stor24-crm-predeploy-\$(date +%Y%m%d-%H%M%S).sql.gz && \
+             /bin/bash scripts/dlp-backup.sh && \
+             install -m 644 docs/stor24-dlp-backup.service docs/stor24-dlp-backup.timer /etc/systemd/system/ && \
+             systemctl daemon-reload && systemctl enable --now stor24-dlp-backup.timer && \
              IMAGE_TAG=\$(git rev-parse --short HEAD) docker compose --env-file .env -f compose.prod.yml build app migrate && \
              IMAGE_TAG=\$(git rev-parse --short HEAD) docker compose --env-file .env -f compose.prod.yml run --rm migrate && \
              IMAGE_TAG=\$(git rev-parse --short HEAD) docker compose --env-file .env -f compose.prod.yml up -d --no-deps app && \

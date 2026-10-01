@@ -19,7 +19,7 @@ jobs:
     steps:
       - name: Verify public application and database readiness
         env:
-          HEALTH_URL: https://stor24-site.srv938083.hstgr.cloud/api/health
+          HEALTH_URL: https://portal.stor24.co.za/api/health
         run: |
           response="$(curl --fail --silent --show-error --max-time 35 --connect-timeout 10 --retry 3 --retry-delay 5 --retry-all-errors -A 'stor24-production-monitor/1.1 (+github-actions)' "$HEALTH_URL")"
           node -e '
@@ -28,3 +28,21 @@ jobs:
               throw new Error(`Unhealthy STOR24 response: ${JSON.stringify(value)}`);
             }
           ' "$response"
+
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment: production
+    steps:
+      - name: Verify encrypted backup freshness
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          umask 077
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/stor24_crm
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" '/bin/bash /opt/stor24-crm/scripts/dlp-backup-health.sh'

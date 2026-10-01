@@ -1,4 +1,5 @@
 import { requirePermissionScope } from "@/lib/scope";
+import { protectDlpResponse } from "@/lib/dlp-transfer-service";
 import { tenantPrivateHeaders } from "@/lib/tenant-portal-response";
 import { sameOrigin } from "@/lib/request-security";
 import { listFacialPhotos, previewFacialPhoto, reviewFacialPhoto } from "@/lib/facial-photo-service";
@@ -12,7 +13,7 @@ export async function GET(request: Request) {
     if (url.searchParams.get("preview") === "true") {
       const scope = await requirePermissionScope("access.manage");
       const bytes = await previewFacialPhoto(scope, url.searchParams.get("id") ?? "", Number(url.searchParams.get("version")));
-      return new Response(new Uint8Array(bytes), { headers: { ...tenantPrivateHeaders, "Content-Type": "image/jpeg", "Content-Disposition": "inline", "Content-Security-Policy": "default-src 'none'; sandbox" } });
+      return await protectDlpResponse(new Response(new Uint8Array(bytes), { headers: { ...tenantPrivateHeaders, "Content-Type": "image/jpeg", "Content-Disposition": "inline", "Content-Security-Policy": "default-src 'none'; sandbox" } }), { organisationId: scope.organisationId, actorId: scope.userId, resourceId: url.searchParams.get("id") ?? "" });
     }
     return Response.json({ data: await listFacialPhotos(await requirePermissionScope("access.view")) }, { headers: tenantPrivateHeaders });
   } catch (error) { return facialPhotoError(error); }

@@ -1,3 +1,4 @@
+import { protectDlpResponse } from "@/lib/dlp-transfer-service";
 import { z } from "zod";
 import { requirePermissionScope } from "@/lib/scope";
 import { sameOrigin } from "@/lib/request-security";
@@ -21,7 +22,7 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams, exporting = params.get("export") === "csv";
     const scope = await requirePermissionScope(exporting ? "collections.export" : "collections.view");
     const data = await collectionsWorkspace(scope, params.get("asOf") ?? southAfricaDateKey(new Date()));
-    if (exporting) return new Response(collectionCsv(data, { search: params.get("search") ?? "", facility: params.get("facility") ?? "", owner: params.get("owner") ?? "", mode: params.get("mode") ?? "all" }), { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="collections-${data.asOf}.csv"`, "cache-control": "no-store", "x-content-type-options": "nosniff" } });
+    if (exporting) return await protectDlpResponse(new Response(collectionCsv(data, { search: params.get("search") ?? "", facility: params.get("facility") ?? "", owner: params.get("owner") ?? "", mode: params.get("mode") ?? "all" }), { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="collections-${data.asOf}.csv"`, "cache-control": "no-store", "x-content-type-options": "nosniff" } }), { organisationId: scope.organisationId, actorId: scope.userId, resourceId: "collections" }, "confidential");
     return Response.json(data, { headers: { "cache-control": "no-store" } });
   } catch (e) { return failure(e); }
 }

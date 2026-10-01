@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { emailProvider } from "../src/lib/email";
 
-const message = { to: "recipient@example.invalid", subject: "Synthetic", text: "Synthetic only", html: "<p>Synthetic only</p>" };
+const message = { to: "recipient@example.invalid", subject: "Synthetic", text: "Synthetic only", html: "<p>Synthetic only</p>", dlp: { organisationId: "synthetic", resourceId: "synthetic", approvedRecipient: "recipient@example.invalid" } };
+const providerOnly = () => emailProvider(async () => ({} as Awaited<ReturnType<typeof import("../src/lib/dlp-transfer-service").guardDlpTransfer>>));
 const keys = ["EMAIL_PROVIDER", "EMAIL_FROM", "RESEND_API_KEY", "SENDGRID_API_KEY", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_EMAIL_FROM"] as const;
 
 test("email providers bound requests and never automatically retry", async t => {
@@ -26,7 +27,7 @@ test("email providers bound requests and never automatically retry", async t => 
         assert.ok(String(init.body).includes("Synthetic only"));
         return new Response(null, { status: 202 });
       });
-      await emailProvider().send(message); assert.equal(calls, 1);
+      await providerOnly().send(message); assert.equal(calls, 1);
     });
     await t.test(`${provider}: stalled provider aborts without a second attempt`, async t => {
       process.env.EMAIL_PROVIDER = provider;
@@ -40,13 +41,13 @@ test("email providers bound requests and never automatically retry", async t => 
           queueMicrotask(() => controller.abort(reason));
         });
       });
-      await assert.rejects(emailProvider().send(message), error => error === reason);
+      await assert.rejects(providerOnly().send(message), error => error === reason);
       assert.equal(calls, 1);
     });
     await t.test(`${provider}: rejected delivery reports status without response contents`, async t => {
       process.env.EMAIL_PROVIDER = provider; let calls = 0;
       t.mock.method(globalThis, "fetch", async () => { calls++; return new Response("Synthetic private response body", { status: 503 }); });
-      await assert.rejects(emailProvider().send(message), { message: "Email provider rejected request (503)." });
+      await assert.rejects(providerOnly().send(message), { message: "Email provider rejected request (503)." });
       assert.equal(calls, 1);
     });
   }

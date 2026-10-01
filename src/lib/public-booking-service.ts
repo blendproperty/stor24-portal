@@ -137,7 +137,7 @@ async function deliverEmailVerificationCode(input: { code: string; email: string
   const subject = "Your Stor24 email verification code";
   const text = `Your Stor24 verification code is ${input.code}. It expires in 10 minutes. Do not share this code.`;
   try {
-    await emailProvider().send({ to: input.email, subject, text, html: stor24EmailVerificationHtml(input.code) });
+    await emailProvider().send({ to: input.email, dlp: { organisationId: input.organisationId, facilityId: input.facilityId, resourceId: input.customerId, approvedRecipient: input.email }, subject, text, html: stor24EmailVerificationHtml(input.code) });
     await db.communicationLog.upsert({
       where: { idempotencyKey: input.idempotencyKey },
       create: { organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, channel: "EMAIL", messageType: "EMAIL_VERIFICATION", recipientHash: privacyHash(input.email), provider: process.env.EMAIL_PROVIDER ?? "configured", status: "SUCCEEDED", idempotencyKey: input.idempotencyKey, sentAt: new Date() },

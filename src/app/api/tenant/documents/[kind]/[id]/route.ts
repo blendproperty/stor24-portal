@@ -1,4 +1,5 @@
 import { isFinancialReceipt } from "@/lib/payments/payment-evidence";
+import { protectDlpResponse } from "@/lib/dlp-transfer-service";
 import { db } from "@/lib/db";
 import { requireTenantSession, tenantRateLimit } from "@/lib/tenant-portal-auth";
 import { tenantCustomerScope } from "@/lib/tenant-portal-security";
@@ -35,6 +36,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ kin
       } else throw new Error("TENANT_NOT_FOUND");
     } else throw new Error("TENANT_NOT_FOUND");
     await db.auditEvent.create({ data: { organisationId: session.organisationId, action: `tenant_portal.${kind}_downloaded`, entityType: "TenantDocument", entityId: id } });
-    return response;
+    return await protectDlpResponse(response, { organisationId: session.organisationId, resourceId: id });
   } catch (error) { return tenantError(error); }
 }

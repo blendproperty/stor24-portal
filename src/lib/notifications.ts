@@ -128,7 +128,7 @@ export async function notifyReservationConfirmed(input: ReservationConfirmationI
       const emailVariables = { ...input.variables, holdExpiresAt: customerDateTime(input.variables.holdExpiresAt) };
       const renderedBody = render(body, emailVariables);
       const payload = { to: input.to.email, subject: render(subject ?? "Your Stor24 reservation", input.variables), text: renderedBody, html: stor24ReservationHeldHtml(emailVariables) };
-      return sendNotificationOnce({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, templateId, channel: "EMAIL", messageType: "RESERVATION_CONFIRMED", recipient: input.to.email, idempotencyKey, provider: process.env.EMAIL_PROVIDER ?? "disabled", payload, send: async () => { await emailProvider().send(payload); return { ok: true }; } });
+      return sendNotificationOnce({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, templateId, channel: "EMAIL", messageType: "RESERVATION_CONFIRMED", recipient: input.to.email, idempotencyKey, provider: process.env.EMAIL_PROVIDER ?? "disabled", payload, send: async () => { await emailProvider().send({ ...payload, dlp: { organisationId: input.organisationId, facilityId: input.facilityId, resourceId: input.customerId, approvedRecipient: input.to.email! } }); return { ok: true }; } });
     }));
   }
 
@@ -161,7 +161,7 @@ export async function notifyViewingBooked(input: Omit<ReservationConfirmationInp
     results.push(await attemptChannel("EMAIL", async () => {
       const idempotencyKey = `${input.idempotencyKey}:EMAIL`;
       const payload = { to: input.to.email, subject: `Your Stor24 viewing is booked — ${input.variables.reference}`, text: body, html: `<p>${escapeEmailHtml(body).replaceAll("\n", "<br/>")}</p>` };
-      return sendNotificationOnce({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, templateId: null, channel: "EMAIL", messageType: "VIEWING_BOOKED", recipient: input.to.email, idempotencyKey, provider: process.env.EMAIL_PROVIDER ?? "disabled", payload, send: async () => { await emailProvider().send(payload); return { ok: true }; } });
+      return sendNotificationOnce({ organisationId: input.organisationId, facilityId: input.facilityId, customerId: input.customerId, templateId: null, channel: "EMAIL", messageType: "VIEWING_BOOKED", recipient: input.to.email, idempotencyKey, provider: process.env.EMAIL_PROVIDER ?? "disabled", payload, send: async () => { await emailProvider().send({ ...payload, dlp: { organisationId: input.organisationId, facilityId: input.facilityId, resourceId: input.customerId, approvedRecipient: input.to.email! } }); return { ok: true }; } });
     }));
   }
   if (input.consent.sms && input.to.phone) {
@@ -216,6 +216,7 @@ export async function sendLeaseSigningLink(input: {
   try {
     await emailProvider().send({
       to: input.to.email,
+      dlp: { organisationId: input.organisationId, facilityId: input.facilityId, resourceId: input.documentId, approvedRecipient: input.to.email },
       subject,
       text: body,
       html: `<p>${escapeEmailHtml(body).replaceAll("\n", "<br/>")}</p>`,

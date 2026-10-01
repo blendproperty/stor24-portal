@@ -15,6 +15,8 @@ await mkdir("output/move-in-flow",{recursive:true});
 try {
  for(const width of [1440,768,390,320]) {
   const page=await browser.newPage({viewport:{width,height:1000}});const errors=[],writes=[];
+  // Keep the fixed 30 September fixture in the intended future-date scenario.
+  await page.clock.install({ time: new Date("2026-09-29T10:00:00Z") });
   page.on("pageerror",e=>errors.push(e.message)); page.on("request",r=>{if(r.method()!=="GET")writes.push(r.url());});
   await page.goto(base+"?mode=held");
   const nav=page.getByRole("navigation",{name:"Move-in progress"});

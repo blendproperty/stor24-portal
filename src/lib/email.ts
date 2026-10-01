@@ -1,4 +1,5 @@
-export type EmailMessage = { to: string; subject: string; text: string; html: string };
+import { guardDlpTransfer, type DlpContext } from "@/lib/dlp-transfer-service";
+export type EmailMessage = { to: string; subject: string; text: string; html: string; dlp?: DlpContext };
 export interface EmailProvider { send(message: EmailMessage): Promise<void> }
 export function escapeEmailHtml(value: string) { return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[character]!); }
 
@@ -150,7 +151,17 @@ class TwilioEmailProvider implements EmailProvider {
 
 class DisabledEmailProvider implements EmailProvider { async send() { throw new Error("Email delivery is not configured."); } }
 
-export function emailProvider(): EmailProvider {
+export function emailProvider(protect = guardDlpTransfer): EmailProvider {
+  const provider = unguardedEmailProvider();
+  return { async send(message) {
+    if (!message.dlp) throw new Error("DLP_CONTEXT_REQUIRED");
+    await protect({ ...message.dlp, recipient: message.to, content: `${message.subject}\n${message.text}\n${message.html}`, channel: "EMAIL", classification: "confidential" });
+    // DLP metadata is local only; never forward it to an external provider.
+    const { to, subject, text, html } = message;
+    await provider.send({ to, subject, text, html });
+  } };
+}
+function unguardedEmailProvider(): EmailProvider {
   if (process.env.EMAIL_PROVIDER === "resend") return new ResendEmailProvider();
   if (process.env.EMAIL_PROVIDER === "sendgrid") return new SendGridEmailProvider();
   if (process.env.EMAIL_PROVIDER === "twilio") return new TwilioEmailProvider();

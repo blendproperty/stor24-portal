@@ -31,6 +31,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   async headers() {
     return [
+      { source: "/api/:path*", headers: [{ key: "Cache-Control", value: "private, no-store, max-age=0" }] },
       {
         source: "/sw.js",
         headers: [

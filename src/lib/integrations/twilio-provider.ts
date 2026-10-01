@@ -1,4 +1,5 @@
 import type { MessageProvider, ProviderContext, ProviderResult } from "./providers";
+import { guardDlpTransfer } from "@/lib/dlp-transfer-service";
 
 const TWILIO_API = "https://api.twilio.com/2010-04-01";
 
@@ -48,7 +49,7 @@ async function sendTwilioMessage(kind: "SMS" | "WHATSAPP", to: string, body: str
     });
     const payload = await response.json() as TwilioMessageResponse;
     if (!response.ok)
-      return { ok: false, retryable: response.status >= 500, code: String(payload.code ?? response.status), message: payload.message ?? "Twilio rejected the message." };
+      return { ok: false, retryable: response.status >= 500, code: String(payload.code ?? response.status), message: "Twilio rejected the message. Review the provider status." };
     return { ok: true, providerReference: payload.sid ?? "", data: { status: "QUEUED" } };
   } catch (error) {
     return { ok: false, retryable: true, code: "NETWORK_ERROR", message: error instanceof Error ? error.message : "Twilio request failed." };
@@ -62,6 +63,7 @@ async function sendTwilioMessage(kind: "SMS" | "WHATSAPP", to: string, body: str
  * Phone Numbers > Manage > Verified Caller IDs.
  */
 export class TwilioSmsProvider implements MessageProvider {
+  constructor(private readonly protect = guardDlpTransfer) {}
   readonly category = "SMS" as const;
 
   async health(): Promise<ProviderResult<{ latencyMs: number }>> {
@@ -72,6 +74,8 @@ export class TwilioSmsProvider implements MessageProvider {
   }
 
   async send(message: { recipient: string; subject?: string; body: string }, _context: ProviderContext) {
+    try { await this.protect({ ..._context, resourceId: _context.idempotencyKey, approvedRecipient: message.recipient, recipient: message.recipient, content: message.body, channel: "SMS", classification: "confidential" }); }
+    catch { return { ok: false as const, retryable: false, code: "DLP_TRANSFER_BLOCKED", message: "Data protection could not authorise this message. Review the system audit." }; }
     return sendTwilioMessage("SMS", message.recipient, message.body);
   }
 }
@@ -87,6 +91,7 @@ export class TwilioSmsProvider implements MessageProvider {
  * WhatsApp. That is a Twilio/Meta-side step, not something this code can do.
  */
 export class TwilioWhatsAppProvider implements MessageProvider {
+  constructor(private readonly protect = guardDlpTransfer) {}
   readonly category = "WHATSAPP" as const;
 
   async health(): Promise<ProviderResult<{ latencyMs: number }>> {
@@ -97,11 +102,15 @@ export class TwilioWhatsAppProvider implements MessageProvider {
   }
 
   async send(message: { recipient: string; subject?: string; body: string }, _context: ProviderContext) {
+    try { await this.protect({ ..._context, resourceId: _context.idempotencyKey, approvedRecipient: message.recipient, recipient: message.recipient, content: message.body, channel: "WHATSAPP", classification: "confidential" }); }
+    catch { return { ok: false as const, retryable: false, code: "DLP_TRANSFER_BLOCKED", message: "Data protection could not authorise this message. Review the system audit." }; }
     return sendTwilioMessage("WHATSAPP", message.recipient, message.body);
   }
 
   async sendTemplate(recipient: string, contentSid: string, variables: Record<string, string>, _context: ProviderContext) {
     if (!/^HX[a-f0-9]{32}$/i.test(contentSid)) return { ok: false as const, retryable: false, code: "INVALID_CONTENT_SID", message: "Twilio WhatsApp template SID is invalid." };
+    try { await this.protect({ ..._context, resourceId: _context.idempotencyKey, approvedRecipient: recipient, recipient, content: Object.values(variables).join("\n"), channel: "WHATSAPP", classification: "confidential" }); }
+    catch { return { ok: false as const, retryable: false, code: "DLP_TRANSFER_BLOCKED", message: "Data protection could not authorise this message. Review the system audit." }; }
     return sendTwilioMessage("WHATSAPP", recipient, "", { sid: contentSid, variables });
   }
 }

@@ -22,6 +22,6 @@ export async function POST(request: Request) {
     db.auditEvent.create({ data: { organisationId: user.organisationId, action: "user.password_reset.requested", entityType: "User", entityId: user.id, ipHash: privacyHash(requestIp(request)) } }),
   ]);
   const appUrl = process.env.APP_URL || new URL(request.url).origin;
-  try { await emailProvider().send({ to: user.email, ...passwordResetEmail({ name: user.name, resetUrl: `${appUrl.replace(/\/$/, "")}/reset-password/${token}` }) }); } catch (error) { console.error("Password reset email delivery failed", error instanceof Error ? error.message : "unknown error"); }
+  try { await emailProvider().send({ to: user.email, dlp: { organisationId: user.organisationId, resourceId: user.id, approvedRecipient: user.email }, ...passwordResetEmail({ name: user.name, resetUrl: `${appUrl.replace(/\/$/, "")}/reset-password/${token}` }) }); } catch (error) { console.error("Password reset email delivery failed", error instanceof Error ? error.message : "unknown error"); }
   return Response.json(generic);
 }

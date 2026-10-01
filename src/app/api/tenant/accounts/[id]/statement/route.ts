@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { protectDlpResponse } from "@/lib/dlp-transfer-service";
 import { requireTenantSession, tenantEmailHtml, tenantRateLimit } from "@/lib/tenant-portal-auth";
 import { tenantCustomerScope } from "@/lib/tenant-portal-security";
 import { tenantError, tenantPdf, tenantPrivateHeaders } from "@/lib/tenant-portal-response";
@@ -16,7 +17,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     if (query.get("format") === "pdf") {
       const bytes = await renderAccountStatementPdf(data);
       await db.auditEvent.create({ data: { organisationId: session.organisationId, action: "tenant_portal.statement_downloaded", entityType: "Account", entityId: id } });
-      return tenantPdf(bytes, `stor24-statement-${data.from}-${data.to}.pdf`);
+      return await protectDlpResponse(tenantPdf(bytes, `stor24-statement-${data.from}-${data.to}.pdf`), { organisationId: session.organisationId, resourceId: id });
     }
     return Response.json({ data }, { headers: tenantPrivateHeaders });
   } catch (error) { return tenantError(error); }
@@ -35,7 +36,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!process.env.APP_URL) throw new Error("PORTAL_URL_UNCONFIGURED");
     const link = new URL("/my", process.env.APP_URL);
     link.search = new URLSearchParams({ organisation: organisation.slug, account: id, from: input.from, to: input.to }).toString();
-    await emailProvider().send({ to: session.email, subject: "Your STOR24 statement is ready to view", text: `Sign in securely to view and download your statement for ${input.from} to ${input.to}: ${link}. This link does not grant access; email verification is required.`, html: tenantEmailHtml("Your statement, safely in reach.", `<p>Your statement for ${escapeEmailHtml(input.from)} to ${escapeEmailHtml(input.to)} is ready to view.</p><p><a href="${escapeEmailHtml(link.toString())}" style="display:inline-block;background:#ff5a0a;color:#071411;padding:16px 24px;border-radius:28px;font-weight:bold">Open My STOR24</a></p><p>Sign in with your verified email to view and download it. This link alone cannot unlock your account.</p>`) });
+    await emailProvider().send({ to: session.email, dlp: { organisationId: session.organisationId, resourceId: id, approvedRecipient: session.email }, subject: "Your STOR24 statement is ready to view", text: `Sign in securely to view and download your statement for ${input.from} to ${input.to}: ${link}. This link does not grant access; email verification is required.`, html: tenantEmailHtml("Your statement, safely in reach.", `<p>Your statement for ${escapeEmailHtml(input.from)} to ${escapeEmailHtml(input.to)} is ready to view.</p><p><a href="${escapeEmailHtml(link.toString())}" style="display:inline-block;background:#ff5a0a;color:#071411;padding:16px 24px;border-radius:28px;font-weight:bold">Open My STOR24</a></p><p>Sign in with your verified email to view and download it. This link alone cannot unlock your account.</p>`) });
     await db.auditEvent.create({ data: { organisationId: session.organisationId, action: "tenant_portal.statement_link_emailed", entityType: "Account", entityId: id } });
     return Response.json({ message: "Secure statement link emailed to your verified address." }, { headers: tenantPrivateHeaders });
   } catch (error) { return tenantError(error); }

@@ -32,7 +32,7 @@ export async function sendTenantWelcome(customerId: string, organisationId: stri
   const claimed = await database.tenantPortalWelcome.updateMany({ where: { id, nextAttemptAt: { lte: new Date() }, ...(!options.resend ? { sentAt: null } : {}) }, data: { nextAttemptAt: new Date(Date.now() + 600000), attempts: { increment: 1 }, failed: false } });
   if (!claimed.count) return "already_sent_or_cooling_down" as const;
   try {
-    await send(message);
+    await send({ ...message, dlp: { organisationId, actorId: options.actorId, resourceId: customerId, approvedRecipient: email } });
   } catch {
     await database.tenantPortalWelcome.update({ where: { id }, data: { failed: true } });
     await database.auditEvent.create({ data: { organisationId, actorId: options.actorId, action: "tenant_portal.welcome_delivery_failed", entityType: "Customer", entityId: customerId } });

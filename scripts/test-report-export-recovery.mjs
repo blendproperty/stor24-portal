@@ -17,15 +17,18 @@ try {
    if(mode==='success'||mode==='empty')return route.fulfill({contentType:'text/csv; charset=utf-8',body:mode==='empty'?'':csv});
    if(mode==='html')return route.fulfill({contentType:'text/html',body:'<h1>Sign in</h1>'});
    if(mode==='malformed')return route.fulfill({status:500,contentType:'application/json',body:'{'});
+   if(mode==='dlp')return route.fulfill({status:422,json:{error:{code:'DLP_EXPORT_BLOCKED',message:'Data protection blocked this export. Contact your administrator with the request reference.',requestId:'SYNTHETIC-DLP'}}});
    return route.fulfill({status:Number(mode),json:{error:{message:'Check the report parameters.'}}});
   });
   const base=`http://127.0.0.1:${server.address().port}`;
   const open=async(query='')=>{await page.goto(base+query);await page.getByLabel(/^Report/).selectOption('lead-conversion');await page.getByLabel(/^Facility/).selectOption('a');};
   const button=page.getByRole('button',{name:'Export CSV',exact:true});
   await open();await page.getByLabel('From',{exact:true}).fill('2026-10-01');await button.click();await expect(page.getByRole('alert')).toContainText('valid date range');assert.equal(reads,0);await page.getByLabel('From',{exact:true}).fill('2026-09-01');
-  for(const failure of ['422','500','malformed','html','network']) {
+  for(const failure of ['422','500','malformed','html','network','dlp']) {
    mode=failure;await button.click();await expect(page.getByRole('alert')).toBeVisible();await expect(button).toBeEnabled();await expect(page.getByLabel('From',{exact:true})).toHaveValue('2026-09-01');await expect(page.getByLabel(/^Facility/)).toHaveValue('a');assert.equal(page.url(),base+'/');assert.equal(downloads,0);
   }
+  await expect(page.getByRole('alert')).toContainText('Data protection blocked');
+  await expect(page.getByRole('alert')).toContainText('SYNTHETIC-DLP');
   mode='hold';await page.clock.install();const before=reads;await button.click();await expect(page.getByRole('button',{name:'Preparing CSV'})).toBeDisabled();await expect(page.getByLabel('From',{exact:true})).toBeDisabled();await page.getByRole('button',{name:'Preparing CSV'}).evaluate(b=>{b.click();b.click();});await page.clock.fastForward(31000);await expect(button).toBeEnabled();await expect(page.getByRole('alert')).toContainText('try again');assert.equal(reads,before+1);
   mode='empty';await button.click();await expect(page.getByRole('status')).toContainText('No rows matched');assert.equal(downloads,0);
   mode='success';const downloadEvent=page.waitForEvent('download');await button.click();const download=await downloadEvent;assert.equal(download.suggestedFilename(),'stor24-lead-conversion-2026-09-01-2026-09-26.csv');assert.equal(await readFile(await download.path(),'utf8'),csv);await expect(page.getByRole('status')).toContainText('download prepared');assert.equal(downloads,1);
