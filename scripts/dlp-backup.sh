@@ -20,7 +20,7 @@ docker exec stor24-crm-postgres-1 pg_dump --username=stor24 --dbname=stor24_crm 
   gpg --batch --yes --pinentry-mode loopback --no-symkey-cache --passphrase-file "$key_file" --symmetric --cipher-algo AES256 --output "$partial"
 # Verify integrity and that the decrypted stream is a valid PostgreSQL archive.
 gpg --batch --pinentry-mode loopback --no-symkey-cache --passphrase-file "$key_file" --decrypt "$partial" 2>/dev/null |
-  docker exec -i stor24-crm-postgres-1 pg_restore --list >/dev/null
+  docker exec -i stor24-crm-postgres-1 sh -c 'pg_restore --list >/dev/null; result=$?; cat >/dev/null; exit "$result"'
 mv -- "$partial" "$archive"
 sha256sum "$archive" > "$archive.sha256"
 printf '{"status":"verified","completedAt":"%s","encrypted":true,"offSite":false}\n' "$(date -u +%FT%TZ)" > "$archive_dir/status/latest.json.tmp"
