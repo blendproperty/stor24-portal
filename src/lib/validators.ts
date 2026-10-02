@@ -9,6 +9,7 @@ export const createLeadSchema = z.object({
   facilityId: z.string().trim().min(1),
   desiredUnitTypeId: z.string().trim().optional(),
   source: z.string().trim().min(1).max(80),
+  expectedMoveIn: z.preprocess(value => value === "" ? undefined : value, z.coerce.date().optional()),
   notes: z.string().trim().max(2000).optional(),
 });
 

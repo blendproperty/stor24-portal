@@ -1,3 +1,4 @@
+import { releaseLeadBookingStage } from "@/lib/lead-booking-stage";
 import { newIdentityAccess } from "@/lib/identity-document-security";
 import type { Prisma } from "@/generated/prisma/client";
 import { requireOperationalUnit } from "@/lib/floor-availability-service";
@@ -187,6 +188,7 @@ export async function releaseExpiredPublicReservations(now = new Date()) {
           for (const line of lines) await tx.product.update({ where: { id: line.productId }, data: { quantityReserved: { decrement: line.quantity } } });
           await tx.reservationPackage.update({ where: { id: current.packageSelection.id }, data: { status: "RELEASED", releasedAt: now } });
         }
+        await releaseLeadBookingStage(tx, { leadId: current.leadId, facilityId: current.facilityId, organisationId: current.customer.organisationId, reservationId: current.id });
         await tx.auditEvent.create({ data: { organisationId: current.customer.organisationId, facilityId: current.facilityId, action: "public_reservation.hold_expired", entityType: "Reservation", entityId: current.id, after: { unitId: current.unitId, expiredAt: now.toISOString() } } });
       }
       return cancelled.count;
@@ -275,6 +277,11 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
           notes: input.websitePath ? `Website path: ${input.websitePath}` : undefined,
         },
       });
+      if (input.attribution) await tx.auditEvent.create({ data: {
+        organisationId: facility.organisationId, facilityId: facility.id,
+        action: "lead.attribution.captured", entityType: "Lead", entityId: lead.id,
+        after: { attribution: input.attribution },
+      } });
       const holdExpiresAt = new Date(Date.now() + (verificationEnabled ? verificationWindowMs : reservationHoldHours() * 60 * 60 * 1000));
       const created = await tx.reservation.create({
         data: {

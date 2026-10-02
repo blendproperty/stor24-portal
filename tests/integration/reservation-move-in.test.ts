@@ -85,9 +85,13 @@ test("isolated PostgreSQL signed reservation handover", async t => {
     });
     await t.test("concurrent confirmation preserves the signed PDF, exact account, balance and payments", async () => {
       const f = await fixture();
+      const lead = await db.lead.create({ data: { facilityId: f.facility.id, customerId: f.customer.id, source: "CI enquiry", stage: "RESERVED" } });
+      await db.reservation.update({ where: { id: f.reservation.id }, data: { leadId: lead.id } });
       assert.equal((await getReservationMoveInReadiness(f.scope, f.reservation.id)).ready, true);
       const [a, b] = await Promise.all([confirmReservationMoveIn(f.scope, f.reservation.id), confirmReservationMoveIn(f.scope, f.reservation.id)]);
       assert.equal(a.tenancyId, b.tenancyId);
+      assert.equal((await db.lead.findUniqueOrThrow({ where: { id: lead.id } })).stage, "WON");
+      assert.equal(await db.auditEvent.count({ where: { entityId: lead.id, action: "lead.stage_changed" } }), 1);
       const tenancy = await db.tenancy.findUniqueOrThrow({ where: { id: a.tenancyId }, include: { occupancies: true, documents: true } });
       assert.equal(tenancy.accountId, f.account.id);
       assert.equal(tenancy.status, "ACTIVE");

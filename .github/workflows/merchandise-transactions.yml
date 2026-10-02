@@ -60,6 +60,9 @@ jobs:
       - run: npx tsx --test tests/integration/monthly-billing.test.ts
       - run: npx tsx --test tests/integration/debit-order-runs.test.ts
       - run: npx tsx --test tests/integration/adjustments.test.ts
+      - run: npx tsx --test tests/integration/leads-workspace.test.ts
+        env:
+          LEADS_DB_TEST: isolated-ci
       - run: npx tsx --test tests/integration/collections.test.ts
       - run: npx tsx --test tests/integration/settlements.test.ts
       - run: npx tsx --test tests/integration/mri.test.ts

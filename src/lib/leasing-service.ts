@@ -1,3 +1,4 @@
+import { releaseLeadBookingStage } from "@/lib/lead-booking-stage";
 import { requireOperationalUnit } from "@/lib/floor-availability-service";
 import { unitIsOperational, floorMapSelection } from "@/lib/floor-availability";
 import { createHash } from "node:crypto";
@@ -304,6 +305,7 @@ export async function createReservation(
       },
     });
     const customer = await requireLeasingCustomer(scope, data.customerId, tx);
+    if (data.leadId) await tx.$queryRaw`SELECT "id" FROM "Lead" WHERE "id" = ${data.leadId} FOR UPDATE`;
     const lead = data.leadId
       ? await tx.lead.findFirst({
           where: {
@@ -320,11 +322,13 @@ export async function createReservation(
       where: { id: unit.id },
       data: { status: "RESERVED" },
     });
-    if (lead)
+    if (lead) {
       await tx.lead.update({
         where: { id: lead.id },
         data: { stage: "RESERVED" },
       });
+      await audit(tx, scope, "lead.stage_changed", "Lead", lead.id, data.facilityId, { stage: lead.stage }, { stage: "RESERVED", reservationId: entity.id });
+    }
     await audit(
       tx,
       scope,
@@ -431,6 +435,7 @@ export async function cancelReservation(
             data: { status: "AVAILABLE" },
           })
         : { count: 0 };
+    await releaseLeadBookingStage(tx, { leadId: reservation.leadId, facilityId: reservation.facilityId, organisationId: scope.organisationId, actorId: scope.userId, reservationId: reservation.id });
     await audit(
       tx,
       scope,
@@ -551,6 +556,7 @@ export async function expireReservation(
             data: { status: "AVAILABLE" },
           })
         : { count: 0 };
+    await releaseLeadBookingStage(tx, { leadId: reservation.leadId, facilityId: reservation.facilityId, organisationId: scope.organisationId, actorId: scope.userId, reservationId: reservation.id });
     await audit(
       tx,
       scope,
