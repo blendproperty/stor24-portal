@@ -1,5 +1,15 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Users permissions layout and audit review - 2 October 2026
+
+- **Implementation:** compact independently sized cards split accounting, settlement, adjustment, billing, collection and access controls; selected counts and fixed header/save bar. Permission keys and server authorisation unchanged. Isolated worktree starts at remote main 72442ee; unrelated changes preserved.
+- **Testing:** actual UsersWorkspace with isolated API fixtures passes selection, payload preservation and save visibility at 1440/390/320px. Screenshots reviewed. Prisma generation, TypeScript and focused lint passed. All 506 unit tests passed. Fixtures do not establish production persistence or staff UAT; no production permissions changed.
+- **Audit findings:** permissions PATCH atomically records actor, time, target, before/after permissions and invalidates sessions. Access PATCH records previous active status but not previous role. Other workflows explicitly write audit events, several without before values. Schema permits missing actor/before/after/request reference. No universal database capture or tamper-evident guarantee established. Audit page shows latest 200 organisation events without pagination or generic before/after display. Full every-change/by-anyone coverage is NOT verified; database/provider/admin changes and retention/immutability remain assessment gaps.
+- **Commit and push:** implementation, validation script and this evidence committed and pushed on codex/users-design-audit-20261002, canonical blendproperty/stor24-portal; remote context presence checked before handoff.
+- **Merge:** not performed.
+- **Deployment and configuration:** not performed; no migration/configuration change. Canonical context requires explicit deployment authority.
+- **Live production verification:** not performed; authenticated screen/save readback and staff UAT remain open. Existing provider, legal/privacy, finance, data, training, recovery and approval gates remain. No tracker acceptance changes.
+
 ## Data loss prevention — application/server live release, 1 October 2026
 
 - **Implementation:** Mandatory policy 2026-10-01.2 covers report CSV/JSON, private document/PDF/image previews/downloads, collection/settlement exports and application email/SMS/WhatsApp. Existing current-role/organisation/resource/facility access remains. Safe audit-before-release and a durable shared 60/hour counter fail closed on persistence/limiter outage. Reports block restricted fields, high-confidence credentials/card patterns, nested data and row/size excess. Messages require approved recipient/context and configured-secret checks. Private transfers are bounded to 20 MiB; signed binary bytes remain intact (binary OCR/general API/file-system discovery are not implemented). DLP uses keyed HMAC address fingerprints; existing password/provider hashes remain unchanged. New WhatsApp metadata uses variable hashes. Scoped Data protection/audit UI, private API headers, encrypted backups and freshness monitoring are included.
