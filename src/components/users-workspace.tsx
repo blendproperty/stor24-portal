@@ -496,6 +496,7 @@ export function UsersWorkspace() {
             >
               <X size={18} />
             </button>
+            <div className="permission-heading">
             <p className="eyebrow">Individual access</p>
             <h2 id="permissions-title">
               Permissions for {permissionUser.name}
@@ -505,10 +506,12 @@ export function UsersWorkspace() {
               security level for this employee and signs out their existing
               sessions.
             </p>
+            <p className="permission-summary">{selectedPermissions.length} permissions selected</p>
+            </div>
             <div className="permission-groups">
               {securityPermissionGroups.map((group) => (
                 <fieldset key={group.label}>
-                  <legend>{group.label}</legend>
+                  <legend>{group.label} <span>{group.permissions.filter(([key]) => selectedPermissions.includes(key)).length}/{group.permissions.length}</span></legend>
                   {group.permissions.map(([key, label]) => (
                     <label className="check-label" key={key}>
                       <input
