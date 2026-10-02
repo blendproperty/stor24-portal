@@ -1,5 +1,13 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Ground-floor pricing attachment correction - 2 October 2026
+
+- **Implementation:** rebuilt the Excel and PDF with all 142 ground-floor units available, explicitly based on Brett's confirmation. Original API snapshot had 11 unavailable units; production inventory was not changed. Corrected filenames containing CORRECTED supersede the original files in docs/operations/ground-floor-pricing-pack-20261002/. Prices, areas, map and architectural drawing retained.
+- **Testing:** spreadsheet validates all 142 availability rows as Available; totals recalculated without errors. Corrected spreadsheet opening view and PDF availability page rendered and visually checked; unchanged PDF pages retain prior inspection evidence. Fresh Outlook draft to verified Pinny Hack pinny@storesmart.co.za, subject STOR24 Midpoint – Ground-floor pricing and layout for review, read back with correct body and exactly two corrected file attachments (XLSX 11,669 bytes; PDF 1,432,133 bytes) at 11:00 SAST. No email sent.
+- **Commit and push:** corrected artifacts and this evidence recorded on codex/ground-floor-pricing-pack-20261002; remote branch and canonical context presence verified after push. Original pack and prior draft evidence are superseded for delivery.
+- **Merge:** not performed.
+- **Deployment and configuration:** not performed; no application or business-data change.
+- **Live production verification:** read-only source snapshot only. All-available status is Brett's confirmed report instruction, not a claim that source availability changed. VAT basis, Pinny review, email-send approval, staff UAT and all existing provider, finance, legal/privacy, data, training, recovery and approval gates remain open.
 ## Midpoint ground-floor pricing and layout review pack - 2 October 2026
 
 - **Implementation:** professional Excel pricing schedule and eight-page PDF created for Pinny. Ground-floor-only schedule includes floor, unit number, area and current displayed monthly rent. Numbered schematic uses the live system map; original MILarchi as-built drawing C-104-00 / B24-001-11A Rev A dated 29 September 2026 is appended. 139 internal units total 2,042 m²; outdoor 530-532 are separate at 29.6 m² each. Unit 46 remains absent. No prices, inventory, map geometry or customer transactions changed. Final files retained under `docs/operations/ground-floor-pricing-pack-20261002/`.
