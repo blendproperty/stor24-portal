@@ -17,7 +17,7 @@ export const getUnitStatsByFacility=async()=>[{facilityId:'fixture',facilityName
 export const requireScope=async()=>({organisationId:'fixture',unrestrictedFacilities:true});
 export const requirePermissionScope=requireScope;
 export const facilityWhere=()=>({});
-export const requireSession=async()=>({permissions:['*']});
+export const requireSession=async()=>({permissions:location.search.includes('restricted')?['operations.view']:['*']});
 export const netCollectionTotal=async()=>162000;
 export const db={account:{aggregate:async()=>({_sum:{balance:12400}})},tenancy:{count:async()=>128},facility:{findMany:async()=>[{id:'fixture',name:'Training store'}]}};
 export const getOperationsCalendar=async()=>Array.from({length:7},(_,i)=>({key:'2026-10-'+String(i+3).padStart(2,'0'),items:i%2===0?[{id:'task'+i,kind:'task',at:new Date('2026-10-03T10:00:00Z'),title:'Example follow-up',detail:'Training store',href:'/leads?lead=fixture'}]:[]}));
@@ -56,6 +56,11 @@ if(process.env.PREVIEW_ONLY){console.log('Design preview: '+base)}else{
     await page.screenshot({path:'output/screen-redesign/design/'+(route==='/'?'home':route.slice(1))+'-'+width+'.png',fullPage:true});
    }
   }
+  await page.goto(base+'/?restricted');
+  await expect(page.getByRole('link',{name:/Explore inventory/})).toHaveCount(0);
+  await expect(page.locator('.portfolio-signal[href="/collections"]')).toHaveCount(0);
+  await expect(page.locator('.daily-workflow[href="/reports"]')).toHaveCount(0);
+  await expect(page.locator('.portfolio-signal[href="/tenants"]')).toBeVisible();
   assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);console.log('Six actual pages pass design/real-value/layout checks at five widths; no writes.');
  }finally{await browser.close();server.close()}
 }

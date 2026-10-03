@@ -26,7 +26,7 @@ function Fixture() {
       reservations={[{ id: "fixture-reservation", facilityId: "fixture-store", customerId: "fixture-customer", unitId: "fixture-unit", label: "T01 · Example Customer", paymentMethod: "CARD", intendedMoveIn: "2026-09-30", quotedRate: 1200, readiness: params.has("unsigned") ? null : readiness, canRecordPayment: true }]}
     /> : <div className="page-stack">
       <header className="page-header"><div><p className="eyebrow">Operations centre · Isolated preview</p><h1>Stor24 operational overview</h1><p>Invented data for browser verification. No customer records are connected.</p></div></header>
-      <PortfolioOverview occupiedUnits={128} totalUnits={200} occupancyPct={64} receivables={12400} overdueAccounts={3} activeLeads={8} newLeadsThisWeek={2}/>
+      <PortfolioOverview access={{owner:true,permissions:["*"]}} occupiedUnits={128} totalUnits={200} occupancyPct={64} receivables={12400} overdueAccounts={3} activeLeads={8} newLeadsThisWeek={2}/>
       <section className="dashboard-grid"><article className="panel panel-spacious" data-guide="dashboard-queue"><h2>Priority work queue</h2><p>Reservations needing attention</p><p>Operational tasks due</p><p>Lead follow-ups due</p></article><article className="panel panel-spacious" data-guide="dashboard-activity"><h2>Recent operational activity</h2><p>Training store · Example reservation created</p></article></section>
     </div>}
   </AppShell>;

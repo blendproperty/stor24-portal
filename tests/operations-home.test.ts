@@ -9,7 +9,7 @@ test("operations home uses live scoped data instead of the synthetic demo module
   assert.doesNotMatch(page, /demo-data|Scaffold active|Good afternoon, Brett/);
   assert.match(page, /getOperationsHome/);
   assert.match(page, /getOperationsHome\(await requireScope\(\)\)/);
-  assert.match(page, /<PortfolioOverview \{\.\.\.data\.metrics\}\/>/);
+  assert.match(page, /<PortfolioOverview \{\.\.\.data\.metrics\} access=\{access\}\/>/);
 });
 
 test("operations home scopes work queues and activity to permitted facilities", () => {
