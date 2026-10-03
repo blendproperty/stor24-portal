@@ -1,3 +1,4 @@
+import { leadAttributionSchema } from "@/lib/lead-attribution";
 import { z } from "zod";
 
 /**
@@ -22,6 +23,7 @@ export const publicLeadSchema = z.object({
   collectionPreference: z.string().trim().max(80).optional(),
   privacyNoticeVersion: z.string().trim().max(80).optional(),
   contactMethod: z.string().trim().max(40).optional(),
+  attribution: leadAttributionSchema.optional().catch(undefined),
   websitePath: z.string().trim().max(300).optional(),
   honeypot: z.string().max(0).optional(),
 });

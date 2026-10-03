@@ -95,7 +95,7 @@ export async function createPublicLead(input: PublicLeadInput, ipHash: string) {
         entityType: "Lead",
         entityId: lead.id,
         ipHash,
-        after: { source: "PUBLIC_QUOTE_FORM", customerId: customer.id, communicationPreferences: preferenceEvidence },
+        after: { ...(input.attribution ? { attribution: input.attribution } : {}), source: "PUBLIC_QUOTE_FORM", customerId: customer.id, communicationPreferences: preferenceEvidence },
       },
     });
 

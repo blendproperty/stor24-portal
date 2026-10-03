@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import Link from "next/link";
 import { CalendarCheck, Plus, Search, X } from "lucide-react";
+import { ReservationUnitPicker, type ReservationMap } from "@/components/reservation-unit-picker";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { formatSouthAfricaDateTime } from "@/lib/south-africa-time";
@@ -15,7 +16,7 @@ type Unit = {
   monthlyRate: string;
   unitType: { name: string; areaSqMetres: string | null };
 };
-type Facility = { id: string; name: string; units: Unit[] };
+type Facility = { id: string; name: string; units: Unit[]; maps?: ReservationMap[] };
 type Customer = {
   id: string;
   firstName: string | null;
@@ -52,13 +53,13 @@ const date = z.string().datetime({ offset: true });
 const customerSchema = z.object({ id: z.string().min(1), firstName: z.string().nullable(), lastName: z.string().nullable(), companyName: z.string().nullable(), email: z.string().nullable(), phone: z.string().nullable() });
 const unitSchema = z.object({ id: z.string().min(1), facilityId: z.string().min(1), number: z.string(), monthlyRate: money, unitType: z.object({ name: z.string(), areaSqMetres: money.nullable() }) });
 const reservationReadSchema = z.object({ data: z.object({
-  facilities: z.array(z.object({ id: z.string().min(1), name: z.string(), units: z.array(unitSchema) })),
+  facilities: z.array(z.object({ id: z.string().min(1), name: z.string(), units: z.array(unitSchema), maps: z.array(z.object({id:z.string(),name:z.string(),width:z.number(),height:z.number(),elements:z.array(z.object({id:z.string(),type:z.string(),x:z.number(),y:z.number(),width:z.number(),height:z.number(),rotation:z.number(),label:z.string().nullable(),unitId:z.string().nullable()}))})).optional() })),
   customers: z.array(customerSchema),
   reservations: z.array(z.object({ id: z.string().min(1), status: z.enum(["ACTIVE", "CONVERTED", "CANCELLED", "EXPIRED"]), quotedRate: money, holdExpiresAt: date.nullable(), intendedMoveIn: date.nullable(), createdAt: date, facility: z.object({ id: z.string().min(1), name: z.string() }), customer: customerSchema, unit: unitSchema, lead: z.object({ id: z.string() }).nullable(), convertedTenancy: z.object({ id: z.string() }).nullable() })),
 }) });
 const emptyData: Payload = { facilities: [], customers: [], reservations: [] };
 
-export function ReservationsWorkspace() {
+export function ReservationsWorkspace({initialCustomerId=""}: {initialCustomerId?: string}) {
   const [data, setData] = useState<Payload>({
     facilities: [],
     customers: [],
@@ -451,6 +452,7 @@ export function ReservationsWorkspace() {
       {dialog ? (
         <ReservationDialog
           data={data}
+          defaultCustomerId={initialCustomerId}
           defaultFacilityId={facilityId || data.facilities[0]?.id || ""}
           busy={busy}
           error={createBlocked ? uncertainCreate : error}
@@ -466,6 +468,7 @@ export function ReservationsWorkspace() {
 
 function ReservationDialog({
   data,
+  defaultCustomerId,
   defaultFacilityId,
   busy,
   error,
@@ -475,6 +478,7 @@ function ReservationDialog({
   review,
 }: {
   data: Payload;
+  defaultCustomerId: string;
   defaultFacilityId: string;
   busy: boolean;
   error: string;
@@ -486,8 +490,7 @@ function ReservationDialog({
   const [facilityId, setFacilityId] = useState(defaultFacilityId);
   const units =
     data.facilities.find((facility) => facility.id === facilityId)?.units ?? [];
-  const [unitId, setUnitId] = useState(units[0]?.id ?? "");
-  const selectedUnit = units.find((unit) => unit.id === unitId);
+
   const [defaultExpiry] = useState(() =>
     new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
   );
@@ -508,10 +511,7 @@ function ReservationDialog({
               onChange={(event) => {
                 const next = event.target.value;
                 setFacilityId(next);
-                setUnitId(
-                  data.facilities.find((facility) => facility.id === next)
-                    ?.units[0]?.id ?? "",
-                );
+
               }}
             >
               {data.facilities.map((facility) => (
@@ -523,7 +523,7 @@ function ReservationDialog({
           </label>
           <label>
             Customer
-            <select name="customerId" required>
+            <select name="customerId" required defaultValue={defaultCustomerId}>
               <option value="">Select customer</option>
               {data.customers.map((customer) => (
                 <option value={customer.id} key={customer.id}>
@@ -532,36 +532,7 @@ function ReservationDialog({
               ))}
             </select>
           </label>
-          <label className="inventory-form-wide">
-            Available unit
-            <select
-              name="unitId"
-              value={unitId}
-              onChange={(event) => setUnitId(event.target.value)}
-              required
-            >
-              {units.map((unit) => (
-                <option value={unit.id} key={unit.id}>
-                  {unit.number} · {unit.unitType.name}
-                  {unit.unitType.areaSqMetres
-                    ? ` · ${unit.unitType.areaSqMetres} m²`
-                    : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Quoted monthly rate (R)
-            <input
-              name="quotedRate"
-              type="number"
-              step=".01"
-              min="0"
-              key={selectedUnit?.id}
-              defaultValue={selectedUnit?.monthlyRate}
-              required
-            />
-          </label>
+          <div className="inventory-form-wide"><ReservationUnitPicker key={facilityId} units={units} maps={data.facilities.find(f=>f.id===facilityId)?.maps ?? []} initialUnitId={units[0]?.id}/></div>
           <label>
             Hold expires
             <input

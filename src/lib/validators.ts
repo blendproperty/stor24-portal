@@ -1,15 +1,21 @@
 import { z } from "zod";
+import { LEAD_SOURCES } from "@/lib/lead-sources";
 import { LEASE_CLAUSE_KEYS } from "@/lib/lease-agreement-content";
 
-export const createLeadSchema = z.object({
-  firstName: z.string().trim().min(1).max(80),
-  lastName: z.string().trim().min(1).max(80),
-  email: z.email(),
+const leadContact = z.object({
+  firstName: z.string().trim().min(1).max(80), lastName: z.string().trim().min(1).max(80),
+  email: z.preprocess(v => v === "" ? undefined : v, z.email().optional()),
   phone: z.string().trim().min(7).max(30),
-  facilityId: z.string().trim().min(1),
-  desiredUnitTypeId: z.string().trim().optional(),
-  source: z.string().trim().min(1).max(80),
-  notes: z.string().trim().max(2000).optional(),
+});
+export const createLeadSchema = z.object({
+  submissionId: z.string().uuid().optional(),
+  facilityId: z.string().trim().min(1), desiredUnitTypeId: z.string().trim().optional(),
+  source: z.enum(LEAD_SOURCES), sourceDetail: z.string().trim().max(200).optional(),
+  expectedMoveIn: z.preprocess(value => value === "" ? undefined : value, z.coerce.date().optional()),
+  notes: z.string().trim().max(1800).optional(),
+}).and(z.union([z.object({ customerId: z.string().trim().min(1).max(64) }), leadContact]))
+.superRefine((input, ctx) => {
+  if (input.source === "Other" && !input.sourceDetail?.trim()) ctx.addIssue({code: "custom", path: ["sourceDetail"], message: "Describe how the customer found us."});
 });
 
 export type CreateLeadInput = z.infer<typeof createLeadSchema>;

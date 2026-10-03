@@ -115,6 +115,14 @@ export async function confirmReservationMoveIn(scope: RequestScope, reservationI
     const claimed = await tx.reservation.updateMany({ where: { id: reservationId, status: "ACTIVE", convertedTenancyId: null }, data: { status: "CONVERTED", convertedTenancyId: tenancy.id } });
     if (claimed.count !== 1) throw new Error("CONFLICT");
     await tx.unit.update({ where: { id: unit.id }, data: { status: "OCCUPIED" } });
+    if (existing.leadId) {
+      const lead = await tx.lead.findFirst({ where: { id: existing.leadId, facilityId: existing.facilityId, customerId: existing.customerId } });
+      if (lead && lead.stage !== "WON") {
+        await tx.lead.update({ where: { id: lead.id }, data: { stage: "WON" } });
+        await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: existing.facilityId, actorId: scope.userId,
+          action: "lead.stage_changed", entityType: "Lead", entityId: lead.id, before: { stage: lead.stage }, after: { stage: "WON", reservationId, tenancyId: tenancy.id } } });
+      }
+    }
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: existing.facilityId, actorId: scope.userId, action: "tenancy.key_handover_confirmed", entityType: "Tenancy", entityId: tenancy.id, after: { reservationId, accountId: state.account.id, leaseId: lease.id, paymentIds: state.receipts.map(payment => payment.id), requiredAmount: state.view.requiredAmount, paidAmount: state.view.paidAmount, accessState: "PENDING" } } });
     return { tenancyId: tenancy.id, idempotent: false };
   });
