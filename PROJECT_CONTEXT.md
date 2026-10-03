@@ -1,5 +1,13 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Live promotion request - 3 October 2026
+
+- **Authorization:** Brett explicitly requested live promotion of the linked enquiry/customer/map/reporting and automatic UTM changes. No second general deployment approval is required.
+- **Implementation/testing:** CRM source c575a767 passed CI validation (build, unit tests, types, lint), isolated transactions, secrets, static analysis and CodeQL. Guided-help browser suite remains in progress. Public branch reconciled with current master8f1e8195; context conflict resolved preserving both release histories in f061bae014169382feef53753e794bd3ca4a6f99. Exact merged public checks pending.
+- **Commit and push:** linked draft PR364/PR94 branches pushed; both canonical remote context files confirmed previously. This evidence note is committed separately.
+- **Merge:** not performed. **Deployment/configuration:** not performed. Dependency security gate fails on unchanged braces development dependency (GHSA-vfj7-8cjw-p6xm); current upstream advisory lists no patched version. Public deployment workflow explicitly requires successful dependency, secret and static checks for the exact release. A specific temporary release exception decision is pending; no check bypass or weakened policy has been applied.
+- **Live verification:** read-only baseline at 2026-10-03T09:00:24Z CRM reports service/database ok; public at09:00:26Z reports healthy with CRM/CMS200. This verifies existing production only, not candidate deployment. No customer/provider data mutated. Existing UAT, privacy, finance/provider, data, training and approval gates remain open.
+
 ## Automatic digital acquisition correction - 3 October 2026
 
 - **Implementation:** removed Google/Facebook/Instagram ads and digital platform choices from staff enquiry capture. Public companion detects source and medium from normalized UTM tags automatically, with tags taking priority over referrer fallback. CRM accepts TikTok/YouTube/X/Pinterest plus paid_social and optional detection method, retaining older snapshot compatibility. Reports label platform ads separately from organic search/social. Historical manual entries remain readable. Unknown values become broad Other; no raw campaign strings, query URLs or identifying tag values are stored. Explicit fresh analytics consent remains required; first acquisition is retained for the bounded consented session. No offline ad conversion integration added.
