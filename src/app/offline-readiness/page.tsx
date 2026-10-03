@@ -42,7 +42,7 @@ export default async function OfflineReadinessPage() {
   const rows = [...devices.values()];
   const now = serverNow();
 
-  return <div className="page-stack">
+  return <div className="page-stack offline-status-workspace">
     <PageHeader eyebrow="Redundancy" title="Offline readiness" description="Latest encrypted snapshot preparation recorded for each facility device. Passphrases and offline data never reach this screen." />
     <section className="panel"><div className="table-wrap"><table className="data-table">
       <thead><tr><th>Device</th><th>Facility</th><th>Prepared by</th><th>Last refreshed</th><th>Snapshot state</th></tr></thead>

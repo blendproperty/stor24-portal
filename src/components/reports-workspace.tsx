@@ -15,6 +15,7 @@ export function ReportsWorkspace({ reports, facilities, initialFrom, initialTo, 
   const [failed, setFailed] = useState(false);
   const [access, setAccess] = useState<"signed-out" | "denied" | null>(null);
   const request = useRef<AbortController | null>(null);
+  const reportSelect = useRef<HTMLSelectElement>(null);
   useEffect(() => () => request.current?.abort(), []);
   const groups = useMemo(() => ["All", ...new Set(reports.map((report) => report.group))], [reports]);
   const visible = group === "All" ? reports : reports.filter((report) => report.group === group);
@@ -60,12 +61,12 @@ export function ReportsWorkspace({ reports, facilities, initialFrom, initialTo, 
   return (
     <div className="report-workspace">
       <section className="panel panel-spacious report-parameters">
-        <div className="panel-heading"><div><h2>Report parameters</h2><p className="panel-subtitle">Choose your report, dates and facility, then download a CSV. Date filters use South African time (SAST).</p></div><Filter className="muted-icon" /></div>
+        <div className="panel-heading"><div><h2>Report parameters</h2><p className="panel-subtitle">Choose a report and store. Set the period, then export. Dates use SAST.</p></div><Filter className="muted-icon" /></div>
         {isSnapshot ? <p>Current snapshot: this report shows the records available when exported, not a historical date range. The export includes its snapshot timestamp.</p> : null}
         {isAgeing ? <p>Ageing uses all account entries up to the selected South African date. Current recorded balances and holds are labelled separately; accounts needing reconciliation have blank ageing amounts.</p> : null}
         <p className="permission-note"><LockKeyhole size={15}/> Exports are confidential and checked by data protection. Share only with authorised recipients. Export decisions are recorded in the system audit.</p>
         <div className="parameter-grid">
-          <label>Report<select disabled={busy} value={reportKey} onChange={(event) => setReportKey(event.target.value)}>{reports.map((report) => <option value={report.key} key={report.key}>{report.name}</option>)}</select></label>
+          <label>Report<select aria-label="Report" ref={reportSelect} disabled={busy} value={reportKey} onChange={(event) => setReportKey(event.target.value)}>{reports.map((report) => <option value={report.key} key={report.key}>{report.name}</option>)}</select></label>
           {!isAgeing && !isSnapshot ? <label>From<input disabled={busy} type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label> : null}
           {!isSnapshot ? <label>{isAgeing ? "As of (SAST)" : "To"}<input disabled={busy} type="date" value={to} onChange={(event) => setTo(event.target.value)} /></label> : null}
           <label>Facility<select disabled={busy} value={facilityId} onChange={(event) => setFacilityId(event.target.value)}><option value="">All permitted facilities</option>{facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}</select></label>
@@ -78,7 +79,7 @@ export function ReportsWorkspace({ reports, facilities, initialFrom, initialTo, 
       </section>
       <div className="filter-tabs">{groups.map((item) => <button className={group === item ? "active" : ""} onClick={() => setGroup(item)} key={item}>{item}</button>)}</div>
       <section className="report-card-grid">
-        {visible.map((report) => <article className="panel report-card" key={report.key}><span>{report.group}</span><h3>{report.name}</h3><p>{report.description}</p><small>{report.formats.join(" / ")}</small></article>)}
+        {visible.map((report) => <article className="panel report-card" key={report.key}><span>{report.group}</span><h3>{report.name}</h3><p>{report.description}</p><small>{report.formats.join(" / ")}</small><button type="button" className="report-select-button" disabled={busy} aria-pressed={reportKey === report.key} onClick={() => { setReportKey(report.key); reportSelect.current?.focus(); }}>Select {report.name}</button></article>)}
       </section>
     </div>
   );

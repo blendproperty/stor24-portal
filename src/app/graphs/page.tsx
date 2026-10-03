@@ -34,17 +34,18 @@ function LineChart({ points, formatValue }: { points: { label: string; value: nu
 
   return (
     <div className="line-chart-wrap" role="region" aria-label="Monthly occupancy trend" tabIndex={0}>
-      <svg viewBox={`0 0 ${width} ${height}`} className="line-chart" preserveAspectRatio="none">
+      <svg viewBox={`-8 -8 ${width + 16} ${height + 16}`} className="line-chart" preserveAspectRatio="none" role="img" aria-label={points.map(p => `${p.label}: ${formatValue ? formatValue(p.value) : p.value}`).join(", ")}>
+        {[0, 1, 2, 3].map(row => <line key={row} x1="0" x2={width} y1={row * height / 3} y2={row * height / 3} stroke="var(--line)" strokeDasharray="3 5"/>)}
         <defs>
           <linearGradient id="lineFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--orange)" stopOpacity="0.28" />
-            <stop offset="100%" stopColor="var(--orange)" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--chart-primary)" stopOpacity="0.28" />
+            <stop offset="100%" stopColor="var(--chart-primary)" stopOpacity="0" />
           </linearGradient>
         </defs>
         <path d={areaPath} fill="url(#lineFill)" stroke="none" />
-        <path d={path} fill="none" stroke="var(--orange)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+        <path d={path} fill="none" stroke="var(--chart-primary)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
         {coords.map((c, i) => (
-          <circle key={i} cx={c.x} cy={c.y} r={3.5} fill="var(--orange)" />
+          <circle key={i} cx={c.x} cy={c.y} r={3.5} fill="var(--chart-primary)" />
         ))}
       </svg>
       <div className="line-chart-labels">
@@ -72,7 +73,7 @@ export default async function GraphsPage() {
   const maxWeekLeads = Math.max(...leadsWeek.map((d) => d.count), 1);
 
   return (
-    <div className="page-stack">
+    <div className="page-stack performance-workspace">
       <PageHeader
         eyebrow="Reporting"
         title="Performance overview"
@@ -137,10 +138,10 @@ export default async function GraphsPage() {
         </article>
         <article className="panel panel-spacious">
           <div className="panel-heading"><h2>New leads, last 7 days</h2><Users className="muted-icon" /></div>
-          <div className="bar-chart" aria-label="New leads by day">
+          <div className="bar-chart daily-leads-chart" aria-label="New leads by day">
             {leadsWeek.map((d, i) => (
               <span key={i} style={{ height: `${Math.max((d.count / maxWeekLeads) * 100, d.count > 0 ? 6 : 2)}%` }}>
-                <i>{d.count}</i>
+                <i>{d.count}</i><small>{d.label}</small>
               </span>
             ))}
           </div>

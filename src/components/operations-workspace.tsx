@@ -421,7 +421,7 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
       clearTimeout(timeout); packageUpdateRequest.current = false; setBusy(false);
     }
   }
-  if (!data) return <div className="page-stack">
+  if (!data) return <div className="page-stack facility-operations-workspace">
     <PageHeader eyebrow="Facility workflows" title={view === "merchandise" ? "Merchandise" : "Operations centre"} description="Work queues and facility records." />
     <section className="panel panel-spacious">
       {loading ? <p role="status">Loading operations data…</p> : <><p role="alert">{error}</p>{readAccess === "signed-out" ? <Link className="button button-primary" href="/login">Sign in</Link> : <button className="button button-primary" onClick={() => void load()}>{readAccess === "denied" ? "Check access again" : "Retry loading"}</button>}</>}
@@ -446,7 +446,7 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
     {selectedPackage && data ? <PackageEditorModal message={packageUpdateMessage} uncertain={packageUpdateUncertain} storagePackage={selectedPackage} products={data.products} busy={busy} close={() => setSelectedPackage(null)} save={updatePackage}/> : null}
   </>;
 
-  if (view === "merchandise") return <div className="page-stack">
+  if (view === "merchandise") return <div className="page-stack facility-operations-workspace">
     <PageHeader eyebrow="Operations · Merchandise" title="Merchandise" description="A dedicated catalogue, stock and package workspace for everything sold alongside a Stor24 unit." action={<span className="inline-actions"><button className="button button-secondary" disabled={busy || stockUncertain} onClick={() => setShowStock(true)}>Move stock</button><button className="button button-primary" disabled={busy || productCreationUncertain} onClick={() => setShowProduct(true)}><Plus size={16}/> Add product</button></span>} />
     <details className="panel"><summary>Customer purchases · collection and delivery</summary><MerchandiseOrderQueue /></details>
     {packageUpdateMessage && !selectedPackage ? <div role={packageUpdateUncertain ? "alert" : "status"}><p>{packageUpdateMessage}</p>{packageUpdateUncertain ? <button className="button button-primary" onClick={() => window.location.reload()}>Reload catalogue</button> : null}</div> : null}
@@ -463,8 +463,8 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
     {merchandiseModals}
   </div>;
 
-  return <div className="page-stack">
-    <PageHeader eyebrow="Facility workflows" title="Operations centre" description="Database-backed work queues, maintenance and end-of-day control for Stor24." action={<button className="button button-primary" onClick={() => setShowTask(true)}><Plus size={16}/> New task</button>} />
+  return <div className="page-stack facility-operations-workspace">
+    <PageHeader eyebrow="Facility workflows" title="Operations centre" description="Prioritise tasks, keep maintenance moving and close the day with confidence." action={<button className="button button-primary" onClick={() => setShowTask(true)}><Plus size={16}/> New task</button>} />
     {maintenanceMessage && !showMaintenance ? <div role="alert"><p>{maintenanceMessage}</p>{maintenanceUncertain ? <button className="button button-primary" onClick={() => window.location.reload()}>Reload maintenance status</button> : null}</div> : null}
     {taskMessage ? <div role={taskNeedsCheck ? "alert" : "status"}><p>{taskMessage}</p>{taskNeedsCheck ? <button className="button button-primary" disabled={taskBusy} onClick={checkTaskStatus}>{taskBusy ? "Checking…" : "Check task status"}</button> : null}</div> : null}
     {error ? <p className="form-error">{error}</p> : null}{readRecovery}

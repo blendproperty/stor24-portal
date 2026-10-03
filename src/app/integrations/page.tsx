@@ -216,7 +216,7 @@ export default async function IntegrationsPage() {
   ] as const;
 
   return (
-    <div className="page-stack">
+    <div className="page-stack integration-monitor-workspace">
       <PageHeader
         eyebrow="Connection centre"
         title="Integrations & webhooks"

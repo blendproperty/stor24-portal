@@ -1,6 +1,7 @@
 // Isolated component fixture. All customers and reservations here are invented.
 import React from "react";
 import { createRoot } from "react-dom/client";
+import { PortfolioOverview } from "../../src/components/portfolio-overview";
 import { AppShell } from "../../src/components/app-shell";
 import { ReservationsWorkspace } from "../../src/components/reservations-workspace";
 import { MoveInWorkspace } from "../../src/components/move-in-workspace";
@@ -25,7 +26,7 @@ function Fixture() {
       reservations={[{ id: "fixture-reservation", facilityId: "fixture-store", customerId: "fixture-customer", unitId: "fixture-unit", label: "T01 · Example Customer", paymentMethod: "CARD", intendedMoveIn: "2026-09-30", quotedRate: 1200, readiness: params.has("unsigned") ? null : readiness, canRecordPayment: true }]}
     /> : <div className="page-stack">
       <header className="page-header"><div><p className="eyebrow">Operations centre · Isolated preview</p><h1>Stor24 operational overview</h1><p>Invented data for browser verification. No customer records are connected.</p></div></header>
-      <section className="metric-grid" data-guide="dashboard-metrics">{["Physical occupancy", "Occupied units", "Receivables", "Active leads"].map((label, i) => <article className="panel panel-spacious" key={label}><small>{label}</small><h2>{["64%", "128", "R 12,400", "8"][i]}</h2></article>)}</section>
+      <PortfolioOverview access={{owner:true,permissions:["*"]}} occupiedUnits={128} totalUnits={200} occupancyPct={64} receivables={12400} overdueAccounts={3} activeLeads={8} newLeadsThisWeek={2}/>
       <section className="dashboard-grid"><article className="panel panel-spacious" data-guide="dashboard-queue"><h2>Priority work queue</h2><p>Reservations needing attention</p><p>Operational tasks due</p><p>Lead follow-ups due</p></article><article className="panel panel-spacious" data-guide="dashboard-activity"><h2>Recent operational activity</h2><p>Training store · Example reservation created</p></article></section>
     </div>}
   </AppShell>;

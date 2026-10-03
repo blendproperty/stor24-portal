@@ -282,7 +282,7 @@ export function AccountsWorkspace({
   );
 
   return (
-    <div className="page-stack">
+    <div className="page-stack finance-accounts-workspace">
       <PageHeader
         eyebrow="Operations centre"
         title="Accounts"

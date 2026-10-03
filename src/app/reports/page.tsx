@@ -17,7 +17,7 @@ export default async function ReportsPage() {
   const today = southAfricaDateKey(new Date());
   const from = `${today.slice(0, 8)}01`;
   return (
-    <div className="page-stack">
+    <div className="page-stack report-library-workspace">
       <PageHeader
         eyebrow="Analytics"
         title="Reports"

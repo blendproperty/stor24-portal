@@ -69,6 +69,11 @@ if (process.env.PREVIEW_ONLY) {
   const errors=[]; page.on('pageerror',e=>errors.push(e.message));
   for (const width of [1440, 1024, 768, 390, 320, 305]) {
    await page.setViewportSize({width,height:900});
+   await page.goto(base + '/');
+   await expect(page.getByRole('img',{name:/Physical occupancy 64.0 percent/})).toBeVisible();
+   await expect(page.getByRole('link',{name:/Explore inventory/})).toHaveAttribute('href','/units');
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth),true,`portfolio overflow ${width}`);
+   await page.screenshot({path:`output/premium-workspace/portfolio-${width}.png`,fullPage:true});
    await page.goto(base + '/settings');
    const finder = page.getByRole('button',{name:'Find a workspace',exact:true});
    await finder.click();

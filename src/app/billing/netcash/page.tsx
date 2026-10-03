@@ -61,7 +61,7 @@ export default async function NetcashPaymentsPage() {
   const pending = rows.filter((row) => row.reconciliation.state === "PENDING").length;
   const failed = rows.filter((row) => row.reconciliation.state === "FAILED").length;
 
-  return <div className="page-stack">
+  return <div className="page-stack payment-monitor-workspace">
     <PageHeader eyebrow="Financial control" title="Netcash payment operations" description="Monitor provider outcomes against Stor24 payment and ledger records. This view checks internal matching; use Settlement reconciliation for provider statements and bank evidence." action={<Link href="/settings/integrations/netcash" className="button button-secondary">Netcash settings</Link>} />
     <section className="summary-strip netcash-ops-summary">
       <div className="summary-cell"><span>Ledger matched</span><strong>{matched}</strong></div>

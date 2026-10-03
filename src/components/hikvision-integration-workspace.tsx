@@ -54,8 +54,8 @@ export function HikvisionIntegrationWorkspace() {
     void call("PUT", { action: "save-mapping", payload: { facilityId, organisationIndexCode: String(formData.get("organisationIndexCode") ?? ""), doorIndexCodes } }, "Facility and door mapping saved. Test the connection before using facial access.");
   }
 
-  return <div className="page-stack">
-    <PageHeader eyebrow="Company setup · Integrations" title="Hikvision access control" description="Connect Stor24 directly to HikCentral for consent-led facial enrolment, facility permissions and immediate revocation." />
+  return <div className="page-stack provider-config-workspace">
+    <PageHeader eyebrow="Company setup · Integrations" title="Hikvision access control" description="Configure the access connection and review enrolment, permissions and revocation controls." />
     {error ? <p className="form-error" role="alert">{error}</p> : null}{notice ? <p className="form-success"><CheckCircle2 size={16}/>{notice}</p> : null}
     {!configuration?.encryptionReady ? <p className="safe-config-note"><LockKeyhole size={17}/>Secure credential storage is not enabled on the server yet. Add the encryption key before entering the HikCentral App Key or App Secret.</p> : null}
     <section className="summary-strip">

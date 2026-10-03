@@ -1,0 +1,13 @@
+import React from "react";
+import {createRoot} from "react-dom/client";
+import {AppShell} from "../../src/components/app-shell";
+import Home from "../../src/app/page";
+import Billing from "../../src/app/billing/page";
+import Calendar from "../../src/app/calendar/page";
+import Performance from "../../src/app/graphs/page";
+import Reports from "../../src/app/reports/page";
+import Settings from "../../src/app/settings/page";
+const screens={"/":Home,"/billing":Billing,"/calendar":Calendar,"/graphs":Performance,"/reports":Reports};
+const Screen=screens[location.pathname];
+const content=Screen ? await Screen() : <Settings/>;
+createRoot(document.getElementById("root")).render(<AppShell access={{owner:true,permissions:["*"]}} facilityLabel="Training portfolio" session={null}>{content}</AppShell>);
