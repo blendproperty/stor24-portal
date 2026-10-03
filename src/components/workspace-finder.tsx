@@ -35,7 +35,10 @@ export function WorkspaceFinder({ items, access }: { items: Destination[]; acces
   }, []);
   return <>
     <button ref={trigger} className="workspace-finder-trigger" type="button" onClick={open} aria-label="Find a workspace" aria-haspopup="dialog"><Search size={17} /><span>Find a workspace</span><kbd>Ctrl K</kbd></button>
-    <dialog ref={dialog} className="workspace-finder" aria-labelledby="workspace-finder-title" onClose={() => trigger.current?.focus()}>
+    <dialog ref={dialog} className="workspace-finder" aria-labelledby="workspace-finder-title" onClose={() => {
+      const active = document.activeElement;
+      if (!active || active === document.body || dialog.current?.contains(active)) trigger.current?.focus();
+    }}>
       <div className="workspace-finder-heading"><div><p className="eyebrow">Go directly to your next task</p><h2 id="workspace-finder-title">Find a workspace</h2></div><button className="icon-button" type="button" aria-label="Close workspace finder" onClick={() => dialog.current?.close()}><X size={18}/></button></div>
       <label className="workspace-finder-search"><Search size={18}/><input ref={input} aria-label="Search workspaces" placeholder="Try customer, move-in, payments or reports" value={query} onChange={event => setQuery(event.target.value)}/></label>
       <p className="workspace-finder-count" role="status">{results.length} {results.length === 1 ? "workspace" : "workspaces"} available to your role</p>
