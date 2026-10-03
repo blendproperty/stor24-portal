@@ -25,7 +25,7 @@ export async function getOperationsCalendar(scope: RequestScope, now = new Date(
   const customerName = (customer: { firstName: string | null; lastName: string | null; companyName: string | null }) => customer.companyName || [customer.firstName, customer.lastName].filter(Boolean).join(" ") || "Customer";
   const items: CalendarItem[] = [
     ...tasks.flatMap((item) => item.dueAt ? [{ id: item.id, at: item.dueAt, kind: "TASK" as const, title: item.title, detail: item.facility?.name ?? "Portfolio", href: "/operations" }] : []),
-    ...leads.flatMap((item) => item.nextActionAt ? [{ id: item.id, at: item.nextActionAt, kind: "LEAD" as const, title: `Follow up · ${customerName(item.customer ?? { firstName: null, lastName: null, companyName: null })}`, detail: item.facility.name, href: "/leads" }] : []),
+    ...leads.flatMap((item) => item.nextActionAt ? [{ id: item.id, at: item.nextActionAt, kind: "LEAD" as const, title: `Follow up · ${customerName(item.customer ?? { firstName: null, lastName: null, companyName: null })}`, detail: item.facility.name, href: `/leads?lead=${encodeURIComponent(item.id)}` }] : []),
     ...viewings.flatMap((item) => item.viewingAt ? [{ id: item.id, at: item.viewingAt, kind: "VIEWING" as const, title: `Viewing · Unit ${item.unit.number}`, detail: `${customerName(item.customer)} · ${item.facility.name}`, href: "/reservations" }] : []),
     ...moveOuts.flatMap((item) => item.endDate ? [{ id: item.id, at: item.endDate, kind: "MOVE_OUT" as const, title: `Move-out · Unit ${item.occupancies[0]?.unit.number ?? "—"}`, detail: `${customerName(item.customer)} · ${item.facility.name}`, href: "/operations/accounts" }] : []),
   ].sort((a, b) => a.at.getTime() - b.at.getTime());

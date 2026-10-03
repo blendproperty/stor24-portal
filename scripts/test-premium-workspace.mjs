@@ -18,7 +18,7 @@ const subscribe = cb => { window.addEventListener('popstate', cb); return () => 
 const read = () => window.location.pathname + window.location.search;
 export const usePathname = () => useSyncExternalStore(subscribe, read, () => '/').split('?')[0];
 export const useRouter = () => ({push(href) { history.pushState(null, '', href); window.dispatchEvent(new PopStateEvent('popstate')); }, replace(href) { history.replaceState(null, '', href); window.dispatchEvent(new PopStateEvent('popstate')); }, refresh() {}});
-export const Link = ({href, children, ...props}) => React.createElement('a', {...props, href, onClick: e => {e.preventDefault(); history.pushState(null, '', href); window.dispatchEvent(new PopStateEvent('popstate'));}}, children);
+export const Link = ({href, children, onClick, ...props}) => React.createElement('a', {...props, href, onClick: e => {onClick?.(e); e.preventDefault(); history.pushState(null, '', href); window.dispatchEvent(new PopStateEvent('popstate'));}}, children);
 export const Image = ({unoptimized, priority, ...props}) => React.createElement('img', props);`;
 const bundle = await build({ absWorkingDir: root, entryPoints: ["tests/browser/guided-help-fixture.jsx"], bundle: true, write: false, format: "esm", jsx: "automatic", plugins: [{ name: "isolated-fixture", setup(b) {
   b.onResolve({filter: /^next\/(navigation|link|image)$/}, args => ({path: args.path, namespace: "fixture"}));
@@ -69,6 +69,31 @@ if (process.env.PREVIEW_ONLY) {
   const errors=[]; page.on('pageerror',e=>errors.push(e.message));
   for (const width of [1440, 1024, 768, 390, 320, 305]) {
    await page.setViewportSize({width,height:900});
+   await page.goto(base + '/settings');
+   const finder = page.getByRole('button',{name:'Find a workspace',exact:true});
+   await finder.click();
+   const findDialog = page.getByRole('dialog',{name:'Find a workspace',exact:true});
+   await expect(findDialog).toBeVisible();
+   await expect(page.getByRole('textbox',{name:'Search workspaces'})).toBeFocused();
+   await page.getByRole('textbox',{name:'Search workspaces'}).fill('monthly');
+   await expect(findDialog.getByRole('link',{name:/Monthly billing/})).toBeVisible();
+   await findDialog.getByRole('link',{name:/Monthly billing/}).click();
+   await expect(page).toHaveURL(base+'/billing/monthly');
+   await expect(findDialog).not.toBeVisible();
+   await page.keyboard.press('Control+k');
+   await expect(findDialog).toBeVisible();
+   await page.keyboard.press('Escape');
+   await expect(finder).toBeFocused();
+   await page.goto(base+'/prorate');
+   await page.getByLabel('Monthly rate (ZAR)').fill('2800');
+   await page.getByLabel('Effective date').fill('2026-02-15');
+   await expect(page.locator('.calculation-result')).toContainText('14 of 28 days');
+   await expect(page.locator('.calculation-result')).toContainText('1');
+   await page.getByLabel('Effective date').fill('2028-02-29');
+   await expect(page.locator('.calculation-result')).toContainText('1 of 29 days');
+   await page.getByLabel('Monthly rate (ZAR)').fill('-1');
+   await expect(page.locator('.calculation-result')).toContainText('Enter a valid');
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth),true,`calculator overflow ${width}`);
    await page.goto(base + '/operations/move-in?inventory');
    await expect(page.getByRole('button',{name:'Next',exact:true})).toBeDisabled();
    assert.equal(await page.locator('.unit-table tbody tr').count(),20);
