@@ -286,3 +286,5 @@
 .app-shell .content textarea { min-height:96px; resize:vertical; }
 
 .staff-mobile-nav .nav-label { margin:14px 12px 4px; font-size:10px; color:#657468; }
+
+.app-shell .workspace-finder-search input:focus-visible { outline:0; }
