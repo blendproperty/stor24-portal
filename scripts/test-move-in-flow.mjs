@@ -23,7 +23,7 @@ try {
   await expect(nav.locator("li")).toHaveCount(6); await expect(nav.locator(".is-complete")).toHaveCount(2);
   await expect(nav.locator(".is-blocked")).toHaveCount(3);
   await expect(nav.locator(".is-action")).toHaveCount(1);
-  await expect(page.getByRole("link",{name:"Review ID",exact:true})).toHaveCSS("background-color","rgb(255, 90, 10)");
+  await expect(page.getByRole("link",{name:"Review ID",exact:true})).toHaveCSS("background-color","rgb(215, 73, 7)");
   await expect(page.getByText("Go to ID check",{exact:true})).toHaveCount(0);
   await expect(page.getByText("Your signed agreement stays on file.",{exact:true})).toHaveCount(0);
   await expect(nav).toContainText("Test payment only"); await expect(nav).toContainText("Collection on hold");

@@ -34,7 +34,8 @@ const server=createServer(async(req,res)=>{
  if(req.method!=='GET'){writes.push(req.url);res.writeHead(405);return res.end();}
  if(req.url==='/fixture.js'){res.setHeader('content-type','text/javascript');return res.end(bundle.outputFiles.find(x=>x.path.endsWith('.js'))?.text??bundle.outputFiles[0].text)}
  if(req.url==='/fixture.css'){res.setHeader('content-type','text/css');return res.end(css+'\n'+(bundle.outputFiles.find(x=>x.path.endsWith('.css'))?.text??''))}
- if(req.url.startsWith('/brand/')){res.setHeader('content-type',req.url.endsWith('.svg')?'image/svg+xml':'font/ttf');return res.end(await readFile('public'+req.url))}
+ if(req.url==='/brand/stor24-logo-white.svg'){res.setHeader('content-type','image/svg+xml');return res.end(await readFile('public/brand/stor24-logo-white.svg'))}
+ if(req.url==='/brand/Satoshi-Variable.ttf'){res.setHeader('content-type','font/ttf');return res.end(await readFile('public/brand/Satoshi-Variable.ttf'))}
  if(req.url.startsWith('/api/')){res.setHeader('content-type','application/json');return res.end(JSON.stringify({data:[]}))}
  res.setHeader('content-type','text/html');res.end('<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/fixture.css"><style>@font-face{font-family:Satoshi;src:url(/brand/Satoshi-Variable.ttf);font-weight:300 900}body{--font-satoshi:Satoshi}</style></head><body><div id="root"></div><script type="module" src="/fixture.js"></script></body></html>');
 });
