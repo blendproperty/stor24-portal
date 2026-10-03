@@ -31,3 +31,7 @@ This covers the 38 primary/specialist screens recorded in BACKEND_QUALITY_REVIEW
 ## Validation and promotion
 
 Candidate validation and release status are tracked in PROJECT_CONTEXT.md. New actual-page design fixtures use invented service responses, with no production connection; ordinary workflow scripts retain their failure/recovery assertions. Final handoff requires exact-head checks, deployment and authenticated live screen readback. Provider, finance, privacy, data, training and staff acceptance gates remain separate.
+
+## Verified live release
+
+PR369 and PR370 are merged. Exact application source2a608c7963fa32f1acfc25e28b04dfcb98a6e941 is deployed and healthy; nine exact-source checks pass, including517 unit tests/build and56 browser scripts. Authenticated38-screen desktop/phone readback is complete, including the final integrations phone correction and blank customer-dialog checks. Seven actual-page isolated fixtures pass five widths. Full dated deployment and live evidence, plus unchanged operational acceptance gates, are in PROJECT_CONTEXT.md. This documentation promotion changes no application code.
