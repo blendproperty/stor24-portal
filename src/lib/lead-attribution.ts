@@ -6,7 +6,8 @@ export const leadAttributionSchema = z.object({
   version: z.literal(1), consent: z.literal("granted"),
   landingPage: publicJourneyPath, conversionPage: publicJourneyPath,
   pages: z.array(publicJourneyPath).min(1).max(12),
-  source: z.enum(["direct", "google", "bing", "facebook", "instagram", "linkedin", "newsletter", "other"]),
-  medium: z.enum(["direct", "organic", "cpc", "social", "email", "referral", "display", "other"]),
+  source: z.enum(["direct", "google", "bing", "facebook", "instagram", "linkedin", "tiktok", "youtube", "x", "pinterest", "newsletter", "other"]),
+  medium: z.enum(["direct", "organic", "cpc", "paid_social", "social", "email", "referral", "display", "other"]),
+  method: z.enum(["utm", "referrer", "direct"]).optional(),
 }).strict();
 export type LeadAttribution = z.infer<typeof leadAttributionSchema>;
