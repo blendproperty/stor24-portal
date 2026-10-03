@@ -91,6 +91,10 @@ if (process.env.PREVIEW_ONLY) {
    await expect(page.locator('.calculation-result')).toContainText('1');
    await page.getByLabel('Effective date').fill('2028-02-29');
    await expect(page.locator('.calculation-result')).toContainText('1 of 29 days');
+   const card = await page.locator('.calculator-card').boundingBox();
+   const note = await page.locator('.calculator-note').boundingBox();
+   assert.ok(note.width > card.width - 80, `calculator note uses the full panel width ${width}`);
+   await page.screenshot({path:`output/premium-workspace/prorate-${width}.png`,fullPage:true});
    await page.getByLabel('Monthly rate (ZAR)').fill('-1');
    await expect(page.locator('.calculation-result')).toContainText('Enter a valid');
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth),true,`calculator overflow ${width}`);
