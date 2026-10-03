@@ -1,6 +1,7 @@
+import { leadSourceLabel, websiteSourceLabel } from "@/lib/lead-sources";
 export const leadStages = ["NEW", "CONTACTED", "QUALIFIED", "QUOTED", "VIEWING_BOOKED", "RESERVED", "WON", "LOST"] as const;
 export const stageLabels: Record<string, string> = { NEW: "New enquiry", CONTACTED: "Contacted", QUALIFIED: "Qualified", QUOTED: "Quoted", VIEWING_BOOKED: "Viewing booked", RESERVED: "Reserved", WON: "Moved in", LOST: "Lost" };
-export type ReportingLead = { stage: string; source: string; createdAt: string; nextActionAt: string | null; attribution: { source: string; landingPage: string; conversionPage: string } | null; reservations: { status: string; quotedRate: number; convertedTenancyId: string | null }[] };
+export type ReportingLead = { stage: string; source: string; createdAt: string; nextActionAt: string | null; attribution: { source: string; medium?: string; landingPage: string; conversionPage: string } | null; reservations: { status: string; quotedRate: number; convertedTenancyId: string | null }[] };
 export function leadReport(leads: ReportingLead[], now = new Date()) {
   const open = leads.filter(l => !["WON", "LOST"].includes(l.stage));
   const won = leads.filter(l => l.stage === "WON").length;
@@ -11,7 +12,7 @@ export function leadReport(leads: ReportingLead[], now = new Date()) {
     return { label: start.toISOString().slice(0, 10), count: 0, start: start.getTime() - 2*3600000 };
   });
   for (const lead of leads) {
-    const key = lead.attribution ? `${lead.attribution.source} · website` : lead.source || "Unknown";
+    const key = lead.attribution ? `${websiteSourceLabel(lead.attribution)} · website` : leadSourceLabel(lead.source) || "Unknown";
     const current = sources.get(key) ?? { total: 0, won: 0 }; current.total++; if (lead.stage === "WON") current.won++; sources.set(key, current);
     if (lead.attribution) { const route = `${lead.attribution.landingPage} → ${lead.attribution.conversionPage}`; paths.set(route, (paths.get(route) ?? 0) + 1); }
     const at = new Date(lead.createdAt).getTime(); const week = weeks.findLast(w => at >= w.start); if (week && at <= now.getTime()) week.count++;

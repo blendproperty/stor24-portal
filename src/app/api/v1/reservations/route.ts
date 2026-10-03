@@ -29,6 +29,7 @@ export async function GET() {
       db.facility.findMany({
         where: facilityWhere,
         include: {
+          maps: { select: { id: true, name: true, width: true, height: true, elements: {select: {id: true, type: true, x: true, y: true, width: true, height: true, rotation: true, label: true, unitId: true}, orderBy: {sortOrder: "asc"}} }, orderBy: {name: "asc"} },
           units: {
             where: { status: "AVAILABLE" },
             include: { unitType: true, mapElements: floorMapSelection },

@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import{randomUUID}from'node:crypto';import{db}from'../../src/lib/db';import{updateLead,leadsWorkspace}from'../../src/lib/leads-workspace-service';import{releaseLeadBookingStage}from'../../src/lib/lead-booking-stage';import{createPublicLead}from'../../src/lib/public-lead-service';
+import test from 'node:test';import assert from 'node:assert/strict';import{randomUUID}from'node:crypto';import{db}from'../../src/lib/db';import{createManualLead}from'../../src/lib/manual-lead-service';import{updateLead,leadsWorkspace}from'../../src/lib/leads-workspace-service';import{releaseLeadBookingStage}from'../../src/lib/lead-booking-stage';import{createPublicLead}from'../../src/lib/public-lead-service';
 const enabled=process.env.LEADS_DB_TEST==='isolated-ci';
 test('lead updates are scoped, concurrent-safe, auditable and cannot fabricate a booking outcome',{skip:!enabled},async()=>{
  assert.ok(["localhost","127.0.0.1"].includes(new URL(process.env.DATABASE_URL!).hostname));
@@ -9,6 +9,16 @@ test('lead updates are scoped, concurrent-safe, auditable and cannot fabricate a
  const quote=await createPublicLead({firstName:'Fixture',lastName:'Visitor',email:`visitor-${key}@example.invalid`,phone:'+27000000000',facilitySlug:`fixture-${key}`,attribution},'fixture-ip-hash');
  const attributed=(await leadsWorkspace(scope)).leads.find(l=>l.id===quote.id);assert.deepEqual(attributed?.attribution,attribution);assert.equal(await db.reservation.count({where:{leadId:quote.id}}),0);
  assert.equal((await leadsWorkspace(scope)).leads.length,2);assert.equal((await leadsWorkspace({...scope,facilityIds:[]})).leads.length,0);
+ const captureInput={facilityId:f.id,source:"Other" as const,sourceDetail:"School newsletter",firstName:"Manual",lastName:"Customer",phone:"+27000000000",submissionId:randomUUID()};
+ const captures=await Promise.all([createManualLead(scope,captureInput),createManualLead(scope,captureInput)]);assert.equal(captures[0].id,captures[1].id);
+ const captured=await db.lead.findUniqueOrThrow({where:{id:captures[0].id}});assert.equal(captured.notes,"Other source: School newsletter");assert.equal(await db.customer.count({where:{organisationId:org.id,firstName:"Manual"}}),1);
+ const reused=await createManualLead(scope,{facilityId:f.id,source:"Walk-in",customerId:captured.customerId!});assert.equal(reused.customerId,captured.customerId);
+ await assert.rejects(createManualLead({...scope,facilityIds:[other.id]}, {facilityId:other.id,source:"Walk-in",customerId:captured.customerId!}),/FORBIDDEN/);
+ await assert.rejects(createManualLead(scope,{...captureInput,phone:"+27000000001"}),/CONFLICT/);
+ const newContact={...captureInput,firstName:"Rollback",submissionId:randomUUID()};const leadConstraint=`capture_audit_${key.replaceAll('-','')}`;
+ await db.$executeRawUnsafe(`ALTER TABLE "AuditEvent" ADD CONSTRAINT "${leadConstraint}" CHECK ("action" <> 'lead.capture.saved' OR "entityId" <> '${newContact.submissionId}') NOT VALID`);
+ try{await assert.rejects(createManualLead(scope,newContact));assert.equal(await db.customer.count({where:{organisationId:org.id,firstName:"Rollback"}}),0);}finally{await db.$executeRawUnsafe(`ALTER TABLE "AuditEvent" DROP CONSTRAINT "${leadConstraint}"`);}
+
  await assert.rejects(updateLead({...scope,facilityIds:[other.id]},lead.id,input),/NOT_FOUND/);
  await assert.rejects(updateLead(scope,lead.id,{...input,stage:'WON'}),/LEAD_BOOKING_STAGE/);await assert.rejects(updateLead(scope,lead.id,{...input,stage:'RESERVED'}),/LEAD_BOOKING_STAGE/);
  const results=await Promise.allSettled([updateLead(scope,lead.id,input),updateLead(scope,lead.id,{...input,stage:'QUALIFIED'})]);assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(results.filter(r=>r.status==='rejected').length,1);
