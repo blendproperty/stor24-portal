@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useSyncExternalStore } from "react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
+  PanelLeftClose,
+  PanelLeftOpen,
   BarChart3,
   Building2,
   CalendarDays,
@@ -37,6 +40,28 @@ import { WorkspaceFinder } from "@/components/workspace-finder";
 
 import { canVisit, restrictedMessage, type NavigationAccess } from "@/lib/navigation-access";
 
+const sidebarPreferenceKey = "stor24.staff.sidebar-hidden";
+const sidebarPreferenceEvent = "stor24-sidebar-preference";
+let sidebarHiddenFallback: boolean | null = null;
+function sidebarHiddenSnapshot() {
+  if (sidebarHiddenFallback !== null) return sidebarHiddenFallback;
+  try { return localStorage.getItem(sidebarPreferenceKey) === "true"; }
+  catch { return false; }
+}
+function subscribeSidebarPreference(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  window.addEventListener(sidebarPreferenceEvent, onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener(sidebarPreferenceEvent, onChange);
+  };
+}
+function setSidebarHidden(hidden: boolean) {
+  sidebarHiddenFallback = hidden;
+  try { localStorage.setItem(sidebarPreferenceKey, String(hidden)); sidebarHiddenFallback = null; } catch { /* Keep the control usable when browser storage is unavailable. */ }
+  window.dispatchEvent(new Event(sidebarPreferenceEvent));
+}
+
 const navigation = [
   { group: "Overview", href: "/", label: "Dashboard", icon: LayoutDashboard },
   { group: "Customers & sales", href: "/tenants", label: "Customers & tenants", icon: Users },
@@ -68,6 +93,7 @@ const navigation = [
 ];
 
 export function AppShell({ children, session, facilityLabel = "Your facilities", access = { owner: false, permissions: [] } }: { children: React.ReactNode; session: SessionPayload | null; access?: NavigationAccess; facilityLabel?: string }) {
+  const sidebarHidden = useSyncExternalStore(subscribeSidebarPreference, sidebarHiddenSnapshot, () => false);
   const pathname = usePathname();
   const router = useRouter();
   const publicPage = pathname === "/login" || pathname === "/forgot-password" || pathname.startsWith("/reset-password/") || pathname.startsWith("/invite/") || pathname.startsWith("/setup/");
@@ -90,10 +116,10 @@ export function AppShell({ children, session, facilityLabel = "Your facilities",
   const sections = ["Overview", "Customers & sales", "Facility operations", "Finance", "Insights", "Administration"];
 
   return (
-    <div className="app-shell" data-workspace={pathname} data-section={current?.group ?? "Administration"}>
+    <div className={clsx("app-shell", sidebarHidden && "sidebar-hidden")} data-workspace={pathname} data-section={current?.group ?? "Administration"}>
       <a className="skip-to-workspace" href="#workspace-content">Skip to workspace</a>
       <ConnectivityStatus />
-      <aside className="sidebar">
+      <aside id="staff-sidebar" className="sidebar">
         <Link className="brand" href="/">
           <Image
             alt="Stor24"
@@ -150,6 +176,9 @@ export function AppShell({ children, session, facilityLabel = "Your facilities",
 
       <div className="app-main">
         <header className="topbar">
+          <button type="button" className="sidebar-toggle" aria-controls="staff-sidebar" aria-expanded={!sidebarHidden} aria-label={sidebarHidden ? "Show menu" : "Hide menu"} title={sidebarHidden ? "Show menu" : "Hide menu"} onClick={() => setSidebarHidden(!sidebarHidden)}>
+            {sidebarHidden ? <PanelLeftOpen size={19} aria-hidden="true" /> : <PanelLeftClose size={19} aria-hidden="true" />}
+          </button>
           <details key={pathname} className="staff-mobile-nav"><summary>Menu</summary><nav aria-label="Mobile navigation">{sections.map(group => <section key={group}><p className="nav-label">{group}</p>{navigation.filter(item => item.group === group).map(item => !canVisit(item.href, access) ? <span key={item.href} className="nav-link-restricted" role="link" aria-disabled="true" tabIndex={0} title={restrictedMessage}><item.icon size={17} /><span>{item.label}<small>{restrictedMessage}</small></span><LockKeyhole size={14} /></span> : <Link href={item.href} key={item.href} aria-current={current?.href === item.href ? "page" : undefined}><item.icon size={17} />{item.label}</Link>)}</section>)}<Link href="/settings"><Settings size={17} />Settings</Link></nav></details>
           <div className="workspace-context"><span>{pathname.startsWith("/settings") ? "Personal" : current?.group ?? "Workspace"}</span><strong>{pathname.startsWith("/settings") ? "Settings" : current?.label ?? "Workspace"}</strong></div>
           <WorkspaceFinder access={access} items={[...navigation, {href:"/settings",label:"Settings",group:"Personal"}, {href:"/operations/move-in",label:"New move-in",group:"Facility operations"}, {href:"/operations/accounts",label:"Customer accounts & payments",group:"Finance"}, {href:"/billing/monthly",label:"Monthly billing",group:"Finance"}, {href:"/billing/settlements",label:"Settlement reconciliation",group:"Finance"}, {href:"/billing/debit-orders",label:"Debit-order runs",group:"Finance"}, {href:"/billing/mri",label:"MRI accounting",group:"Finance"}, {href:"/billing/netcash",label:"Netcash payments",group:"Finance"}]} />

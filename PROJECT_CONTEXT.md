@@ -1,5 +1,11 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Desktop menu hide/show candidate - 3 October 2026
+
+- **Implementation:** top-left accessible Hide menu / Show menu button controls the entire desktop sidebar, releases its248px column and removes the content width cap while hidden. Browser preference persists across navigation/reload; storage-denied browsers retain a working in-memory toggle. Existing phone Menu drawer is independent. No route permissions, provider configuration or records change.
+- **Testing:** actual seven-page design fixture passes five widths and now verifies hide/show, gained workspace width, route/reload persistence, keyboard activation/focus, phone drawer independence and blocked-storage behavior. Focused lint and TypeScript pass. Initial exact-head build/unit/security/transactions passed; browser suite exposed a focus-restoration race in the restricted-navigation fixture. The fixture now asserts search-trigger focus after Escape before focusing the restricted link; all original permission assertions remain. Restricted-navigation, premium-workspace and actual-page design tests pass locally. New exact-head full suite pending.
+- **Commit and push:** candidate on codex/sidebar-toggle-20261003 from canonical main89c1c17; unrelated checkouts preserved. **Merge:** pending. **Deployment/configuration:** pending. **Live production verification:** pending after exact-source promotion; no live data writes planned. Existing provider, finance, privacy, recovery, data, training, staff UAT, telephony, Power BI and approval gates remain open.
+
 ## Staff screen redesign - live verified 3 October 2026
 
 - **Implementation:** PR369 replaces the generic staff presentation with the slate/white console and individual screen compositions documented in docs/BACKEND_SCREEN_REDESIGN.md. PR370 corrects the integrations queue at narrow phone widths and adds the actual integrations page to the isolated fixture. Home uses scoped real occupancy/signals/priority work; billing retains ten modules in three workstreams; reports add a parameter rail/report-card selection; scheduling, performance, customer/profile, inventory, finance, settings and specialist screens have defined treatments. No API, finance posting policy, provider credentials, permission grants or production records change.
