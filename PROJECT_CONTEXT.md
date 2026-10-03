@@ -1,5 +1,13 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Local braces security remediation candidate - 3 October 2026
+
+- **Implementation:** user authorized reviewing/applying the proposed CVE-2026-93687 fix and continuing previously authorized live release if it works. Both repositories pin a checked-in MIT-licensed braces fork, based on immutable upstream PR72 commit d0d575e55e74a4e0218e5248fafb79efc3e54ebb. Local corrections preserve stringify escapeInvalid behavior and consistently enforce fractional depth limits. Parser and direct compile/expand/stringify AST routes reject depth above100. Explicit local package version3.0.4-stor24.1 is not an official release; provenance records exact origin/changes. npm override references the direct file dependency; Docker copies fork before installation. No scanner, test or release gate disabled.
+- **Testing:** published3.0.3 direct30000-level AST reproduced RangeError stack exhaustion. Three focused regression tests pass from a fresh isolated npm ci install and prove actual micromatch caller resolves local fork; string/AST aliases, mixed/parenthesis/unmatched nesting, depth boundaries, fractional/nonfinite limits and ordinary behaviors covered.126 ordinary input/API/options comparisons match published behavior. npm audit reports zero findings in both updated lockfiles. Independent prepatch investigation completed. Reviewer tool could not complete; parent performed a separate challenge pass covering public aliases, direct ASTs, options and legacy behavior. Final fresh installation plus exact-head Linux full CI/build/transaction/browser/security checks pending; no fixed/deployed claim yet.
+- **Commit and push:** candidate being committed to linked draft PR364 and PR94, preserving unrelated shared dependency checkouts and public untracked Stor24 directory. Canonical contexts travel with implementation.
+- **Merge:** not performed. **Deployment/configuration:** not performed yet. The pending request is remediation, not permission to bypass checks; no exception required if all checks pass. CRM must deploy first.
+- **Live production verification:** candidate not live. Previous production health baseline remains dated; no customer/provider data mutation. Provider, finance, privacy, UAT, data, training and approval gates remain open.
+
 ## Live promotion request - 3 October 2026
 
 - **Authorization:** Brett explicitly requested live promotion of the linked enquiry/customer/map/reporting and automatic UTM changes. No second general deployment approval is required.
