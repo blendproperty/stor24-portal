@@ -6,4 +6,4 @@ if (!Array.isArray(findings)) throw new Error("Scanner did not return a valid re
 console.log(JSON.stringify({ scanner: format, findings: findings.map(f => ({
   rule: f.RuleID ?? f.check_id, path: f.File ?? f.path, line: f.StartLine ?? f.start?.line,
 })), errors: format === "semgrep" ? (report.errors?.length ?? 0) : 0 }));
-if (format === "semgrep" && report.errors?.length) { console.log(JSON.stringify(report.errors.map(e => ({type:Array.isArray(e.type) ? e.type[0] : e.type, code:e.code})))); process.exit(2); }
+if (format === "semgrep" && report.errors?.length) { console.log(JSON.stringify(report.errors.map(e => ({type:Array.isArray(e.type) ? e.type[0] : e.type, code:e.code, path:e.path ?? e.spans?.[0]?.file ?? null, line:e.spans?.[0]?.start?.line ?? null})))); process.exit(2); }
