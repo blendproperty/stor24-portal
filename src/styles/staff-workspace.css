@@ -275,7 +275,7 @@
 .app-shell .data-table td { vertical-align:middle; }
 .app-shell .data-table td:where(:not(:first-child)) { font-variant-numeric:tabular-nums; }
 .app-shell .content :where(input,select,textarea):disabled { background:#f0f2e9; color:#657468; cursor:not-allowed; }
-.calculator-note { font-size:12px; line-height:1.65; color:var(--muted); margin:0; }
+.calculator-note { grid-column:1 / -1; font-size:12px; line-height:1.65; color:var(--muted); margin:0; }
 @media(max-width:1100px) { .workspace-context { display:none; } .workspace-finder-trigger { margin-left:0; } }
 @media(max-width:760px) { .app-shell .topbar { gap:8px; } .workspace-finder-trigger { width:36px; min-height:36px; padding:8px; justify-content:center; border:0; flex-shrink:0; } .workspace-finder-trigger span,.workspace-finder-trigger kbd { display:none; } .skip-to-workspace { left:12px; } }
 @media(prefers-reduced-motion:reduce) { .app-shell *, .app-shell *::before, .app-shell *::after { scroll-behavior:auto !important; transition:none !important; animation:none !important; } }
