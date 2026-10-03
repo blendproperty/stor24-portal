@@ -10,7 +10,7 @@ export default async function PhonePage() {
   const { organisationId, allowedFacilityIds } = await requirePermission("phone.view");
   const connection = await db.integrationConnection.findFirst({ where: { organisationId, category: { equals: "PHONE", mode: "insensitive" }, ...(allowedFacilityIds ? { OR: [{ facilityId: null }, { facilityId: { in: allowedFacilityIds } }] } : {}) }, orderBy: { updatedAt: "desc" } });
   return (
-    <div className="page-stack">
+    <div className="page-stack phone-workspace">
       <PageHeader eyebrow="Telephony" title="Phone integration" description="Review the phone connection and the remaining steps before caller matching is available." />
       <section className="dashboard-grid">
         <article className="panel panel-spacious">

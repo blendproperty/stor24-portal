@@ -98,7 +98,7 @@ export function NetcashIntegrationWorkspace() {
   }
 
   const configuredCount = configuration ? [configuration.accountServiceKeyConfigured, configuration.debitOrderServiceKeyConfigured, configuration.payNowServiceKeyConfigured].filter(Boolean).length : 0;
-  return <div className="page-stack">
+  return <div className="page-stack provider-config-workspace">
     <PageHeader eyebrow="Company setup · Integrations" title="Netcash test connection" description="Validate the dedicated Netcash test account and store its service keys securely. This screen cannot submit payments or debit orders." />
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p className="form-success"><CheckCircle2 size={16}/>{notice}</p> : null}

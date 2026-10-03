@@ -44,7 +44,7 @@ export function BiometricAccessWorkspace({
 
   if (!enrollments.length) return null;
   return (
-    <div className="page-stack">
+    <div className="page-stack access-events-workspace">
       <section className="panel panel-spacious">
         <div className="panel-heading">
           <div>

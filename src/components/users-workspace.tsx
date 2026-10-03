@@ -183,7 +183,7 @@ export function UsersWorkspace() {
   );
 
   return (
-    <div className="page-stack">
+    <div className="page-stack people-admin-workspace">
       <PageHeader
         eyebrow="Access administration"
         title="Users & permissions"

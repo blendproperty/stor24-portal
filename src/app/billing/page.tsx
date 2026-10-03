@@ -40,7 +40,7 @@ export default async function BillingPage() {
   const collectedThisMonth = paymentsAgg;
 
   return (
-    <div className="page-stack">
+    <div className="page-stack finance-hub-workspace">
       <PageHeader
         eyebrow="Financial operations"
         title="Billing & payments"
@@ -56,11 +56,16 @@ export default async function BillingPage() {
           <Link className="summary-cell" href={href} key={label}><span>{label}</span><strong>{value}</strong></Link>
         ))}
       </section>
-      <section className="module-grid">
-        {modules.map(([Icon, title, copy, href, action]) => (
-          <Link className="module-card" href={href} key={title}><Icon size={22} /><h3>{title}</h3><p>{copy}</p><span className="text-button">{action} →</span></Link>
-        ))}
-      </section>
+      <div className="finance-workstreams">
+        {[
+          { title: "Bill & collect", description: "Run the monthly cycle and manage payments.", indexes: [2, 4, 5, 3] },
+          { title: "Reconcile & close", description: "Match outcomes and keep the ledger in balance.", indexes: [1, 0, 9] },
+          { title: "Evidence & controls", description: "Prepare statements, trace receipts and review exceptions.", indexes: [6, 7, 8] },
+        ].map(group => <section className="finance-workstream" key={group.title}><header><p className="eyebrow">Financial operations</p><h2>{group.title}</h2><p>{group.description}</p></header><div className="module-grid">{group.indexes.map(index => {
+          const [Icon, title, copy, href, action] = modules[index];
+          return <Link className="module-card" href={href} key={title}><Icon size={22}/><h3>{title}</h3><p>{copy}</p><span className="text-button">{action} →</span></Link>;
+        })}</div></section>)}
+      </div>
     </div>
   );
 }

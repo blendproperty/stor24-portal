@@ -90,7 +90,7 @@ export function AppShell({ children, session, facilityLabel = "Your facilities",
   const sections = ["Overview", "Customers & sales", "Facility operations", "Finance", "Insights", "Administration"];
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-workspace={pathname} data-section={current?.group ?? "Administration"}>
       <a className="skip-to-workspace" href="#workspace-content">Skip to workspace</a>
       <ConnectivityStatus />
       <aside className="sidebar">

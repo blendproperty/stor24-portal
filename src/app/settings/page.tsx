@@ -17,7 +17,7 @@ const modules = [
 
 export default function SettingsPage() {
   return (
-    <div className="page-stack">
+    <div className="page-stack settings-hub-workspace">
       <PageHeader
         eyebrow="Administration"
         title="Settings"

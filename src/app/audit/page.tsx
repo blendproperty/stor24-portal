@@ -35,7 +35,7 @@ function netcashDetails(action: string, after: unknown) {
 export default async function AuditPage() {
   const auth = await requirePermission("audit.view");
   const events = await db.auditEvent.findMany({ where: { organisationId: auth.user.organisationId }, include: { actor: { select: { name: true, email: true } } }, orderBy: { occurredAt: "desc" }, take: 200 });
-  return <div className="page-stack"><PageHeader eyebrow="System" title="System audit" description="Recent authentication, configuration, integration, recovery and operational events for this organisation." /><section className="panel"><div className="table-wrap"><table className="data-table"><thead><tr><th>Time</th><th>Action</th><th>Actor</th><th>Target</th><th>Details</th><th>Request reference</th></tr></thead><tbody>{events.length ? events.map((event) => {
+  return <div className="page-stack audit-register-workspace"><PageHeader eyebrow="System" title="System audit" description="Recent authentication, configuration, integration, recovery and operational events for this organisation." /><section className="panel"><div className="table-wrap"><table className="data-table"><thead><tr><th>Time</th><th>Action</th><th>Actor</th><th>Target</th><th>Details</th><th>Request reference</th></tr></thead><tbody>{events.length ? events.map((event) => {
     const href = targetHref(event.entityType, event.entityId);
     const target = <>{event.entityType}<span className="secondary-cell">{event.entityId}</span></>;
     const dlp = event.action.startsWith("dlp.") && event.after && typeof event.after === "object" && !Array.isArray(event.after) ? event.after as Record<string, unknown> : null;

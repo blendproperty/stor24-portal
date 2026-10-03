@@ -73,6 +73,7 @@ jobs:
       - run: node scripts/test-move-in-training.mjs
       - run: node scripts/test-restricted-navigation.mjs
       - run: node scripts/test-premium-workspace.mjs
+      - run: node scripts/test-screen-design.mjs
       - run: node scripts/test-floor-availability.mjs
       - run: node scripts/test-tenant-login.mjs
       - uses: actions/upload-artifact@v4

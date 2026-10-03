@@ -14,7 +14,7 @@ export function MetricCard({
   tone?: "default" | "orange" | "green" | "warning";
 }) {
   return (
-    <article className="metric-card">
+    <article className={`metric-card metric-card-${tone}`}>
       <div className="metric-top">
         <span className="metric-label">{label}</span>
         <span className={`metric-icon metric-icon-${tone}`}>

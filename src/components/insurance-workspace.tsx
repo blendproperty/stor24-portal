@@ -219,7 +219,7 @@ export function InsuranceWorkspace() {
     );
 
   return (
-    <div className="page-stack">
+    <div className="page-stack insurance-operations-workspace">
       <PageHeader
         eyebrow="Tenant protection"
         title="Insurance operations"
