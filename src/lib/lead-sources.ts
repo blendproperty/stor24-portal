@@ -1,6 +1,6 @@
 export const LEAD_SOURCES = ["Walk-in", "Phone in", "Website", "WhatsApp", "SMS", "Email", "Customer referral", "Friend / family referral", "Estate agent / property manager", "Removal / moving company", "Business partner", "Roadside signage", "Billboard", "Flyer / brochure", "Print advertising", "Radio", "Event / exhibition", "Online directory", "Gumtree", "Vehicle branding", "Community sponsorship", "Returning customer", "Other"] as const;
 export function leadSourceLabel(source: string) {
-  return ({ Phone: "Phone in", Walkin: "Walk-in", "Phone In": "Phone in", PUBLIC_QUOTE_FORM: "Website", PUBLIC_BOOKING: "Website" } as Record<string, string>)[source] ?? source;
+  return ({ Phone: "Phone in", Walkin: "Walk-in", "Phone In": "Phone in", PUBLIC_QUOTE_FORM: "Website", PUBLIC_BOOKING: "Website", PUBLIC_WEBSITE: "Website booking", PUBLIC_VIEWING: "Website viewing", OFFLINE_PWA: "Offline capture" } as Record<string, string>)[source] ?? source;
 }
 
 export function websiteSourceLabel(attribution: {source: string; medium?: string}) {
