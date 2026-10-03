@@ -1,5 +1,11 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Workspace finder focus follow-up candidate - 3 October 2026
+
+- **Implementation:** repeated documentation CI reproduced the restricted-navigation focus failure despite the fixture's restored-trigger assertion. Native dialog close restores focus immediately, then its delayed close event could unconditionally steal it back from a newly focused menu link. WorkspaceFinder now restores the trigger only when focus is on the body or remains inside the closed dialog; valid focus elsewhere is respected. Restricted-navigation also asserts the selected link remains focused. This is a product correction, not a retry or disabled assertion.
+- **Testing:** three consecutive restricted desktop/mobile checks, premium workspace and actual-page design checks pass locally; focused lint and TypeScript pass. New exact-head full CI pending. Initial documentation source9917f35 failed its browser check and was not merged; all other eight checks passed. No exceptions/suppression.
+- **Commit and push:** follow-up on codex/sidebar-live-record-20261003/PR373 with the menu deployment evidence below. **Merge:** pending for this follow-up. **Deployment/configuration:** existing menu source16482e4 remains live; this focus correction is not deployed yet. **Live verification:** pending after promotion. Existing provider, finance, privacy, recovery, data, training, staff UAT, telephony, Power BI and approval gates remain open. Earlier statements about a fixture-only race are superseded by this diagnosis.
+
 ## Desktop menu hide/show - live verified 3 October 2026
 
 - **Implementation:** PR372 adds an accessible top-left Hide menu / Show menu control, removes the248px desktop sidebar column and content width cap when hidden, remembers the preference in this browser, retains a working toggle when storage is blocked and keeps the existing phone drawer independent. Existing route permissions/provider/data behavior unchanged.
