@@ -19,13 +19,15 @@ export const requirePermissionScope=requireScope;
 export const facilityWhere=()=>({});
 export const requireSession=async()=>({permissions:location.search.includes('restricted')?['operations.view']:['*']});
 export const netCollectionTotal=async()=>162000;
-export const db={account:{aggregate:async()=>({_sum:{balance:12400}})},tenancy:{count:async()=>128},facility:{findMany:async()=>[{id:'fixture',name:'Training store'}]}};
+export const getWhatsAppAutomationState=async()=>({enabled:false,serverGateEnabled:false});
+export const listHikCentralConfiguration=async()=>({company:{endpoint:"",appKeyConfigured:false,appSecretConfigured:false,status:"DISCONNECTED",failureMessage:null},facilities:[]});
+export const db={document:{findMany:async()=>[]},webhookInbox:{groupBy:async()=>[{status:'PROCESSED',_count:369}]},webhookOutbox:{groupBy:async()=>[{status:'PENDING',_count:18}]},communicationLog:{findMany:async()=>[]},auditEvent:{findMany:async()=>[]},account:{aggregate:async()=>({_sum:{balance:12400}})},tenancy:{count:async()=>128},facility:{findMany:async()=>[{id:'fixture',name:'Training store'}]}};
 export const getOperationsCalendar=async()=>Array.from({length:7},(_,i)=>({key:'2026-10-'+String(i+3).padStart(2,'0'),items:i%2===0?[{id:'task'+i,kind:'task',at:new Date('2026-10-03T10:00:00Z'),title:'Example follow-up',detail:'Training store',href:'/leads?lead=fixture'}]:[]}));
 `;
-const bundle=await build({entryPoints:['tests/browser/screen-design-fixture.jsx'],bundle:true,write:false,outdir:'output/screen-redesign/bundle',format:'esm',jsx:'automatic',plugins:[{name:'design-fixture',setup(b){
+const bundle=await build({entryPoints:['tests/browser/screen-design-fixture.jsx'],bundle:true,write:false,outdir:'output/screen-redesign/bundle',define:{'process.env':'{}'},format:'esm',jsx:'automatic',plugins:[{name:'design-fixture',setup(b){
  b.onResolve({filter:/^next\/(link|image|navigation)$/},a=>({path:a.path,namespace:'next-stub'}));
  b.onLoad({filter:/.*/,namespace:'next-stub'},a=>({loader:'jsx',resolveDir:root,contents:a.path==='next/navigation'?`export const usePathname=()=>location.pathname;export const useRouter=()=>({replace(h){location.href=h},refresh(){}});`:a.path==='next/image'?`import React from 'react';export default function Image({priority,fill,...props}){return <img {...props}/>}`:`import React from 'react';export default function Link(props){return <a {...props}/>}`}));
- b.onResolve({filter:/^@\/lib\/(dashboard-service|scope|db|auth-guards|calendar-service|finance\/collection-total)$/},a=>({path:a.path,namespace:'services'}));
+ b.onResolve({filter:/^@\/lib\/(dashboard-service|scope|db|auth-guards|calendar-service|finance\/collection-total|integrations\/whatsapp-automation|integrations\/hikcentral-configuration)$/},a=>({path:a.path,namespace:'services'}));
  b.onLoad({filter:/.*/,namespace:'services'},()=>({contents:mock,loader:'js'}));
 }}]});
 const css=(await Promise.all(['src/app/globals.css','src/styles/stor24-brand.css','src/styles/guided-help.css','src/styles/staff-workspace.css'].map(p=>readFile(p,'utf8')))).join('\n').replace('@import "tailwindcss";','');
@@ -46,7 +48,7 @@ if(process.env.PREVIEW_ONLY){console.log('Design preview: '+base)}else{
   await mkdir('output/screen-redesign/design',{recursive:true});
   for(const width of [1440,1024,768,390,320]){
    await page.setViewportSize({width,height:1000});
-   for(const [route,title] of [['/','Stor24 operational overview'],['/billing','Billing & payments'],['/calendar','Calendar'],['/graphs','Performance overview'],['/reports','Reports'],['/settings','Settings']]){
+   for(const [route,title] of [['/','Stor24 operational overview'],['/billing','Billing & payments'],['/calendar','Calendar'],['/graphs','Performance overview'],['/reports','Reports'],['/settings','Settings'],['/integrations','Integrations & webhooks']]){
     await page.goto(base+route);await expect(page.getByRole('heading',{name:title,exact:true})).toBeVisible();
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,route+' overflow '+width);
     if(route==='/billing'){await expect(page.getByRole('heading',{name:'Bill & collect'})).toBeVisible();assert.equal(await page.locator('.finance-workstream .module-card').count(),10)}
@@ -61,6 +63,6 @@ if(process.env.PREVIEW_ONLY){console.log('Design preview: '+base)}else{
   await expect(page.locator('.portfolio-signal[href="/collections"]')).toHaveCount(0);
   await expect(page.locator('.daily-workflow[href="/reports"]')).toHaveCount(0);
   await expect(page.locator('.portfolio-signal[href="/tenants"]')).toBeVisible();
-  assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);console.log('Six actual pages pass design/real-value/layout checks at five widths; no writes.');
+  assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);console.log('Seven actual pages pass design/real-value/layout checks at five widths; no writes.');
  }finally{await browser.close();server.close()}
 }

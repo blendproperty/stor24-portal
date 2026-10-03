@@ -619,3 +619,8 @@
 .app-shell .report-parameters > p { font-size:12px; line-height:1.65; color:#627580; }
 .app-shell .filter-tabs button { background:#fff; color:#697f8a; border:1px solid #dce5eb; border-radius:6px; font-weight:600; font-size:11px; }
 .app-shell .filter-tabs button.active { color:#fff; background:#16313b; border-color:#16313b; }
+
+@media(max-width:980px) {
+ .app-shell .integration-monitor-workspace > .dashboard-grid,
+ .app-shell .communications-workspace .dashboard-grid { grid-template-columns:minmax(0,1fr); }
+}
