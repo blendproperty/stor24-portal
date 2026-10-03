@@ -624,3 +624,13 @@
  .app-shell .integration-monitor-workspace > .dashboard-grid,
  .app-shell .communications-workspace .dashboard-grid { grid-template-columns:minmax(0,1fr); }
 }
+
+/* Desktop menu preference leaves the existing phone drawer independent. */
+.app-shell .sidebar-toggle { display:none; }
+@media(min-width:761px) {
+ .app-shell .sidebar-toggle { display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; width:40px; height:40px; border:1px solid #dce5eb; border-radius:7px; background:#fff; color:#284855; cursor:pointer; margin-right:12px; }
+ .app-shell .sidebar-toggle:hover { background:#edf4f6; }
+ .app-shell.sidebar-hidden .sidebar { display:none; }
+ .app-shell.sidebar-hidden .app-main { margin-left:0; }
+ .app-shell.sidebar-hidden .content { max-width:none; }
+}

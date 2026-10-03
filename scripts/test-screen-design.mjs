@@ -58,6 +58,34 @@ if(process.env.PREVIEW_ONLY){console.log('Design preview: '+base)}else{
     await page.screenshot({path:'output/screen-redesign/design/'+(route==='/'?'home':route.slice(1))+'-'+width+'.png',fullPage:true});
    }
   }
+  await page.setViewportSize({width:1440,height:1000});
+  await page.goto(base+'/');
+  const expandedWidth=await page.locator('.app-main').evaluate(e=>e.getBoundingClientRect().width);
+  await page.getByRole('button',{name:'Hide menu',exact:true}).click();
+  await expect(page.locator('#staff-sidebar')).not.toBeVisible();
+  await expect(page.getByRole('button',{name:'Show menu',exact:true})).toHaveAttribute('aria-expanded','false');
+  assert.ok(await page.locator('.app-main').evaluate(e=>e.getBoundingClientRect().width)>expandedWidth+200);
+  await page.goto(base+'/billing');
+  await expect(page.locator('#staff-sidebar')).not.toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('button',{name:'Show menu',exact:true})).toBeVisible();
+  await page.setViewportSize({width:390,height:1000});
+  await expect(page.locator('.staff-mobile-nav')).toBeVisible();
+  await expect(page.locator('.sidebar-toggle')).not.toBeVisible();
+  await page.setViewportSize({width:1440,height:1000});
+  await page.getByRole('button',{name:'Show menu',exact:true}).press('Enter');
+  await expect(page.locator('#staff-sidebar')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Hide menu',exact:true})).toBeFocused();
+  await page.reload();
+  await expect(page.locator('#staff-sidebar')).toBeVisible();
+  const storageBlocked=await browser.newPage({viewport:{width:1440,height:1000}});
+  await storageBlocked.addInitScript(()=>{Storage.prototype.setItem=function(){throw new Error('Storage blocked for isolated test')};});
+  await storageBlocked.goto(base+'/');
+  await storageBlocked.getByRole('button',{name:'Hide menu',exact:true}).click();
+  await expect(storageBlocked.locator('#staff-sidebar')).not.toBeVisible();
+  await storageBlocked.getByRole('button',{name:'Show menu',exact:true}).click();
+  await expect(storageBlocked.locator('#staff-sidebar')).toBeVisible();
+  await storageBlocked.close();
   await page.goto(base+'/?restricted');
   await expect(page.getByRole('link',{name:/Explore inventory/})).toHaveCount(0);
   await expect(page.locator('.portfolio-signal[href="/collections"]')).toHaveCount(0);
