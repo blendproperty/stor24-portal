@@ -261,7 +261,7 @@ export function MarketingDashboard({ canManage }: { canManage: boolean }) {
     <div className="marketing-workspace">
       <header className="marketing-heading">
         <div>
-          <p className="marketing-eyebrow">GROWTH & ACQUISITION</p>
+          <p className="marketing-eyebrow">GROWTH &amp; ACQUISITION</p>
           <h1>Marketing performance</h1>
           <p>See which activity brings enquiries through the door.</p>
         </div>
