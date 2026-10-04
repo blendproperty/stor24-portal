@@ -72,7 +72,7 @@ export function marketingReport(
   for (const l of selected) {
     const label = l.attribution
       ? `${l.attribution.source} / ${l.attribution.medium}`
-      : `${l.source || "Unknown"} · staff recorded`;
+      : `${l.source || "Unknown"} · recorded source`;
     const row = channels.get(label) ?? { label, leads: 0, won: 0 };
     row.leads++;
     if (l.won) row.won++;

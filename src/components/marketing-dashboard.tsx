@@ -520,7 +520,7 @@ export function MarketingDashboard({ canManage }: { canManage: boolean }) {
                 </section>
                 <section className="marketing-card">
                   <h2>Acquisition channels</h2>
-                  <p>Website attribution and staff sources stay distinct</p>
+                  <p>Website attribution and recorded sources stay distinct</p>
                   <div className="marketing-channel-bars">
                     {report.channels.slice(0, 8).map((c) => (
                       <div key={c.label}>
@@ -558,7 +558,7 @@ export function MarketingDashboard({ canManage }: { canManage: boolean }) {
                     <div>
                       <b>{report.attributed} attributed</b>
                       <p>
-                        {report.unknown} staff-recorded or unattributed
+                        {report.unknown} recorded-source or unattributed
                         enquiries
                       </p>
                     </div>
