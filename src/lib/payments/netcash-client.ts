@@ -48,6 +48,8 @@
 import { db } from "@/lib/db";
 import { NETCASH_SOFTWARE_VENDOR_KEY } from "@/lib/integrations/netcash-configuration";
 import { decryptIntegrationSecret } from "@/lib/integrations/integration-secret-vault";
+import { z } from "zod";
+import { abortable, boundedPayNowBody, boundedPayNowVerification, payNowIdentifier, PAY_NOW_RESPONSE_BYTES, PAY_NOW_VERIFICATION_TIMEOUT_MS } from "./netcash-pay-now-security";
 
 export type NetcashConfig = {
   merchantAccount?: string;
@@ -316,24 +318,35 @@ export function createPayNowCheckout(connection: { config: unknown }, params: {
  * scoped by the (effectively unguessable) RequestTrace value alone.
  */
 export async function checkPayNowTransactionStatus(requestTrace: string, request: typeof fetch = fetch) {
-  const res = await request(`https://ws.netcash.co.za/PayNow/TransactionStatus/Check?RequestTrace=${encodeURIComponent(requestTrace)}`);
-  const text = await res.text();
-  if (!res.ok) throw new Error(`NETCASH_TRANSACTION_STATUS_HTTP_${res.status}: ${text.slice(0, 500)}`);
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    throw new Error(`NETCASH_TRANSACTION_STATUS_NON_JSON: ${text.slice(0, 500)}`);
-  }
-  const body = parsed as { RequestTrace?: string; Amount?: string; TransactionAccepted?: boolean; Reference?: string; Reason?: string };
-  return {
-    requestTrace: body.RequestTrace ?? requestTrace,
-    amount: body.Amount,
-    accepted: body.TransactionAccepted === true,
-    reference: body.Reference,
-    reason: body.Reason,
-    raw: body,
-  };
+  if (!payNowIdentifier(requestTrace)) throw new Error("NETCASH_REQUEST_TRACE_INVALID");
+  return boundedPayNowVerification(async () => {
+    const signal = AbortSignal.timeout(PAY_NOW_VERIFICATION_TIMEOUT_MS);
+    let res: Response;
+    try {
+      res = await abortable(request(`https://ws.netcash.co.za/PayNow/TransactionStatus/Check?RequestTrace=${encodeURIComponent(requestTrace)}`, { signal, redirect: "error", cache: "no-store" }), signal);
+    } catch { throw new Error("NETCASH_TRANSACTION_STATUS_UNAVAILABLE"); }
+    if (!res.ok) {
+      void res.body?.cancel().catch(() => undefined);
+      throw new Error(`NETCASH_TRANSACTION_STATUS_HTTP_${res.status}`);
+    }
+    let text: string;
+    try { text = await boundedPayNowBody(res, PAY_NOW_RESPONSE_BYTES, signal); }
+    catch { throw new Error("NETCASH_TRANSACTION_STATUS_RESPONSE_INVALID"); }
+    let parsed: unknown;
+    try { parsed = JSON.parse(text); }
+    catch { throw new Error("NETCASH_TRANSACTION_STATUS_NON_JSON"); }
+    const result = z.object({
+      RequestTrace: z.string().refine(payNowIdentifier).optional(),
+      Amount: z.union([z.string().regex(/^\d{1,12}(?:\.\d{1,2})?$/), z.number().finite().nonnegative().max(999_999_999_999.99)]).optional(),
+      TransactionAccepted: z.boolean(),
+      Reference: z.string().refine(payNowIdentifier).optional(),
+      Reason: z.string().max(2000).optional(),
+    }).safeParse(parsed);
+    if (!result.success || (result.data.RequestTrace !== undefined && result.data.RequestTrace !== requestTrace) ||
+      (result.data.TransactionAccepted && (result.data.Amount === undefined || !result.data.Reference))) throw new Error("NETCASH_TRANSACTION_STATUS_RESPONSE_INVALID");
+    const body = result.data;
+    return { requestTrace: body.RequestTrace ?? requestTrace, amount: body.Amount, accepted: body.TransactionAccepted, reference: body.Reference, reason: body.Reason, raw: body };
+  });
 }
 
 /** Account Verification Service -- confirm a bank account is valid/open before setting up a mandate. */

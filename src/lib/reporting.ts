@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { hasPermission } from "@/lib/permissions";
+import { reportPeriodAllowed } from "@/lib/report-workload";
 
 export function isCurrentSnapshotReport(key: string) {
   return ["occupancy-revenue", "unit-availability", "integration-health"].includes(key);
@@ -33,7 +34,8 @@ export const reportParametersSchema = z.object({
   to: z.iso.date(),
   format: z.enum(["CSV", "JSON"]).default("CSV"),
   groupBy: z.enum(["day", "week", "month", "facility"]).default("month"),
-}).refine((value) => value.from <= value.to, { message: "From date must be on or before to date.", path: ["from"] });
+}).refine((value) => value.from <= value.to, { message: "From date must be on or before to date.", path: ["from"] })
+  .refine(value => reportPeriodAllowed(value.reportKey, value.from, value.to), { message: "Choose a period of up to 366 days, or export separate periods.", path: ["from"] });
 
 export type ReportParameters = z.infer<typeof reportParametersSchema>;
 

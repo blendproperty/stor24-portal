@@ -413,7 +413,7 @@ test("report exports require overlapping export and report facility grants", asy
 test("receivables export uses approved ageing and shows review states instead of plausible buckets", async () => {
   const state = fixture();
   const account: Row = { id: "age-account", accountNumber: "AGE-SYN", balance: "100", currency: "ZAR", customer: { firstName: "Synthetic", lastName: "Ageing", companyName: null }, tenancy: { facilityId: "a", facility: { name: "A" } }, ledgerEntries: [{ id: "charge", type: "CHARGE", amount: "100", description: "Synthetic rent", effectiveAt: new Date("2020-01-01T00:00:00+02:00"), metadata: null }], payments: [], adjustments: [], debitInstructions: [], collectionCase: { terms: { dueDays: 0, allocation: "OLDEST_DUE_FIRST", approvalReference: "Synthetic approved terms", overrides: [] }, activities: [], promises: [] } };
-  state.db.account = { findMany: async () => [account] };
+  state.db.account = { findMany: async ({ select }: Row) => select ? [{ _count: { ledgerEntries: account.ledgerEntries.length, payments: account.payments.length, adjustments: account.adjustments.length, debitInstructions: account.debitInstructions.length } }] : [account] };
   state.db.tenancy = { findMany: async () => [{ ...account.tenancy, customer: account.customer, account, occupancies: [], status: "ACTIVE" }] };
   const api = await load("./src/lib/report-data-service.ts", state);
   const scope = { userId: "staff", organisationId: "org", facilityIds: ["a"], unrestrictedFacilities: false };
@@ -447,8 +447,8 @@ test("report date windows include SAST midnight and exclude the next SAST day", 
 
 test("current snapshot report rows identify capture time despite historical parameters", async () => {
   const state = fixture();
-  state.db.facility.findMany = async () => [{ name: "A", units: [{ monthlyRate: 100, occupancies: [{ monthlyRate: 90 }] }] }];
-  state.db.unit = { findMany: async () => [{ facility: { name: "A" }, number: "SYN", unitType: { name: "Synthetic", areaSqMetres: null }, monthlyRate: 100, status: "AVAILABLE", reservations: [] }] };
+  state.db.facility.findMany = async () => [{ id: "a", name: "A" }];
+  state.db.unit = { findMany: async () => [{ facilityId: "a", occupancies: [{ monthlyRate: 90 }], facility: { name: "A" }, number: "SYN", unitType: { name: "Synthetic", areaSqMetres: null }, monthlyRate: 100, status: "AVAILABLE", reservations: [] }] };
   state.db.integrationConnection = { findMany: async () => [{ facility: null, category: "Synthetic", provider: "Fixture", status: "DISABLED", consecutiveFailures: 0, failureCode: null, failureMessage: null }] };
   const api = await load("./src/lib/report-data-service.ts", state);
   for (const reportKey of ["occupancy-revenue", "unit-availability", "integration-health"]) {

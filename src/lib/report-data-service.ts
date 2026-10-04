@@ -1,11 +1,13 @@
 import { db } from "@/lib/db";
 import { collectionsWorkspace } from "@/lib/collections-service";
 import { requireFacility, type RequestScope } from "@/lib/scope";
-import type { ReportParameters } from "@/lib/reporting";
+import { reportParametersSchema, type ReportParameters } from "@/lib/reporting";
+import { requireReportCapacity, REPORT_QUERY_TAKE } from "@/lib/report-workload";
 
 export type ReportRow = Record<string, string | number | boolean | null>;
 
 export async function buildReportRows(scope: RequestScope, parameters: ReportParameters): Promise<ReportRow[]> {
+  if (!reportParametersSchema.safeParse(parameters).success) throw new Error("REPORT_PERIOD_LIMIT");
   if (parameters.facilityId) await requireFacility(scope, parameters.facilityId);
   const facilityId = parameters.facilityId ? parameters.facilityId : scope.unrestrictedFacilities ? undefined : { in: scope.facilityIds };
   const from = new Date(`${parameters.from}T00:00:00.000+02:00`);
@@ -16,29 +18,41 @@ export async function buildReportRows(scope: RequestScope, parameters: ReportPar
 
   switch (parameters.reportKey) {
     case "occupancy-revenue": {
-      const facilities = await db.facility.findMany({ where: facility, include: { units: { include: { unitType: true, occupancies: { where: { status: { in: ["ACTIVE", "NOTICE_GIVEN"] } }, select: { monthlyRate: true } } } } }, orderBy: { name: "asc" } });
+      const facilities = await db.facility.findMany({ where: facility, select: { id: true, name: true }, orderBy: { name: "asc" }, take: REPORT_QUERY_TAKE });
+      requireReportCapacity(facilities);
+      const units = await db.unit.findMany({ where: { facility }, select: { facilityId: true, monthlyRate: true, occupancies: { where: { status: { in: ["ACTIVE", "NOTICE_GIVEN"] } }, select: { monthlyRate: true }, take: 1 } }, take: REPORT_QUERY_TAKE });
+      requireReportCapacity(units);
+      const unitsByFacility = new Map<string, typeof units>();
+      for (const unit of units) {
+        const group = unitsByFacility.get(unit.facilityId);
+        if (group) group.push(unit); else unitsByFacility.set(unit.facilityId, [unit]);
+      }
       return facilities.map((item) => {
-        const occupied = item.units.filter((unit) => unit.occupancies.length);
-        const potentialRent = item.units.reduce((sum, unit) => sum + Number(unit.monthlyRate), 0);
+        const facilityUnits = unitsByFacility.get(item.id) ?? [];
+        const occupied = facilityUnits.filter((unit) => unit.occupancies.length);
+        const potentialRent = facilityUnits.reduce((sum, unit) => sum + Number(unit.monthlyRate), 0);
         const achievedRent = occupied.reduce((sum, unit) => sum + Number(unit.occupancies[0].monthlyRate), 0);
-        return { snapshotTakenAt, facility: item.name, totalUnits: item.units.length, occupiedUnits: occupied.length, physicalOccupancyPercent: item.units.length ? Number((occupied.length / item.units.length * 100).toFixed(2)) : 0, monthlyOccupiedRent: achievedRent, potentialMonthlyRent: potentialRent, economicOccupancyPercent: potentialRent ? Number((achievedRent / potentialRent * 100).toFixed(2)) : 0 };
+        return { snapshotTakenAt, facility: item.name, totalUnits: facilityUnits.length, occupiedUnits: occupied.length, physicalOccupancyPercent: facilityUnits.length ? Number((occupied.length / facilityUnits.length * 100).toFixed(2)) : 0, monthlyOccupiedRent: achievedRent, potentialMonthlyRent: potentialRent, economicOccupancyPercent: potentialRent ? Number((achievedRent / potentialRent * 100).toFixed(2)) : 0 };
       });
     }
     case "unit-availability": {
-      const units = await db.unit.findMany({ where: { facility }, include: { facility: { select: { name: true } }, unitType: { select: { name: true, areaSqMetres: true } }, reservations: { where: { status: "ACTIVE" }, select: { holdExpiresAt: true }, take: 1 } }, orderBy: [{ facilityId: "asc" }, { number: "asc" }] });
+      const units = await db.unit.findMany({ where: { facility }, include: { facility: { select: { name: true } }, unitType: { select: { name: true, areaSqMetres: true } }, reservations: { where: { status: "ACTIVE" }, select: { holdExpiresAt: true }, take: 1 } }, orderBy: [{ facilityId: "asc" }, { number: "asc" }], take: REPORT_QUERY_TAKE });
+      requireReportCapacity(units);
       return units.map((unit) => ({ snapshotTakenAt, facility: unit.facility.name, unit: unit.number, type: unit.unitType.name, areaSqMetres: unit.unitType.areaSqMetres === null ? null : Number(unit.unitType.areaSqMetres), status: unit.status, monthlyRate: Number(unit.monthlyRate), activeHoldExpiresAt: unit.reservations[0]?.holdExpiresAt?.toISOString() ?? null }));
     }
     case "move-activity": {
-      const occupancies = await db.occupancy.findMany({ where: { tenancy: { facility }, OR: [{ startDate: { gte: from, lte: to } }, { endDate: { gte: from, lte: to } }] }, include: { unit: { select: { number: true } }, tenancy: { include: { facility: { select: { name: true } }, customer: { select: { firstName: true, lastName: true, companyName: true } }, account: { select: { accountNumber: true } } } } }, orderBy: { startDate: "asc" } });
+      const occupancies = await db.occupancy.findMany({ where: { tenancy: { facility }, OR: [{ startDate: { gte: from, lte: to } }, { endDate: { gte: from, lte: to } }] }, include: { unit: { select: { number: true } }, tenancy: { include: { facility: { select: { name: true } }, customer: { select: { firstName: true, lastName: true, companyName: true } }, account: { select: { accountNumber: true } } } } }, orderBy: { startDate: "asc" }, take: REPORT_QUERY_TAKE });
+      requireReportCapacity(occupancies);
       return occupancies.map((item) => ({ facility: item.tenancy.facility.name, account: item.tenancy.account.accountNumber, customer: item.tenancy.customer.companyName || [item.tenancy.customer.firstName, item.tenancy.customer.lastName].filter(Boolean).join(" "), unit: item.unit.number, status: item.status, moveIn: item.startDate.toISOString(), moveOut: item.endDate?.toISOString() ?? null, monthlyRate: Number(item.monthlyRate) }));
     }
     case "lead-conversion": {
-      const leads = await db.lead.findMany({ where: { facility, createdAt: { gte: from, lte: to } }, include: { facility: { select: { name: true } }, customer: { select: { firstName: true, lastName: true, companyName: true } }, assignedTo: { select: { name: true } } }, orderBy: { createdAt: "asc" } });
+      const leads = await db.lead.findMany({ where: { facility, createdAt: { gte: from, lte: to } }, include: { facility: { select: { name: true } }, customer: { select: { firstName: true, lastName: true, companyName: true } }, assignedTo: { select: { name: true } } }, orderBy: { createdAt: "asc" }, take: REPORT_QUERY_TAKE });
+      requireReportCapacity(leads);
       return leads.map((lead) => ({ facility: lead.facility.name, createdAt: lead.createdAt.toISOString(), source: lead.source, stage: lead.stage, customer: lead.customer?.companyName || [lead.customer?.firstName, lead.customer?.lastName].filter(Boolean).join(" ") || "Unlinked", assignedTo: lead.assignedTo?.name ?? "Unassigned", expectedMoveIn: lead.expectedMoveIn?.toISOString() ?? null, nextActionAt: lead.nextActionAt?.toISOString() ?? null }));
     }
     case "receivables-ageing": {
       const reportScope = parameters.facilityId ? { ...scope, facilityIds: [parameters.facilityId], unrestrictedFacilities: false } : scope;
-      const data = await collectionsWorkspace(reportScope, parameters.to);
+      const data = await collectionsWorkspace(reportScope, parameters.to, true);
       return data.rows.map(row => {
         const amount = (cents: number) => row.ageing.issue ? null : (cents / 100).toFixed(2);
         return { asOfSast: data.asOf, facility: row.facility, account: row.accountNumber, customer: row.name, currentRecordedBalance: row.currentBalance,
@@ -48,15 +62,18 @@ export async function buildReportRows(scope: RequestScope, parameters: ReportPar
     }
     case "rent-roll":
     case "collections-performance": {
-      const tenancies = await db.tenancy.findMany({ where: { facility, status: { in: ["ACTIVE", "NOTICE_GIVEN"] }, ...(parameters.reportKey === "rent-roll" ? {} : { account: { balance: { gt: 0 } } }) }, include: { facility: { select: { name: true } }, customer: { select: { firstName: true, lastName: true, companyName: true } }, account: { include: { ledgerEntries: { where: { effectiveAt: { gte: from, lte: to } }, orderBy: { effectiveAt: "asc" } } } }, occupancies: { where: { status: { in: ["ACTIVE", "NOTICE_GIVEN"] } }, include: { unit: { select: { number: true } } }, take: 1 } }, orderBy: { facilityId: "asc" } });
-      return tenancies.map((item) => ({ facility: item.facility.name, account: item.account.accountNumber, customer: item.customer.companyName || [item.customer.firstName, item.customer.lastName].filter(Boolean).join(" "), unit: item.occupancies[0]?.unit.number ?? null, tenancyStatus: item.status, monthlyRate: item.occupancies[0] ? Number(item.occupancies[0].monthlyRate) : null, balance: Number(item.account.balance), periodLedgerEntries: item.account.ledgerEntries.length, oldestPeriodEntry: item.account.ledgerEntries[0]?.effectiveAt.toISOString() ?? null }));
+      const tenancies = await db.tenancy.findMany({ where: { facility, status: { in: ["ACTIVE", "NOTICE_GIVEN"] }, ...(parameters.reportKey === "rent-roll" ? {} : { account: { balance: { gt: 0 } } }) }, include: { facility: { select: { name: true } }, customer: { select: { firstName: true, lastName: true, companyName: true } }, account: { include: { _count: { select: { ledgerEntries: { where: { effectiveAt: { gte: from, lte: to } } } } }, ledgerEntries: { where: { effectiveAt: { gte: from, lte: to } }, select: { effectiveAt: true }, orderBy: { effectiveAt: "asc" }, take: 1 } } }, occupancies: { where: { status: { in: ["ACTIVE", "NOTICE_GIVEN"] } }, include: { unit: { select: { number: true } } }, take: 1 } }, orderBy: { facilityId: "asc" }, take: REPORT_QUERY_TAKE });
+      requireReportCapacity(tenancies);
+      return tenancies.map((item) => ({ facility: item.facility.name, account: item.account.accountNumber, customer: item.customer.companyName || [item.customer.firstName, item.customer.lastName].filter(Boolean).join(" "), unit: item.occupancies[0]?.unit.number ?? null, tenancyStatus: item.status, monthlyRate: item.occupancies[0] ? Number(item.occupancies[0].monthlyRate) : null, balance: Number(item.account.balance), periodLedgerEntries: item.account._count.ledgerEntries, oldestPeriodEntry: item.account.ledgerEntries[0]?.effectiveAt.toISOString() ?? null }));
     }
     case "insurance-participation": {
-      const enrollments = await db.insuranceEnrollment.findMany({ where: { organisationId: scope.organisationId, ...(facilityId ? { facilityId } : {}), acknowledgedAt: { lte: to } }, include: { facility: { select: { name: true } }, tenancy: { include: { customer: { select: { firstName: true, lastName: true, companyName: true } }, account: { select: { accountNumber: true } }, occupancies: { where: { status: { in: ["PENDING", "ACTIVE", "NOTICE_GIVEN"] } }, include: { unit: { select: { number: true } } }, take: 1 } } }, plan: { select: { code: true, name: true } } }, orderBy: { acknowledgedAt: "asc" } });
+      const enrollments = await db.insuranceEnrollment.findMany({ where: { organisationId: scope.organisationId, ...(facilityId ? { facilityId } : {}), acknowledgedAt: { lte: to } }, include: { facility: { select: { name: true } }, tenancy: { include: { customer: { select: { firstName: true, lastName: true, companyName: true } }, account: { select: { accountNumber: true } }, occupancies: { where: { status: { in: ["PENDING", "ACTIVE", "NOTICE_GIVEN"] } }, include: { unit: { select: { number: true } } }, take: 1 } } }, plan: { select: { code: true, name: true } } }, orderBy: { acknowledgedAt: "asc" }, take: REPORT_QUERY_TAKE });
+      requireReportCapacity(enrollments);
       return enrollments.map((item) => ({ facility: item.facility.name, account: item.tenancy.account.accountNumber, customer: item.tenancy.customer.companyName || [item.tenancy.customer.firstName, item.tenancy.customer.lastName].filter(Boolean).join(" "), unit: item.tenancy.occupancies[0]?.unit.number ?? null, status: item.status, planCode: item.plan?.code ?? null, plan: item.plan?.name ?? null, provider: item.providerName, coverageAmount: item.coverageAmount === null ? null : Number(item.coverageAmount), monthlyPremium: item.monthlyPremium === null ? null : Number(item.monthlyPremium), waiverReason: item.waiverReason, acknowledgedAt: item.acknowledgedAt.toISOString() }));
     }
     case "integration-health": {
-      const connections = await db.integrationConnection.findMany({ where: { organisationId: scope.organisationId, ...(facilityId ? { facilityId } : {}) }, include: { facility: { select: { name: true } } }, orderBy: [{ category: "asc" }, { provider: "asc" }] });
+      const connections = await db.integrationConnection.findMany({ where: { organisationId: scope.organisationId, ...(facilityId ? { facilityId } : {}) }, include: { facility: { select: { name: true } } }, orderBy: [{ category: "asc" }, { provider: "asc" }], take: REPORT_QUERY_TAKE });
+      requireReportCapacity(connections);
       return connections.map((item) => ({ snapshotTakenAt, facility: item.facility?.name ?? "Organisation-wide", category: item.category, provider: item.provider, status: item.status, lastHealthAt: item.lastHealthAt?.toISOString() ?? null, lastSuccessAt: item.lastSuccessAt?.toISOString() ?? null, lastFailureAt: item.lastFailureAt?.toISOString() ?? null, consecutiveFailures: item.consecutiveFailures, failureCode: item.failureCode, failureMessage: item.failureMessage }));
     }
     default:

@@ -24,18 +24,16 @@ import { db } from "@/lib/db";
 import { enqueueMriExport } from "@/lib/finance/mri-export";
 import { checkPayNowTransactionStatus } from "@/lib/payments/netcash-client";
 import { settleVerifiedMerchandisePayment } from "@/lib/merchandise-order-settlement";
+import { payNowCallback } from "@/lib/payments/netcash-pay-now-security";
 
 export async function POST(request: Request) {
-  const rawBody = await request.text();
-  let form: URLSearchParams;
+  let payload: Record<string, string>;
   try {
-    form = new URLSearchParams(rawBody);
-  } catch {
-    return NextResponse.json({ error: "invalid_payload" }, { status: 400 });
-  }
-  const payload = Object.fromEntries(form.entries());
-  if (Object.keys(payload).length === 0) {
-    return NextResponse.json({ error: "invalid_payload" }, { status: 400 });
+    payload = await payNowCallback(request);
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "";
+    const status = code === "NETCASH_BODY_TOO_LARGE" ? 413 : code === "NETCASH_REQUEST_TIMEOUT" ? 408 : 400;
+    return NextResponse.json({ error: "invalid_payload" }, { status });
   }
 
   const providerRef = payload.Reference || undefined; // the p2 we sent = payment.id

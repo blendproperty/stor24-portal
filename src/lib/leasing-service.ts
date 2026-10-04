@@ -1022,14 +1022,17 @@ export async function transfer(
       where: { id: tenancy.id },
       data: { status: "ACTIVE" },
     });
-    await tx.occupancy.update({
-      where: { id: current.id },
+    // The source was read before allocation locks. A competing transfer may
+    // have moved it out while this transaction waited; never move it twice.
+    const moved = await tx.occupancy.updateMany({
+      where: { id: current.id, tenancyId: tenancy.id, status: "ACTIVE" },
       data: {
         status: "MOVED_OUT",
         endDate: input.effectiveAt,
         accessState: "REVOKED",
       },
     });
+    if (moved.count !== 1) throw new Error("CONFLICT");
     await tx.unit.update({
       where: { id: current.unitId },
       data: { status: "AVAILABLE" },
