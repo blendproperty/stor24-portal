@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: stor24-crm-production
@@ -25,7 +26,20 @@ jobs:
       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     environment: production
+    timeout-minutes: 35
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Require exact main release evidence
+        id: release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          DEPLOY_REF: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.ref }}
+        run: node scripts/verify-release.mjs
       - name: Configure SSH
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -42,7 +56,7 @@ jobs:
 
       - name: Deploy verified ref
         env:
-          DEPLOY_REF: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.ref }}
+          DEPLOY_REF: ${{ steps.release.outputs.sha }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
