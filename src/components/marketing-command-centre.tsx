@@ -233,6 +233,72 @@ export function MarketingCommandCentre({
   if (view === "channels")
     return (
       <>
+        <div className="marketing-chart-grid">
+          <section className="marketing-card">
+            <h2>Recorded channel spend</h2>
+            <p>Share of recorded spend for registered campaign channels.</p>
+            <div className="marketing-channel-bars">
+              {intelligence.channels
+                .filter((c) => c.registered && c.spend > 0)
+                .map((c) => (
+                  <div key={c.label}>
+                    <span>{c.label}</span>
+                    <strong>{money(c.spend)}</strong>
+                    <div>
+                      <i
+                        style={{
+                          width: `${(c.spend / Math.max(1, current.spend)) * 100}%`,
+                          background: "#294f60",
+                        }}
+                      />
+                    </div>
+                    <small>
+                      {percent(ratio(c.spend, current.spend, 100))} of recorded
+                      spend
+                    </small>
+                  </div>
+                ))}
+            </div>
+            {!current.spend && (
+              <p className="marketing-empty">
+                Record campaign spend to compare channel investment.
+              </p>
+            )}
+          </section>
+          <section className="marketing-card">
+            <h2>Enquiry mix</h2>
+            <p>
+              All enquiry sources, including those without registered campaign
+              costs.
+            </p>
+            <div className="marketing-channel-bars">
+              {intelligence.channels
+                .filter((c) => c.leads > 0)
+                .map((c) => (
+                  <div key={c.label}>
+                    <span>{c.label}</span>
+                    <strong>{c.leads} enquiries</strong>
+                    <div>
+                      <i
+                        style={{
+                          width: `${(c.leads / Math.max(1, current.leads)) * 100}%`,
+                        }}
+                      />
+                    </div>
+                    <small>
+                      {percent(ratio(c.leads, current.leads, 100))} of enquiries
+                      · {c.won} confirmed move-ins
+                    </small>
+                  </div>
+                ))}
+            </div>
+            {!current.leads && (
+              <p className="marketing-empty">
+                Enquiry sources appear as enquiries arrive.
+              </p>
+            )}
+          </section>
+        </div>
         <section className="marketing-card">
           <h2>Channel performance</h2>
           <p>
