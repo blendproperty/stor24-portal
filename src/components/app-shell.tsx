@@ -67,6 +67,7 @@ const navigation = [
   { group: "Customers & sales", href: "/tenants", label: "Customers & tenants", icon: Users },
   { group: "Administration", href: "/users", label: "Users & permissions", icon: Users },
   { group: "Customers & sales", href: "/leads", label: "Lead to lease", icon: CalendarCheck },
+  { group: "Customers & sales", href: "/marketing", label: "Marketing", icon: BarChart3 },
   { group: "Customers & sales", href: "/reservations", label: "Reservations", icon: CalendarDays },
   { group: "Customers & sales", href: "/identity", label: "Identity review", icon: ShieldCheck },
   { group: "Facility operations", href: "/units", label: "Units & rates", icon: Warehouse },

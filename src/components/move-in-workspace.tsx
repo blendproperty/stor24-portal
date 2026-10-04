@@ -607,7 +607,8 @@ export function MoveInWorkspace({
       )}
       {step === 1 ? (
         <div className="form-footer move-in-navigation">
-          <div className="move-in-selection" aria-live="polite"><small>{selected ? "READY FOR THE NEXT STEP" : "LET’S FIND THEIR SPACE"}</small><strong>{selected ? `Unit ${selected.number} · ${selected.area?.toFixed(1) ?? "—"} m² · R ${selected.monthlyRate.toLocaleString("en-ZA")} / month` : "Choose a unit to continue"}</strong></div>
+          <span className="move-in-step-number" aria-hidden="true">1</span>
+          <div className="move-in-selection" aria-live="polite"><small>UNIT SELECTION</small><strong>{selected ? `Unit ${selected.number} · ${selected.area?.toFixed(1) ?? "—"} m² · R ${selected.monthlyRate.toLocaleString("en-ZA")} / month` : "Choose a unit to continue"}</strong><span>{selected ? "Your space is selected. Continue to customer details." : "Select an available space for your customer."}</span></div>
           <button
             className="button button-secondary"
             type="button"
