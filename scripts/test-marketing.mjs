@@ -176,13 +176,20 @@ if (process.env.PREVIEW_ONLY) {
       page.on("pageerror", (e) => errors.push(e.message));
       await page.goto(base);
       await expect(
-        page.getByRole("heading", { name: "Marketing performance" }),
+        page.getByRole("heading", {
+          name: "Marketing command centre",
+          exact: true,
+        }),
       ).toBeVisible();
       await expect(
         page.locator(".marketing-kpis article").first(),
       ).toContainText("12");
       for (const tab of [
         "overview",
+        "channels",
+        "budgets",
+        "placements",
+        "calendar",
         "campaigns",
         "tracked links",
         "activity",
@@ -195,11 +202,61 @@ if (process.env.PREVIEW_ONLY) {
           true,
           `${tab} overflow ${width}`,
         );
+        if (width === 1440) {
+          const completed = page.waitForEvent("download");
+          await page
+            .getByRole("button", { name: "Export", exact: true })
+            .click();
+          const exported = await completed;
+          const file = await exported.path();
+          const csv = await readFile(file, "utf8");
+          const headers = {
+            channels: "Channel",
+            budgets: "Lifetime budget ZAR",
+            placements: "Placement",
+            calendar: "SAST day",
+            activity: "SAST day",
+            "tracked links": "Tracking URL",
+          };
+          assert.ok(
+            csv.includes(headers[tab] ?? "Campaign"),
+            `correct ${tab} export`,
+          );
+          assert.ok(
+            exported.suggestedFilename().includes(tab.replaceAll(" ", "-")),
+          );
+        }
         await page.screenshot({
           path: `output/marketing/${tab.replaceAll(" ", "-")}-${width}.png`,
           fullPage: true,
         });
       }
+      await page.getByRole("button", { name: "channels", exact: true }).click();
+      await expect(page.getByRole("cell", { name: /3[,.]33/ })).toBeVisible();
+      await page.getByLabel("Campaign", { exact: true }).selectOption(cid);
+      await expect(
+        page.getByText("Cost per enquiry", { exact: true }),
+      ).toBeVisible();
+      await page.getByRole("button", { name: "budgets", exact: true }).click();
+      await expect(page.getByRole("progressbar")).toHaveAttribute(
+        "value",
+        "1200",
+      );
+      await page
+        .getByRole("button", { name: "placements", exact: true })
+        .click();
+      await page.getByLabel("Find placement").fill("no match");
+      await expect(
+        page.getByRole("cell", { name: "Search creative A", exact: true }),
+      ).toHaveCount(0);
+      await page.getByLabel("Find placement").fill("Search creative");
+      await expect(
+        page.getByRole("cell", { name: "Search creative A", exact: true }),
+      ).toBeVisible();
+      await page.getByRole("button", { name: "calendar", exact: true }).click();
+      await expect(
+        page.getByText("Search launch", { exact: true }),
+      ).toBeVisible();
       await page.getByRole("button", { name: "New campaign" }).click();
       await page.getByLabel("Campaign name").fill("Fail test");
       await page.getByRole("button", { name: "Save", exact: true }).click();
@@ -323,4 +380,3 @@ if (process.env.PREVIEW_ONLY) {
     server.close();
   }
 }
-

@@ -47,7 +47,8 @@ export function marketingReport(
     .filter((c) => !facilityId || c.facilityId === facilityId)
     .map((c) => {
       const matched = selected.filter(
-          (l) => l.attribution?.campaignId === c.id,
+          (l) =>
+            l.facilityId === c.facilityId && l.attribution?.campaignId === c.id,
         ),
         activities = c.activities.filter((a) => within(a.occurredAt));
       const spend = activities.reduce((n, a) => n + a.spend, 0),

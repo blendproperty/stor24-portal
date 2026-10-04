@@ -76,6 +76,244 @@
   color: var(--marketing-ink);
   min-width: 0;
 }
+.marketing-executive {
+  background: #102b35;
+  color: white;
+  padding: 30px;
+  border-radius: 20px;
+  display: grid;
+  gap: 26px;
+}
+.marketing-executive h2 {
+  font-size: clamp(24px, 3vw, 34px);
+  letter-spacing: -0.04em;
+  margin: 8px 0 12px;
+}
+.marketing-executive p {
+  color: #c4d4da;
+  font-size: 12px;
+  margin: 0;
+  line-height: 1.6;
+}
+.marketing-executive .marketing-eyebrow {
+  color: #ffad74 !important;
+}
+.marketing-comparisons,
+.marketing-budget-totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+.marketing-comparison,
+.marketing-budget-totals > span {
+  display: grid;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid #ffffff26;
+  font-size: 12px;
+  min-width: 0;
+}
+.marketing-comparison strong,
+.marketing-budget-totals strong {
+  font-size: 32px;
+  letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
+}
+.marketing-comparison small {
+  color: #c4d4da;
+  line-height: 1.6;
+}
+.marketing-efficiency {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.marketing-efficiency article {
+  display: grid;
+  gap: 12px;
+  background: white;
+  border: 1px solid #dce5eb;
+  border-radius: 16px;
+  padding: 22px;
+  min-width: 0;
+}
+.marketing-efficiency article span {
+  font-size: 12px;
+  color: #607985;
+}
+.marketing-efficiency article strong {
+  font-size: 27px;
+  letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
+}
+.marketing-efficiency article small {
+  font-size: 10px;
+  color: #607985;
+  line-height: 1.5;
+}
+.marketing-period-presets {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.marketing-period-presets button {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid #dce5eb;
+  border-radius: 8px;
+  background: #f3f7f8;
+  font-size: 12px;
+  font-weight: 700;
+}
+.marketing-analysis-filter {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  max-width: 100%;
+}
+.marketing-analysis-filter input,
+.marketing-analysis-filter select {
+  min-height: 44px;
+  border: 1px solid #dce5eb;
+  border-radius: 8px;
+  padding: 10px;
+  max-width: 100%;
+  background: white;
+  color: #16313b;
+}
+.marketing-cell-note {
+  display: block;
+  color: #607985;
+  font-size: 10px;
+  margin-top: 5px;
+}
+.marketing-attention {
+  display: grid;
+  gap: 12px;
+}
+.marketing-attention p {
+  margin: 0;
+  padding: 16px;
+  border-left: 3px solid #ff6a13;
+  background: #fff7f1;
+  border-radius: 0 8px 8px 0;
+}
+.marketing-budget-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.marketing-budget-value {
+  display: grid;
+  gap: 8px;
+  margin: 24px 0 18px;
+}
+.marketing-budget-value strong {
+  font-size: 30px;
+  letter-spacing: -0.04em;
+}
+.marketing-budget-value span {
+  font-size: 12px;
+  color: #607985;
+}
+.marketing-budget-grid progress {
+  width: 100%;
+  height: 12px;
+  accent-color: #ff6a13;
+  margin-bottom: 16px;
+}
+.marketing-budget-detail {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  font-size: 12px;
+  margin: 24px 0;
+}
+.marketing-budget-detail dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
+}
+.marketing-calendar {
+  display: grid;
+  gap: 20px;
+}
+.marketing-calendar > article {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 20px;
+}
+.marketing-calendar-date {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  font-size: 12px;
+  padding-top: 16px;
+}
+.marketing-calendar-date strong {
+  font-size: 22px;
+}
+.marketing-calendar-entry {
+  padding: 20px;
+  border: 1px solid #dce5eb;
+  border-radius: 12px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.marketing-calendar-entry > span {
+  font-size: 12px;
+}
+.marketing-calendar-entry p {
+  width: 100%;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 900px) {
+  .marketing-efficiency {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .marketing-budget-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 550px) {
+  .marketing-executive {
+    padding: 22px;
+  }
+  .marketing-comparisons,
+  .marketing-budget-totals {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .marketing-efficiency {
+    gap: 10px;
+  }
+  .marketing-efficiency article {
+    padding: 16px;
+  }
+  .marketing-efficiency article strong {
+    font-size: 23px;
+  }
+  .marketing-calendar > article {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .marketing-calendar-date {
+    display: flex;
+    align-items: center;
+  }
+  .marketing-budget-detail {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .marketing-budget-detail dd {
+    text-align: left;
+    margin-bottom: 8px;
+  }
+}
 .marketing-heading {
   display: flex;
   align-items: center;
@@ -581,6 +819,25 @@
   }
 }
 
-.marketing-modal::backdrop{background:#0b1d1980;backdrop-filter:blur(3px)}dialog.marketing-modal{width:min(620px,calc(100% - 32px));margin:auto;border:1px solid #dce5eb;box-shadow:0 24px 80px #07141133}
+.marketing-modal::backdrop {
+  background: #0b1d1980;
+  backdrop-filter: blur(3px);
+}
+dialog.marketing-modal {
+  width: min(620px, calc(100% - 32px));
+  margin: auto;
+  border: 1px solid #dce5eb;
+  box-shadow: 0 24px 80px #07141133;
+}
 
-.marketing-edit{border:0;background:#edf4f6;color:#294f60;border-radius:6px;padding:9px 12px;font:inherit;font-weight:750;white-space:nowrap;cursor:pointer}
+.marketing-edit {
+  border: 0;
+  background: #edf4f6;
+  color: #294f60;
+  border-radius: 6px;
+  padding: 9px 12px;
+  font: inherit;
+  font-weight: 750;
+  white-space: nowrap;
+  cursor: pointer;
+}
