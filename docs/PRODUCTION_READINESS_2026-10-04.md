@@ -1,6 +1,35 @@
 # STOR24 production readiness — 4 October 2026
 
-Status: engineering hardening candidate; full production acceptance remains open.
+Status: engineering hardening deployed and read-only verified; full production acceptance remains open.
+
+## Validated release and private staging evidence
+
+- Implementation `b841042ab7c05a85a99834c849249bb9678a8833` passed all nine PR checks: CI `37206593092` (532 tests, build/typecheck/lint and complete browser suite), security `37206593086`, isolated PostgreSQL transactions/restore `37206593103` and CodeQL `37206591818`. PR #379 merged as `fcbdbfd5a9aca2fa759c50ffe717c62727ac1069`; fetched complete tree equals the tested source. Mainline CI37207297915, security37207297911 and transactions37207297923 passed; deployment37207936162 succeeded.
+- Clean local lockfile installation, full build, TypeScript and 532 tests passed; lint zero errors/seven existing warnings. Initial dependency-junction build failure was resolved by the clean installation.
+- Fresh encrypted production archive restored at `2026-10-04T13:43:15Z`: 78 tables, three seconds, no network and no production DB writes. This proves local database restoration, not independent key/host-loss recovery.
+- Isolated CI database read probe: 340 requests at 10/25/50 concurrent readers; zero errors; ten connections; worst p95 189 ms. Server resource probe: disk52%, available memory65%, six/seven connections out of100, healthy app/no OOM. Candidate production Compose validates on the host.
+- Private technical staging is running from the exact merged source at `/opt/stor24-staging`, with a persistent separate database, independent random DB/signing secrets, internal-only Docker network, no published ports and no production/provider credentials. App/database each have one CPU/1 GB/256 PIDs and bounded logs. Fresh versioned migrations bootstrap an empty database; customer count is zero. This is not representative authenticated business UAT.
+- Staging HTTP/database health probe at `2026-10-04T13:59:31.450Z`: 340 requests at 10/25/50 readers, zero errors, worst p95 599 ms. At `2026-10-04T14:00:04Z`, the staging app switched to retained image `bc47f71f5`, passed health and restored healthy candidate `fcbdbfd5a`. Schema compatibility was checked first; production was unchanged. Initial host-port probe was refused by network isolation; the successful probe executes inside the staging app namespace, and the staging specification publishes no ports.
+
+Staging definition and bounded probe are retained in `compose.staging.yml` and `scripts/test-staging-health-capacity.mjs`. Evidence files are also retained outside Git in `Sitelink/output/production-readiness-20261004`. There is no application AI-provider SDK/configuration in the inspected source; OpenAI budget controls are currently not applicable. Provider SMS/payment/document costs still require operational consumption and budget ownership.
+
+## Production runtime verification
+
+Deployment `37207936162` succeeded for exact merged source `fcbdbfd5a9aca2fa759c50ffe717c62727ac1069`. Healthy image `stor24-crm:fcbdbfd5a`, digest `sha256:0ba01bf6ecac076ab801124c61f6c4fbd05a47043cc4f170f05e91f274f52f1f`, started `2026-10-04T14:06:59.400275212Z`. App and PostgreSQL runtime limits verify two CPUs / 2 GB / 256 PIDs and three 10 MB log files. PostgreSQL was updated without restart; Docker required the compatible 4 GB memory-plus-swap setting, and the host has no swap.
+
+At `14:08:23Z`, production app/database/resource/backup health passes: disk54%, available memory63%, seven DB connections of100, no app OOM. Released adapter configuration was tested read-only against production PostgreSQL at `14:08:49.910Z`: pool10, acquisition5s, statement30s, idle-transaction60s. Public health/booking return200; anonymous staff users/report export/public CRM API return401 with private no-store. Fresh pre-migration encrypted backup completed `14:05:00Z`, still `offSite:false`.
+
+Production monitor run `37208198253` and monthly isolated restore run `37208200272` both pass on the released SHA. This verifies workflow execution; named ownership/delivered failure-alert acceptance and independent off-server recovery remain open. No production business-record/provider action was submitted.
+
+## Private staging operation
+
+Use the dedicated `/opt/stor24-staging` checkout and root-restricted `.env.staging`; never copy production `.env` or production records/provider credentials. `IMAGE_TAG` must select the tested retained image. The internal network intentionally exposes no browser/public ingress. Human workflow testing requires a separately approved access method and synthetic data/roles.
+
+Fresh initialization only: `docker compose --env-file .env.staging -f compose.staging.yml up -d postgres`, then `run --rm bootstrap` once. The bootstrap refuses populated schemas. Subsequent reviewed migrations use the migrator image's ordinary `prisma migrate deploy` command, not the empty bootstrap. Start/update only the stage app with `up -d --no-deps app`.
+
+Readiness: `docker exec stor24-readiness-staging-app-1 wget -qO- http://127.0.0.1:3000/api/health`. Bounded probe: `docker exec -e STOR24_STAGING_CAPACITY_TEST=isolated-loopback -i stor24-readiness-staging-app-1 node --input-type=module < scripts/test-staging-health-capacity.mjs`. The tool refuses environments lacking the synthetic staging marker. Preserve the resulting report before app recreation.
+
+Before switching images, prove schema compatibility and availability of the previous image, retain the intended candidate tag, and restore it even if the rehearsal fails. A staged health-only rollback does not prove all financial/provider workflows or recovery from a destructive migration.
 
 ## Scope and verified baseline
 
@@ -36,7 +65,7 @@ Existing isolated CI covers staff/customer/facility boundaries, recovery-code co
 | Capacity | Bounded application connections/resources; isolated read-queue probe | Engineering/business: supply expected workload, representative isolated booking/report/payment/provider-failure load, resource and cost thresholds |
 | Monitoring | App/DB/backup and new host thresholds; GitHub failure signal | Operations: name responder, verify delivered alert and run incident drill; CPU/slow-query/provider delivery monitoring remains to be validated |
 | Releases | Exact-main gate; backup before migration; previous images | Engineering: passing source/release checks, deployed SHA and runtime configuration; rehearse rollback with compatible schema |
-| Environment separation | Isolated PostgreSQL CI and browser fixtures | Infrastructure: durable representative staging with isolated provider credentials and data is not verified |
+| Environment separation | Isolated CI/browser fixtures and persistent private technical staging; independent keys/DB, no egress or published ports | Infrastructure/business: representative synthetic data, authenticated workflow UAT and approved access/provider sandbox method remain open |
 | Payments/MRI | Implemented service/replay controls are not settlement or posting acceptance | Finance/provider owners: settlement, reconciliation, exception ownership and approved production policies |
 | Identity/access | Consent/scoped storage and move-in gates; device effects distinct | Legal/access owner: approved retention and physical enrolment/entry/revocation UAT |
 | Data/merchandise/insurance | Existing configuration and workflow gates persist | Business: verified stock, prices/VAT, insurance terms and authorized migration data |
