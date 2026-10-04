@@ -232,6 +232,7 @@ if (process.env.PREVIEW_ONLY) {
         });
       }
       await page.getByRole("button", { name: "channels", exact: true }).click();
+      await expect(page.getByRole("cell", { name: /3[,.]33/ })).toBeVisible();
       await page.getByLabel("Campaign", { exact: true }).selectOption(cid);
       await expect(
         page.getByText("Cost per enquiry", { exact: true }),

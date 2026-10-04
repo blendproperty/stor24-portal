@@ -8,7 +8,8 @@ const money = (n: number | null) =>
     : new Intl.NumberFormat("en-ZA", {
         style: "currency",
         currency: "ZAR",
-        maximumFractionDigits: 0,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
       }).format(n);
 const percent = (n: number | null) => (n === null ? "—" : `${n.toFixed(1)}%`);
 type Intelligence = ReturnType<typeof marketingIntelligence>;
