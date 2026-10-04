@@ -239,6 +239,14 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
       }
       await grants(null, null); const all = await read(); assert.equal(all.status, 200); const body = await all.text(); assert.match(body, /SYN-A/); assert.match(body, /SYN-B/); assert.doesNotMatch(body, /SYN-FOREIGN/);
       assert.equal((await read(foreign.id)).status, 403);
+      // Seven permitted exports above; denied facility requests must not consume work capacity.
+      for (let index = 0; index < 3; index++) assert.equal((await read()).status, 200);
+      const auditsBefore = await db.auditEvent.count({ where: { organisationId: org.id, actorId: actor.id } });
+      const busy = await read();
+      assert.equal(busy.status, 422); assert.equal(busy.headers.get("Retry-After"), "60");
+      assert.equal((await busy.json()).error.code, "REPORT_BUSY");
+      assert.equal(await db.auditEvent.count({ where: { organisationId: org.id, actorId: actor.id } }), auditsBefore);
+      assert.equal((await read(foreign.id)).status, 403);
     });
     await t.test("report date filters respect both SAST midnight boundaries in PostgreSQL", async () => {
       const stamps = ["2026-09-24T21:59:59.999Z", "2026-09-24T22:00:00.000Z", "2026-09-25T21:59:59.999Z", "2026-09-25T22:00:00.000Z"];

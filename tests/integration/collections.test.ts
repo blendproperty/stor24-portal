@@ -27,6 +27,16 @@ test("isolated PostgreSQL aged collections", async t => {
   const base = async (f: Awaited<ReturnType<typeof fixture>>) => ({ accountId: f.account.id, revision: (await row(f)).revision, requestKey: randomUUID(), note: "CI evidence reference" });
   const terms = async (f: Awaited<ReturnType<typeof fixture>>) => updateCollection(f.scope, { ...await base(f), action: "terms", terms: { dueDays: 0, allocation: "OLDEST_DUE_FIRST", approvalReference: "CI approved agreement", overrides: [] }, confirm: true });
   try {
+    await t.test("ageing export rejects excessive complete history without creating a partial report", async () => {
+      const f = await fixture();
+      await db.ledgerEntry.createMany({ data: Array.from({ length: 2000 }, (_, index) => ({ accountId: f.account.id, type: "CHARGE" as const, amount: 1, description: `Synthetic excess history ${index}`, effectiveAt: new Date("2020-01-01") })) });
+      const parameters = { reportKey: "receivables-ageing", from: today, to: today, format: "JSON" as const, groupBy: "month" as const };
+      await assert.rejects(buildReportRows(f.scope, parameters), /REPORT_LIMIT/);
+      assert.equal(await db.ledgerEntry.count({ where: { accountId: f.account.id } }), 2001);
+      assert.equal((await db.account.findUniqueOrThrow({ where: { id: f.account.id } })).balance.toString(), "100");
+      assert.equal(await db.communicationLog.count({ where: { organisationId: f.org.id } }), 0);
+      assert.equal(await db.webhookOutbox.count({ where: { organisationId: f.org.id } }), 0);
+    });
     await t.test("missing terms excluded; approved terms produce 91+ age without financial writes", async () => {
       const f = await fixture(); assert.match((await row(f)).ageing.issue!, /terms/);
       const parameters = { reportKey: "receivables-ageing", from: today, to: today, format: "JSON" as const, groupBy: "month" as const };

@@ -5,6 +5,7 @@ import { hasPermission } from "@/lib/permissions";
 import { isTestPayment } from "@/lib/payments/payment-evidence";
 import { southAfricaDateKey } from "@/lib/south-africa-time";
 import { ageAccount, collectionActionSchema, dateKey, effectiveEntries, moneyCents, promiseProgress, termsSchema, type CollectionAction } from "@/lib/collections-policy";
+import { MAX_REPORT_ROWS, REPORT_QUERY_TAKE, requireReportCapacity } from "@/lib/report-workload";
 
 type Client = Prisma.TransactionClient;
 const json = (v: unknown) => JSON.parse(JSON.stringify(v)) as Prisma.InputJsonValue;
@@ -19,10 +20,11 @@ async function owners(tx: Client, scope: RequestScope) {
   const users = await tx.user.findMany({ where: { organisationId: scope.organisationId, active: true }, select: { id: true, name: true, roleAssignments: { include: { role: true } } } });
   return users.map(u => ({ id: u.id, name: u.name, facilities: u.roleAssignments.filter(a => a.role.organisationId === scope.organisationId && hasPermission(a.role.permissions, "collections.manage")).map(a => a.facilityId) })).filter(u => u.facilities.length > 0);
 }
-async function receiptEvidence(tx: Client, scope: RequestScope, accounts: Account[]) {
+async function receiptEvidence(tx: Client, scope: RequestScope, accounts: Account[], reportBounded = false) {
   const ids = accounts.flatMap(a => a.payments.map(p => p.id));
   if (!ids.length) return new Set<string>();
-  const evidence = await tx.auditEvent.findMany({ where: { organisationId: scope.organisationId, entityType: "Payment", entityId: { in: ids }, action: { in: ["payment.posted", "booking.payment_recorded"] } }, select: { entityId: true } });
+  const evidence = await tx.auditEvent.findMany({ where: { organisationId: scope.organisationId, entityType: "Payment", entityId: { in: ids }, action: { in: ["payment.posted", "booking.payment_recorded"] } }, select: { entityId: true }, ...(reportBounded ? { take: REPORT_QUERY_TAKE } : {}) });
+  if (reportBounded) requireReportCapacity(evidence);
   return new Set(evidence.map(e => e.entityId));
 }
 function evaluate(account: Account, asOf: string, provenPayments: Set<string>) {
@@ -56,13 +58,29 @@ function evaluate(account: Account, asOf: string, provenPayments: Set<string>) {
   if (!hold && openPromise?.progress?.covered) hold = "Promise receipts awaiting confirmation";
   return { ageing, entries, verifiedReceiptIds, hold, promises };
 }
-export async function collectionsWorkspace(scope: RequestScope, asOf: string) {
+export async function collectionsWorkspace(scope: RequestScope, asOf: string, reportBounded = false) {
   dateKey.parse(asOf); if (asOf > southAfricaDateKey(new Date())) throw new Error("COLLECTION_DATE");
   return db.$transaction(async tx => {
+    if (reportBounded) {
+      // Count complete histories in this same RepeatableRead snapshot before loading them.
+      // Never take a partial ledger: even historical ageing needs later reconciliation evidence.
+      const counts = await tx.account.findMany({ where: where(scope), select: { _count: { select: { ledgerEntries: true, payments: true, adjustments: { where: { status: { in: ["PENDING_APPROVAL", "APPROVED"] } } }, debitInstructions: { where: { run: { status: { not: "CANCELLED" } } } } } } }, take: 2001 });
+      if (counts.length > 2000) throw new Error("COLLECTION_LIMIT");
+      let total = 0;
+      for (const account of counts) {
+        for (const count of Object.values(account._count)) {
+          // Bound repeated per-account receipt reconciliation scans as well as total materialisation.
+          if (count > 2000) throw new Error("REPORT_LIMIT");
+          total += count;
+          if (total > MAX_REPORT_ROWS) throw new Error("REPORT_LIMIT");
+        }
+      }
+    }
     const accounts = await tx.account.findMany({ where: where(scope), include, orderBy: { accountNumber: "asc" }, take: 2001 });
-    const staff = await owners(tx, scope);
     if (accounts.length > 2000) throw new Error("COLLECTION_LIMIT");
-    const proof = await receiptEvidence(tx, scope, accounts);
+    // Reports do not use follow-up owner choices; avoid loading an unrelated staff graph.
+    const staff = reportBounded ? [] : await owners(tx, scope);
+    const proof = await receiptEvidence(tx, scope, accounts, reportBounded);
     const rows = accounts.map(a => {
       const result = evaluate(a, asOf, proof), c = a.collectionCase;
       return { id: a.id, accountNumber: a.accountNumber, name: a.customer.companyName || [a.customer.firstName, a.customer.lastName].filter(Boolean).join(" ") || "Unnamed customer", facilityId: a.tenancy!.facilityId, facility: a.tenancy!.facility.name, currentBalance: a.balance.toString(), ageing: result.ageing, hold: result.hold, revision: c?.revision ?? 0, ownerId: c?.ownerId ?? null, nextFollowUp: c?.nextFollowUp ?? null, disputed: c?.disputed ?? false, disputeReason: c?.disputeReason ?? null, terms: termsSchema.safeParse(c?.terms).success ? termsSchema.parse(c?.terms) : null, promises: result.promises, activities: (c?.activities ?? []).map(v => ({ id: v.id, action: v.action, note: v.note, actorId: v.actorId, createdAt: v.createdAt.toISOString() })), owners: staff.filter(u => u.facilities.includes(null) || u.facilities.includes(a.tenancy!.facilityId)).map(u => ({ id: u.id, name: u.name })), sources: a.ledgerEntries.filter(e => e.type === "CHARGE").map(e => ({ id: e.id, description: e.description, date: southAfricaDateKey(e.effectiveAt) })) };

@@ -18,14 +18,18 @@ try {
    if(mode==='html')return route.fulfill({contentType:'text/html',body:'<h1>Sign in</h1>'});
    if(mode==='malformed')return route.fulfill({status:500,contentType:'application/json',body:'{'});
    if(mode==='dlp')return route.fulfill({status:422,json:{error:{code:'DLP_EXPORT_BLOCKED',message:'Data protection blocked this export. Contact your administrator with the request reference.',requestId:'SYNTHETIC-DLP'}}});
+   if(mode==='limit')return route.fulfill({status:422,json:{error:{code:'REPORT_LIMIT',message:'This report exceeds its safe workload limit. No partial export was created.'}}});
+   if(mode==='busy')return route.fulfill({status:422,headers:{'Retry-After':'60'},json:{error:{code:'REPORT_BUSY',message:'Too many report requests. Wait one minute and try again. Your selections are retained.'}}});
    return route.fulfill({status:Number(mode),json:{error:{message:'Check the report parameters.'}}});
   });
   const base=`http://127.0.0.1:${server.address().port}`;
   const open=async(query='')=>{await page.goto(base+query);await page.getByLabel(/^Report/).selectOption('lead-conversion');await page.getByLabel(/^Facility/).selectOption('a');};
   const button=page.getByRole('button',{name:'Export CSV',exact:true});
   await open();await page.getByLabel('From',{exact:true}).fill('2026-10-01');await button.click();await expect(page.getByRole('alert')).toContainText('valid date range');assert.equal(reads,0);await page.getByLabel('From',{exact:true}).fill('2026-09-01');
-  for(const failure of ['422','500','malformed','html','network','dlp']) {
+  for(const failure of ['422','500','malformed','html','network','limit','busy','dlp']) {
    mode=failure;await button.click();await expect(page.getByRole('alert')).toBeVisible();await expect(button).toBeEnabled();await expect(page.getByLabel('From',{exact:true})).toHaveValue('2026-09-01');await expect(page.getByLabel(/^Facility/)).toHaveValue('a');assert.equal(page.url(),base+'/');assert.equal(downloads,0);
+   if(failure==='limit')await expect(page.getByRole('alert')).toContainText('No partial export');
+   if(failure==='busy')await expect(page.getByRole('alert')).toContainText('Wait one minute');
   }
   await expect(page.getByRole('alert')).toContainText('Data protection blocked');
   await expect(page.getByRole('alert')).toContainText('SYNTHETIC-DLP');

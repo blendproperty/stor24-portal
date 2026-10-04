@@ -30,7 +30,7 @@ async function fixture() {
     builder.onResolve({ filter: /^@\/lib\/(db|auth-guards|scope|report-data-service)$/ }, args => ({ path: args.path, namespace: "fixture" }));
     builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents:
       args.path.endsWith("/db") ? "export const db={$queryRaw:async()=>[{count:1}],auditEvent:{create:async({data})=>{if(__state.failAudit)throw Error('AUDIT_DOWN');__state.audits.push(data);return data;}}};" :
-      args.path.endsWith("/scope") ? "export const requirePermissionScope=async()=>({organisationId:'org-a',facilityIds:['facility-a'],unrestrictedFacilities:false});" :
+      args.path.endsWith("/scope") ? "export const requirePermissionScope=async()=>({organisationId:'org-a',facilityIds:['facility-a'],unrestrictedFacilities:false});export const requireFacility=async(scope,id)=>{if(!scope.facilityIds.includes(id))throw Error('FACILITY_FORBIDDEN');return {id};};" :
       args.path.endsWith("/report-data-service") ? "export const buildReportRows=async()=>__state.rows;" :
       "export const requirePermission=async()=>{if(!__state.allowed)throw Error('FORBIDDEN');return {organisationId:'org-a',user:{id:'actor-a'},permissions:['*'],allowedFacilityIds:['facility-a']};};export const authErrorResponse=e=>Response.json({error:{code:e.message==='FORBIDDEN'?'FORBIDDEN':'INTERNAL_ERROR'}},{status:e.message==='FORBIDDEN'?403:500});"
     }));
