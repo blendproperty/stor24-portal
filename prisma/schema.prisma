@@ -201,6 +201,7 @@ enum AccessDecisionState {
 }
 
 model Organisation {
+  marketingCampaigns MarketingCampaign[]
   id                     String                  @id @default(cuid())
   name                   String
   slug                   String                  @unique
@@ -260,6 +261,7 @@ model UserInvitation {
 }
 
 model Facility {
+  marketingCampaigns MarketingCampaign[]
   id                    String                  @id @default(cuid())
   organisationId        String
   organisation          Organisation            @relation(fields: [organisationId], references: [id], onDelete: Cascade)
@@ -1791,4 +1793,52 @@ model FacialPhotoControl {
   version Int @default(1)
   policyVersion String @default("interim-20260923-v1")
   updatedAt DateTime @updatedAt
+}
+
+model MarketingCampaign {
+  id String @id @default(cuid())
+  organisationId String
+  organisation Organisation @relation(fields:[organisationId],references:[id],onDelete:Restrict)
+  facilityId String
+  facility Facility @relation(fields:[facilityId],references:[id],onDelete:Restrict)
+  name String
+  source String
+  medium String
+  budget Decimal @db.Decimal(12, 2)
+  status String @default("PLANNED")
+  version Int @default(1)
+  startsAt DateTime
+  endsAt DateTime?
+  createdAt DateTime @default(now())
+  links MarketingLink[]
+  activities MarketingActivity[]
+  @@index([organisationId, facilityId, createdAt])
+}
+
+model MarketingLink {
+  id String @id @default(cuid())
+  campaignId String
+  campaign MarketingCampaign @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  label String
+  landingPage String
+  keyword String?
+  createdAt DateTime @default(now())
+  @@index([campaignId])
+}
+
+model MarketingActivity {
+  id String @id @default(cuid())
+  campaignId String
+  campaign MarketingCampaign @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  title String
+  version Int @default(1)
+  kind String
+  occurredAt DateTime
+  spend Decimal @db.Decimal(12, 2)
+  impressions Int @default(0)
+  clicks Int @default(0)
+  notes String?
+  createdById String
+  createdAt DateTime @default(now())
+  @@index([campaignId, occurredAt])
 }

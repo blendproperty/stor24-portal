@@ -21,6 +21,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: node scripts/test-leads-workspace.mjs
+      - run: node scripts/test-marketing.mjs
       - run: npm run test:guides
       - run: node scripts/test-monthly-billing.mjs
       - run: node scripts/test-debit-orders.mjs
@@ -81,6 +82,7 @@ jobs:
         with:
           name: guided-help-browser-evidence
           path: |
+            output/marketing/
             output/guided-help/
             output/company-setup-recovery/
             output/task-completion-recovery/

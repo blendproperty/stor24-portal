@@ -9,5 +9,7 @@ export const leadAttributionSchema = z.object({
   source: z.enum(["direct", "google", "bing", "facebook", "instagram", "linkedin", "tiktok", "youtube", "x", "pinterest", "newsletter", "other"]),
   medium: z.enum(["direct", "organic", "cpc", "paid_social", "social", "email", "referral", "display", "other"]),
   method: z.enum(["utm", "referrer", "direct"]).optional(),
+  campaignId: z.string().regex(/^c[a-z0-9]{24,32}$/).optional(),
+  linkId: z.string().regex(/^c[a-z0-9]{24,32}$/).optional(),
 }).strict();
 export type LeadAttribution = z.infer<typeof leadAttributionSchema>;

@@ -5,6 +5,7 @@ export type NavigationAccess = { owner: boolean; permissions: string[] };
 const rules: Record<string, string[]> = {
   "/tenants": ["operations.view"], "/users": ["@owner"],
   "/leads": ["leads.view"], "/reservations": ["reservations.manage"],
+  "/marketing": ["leads.view"],
   "/identity": ["identity.review"], "/units": ["inventory.view"],
   "/billing": ["billing.view"], "/billing/monthly": ["billing.view"],
   "/billing/netcash": ["payments.view"], "/billing/mri": ["mri.view"],
