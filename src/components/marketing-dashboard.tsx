@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { MarketingCommandCentre } from "./marketing-command-centre";
 import { MarketingOutcomes } from "./marketing-outcomes";
 import { MarketingDialog } from "./marketing-dialog";
 import { MarketingTrafficChart } from "./marketing-traffic";
@@ -16,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import type { MarketingWorkspace } from "@/lib/marketing-service";
+import { marketingIntelligence, ratio } from "@/lib/marketing-intelligence";
 import { marketingReport } from "@/lib/marketing-reporting";
 import {
   marketingSources,
@@ -121,7 +123,7 @@ export function MarketingDashboard({ canManage }: { canManage: boolean }) {
     .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
   function exportCsv() {
     if (!report) return;
-    const rows = [
+    let rows: (string | number)[][] = [
       [
         "Campaign",
         "Source",
@@ -147,6 +149,92 @@ export function MarketingDashboard({ canManage }: { canManage: boolean }) {
         c.cac?.toFixed(2) ?? "",
       ]),
     ];
+    if (data) {
+      const analysis = marketingIntelligence(data, from, to, facility);
+      if (tab === "channels")
+        rows = [
+          [
+            "Channel",
+            "Matched campaign spend",
+            "Enquiries",
+            "Move-ins",
+            "Clicks",
+            "Impressions",
+            "CTR percent",
+            "CPC ZAR",
+            "CPM ZAR",
+          ],
+          ...analysis.channels.map((c) => [
+            c.label,
+            c.registered ? c.spend : "",
+            c.leads,
+            c.won,
+            c.registered ? c.clicks : "",
+            c.registered ? c.impressions : "",
+            c.registered ? (ratio(c.clicks, c.impressions, 100) ?? "") : "",
+            c.registered ? (ratio(c.spend, c.clicks) ?? "") : "",
+            c.registered ? (ratio(c.spend, c.impressions, 1000) ?? "") : "",
+          ]),
+        ];
+      if (tab === "budgets")
+        rows = [
+          [
+            "Campaign",
+            "Lifetime budget ZAR",
+            "Lifetime recorded spend ZAR",
+            "Lifetime remaining ZAR",
+            "Spend through reporting end ZAR",
+            "Scheduled budget through reporting end ZAR",
+          ],
+          ...analysis.budgets.map((c) => [
+            c.name,
+            c.budget,
+            c.lifetimeSpend,
+            c.remaining,
+            c.spendToCutoff,
+            c.expectedToDate ?? "",
+          ]),
+        ];
+      if (tab === "placements")
+        rows = [
+          ["Placement", "Campaign", "Landing page", "Enquiries", "Move-ins"],
+          ...analysis.placements.map((p) => [
+            p.label,
+            p.campaignName,
+            p.landingPage,
+            p.leads,
+            p.won,
+          ]),
+        ];
+      if (tab === "calendar" || tab === "activity")
+        rows = [
+          [
+            "SAST day",
+            "Campaign",
+            "Activity",
+            "Type",
+            "Recorded spend ZAR",
+            "Recorded clicks",
+            "Recorded impressions",
+          ],
+          ...activities.map((a) => [
+            southAfricaDateKey(new Date(a.occurredAt)),
+            a.campaignName,
+            a.title,
+            a.kind,
+            a.spend,
+            a.clicks,
+            a.impressions,
+          ]),
+        ];
+      if (tab === "tracked links")
+        rows = [
+          ["Campaign", "Placement", "Landing page", "Tracking URL"],
+          ...campaigns.flatMap((c) =>
+            c.links.map((l) => [c.name, l.label, l.landingPage, l.url]),
+          ),
+        ];
+    }
     const url = URL.createObjectURL(
       new Blob([rows.map((row) => row.map(csvCell).join(",")).join("\r\n")], {
         type: "text/csv;charset=utf-8",
@@ -154,7 +242,7 @@ export function MarketingDashboard({ canManage }: { canManage: boolean }) {
     );
     const a = document.createElement("a");
     a.href = url;
-    a.download = `stor24-marketing-${from}-${to}.csv`;
+    a.download = `stor24-marketing-${tab.replaceAll(" ", "-")}-${from}-${to}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -262,8 +350,11 @@ export function MarketingDashboard({ canManage }: { canManage: boolean }) {
       <header className="marketing-heading">
         <div>
           <p className="marketing-eyebrow">GROWTH &amp; ACQUISITION</p>
-          <h1>Marketing performance</h1>
-          <p>See which activity brings enquiries through the door.</p>
+          <h1>Marketing command centre</h1>
+          <p>
+            Plan campaigns. Track every channel. See what brings customers
+            through the door.
+          </p>
         </div>
         <div className="marketing-actions">
           <button
@@ -335,6 +426,29 @@ export function MarketingDashboard({ canManage }: { canManage: boolean }) {
             ))}
           </select>
         </label>
+        <div
+          className="marketing-period-presets"
+          aria-label="Quick reporting periods"
+        >
+          {[7, 30, 90].map((days) => (
+            <button
+              key={days}
+              onClick={() => {
+                setTo(today);
+                setFrom(
+                  southAfricaDateKey(
+                    new Date(
+                      new Date(today + "T12:00:00+02:00").getTime() -
+                        (days - 1) * 86400000,
+                    ),
+                  ),
+                );
+              }}
+            >
+              {days} days
+            </button>
+          ))}
+        </div>
         <span>South African time · ZAR</span>
       </div>
       {error ? (
@@ -388,7 +502,16 @@ export function MarketingDashboard({ canManage }: { canManage: boolean }) {
             ))}
           </div>
           <nav className="marketing-tabs" aria-label="Marketing views">
-            {["overview", "campaigns", "tracked links", "activity"].map((t) => (
+            {[
+              "overview",
+              "channels",
+              "budgets",
+              "placements",
+              "calendar",
+              "campaigns",
+              "tracked links",
+              "activity",
+            ].map((t) => (
               <button
                 key={t}
                 aria-current={tab === t ? "page" : undefined}
@@ -398,6 +521,15 @@ export function MarketingDashboard({ canManage }: { canManage: boolean }) {
               </button>
             ))}
           </nav>
+          {data && (
+            <MarketingCommandCentre
+              data={data}
+              from={from}
+              to={to}
+              facility={facility}
+              view={tab}
+            />
+          )}
           {tab === "overview" && (
             <>
               <MarketingTrafficChart key={from + to} from={from} to={to} />

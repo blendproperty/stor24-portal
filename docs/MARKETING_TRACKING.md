@@ -32,3 +32,13 @@ API reference verified: https://developers.google.com/analytics/devguides/report
 ## Platform and operational gates
 
 Ad-platform spend/click/impression sync is not connected. Current activity figures are staff-recorded reports, not verified provider data. Google Ads/Meta API authorisation, mapping, deduplicated imports and reconciled report acceptance remain separate connection work. No campaign is published and no ad spend is incurred by this release. Email sends, provider activation, finance, legal/privacy, production UAT, training, data and existing approval gates remain open. Production campaign/link/activity write UAT must use legitimate business records rather than invented live customers or spend.
+
+## Marketing command centre expansion — 4 October 2026
+
+Eight views: Overview, Channels, Budgets, Placements, Calendar, Campaigns, Tracked links and Activity. Quick periods select 7/30/90 days; comparison uses the immediately preceding equal-length SAST window. Enquiry comparisons are creation cohorts; current conversion outcomes must not be described as historical conversion events.
+
+Channel efficiency joins only registered same-store campaigns. CTR = recorded clicks/impressions; CPC = spend/clicks; CPM = spend/impressions × 1,000. Zero denominators show unavailable, not zero. Enquiry costs use matched registered-campaign enquiries, excluding unmatched recorded sources. Placement results join registered campaign and placement IDs in the same store; placement click/spend attribution is unavailable and is not fabricated. Landing-page contribution counts consented enquiry entry pages, not website sessions or visitor conversion rates.
+
+Budget cards show total lifetime recorded spend and lifetime remaining. Reporting-cutoff spend includes activity through the selected end date; scheduled budget is linearly allocated between campaign start/end dates at that cutoff. Open-ended dates and zero budgets have no pacing percentage. Negative remaining is retained to show overspend. This is recorded budget pacing, not a prediction, provider settlement or automatic bidding advice.
+
+Calendar displays recorded work in the selected period, plus all permitted campaign schedules, including future starts. It does not publish campaigns or prove that planned campaigns ran. Export respects the current view and store filter, with explicit period/lifetime column labels. Google traffic and advertising integrations remain the previously documented separate access, mapping and reconciliation gates.
