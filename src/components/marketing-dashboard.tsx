@@ -574,7 +574,7 @@ export function MarketingDashboard({ canManage }: { canManage: boolean }) {
                   <div className="marketing-connection">
                     <span className="marketing-dot" />
                     <div>
-                      <b>CRM enquiries & move-ins</b>
+                      <b>CRM enquiries &amp; move-ins</b>
                       <p>Live, scoped operational results</p>
                     </div>
                   </div>
@@ -590,7 +590,7 @@ export function MarketingDashboard({ canManage }: { canManage: boolean }) {
                   <div className="marketing-connection">
                     <span className="marketing-dot marketing-dot-manual" />
                     <div>
-                      <b>Ad spend, clicks & impressions</b>
+                      <b>Ad spend, clicks &amp; impressions</b>
                       <p>
                         Recorded activity figures; platform sync is not
                         connected
