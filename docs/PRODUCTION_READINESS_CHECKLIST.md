@@ -1,6 +1,16 @@
 # STOR24 production readiness checklist
 
-Target: operational release by Thursday 3 September 2026. Financial integrations and Hikvision are excluded.
+Current assessment: 4 October 2026. See `PRODUCTION_READINESS_2026-10-04.md` for dated baseline evidence, engineering hardening and the remaining acceptance register. The historical September operational scope did not include finance or Hikvision; those remain explicit dependencies for full production readiness.
+
+## Full production acceptance
+
+- [ ] Independent off-server encrypted recovery, key custody and file/configuration coverage verified.
+- [ ] Business-approved RPO/RTO and host-loss restore rehearsal completed.
+- [ ] Representative isolated workflow peak load, provider outages and cost controls validated.
+- [ ] Durable staging and delivered alerts to a named responder verified.
+- [ ] Exact-main CI/security/transaction release gate and runtime resource/session limits verified.
+- [ ] Compatible-image/configuration rollback rehearsed.
+- [ ] Finance/provider reconciliation and physical access acceptance completed where applicable.
 
 ## Engineering and deployment
 

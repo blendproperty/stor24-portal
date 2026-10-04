@@ -45,4 +45,4 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
           printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/stor24_crm
-          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" '/bin/bash /opt/stor24-crm/scripts/dlp-backup-health.sh'
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" '/bin/bash /opt/stor24-crm/scripts/dlp-backup-health.sh && /bin/bash /opt/stor24-crm/scripts/production-resource-health.sh'

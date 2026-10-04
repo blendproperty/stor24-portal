@@ -1,0 +1,28 @@
+name: Isolated production backup restore
+on:
+  schedule:
+    - cron: '31 3 1 * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: stor24-isolated-restore
+  cancel-in-progress: false
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Restore latest encrypted backup into a disposable network-isolated database
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          umask 077
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/stor24_crm
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" 'set -euo pipefail; /bin/bash /opt/stor24-crm/scripts/dlp-backup-health.sh; archive=$(find /opt/backups/stor24-dlp -maxdepth 1 -type f -name "stor24-*.dump.gpg" | sort | tail -1); test -n "$archive"; /bin/bash /opt/stor24-crm/scripts/dlp-restore-proof.sh "$archive"'
