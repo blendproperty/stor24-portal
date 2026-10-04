@@ -1,4 +1,3 @@
-import { writeFileSync } from 'node:fs';
 import { get, Agent } from 'node:http';
 if (process.env.STOR24_STAGING_CAPACITY_TEST !== 'isolated-loopback' || process.env.TENANT_PORTAL_ORGANISATION_SLUG !== 'synthetic-staging') throw new Error('STAGING_CAPACITY_OPT_IN_REQUIRED');
 // Execute inside the isolated staging app; there is no public/host port or provider URL.
@@ -42,6 +41,5 @@ for (const concurrent of [10, 25, 50]) {
   phases.push({ concurrent, requests: timings.length, errors: 0, p95Ms, elapsedMs: performance.now() - start });
 }
 const evidence = { verifiedAt: new Date().toISOString(), scope: 'private staging HTTP/database health only; not authenticated business-workflow capacity', phases };
-writeFileSync('/tmp/stor24-staging-capacity.json', JSON.stringify(evidence, null, 2));
 console.log(JSON.stringify(evidence));
 agent.destroy();
