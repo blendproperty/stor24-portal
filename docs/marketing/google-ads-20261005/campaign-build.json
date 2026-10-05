@@ -20,7 +20,7 @@
       "bidding": "Maximise clicks; CPC cap pending keyword estimates",
       "final_url_expansion": false,
       "conversion_goals": "STOR24-specific only; configuration pending",
-      "platform_state": "NOT CREATED: editor blocked by ad-blocker dialog"
+      "platform_state": "NOT CREATED: owner Google phone reauthentication pending; Brand assets entered in Search draft10207356546"
     },
     {
       "name": "STOR24 | Search | Midrand",
@@ -36,7 +36,7 @@
       "bidding": "Maximise clicks; CPC cap pending keyword estimates",
       "final_url_expansion": false,
       "conversion_goals": "STOR24-specific only; configuration pending",
-      "platform_state": "NOT CREATED: editor blocked by ad-blocker dialog"
+      "platform_state": "NOT CREATED: owner Google phone reauthentication pending; Brand assets entered in Search draft10207356546"
     },
     {
       "name": "STOR24 | Performance Max | Midrand",
@@ -52,7 +52,7 @@
       "bidding": "Maximise conversions; no target CPA until conversion evidence",
       "final_url_expansion": false,
       "conversion_goals": "STOR24-specific only; configuration pending",
-      "platform_state": "NOT CREATED: editor blocked by ad-blocker dialog"
+      "platform_state": "NOT CREATED: owner Google phone reauthentication pending; Brand assets entered in Search draft10207356546"
     }
   ],
   "ads": [
@@ -522,7 +522,7 @@
   ],
   "negative_keywords_status": "No search-terms evidence fetched for STOR24; no negatives invented or applied. Obtain/review terms first.",
   "blockers": [
-    "Google Ads editor displays Turn off ad blockers after reload",
+    "Google Ads owner phone reauthentication pending before final URL can be saved",
     "Advertiser verification overdue; account paused",
     "STOR24 conversion goals and measurement verification pending",
     "Performance Max imagery and asset validation pending"
