@@ -37,6 +37,9 @@ test('website failure uses encrypted last-known team; unavailable or invalid cac
       return new Response(JSON.stringify({ data: { recipients: [row] } }));
     }, file);
     assert.equal(live.source, 'SAVED_RECIPIENTS');
+    const unwritable = await loadAlertRecipients({ STOR24_ALERT_CONFIG_KEY: key }, async () => new Response(JSON.stringify({ data: { recipients: [row] } })), join(dir, 'missing-directory', 'cache.enc'));
+    assert.equal(unwritable.source, 'SAVED_RECIPIENTS_NO_CACHE');
+    assert.deepEqual(unwritable.recipients, [row]);
     const failed = async () => { throw Error('synthetic outage'); };
     assert.deepEqual((await loadAlertRecipients({ STOR24_ALERT_CONFIG_KEY: key }, failed, file)).recipients, [row]);
     await writeFile(file, 'corrupt');

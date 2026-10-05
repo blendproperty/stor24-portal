@@ -35,9 +35,14 @@ export async function loadAlertRecipients(env, fetcher = fetch, file = '.operati
     const body = await response.text();
     if (body.length > 24_000) throw Error('Response too large');
     const recipients = validateAlertRecipients(JSON.parse(body).data?.recipients);
-    const temporary = `${file}.${randomBytes(12).toString('hex')}.tmp`;
-    await writeFile(temporary, encryptRecipients(recipients, env.STOR24_ALERT_CONFIG_KEY), { flag: 'wx', mode: 0o600 });
-    await rename(temporary, file);
+    try {
+      const temporary = `${file}.${randomBytes(12).toString('hex')}.tmp`;
+      await writeFile(temporary, encryptRecipients(recipients, env.STOR24_ALERT_CONFIG_KEY), { flag: 'wx', mode: 0o600 });
+      await rename(temporary, file);
+    } catch {
+      // A cache/storage fault must not resurrect an old list after a valid live read.
+      return { source: 'SAVED_RECIPIENTS_NO_CACHE', recipients };
+    }
     return { source: 'SAVED_RECIPIENTS', recipients };
   } catch {
     try { return { source: 'ENCRYPTED_LAST_KNOWN', recipients: decryptRecipients(await readFile(file, 'utf8'), env.STOR24_ALERT_CONFIG_KEY) }; }
