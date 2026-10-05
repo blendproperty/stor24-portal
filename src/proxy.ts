@@ -14,6 +14,7 @@ export function isPublicPathname(pathname: string) {
   // Do not exempt the surrounding staff operations routes or arbitrary descendants.
   if (pathname === "/api/v1/operations/merchandise-orders/expire") return true;
   if (pathname === "/api/v1/access/photos/expire") return true;
+  if (pathname === "/api/v1/operations/alert-monitor-config") return true;
   // Tenant APIs enforce separate tenant sessions; never accept the staff cookie as tenant authentication.
   if (pathname === "/my" || /^\/my\/orders\/[A-Za-z0-9_-]+$/.test(pathname) || pathname.startsWith("/api/tenant/")) return true;
   return publicPagePrefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix)) ||

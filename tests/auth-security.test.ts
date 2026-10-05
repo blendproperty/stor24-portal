@@ -4,6 +4,11 @@ import { permissionGranted } from "../src/lib/permissions.ts";
 import { createResetToken, hashResetToken } from "../src/lib/password-reset.ts";
 import { isPublicPathname } from "../src/proxy.ts";
 
+test('alert worker exemption is exact and never exposes recipient administration', () => {
+  assert.equal(isPublicPathname('/api/v1/operations/alert-monitor-config'), true);
+  for (const path of ['/api/v1/operations/alert-monitor-config/private', '/api/v1/operations/alert-recipients', '/api/v1/operations/alert-monitor-config-extra']) assert.equal(isPublicPathname(path), false);
+});
+
 test("privacy information is public without exposing private descendants", () => {
   for (const path of ["/privacy", "/paia"]) assert.equal(isPublicPathname(path), true);
   for (const path of ["/privacy/export", "/privacy-admin", "/paia/records"]) assert.equal(isPublicPathname(path), false);

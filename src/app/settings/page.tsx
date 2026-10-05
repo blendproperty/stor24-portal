@@ -1,4 +1,4 @@
-import { BadgePercent, Building2, Cable, FileSignature, KeyRound, ShieldCheck } from "lucide-react";
+import { BadgePercent, BellRing, Building2, Cable, FileSignature, KeyRound, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { ChangePasswordForm } from "@/components/change-password-form";
 import Link from "next/link";
@@ -13,6 +13,7 @@ const modules = [
   [FileSignature, "Documents & templates", "Agreements, notices, invoices, receipts and communication templates.", "/company"],
   [KeyRound, "Hikvision access control", "Secure OpenAPI credentials, facility mapping and access lifecycle rules.", "/settings/integrations/hikvision"],
   [Cable, "Integrations & webhooks", "Payments, messaging, accounting, e-signature and partner APIs.", "/integrations"],
+  [BellRing, "Operations alerts", "Manage the people who receive website, backup and recovery notifications.", "/settings/alerts"],
 ] as const;
 
 export default function SettingsPage() {

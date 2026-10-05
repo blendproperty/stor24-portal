@@ -1,5 +1,8 @@
 import { writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
+import { createHash } from 'node:crypto';
+import { validateAlertRecipients } from '../src/lib/operations-alert-policy.mjs';
+import { loadAlertRecipients } from './load-alert-recipients.mjs';
 
 const SUCCESS = 'success';
 export function notificationKind(current, previous, test = false) {
@@ -10,7 +13,23 @@ export function notificationKind(current, previous, test = false) {
 }
 
 export async function deliverAlert(env, kind, fetcher = fetch) {
+  if (!env.ALERT_RECIPIENTS_JSON) return deliverDestinations(env, kind, fetcher);
+  const recipients = validateAlertRecipients(JSON.parse(env.ALERT_RECIPIENTS_JSON)).filter(r => r.enabled);
   const results = [];
+  // Four recipients at a time bounds provider concurrency and total dispatch time.
+  for (let offset = 0; offset < recipients.length; offset += 4) {
+    const batch = await Promise.all(recipients.slice(offset, offset + 4).map(async recipient => {
+      const channels = await deliverDestinations({ ...env, ALERT_CHANNELS: recipient.channels.join(','), ALERT_EMAIL_TO: recipient.email, ALERT_SMS_TO: recipient.mobile, ALERT_WHATSAPP_TO: recipient.mobile }, kind, fetcher);
+      return channels.map(result => ({ ...result, recipientRef: createHash('sha256').update(recipient.id).digest('hex').slice(0, 12) }));
+    }));
+    results.push(...batch.flat());
+  }
+  return results;
+}
+
+async function deliverDestinations(env, kind, fetcher) {
+  const results = [];
+  const allowed = env.ALERT_CHANNELS === undefined ? ['EMAIL', 'SMS', 'WHATSAPP'] : env.ALERT_CHANNELS.split(',');
   const text = `STOR24 ${kind} ALERT. Application: ${env.READINESS_RESULT}. Backup/resources: ${env.BACKUP_RESULT}. ${kind === 'TEST' ? 'Delivery test only; no outage detected. ' : ''}Review the production monitor in GitHub.`;
   const request = async (channel, url, options) => {
     try {
@@ -24,6 +43,7 @@ export async function deliverAlert(env, kind, fetcher = fetch) {
     }
   };
   const emails = (env.ALERT_EMAIL_TO || '').split(',').map(x => x.trim()).filter(Boolean);
+  if (allowed.includes('EMAIL')) {
   if (!emails.length || !env.SENDGRID_API_KEY || !env.EMAIL_FROM) results.push({ channel: 'EMAIL', accepted: false, status: 'CONFIG_REQUIRED' });
   else {
     const match = env.EMAIL_FROM.match(/^(.*)<([^<>]+)>$/);
@@ -33,8 +53,10 @@ export async function deliverAlert(env, kind, fetcher = fetch) {
       body: JSON.stringify({ personalizations: [{ to: [{ email }] }], from, subject: `STOR24 ${kind} ALERT`, content: [{ type: 'text/plain', value: text }] }),
     }));
   }
+  }
   const auth = `Basic ${Buffer.from(`${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`).toString('base64')}`;
   for (const channel of ['SMS', 'WHATSAPP']) {
+    if (!allowed.includes(channel)) continue;
     const to = env[`ALERT_${channel}_TO`];
     const from = env[`TWILIO_${channel}_FROM`];
     if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !from || !/^\+[1-9]\d{7,14}$/.test(to || '')) {
@@ -87,7 +109,9 @@ export async function run(env, fetcher = fetch) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    const report = { verifiedAt: new Date().toISOString(), ...(await run(process.env)) };
+    const configuration = await loadAlertRecipients(process.env);
+    const env = configuration.recipients ? { ...process.env, ALERT_RECIPIENTS_JSON: JSON.stringify(configuration.recipients) } : process.env;
+    const report = { verifiedAt: new Date().toISOString(), recipientSource: configuration.source, ...(await run(env)) };
     await writeFile('production-alert-result.json', JSON.stringify(report, null, 2), { flag: 'wx', mode: 0o600 });
     console.log(JSON.stringify(report));
     if (report.results?.some(r => !r.accepted)) process.exitCode = 1;
