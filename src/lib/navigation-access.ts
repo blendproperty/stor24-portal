@@ -23,6 +23,7 @@ const rules: Record<string, string[]> = {
   "/audit": ["audit.view"], "/offline-readiness": ["operations.manage"],
   "/settings/integrations": ["integrations.view"],
   "/settings/alerts": ["@owner"],
+  "/settings/troubleshooting": ["@owner"],
 };
 export function canVisit(path: string, access: NavigationAccess) {
   // Training has its own current-role/controller checks; personal Settings remain available.

@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh STOR24 aggregate operations evidence every minute
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=60s
+AccuracySec=5s
+Unit=stor24-operations-status.service
+
+[Install]
+WantedBy=timers.target

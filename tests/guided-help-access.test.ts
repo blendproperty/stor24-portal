@@ -33,7 +33,7 @@ test("every authored guide and step has an explicit access policy; owner retains
 
 test("facility managers have operational guidance without configuration, credentials, owner actions or admin search results", () => {
   const data = catalogueForAssignments([assignment(["facility.*", "users.view", "operations.*", "inventory.*", "daily_close.*", "configuration.view", "facility_map.view", "phone.view", "reports.view", "reports.export", "communications.view", "integrations.view", "access.view", "access.manage"], "store-a", "Facility manager")]);
-  for (const id of ["company", "tenant-defaults", "program-defaults", "settings", "hikvision", "netcash-settings", "operations-alerts"]) assert.ok(!data.guides.some(g => g.id === id), id);
+  for (const id of ["company", "tenant-defaults", "program-defaults", "settings", "hikvision", "netcash-settings", "operations-alerts", "troubleshooting"]) assert.ok(!data.guides.some(g => g.id === id), id);
   assert.ok(data.guides.some(g => g.id === "operations"));
   assert.ok(!JSON.stringify(data).includes("Reset UAT"));
   assert.ok(!JSON.stringify(data).includes("Invite an employee deliberately"));

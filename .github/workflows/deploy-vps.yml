@@ -76,6 +76,8 @@ jobs:
              /bin/bash scripts/dlp-backup.sh && \
              install -m 644 docs/stor24-dlp-backup.service docs/stor24-dlp-backup.timer /etc/systemd/system/ && \
              systemctl daemon-reload && systemctl enable --now stor24-dlp-backup.timer && \
+             install -m 644 docs/stor24-operations-status.service docs/stor24-operations-status.timer /etc/systemd/system/ && \
+             systemctl daemon-reload && systemctl enable --now stor24-operations-status.timer && \
              IMAGE_TAG=\$(git rev-parse --short HEAD) docker compose --env-file .env -f compose.prod.yml build app migrate && \
              IMAGE_TAG=\$(git rev-parse --short HEAD) docker compose --env-file .env -f compose.prod.yml run --rm migrate && \
              IMAGE_TAG=\$(git rev-parse --short HEAD) docker compose --env-file .env -f compose.prod.yml up -d --no-deps app && \
@@ -87,5 +89,6 @@ jobs:
                sleep 2; \
              done && \
              test \"\$(docker inspect --format '{{.State.Health.Status}}' \"\$container\")\" = healthy && \
+             systemctl start stor24-operations-status.service && \
              curl --fail http://127.0.0.1:3014/api/health"
 
