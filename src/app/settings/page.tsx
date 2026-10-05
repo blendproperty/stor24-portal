@@ -1,4 +1,5 @@
-import { BadgePercent, Building2, Cable, FileSignature, KeyRound, ShieldCheck } from "lucide-react";
+import { BadgePercent, BellRing, Building2, Cable, FileSignature, KeyRound, ShieldCheck } from "lucide-react";
+import { requireSession } from "@/lib/auth-guards";
 import { PageHeader } from "@/components/page-header";
 import { ChangePasswordForm } from "@/components/change-password-form";
 import Link from "next/link";
@@ -13,9 +14,11 @@ const modules = [
   [FileSignature, "Documents & templates", "Agreements, notices, invoices, receipts and communication templates.", "/company"],
   [KeyRound, "Hikvision access control", "Secure OpenAPI credentials, facility mapping and access lifecycle rules.", "/settings/integrations/hikvision"],
   [Cable, "Integrations & webhooks", "Payments, messaging, accounting, e-signature and partner APIs.", "/integrations"],
+  [BellRing, "Operations alerts", "Manage the people who receive website, backup and recovery notifications.", "/settings/alerts"],
 ] as const;
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  const session = await requireSession();
   return (
     <div className="page-stack settings-hub-workspace">
       <PageHeader
@@ -24,7 +27,7 @@ export default function SettingsPage() {
         description="Configure the shared policies and integrations that drive every facility workflow."
       />
       <section className="module-grid">
-        {modules.map(([Icon, title, copy, href]) => (
+        {modules.filter(module => module[3] !== "/settings/alerts" || session.role === "Organisation owner").map(([Icon, title, copy, href]) => (
           <Link className="module-card" href={href} key={title}><Icon size={22} /><h3>{title}</h3><p>{copy}</p></Link>
         ))}
       </section>

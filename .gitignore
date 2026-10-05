@@ -59,3 +59,4 @@ next-env.d.ts
 /.claude/
 /.windsurf/
 /skills-lock.json
+.operations-alert-config.enc*

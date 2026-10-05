@@ -57,16 +57,23 @@ jobs:
     if: always()
     needs: [readiness, backup]
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 8
     environment: production
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Restore encrypted last-known recipients
+        uses: actions/cache@v4
+        with:
+          path: .operations-alert-config.enc
+          key: operations-alert-recipients-v1-${{ github.run_id }}
+          restore-keys: operations-alert-recipients-v1-
       - name: Notify operations using existing STOR24 providers
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          STOR24_ALERT_CONFIG_KEY: ${{ secrets.STOR24_ALERT_CONFIG_KEY }}
           READINESS_RESULT: ${{ needs.readiness.result }}
           BACKUP_RESULT: ${{ needs.backup.result }}
           ALERT_TEST: ${{ inputs.test_alert || false }}

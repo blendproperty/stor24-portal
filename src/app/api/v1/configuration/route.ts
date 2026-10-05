@@ -7,7 +7,7 @@ export async function GET() {
     const { organisationId, allowedFacilityIds } = await requirePermission("configuration.view");
     const facilityScope = allowedFacilityIds ? { in: allowedFacilityIds } : undefined;
     const [profiles, integrations, charges, discounts, facilities, roles, users] = await Promise.all([
-      db.configurationProfile.findMany({ where: { organisationId, ...(facilityScope ? { OR: [{ facilityId: null }, { facilityId: facilityScope }] } : {}) }, orderBy: [{ domain: "asc" }, { name: "asc" }] }),
+      db.configurationProfile.findMany({ where: { organisationId, domain: { not: "OPERATIONS_ALERTS" }, ...(facilityScope ? { OR: [{ facilityId: null }, { facilityId: facilityScope }] } : {}) }, orderBy: [{ domain: "asc" }, { name: "asc" }] }),
       db.integrationConnection.findMany({ where: { organisationId, ...(facilityScope ? { OR: [{ facilityId: null }, { facilityId: facilityScope }] } : {}) }, orderBy: [{ category: "asc" }, { provider: "asc" }] }),
       db.chargeDefinition.findMany({ where: { organisationId }, orderBy: { name: "asc" } }),
       db.discountPlan.findMany({ where: { organisationId }, orderBy: { name: "asc" } }),
@@ -25,6 +25,7 @@ export async function PUT(request: Request) {
     const body = await request.json() as { kind?: string; payload?: unknown };
     const { organisationId, user } = await requirePermission("configuration.manage");
     if (body.kind === "profile") {
+      if (body.payload && typeof body.payload === 'object' && 'domain' in body.payload && body.payload.domain === 'OPERATIONS_ALERTS') return Response.json({ error: { code: "DEDICATED_CONFIGURATION_REQUIRED", message: "Manage alert recipients from Operations alerts." } }, { status: 400 });
       const input = configurationSchema.parse(body.payload);
       if (input.facilityId) await requirePermission("configuration.manage", input.facilityId);
       const profile = await db.$transaction(async tx => {

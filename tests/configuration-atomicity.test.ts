@@ -56,5 +56,6 @@ test("denied and dedicated-provider configuration paths never write", async () =
   f.state.allowed = true;
   assert.equal((await f.send({ kind: "integration", payload: { category: "ACCESS_CONTROL", provider: "HIKCENTRAL", config: {} } })).status, 400);
   assert.equal((await f.send({ kind: "unsupported" })).status, 400);
+  assert.equal((await f.send({ kind: "profile", payload: { domain: "OPERATIONS_ALERTS", name: "Operations alert recipients", status: "ACTIVE", config: {} } })).status, 400);
   assert.equal(f.state.rows.length, 0); assert.equal(f.state.audits.length, 0);
 });

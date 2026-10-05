@@ -2764,3 +2764,24 @@ a.module-card:focus-visible {
 @media(max-width: 760px) { .customer-modal {padding: 20px;} .customer-modal .form-actions {bottom: -20px;} .customer-form fieldset {padding: 16px;} }
 
 .leads-source-list { max-height: 340px; overflow: auto; }
+/* Operations alert recipient administration */
+.alert-recipient-workspace{max-width:1100px;width:100%;margin-inline:auto}
+.alert-recipient-fieldset{border:0;padding:0;margin:0;min-width:0}
+.alert-recipient-list{display:grid;gap:18px;margin:24px 0}
+.alert-recipient-card{border:1px solid var(--border,#dfe3df);border-radius:16px;padding:22px;background:var(--surface,#fff);min-width:0}
+.alert-recipient-card.is-paused{background:#f5f6f4}
+.alert-recipient-heading,.alert-recipient-footer,.alert-recipient-actions{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.alert-recipient-heading h3{margin:0;font-size:18px;overflow-wrap:anywhere}
+.alert-recipient-fields{display:grid;grid-template-columns:1fr 1.3fr 1fr;gap:16px;margin:22px 0}
+.alert-recipient-fields label{display:grid;gap:8px;font-size:13px;font-weight:600;min-width:0}
+.alert-recipient-fields input{width:100%;min-width:0;padding:12px;border:1px solid #cdd4cd;border-radius:9px;background:#fff;color:#15231e;font:inherit}
+.alert-recipient-fields input:focus{outline:2px solid #f05a20;outline-offset:2px}
+.alert-recipient-check,.alert-recipient-channels label{display:flex;align-items:center;gap:9px;font-size:13px;line-height:1.5}
+.alert-recipient-check input,.alert-recipient-channels input{accent-color:#ee5a21;flex-shrink:0;width:17px;height:17px}
+.alert-recipient-channels{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:22px}
+.alert-recipient-channels label{padding:10px 14px;border:1px solid #dfe3df;border-radius:9px;background:#fff}
+.alert-recipient-footer{border-top:1px solid #e8ebe5;padding-top:18px}
+.alert-recipient-note{color:#5e6d65;font-size:13px;line-height:1.65;max-width:800px}
+.alert-recipient-error{border:1px solid #e7b9aa;background:#fff1ec;color:#963517;padding:14px 16px;border-radius:10px;margin:16px 0;overflow-wrap:anywhere}
+.alert-recipient-notice{background:#edf7ef;color:#245f35;padding:14px 16px;border-radius:10px}
+@media(max-width:650px){.alert-recipient-fields{grid-template-columns:1fr}.alert-recipient-card{padding:16px}.alert-recipient-actions .button{flex:1}.alert-recipient-footer{align-items:flex-start}.alert-recipient-check{align-items:flex-start}}

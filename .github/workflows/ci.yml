@@ -33,6 +33,7 @@ jobs:
       - run: node scripts/test-company-setup-recovery.mjs
       - run: node scripts/test-password-form-recovery.mjs
       - run: node scripts/test-mfa-settings-recovery.mjs
+      - run: node scripts/test-operations-alert-recipients.mjs
       - run: node scripts/test-pending-order-recovery.mjs
       - run: node scripts/test-purchase-read-recovery.mjs
       - run: node scripts/test-task-completion-recovery.mjs
@@ -83,6 +84,7 @@ jobs:
           name: guided-help-browser-evidence
           path: |
             output/marketing/
+            output/operations-alert-recipients/
             output/guided-help/
             output/company-setup-recovery/
             output/task-completion-recovery/
