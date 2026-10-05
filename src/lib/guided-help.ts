@@ -77,7 +77,6 @@ export const workflowGuides: WorkflowGuide[] = [
 
 export type PageHelp = { route: string; title: string; body: string; guideId?: string };
 export const pageHelp: PageHelp[] = [
-  {route:"/settings/advertising",title:"Advertising reporting",body:"Connect the verified company advertising account, check live retrieval status and keep provider conversions separate from CRM outcomes.",guideId:"advertising"},
   { route: "/audit/data-protection", title: "Data protection", body: "Review the report export policy and recent decisions. Use the request reference in System audit to investigate a block without copying sensitive content.", guideId: "data-protection" },
   ...extendedPageHelp,
   { route: "/operations/move-in", title: "Move in", body: "Start from the correct reservation. Signed bookings use the original agreement, verified payment and date checks before physical key handover.", guideId: "move-in" },
