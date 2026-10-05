@@ -91,6 +91,8 @@ if (process.env.PREVIEW_ONLY) {
    await expect(finder).toBeFocused();
    await page.goto(base+'/prorate');
    await page.getByLabel('Monthly rate (ZAR)').fill('2800');
+   assert.ok((await page.getByLabel('Monthly rate (ZAR)').boundingBox()).width >= 120, `usable rate input ${width}`);
+   assert.ok((await page.getByLabel('Effective date').boundingBox()).width >= 120, `usable date input ${width}`);
    await page.getByLabel('Effective date').fill('2026-02-15');
    await expect(page.locator('.calculation-result')).toContainText('14 of 28 days');
    await expect(page.locator('.calculation-result')).toContainText('1');
