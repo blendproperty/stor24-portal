@@ -4,9 +4,15 @@ on:
   schedule:
     - cron: "*/10 * * * *"
   workflow_dispatch:
+    inputs:
+      test_alert:
+        description: Send labelled delivery tests to the configured operations recipients
+        type: boolean
+        default: false
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: stor24-production-monitor
@@ -46,3 +52,38 @@ jobs:
           printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
           printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/stor24_crm
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" '/bin/bash /opt/stor24-crm/scripts/dlp-backup-health.sh && /bin/bash /opt/stor24-crm/scripts/production-resource-health.sh'
+
+  alerts:
+    if: always()
+    needs: [readiness, backup]
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Notify operations using existing STOR24 providers
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          READINESS_RESULT: ${{ needs.readiness.result }}
+          BACKUP_RESULT: ${{ needs.backup.result }}
+          ALERT_TEST: ${{ inputs.test_alert || false }}
+          ALERT_EMAIL_TO: ${{ vars.STOR24_ALERT_EMAIL_TO }}
+          ALERT_SMS_TO: ${{ vars.STOR24_ALERT_MOBILE }}
+          ALERT_WHATSAPP_TO: ${{ vars.STOR24_ALERT_MOBILE }}
+          ALERT_WHATSAPP_CONTENT_SID: ${{ vars.STOR24_ALERT_WHATSAPP_CONTENT_SID }}
+          EMAIL_FROM: ${{ secrets.STOR24_ALERT_EMAIL_FROM }}
+          SENDGRID_API_KEY: ${{ secrets.STOR24_ALERT_SENDGRID_API_KEY }}
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_SMS_FROM: ${{ secrets.TWILIO_SMS_FROM }}
+          TWILIO_WHATSAPP_FROM: ${{ secrets.TWILIO_WHATSAPP_FROM }}
+        run: node scripts/send-production-alert.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: production-alert-result
+          path: production-alert-result.json
+          retention-days: 14
