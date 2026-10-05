@@ -1,7 +1,8 @@
 import { leadSourceLabel, websiteSourceLabel } from "@/lib/lead-sources";
+import type { LeadMarketProfile } from './lead-market-profile';
 export const leadStages = ["NEW", "CONTACTED", "QUALIFIED", "QUOTED", "VIEWING_BOOKED", "RESERVED", "WON", "LOST"] as const;
 export const stageLabels: Record<string, string> = { NEW: "New enquiry", CONTACTED: "Contacted", QUALIFIED: "Qualified", QUOTED: "Quoted", VIEWING_BOOKED: "Viewing booked", RESERVED: "Reserved", WON: "Moved in", LOST: "Lost" };
-export type ReportingLead = { stage: string; source: string; createdAt: string; nextActionAt: string | null; attribution: { source: string; medium?: string; landingPage: string; conversionPage: string } | null; reservations: { status: string; quotedRate: number; convertedTenancyId: string | null }[] };
+export type ReportingLead = { marketProfile?:LeadMarketProfile|null; stage: string; source: string; createdAt: string; nextActionAt: string | null; attribution: { source: string; medium?: string; landingPage: string; conversionPage: string } | null; reservations: { status: string; quotedRate: number; convertedTenancyId: string | null }[] };
 export function leadReport(leads: ReportingLead[], now = new Date()) {
   const open = leads.filter(l => !["WON", "LOST"].includes(l.stage));
   const won = leads.filter(l => l.stage === "WON").length;
@@ -17,7 +18,8 @@ export function leadReport(leads: ReportingLead[], now = new Date()) {
     if (lead.attribution) { const route = `${lead.attribution.landingPage} → ${lead.attribution.conversionPage}`; paths.set(route, (paths.get(route) ?? 0) + 1); }
     const at = new Date(lead.createdAt).getTime(); const week = weeks.findLast(w => at >= w.start); if (week && at <= now.getTime()) week.count++;
   }
-  return { total: leads.length, open: open.length, won, conversionRate: leads.length ? Math.round(won / leads.length * 100) : 0,
+  const breakdown=(field:keyof LeadMarketProfile)=>{const values=new Map<string,number>();for(const l of leads){const recorded=l.marketProfile?.[field];const key=!recorded||recorded==='UNKNOWN'?'Unknown':recorded;values.set(key,(values.get(key)??0)+1);}return [...values].map(([label,count])=>({label,count}));};
+  return { genders:breakdown('gender'),storageUses:breakdown('storageUse'),discoverySources:breakdown('discoverySource'), total: leads.length, open: open.length, won, conversionRate: leads.length ? Math.round(won / leads.length * 100) : 0,
     overdue: open.filter(l => l.nextActionAt && new Date(l.nextActionAt) < now).length,
     attributed: leads.filter(l => l.attribution).length,
     pipelineValue: open.reduce((sum, l) => sum + l.reservations.filter(r => r.status === "ACTIVE").reduce((n, r) => n + r.quotedRate, 0), 0),

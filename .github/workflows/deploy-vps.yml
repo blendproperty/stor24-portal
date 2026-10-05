@@ -73,6 +73,10 @@ jobs:
                integration_key=\$(openssl rand -hex 32); \
                printf 'INTEGRATION_CONFIG_ENCRYPTION_KEY=%s\n' \"\$integration_key\" >> .env; \
              fi && \
+             if ! grep -q '^LEAD_SLA_WORKER_KEY=' .env; then \
+               sla_key=\$(openssl rand -hex 32); \
+               printf 'LEAD_SLA_WORKER_KEY=%s\n' \"\$sla_key\" >> .env; \
+             fi && \
              /bin/bash scripts/dlp-backup.sh && \
              install -m 644 docs/stor24-dlp-backup.service docs/stor24-dlp-backup.timer /etc/systemd/system/ && \
              systemctl daemon-reload && systemctl enable --now stor24-dlp-backup.timer && \
@@ -90,5 +94,7 @@ jobs:
              done && \
              test \"\$(docker inspect --format '{{.State.Health.Status}}' \"\$container\")\" = healthy && \
              systemctl start stor24-operations-status.service && \
+             install -m 644 docs/stor24-lead-sla.service docs/stor24-lead-sla.timer /etc/systemd/system/ && \
+             systemctl daemon-reload && systemctl enable --now stor24-lead-sla.timer && \
              curl --fail http://127.0.0.1:3014/api/health"
 

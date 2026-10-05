@@ -1,4 +1,6 @@
+import type {LeadMarketProfile} from "./lead-market-profile";
 export type MarketingLead = {
+  marketProfile?:LeadMarketProfile|null;
   facilityId: string;
   createdAt: string;
   won: boolean;
@@ -105,7 +107,9 @@ export function marketingReport(
   });
   const won = selected.filter((l) => l.won).length,
     attributed = selected.filter((l) => l.attribution).length;
+  const profileCount=(field:keyof LeadMarketProfile)=>{const rows=new Map<string,number>();for(const l of selected){const recorded=l.marketProfile?.[field];const value=!recorded||recorded==="UNKNOWN"?"Unknown":recorded;rows.set(value,(rows.get(value)??0)+1);}return [...rows].map(([label,count])=>({label,count}));};
   return {
+    genders:profileCount("gender"),storageUses:profileCount("storageUse"),discoverySources:profileCount("discoverySource"),
     leads: selected.length,
     won,
     reserved: selected.filter((l) => l.reserved).length,

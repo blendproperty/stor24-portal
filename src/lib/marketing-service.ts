@@ -1,3 +1,4 @@
+import {marketProfileSchema} from "./lead-market-profile";
 import { db } from "./db";
 import { createHash } from "node:crypto";
 import { facilityWhere, requireFacility, type RequestScope } from "./scope";
@@ -54,7 +55,7 @@ export async function marketingWorkspace(scope: RequestScope) {
           organisationId: scope.organisationId,
           entityType: "Lead",
           entityId: { in: leads.map((l) => l.id) },
-          action: { in: ["public_lead.created", "lead.attribution.captured"] },
+          action: { in: ["public_lead.created", "lead.attribution.captured", "lead.market_profile.captured"] },
         },
         select: { entityId: true, after: true },
         orderBy: { occurredAt: "asc" },
@@ -68,6 +69,7 @@ export async function marketingWorkspace(scope: RequestScope) {
       return parsed.success ? [[e.entityId, parsed.data] as const] : [];
     }),
   );
+  const profiles=new Map(evidence.flatMap(e=>{const p=marketProfileSchema.safeParse((e.after as {marketProfile?:unknown}|null)?.marketProfile);return p.success?[[e.entityId,p.data] as const]:[];}));
   const known = new Map(campaigns.map((c) => [c.id, c]));
   return {
     facilities,
@@ -96,6 +98,7 @@ export async function marketingWorkspace(scope: RequestScope) {
       const c = a?.campaignId ? known.get(a.campaignId) : null;
       const valid = c?.facilityId === l.facilityId;
       return {
+        marketProfile:profiles.get(l.id)??null,
         id: l.id,
         facilityId: l.facilityId,
         source: l.source,

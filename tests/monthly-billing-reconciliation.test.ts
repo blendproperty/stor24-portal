@@ -5,7 +5,7 @@ import { Prisma } from "../src/generated/prisma/client";
 import { previewMonthlyBilling } from "../src/lib/monthly-billing-service";
 
 test("monthly preview refuses a balance that disagrees with transaction history", async () => {
-  const original = { account: db.account.findFirst, profile: db.configurationProfile.findFirst, entries: db.ledgerEntry.findMany, payments: db.payment.findMany };
+  const original = { account: db.account.findFirst, profile: db.configurationProfile.findFirst, schedules: db.configurationProfile.findMany, entries: db.ledgerEntry.findMany, payments: db.payment.findMany };
   const decimal = (value: string) => new Prisma.Decimal(value);
   let balance = "50";
   let entries: unknown[] = [];
@@ -13,6 +13,7 @@ test("monthly preview refuses a balance that disagrees with transaction history"
   const plan = { firstPeriod: "2026-02", proration: "FULL_MONTH", taxPercent: 15, rentTaxable: true, insuranceEnabled: false, insuranceTaxable: false, charges: [], discount: null, approvalReference: "Synthetic only" };
   db.account.findFirst = (async () => ({ id: "account", accountNumber: "TEST", customerId: "customer", currency: "ZAR", balance: decimal(balance), customer: { firstName: "Test" }, tenancy })) as unknown as typeof original.account;
   db.configurationProfile.findFirst = (async () => ({ status: "READY", config: plan })) as unknown as typeof original.profile;
+  db.configurationProfile.findMany = (async () => []) as unknown as typeof original.schedules;
   db.ledgerEntry.findMany = (async () => entries) as unknown as typeof original.entries;
   db.payment.findMany = (async () => []) as unknown as typeof original.payments;
   const scope = { organisationId: "org", userId: "staff", facilityIds: ["store"], unrestrictedFacilities: false };
@@ -30,6 +31,7 @@ test("monthly preview refuses a balance that disagrees with transaction history"
   } finally {
     db.account.findFirst = original.account;
     db.configurationProfile.findFirst = original.profile;
+    db.configurationProfile.findMany = original.schedules;
     db.ledgerEntry.findMany = original.entries;
     db.payment.findMany = original.payments;
   }

@@ -91,11 +91,21 @@ if (process.env.PREVIEW_ONLY) {
    await expect(finder).toBeFocused();
    await page.goto(base+'/prorate');
    await page.getByLabel('Monthly rate (ZAR)').fill('2800');
+   assert.ok((await page.getByLabel('Monthly rate (ZAR)').boundingBox()).width >= 120, `usable rate input ${width}`);
+   assert.ok((await page.getByLabel('Effective date').boundingBox()).width >= 120, `usable date input ${width}`);
    await page.getByLabel('Effective date').fill('2026-02-15');
    await expect(page.locator('.calculation-result')).toContainText('14 of 28 days');
    await expect(page.locator('.calculation-result')).toContainText('1');
    await page.getByLabel('Effective date').fill('2028-02-29');
    await expect(page.locator('.calculation-result')).toContainText('1 of 29 days');
+   for (const method of ['FULL_MONTH', 'AFTER_CUTOFF_NEXT_MONTH', 'ACTUAL_DAYS']) {
+    await page.getByLabel('Pricing method').selectOption(method);
+    if (method === 'AFTER_CUTOFF_NEXT_MONTH') {
+     await page.getByLabel('Cutoff day').fill('15');
+     await expect(page.locator('.calculation-result')).toContainText('2028-03');
+    }
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth),true,`calculator ${method} overflow ${width}`);
+   }
    const card = await page.locator('.calculator-card').boundingBox();
    const note = await page.locator('.calculator-note').boundingBox();
    assert.ok(note.width > card.width - 80, `calculator note uses the full panel width ${width}`);

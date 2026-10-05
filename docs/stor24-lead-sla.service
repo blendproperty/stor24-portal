@@ -1,0 +1,10 @@
+[Unit]
+Description=STOR24 enquiry SLA escalation worker
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/stor24-crm
+ExecStart=/usr/bin/node /opt/stor24-crm/scripts/run-lead-sla.mjs
+TimeoutStartSec=210
+UMask=0077

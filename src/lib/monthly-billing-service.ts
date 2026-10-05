@@ -8,6 +8,7 @@ import { renderInvoiceHtml } from "./finance/invoice-renderer";
 import { getBillingDocumentCompanyDetails } from "./finance/billing-document-config";
 
 import { buildAccountStatement } from "./finance/account-statement";
+import { rentRatesForBilling } from './rent-review-service';
 
 const DOMAIN = "MONTHLY_BILLING";
 type Client = Prisma.TransactionClient;
@@ -66,7 +67,8 @@ async function preview(client: Client, scope: RequestScope, accountId: string, p
     throw new Error("BILLING_RECONCILIATION_REQUIRED");
   }
   if (!account.balance.equals(ledgerBalance) || entries.some(entry => entry.effectiveAt > new Date())) throw new Error("BILLING_RECONCILIATION_REQUIRED");
-  const result = calculateMonthlyBill(period, plan, tenancy.occupancies.filter(o => !["PENDING", "CANCELLED"].includes(o.status)).map(o => ({ id: o.id, number: o.unit.number, monthlyRate: Number(o.monthlyRate), startDate: o.startDate, endDate: o.endDate })), tenancy.insuranceEnrollment ? { ...tenancy.insuranceEnrollment, monthlyPremium: tenancy.insuranceEnrollment.monthlyPremium === null ? null : Number(tenancy.insuranceEnrollment.monthlyPremium) } : null);
+  const rates = await rentRatesForBilling(client, scope.organisationId, tenancy.facilityId, tenancy.occupancies, period);
+  const result = calculateMonthlyBill(period, plan, tenancy.occupancies.filter(o => !["PENDING", "CANCELLED"].includes(o.status)).map(o => ({ id: o.id, number: o.unit.number, monthlyRate: rates.get(o.id)!, startDate: o.startDate, endDate: o.endDate })), tenancy.insuranceEnrollment ? { ...tenancy.insuranceEnrollment, monthlyPremium: tenancy.insuranceEnrollment.monthlyPremium === null ? null : Number(tenancy.insuranceEnrollment.monthlyPremium) } : null);
   const fingerprint = createHash("sha256").update(JSON.stringify({ account, profile, entries, payments, result })).digest("hex");
   return { ...result, fingerprint, accountNumber: account.accountNumber, accountId, customerName: account.customer.companyName || [account.customer.firstName, account.customer.lastName].filter(Boolean).join(" ") || "Customer", facilityName: tenancy.facility.name, tenancyId: tenancy.id, facilityId: tenancy.facilityId, balance: account.balance.toString(), approvalReference: plan.approvalReference };
 }

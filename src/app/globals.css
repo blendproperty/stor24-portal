@@ -1131,13 +1131,14 @@ a.module-card:focus-visible {
 
 .calculator-card {
   display: grid;
-  grid-template-columns: auto repeat(2, minmax(180px, 1fr)) minmax(260px, 1.2fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: end;
   gap: 22px;
   padding: 24px;
 }
 
 .calculator-icon {
+  grid-column: 1 / -1;
   display: grid;
   width: 58px;
   height: 58px;
@@ -1148,14 +1149,18 @@ a.module-card:focus-visible {
 }
 
 .calculator-card label {
+  min-width: 0;
   color: var(--muted);
   font-size: 11px;
   font-weight: 650;
 }
 
-.calculator-card input {
+.calculator-card input,
+.calculator-card select {
   display: block;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   height: 44px;
   margin-top: 8px;
   padding: 0 12px;
@@ -1631,7 +1636,7 @@ a.module-card:focus-visible {
   }
 
   .calculator-card {
-    grid-template-columns: auto 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .calculation-result {
@@ -1687,6 +1692,7 @@ a.module-card:focus-visible {
   }
 
   .calculator-icon {
+  grid-column: 1 / -1;
     display: none;
   }
 
@@ -2800,3 +2806,24 @@ a.module-card:focus-visible {
 .alert-recipient-error{border:1px solid #e7b9aa;background:#fff1ec;color:#963517;padding:14px 16px;border-radius:10px;margin:16px 0;overflow-wrap:anywhere}
 .alert-recipient-notice{background:#edf7ef;color:#245f35;padding:14px 16px;border-radius:10px}
 @media(max-width:650px){.alert-recipient-fields{grid-template-columns:1fr}.alert-recipient-card{padding:16px}.alert-recipient-actions .button{flex:1}.alert-recipient-footer{align-items:flex-start}.alert-recipient-check{align-items:flex-start}}
+
+/* Rent review and enquiry SLA share accessible, responsive administration controls. */
+.meeting-workspace .form-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin:20px 0;align-items:end}
+.meeting-workspace label{display:grid;gap:8px;color:var(--muted);font-size:13px;font-weight:650;min-width:0}
+.meeting-workspace input:not([type=checkbox]),.meeting-workspace select,.meeting-workspace textarea{width:100%;min-height:46px;padding:11px 13px;border:1px solid #d3dbe5;border-radius:10px;background:#fff;color:var(--ink);font:inherit}
+.meeting-workspace input:focus-visible,.meeting-workspace select:focus-visible,.meeting-workspace textarea:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.meeting-workspace input[type=checkbox]{width:18px;height:18px;accent-color:var(--orange)}
+.meeting-workspace .button-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:20px}
+.meeting-workspace .button{min-height:46px;padding:11px 18px;border-radius:10px;border:1px solid transparent;background:var(--orange);color:#fff;font-size:13px;font-weight:700;cursor:pointer}
+.meeting-workspace .button-secondary{border-color:var(--line);background:#fff;color:var(--ink)}
+.meeting-workspace .button:disabled{opacity:.45;cursor:not-allowed}
+.meeting-workspace p{font-size:13px;line-height:1.7;color:var(--muted)}
+.meeting-workspace .table-wrap{overflow:auto;max-width:100%}
+.meeting-workspace .data-table{min-width:900px}
+.meeting-workspace textarea{min-height:90px}
+@media(max-width:900px){.meeting-workspace .form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.meeting-workspace .form-grid{grid-template-columns:1fr}.meeting-workspace .panel-heading{flex-wrap:wrap;gap:14px}.meeting-workspace .button-row .button{flex:1}}
+
+.market-profile-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}.market-profile-summary p{color:var(--muted);font-size:13px;line-height:1.6}.market-profile-grid>div{background:var(--canvas);border:1px solid var(--line);border-radius:12px;padding:18px}.market-profile-grid p{display:flex;justify-content:space-between;gap:16px}.market-profile-grid strong{color:var(--ink)}@media(max-width:700px){.market-profile-grid{grid-template-columns:1fr}}
+
+.calculator-method, .calculator-card .calculation-result { grid-column: 1 / -1; }

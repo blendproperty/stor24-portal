@@ -151,6 +151,7 @@ export function MarketingDashboard({ canManage }: { canManage: boolean }) {
     ];
     if (data) {
       const analysis = marketingIntelligence(data, from, to, facility);
+      if(tab==='overview')rows.push([],['Customer profile category','Answer','Enquiries'],...[{category:'Storage use',rows:report.storageUses},{category:'Discovery source',rows:report.discoverySources},{category:'Gender (self-reported)',rows:report.genders}].flatMap(group=>group.rows.map(row=>[group.category,row.label,row.count])));
       if (tab === "channels")
         rows = [
           [

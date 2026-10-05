@@ -1,0 +1,15 @@
+import { z } from 'zod';
+import { southAfricaDateKey } from './south-africa-time';
+export const rentReviewInput = z.object({
+  facilityId: z.string().min(1).max(100), minimumMonths: z.number().int().min(0).max(1200),
+  basis: z.enum(['TIME_IN_UNIT', 'TIME_SINCE_CHANGE']), type: z.enum(['PERCENTAGE', 'AMOUNT']),
+  value: z.number().finite().positive().max(1000000), effectivePeriod: z.string().regex(/^20\d{2}-(0[1-9]|1[0-2])$/),
+}).strict().superRefine((v, ctx) => { if (v.type === 'AMOUNT' && Math.abs(v.value * 100 - Math.round(v.value * 100)) > 0.000001) ctx.addIssue({code:'custom',message:'Rand amounts must use whole cents.'}); if (v.type === 'PERCENTAGE' && v.value > 100) ctx.addIssue({ code: 'custom', message: 'Percentage must not exceed 100.' }); });
+export type RentReviewInput = z.infer<typeof rentReviewInput>;
+export const rentScheduleSchema = z.object({ baseline: z.number().finite().min(0).max(10000000), changes: z.array(z.object({ period: z.string().regex(/^20\d{2}-(0[1-9]|1[0-2])$/), rate: z.number().finite().min(0).max(10000000), approvedAt: z.string().datetime(), approvalReference: z.string().min(5).max(250), batchId: z.string().uuid() }).strict()).max(100) }).strict().superRefine((v,c)=>{ if(new Set(v.changes.map(x=>x.period)).size!==v.changes.length)c.addIssue({code:'custom',message:'Duplicate effective period'}); });
+export type RentSchedule = z.infer<typeof rentScheduleSchema>;
+export function daysBetween(start: string, end: string) { return Math.max(0, Math.floor((Date.parse(end+'T00:00:00Z')-Date.parse(start+'T00:00:00Z'))/86400000)); }
+export function completedMonths(start: string, end: string) { const a=start.split('-').map(Number), b=end.split('-').map(Number); const anniversaryDay=Math.min(a[2],new Date(Date.UTC(b[0],b[1],0)).getUTCDate()); return Math.max(0,(b[0]-a[0])*12+b[1]-a[1]-(b[2]<anniversaryDay?1:0)); }
+export function rateForPeriod(baseline: number, schedule: RentSchedule | null, period: string) { if(!Number.isFinite(baseline)||baseline<0||baseline>10000000)throw Error('RENT_RATE_INVALID'); if(!schedule)return baseline; const checked=rentScheduleSchema.parse(schedule); if(checked.baseline!==baseline)throw Error('RENT_BASELINE_CHANGED'); return [...checked.changes].sort((a,b)=>b.period.localeCompare(a.period)).find(x=>x.period<=period)?.rate ?? checked.baseline; }
+export function increasedRate(rate: number, type: RentReviewInput['type'], value: number) { const cents=Math.round(rate*100); const next=(type==='PERCENTAGE'?cents+Math.round(cents*value/100):cents+Math.round(value*100))/100; if(next>10000000||next<=rate)throw Error('RENT_INCREASE_INVALID'); return next; }
+export function validateNoticePeriod(period: string, now=new Date()) { const today=southAfricaDateKey(now); const [y,m,d]=today.split('-').map(Number); const nextMonthDays=new Date(Date.UTC(y,m+1,0)).getUTCDate(); const earliest=new Date(Date.UTC(y,m,Math.min(d,nextMonthDays))).toISOString().slice(0,10); if(period+'-01'<earliest)throw Error('RENT_NOTICE_PERIOD_REQUIRED'); }
