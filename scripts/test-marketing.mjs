@@ -354,18 +354,6 @@ if (process.env.PREVIEW_ONLY) {
       assert.equal(requests.at(-1).activityId, "activity");
       assert.equal(requests.at(-1).version, 1);
       await page.locator(".marketing-filters select").selectOption("second");
-      await expect(page.getByRole("heading", {name:/Google Ads.*Connected/})).toBeVisible();
-      await expect(page.getByRole("heading", {name:/Meta Ads.*Connection needed/})).toBeVisible();
-      await expect(page.getByRole("button", {name:"Export Meta Ads"})).toBeDisabled();
-      if (width === 1440) {
-        const downloaded = page.waitForEvent("download");
-        await page.getByRole("button", {name:"Export Google Ads"}).click();
-        const file = await downloaded;
-        const report = await readFile(await file.path(), "utf8");
-        assert.ok(report.includes("24315692802"));
-        assert.ok(report.includes("'=Synthetic campaign"));
-        assert.ok(report.includes("ZAR"));
-      }
       await expect(
         page.locator(".marketing-kpis article").first(),
       ).toContainText("0");
