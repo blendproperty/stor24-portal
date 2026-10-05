@@ -48,3 +48,7 @@ test('persistent outage is suppressed after a recent delivery attempt, including
   const result = await run({ READINESS_RESULT: 'failure', BACKUP_RESULT: 'success', GITHUB_RUN_ID: '10' }, async url => ({ ok: true, json: async () => url.includes('/jobs') ? { jobs: [{ name: 'readiness', conclusion: 'failure' }, { name: 'backup', conclusion: 'success' }, { name: 'alerts', status: 'completed', conclusion: 'failure' }] } : { workflow_runs: [{ id: 9, created_at: new Date().toISOString() }] } }));
   assert.equal(result.status, 'SUPPRESSED');
 });
+test('a recent healthy test cannot suppress the first real incident', async () => {
+  const result = await run({ READINESS_RESULT: 'failure', BACKUP_RESULT: 'success', GITHUB_RUN_ID: '10' }, async url => ({ ok: true, json: async () => url.includes('/jobs') ? { jobs: [{ name: 'readiness', conclusion: 'success' }, { name: 'backup', conclusion: 'success' }, { name: 'alerts', status: 'completed', conclusion: 'success' }] } : { workflow_runs: [{ id: 9, created_at: new Date().toISOString() }] } }));
+  assert.equal(result.status, 'ATTEMPTED');
+});

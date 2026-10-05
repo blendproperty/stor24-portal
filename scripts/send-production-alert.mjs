@@ -75,7 +75,7 @@ export async function run(env, fetcher = fetch) {
   }
   const kind = notificationKind(current, previous, env.ALERT_TEST === 'true');
   if (!kind) return { status: 'HEALTHY_NO_NOTIFICATION' };
-  if (kind === 'FAILURE') {
+  if (kind === 'FAILURE' && previous?.conclusion === 'failure') {
     for (const prior of (history.workflow_runs || []).filter(r => String(r.id) !== env.GITHUB_RUN_ID && Date.now() - Date.parse(r.created_at) < 30 * 60000)) {
       const jobs = await get(`${api}/actions/runs/${prior.id}/jobs?per_page=100`);
       // A completed sender, even with partial channel failure, consumes the cooldown.
