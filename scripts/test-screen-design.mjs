@@ -17,7 +17,7 @@ export const getUnitStatsByFacility=async()=>[{facilityId:'fixture',facilityName
 export const requireScope=async()=>({organisationId:'fixture',unrestrictedFacilities:true});
 export const requirePermissionScope=requireScope;
 export const facilityWhere=()=>({});
-export const requireSession=async()=>({permissions:location.search.includes('restricted')?['operations.view']:['*']});
+export const requireSession=async()=>({permissions:location.search.includes('restricted')?['operations.view']:['*'],user:{roleAssignments:[{facilityId:null,role:{name:location.search.includes('restricted')?'Operations':'Organisation owner',permissions:location.search.includes('restricted')?['operations.view']:['*']}}]}});
 export const netCollectionTotal=async()=>162000;
 export const getWhatsAppAutomationState=async()=>({enabled:false,serverGateEnabled:false});
 export const listHikCentralConfiguration=async()=>({company:{endpoint:"",appKeyConfigured:false,appSecretConfigured:false,status:"DISCONNECTED",failureMessage:null},facilities:[]});
