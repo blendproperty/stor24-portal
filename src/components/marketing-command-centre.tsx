@@ -224,9 +224,9 @@ export function MarketingCommandCentre({
                 </p>
               ))}
             <p>
-              Website traffic needs the read-only Google reporting connection.
-              Advertising results currently come from recorded activity;
-              automated platform feeds are not connected.
+              Website traffic and advertising use separate reporting connections.
+              Check their connection status and live provider figures below.
+              Recorded activity remains separate from provider delivery.
             </p>
           </div>
         </section>
