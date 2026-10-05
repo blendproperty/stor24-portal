@@ -23,6 +23,8 @@ test('cached recipients are authenticated encrypted and bounded by age', () => {
   assert.deepEqual(decryptRecipients(encrypted, key, now), [row]);
   assert.throws(() => decryptRecipients(encrypted, 'b'.repeat(64), now));
   assert.throws(() => decryptRecipients(encrypted, key, now + 31 * 86400_000));
+  const shortened = JSON.parse(encrypted); shortened.tag = Buffer.from(shortened.tag, 'base64').subarray(0, 4).toString('base64');
+  assert.throws(() => decryptRecipients(JSON.stringify(shortened), key, now));
   const altered = JSON.parse(encrypted); altered.data = Buffer.from('tampered').toString('base64');
   assert.throws(() => decryptRecipients(JSON.stringify(altered), key, now));
 });

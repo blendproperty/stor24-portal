@@ -8,7 +8,7 @@ function keyBytes(key) {
   return createHash('sha256').update('stor24-alert-recipient-cache-v1:').update(key).digest();
 }
 export function encryptRecipients(recipients, key, now = Date.now()) {
-  const iv = randomBytes(12), cipher = createCipheriv('aes-256-gcm', keyBytes(key), iv);
+  const iv = randomBytes(12), cipher = createCipheriv('aes-256-gcm', keyBytes(key), iv, { authTagLength: 16 });
   const plaintext = JSON.stringify({ savedAt: now, recipients: validateAlertRecipients(recipients) });
   const data = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
   return JSON.stringify({ version: 1, iv: iv.toString('base64'), tag: cipher.getAuthTag().toString('base64'), data: data.toString('base64') });
@@ -17,8 +17,10 @@ export function decryptRecipients(text, key, now = Date.now()) {
   if (text.length > 64_000) throw Error('Cache too large');
   const cache = JSON.parse(text);
   if (cache.version !== 1) throw Error('Unsupported cache');
-  const decipher = createDecipheriv('aes-256-gcm', keyBytes(key), Buffer.from(cache.iv, 'base64'));
-  decipher.setAuthTag(Buffer.from(cache.tag, 'base64'));
+  const iv = Buffer.from(cache.iv, 'base64'), tag = Buffer.from(cache.tag, 'base64');
+  if (iv.length !== 12 || tag.length !== 16) throw Error('Invalid authenticated cache');
+  const decipher = createDecipheriv('aes-256-gcm', keyBytes(key), iv, { authTagLength: 16 });
+  decipher.setAuthTag(tag);
   const value = JSON.parse(Buffer.concat([decipher.update(Buffer.from(cache.data, 'base64')), decipher.final()]).toString('utf8'));
   if (!Number.isSafeInteger(value.savedAt) || now - value.savedAt > MAX_CACHE_AGE || value.savedAt > now + 60_000) throw Error('Cache expired');
   return validateAlertRecipients(value.recipients);
