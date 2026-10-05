@@ -1,3 +1,4 @@
+import {publicInitialRent} from "./public-initial-rent";
 import { releaseLeadBookingStage } from "@/lib/lead-booking-stage";
 import { requireOperationalUnit } from "@/lib/floor-availability-service";
 import { unitIsOperational, floorMapSelection } from "@/lib/floor-availability";
@@ -706,6 +707,9 @@ export async function moveIn(
         expiresAt,
       },
     });
+    const bookedRent=reservation?.initialRentSnapshot?publicInitialRent(reservation):null;
+    if(bookedRent&&(Number(monthlyRate)!==Number(reservation!.quotedRate)||southAfricaDateKey(input.startDate)!==southAfricaDateKey(reservation!.intendedMoveIn!)))throw Error("BOOKED_INITIAL_RENT_CHANGED");
+    if(bookedRent)input.initialRentPolicy={...bookedRent.policy!,approvalReference:`Public booking ${reservation!.id}`};
     const calculated=input.initialRentPolicy?initialRentPreview(Number(monthlyRate),southAfricaDateKey(input.startDate),input.initialRentPolicy):null;
     if(input.initialRentPolicy&&!calculated)throw Error('INVALID_INITIAL_RENT_POLICY');
     if(calculated){for(const line of calculated.lines)if(line.amount>0)await tx.ledgerEntry.create({data:{accountId:account.id,type:'CHARGE',amount:line.amount,description:PENDING_MOVE_IN_CHARGE_DESCRIPTION,effectiveAt:input.startDate,externalRef:`RENT-${line.period}`,createdById:scope.userId,metadata:{initialRentPolicy:input.initialRentPolicy!,coveredPeriod:line.period,moveIn:southAfricaDateKey(input.startDate)}}});await tx.account.update({where:{id:account.id},data:{balance:{increment:calculated.total}}});await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:input.facilityId,actorId:scope.userId,action:'tenancy.initial_rent.calculated',entityType:'Tenancy',entityId:tenancy.id,after:{policy:input.initialRentPolicy!,lines:calculated.lines,total:calculated.total}}});}

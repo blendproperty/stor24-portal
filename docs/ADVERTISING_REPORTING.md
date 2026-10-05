@@ -1,0 +1,9 @@
+# STOR24 advertising reporting
+
+Google reports read only campaigns 24315692802 and 24315694704 from company account 5635711564. They do not activate campaigns or change budget. Server credentials use the existing approved service account and developer token. Bind ADVERTISING_ORGANISATION_ID to the company organisation. GOOGLE_ADS_SERVICE_ACCOUNT_JSON, GOOGLE_ADS_DEVELOPER_TOKEN, GOOGLE_ADS_CUSTOMER_ID, GOOGLE_ADS_LOGIN_CUSTOMER_ID and GOOGLE_ADS_CAMPAIGN_IDS stay server-only. Google REST reporting reference: https://developers.google.com/google-ads/api/rest/common/search
+
+Owners open /settings/advertising to verify and store a company-managed Meta system-user ads_read token for verified STOR24 ZAR account 1064679099720272. Do not reuse a browser session cookie. Stored tokens are encrypted using the existing INTEGRATION_CONFIG_ENCRYPTION_KEY; audits contain only account/configuration evidence. API version is v25.0. Reference: https://developers.facebook.com/docs/marketing-api/insights/
+
+Select up to 90 days in Marketing overview. Connected means a live provider response; connection needed/unavailable means no usable provider evidence. No rows from a connected provider means no delivery returned. Figures retain provider currency and provider conversion definitions; Meta all-clicks are not website link clicks or CRM enquiries. Export retrieves full returned rows; on-screen table is capped at200. Campaign data is restricted to organisation users with all-store lead-view permission. Credentials and provider errors are never exported.
+
+Website GA4 and registered, consented attribution remain separate from advertising delivery. This release does not create ad campaigns, change spend, upload customer lists, activate conversion pixels, or infer gender. Real campaign reconciliation, read-only credential continuity, customer/provider UAT and legal/privacy/business acceptance remain open.

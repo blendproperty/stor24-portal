@@ -100,7 +100,7 @@ test("the public Netcash journey's total includes any storage/merchandise packag
   // the sandbox checkout undercharges relative to what was actually booked.
   assert.match(source, /packageSelection:\s*\{\s*select:\s*\{\s*priceSnapshot:\s*true\s*\}\s*\}/);
   assert.match(source, /reservation\.packageSelection\?\.priceSnapshot/);
-  assert.match(source, /quotedRate\s*\+\s*packageAmount/);
+  assert.match(source, /publicCheckoutTotal\(reservation\)/);
 });
 
 test("public Netcash status distinguishes a cancelled checkout from a declined payment", () => {

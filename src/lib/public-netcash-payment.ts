@@ -1,3 +1,4 @@
+import {publicCheckoutTotal} from "./public-initial-rent";
 import { isTestPayment } from "@/lib/payments/payment-evidence";
 import { db } from "@/lib/db";
 import { welcomeTenantWhenReady } from "@/lib/tenant-welcome-email";
@@ -67,7 +68,7 @@ export async function startPublicNetcashSandboxPayment(reference: string, idempo
   // of what the customer actually booked.
   const quotedRate = Number(reservation.quotedRate);
   const packageAmount = Number(reservation.packageSelection?.priceSnapshot ?? 0);
-  const amount = quotedRate + packageAmount;
+  const amount = publicCheckoutTotal(reservation);
   const checkout = await createOnceOffCheckout(
     reservation.customer.organisationId,
     null,

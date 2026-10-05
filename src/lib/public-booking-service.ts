@@ -1,3 +1,4 @@
+import {newPublicInitialRent,publicInitialRent,publicCheckoutTotal} from "./public-initial-rent";
 import { releaseLeadBookingStage } from "@/lib/lead-booking-stage";
 import { newIdentityAccess } from "@/lib/identity-document-security";
 import type { Prisma } from "@/generated/prisma/client";
@@ -35,6 +36,8 @@ function reservationResult(reservation: {
   journey: string;
   viewingAt: Date | null;
   quotedRate: { toString(): string };
+  initialRentSnapshot?:unknown;
+  intendedMoveIn?:Date|null;
   unit: { number: string; unitType: { name: string; areaSqMetres: { toString(): string } | null } };
   facility: { name: string; publicSlug: string | null };
   packageSelection?: { packageName: string; priceSnapshot: { toString(): string }; status: string } | null;
@@ -45,6 +48,8 @@ function reservationResult(reservation: {
     holdExpiresAt: reservation.holdExpiresAt?.toISOString() ?? null,
     journey: reservation.journey,
     viewingAt: reservation.viewingAt?.toISOString() ?? null,
+    initialRent: publicInitialRent(reservation),
+    checkoutTotalZar: reservation.journey === "RENTAL" ? publicCheckoutTotal(reservation) : null,
     quotedMonthlyRateZar: Number(reservation.quotedRate.toString()),
     facility: { name: reservation.facility.name, slug: reservation.facility.publicSlug },
     package: reservation.packageSelection ? { name: reservation.packageSelection.packageName, priceZar: Number(reservation.packageSelection.priceSnapshot.toString()), status: reservation.packageSelection.status } : null,
@@ -290,6 +295,7 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
           leadId: lead.id,
           unitId: unit.id,
           quotedRate: unit.monthlyRate,
+          initialRentSnapshot: input.journey === "RENTAL" && input.intendedMoveIn ? newPublicInitialRent(Number(unit.monthlyRate), input.intendedMoveIn) : undefined,
           journey: input.journey,
           holdExpiresAt,
           intendedMoveIn: input.intendedMoveIn,

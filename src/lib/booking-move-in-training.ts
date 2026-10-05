@@ -1,3 +1,4 @@
+import {publicCheckoutTotal} from "./public-initial-rent";
 import { db } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
 import { trainingAccess, type TrainingSnapshot } from "@/lib/move-in-training";
@@ -23,7 +24,7 @@ async function snapshot(tx: Prisma.TransactionClient, userId: string, reservatio
     AND ("after"->>'generation')::int = ${generation}
     ORDER BY ("after"->>'version')::int DESC LIMIT 1` : [];
   const stored = saved[0]?.after;
-  const requiredAmount = Math.round((Number(reservation.quotedRate) + Number(reservation.packageSelection?.priceSnapshot ?? 0)) * 100) / 100;
+  const requiredAmount = publicCheckoutTotal(reservation);
   if (!Number.isFinite(requiredAmount) || requiredAmount <= 0) throw new Error("TRAINING_STEP_REQUIRED");
   const data: TrainingSnapshot = {
     enabled: control?.enabled ?? false, controlVersion: control?.version ?? 0,
