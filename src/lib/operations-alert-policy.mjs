@@ -11,7 +11,7 @@ export function validateAlertRecipients(value) {
     const mobile = typeof item.mobile === 'string' ? item.mobile.trim() : '';
     if (!name || name.length > 80 || /[\r\n\x00-\x1f]/.test(name)) throw new Error('Enter a name of up to 80 characters.');
     if (email && (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) throw new Error('Enter a valid email address.');
-    if (mobile && !/^\+[1-9]\d{7,14}$/.test(mobile)) throw new Error('Use an international mobile number, for example +27817088120.');
+    if (mobile && !/^\+[1-9]\d{7,14}$/.test(mobile)) throw new Error('Use an international mobile number, for example +27820000000.');
     if (typeof item.enabled !== 'boolean' || typeof item.consent !== 'boolean' || !Array.isArray(item.channels) || item.channels.length > 3 || new Set(item.channels).size !== item.channels.length || item.channels.some(c => !['EMAIL', 'SMS', 'WHATSAPP'].includes(c))) throw new Error('Choose valid notification channels.');
     if (item.channels.includes('EMAIL') && !email) throw new Error('Email alerts need an email address.');
     if (item.channels.some(c => c !== 'EMAIL') && !mobile) throw new Error('SMS and WhatsApp alerts need a mobile number.');
