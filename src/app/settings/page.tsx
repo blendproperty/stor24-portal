@@ -7,6 +7,7 @@ import { MfaSettings } from "@/components/mfa-settings";
 export const metadata = { title: "Settings" };
 
 const modules = [
+  [BellRing, "Enquiry response SLA", "Configure business hours, response deadlines and the escalation team.", "/settings/lead-sla"],
   [Activity, "Troubleshooting", "Website, database, server resources, backups and alert history in one place.", "/settings/troubleshooting"],
   [Building2, "Organisation & facilities", "Portfolio hierarchy, facilities, buildings, zones and operating hours.", "/company"],
   [ShieldCheck, "Users & permissions", "Scoped roles, approval thresholds and report access.", "/users"],

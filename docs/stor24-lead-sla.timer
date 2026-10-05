@@ -1,0 +1,11 @@
+[Unit]
+Description=Check STOR24 enquiry response deadlines every minute
+
+[Timer]
+OnBootSec=60
+OnUnitInactiveSec=60
+AccuracySec=5
+Unit=stor24-lead-sla.service
+
+[Install]
+WantedBy=timers.target

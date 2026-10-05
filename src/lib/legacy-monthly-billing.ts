@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { rentRatesForBilling } from './rent-review-service';
 
 /**
  * Automated recurring monthly rent billing.
@@ -44,7 +45,7 @@ export async function runLegacyMonthlyBilling(period: string): Promise<MonthlyBi
 
   const occupancies = await db.occupancy.findMany({
     where: { status: "ACTIVE", tenancy: { status: "ACTIVE" } },
-    include: { tenancy: { include: { account: true } } },
+    include: { tenancy: { include: { account: true, facility: { select: { organisationId: true } } } } },
   });
 
   let charged = 0;
@@ -59,21 +60,24 @@ export async function runLegacyMonthlyBilling(period: string): Promise<MonthlyBi
     if (alreadyBilled) { skipped++; continue; }
 
     try {
-      await db.$transaction(async (tx) => {
+      const billedRate = await db.$transaction(async (tx) => {
+        const rates = await rentRatesForBilling(tx, occupancy.tenancy.facility.organisationId, occupancy.tenancy.facilityId, [occupancy], period);
+        const rate = rates.get(occupancy.id)!;
         await tx.ledgerEntry.create({
           data: {
             accountId: account.id,
             type: "CHARGE",
-            amount: occupancy.monthlyRate,
+            amount: rate,
             description: `Monthly rent — ${period}`,
             effectiveAt,
             externalRef,
           },
         });
-        await tx.account.update({ where: { id: account.id }, data: { balance: { increment: occupancy.monthlyRate } } });
+        await tx.account.update({ where: { id: account.id }, data: { balance: { increment: rate } } });
+        return rate;
       });
       charged++;
-      totalAmount += Number(occupancy.monthlyRate);
+      totalAmount += billedRate;
     } catch (error) {
       // Unique (accountId, externalRef) constraint tripped by a concurrent
       // run for the same period — treat as already billed, not a failure.

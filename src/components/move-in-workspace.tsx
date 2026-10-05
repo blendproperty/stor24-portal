@@ -1,5 +1,6 @@
 "use client";
 
+import { InitialRentFields } from "./initial-rent-fields";
 import { MoveInProgressNav } from "./move-in-progress-nav";
 import type { MoveInProgress } from "@/lib/move-in-progress";
 import { useMemo, useState } from "react";
@@ -514,41 +515,7 @@ export function MoveInWorkspace({
                   ))}
               </select>
             </label>
-            <label>
-              Start date
-              <input
-                name="startDate"
-                type="date"
-                defaultValue={
-                  selectedReservation?.intendedMoveIn ??
-                  southAfricaDateKey(new Date())
-                }
-                required
-              />
-            </label>
-            <label>
-              Monthly rent
-              <input
-                name="monthlyRate"
-                type="number"
-                step=".01"
-                defaultValue={
-                  selectedReservation?.quotedRate ?? selected?.monthlyRate
-                }
-              />
-            </label>
-            <label>
-              Initial charge
-              <input
-                name="initialCharge"
-                type="number"
-                step=".01"
-                defaultValue="0"
-              />
-              <small>
-                Provisional until the financial rules are confirmed.
-              </small>
-            </label>
+            <InitialRentFields key={selectedId+reservationId} rate={selectedReservation?.quotedRate ?? selected?.monthlyRate ?? 0} date={selectedReservation?.intendedMoveIn ?? southAfricaDateKey(new Date())}/>
             <label>
               Payment method
               <select

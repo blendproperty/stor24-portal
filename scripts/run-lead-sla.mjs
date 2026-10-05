@@ -1,0 +1,4 @@
+import {execFileSync} from 'node:child_process';
+// Fixed local endpoint and existing container only; keys stay inside the container.
+const code=`(async()=>{const key=process.env.LEAD_SLA_WORKER_KEY;if(!key)throw Error('SLA worker key missing');const r=await fetch('http://127.0.0.1:3000/api/v1/leads/sla-worker',{method:'POST',headers:{'x-sla-worker-key':key},signal:AbortSignal.timeout(180000)});if(!r.ok)throw Error('SLA worker requires review');const b=await r.json();console.log(JSON.stringify(b.data));})().catch(()=>{console.error('SLA worker failed; inspect status without replaying ambiguous sends.');process.exit(1)});`;
+try{process.stdout.write(execFileSync('docker',['exec','stor24-crm-app-1','node','-e',code],{timeout:190000,maxBuffer:4096,encoding:'utf8'}));}catch{console.error('SLA worker failed; check server timer and protected app status.');process.exitCode=1;}

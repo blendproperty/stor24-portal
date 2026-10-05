@@ -35,6 +35,8 @@ jobs:
       - run: node scripts/test-mfa-settings-recovery.mjs
       - run: node scripts/test-operations-alert-recipients.mjs
       - run: node scripts/test-troubleshooting-dashboard.mjs
+      - run: node scripts/test-rent-reviews.mjs
+      - run: node scripts/test-lead-sla.mjs
       - run: node scripts/test-pending-order-recovery.mjs
       - run: node scripts/test-purchase-read-recovery.mjs
       - run: node scripts/test-task-completion-recovery.mjs
@@ -87,6 +89,8 @@ jobs:
             output/marketing/
             output/operations-alert-recipients/
             output/troubleshooting/
+            output/lead-sla/
+            output/rent-reviews/
             output/guided-help/
             output/company-setup-recovery/
             output/task-completion-recovery/

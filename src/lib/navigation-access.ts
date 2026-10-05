@@ -7,7 +7,7 @@ const rules: Record<string, string[]> = {
   "/leads": ["leads.view"], "/reservations": ["reservations.manage"],
   "/marketing": ["leads.view"],
   "/identity": ["identity.review"], "/units": ["inventory.view"],
-  "/billing": ["billing.view"], "/billing/monthly": ["billing.view"],
+  "/billing": ["billing.view"], "/billing/monthly": ["billing.view"], "/billing/rent-reviews": ["@owner"],
   "/billing/netcash": ["payments.view"], "/billing/mri": ["mri.view"],
   "/billing/settlements": ["settlements.view"],
   "/billing/debit-orders": ["debit_orders.view"],
@@ -24,6 +24,7 @@ const rules: Record<string, string[]> = {
   "/settings/integrations": ["integrations.view"],
   "/settings/alerts": ["@owner"],
   "/settings/troubleshooting": ["@owner"],
+  "/settings/lead-sla": ["@owner"],
 };
 export function canVisit(path: string, access: NavigationAccess) {
   // Training has its own current-role/controller checks; personal Settings remain available.

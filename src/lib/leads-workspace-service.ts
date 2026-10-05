@@ -2,8 +2,10 @@ import { db } from "@/lib/db";
 import { facilityWhere, type RequestScope } from "@/lib/scope";
 import { leadAttributionSchema } from "@/lib/lead-attribution";
 import { z } from "zod";
+import { marketProfileSchema } from './lead-market-profile';
 
 export const leadUpdateSchema = z.object({
+  marketProfile: marketProfileSchema.optional(),
   updatedAt: z.iso.datetime(),
   stage: z.enum(["NEW", "CONTACTED", "QUALIFIED", "QUOTED", "VIEWING_BOOKED", "RESERVED", "WON", "LOST"]),
   nextActionAt: z.iso.datetime().nullable(),
@@ -27,15 +29,16 @@ export async function leadsWorkspace(scope: RequestScope) {
       select: { id: true, name: true, roleAssignments: { select: { facilityId: true } } }, orderBy: { name: "asc" } }),
   ]);
   const evidence = leads.length ? await db.auditEvent.findMany({ where: { organisationId: scope.organisationId,
-    entityType: "Lead", entityId: { in: leads.map(l => l.id) }, action: { in: ["public_lead.created", "lead.attribution.captured"] } },
+    entityType: "Lead", entityId: { in: leads.map(l => l.id) }, action: { in: ["public_lead.created", "lead.attribution.captured", "lead.market_profile.captured"] } },
     select: { entityId: true, after: true }, orderBy: { occurredAt: "asc" } }) : [];
   const attribution = new Map(evidence.flatMap(event => {
     const after = event.after as { attribution?: unknown } | null;
     const parsed = leadAttributionSchema.safeParse(after?.attribution);
     return parsed.success ? [[event.entityId, parsed.data] as const] : [];
   }));
+  const marketProfiles=new Map(evidence.flatMap(event=>{const parsed=marketProfileSchema.safeParse((event.after as {marketProfile?:unknown}|null)?.marketProfile);return parsed.success?[[event.entityId,parsed.data] as const]:[];}));
   return { facilities, staff: staff.map(person => ({ id: person.id, name: person.name, facilityIds: person.roleAssignments.map(a => a.facilityId) })), count,
-    leads: leads.map(lead => ({ ...lead, attribution: attribution.get(lead.id) ?? null,
+    leads: leads.map(lead => ({ ...lead, attribution: attribution.get(lead.id) ?? null,marketProfile:marketProfiles.get(lead.id)??null,
       stage: lead.reservations.some(r => r.status === "CONVERTED" && r.convertedTenancyId && ["ACTIVE", "NOTICE_GIVEN"].includes(r.convertedTenancy?.status ?? "")) ? "WON" : lead.stage,
       reservations: lead.reservations.map(r => ({ ...r, quotedRate: Number(r.quotedRate) })) })) };
 }
@@ -60,6 +63,7 @@ export async function updateLead(scope: RequestScope, id: string, input: LeadUpd
       action: "lead.updated", entityType: "Lead", entityId: id,
       before: { stage: lead.stage, nextActionAt: lead.nextActionAt?.toISOString() ?? null, assignedToId: lead.assignedToId, notes: lead.notes },
       after: { stage: input.stage, nextActionAt: input.nextActionAt, assignedToId: input.assignedToId, notes: input.notes || null } } });
+    if(input.marketProfile)await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:lead.facilityId,actorId:scope.userId,action:'lead.market_profile.captured',entityType:'Lead',entityId:id,after:{marketProfile:input.marketProfile}}});
     return { id };
   });
 }

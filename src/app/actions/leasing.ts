@@ -49,7 +49,7 @@ export async function reserveAction(data: FormData) {
  */
 export async function moveInAction(data: FormData) {
   await requirePermission("move_in.create");
-  const parsed = moveInSchema.parse({ reservationId: text(data, "reservationId"), facilityId: text(data, "facilityId"), customerId: text(data, "customerId"), unitId: text(data, "unitId"), startDate: text(data, "startDate"), monthlyRate: number(data, "monthlyRate"), initialCharge: number(data, "initialCharge") ?? 0, accessState: "PENDING", paymentMethod: text(data, "paymentMethod") });
+  const parsed = moveInSchema.parse({ reservationId: text(data, "reservationId"), facilityId: text(data, "facilityId"), customerId: text(data, "customerId"), unitId: text(data, "unitId"), startDate: text(data, "startDate"), monthlyRate: number(data, "monthlyRate"), initialCharge: number(data, "initialCharge") ?? 0, initialRentPolicy: text(data,"initialRentMode") && text(data,"initialRentMode") !== "MANUAL" ? {mode:text(data,"initialRentMode"),cutoffDay:number(data,"initialRentCutoff"),approvalReference:text(data,"initialRentApproval")} : undefined, accessState: "PENDING", paymentMethod: text(data, "paymentMethod") });
   const scope = await requireScope();
   const result = await moveIn(scope, parsed);
   await dispatchBlendSignLease(scope, result, parsed);

@@ -2,6 +2,8 @@ import { releaseLeadBookingStage } from "@/lib/lead-booking-stage";
 import { requireOperationalUnit } from "@/lib/floor-availability-service";
 import { unitIsOperational, floorMapSelection } from "@/lib/floor-availability";
 import { createHash } from "node:crypto";
+import {initialRentPreview,type InitialRentPolicy} from './proration-preview';
+import {southAfricaDateKey} from './south-africa-time';
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { moveOutSchema } from "@/lib/validators";
@@ -614,6 +616,7 @@ export async function moveIn(
     startDate: Date;
     monthlyRate?: number;
     initialCharge: number;
+    initialRentPolicy?:InitialRentPolicy & {approvalReference:string};
     accessState: string;
     paymentMethod: "DEBIT_ORDER" | "CARD" | "EFT" | "OTHER";
     simulation?: boolean;
@@ -703,7 +706,10 @@ export async function moveIn(
         expiresAt,
       },
     });
-    if (input.initialCharge > 0) {
+    const calculated=input.initialRentPolicy?initialRentPreview(Number(monthlyRate),southAfricaDateKey(input.startDate),input.initialRentPolicy):null;
+    if(input.initialRentPolicy&&!calculated)throw Error('INVALID_INITIAL_RENT_POLICY');
+    if(calculated){for(const line of calculated.lines)if(line.amount>0)await tx.ledgerEntry.create({data:{accountId:account.id,type:'CHARGE',amount:line.amount,description:PENDING_MOVE_IN_CHARGE_DESCRIPTION,effectiveAt:input.startDate,externalRef:`RENT-${line.period}`,createdById:scope.userId,metadata:{initialRentPolicy:input.initialRentPolicy!,coveredPeriod:line.period,moveIn:southAfricaDateKey(input.startDate)}}});await tx.account.update({where:{id:account.id},data:{balance:{increment:calculated.total}}});await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:input.facilityId,actorId:scope.userId,action:'tenancy.initial_rent.calculated',entityType:'Tenancy',entityId:tenancy.id,after:{policy:input.initialRentPolicy!,lines:calculated.lines,total:calculated.total}}});}
+    if (!calculated && input.initialCharge > 0) {
       await tx.ledgerEntry.create({
         data: {
           accountId: account.id,

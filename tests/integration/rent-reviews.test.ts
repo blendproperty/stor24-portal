@@ -1,0 +1,19 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { randomUUID } from 'node:crypto';
+import { db } from '../../src/lib/db';
+import { approveRentReview,previewRentReview,rentReviewReport,rentRatesForBilling } from '../../src/lib/rent-review-service';
+import { southAfricaDateKey } from '../../src/lib/south-africa-time';
+test('isolated rent reviews preserve historical rates, enforce scope and prevent stale or repeated approvals',async()=>{
+  assert.equal(process.env.MERCHANDISE_DB_TEST,'isolated-ci');assert.equal(new URL(process.env.DATABASE_URL!).hostname,'localhost');
+  const key=randomUUID();const org=await db.organisation.create({data:{name:'Rent review CI',slug:key}});
+  try{const facility=await db.facility.create({data:{organisationId:org.id,code:key,name:'CI store'}});const actor=await db.user.create({data:{organisationId:org.id,email:key+'@example.invalid',name:'CI owner'}});const customer=await db.customer.create({data:{organisationId:org.id,firstName:'CI'}});const unitType=await db.unitType.create({data:{facilityId:facility.id,name:'CI',features:[]}});const unit=await db.unit.create({data:{facilityId:facility.id,unitTypeId:unitType.id,number:'101',monthlyRate:1000,status:'OCCUPIED'}});const account=await db.account.create({data:{customerId:customer.id,accountNumber:key}});const tenancy=await db.tenancy.create({data:{facilityId:facility.id,customerId:customer.id,accountId:account.id,status:'ACTIVE',startDate:new Date('2020-01-01T00:00:00+02:00')}});const occupancy=await db.occupancy.create({data:{tenancyId:tenancy.id,unitId:unit.id,status:'ACTIVE',monthlyRate:1000,startDate:new Date('2020-01-01T00:00:00+02:00')}});
+    const today=southAfricaDateKey(new Date());const future=String(Number(today.slice(0,4))+1)+'-12';const input={facilityId:facility.id,minimumMonths:12,basis:'TIME_IN_UNIT',type:'PERCENTAGE',value:5,effectivePeriod:future};
+    await assert.rejects(rentReviewReport('another-org',facility.id),/FORBIDDEN/);const unknown=await previewRentReview(org.id,{...input,basis:'TIME_SINCE_CHANGE'});assert.equal(unknown.eligibleCount,0);assert.equal(unknown.rows[0].lastPriceChange,null);
+    const before=await previewRentReview(org.id,input);assert.equal(before.eligibleCount,1);assert.equal(before.rows[0].newRate,1050);assert.equal(await db.configurationProfile.count({where:{organisationId:org.id,domain:'OCCUPANCY_RENT_SCHEDULE'}}),0);
+    await db.occupancy.update({where:{id:occupancy.id},data:{monthlyRate:1100}});await assert.rejects(approveRentReview(org.id,actor.id,input,before.fingerprint,'CI approval'),/PREVIEW_CHANGED/);
+    const fresh=await previewRentReview(org.id,input);const attempts=await Promise.allSettled([approveRentReview(org.id,actor.id,input,fresh.fingerprint,'CI approval'),approveRentReview(org.id,actor.id,input,fresh.fingerprint,'CI approval')]);assert.equal(attempts.filter(x=>x.status==='fulfilled').length,1);
+    assert.equal(await db.auditEvent.count({where:{organisationId:org.id,action:'rent.group_increase.approved'}}),1);const o=await db.occupancy.findUniqueOrThrow({where:{id:occupancy.id}});assert.equal(Number(o.monthlyRate),1100);const old=await rentRatesForBilling(db,org.id,facility.id,[o],today.slice(0,7));assert.equal(old.get(o.id),1100);const next=await rentRatesForBilling(db,org.id,facility.id,[o],future);assert.equal(next.get(o.id),1155);
+    await assert.rejects(approveRentReview(org.id,actor.id,input,fresh.fingerprint,'CI approval'),/PREVIEW_CHANGED/);assert.equal(await db.ledgerEntry.count({where:{accountId:account.id}}),0);assert.equal(await db.payment.count({where:{accountId:account.id}}),0);assert.equal(await db.communicationLog.count({where:{organisationId:org.id}}),0);
+  }finally{await db.$disconnect();}
+});

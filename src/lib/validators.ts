@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { marketProfileSchema } from './lead-market-profile';
 import { LEAD_SOURCES } from "@/lib/lead-sources";
 import { LEASE_CLAUSE_KEYS } from "@/lib/lease-agreement-content";
 
@@ -8,6 +9,7 @@ const leadContact = z.object({
   phone: z.string().trim().min(7).max(30),
 });
 export const createLeadSchema = z.object({
+  marketProfile: marketProfileSchema.optional(),
   submissionId: z.string().uuid().optional(),
   facilityId: z.string().trim().min(1), desiredUnitTypeId: z.string().trim().optional(),
   source: z.enum(LEAD_SOURCES), sourceDetail: z.string().trim().max(200).optional(),
@@ -201,6 +203,7 @@ export const moveInSchema = z.object({
   startDate: z.coerce.date(),
   monthlyRate: money.optional(),
   initialCharge: money.default(0),
+  initialRentPolicy:z.object({mode:z.enum(['ACTUAL_DAYS','FULL_MONTH','AFTER_CUTOFF_NEXT_MONTH']),cutoffDay:z.coerce.number().int().min(1).max(31),approvalReference:z.string().trim().min(5).max(250)}).strict().optional(),
   accessState: z.string().trim().min(1).max(40).default("PENDING"),
   paymentMethod: z.enum(["DEBIT_ORDER", "CARD", "EFT", "OTHER"]),
 });
