@@ -1,0 +1,42 @@
+{
+  "date": "2026-10-05",
+  "account": "1064679099720272",
+  "currency": "ZAR",
+  "page": "1193468067180296",
+  "status": "CREATIVES_ONLY_BUDGET_ANSWER_PENDING",
+  "campaign_created": false,
+  "adset_created": false,
+  "ad_created": false,
+  "creatives": {
+    "ad_creatives": [
+      {
+        "id": "1421199236816775",
+        "status": "ACTIVE",
+        "body": "Life happens. We’ve got room.\n\nMake space for your next move at STOR24 Midrand. Explore available units, compare sizes and start your booking online.\n\nFind us at 162 Tonetti Street, Halfway House, Midrand.",
+        "title": "Make room in Midrand",
+        "image_hash": "9c31083daa06cf513f3ef1f69bfb03cc"
+      },
+      {
+        "id": "1714843710648014",
+        "status": "ACTIVE",
+        "body": "Moving home or making room for business stock?\n\nExplore STOR24 storage at Midpoint in Midrand. Compare unit sizes and view available space online.\n\n162 Tonetti Street, Halfway House, Midrand.",
+        "title": "Storage for home or business",
+        "image_hash": "9c31083daa06cf513f3ef1f69bfb03cc"
+      }
+    ]
+  },
+  "tracking": "Static UTM destination submitted for both creative writes. Immediate second-creative readback included correct URL, post-resolution readback omits link_url for both; final click-destination/macros verification remains open. No dataset/pixel available.",
+  "geo": {
+    "latitude": -25.998768,
+    "longitude": 28.123685,
+    "radius_km": 15,
+    "source": "Google Ads saved facility criterion"
+  },
+  "gates": [
+    "Explicit daily budget pending: R200/day proposed via user question; not assumed",
+    "No pixel/dataset; conversion tracking remains unimplemented",
+    "Local targeting not yet installed",
+    "AI disclosure preference unresolved; field omitted",
+    "No activation/publishing; zero serving ads created"
+  ]
+}
