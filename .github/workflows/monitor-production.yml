@@ -88,6 +88,29 @@ jobs:
           TWILIO_SMS_FROM: ${{ secrets.TWILIO_SMS_FROM }}
           TWILIO_WHATSAPP_FROM: ${{ secrets.TWILIO_WHATSAPP_FROM }}
         run: node scripts/send-production-alert.mjs
+      - name: Publish aggregate dashboard evidence
+        if: always()
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          READINESS_RESULT: ${{ needs.readiness.result }}
+          BACKUP_RESULT: ${{ needs.backup.result }}
+        run: |
+          umask 077
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/stor24_crm
+          chmod 600 ~/.ssh/known_hosts ~/.ssh/stor24_crm
+          node --input-type=module -e '
+            import {readFileSync} from "node:fs";
+            import {safeMonitorEntry} from "./src/lib/operations-status-policy.mjs";
+            let report = {}; try { report = JSON.parse(readFileSync("production-alert-result.json", "utf8")); } catch {}
+            const entry = safeMonitorEntry({...report, checkedAt: new Date().toISOString(), runId: process.env.GITHUB_RUN_ID, readiness: process.env.READINESS_RESULT, backup: process.env.BACKUP_RESULT});
+            if (!entry) throw new Error("Invalid dashboard evidence");
+            process.stdout.write(JSON.stringify(entry));
+          ' | ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" 'cd /opt/stor24-crm && node scripts/write-monitor-status.mjs'
       - uses: actions/upload-artifact@v4
         if: always()
         with:

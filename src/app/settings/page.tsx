@@ -1,4 +1,4 @@
-import { BadgePercent, BellRing, Building2, Cable, FileSignature, KeyRound, ShieldCheck } from "lucide-react";
+import { Activity, BadgePercent, BellRing, Building2, Cable, FileSignature, KeyRound, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { ChangePasswordForm } from "@/components/change-password-form";
 import Link from "next/link";
@@ -7,6 +7,7 @@ import { MfaSettings } from "@/components/mfa-settings";
 export const metadata = { title: "Settings" };
 
 const modules = [
+  [Activity, "Troubleshooting", "Website, database, server resources, backups and alert history in one place.", "/settings/troubleshooting"],
   [Building2, "Organisation & facilities", "Portfolio hierarchy, facilities, buildings, zones and operating hours.", "/company"],
   [ShieldCheck, "Users & permissions", "Scoped roles, approval thresholds and report access.", "/users"],
   [BadgePercent, "Rates & billing rules", "Rate plans, fees, deposits, tax, discounts and collection policies.", "/company"],

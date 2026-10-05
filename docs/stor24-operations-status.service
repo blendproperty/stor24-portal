@@ -1,0 +1,10 @@
+[Unit]
+Description=STOR24 read-only operations snapshot
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/stor24-crm
+ExecStart=/usr/bin/node /opt/stor24-crm/scripts/collect-operations-status.mjs
+TimeoutStartSec=25
+UMask=0022
