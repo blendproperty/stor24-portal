@@ -1,0 +1,530 @@
+{
+  "date": "2026-10-05",
+  "account": "5635711564 Blend Property Group",
+  "total_monthly_zar": 20000,
+  "google_monthly_zar": 14000,
+  "facebook_monthly_zar": 6000,
+  "budget_status": "Provisional allocation; no spend enabled. Average daily budgets are not a hard portfolio cap.",
+  "campaigns": [
+    {
+      "name": "STOR24 | Brand | Midrand",
+      "status": "PAUSED",
+      "monthly_zar": 1400,
+      "daily_zar": 46.05,
+      "final_url": "https://stor24.co.za/storage/midpoint",
+      "final_url_suffix": "utm_source=google&utm_medium=cpc&utm_campaign=stor24_midrand_brand&utm_id={campaignid}&utm_content=ad_{creative}_ag_{adgroupid}&utm_term={keyword}&device={device}&network={network}&loc_physical_ms={loc_physical_ms}",
+      "location": "15 km radius around 162 Tonetti Street, Halfway House, Midrand",
+      "location_option": "Presence: people in or regularly in target area",
+      "language": "English",
+      "network": "Google Search only; search partners and display off",
+      "bidding": "Maximise clicks; CPC cap pending keyword estimates",
+      "final_url_expansion": false,
+      "conversion_goals": "STOR24-specific only; configuration pending",
+      "platform_state": "NOT CREATED: editor blocked by ad-blocker dialog"
+    },
+    {
+      "name": "STOR24 | Search | Midrand",
+      "status": "PAUSED",
+      "monthly_zar": 8400,
+      "daily_zar": 276.32,
+      "final_url": "https://stor24.co.za/storage/midpoint",
+      "final_url_suffix": "utm_source=google&utm_medium=cpc&utm_campaign=stor24_midrand_search&utm_id={campaignid}&utm_content=ad_{creative}_ag_{adgroupid}&utm_term={keyword}&device={device}&network={network}&loc_physical_ms={loc_physical_ms}",
+      "location": "15 km radius around 162 Tonetti Street, Halfway House, Midrand",
+      "location_option": "Presence: people in or regularly in target area",
+      "language": "English",
+      "network": "Google Search only; search partners and display off",
+      "bidding": "Maximise clicks; CPC cap pending keyword estimates",
+      "final_url_expansion": false,
+      "conversion_goals": "STOR24-specific only; configuration pending",
+      "platform_state": "NOT CREATED: editor blocked by ad-blocker dialog"
+    },
+    {
+      "name": "STOR24 | Performance Max | Midrand",
+      "status": "PAUSED",
+      "monthly_zar": 4200,
+      "daily_zar": 138.16,
+      "final_url": "https://stor24.co.za/storage/midpoint",
+      "final_url_suffix": "utm_source=google&utm_medium=cpc&utm_campaign=stor24_midrand_pmax&utm_id={campaignid}&utm_content=assetgroup_{assetgroupid}&utm_term={keyword}&device={device}&network={network}&loc_physical_ms={loc_physical_ms}",
+      "location": "15 km radius around 162 Tonetti Street, Halfway House, Midrand",
+      "location_option": "Presence: people in or regularly in target area",
+      "language": "English",
+      "network": "Performance Max",
+      "bidding": "Maximise conversions; no target CPA until conversion evidence",
+      "final_url_expansion": false,
+      "conversion_goals": "STOR24-specific only; configuration pending",
+      "platform_state": "NOT CREATED: editor blocked by ad-blocker dialog"
+    }
+  ],
+  "ads": [
+    {
+      "campaign": "STOR24 | Brand | Midrand",
+      "ad_group": "Brand",
+      "status": "Paused",
+      "final_url": "https://stor24.co.za/storage/midpoint",
+      "path1": "storage",
+      "path2": "midrand",
+      "headlines": [
+        "STOR24 Midrand",
+        "STOR24 at Midpoint",
+        "Storage in Halfway House",
+        "162 Tonetti Street",
+        "Choose Your Storage Unit",
+        "Explore Available Units",
+        "Check Unit Sizes Online",
+        "See Live Availability",
+        "Find Your Storage Fit",
+        "Storage for Life in Motion",
+        "Ground Floor Storage Units",
+        "Compare Storage Unit Sizes",
+        "Start Your Booking Online",
+        "Plan Your Storage Space",
+        "Visit Our Midrand Store"
+      ],
+      "descriptions": [
+        "Find your storage space at STOR24, 162 Tonetti Street, Halfway House, Midrand.",
+        "Explore available units, compare sizes and start your storage booking online.",
+        "Make room for home or business. Explore STOR24 storage at Midpoint in Midrand.",
+        "Unsure what size you need? Use our space guide, then view available storage units."
+      ],
+      "pinning": "None"
+    },
+    {
+      "campaign": "STOR24 | Search | Midrand",
+      "ad_group": "Local Self Storage",
+      "status": "Paused",
+      "final_url": "https://stor24.co.za/storage/midpoint",
+      "path1": "storage",
+      "path2": "midrand",
+      "headlines": [
+        "Self Storage in Midrand",
+        "Storage Units in Midrand",
+        "Storage in Halfway House",
+        "Find Your Storage Space",
+        "Storage Near You",
+        "STOR24 at Midpoint",
+        "Explore Available Units",
+        "Check Unit Sizes Online",
+        "See Live Availability",
+        "Find Your Storage Fit",
+        "Storage for Life in Motion",
+        "Ground Floor Storage Units",
+        "Compare Storage Unit Sizes",
+        "Start Your Booking Online",
+        "Plan Your Storage Space"
+      ],
+      "descriptions": [
+        "Find your storage space at STOR24, 162 Tonetti Street, Halfway House, Midrand.",
+        "Explore available units, compare sizes and start your storage booking online.",
+        "Make room for home or business. Explore STOR24 storage at Midpoint in Midrand.",
+        "Unsure what size you need? Use our space guide, then view available storage units."
+      ],
+      "pinning": "None"
+    },
+    {
+      "campaign": "STOR24 | Search | Midrand",
+      "ad_group": "Personal & Moving",
+      "status": "Paused",
+      "final_url": "https://stor24.co.za/storage/midpoint",
+      "path1": "moving",
+      "path2": "storage",
+      "headlines": [
+        "Moving House in Midrand?",
+        "Furniture Storage Midrand",
+        "Room for Your Next Move",
+        "Personal Storage Midrand",
+        "Make Space at Home",
+        "STOR24 at Midpoint",
+        "Explore Available Units",
+        "Check Unit Sizes Online",
+        "See Live Availability",
+        "Find Your Storage Fit",
+        "Storage for Life in Motion",
+        "Ground Floor Storage Units",
+        "Compare Storage Unit Sizes",
+        "Start Your Booking Online",
+        "Plan Your Storage Space"
+      ],
+      "descriptions": [
+        "Find your storage space at STOR24, 162 Tonetti Street, Halfway House, Midrand.",
+        "Explore available units, compare sizes and start your storage booking online.",
+        "Make room for home or business. Explore STOR24 storage at Midpoint in Midrand.",
+        "Unsure what size you need? Use our space guide, then view available storage units."
+      ],
+      "pinning": "None"
+    },
+    {
+      "campaign": "STOR24 | Search | Midrand",
+      "ad_group": "Business Storage",
+      "status": "Paused",
+      "final_url": "https://stor24.co.za/storage/midpoint",
+      "path1": "business",
+      "path2": "storage",
+      "headlines": [
+        "Business Storage Midrand",
+        "Space for Business Stock",
+        "Storage for Your Business",
+        "Make Room for Your Stock",
+        "Local Business Storage",
+        "STOR24 at Midpoint",
+        "Explore Available Units",
+        "Check Unit Sizes Online",
+        "See Live Availability",
+        "Find Your Storage Fit",
+        "Storage for Life in Motion",
+        "Ground Floor Storage Units",
+        "Compare Storage Unit Sizes",
+        "Start Your Booking Online",
+        "Plan Your Storage Space"
+      ],
+      "descriptions": [
+        "Find your storage space at STOR24, 162 Tonetti Street, Halfway House, Midrand.",
+        "Explore available units, compare sizes and start your storage booking online.",
+        "Make room for home or business. Explore STOR24 storage at Midpoint in Midrand.",
+        "Unsure what size you need? Use our space guide, then view available storage units."
+      ],
+      "pinning": "None"
+    }
+  ],
+  "keywords": [
+    {
+      "Campaign": "STOR24 | Brand | Midrand",
+      "Ad group": "Brand",
+      "Keyword": "stor24",
+      "Match type": "Exact",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Brand | Midrand",
+      "Ad group": "Brand",
+      "Keyword": "stor24",
+      "Match type": "Phrase",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Brand | Midrand",
+      "Ad group": "Brand",
+      "Keyword": "stor 24",
+      "Match type": "Exact",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Brand | Midrand",
+      "Ad group": "Brand",
+      "Keyword": "stor 24",
+      "Match type": "Phrase",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Brand | Midrand",
+      "Ad group": "Brand",
+      "Keyword": "stor24 midrand",
+      "Match type": "Exact",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Brand | Midrand",
+      "Ad group": "Brand",
+      "Keyword": "stor24 midrand",
+      "Match type": "Phrase",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Brand | Midrand",
+      "Ad group": "Brand",
+      "Keyword": "stor24 halfway house",
+      "Match type": "Exact",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Brand | Midrand",
+      "Ad group": "Brand",
+      "Keyword": "stor24 halfway house",
+      "Match type": "Phrase",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Brand | Midrand",
+      "Ad group": "Brand",
+      "Keyword": "stor24 tonetti",
+      "Match type": "Exact",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Brand | Midrand",
+      "Ad group": "Brand",
+      "Keyword": "stor24 tonetti",
+      "Match type": "Phrase",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Search | Midrand",
+      "Ad group": "Local Self Storage",
+      "Keyword": "self storage midrand",
+      "Match type": "Exact",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Search | Midrand",
+      "Ad group": "Local Self Storage",
+      "Keyword": "self storage midrand",
+      "Match type": "Phrase",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Search | Midrand",
+      "Ad group": "Local Self Storage",
+      "Keyword": "storage units midrand",
+      "Match type": "Exact",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Search | Midrand",
+      "Ad group": "Local Self Storage",
+      "Keyword": "storage units midrand",
+      "Match type": "Phrase",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Search | Midrand",
+      "Ad group": "Local Self Storage",
+      "Keyword": "storage halfway house",
+      "Match type": "Exact",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Search | Midrand",
+      "Ad group": "Local Self Storage",
+      "Keyword": "storage halfway house",
+      "Match type": "Phrase",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Search | Midrand",
+      "Ad group": "Local Self Storage",
+      "Keyword": "self storage near me",
+      "Match type": "Exact",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Search | Midrand",
+      "Ad group": "Local Self Storage",
+      "Keyword": "self storage near me",
+      "Match type": "Phrase",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Search | Midrand",
+      "Ad group": "Personal & Moving",
+      "Keyword": "personal storage midrand",
+      "Match type": "Exact",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Search | Midrand",
+      "Ad group": "Personal & Moving",
+      "Keyword": "personal storage midrand",
+      "Match type": "Phrase",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Search | Midrand",
+      "Ad group": "Personal & Moving",
+      "Keyword": "furniture storage midrand",
+      "Match type": "Exact",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Search | Midrand",
+      "Ad group": "Personal & Moving",
+      "Keyword": "furniture storage midrand",
+      "Match type": "Phrase",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Search | Midrand",
+      "Ad group": "Personal & Moving",
+      "Keyword": "moving storage midrand",
+      "Match type": "Exact",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Search | Midrand",
+      "Ad group": "Personal & Moving",
+      "Keyword": "moving storage midrand",
+      "Match type": "Phrase",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Search | Midrand",
+      "Ad group": "Personal & Moving",
+      "Keyword": "household storage midrand",
+      "Match type": "Exact",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Search | Midrand",
+      "Ad group": "Personal & Moving",
+      "Keyword": "household storage midrand",
+      "Match type": "Phrase",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Search | Midrand",
+      "Ad group": "Business Storage",
+      "Keyword": "business storage midrand",
+      "Match type": "Exact",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Search | Midrand",
+      "Ad group": "Business Storage",
+      "Keyword": "business storage midrand",
+      "Match type": "Phrase",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Search | Midrand",
+      "Ad group": "Business Storage",
+      "Keyword": "stock storage midrand",
+      "Match type": "Exact",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Search | Midrand",
+      "Ad group": "Business Storage",
+      "Keyword": "stock storage midrand",
+      "Match type": "Phrase",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Search | Midrand",
+      "Ad group": "Business Storage",
+      "Keyword": "document storage midrand",
+      "Match type": "Exact",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Search | Midrand",
+      "Ad group": "Business Storage",
+      "Keyword": "document storage midrand",
+      "Match type": "Phrase",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Search | Midrand",
+      "Ad group": "Business Storage",
+      "Keyword": "small business storage midrand",
+      "Match type": "Exact",
+      "Status": "Paused"
+    },
+    {
+      "Campaign": "STOR24 | Search | Midrand",
+      "Ad group": "Business Storage",
+      "Keyword": "small business storage midrand",
+      "Match type": "Phrase",
+      "Status": "Paused"
+    }
+  ],
+  "sitelinks": [
+    [
+      "View Available Units",
+      "Explore the live floor plan",
+      "Choose a unit that fits",
+      "/book"
+    ],
+    [
+      "Find Your Storage Size",
+      "Explore the 3D space guide",
+      "Plan space before booking",
+      "/space-guide"
+    ],
+    [
+      "Personal Storage",
+      "Make space for everyday life",
+      "Explore personal storage",
+      "/personal-storage"
+    ],
+    [
+      "Business Storage",
+      "Space for your business items",
+      "Explore business storage",
+      "/business-storage"
+    ],
+    [
+      "Visit STOR24 Midrand",
+      "162 Tonetti Street, Midrand",
+      "Meet our Midpoint store",
+      "/storage/midpoint"
+    ]
+  ],
+  "callouts": [
+    "Midrand Location",
+    "Live Unit Availability",
+    "Online Reservations",
+    "3D Space Guide",
+    "Ground Floor Units"
+  ],
+  "pmax": {
+    "asset_group": "STOR24 | Midrand Storage",
+    "headlines": [
+      "Self Storage in Midrand",
+      "Storage Units in Midrand",
+      "Storage in Halfway House",
+      "Find Your Storage Space",
+      "Storage Near You",
+      "STOR24 at Midpoint",
+      "Explore Available Units",
+      "Check Unit Sizes Online",
+      "See Live Availability",
+      "Find Your Storage Fit",
+      "Storage for Life in Motion",
+      "Ground Floor Storage Units",
+      "Compare Storage Unit Sizes",
+      "Start Your Booking Online",
+      "Plan Your Storage Space"
+    ],
+    "long_headlines": [
+      "Make Space for Home and Business at STOR24 in Halfway House, Midrand",
+      "Explore STOR24 Storage Units at Midpoint on 162 Tonetti Street",
+      "Find Your Storage Fit With Our Space Guide and Live Unit Availability"
+    ],
+    "descriptions": [
+      "Find your storage space at STOR24, 162 Tonetti Street, Halfway House, Midrand.",
+      "Explore available units, compare sizes and start your storage booking online.",
+      "Make room for home or business. Explore STOR24 storage at Midpoint in Midrand.",
+      "Unsure what size you need? Use our space guide, then view available storage units.",
+      "STOR24 at Midpoint. Explore local storage for your next move in Midrand."
+    ],
+    "business_name": "STOR24",
+    "search_themes": [
+      "self storage midrand",
+      "storage units halfway house",
+      "furniture storage midrand",
+      "business storage midrand",
+      "moving storage midrand"
+    ],
+    "assets_status": "Pending verified STOR24 facility photographs, square/landscape images, logo and video",
+    "brand_exclusion": "Exclude STOR24 to keep Brand reporting separate; pending platform configuration"
+  },
+  "tracking": [
+    "Enable Ads auto-tagging without removing UTMs. Do not manually fabricate gclid/gbraid/wbraid.",
+    "Verify/link STOR24 GA4 property 556793224, measurement ID G-ECMWM7S5H6, to advertiser 5635711564. Do not import Midpoint-property goals.",
+    "Primary: successful server-saved STOR24 enquiry, counted once. Reservation and qualified/converted lead stages must deduplicate and avoid counting the same customer as multiple acquisition goals.",
+    "Secondary: booking CTA, phone/email/WhatsApp clicks. Clicks and form attempts are not confirmed leads.",
+    "Current source inspected: consent-gated source/medium plus registered CRM IDs only. Numeric Ads utm_id will not match CRM campaignIdentifiers validation (c-prefixed IDs).",
+    "CRM campaign reconciliation needs registered campaign/link identifiers and Ads-ID mapping; use a separate parameter for Ads IDs when CRM utm_id is registered. Do not invent CRM IDs.",
+    "Current source does not persist gclid/gbraid/wbraid. Offline qualified-lead matching requires an approved consent-aware implementation and CRM readback.",
+    "Analytics sanitises page_location and denies advertising storage/data/personalisation; confirm lawful consent design before enabling Ads measurement or enhanced conversions.",
+    "Validate consent granted/denied, UTM preservation, mobile landing, enquiry success/deduplication, CRM attribution, GA4 event and Ads import with a legitimate consented UAT submission before launch.",
+    "PMax keyword may be empty. Use campaign/asset-group identifiers for attribution; verify supported ValueTrack macros in the actual URL Test.",
+    "Use campaign-level final URL suffix, without a leading ?; no duplicate tracking template. Keep personal/customer data out of URLs.",
+    "Facebook preparation: utm_source={{site_source_name}}&utm_medium=paid_social&utm_campaign=stor24_midrand_meta&utm_id={{campaign.id}}&utm_content={{ad.id}}&adset_id={{adset.id}}&placement={{placement}}; validate accepted macros when Meta is built."
+  ],
+  "negative_keywords_status": "No search-terms evidence fetched for STOR24; no negatives invented or applied. Obtain/review terms first.",
+  "blockers": [
+    "Google Ads editor displays Turn off ad blockers after reload",
+    "Advertiser verification overdue; account paused",
+    "STOR24 conversion goals and measurement verification pending",
+    "Performance Max imagery and asset validation pending"
+  ]
+}
