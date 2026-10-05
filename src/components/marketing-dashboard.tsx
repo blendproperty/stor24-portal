@@ -727,8 +727,7 @@ export function MarketingDashboard({ canManage }: { canManage: boolean }) {
                     <div>
                       <b>Ad spend, clicks &amp; impressions</b>
                       <p>
-                        Recorded activity figures; platform sync is not
-                        connected
+                        Recorded activity figures; live provider reports appear above
                       </p>
                     </div>
                   </div>

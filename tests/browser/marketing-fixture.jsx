@@ -1,12 +1,13 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { MarketingDashboard } from "../../src/components/marketing-dashboard";
+import { AdvertisingConnectionForm } from "../../src/components/advertising-connection-form";
 import { MoveInWorkspace } from "../../src/components/move-in-workspace";
 const move = location.pathname === "/move-in";
 createRoot(document.getElementById("root")).render(
   <div className="app-shell">
     <main className="content">
-      {move ? (
+      {location.pathname === "/settings/advertising" ? <AdvertisingConnectionForm /> : move ? (
         <MoveInWorkspace
           facilities={[{ id: "fixture", name: "Training store" }]}
           customers={[]}
