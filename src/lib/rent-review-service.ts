@@ -20,8 +20,8 @@ async function preview(org:string,input:unknown,client:Client=db,now=new Date())
   const request=rentReviewInput.parse(input);validateNoticePeriod(request.effectivePeriod,now);
   const report=await rentReviewReport(org,request.facilityId,client,now);
   const rows=report.rows.map(row=>{const months=request.basis==='TIME_IN_UNIT'?row.monthsInUnit:row.lastPriceChange?completedMonths(row.lastPriceChange,report.today):null;
-    const reason=!row.validUnit?'Unit facility mismatch':row.currency!=='ZAR'?'Currency requires review':months===null?'Last price change unknown':months<request.minimumMonths?'Below selected duration':row.schedule?.changes.some(c=>c.period>=request.effectivePeriod)?'Existing scheduled change requires review':row.schedule&&row.schedule.changes.length>=100?'History limit requires review':null;
-    const previousRate=rateForPeriod(row.baseline,row.schedule,request.effectivePeriod);return {...row,eligible:reason===null,reason,previousRate,newRate:reason===null?increasedRate(previousRate,request.type,request.value):null};});
+    let reason=!row.validUnit?'Unit facility mismatch':row.currency!=='ZAR'?'Currency requires review':months===null?'Last price change unknown':months<request.minimumMonths?'Below selected duration':row.schedule?.changes.some(c=>c.period>=request.effectivePeriod)?'Existing scheduled change requires review':row.schedule&&row.schedule.changes.length>=100?'History limit requires review':null;
+    const previousRate=rateForPeriod(row.baseline,row.schedule,request.effectivePeriod);let newRate:number|null=null;if(reason===null){try{newRate=increasedRate(previousRate,request.type,request.value);}catch{reason='Increase rounds to unchanged rent or exceeds the allowed rate; review separately';}}return {...row,eligible:reason===null,reason,previousRate,newRate};});
   const fingerprint=createHash('sha256').update(JSON.stringify({org,request,today:report.today,rows})).digest('hex');return {...report,request,rows,fingerprint,eligibleCount:rows.filter(r=>r.eligible).length};
 }
 export async function previewRentReview(org:string,input:unknown){return preview(org,input);}
