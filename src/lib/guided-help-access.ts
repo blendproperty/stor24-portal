@@ -9,6 +9,7 @@ const rule = (base: string, steps: string[], organisation = false): Rule => ({ b
 // Commas mean AND, pipes mean OR. @owner uses a current database assignment, never the JWT label.
 // Missing guides/steps fail closed; the coverage test requires an explicit editorial decision.
 export const guideAccessRules: Record<string, Rule> = {
+  "operations-alerts": rule("@owner", ["", "", ""], true),
   "access-restricted": rule("", ["", "", ""]),
   "move-in-training": rule("@owner|@manager|@custom-move-in", ["", "", ""]),
   orientation: rule("operations.view", ["", "", "leads.view,reservations.manage,ledger.view,collections.view", ""]),

@@ -1,5 +1,4 @@
 import { BadgePercent, BellRing, Building2, Cable, FileSignature, KeyRound, ShieldCheck } from "lucide-react";
-import { requireSession } from "@/lib/auth-guards";
 import { PageHeader } from "@/components/page-header";
 import { ChangePasswordForm } from "@/components/change-password-form";
 import Link from "next/link";
@@ -17,8 +16,7 @@ const modules = [
   [BellRing, "Operations alerts", "Manage the people who receive website, backup and recovery notifications.", "/settings/alerts"],
 ] as const;
 
-export default async function SettingsPage() {
-  const session = await requireSession();
+export default function SettingsPage() {
   return (
     <div className="page-stack settings-hub-workspace">
       <PageHeader
@@ -27,7 +25,7 @@ export default async function SettingsPage() {
         description="Configure the shared policies and integrations that drive every facility workflow."
       />
       <section className="module-grid">
-        {modules.filter(module => module[3] !== "/settings/alerts" || session.role === "Organisation owner").map(([Icon, title, copy, href]) => (
+        {modules.map(([Icon, title, copy, href]) => (
           <Link className="module-card" href={href} key={title}><Icon size={22} /><h3>{title}</h3><p>{copy}</p></Link>
         ))}
       </section>
