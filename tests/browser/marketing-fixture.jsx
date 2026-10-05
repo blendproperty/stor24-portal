@@ -3,11 +3,12 @@ import { createRoot } from "react-dom/client";
 import { MarketingDashboard } from "../../src/components/marketing-dashboard";
 import { AdvertisingConnectionForm } from "../../src/components/advertising-connection-form";
 import { MoveInWorkspace } from "../../src/components/move-in-workspace";
+import { GoogleAnalyticsSetup } from "../../src/components/google-analytics-setup";
 const move = location.pathname === "/move-in";
 createRoot(document.getElementById("root")).render(
   <div className="app-shell">
     <main className="content">
-      {location.pathname === "/settings/advertising" ? <AdvertisingConnectionForm /> : move ? (
+      {location.pathname === "/settings/advertising" ? <><AdvertisingConnectionForm /><GoogleAnalyticsSetup project="synthetic-company-project" reader="report-reader@synthetic-company-project.iam.gserviceaccount.com"/></> : move ? (
         <MoveInWorkspace
           facilities={[{ id: "fixture", name: "Training store" }]}
           customers={[]}

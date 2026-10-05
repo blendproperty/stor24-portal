@@ -192,6 +192,8 @@ if (process.env.PREVIEW_ONLY) {
       const errors = [];
       page.on("pageerror", (e) => errors.push(e.message));
       await page.goto(base + "/settings/advertising");
+      await expect(page.getByRole("heading",{name:"Website traffic: Google Analytics"})).toBeVisible();
+      await expect(page.getByRole("link",{name:/Enable the Google Analytics/})).toHaveAttribute("href","https://console.cloud.google.com/apis/library/analyticsdata.googleapis.com?project=synthetic-company-project");
       await page.getByLabel("Meta reporting access token").fill("synthetic-only-fail-" + "a".repeat(32));
       await page.getByRole("button", {name:"Verify and connect"}).click();
       await expect(page.getByRole("status")).toContainText("Synthetic provider unavailable");
