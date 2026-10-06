@@ -252,3 +252,5 @@ select:focus-visible {
   outline: 3px solid var(--stor24-orange);
   outline-offset: 3px;
 }
+
+.map-editor-element[hidden]{display:none!important}

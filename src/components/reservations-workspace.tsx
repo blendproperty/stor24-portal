@@ -26,6 +26,7 @@ type Customer = {
   phone: string | null;
 };
 type Reservation = {
+  productLine?: string;
   id: string;
   status: string;
   quotedRate: string;
@@ -55,7 +56,7 @@ const unitSchema = z.object({ id: z.string().min(1), facilityId: z.string().min(
 const reservationReadSchema = z.object({ data: z.object({
   facilities: z.array(z.object({ id: z.string().min(1), name: z.string(), units: z.array(unitSchema), maps: z.array(z.object({id:z.string(),name:z.string(),width:z.number(),height:z.number(),elements:z.array(z.object({id:z.string(),type:z.string(),x:z.number(),y:z.number(),width:z.number(),height:z.number(),rotation:z.number(),label:z.string().nullable(),unitId:z.string().nullable()}))})).optional() })),
   customers: z.array(customerSchema),
-  reservations: z.array(z.object({ id: z.string().min(1), status: z.enum(["ACTIVE", "CONVERTED", "CANCELLED", "EXPIRED"]), quotedRate: money, holdExpiresAt: date.nullable(), intendedMoveIn: date.nullable(), createdAt: date, facility: z.object({ id: z.string().min(1), name: z.string() }), customer: customerSchema, unit: unitSchema, lead: z.object({ id: z.string() }).nullable(), convertedTenancy: z.object({ id: z.string() }).nullable() })),
+  reservations: z.array(z.object({ productLine: z.string().optional(), id: z.string().min(1), status: z.enum(["ACTIVE", "CONVERTED", "CANCELLED", "EXPIRED"]), quotedRate: money, holdExpiresAt: date.nullable(), intendedMoveIn: date.nullable(), createdAt: date, facility: z.object({ id: z.string().min(1), name: z.string() }), customer: customerSchema, unit: unitSchema, lead: z.object({ id: z.string() }).nullable(), convertedTenancy: z.object({ id: z.string() }).nullable() })),
 }) });
 const emptyData: Payload = { facilities: [], customers: [], reservations: [] };
 
@@ -373,7 +374,7 @@ export function ReservationsWorkspace({initialCustomerId=""}: {initialCustomerId
                       </td>
                       <td>{item.facility.name}</td>
                       <td>
-                        <strong>{item.unit.number}</strong>
+                        <strong>{item.unit.number}</strong>{item.productLine === "MICRO_WAREHOUSE" && <small>Micro Warehousing</small>}
                         <small>{item.unit.unitType.name}</small>
                       </td>
                       <td>
