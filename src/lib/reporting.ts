@@ -2,7 +2,7 @@ import { z } from "zod";
 import { hasPermission } from "@/lib/permissions";
 
 export function isCurrentSnapshotReport(key: string) {
-  return ["occupancy-revenue", "unit-availability", "integration-health"].includes(key);
+  return ["occupancy-revenue", "unit-availability", "integration-health", "tenant-duration"].includes(key);
 }
 
 export type ReportDefinition = {
@@ -11,19 +11,20 @@ export type ReportDefinition = {
   group: string;
   description: string;
   permission: string;
-  formats: readonly ("CSV" | "JSON")[];
+  formats: readonly ("CSV" | "JSON" | "XLSX" | "PDF")[];
 };
 
 export const reportDefinitions: readonly ReportDefinition[] = [
-  { key: "occupancy-revenue", name: "Occupancy & revenue", group: "Operations", description: "Current unit occupancy and monthly contracted/potential rent snapshot.", permission: "reports.view", formats: ["CSV", "JSON"] },
-  { key: "unit-availability", name: "Unit availability", group: "Operations", description: "Current unit states, rates and recorded reservation hold expiry.", permission: "reports.view", formats: ["CSV", "JSON"] },
-  { key: "move-activity", name: "Move activity", group: "Operations", description: "Move-ins, move-outs, transfers, notices and net rentals.", permission: "reports.view", formats: ["CSV", "JSON"] },
-  { key: "lead-conversion", name: "Lead conversion", group: "Sales", description: "Source, stage velocity, conversion and loss reasons.", permission: "reports.sales", formats: ["CSV", "JSON"] },
-  { key: "rent-roll", name: "Rent roll & tenant ledger", group: "Finance", description: "Rates, balances and account activity.", permission: "reports.financial", formats: ["CSV", "JSON"] },
-  { key: "receivables-ageing", name: "Receivables ageing", group: "Finance", description: "Approved-terms ageing at the selected SAST date, with reconciliation exceptions.", permission: "reports.financial", formats: ["CSV", "JSON"] },
-  { key: "collections-performance", name: "Collections workload", group: "Collections", description: "Current positive balances and period account activity requiring collections attention.", permission: "reports.collections", formats: ["CSV", "JSON"] },
-  { key: "insurance-participation", name: "Insurance participation", group: "Operations", description: "Tenant cover, waivers, snapshotted premiums and outstanding decisions.", permission: "reports.view", formats: ["CSV", "JSON"] },
-  { key: "integration-health", name: "Integration health", group: "Integrations", description: "Current connection state, last health checks and recorded failures.", permission: "integrations.view", formats: ["CSV", "JSON"] },
+  { key: "occupancy-revenue", name: "Occupancy & revenue", group: "Operations", description: "Current unit occupancy and monthly contracted/potential rent snapshot.", permission: "reports.view", formats: ["CSV", "JSON", "XLSX", "PDF"] },
+  { key: "unit-availability", name: "Unit availability", group: "Operations", description: "Current unit states, rates and recorded reservation hold expiry.", permission: "reports.view", formats: ["CSV", "JSON", "XLSX", "PDF"] },
+  { key: "move-activity", name: "Move activity", group: "Operations", description: "Move-ins, move-outs, transfers, notices and net rentals.", permission: "reports.view", formats: ["CSV", "JSON", "XLSX", "PDF"] },
+  { key: "lead-conversion", name: "Lead conversion", group: "Sales", description: "Enquiry sources, current stages, product and follow-up ownership.", permission: "reports.sales", formats: ["CSV", "JSON", "XLSX", "PDF"] },
+  { key: "tenant-duration", name: "Tenant duration & rent changes", group: "Finance", description: "Current tenancy duration, recorded price changes and scheduled increases. Unknown change dates stay explicit.", permission: "reports.financial", formats: ["CSV", "JSON", "XLSX", "PDF"] },
+  { key: "rent-roll", name: "Rent roll & tenant ledger", group: "Finance", description: "Rates, balances and account activity.", permission: "reports.financial", formats: ["CSV", "JSON", "XLSX", "PDF"] },
+  { key: "receivables-ageing", name: "Receivables ageing", group: "Finance", description: "Approved-terms ageing at the selected SAST date, with reconciliation exceptions.", permission: "reports.financial", formats: ["CSV", "JSON", "XLSX", "PDF"] },
+  { key: "collections-performance", name: "Collections workload", group: "Collections", description: "Current positive balances and period account activity requiring collections attention.", permission: "reports.collections", formats: ["CSV", "JSON", "XLSX", "PDF"] },
+  { key: "insurance-participation", name: "Insurance participation", group: "Operations", description: "Recorded cover decisions, waivers and snapshotted premiums.", permission: "reports.view", formats: ["CSV", "JSON", "XLSX", "PDF"] },
+  { key: "integration-health", name: "Integration health", group: "Integrations", description: "Current connection state, last health checks and recorded failures.", permission: "integrations.view", formats: ["CSV", "JSON", "XLSX", "PDF"] },
 ] as const;
 
 export const reportParametersSchema = z.object({
@@ -31,7 +32,7 @@ export const reportParametersSchema = z.object({
   facilityId: z.string().trim().min(1).optional(),
   from: z.iso.date(),
   to: z.iso.date(),
-  format: z.enum(["CSV", "JSON"]).default("CSV"),
+  format: z.enum(["CSV", "JSON", "XLSX", "PDF"]).default("CSV"),
   groupBy: z.enum(["day", "week", "month", "facility"]).default("month"),
 }).refine((value) => value.from <= value.to, { message: "From date must be on or before to date.", path: ["from"] });
 

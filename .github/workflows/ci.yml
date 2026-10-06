@@ -59,6 +59,7 @@ jobs:
       - run: node scripts/test-daily-close-form.mjs
       - run: node scripts/test-daily-close-history.mjs
       - run: node scripts/test-report-export-recovery.mjs
+      - run: node scripts/test-reports-and-unit-map.mjs
       - run: node scripts/test-task-create-recovery.mjs
       - run: node scripts/test-maintenance-status-recovery.mjs
       - run: node scripts/test-maintenance-create-recovery.mjs

@@ -1,9 +1,9 @@
 // Deterministic application export policy. Never return matching content in findings.
-export const DLP_POLICY_VERSION = "2026-10-01.2";
+export const DLP_POLICY_VERSION = "2026-10-06.1";
 export const DLP_MAX_ROWS = 5000;
 export const DLP_MAX_BYTES = 5 * 1024 * 1024;
 export type DlpDecision = { allowed: boolean; classification: "confidential" | "restricted"; reasons: string[]; rowCount: number; policyVersion: string };
-const exportableReports = new Set(["occupancy-revenue", "unit-availability", "move-activity", "lead-conversion", "rent-roll", "receivables-ageing", "collections-performance", "insurance-participation", "integration-health"]);
+const exportableReports = new Set(["occupancy-revenue", "unit-availability", "move-activity", "lead-conversion", "rent-roll", "tenant-duration", "receivables-ageing", "collections-performance", "insurance-participation", "integration-health"]);
 const restrictedField = /^(password|passwordhash|secret|clientsecret|apikey|accesstoken|refreshtoken|authtoken|authorization|privatekey|idnumber|identitynumber|passportnumber|bankaccount|bankaccountnumber|cardnumber|cvv|biometric|biometrictemplate)$/;
 function luhn(value: string) {
   let sum = 0;

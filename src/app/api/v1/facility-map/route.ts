@@ -45,6 +45,9 @@ export async function POST(request: Request) {
     const existingNumber = draftNumbers.length ? await db.unit.findFirst({ where: { facilityId: input.facilityId, number: { in: draftNumbers } } }) : null;
     if (existingNumber) return Response.json({ error: { code: "UNIT_NUMBER_EXISTS", message: `Unit number ${existingNumber.number} already exists at this store. Place the existing unit or choose another number.` } }, { status: 409 });
     const result = await db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Facility" WHERE "id"=${input.facilityId} FOR UPDATE`;
+      const combinationUnits = await tx.unit.findMany({where:{facilityId:input.facilityId},select:{combinationSnapshot:true,combinedIntoUnitId:true}});
+      if(combinationUnits.some(u=>u.combinationSnapshot || u.combinedIntoUnitId)) throw new Error("CONFLICT");
       const map = await tx.facilityMap.upsert({ where: { facilityId_name: { facilityId: input.facilityId, name: input.name } }, update: { width: input.width, height: input.height, backgroundUrl: input.backgroundUrl }, create: { facilityId: input.facilityId, name: input.name, width: input.width, height: input.height, backgroundUrl: input.backgroundUrl } });
       await tx.mapElement.deleteMany({ where: { mapId: map.id } });
       const existingUnitIds = [...new Set(input.elements.flatMap((element) => element.type === "UNIT" && element.unitId ? [element.unitId] : []))];
