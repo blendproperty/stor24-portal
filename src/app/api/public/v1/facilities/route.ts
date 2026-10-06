@@ -37,5 +37,5 @@ export async function GET(request: Request) {
       floors: facility.maps.filter(map => floorIsOperational(map.name, facility.closedFloors)).map((map) => map.name),
     })),
     meta: { count: facilities.length },
-  }, { headers: noStore });
+  }, { headers: { ...noStore, "x-stor24-product-line": product } });
 }

@@ -183,5 +183,5 @@ export async function GET(
         } : null,
       })),
     })),
-  } }, { headers: noStore });
+  } }, { headers: { ...noStore, "x-stor24-product-line": product } });
 }
