@@ -44,7 +44,8 @@ test("isolated PostgreSQL signed reservation handover", async t => {
     await t.test("public prepaid schedule requires full payment and records both periods exactly once",async()=>{
       const f=await fixture(),date=new Date('2026-02-16T00:00:00+02:00');
       const businessDetails={companyName:"Synthetic company only",businessUse:"Synthetic business snapshot"};
-      await db.unitType.update({where:{id:f.unit.unitTypeId},data:{productUseType:"MICRO_WAREHOUSE"}});
+      await db.unitType.update({where:{id:f.unit.unitTypeId},data:{useTypes:["MICRO_WAREHOUSE"]}});
+      await db.unit.update({where:{id:f.unit.id},data:{floor:"Ground Floor"}});
       await db.reservation.update({where:{id:f.reservation.id},data:{productLine:"MICRO_WAREHOUSE",businessDetails,quotedRate:2800,intendedMoveIn:date,initialRentSnapshot:newPublicInitialRent(2800,date)}});
       assert.equal((await getReservationMoveInReadiness(f.scope,f.reservation.id)).paymentVerified,false);
       await db.payment.update({where:{id:f.payment.id},data:{amount:4100}});
