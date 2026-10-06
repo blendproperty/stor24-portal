@@ -2831,3 +2831,72 @@ a.module-card:focus-visible {
 .report-workspace>.report-live-preview{grid-column:1/-1}.report-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px;margin:24px 0}.report-kpi-grid>div{background:#edf5f1;padding:20px;border-radius:10px}.report-kpi-grid strong{display:block;font-size:26px;margin-top:8px}.report-bars{display:grid;gap:14px;margin:20px 0}.report-bars>div{display:grid;grid-template-columns:minmax(100px,180px) minmax(80px,1fr) 100px;gap:14px;align-items:center}.report-bars>div>div{background:#edf0ed;height:22px;border-radius:4px}.report-bars i{display:block;height:100%;background:#f65b12;border-radius:4px}.report-guidance{padding:18px;border-left:4px solid #f65b12;background:#fff8ef;line-height:1.6}.inventory-map-scroll{overflow:auto;background:#f3f4ee;border-radius:12px}.inventory-map-scroll svg{width:100%;min-width:680px;display:block}.inventory-facility-map .report-actions{flex-wrap:wrap;gap:20px;margin:18px 0}.inventory-facility-map select{padding:10px}.map-status-legend{display:flex;gap:20px;flex-wrap:wrap}.map-status-legend span:nth-child(1){color:#277055}.map-status-legend span:nth-child(2){color:#bc5809}.map-status-legend span:nth-child(3){color:#28627a}.map-status-legend span:nth-child(4){color:#636b70}.combination-controls{padding:20px;border:1px solid #cbd6cf;border-radius:12px}.combination-controls label{display:block;margin:16px 0}@media(max-width:600px){.report-bars>div{grid-template-columns:100px 1fr 65px;gap:8px}.report-kpi-grid strong{font-size:22px}}
 
 .report-parameters .report-actions{flex-wrap:wrap;gap:12px}.report-live-preview{min-width:0;max-width:100%}.report-live-preview .table-wrap{max-width:100%;overflow-x:auto}.report-live-preview .report-actions{flex-wrap:wrap}.report-live-preview .report-bars{min-width:0}
+
+/* Operational map uses the same presentation treatment as the public unit finder. */
+.inventory-facility-map{min-width:0}
+.inventory-map-header{display:flex;align-items:start;justify-content:space-between;gap:20px;margin-bottom:24px}
+.inventory-map-header h2{font-size:28px;letter-spacing:-.035em;margin:6px 0 10px}
+.inventory-map-eyebrow{font-size:10px;font-weight:750;letter-spacing:.15em;text-transform:uppercase;color:#d74907;margin:0}
+.inventory-layout-link{white-space:nowrap;font-size:12px;color:#627580;padding-top:10px}
+.inventory-map-toolbar{display:flex;align-items:center;gap:18px;flex-wrap:wrap;border-top:1px solid #e2e8e5;border-bottom:1px solid #e2e8e5;padding:16px 0;margin-bottom:24px}
+.inventory-map-toolbar label{display:flex;align-items:center;gap:10px;font-size:12px}
+.inventory-map-toolbar select{min-width:160px;padding:10px 12px;border:1px solid #d4dfd9;border-radius:8px;background:#fff}
+.inventory-map-matches{font-size:12px;color:#627580}
+.inventory-combine-toggle{margin-left:auto}
+.inventory-map-layout{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:24px;align-items:start}
+.inventory-map-main{min-width:0}
+.inventory-map-legend{display:flex;gap:14px 20px;flex-wrap:wrap;font-size:11px;color:#52655c;margin:0 0 16px}
+.inventory-map-legend span{display:flex;align-items:center;gap:7px}
+.inventory-map-legend i{width:12px;height:12px;border-radius:3px;display:inline-block;border:1px solid #315a49}
+.inventory-map-legend .is-available{background:#fafbf8}
+.inventory-map-legend .is-held{background:#ffd0b4;border-color:#dd9267}
+.inventory-map-legend .is-occupied{background:#b8d6e4;border-color:#759ba9}
+.inventory-map-legend .is-unavailable{background:repeating-linear-gradient(45deg,#e5e9e1,#e5e9e1 3px,#b7c0b5 3px,#b7c0b5 4px);border-color:#89968e}
+.inventory-plan-explorer{min-width:0;padding:16px;border:1px solid #dbe4dc;border-radius:14px;background:#fff}
+.inventory-plan-heading{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.inventory-plan-heading strong{font-size:15px;color:#173f35}
+.inventory-plan-heading>span{font-size:10px;color:#687b72}
+.inventory-plan-controls{display:flex;gap:6px;margin-left:auto}
+.inventory-plan-controls button{display:inline-flex;align-items:center;justify-content:center;min-width:36px;min-height:36px;padding:0 10px;border:1px solid #d6dfd5;border-radius:8px;background:#fff;color:#173f35;font-size:21px;cursor:pointer}
+.inventory-plan-controls button:last-child{font-size:11px}
+.inventory-plan-controls button:hover{background:#edf4ee}
+.inventory-plan-viewport{height:clamp(360px,40vw,620px);overflow:auto;border-radius:10px;background:#f3f3ee;touch-action:none;cursor:grab;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#bcc9be transparent}
+.inventory-plan-viewport:active{cursor:grabbing}
+.inventory-plan-viewport:focus-visible{outline:3px solid #ff5a0a;outline-offset:3px}
+.inventory-plan-surface{position:relative;margin:0 auto;min-width:0}
+.inventory-plan-surface canvas{position:absolute;inset:0;pointer-events:none}
+.inventory-plan-surface .inventory-plan-unit{position:absolute;display:block;min-width:0;min-height:0;max-width:none;margin:0;padding:0;border:0;border-radius:0;background:transparent!important;color:transparent!important;box-shadow:none;font-size:0;cursor:pointer;transform-origin:center}
+.inventory-plan-unit span{font-size:0}
+.inventory-plan-surface .inventory-plan-unit:focus-visible{outline:3px solid #ff5a0a;outline-offset:2px}
+.inventory-plan-help{text-align:center;font-size:11px;color:#687b72;margin:14px 0 0}
+.inventory-map-details{border:1px solid #dce5de;border-radius:14px;background:#fff;overflow:hidden}
+.inventory-map-empty{padding:28px 22px}
+.inventory-unit-outline{width:44px;height:44px;display:grid;place-items:center;border:1px solid #e3eae4;border-radius:12px;color:#e85208;font-size:24px;background:#fafcf9;margin-bottom:22px}
+.inventory-map-empty h3{font-size:19px;letter-spacing:-.02em;margin:0 0 12px}
+.inventory-map-empty p{font-size:12px;line-height:1.8;color:#627580;margin:0 0 20px}
+.inventory-map-empty small{font-size:10px;line-height:1.6;color:#627580}
+.inventory-unit-summary{padding:24px;border-bottom:1px solid #e4e9e3}
+.inventory-unit-summary:last-child{border-bottom:0}
+.inventory-unit-status{display:inline-flex;border-radius:5px;background:#eef3ed;color:#5b6d60;padding:5px 8px;font-size:10px;font-weight:650}
+.inventory-unit-status.is-available{background:#edf7ef;color:#24704f}
+.inventory-unit-status.is-held,.inventory-unit-status.is-reserved{background:#fff0e5;color:#a44913}
+.inventory-unit-status.is-occupied{background:#e7f1f6;color:#386778}
+.inventory-unit-summary h3{font-size:27px;margin:18px 0 8px;letter-spacing:-.035em}
+.inventory-unit-area{font-size:16px;margin:0 0 18px}
+.inventory-unit-area span{font-size:11px;color:#627580}
+.inventory-unit-products{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 22px}
+.inventory-unit-products span{font-size:10px;padding:5px 7px;border-radius:5px;border:1px solid #e3e9e4;color:#526a5d;background:#fafcf9}
+.inventory-unit-price{padding-top:20px;border-top:1px solid #e2e8e2;margin-bottom:20px}
+.inventory-unit-price strong{display:block;font-size:28px;letter-spacing:-.03em}
+.inventory-unit-price>span{font-size:10px;color:#627580}
+.inventory-unit-summary>.button{width:100%}
+.inventory-map-details .combination-controls{padding:20px;border:0;border-radius:0;background:#fafbf8}
+.inventory-map-details .combination-controls>.button{width:100%}
+.inventory-map-details .combination-controls label{font-size:11px;line-height:1.7;color:#536957;margin:20px 0}
+.inventory-combined-price{display:grid;gap:6px;margin-top:24px}
+.inventory-combined-price strong{font-size:28px}
+.inventory-combined-price>span{font-size:15px}
+.inventory-combined-price small{font-size:10px;color:#627580}
+@media(max-width:1100px){.inventory-map-layout{grid-template-columns:minmax(0,1fr) 240px;gap:16px}.inventory-plan-heading>span{display:none}}
+@media(max-width:850px){.inventory-map-layout{grid-template-columns:minmax(0,1fr)}.inventory-map-details{order:2}.inventory-map-empty{padding:20px}.inventory-unit-outline{display:none}.inventory-map-empty p{margin-bottom:12px}.inventory-plan-heading>span{display:inline}.inventory-plan-viewport{height:440px}}
+@media(max-width:500px){.inventory-map-header h2{font-size:23px}.inventory-map-header{gap:10px}.inventory-layout-link{font-size:10px}.inventory-map-toolbar{gap:12px}.inventory-map-toolbar label{width:100%}.inventory-map-toolbar select{flex:1;min-width:0}.inventory-map-matches{width:100%}.inventory-combine-toggle{margin-left:0;width:100%}.inventory-plan-explorer{padding:10px}.inventory-plan-heading strong{font-size:13px}.inventory-plan-heading>span{display:none}.inventory-map-legend{font-size:10px;gap:12px}.inventory-plan-viewport{height:390px}.inventory-plan-controls button{min-width:32px;min-height:36px;padding:0 7px}.inventory-unit-summary{padding:20px}}
