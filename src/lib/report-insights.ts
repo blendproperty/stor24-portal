@@ -61,11 +61,10 @@ export function reportInsights(key: string, rows: ReportRow[]): ReportInsight {
         value: rows.filter((r) => r.effectiveStatus === "AVAILABLE").length,
       },
       {
-        label: "Micro eligible",
+        label: "Micro ground-floor eligible",
         value: rows.filter(
           (r) =>
-            String(r.products).includes("MICRO_WAREHOUSE") &&
-            r.floorOperational === true,
+            r.microGroundFloorEligible === true,
         ).length,
       },
     ];

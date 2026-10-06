@@ -15,3 +15,5 @@ test("PDF paginates complete detail records and retains a meaningful title",asyn
 test("ageing charts exclude unresolved balances and show reconciliation exceptions",()=>{
  const insight=reportInsights("receivables-ageing",[{current:null,overdue:null,days91Plus:null,reviewReason:"Missing approved terms"},{current:"100.25",overdue:"250",days91Plus:"250",reviewReason:null}]);assert.equal(insight.metrics.find(m=>m.label==="Overdue")?.value,250);assert.equal(insight.metrics.find(m=>m.label==="Needs reconciliation")?.value,1);assert.equal(insight.bars.find(b=>b.label==="current")?.value,100.25);
 });
+
+test("availability summary uses operational ground-floor product eligibility",()=>{const insight=reportInsights("unit-availability",[{products:"STORAGE | MICRO_WAREHOUSE",floorOperational:true,microGroundFloorEligible:false,effectiveStatus:"AVAILABLE"},{products:"STORAGE | MICRO_WAREHOUSE",floorOperational:true,microGroundFloorEligible:true,effectiveStatus:"AVAILABLE"}]);assert.equal(insight.metrics.find(m=>m.label==="Micro ground-floor eligible")?.value,1);});

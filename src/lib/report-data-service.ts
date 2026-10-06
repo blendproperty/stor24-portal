@@ -1,6 +1,6 @@
 import { rentReviewReport } from "@/lib/rent-review-service";
 import { unitIsOperational } from "@/lib/floor-availability";
-import { effectiveUseTypes } from "@/lib/product-line";
+import { effectiveUseTypes, unitSupportsProduct } from "@/lib/product-line";
 import { db } from "@/lib/db";
 import { collectionsWorkspace } from "@/lib/collections-service";
 import { requireFacility, type RequestScope } from "@/lib/scope";
@@ -35,7 +35,7 @@ export async function buildReportRows(scope: RequestScope, parameters: ReportPar
     }
     case "unit-availability": {
       const units = await db.unit.findMany({ where: { facility, combinedIntoUnitId: null }, include: { facility: { select: { name: true, closedFloors:true } }, unitType: true, mapElements:{include:{map:{select:{name:true}}}}, reservations: { where: { status: "ACTIVE" }, select: { holdExpiresAt: true }, take: 1 } }, orderBy: [{ facilityId: "asc" }, { number: "asc" }] });
-      return units.map((unit) => ({ snapshotTakenAt, facility: unit.facility.name, unit: unit.number, type: unit.unitType.name, areaSqMetres: unit.unitType.areaSqMetres === null ? null : Number(unit.unitType.areaSqMetres), status: unit.status, effectiveStatus:unitIsOperational(unit,unit.facility.closedFloors)?unit.status:"CLOSED_FLOOR", floorOperational:unitIsOperational(unit,unit.facility.closedFloors), products:effectiveUseTypes(unit).join(" | "), monthlyRate: Number(unit.monthlyRate), activeHoldExpiresAt: unit.reservations[0]?.holdExpiresAt?.toISOString() ?? null }));
+      return units.map((unit) => ({ snapshotTakenAt, facility: unit.facility.name, unit: unit.number, floor: unit.floor, type: unit.unitType.name, microGroundFloorEligible:unitIsOperational(unit,unit.facility.closedFloors)&&unitSupportsProduct(unit,"MICRO_WAREHOUSE"), areaSqMetres: unit.unitType.areaSqMetres === null ? null : Number(unit.unitType.areaSqMetres), status: unit.status, effectiveStatus:unitIsOperational(unit,unit.facility.closedFloors)?unit.status:"CLOSED_FLOOR", floorOperational:unitIsOperational(unit,unit.facility.closedFloors), products:effectiveUseTypes(unit).join(" | "), monthlyRate: Number(unit.monthlyRate), activeHoldExpiresAt: unit.reservations[0]?.holdExpiresAt?.toISOString() ?? null }));
     }
     case "move-activity": {
       const occupancies = await db.occupancy.findMany({ where: { tenancy: { facility }, OR: [{ startDate: { gte: from, lte: to } }, { endDate: { gte: from, lte: to } }] }, include: { unit: { select: { number: true } }, tenancy: { include: { facility: { select: { name: true } }, customer: { select: { firstName: true, lastName: true, companyName: true } }, account: { select: { accountNumber: true } } } } }, orderBy: { startDate: "asc" } });
