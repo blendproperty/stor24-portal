@@ -14,3 +14,19 @@ export async function requireEditableCombinationUnit(
   if (!unit || unit.combinedIntoUnitId || unit.combinationSnapshot)
     throw new Error("CONFLICT");
 }
+
+/** Type edits and forced type deletion must preserve every combined component. */
+export async function requireEditableCombinationUnitType(
+  tx: Prisma.TransactionClient,
+  facilityId: string,
+  unitTypeId: string,
+) {
+  await tx.$queryRaw`SELECT "id" FROM "Facility" WHERE "id"=${facilityId} FOR UPDATE`;
+  const units = await tx.unit.findMany({
+    where: { facilityId, unitTypeId },
+    select: { id: true },
+    orderBy: { id: "asc" },
+  });
+  for (const unit of units)
+    await requireEditableCombinationUnit(tx, facilityId, unit.id);
+}
