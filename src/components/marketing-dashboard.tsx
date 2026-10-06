@@ -49,6 +49,7 @@ export function MarketingDashboard({ canManage }: { canManage: boolean }) {
     [data, setData] = useState<MarketingWorkspace | null>(null),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
+    [reportVersion, setReportVersion] = useState(0),
     [modal, setModal] = useState<"campaign" | "link" | "activity" | null>(null),
     [busy, setBusy] = useState(false),
     [formError, setFormError] = useState(""),
@@ -75,6 +76,7 @@ export function MarketingDashboard({ canManage }: { canManage: boolean }) {
       const result = await response.json();
       setData(result.data);
       setError("");
+      setReportVersion((version) => version + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to load marketing.");
     } finally {
@@ -534,8 +536,8 @@ export function MarketingDashboard({ canManage }: { canManage: boolean }) {
           )}
           {tab === "overview" && (
             <>
-              <MarketingTrafficChart key={from + to} from={from} to={to} />
-              <MarketingAdvertising key={"ads-"+from+to} from={from} to={to} />
+              <MarketingTrafficChart key={`${from}-${to}-${reportVersion}`} from={from} to={to} />
+              <MarketingAdvertising key={`ads-${from}-${to}-${reportVersion}`} from={from} to={to} />
               <MarketingOutcomes report={report} />
               <div className="marketing-chart-grid">
                 <section className="marketing-card">
