@@ -107,6 +107,7 @@ export async function confirmReservationMoveIn(scope: RequestScope, reservationI
     if (!lease.signedPdf || createHash("sha256").update(lease.signedPdf).digest("hex") !== lease.signedPdfSha256 || createHash("sha256").update(lease.content).digest("hex") !== lease.sha256) throw new Error("MOVE_IN_DOCUMENT_REVIEW");
     const tenancy = await tx.tenancy.create({ data: {
       facilityId: existing.facilityId, customerId: existing.customerId, accountId: state.account.id,
+      productLine: existing.productLine, businessDetails: existing.businessDetails ?? undefined,
       status: "ACTIVE", startDate: state.reservation.intendedMoveIn, paymentMethod: lease.paymentMethod,
       occupancies: { create: { unitId: unit.id, status: "ACTIVE", startDate: state.reservation.intendedMoveIn, monthlyRate: existing.quotedRate, accessState: "PENDING" } },
       documents: { create: { type: "LEASE_AGREEMENT", provider: "PUBLIC_RESERVATION", externalId: lease.id, storageKey: `public-reservation:${lease.id}`, status: "SIGNED", content: lease.content, sha256: lease.sha256, signerName: lease.signerName, signerIp: lease.signerIp, signerUserAgent: lease.signerUserAgent, clauseVersion: lease.version, signedAt: lease.signedAt, idempotencyKey: `reservation-lease:${lease.id}` } },

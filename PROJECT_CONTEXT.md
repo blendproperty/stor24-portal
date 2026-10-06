@@ -1,5 +1,7 @@
 ## Rollout recovery audit — 6 October 2026
 
+- **Combined-release integrity:** public handover now retains the existing Micro Warehousing product/business snapshot just as staff move-in does. The prepaid-period database fixture asserts those fields alongside full payment, both rent periods, zero balance and safe replay. This prevents the new combined checkout from dropping business booking information. Fresh protected checks cover this small reconciliation fix.
+
 - **Implementation:** resumed the unmerged checkout/advertising candidates PR393 and public PR105. Yesterday's last backend candidate608bfb8 passed eight checks, including transactions and browser guidance, but validate failed on one unescaped JSX apostrophe in the Analytics setup link. That link is corrected; no protection bypass. Current main includes the separately delivered Micro Warehousing work, which is being preserved in this candidate.
 - **Testing:** merged current canonical mainc9a73da and retained both product eligibility and first-rent imports. Fresh Prisma generation/type/lint/unit/build and protected exact-source checks are required.
 - **Commit and push / merge:** candidate merge reconciliation in progress; feature PR393 remains unmerged. **Deployment:** live application remains85ed2a24e8ee764506f107e93f1825b74c34d23a, healthy. Public live checkout9de7f1c5e3cd9aa832d361109bae6acdcfee9921 is running; checkout candidate not deployed.
