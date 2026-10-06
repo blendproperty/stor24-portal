@@ -634,3 +634,41 @@
  .app-shell.sidebar-hidden .app-main { margin-left:0; }
  .app-shell.sidebar-hidden .content { max-width:none; }
 }
+
+/* Reports: controls, results and catalogue follow one full-width reading order. */
+.app-shell .report-library-workspace { gap:24px; }
+.app-shell .report-library-workspace .report-workspace { display:grid; grid-template-columns:minmax(0,1fr); gap:24px; }
+.app-shell .report-library-workspace .report-parameters { grid-row:auto; padding:24px; display:grid; gap:18px; }
+.app-shell .report-library-workspace .report-parameters .panel-heading { margin:0; align-items:flex-start; }
+.app-shell .report-library-workspace .report-parameters > p { margin:0; }
+.app-shell .report-library-workspace .parameter-grid { grid-template-columns:2fr repeat(3,minmax(0,1fr)); gap:16px; }
+.app-shell .report-library-workspace .report-actions { margin:0; gap:16px; align-items:end; }
+.app-shell .report-library-workspace .report-actions label { display:grid; gap:8px; color:#627580; font-size:12px; }
+.app-shell .report-library-workspace .report-actions select { min-height:44px; min-width:150px; padding:0 12px; border:1px solid #cad8df; border-radius:8px; background:white; color:#16313b; }
+.app-shell .report-library-workspace .report-shortcuts { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:20px; }
+.app-shell .report-library-workspace .report-shortcut { padding:24px; display:flex; flex-direction:column; align-items:flex-start; gap:12px; }
+.app-shell .report-library-workspace .report-shortcut h2,.app-shell .report-library-workspace .report-shortcut p { margin:0; }
+.app-shell .report-library-workspace .report-shortcut p { color:#627580; font-size:13px; line-height:1.65; }
+.app-shell .report-library-workspace .report-shortcut .button { margin-top:auto; }
+.app-shell .report-library-workspace .report-catalogue { display:grid; gap:18px; min-width:0; }
+.app-shell .report-library-workspace .report-catalogue .panel-heading { margin:0; }
+.app-shell .report-library-workspace .filter-tabs { display:flex; flex-wrap:wrap; gap:8px; }
+.app-shell .report-library-workspace .report-card-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }
+.app-shell .report-library-workspace .report-card { display:flex; flex-direction:column; gap:12px; padding:24px; }
+.app-shell .report-library-workspace .report-card h3,.app-shell .report-library-workspace .report-card p { margin:0; }
+.app-shell .report-library-workspace .report-select-button { margin-top:auto; min-height:42px; }
+.app-shell .report-library-workspace .report-live-preview { padding:24px; }
+@media(max-width:1100px) {
+ .app-shell .report-library-workspace .parameter-grid,.app-shell .report-library-workspace .report-card-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media(max-width:600px) {
+ .app-shell .report-library-workspace .parameter-grid,.app-shell .report-library-workspace .report-card-grid,.app-shell .report-library-workspace .report-shortcuts { grid-template-columns:minmax(0,1fr); }
+ .app-shell .report-library-workspace .report-parameters,.app-shell .report-library-workspace .report-shortcut,.app-shell .report-library-workspace .report-card,.app-shell .report-library-workspace .report-live-preview { padding:20px; }
+ .app-shell .report-library-workspace .report-actions { display:grid; grid-template-columns:minmax(0,1fr); }
+ .app-shell .report-library-workspace .report-actions select { width:100%; }
+}
+
+@media(min-width:1101px) {
+ .app-shell .report-library-workspace .parameter-grid-snapshot { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .app-shell .report-library-workspace .parameter-grid-ageing { grid-template-columns:2fr 1fr 1fr; }
+}

@@ -1,5 +1,14 @@
 ## Verified Cloudflare cutover — 6 October 2026, 08:35 UTC
 
+## Reports layout correction candidate - 6 October 2026
+
+- **Implementation:** `codex/reports-layout-20261006`, based on canonical main `e75b67f`, replaces the sidebar and row-span grid with full-width controls, results immediately beneath, and a labelled catalogue. Page heading precedes consistently spaced shortcut cards. Snapshot, ageing and date-range controls have appropriate columns; tabs wrap and cards use responsive columns. Permissions, DLP and report/export services retained.
+- **Testing:** actual-component isolated browser checks pass at 1440/390/320px, asserting a 18-30px controls/results gap, equal width/alignment, no page overflow, denied-preview clearing and Excel/PDF downloads. Seven actual pages pass design checks at five widths. Focused ESLint and whitespace validation pass. Desktop/mobile screenshots reviewed in output/reports-unit-map. Initial TypeScript run lacked Prisma generated types; Prisma and route types subsequently generated; final TypeScript check pending at this record. Build and protected CI pending. Invented/intercepted browser data only; no live writes.
+- **Commit and push:** implementation and context prepared together for this branch; remote readback required before handoff.
+- **Merge:** not performed; protected checks and review required.
+- **Deployment and configuration:** not performed; no migration or provider configuration changes.
+- **Live production verification:** pending deployment and authenticated desktop/mobile review. Existing provider, finance, reconciliation, privacy, data, UAT, training and approval gates remain open.
+
 Final evidence branch preserves subsequent canonical ef70571 internal units-map changes from another workstream. The307 runtime checkpoint below remains exact historical proof; later application deployments require their own checks/readback. The facility-map business/security policy decision remains deferred to Brett/Mark.
 
 - **Implementation / testing:** all22 actual Hostinger DNS records reconciled; only apex/www/portal/CMS Proxied and18 mail/SendGrid/verification records remain DNS-only. Active Universal SSL covers apex and wildcard through4January2027; Full(strict), Always Use HTTPS, minimumTLS1.2, private/transactional cache bypass, managed Free WAF and removal of incoming forged forwarded chains are configured. Traefik trusts only22 official Cloudflare CIDRs. Separate stor24http HTTP-01 resolver and protected certificate storage preserve other shared-host services.

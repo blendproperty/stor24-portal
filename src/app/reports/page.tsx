@@ -20,13 +20,15 @@ export default async function ReportsPage() {
   const from = `${today.slice(0, 8)}01`;
   return (
     <div className="page-stack report-library-workspace">
-      {hasPermission(permissions,'leads.view')&&<section className="panel panel-spacious"><h2>Marketing and customer profile</h2><p>Compare enquiry sources, personal or business storage and voluntarily recorded gender with the selected reporting period and store.</p><Link href="/marketing" className="button button-secondary">Open marketing reports</Link></section>}
       <PageHeader
         eyebrow="Analytics"
         title="Reports"
         description="Governed operational and financial reporting for individual facilities and the portfolio."
       />
-      {currentRoleAccess(session.user.roleAssignments).owner && <section className="panel panel-spacious"><h2>Tenant duration & rent changes</h2><p>Days in each unit, days since a recorded price change and scheduled group increases.</p><Link className="button button-secondary" href="/billing/rent-reviews">Open tenant duration report</Link></section>}
+      <div className="report-shortcuts">
+      {hasPermission(permissions,'leads.view')&&<section className="panel report-shortcut"><h2>Marketing and customer profile</h2><p>Compare enquiry sources, personal or business storage and voluntarily recorded gender with the selected reporting period and store.</p><Link href="/marketing" className="button button-secondary">Open marketing reports</Link></section>}
+      {currentRoleAccess(session.user.roleAssignments).owner && <section className="panel report-shortcut"><h2>Tenant duration & rent changes</h2><p>Days in each unit, days since a recorded price change and scheduled group increases.</p><Link className="button button-secondary" href="/billing/rent-reviews">Open tenant duration report</Link></section>}
+      </div>
       <ReportsWorkspace reports={availableReports(permissions)} facilities={facilities} initialFrom={from} initialTo={today} canExport={hasPermission(permissions, "reports.export")} />
     </div>
   );
