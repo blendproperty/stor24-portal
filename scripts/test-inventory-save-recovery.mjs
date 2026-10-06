@@ -20,6 +20,7 @@ try {for(const width of [1440,390,320]) for(const action of ["type-create","type
   if(["403","409","500"].includes(mode))return route.fulfill({status:Number(mode),json:{error:{message:"Synthetic rejection"}}});
   const body=req.postDataJSON(),data=body.data??body,isType=resource==="unit-types";
   const saved={...(isType?type:unit),...data,id:body.id??"new-record"};
+  const attributeKey=isType?"businessAttributes":"businessAttributesOverride";if(saved[attributeKey])saved[attributeKey]=Object.fromEntries(Object.entries(saved[attributeKey]).sort(([a],[b])=>a.localeCompare(b)));
   if(mode==="wrong")saved.facilityId="other";
   if(mode==="value")saved[isType?"name":"monthlyRate"]=isType?"Other":"999";
   if(mode==="identity")saved.id="wrong-record";
@@ -27,7 +28,7 @@ try {for(const width of [1440,390,320]) for(const action of ["type-create","type
   return route.fulfill({json:{data:saved}});
  });
  const open=async()=>{if(action==="type-create")await page.getByRole("button",{name:"Unit type",exact:true}).click();else if(action==="type-edit")await page.locator(".inventory-type-actions").getByRole("button",{name:"Edit",exact:true}).click();else await page.getByRole("button",{name:action==="unit-create"?"Add unit":"Edit unit T01",exact:true}).click();};
- const fill=async()=>{if(action.startsWith("type")){await page.locator('input[name="name"]').fill("Saved synthetic type");await page.locator('input[name="areaSqMetres"]').fill("12");}else{await page.locator('input[name="number"]').fill("T02");await page.locator('input[name="monthlyRate"]').fill("125");}};
+ const fill=async()=>{if(action.startsWith("type")){await page.locator('input[name="name"]').fill("Saved synthetic type");await page.locator('input[name="areaSqMetres"]').fill("12");}else{await page.locator('input[name="number"]').fill("T02");await page.locator('input[name="monthlyRate"]').fill("125");}await page.locator("details").filter({hasText:"Business space details"}).locator("summary").click();await page.locator('select[name="mw_hasPower"]').selectOption("true");await page.locator('input[name="mw_doorWidthMm"]').fill("2500");};
  await page.goto(`http://127.0.0.1:${server.address().port}`);await open();await fill();
  if(process.env.REPRO_ONLY){await page.getByRole("button",{name:"Save",exact:true}).click();await page.waitForTimeout(500);assert.equal(writes,1);assert.ok(errors.length);console.log("REPRO: inventory save network failure throws and leaves saving stuck");await page.close();break;}
  mode="409";await page.getByRole("button",{name:"Save",exact:true}).click();await expect(page.getByRole("alert")).toContainText("Synthetic rejection");await expect(page.locator(action.startsWith("type")?'input[name="name"]':'input[name="number"]')).toHaveValue(action.startsWith("type")?"Saved synthetic type":"T02");

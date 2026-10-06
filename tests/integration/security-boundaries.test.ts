@@ -667,7 +667,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
       assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "units.updated", actorId: unitActor.id } }), 1);
       assert.equal((await patch(own.id, { facilityId: b.id })).status, 403);
       const audit = await db.auditEvent.findFirstOrThrow({ where: { entityId: own.id, action: "units.updated" } });
-      assert.deepEqual(audit.before, { number: "Before-audit" }); assert.deepEqual(audit.after, { number: "After-audit", mapLabelSynchronized: true });
+      assert.deepEqual(audit.before, { number: "Before-audit", useTypesOverride: [], businessAttributesOverride: "null" }); assert.deepEqual(audit.after, { number: "After-audit", mapLabelSynchronized: true, useTypesOverride: [], businessAttributesOverride: "null" });
       await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_unit_patch_failure CHECK (false) NOT VALID');
       try { assert.equal((await patch(own.id, { monthlyRate: 300 })).status, 500); }
       finally { await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_unit_patch_failure'); }
