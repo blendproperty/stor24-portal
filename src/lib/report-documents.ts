@@ -1,7 +1,11 @@
+import fontkit from "@pdf-lib/fontkit";
+import {readFile} from "node:fs/promises";
+import {join} from "node:path";
 import ExcelJS from "exceljs";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, rgb } from "pdf-lib";
 import type { ReportRow } from "./report-data-service";
 import { reportInsights } from "./report-insights";
+let fontBytes:Promise<Buffer>|undefined;
 const heading=(s:string)=>s.replace(/([a-z])([A-Z])/g,"$1 $2").replace(/^./,c=>c.toUpperCase());
 export async function reportExcel(title:string,key:string,rows:ReportRow[],period:string){
  const book=new ExcelJS.Workbook();book.creator="STOR24";book.created=new Date();
@@ -12,10 +16,10 @@ export async function reportExcel(title:string,key:string,rows:ReportRow[],perio
  return new Uint8Array(await book.xlsx.writeBuffer());
 }
 export async function reportPdf(title:string,key:string,rows:ReportRow[],period:string){
- const pdf=await PDFDocument.create();pdf.setTitle(title);const font=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold);let page=pdf.addPage([842,595]),y=550;
- const clean=(s:string)=>s.replace(/[^\x20-\x7e\xa0-\xff]/g,"?");
+ const pdf=await PDFDocument.create();pdf.setTitle(title);pdf.registerFontkit(fontkit);fontBytes ??= readFile(join(process.cwd(),"public","brand","Satoshi-Variable.ttf"));const font=await pdf.embedFont(await fontBytes,{subset:true}),bold=font;let page=pdf.addPage([842,595]),y=550;
+ const clean=(s:string)=>s.replace(/[\x00-\x1f\x7f]/g," ");
  const line=(text:string,size=10,strong=false)=>{if(y<45){page=pdf.addPage([842,595]);y=550;}page.drawText(clean(text),{x:35,y,size,font:strong?bold:font,color:rgb(.03,.15,.12)});y-=size+9;};
- const wrap=(text:string,width=120)=>{for(let offset=0;offset<text.length;offset+=width)line(text.slice(offset,offset+width),9);};
+ const wrap=(text:string)=>{let part="";for(const character of clean(text)){if(font.widthOfTextAtSize(part+character,9)>770){line(part,9);part="";}part+=character;}if(part)line(part,9);};
  line(`STOR24 | ${title}`,20,true);line(period);line(`Generated ${new Date().toISOString()} | Confidential`);const insight=reportInsights(key,rows);
  for(const m of insight.metrics)line(`${m.label}: ${m.money?"R ":""}${m.value.toLocaleString("en-ZA")}`,12,true);
  line(insight.chartTitle,12,true);const max=insight.chartTitle.includes("(%)")?100:Math.max(1,...insight.bars.map(b=>Math.abs(b.value)));for(const b of insight.bars.slice(0,20)){line(`${b.label}: ${b.value.toLocaleString("en-ZA")}`);if(y<50){page=pdf.addPage([842,595]);y=550;}page.drawRectangle({x:35,y:y+5,width:Math.max(1,Math.abs(b.value)/max*400),height:6,color:rgb(1,.32,0)});y-=8;}
