@@ -49,7 +49,7 @@ services:
       - traefik.http.routers.stor24-crm.rule=Host(`${APP_HOST:-portal.stor24.co.za}`)
       - traefik.http.routers.stor24-crm.entrypoints=websecure
       - traefik.http.routers.stor24-crm.tls=true
-      - traefik.http.routers.stor24-crm.tls.certresolver=mytlschallenge
+      - traefik.http.routers.stor24-crm.tls.certresolver=${STOR24_CERT_RESOLVER:-mytlschallenge}
       - traefik.http.services.stor24-crm.loadbalancer.server.port=3000
       # Preserve API/webhook delivery on the previous hostname during migration.
       - traefik.http.routers.stor24-crm-legacy.rule=Host(`stor24-site.srv938083.hstgr.cloud`)
