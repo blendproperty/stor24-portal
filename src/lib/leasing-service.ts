@@ -1,4 +1,5 @@
 import {publicInitialRent} from "./public-initial-rent";
+import { unitSupportsProduct } from "@/lib/product-line";
 import { releaseLeadBookingStage } from "@/lib/lead-booking-stage";
 import { requireOperationalUnit } from "@/lib/floor-availability-service";
 import { unitIsOperational, floorMapSelection } from "@/lib/floor-availability";
@@ -306,6 +307,7 @@ export async function createReservation(
         facilityId: data.facilityId,
         status: "AVAILABLE",
       },
+      include: { unitType: true, mapElements: floorMapSelection },
     });
     const customer = await requireLeasingCustomer(scope, data.customerId, tx);
     if (data.leadId) await tx.$queryRaw`SELECT "id" FROM "Lead" WHERE "id" = ${data.leadId} FOR UPDATE`;
@@ -320,7 +322,9 @@ export async function createReservation(
       : null;
     if (!unit || !customer || (data.leadId && !lead))
       throw new Error("CONFLICT");
-    const entity = await tx.reservation.create({ data });
+    const productLine = lead?.productLine === "MICRO_WAREHOUSE" ? "MICRO_WAREHOUSE" : "STORAGE";
+    if (productLine === "MICRO_WAREHOUSE" && !unitSupportsProduct(unit, productLine)) throw new Error("CONFLICT");
+    const entity = await tx.reservation.create({ data: { ...data, productLine, businessDetails: lead?.businessDetails ?? undefined } });
     await tx.unit.update({
       where: { id: unit.id },
       data: { status: "RESERVED" },
@@ -673,6 +677,8 @@ export async function moveIn(
         facilityId: input.facilityId,
         customerId: customer.id,
         accountId: account.id,
+        productLine: reservation?.productLine ?? "STORAGE",
+        businessDetails: reservation?.businessDetails ?? undefined,
         status: "DRAFT",
         startDate: input.startDate,
         paymentMethod: input.paymentMethod,

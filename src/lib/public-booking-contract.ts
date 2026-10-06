@@ -10,6 +10,8 @@ export const publicReservationSchema = z.object({
     productId: z.string().trim().cuid(),
     quantity: z.number().int().min(1).max(100),
   })).max(30).optional(),
+  productLine: z.enum(["STORAGE", "MICRO_WAREHOUSE"]).default("STORAGE"),
+  businessDetails: z.object({ companyName: z.string().trim().max(150), registrationNumber: z.string().trim().max(80).optional(), taxNumber: z.string().trim().max(80).optional(), intendedUse: z.string().trim().max(500).optional() }).optional(),
   firstName: z.string().trim().min(1).max(100),
   lastName: z.string().trim().min(1).max(100),
   email: z.email().transform((value) => value.trim().toLowerCase()),
@@ -29,6 +31,7 @@ export const publicReservationSchema = z.object({
   websitePath: z.string().trim().max(300).optional(),
   honeypot: z.string().max(0).optional(),
 }).superRefine((value, context) => {
+  if (value.productLine === "MICRO_WAREHOUSE" && !value.businessDetails?.companyName) context.addIssue({ code: "custom", path: ["businessDetails", "companyName"], message: "Enter your business name." });
   if (value.storagePackageId && value.customPackageItems?.length) {
     context.addIssue({ code: "custom", path: ["customPackageItems"], message: "Choose a package or build your own, not both." });
   }
@@ -37,7 +40,7 @@ export const publicReservationSchema = z.object({
   }
 });
 
-export type PublicReservationInput = z.infer<typeof publicReservationSchema>;
+export type PublicReservationInput = Omit<z.infer<typeof publicReservationSchema>, "productLine"> & { productLine?: "STORAGE" | "MICRO_WAREHOUSE" };
 
 export function secureKeyMatches(provided: string | null, configured: string | undefined) {
   if (!provided || !configured || configured.length < 32) return false;

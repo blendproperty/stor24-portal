@@ -215,7 +215,7 @@ export async function PATCH(
       const current = (await (model as typeof db.unit).findFirst({
         where: { id: body.id },
         include: { facility: true },
-      } as never)) as { id: string; facilityId: string; number?: string } | null;
+      } as never)) as { id: string; facilityId: string; number?: string; useTypes?: string[]; useTypesOverride?: string[]; businessAttributes?: unknown; businessAttributesOverride?: unknown } | null;
       if (!current) throw new Error("NOT_FOUND");
       await requireFacility(scope, current.facilityId);
       const parent = parsed.data as { facilityId?: string };
@@ -316,14 +316,14 @@ export async function PATCH(
             where: { unitId: current.id },
             data: { label: nextNumber },
           });
-          await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "units.updated", entityType: "units", entityId: current.id, before: auditBefore, after: auditAfter } });
+          await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "units.updated", entityType: "units", entityId: current.id, before: { ...auditBefore, useTypesOverride: current.useTypesOverride, businessAttributesOverride: JSON.stringify(current.businessAttributesOverride ?? null) }, after: { ...auditAfter, useTypesOverride: updated.useTypesOverride, businessAttributesOverride: JSON.stringify(updated.businessAttributesOverride) } } });
           return updated;
         });
         return Response.json({ data: entity });
       } else if (resource === "unit-types") {
         const updated = await db.$transaction(async tx => {
           const saved = await tx.unitType.update({ where: { id: current.id }, data });
-          await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "unit-types.updated", entityType: "unit-types", entityId: current.id } });
+          await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "unit-types.updated", entityType: "unit-types", entityId: current.id, before: { useTypes: current.useTypes, businessAttributes: JSON.stringify(current.businessAttributes ?? null) }, after: { useTypes: saved.useTypes, businessAttributes: JSON.stringify(saved.businessAttributes) } } });
           return saved;
         });
         return Response.json({ data: updated });
@@ -349,7 +349,7 @@ export async function PATCH(
       } else {
         entity = await db.$transaction(async tx => {
           const saved = await tx.unit.update({ where: { id: current.id }, data });
-          await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "units.updated", entityType: "units", entityId: current.id } });
+          await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "units.updated", entityType: "units", entityId: current.id, before: { useTypesOverride: current.useTypesOverride, businessAttributesOverride: JSON.stringify(current.businessAttributesOverride ?? null) }, after: { useTypesOverride: saved.useTypesOverride, businessAttributesOverride: JSON.stringify(saved.businessAttributesOverride) } } });
           return saved;
         });
         return Response.json({ data: entity });

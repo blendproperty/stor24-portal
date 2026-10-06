@@ -1,4 +1,5 @@
 import {newPublicInitialRent,publicInitialRent,publicCheckoutTotal} from "./public-initial-rent";
+import { unitSupportsProduct } from "@/lib/product-line";
 import { releaseLeadBookingStage } from "@/lib/lead-booking-stage";
 import { newIdentityAccess } from "@/lib/identity-document-security";
 import type { Prisma } from "@/generated/prisma/client";
@@ -210,7 +211,7 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
     include: reservationInclude,
   });
   if (existing) {
-    if (existing.facility.publicSlug !== input.facilitySlug)
+    if (existing.facility.publicSlug !== input.facilitySlug || existing.productLine !== (input.productLine ?? "STORAGE") || existing.unitId !== input.unitId)
       throw new PublicBookingError("IDEMPOTENCY_CONFLICT", 409);
     return {
       ...reservationResult(existing),
@@ -240,9 +241,9 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
       }
       const unit = await tx.unit.findFirst({
         where: { id: input.unitId, facilityId: facility.id },
-        include: { unitType: true },
+        include: { unitType: true, mapElements: { select: { map: { select: { name: true } } } } },
       });
-      if (!unit || unit.status !== "AVAILABLE")
+      if (!unit || unit.status !== "AVAILABLE" || !unitSupportsProduct(unit, input.productLine ?? "STORAGE"))
         throw new PublicBookingError("UNIT_UNAVAILABLE", 409);
 
       const claimed = await tx.unit.updateMany({
@@ -269,11 +270,13 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
       const source = input.journey === "VIEWING" ? "PUBLIC_VIEWING" : "PUBLIC_WEBSITE";
       const consent = bookingPreferenceRecord(input.communicationConsent, input.privacyNoticeVersion, source);
       let customer = verificationEnabled ? null : await tx.customer.findFirst({ where: { organisationId: facility.organisationId, email: { equals: input.email, mode: "insensitive" } }, orderBy: { updatedAt: "desc" } });
-      if (!customer) customer = await tx.customer.create({ data: { organisationId: facility.organisationId, type: "INDIVIDUAL", firstName: input.firstName, lastName: input.lastName, email: input.email, phone: normalizeTwilioRecipient(input.phone) ?? input.phone, communicationConsent: consent } });
+      if (!customer) customer = await tx.customer.create({ data: { organisationId: facility.organisationId, type: input.productLine === "MICRO_WAREHOUSE" ? "BUSINESS" : "INDIVIDUAL", companyName: input.businessDetails?.companyName, taxNumber: input.businessDetails?.taxNumber, firstName: input.firstName, lastName: input.lastName, email: input.email, phone: normalizeTwilioRecipient(input.phone) ?? input.phone, communicationConsent: consent } });
 
       const lead = await tx.lead.create({
         data: {
           facilityId: facility.id,
+          productLine: input.productLine ?? "STORAGE",
+          businessDetails: input.businessDetails,
           customerId: customer.id,
           desiredUnitTypeId: unit.unitTypeId,
           stage: input.journey === "VIEWING" ? "VIEWING_BOOKED" : "RESERVED",
@@ -291,6 +294,8 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
       const created = await tx.reservation.create({
         data: {
           facilityId: facility.id,
+          productLine: input.productLine ?? "STORAGE",
+          businessDetails: input.businessDetails,
           customerId: customer.id,
           leadId: lead.id,
           unitId: unit.id,

@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import { readFile, mkdir } from "node:fs/promises";
 import assert from "node:assert/strict";
 
-const type={id:"type",facilityId:"store",name:"Synthetic type",widthMetres:null,lengthMetres:null,areaSqMetres:"9",features:[]};
+const type={id:"type",facilityId:"store",name:"Synthetic type",widthMetres:null,lengthMetres:null,areaSqMetres:"9",features:[],useTypes:["STORAGE"]};
 const unit={id:"unit",facilityId:"store",unitTypeId:"type",number:"T01",floor:"First",zone:null,status:"AVAILABLE",monthlyRate:"100",taxRate:"0.15",accountId:"account",unitType:type,mapElements:[]};
 const facility={id:"store",name:"Synthetic store",code:"SYN",closedFloors:["First"],maps:[],unitTypes:[type],units:[unit]};
 const css=(await Promise.all(["src/app/globals.css","src/styles/stor24-brand.css","src/styles/staff-workspace.css"].map(p=>readFile(p,"utf8")))).join("\n").replace('@import "tailwindcss";',"");
@@ -16,7 +16,7 @@ try{for(const width of [1440,390,320]){
  page.on("pageerror",e=>errors.push(e.message));
  await page.route("**/api/v1/leasing/**",route=>{
   const resource=new URL(route.request().url()).pathname.split("/").at(-1);methods.push(route.request().method());
-  if(route.request().method()==="POST")return route.fulfill({status:201,json:{data:{...type,id:"new-type",name:"New synthetic type"}}});
+  if(route.request().method()==="POST")return route.fulfill({status:201,json:{data:{...type,...route.request().postDataJSON(),id:"new-type"}}});
   if(mode==="network")return route.abort();
   if(mode==="hold"){pending.push(route);return;}
   if(["401","403","500"].includes(mode)&&resource==="units")return route.fulfill({status:Number(mode),json:{error:{message:"Synthetic"}}});

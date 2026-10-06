@@ -547,7 +547,7 @@ test("reservation PATCH rolls back quote when audit fails and retains floor guar
 
 test("unit PATCH rolls back number map and rate when audit fails", async () => {
   const state = fixture(); state.grant("inventory.manage");
-  const unit: Row = { id: "unit-a", facilityId: "a", number: "Before", monthlyRate: 100, occupancies: [], reservations: [] };
+  const unit: Row = { id: "unit-a", facilityId: "a", number: "Before", monthlyRate: 100, useTypesOverride: [], businessAttributesOverride: null, occupancies: [], reservations: [] };
   state.tables.unit.push(unit);
   const map = { label: "Before" };
   state.db.unit.findFirst = async ({ where }: Row) => where.id === unit.id ? unit : null;
@@ -560,7 +560,7 @@ test("unit PATCH rolls back number map and rate when audit fails", async () => {
   const patch = (data: Row) => api.PATCH(request("PATCH", { id: unit.id, data }), context("units"));
   assert.equal((await patch({ number: "After", monthlyRate: 200 })).status, 500); assert.equal(unit.number, "Before"); assert.equal(map.label, "Before"); assert.equal(unit.monthlyRate, 100);
   fail = false; assert.equal((await patch({ number: "After", monthlyRate: 200 })).status, 200); assert.equal(map.label, "After"); assert.equal(audits.length, 1);
-  assert.deepEqual(audits[0].before, { number: "Before" }); assert.deepEqual(audits[0].after, { number: "After", mapLabelSynchronized: true });
+  assert.deepEqual(audits[0].before, { number: "Before", useTypesOverride: [], businessAttributesOverride: "null" }); assert.deepEqual(audits[0].after, { number: "After", mapLabelSynchronized: true, useTypesOverride: [], businessAttributesOverride: "null" });
   fail = true; assert.equal((await patch({ monthlyRate: 300 })).status, 500); assert.equal(unit.monthlyRate, 200);
   fail = false; assert.equal((await patch({ monthlyRate: 300 })).status, 200); assert.equal(audits.length, 2);
   assert.equal((await patch({ status: "OCCUPIED" })).status, 409);
