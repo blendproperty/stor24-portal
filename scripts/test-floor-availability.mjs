@@ -51,11 +51,11 @@ try {
     await page.evaluate(() => document.fonts.ready);
     await section.screenshot({ path: `output/floor-availability/${width}.png` });
   }
-  await page.locator(".inventory-toolbar select").nth(2).selectOption("AVAILABLE");
+  await page.locator(".inventory-toolbar").getByLabel("Status", {exact:true}).selectOption("AVAILABLE");
   await expect(page.locator(".data-table tbody tr")).toHaveCount(1);
-  await page.locator(".inventory-toolbar select").nth(2).selectOption("UNDER_CONSTRUCTION");
+  await page.locator(".inventory-toolbar").getByLabel("Status", {exact:true}).selectOption("UNDER_CONSTRUCTION");
   await expect(page.locator(".data-table tbody tr")).toHaveCount(2);
-  await page.locator(".inventory-toolbar select").nth(2).selectOption("");
+  await page.locator(".inventory-toolbar").getByLabel("Status", {exact:true}).selectOption("");
   const first = page.getByRole("switch", { name: "First Floor operational" });
   await first.focus(); await page.keyboard.press("Space");
   await expect(first).toHaveAttribute("aria-checked", "true");
@@ -68,3 +68,4 @@ try {
   assert.equal(writes, 3); assert.deepEqual(errors, []);
   console.log("PASS: inventory floor switches, counts, independent floors, persistence, keyboard, denied-save state, 1440/390/320px. Synthetic API only.");
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
+
