@@ -51,13 +51,17 @@ services:
       - traefik.http.routers.stor24-crm.tls=true
       - traefik.http.routers.stor24-crm.tls.certresolver=${STOR24_CERT_RESOLVER:-mytlschallenge}
       - traefik.http.services.stor24-crm.loadbalancer.server.port=3000
-      # Preserve API/webhook delivery on the previous hostname during migration.
+      # Match the socket peer, never caller-supplied forwarding headers.
+      - traefik.http.middlewares.stor24-crm-origin.ipallowlist.sourcerange=173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,2400:cb00::/32,2606:4700::/32,2803:f800::/32,2405:b500::/32,2405:8100::/32,2a06:98c0::/29,2c0f:f248::/32
+      - traefik.http.routers.stor24-crm.middlewares=stor24-crm-origin
+      # Only exact POST provider callbacks bypass the legacy origin guard.
       - traefik.http.routers.stor24-crm-legacy.rule=Host(`stor24-site.srv938083.hstgr.cloud`)
       - traefik.http.routers.stor24-crm-legacy.entrypoints=websecure
       - traefik.http.routers.stor24-crm-legacy.tls=true
       - traefik.http.routers.stor24-crm-legacy.tls.certresolver=mytlschallenge
       - traefik.http.routers.stor24-crm-legacy.service=stor24-crm
-      - traefik.http.routers.stor24-crm-navigation.rule=Host(`stor24-site.srv938083.hstgr.cloud`) && (Method(`GET`) || Method(`HEAD`)) && !PathPrefix(`/api/`)
+      - traefik.http.routers.stor24-crm-legacy.middlewares=stor24-crm-origin
+      - traefik.http.routers.stor24-crm-navigation.rule=Host(`stor24-site.srv938083.hstgr.cloud`) && (Method(`GET`) || Method(`HEAD`))
       - traefik.http.routers.stor24-crm-navigation.entrypoints=websecure
       - traefik.http.routers.stor24-crm-navigation.tls=true
       - traefik.http.routers.stor24-crm-navigation.tls.certresolver=mytlschallenge
@@ -67,6 +71,12 @@ services:
       - traefik.http.middlewares.stor24-portal-domain.redirectregex.regex=^https://stor24-site[.]srv938083[.]hstgr[.]cloud/(.*)
       - traefik.http.middlewares.stor24-portal-domain.redirectregex.replacement=https://portal.stor24.co.za/$${1}
       - traefik.http.middlewares.stor24-portal-domain.redirectregex.permanent=true
+      - traefik.http.routers.stor24-crm-callbacks.rule=Host(`stor24-site.srv938083.hstgr.cloud`) && Method(`POST`) && (Path(`/api/webhooks/netcash`) || Path(`/api/webhooks/netcash/mandate`) || Path(`/api/webhooks/twilio/status`) || Path(`/api/webhooks/twilio/inbound`) || Path(`/api/webhooks/blendsign`) || PathRegexp(`^/api/v1/webhooks/inbound/[A-Za-z0-9_-]+$`))
+      - traefik.http.routers.stor24-crm-callbacks.entrypoints=websecure
+      - traefik.http.routers.stor24-crm-callbacks.tls=true
+      - traefik.http.routers.stor24-crm-callbacks.tls.certresolver=mytlschallenge
+      - traefik.http.routers.stor24-crm-callbacks.service=stor24-crm
+      - traefik.http.routers.stor24-crm-callbacks.priority=200
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
       interval: 30s
