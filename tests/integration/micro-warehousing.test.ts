@@ -13,8 +13,8 @@ test("isolated shared Micro Warehousing inventory and concurrent allocation", as
   const key = randomUUID();
   const org = await db.organisation.create({ data: { name: "MW isolated fixture", slug: key } });
   const facility = await db.facility.create({ data: { organisationId: org.id, name: "MW fixture", code: key, publicSlug: key, publicBookingEnabled: true } });
-  const type = await db.unitType.create({ data: { facilityId: facility.id, name: "Shared", useTypes: ["STORAGE", "MICRO_WAREHOUSE"] } });
-  const shared = await db.unit.create({ data: { facilityId: facility.id, unitTypeId: type.id, number: "G1", floor: "Ground Floor", monthlyRate: 100 } });
+  const type = await db.unitType.create({ data: { facilityId: facility.id, name: "Shared", businessAttributes: {hasPower:true,doorWidthMm:2500}, useTypes: ["STORAGE", "MICRO_WAREHOUSE"] } });
+  const shared = await db.unit.create({ data: { facilityId: facility.id, unitTypeId: type.id, number: "G1", businessAttributesOverride: {hasPower:false,doorHeightMm:2800}, floor: "Ground Floor", monthlyRate: 100 } });
   const storage = await db.unit.create({ data: { facilityId: facility.id, unitTypeId: type.id, number: "G2", floor: "Ground Floor", monthlyRate: 100, useTypesOverride: ["STORAGE"] } });
   const upper = await db.unit.create({ data: { facilityId: facility.id, unitTypeId: type.id, number: "F1", floor: "First Floor", monthlyRate: 100 } });
   await db.facilityMap.create({ data: { facilityId: facility.id, name: "Ground Floor", elements: { create: [shared, storage].map((u, i) => ({ unitId: u.id, type: "UNIT" as const, x: i * 30, y: 0, width: 30, height: 30 })) } } });
@@ -23,6 +23,7 @@ test("isolated shared Micro Warehousing inventory and concurrent allocation", as
   const payload = (unitId: string, productLine: "STORAGE" | "MICRO_WAREHOUSE") => ({ facilitySlug: key, unitId, productLine, firstName: "CI", lastName: "Only", email: `${randomUUID()}@example.invalid`, phone: "0000000000", journey: "RENTAL" as const, idempotencyKey: randomUUID(), communicationConsent: { email: false, sms: false, phone: false, whatsapp: false }, businessDetails: { companyName: "CI business" } });
   try {
     const before = await (await inventory(request("MICRO_WAREHOUSE"), { params: Promise.resolve({ slug: key }) })).json();
+    assert.deepEqual(before.data.units[0].type.businessAttributes,{hasPower:false,doorWidthMm:2500,doorHeightMm:2800});
     assert.deepEqual(before.data.units.map((u: { id: string }) => u.id), [shared.id]);
     assert.deepEqual(before.data.maps.map((m: { name: string }) => m.name), ["Ground Floor"]);
     assert.deepEqual(before.data.maps[0].elements.map((e: { unit: { id: string } }) => e.unit.id), [shared.id]);

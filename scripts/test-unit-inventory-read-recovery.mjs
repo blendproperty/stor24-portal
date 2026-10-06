@@ -16,7 +16,7 @@ try{for(const width of [1440,390,320]){
  page.on("pageerror",e=>errors.push(e.message));
  await page.route("**/api/v1/leasing/**",route=>{
   const resource=new URL(route.request().url()).pathname.split("/").at(-1);methods.push(route.request().method());
-  if(route.request().method()==="POST")return route.fulfill({status:201,json:{data:{...type,id:"new-type",name:"New synthetic type"}}});
+  if(route.request().method()==="POST")return route.fulfill({status:201,json:{data:{...type,...route.request().postDataJSON(),id:"new-type"}}});
   if(mode==="network")return route.abort();
   if(mode==="hold"){pending.push(route);return;}
   if(["401","403","500"].includes(mode)&&resource==="units")return route.fulfill({status:Number(mode),json:{error:{message:"Synthetic"}}});

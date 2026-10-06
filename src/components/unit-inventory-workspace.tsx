@@ -28,12 +28,14 @@ type UnitType = {
   widthMetres: string | null;
   lengthMetres: string | null;
   areaSqMetres: string | null;
+  businessAttributes?: unknown;
   useTypes?: string[];
   features: string[];
 };
 type Unit = {
   id: string;
   facilityId: string;
+  businessAttributesOverride?: unknown;
   useTypesOverride?: string[];
   unitTypeId: string;
   number: string;
@@ -80,9 +82,9 @@ type UatResetPreview = {
 };
 
 const decimalRead = z.string().refine(value => value.trim() !== "" && Number.isFinite(Number(value)));
-const typeRead = z.object({ id: z.string().min(1), facilityId: z.string().min(1), name: z.string(), widthMetres: decimalRead.nullable(), lengthMetres: decimalRead.nullable(), areaSqMetres: decimalRead.nullable(), useTypes: z.array(z.string()).optional(), features: z.array(z.string()) });
+const typeRead = z.object({ id: z.string().min(1), facilityId: z.string().min(1), name: z.string(), widthMetres: decimalRead.nullable(), lengthMetres: decimalRead.nullable(), areaSqMetres: decimalRead.nullable(), businessAttributes: z.record(z.string(),z.union([z.string(),z.number(),z.boolean()])).nullable().optional(), useTypes: z.array(z.string()).optional(), features: z.array(z.string()) });
 const facilityRead = z.object({ id: z.string().min(1), name: z.string(), code: z.string(), closedFloors: z.array(z.string()).optional(), maps: z.array(z.object({ name: z.string() })).optional() });
-const unitRead = z.object({ id: z.string().min(1), facilityId: z.string().min(1), useTypesOverride: z.array(z.string()).optional(), unitTypeId: z.string().min(1), number: z.string(), floor: z.string().nullable(), zone: z.string().nullable(), status: z.string().min(1), monthlyRate: decimalRead, taxRate: decimalRead, unitType: typeRead, mapElements: z.array(z.object({ map: z.object({ name: z.string() }) })).optional() });
+const unitRead = z.object({ id: z.string().min(1), facilityId: z.string().min(1), businessAttributesOverride: z.record(z.string(),z.union([z.string(),z.number(),z.boolean()])).nullable().optional(), useTypesOverride: z.array(z.string()).optional(), unitTypeId: z.string().min(1), number: z.string(), floor: z.string().nullable(), zone: z.string().nullable(), status: z.string().min(1), monthlyRate: decimalRead, taxRate: decimalRead, unitType: typeRead, mapElements: z.array(z.object({ map: z.object({ name: z.string() }) })).optional() });
 
 const editableStatuses = ["AVAILABLE", "SERVICE", "UNAVAILABLE"];
 const statusLabel = (status: string) =>
@@ -334,6 +336,7 @@ export function UnitInventoryWorkspace({
           widthMetres: width || undefined,
           lengthMetres: length || undefined,
           areaSqMetres: area || undefined,
+          businessAttributes: readBusinessAttributes(form),
           useTypes: String(form.get("useTypes") || "STORAGE").split(","),
           features: String(form.get("features") ?? "")
             .split(",")
@@ -342,6 +345,7 @@ export function UnitInventoryWorkspace({
         }
       : {
           facilityId: targetFacility,
+          businessAttributesOverride: readBusinessAttributes(form),
           useTypesOverride: String(form.get("useTypesOverride") || "").split(",").filter(Boolean),
           unitTypeId: form.get("unitTypeId"),
           number: form.get("number"),
@@ -381,6 +385,7 @@ export function UnitInventoryWorkspace({
           if (value === undefined) return true;
           if (numeric.has(key)) return ["string", "number"].includes(typeof saved[key]) && String(saved[key]).trim() !== "" && Number.isFinite(Number(saved[key])) && Number(saved[key]) === Number(value);
           if (Array.isArray(value)) return Array.isArray(saved[key]) && JSON.stringify(saved[key]) === JSON.stringify(value);
+          if (value && typeof value === "object") return saved[key] && typeof saved[key] === "object" && !Array.isArray(saved[key]) && Object.keys(saved[key]).length === Object.keys(value).length && Object.entries(value).every(([field, expected]) => saved[key][field] === expected);
           return saved[key] === (typeof value === "string" ? value.trim() : value);
         });
       if (!response.ok || !matching) throw new Error("Unconfirmed inventory save");
@@ -1219,6 +1224,7 @@ function InventoryDialog({
                 ) : null}
               </label>
               <label>Product eligibility<select name="useTypes" defaultValue={editingType?.useTypes?.join(",") || "STORAGE"}><option value="STORAGE">Self-Storage only</option><option value="MICRO_WAREHOUSE">Micro Warehousing only</option><option value="STORAGE,MICRO_WAREHOUSE">Both</option></select></label>
+              <BusinessAttributesFields value={editingType?.businessAttributes}/>
               <Field
                 name="features"
                 label="Features (comma separated)"
@@ -1250,6 +1256,7 @@ function InventoryDialog({
                 required
               />
               <label>Unit product eligibility<select name="useTypesOverride" defaultValue={editingUnit?.useTypesOverride?.join(",") || ""}><option value="">Use unit type default</option><option value="STORAGE">Self-Storage only</option><option value="MICRO_WAREHOUSE">Micro Warehousing only</option><option value="STORAGE,MICRO_WAREHOUSE">Both</option></select><small>Micro Warehousing is offered on the ground floor only. Existing bookings retain their product.</small></label>
+              <BusinessAttributesFields value={editingUnit?.businessAttributesOverride} override/>
               <Field name="floor" label="Floor" value={editingUnit?.floor} />
               <Field
                 name="zone"
@@ -1374,4 +1381,21 @@ function Field({
       <input defaultValue={value ?? ""} {...props} />
     </label>
   );
+}
+
+const businessBooleanFields=[['hasPower','Power available'],['hasLighting','Lighting available'],['driveUpAccess','Drive-up access']] as const;
+const businessNumberFields=[['doorWidthMm','Door width (mm)'],['doorHeightMm','Door height (mm)'],['ceilingHeightMm','Ceiling height (mm)'],['distanceToLoadingBayM','Distance to loading bay (m)'],['palletCapacityEstimate','Estimated pallet capacity']] as const;
+function readBusinessAttributes(form:FormData){
+ const data:Record<string,string|number|boolean>={};
+ for(const [key] of businessBooleanFields){const value=form.get(`mw_${key}`);if(value==='true'||value==='false')data[key]=value==='true';}
+ for(const [key] of businessNumberFields){const value=String(form.get(`mw_${key}`)||'').trim();if(value)data[key]=Number(value);}
+ for(const key of ['powerSpec','doorType']){const value=String(form.get(`mw_${key}`)||'').trim();if(value)data[key]=value;}
+ return data;
+}
+function BusinessAttributesFields({value:raw,override=false}:{value?:unknown;override?:boolean}){
+ const value=raw && typeof raw==='object' && !Array.isArray(raw)?raw as Record<string,string|number|boolean>:{};
+ return <details className="inventory-form-wide"><summary>Business space details {override?'(unit overrides)':''}</summary><p>Record confirmed physical details only. Blank fields inherit the unit type or remain unconfirmed.</p><div className="inventory-form">
+ {businessBooleanFields.map(([key,label])=><label key={key}>{label}<select name={`mw_${key}`} defaultValue={value?.[key]===undefined?'':String(value[key])}><option value="">Not recorded / inherit</option><option value="true">Yes — confirmed</option><option value="false">No</option></select></label>)}
+ {businessNumberFields.map(([key,label])=><label key={key}>{label}<input name={`mw_${key}`} type="number" min="0" step="1" defaultValue={value?.[key]===undefined?'':String(value[key])}/></label>)}
+ <label>Power specification<input name="mw_powerSpec" maxLength={200} defaultValue={String(value?.powerSpec||'')}/></label><label>Door type<input name="mw_doorType" maxLength={100} defaultValue={String(value?.doorType||'')}/></label></div></details>
 }

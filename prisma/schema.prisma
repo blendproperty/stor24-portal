@@ -313,6 +313,7 @@ model UnitType {
   widthMetres  Decimal? @db.Decimal(8, 2)
   lengthMetres Decimal? @db.Decimal(8, 2)
   areaSqMetres Decimal? @db.Decimal(8, 2)
+  businessAttributes Json?
   useTypes     String[] @default(["STORAGE"])
   features     String[]
   units        Unit[]
@@ -324,6 +325,7 @@ model UnitType {
 }
 
 model Unit {
+  businessAttributesOverride Json?
   useTypesOverride String[] @default([])
   id                  String               @id @default(cuid())
   facilityId          String

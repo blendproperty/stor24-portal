@@ -7,8 +7,10 @@ import {
 } from "@/lib/public-booking-contract";
 
 import { productLineFromRequest, unitSupportsProduct } from "@/lib/product-line";
+import { businessAttributesSchema } from "@/lib/validators";
 const noStore = { "cache-control": "private, no-store, max-age=0" };
 const publicStoreKeys = [
+  "hasLoadingBay", "hasForkliftOrTrolleys", "hasWifi", "hasBusinessParking", "acceptsDeliveries", "hasMeetingSpace", "vehicleAccess", "deliveryRules", "mwNotes",
   "dbaName", "address1", "address2", "city", "province", "postalCode", "country",
   "phone", "email", "websiteUrl", "directions", "latitude", "longitude",
   "weekdayClosed", "weekdayStart", "weekdayEnd", "saturdayClosed", "saturdayStart",
@@ -57,9 +59,9 @@ export async function GET(
       units: {
         select: {
           mapElements: floorMapSelection,
-          useTypesOverride: true, id: true, number: true, floor: true, zone: true, status: true,
+          businessAttributesOverride: true, useTypesOverride: true, id: true, number: true, floor: true, zone: true, status: true,
           monthlyRate: true, taxRate: true,
-          unitType: { select: { useTypes: true, name: true, widthMetres: true, lengthMetres: true, areaSqMetres: true, features: true } },
+          unitType: { select: { businessAttributes: true, useTypes: true, name: true, widthMetres: true, lengthMetres: true, areaSqMetres: true, features: true } },
         },
         orderBy: { number: "asc" },
       },
@@ -72,8 +74,8 @@ export async function GET(
               rotation: true, label: true, config: true, sortOrder: true,
               unit: {
                 select: {
-                  useTypesOverride: true, id: true, number: true, floor: true, status: true, monthlyRate: true, taxRate: true,
-                  unitType: { select: { useTypes: true, name: true, widthMetres: true, lengthMetres: true, areaSqMetres: true, features: true } },
+                  businessAttributesOverride: true, useTypesOverride: true, id: true, number: true, floor: true, status: true, monthlyRate: true, taxRate: true,
+                  unitType: { select: { businessAttributes: true, useTypes: true, name: true, widthMetres: true, lengthMetres: true, areaSqMetres: true, features: true } },
                 },
               },
             },
@@ -115,6 +117,7 @@ export async function GET(
       lengthMetres: unit.unitType.lengthMetres ? Number(unit.unitType.lengthMetres.toString()) : null,
       areaSqMetres: unit.unitType.areaSqMetres ? Number(unit.unitType.areaSqMetres.toString()) : null,
       features: unit.unitType.features,
+      businessAttributes: product === "MICRO_WAREHOUSE" ? { ...(businessAttributesSchema.safeParse(unit.unitType.businessAttributes).data || {}), ...(businessAttributesSchema.safeParse(unit.businessAttributesOverride).data || {}) } : undefined,
     },
   });
 
