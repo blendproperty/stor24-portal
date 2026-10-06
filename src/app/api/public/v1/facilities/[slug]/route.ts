@@ -1,4 +1,4 @@
-import { floorIsOperational, unitIsOperational, floorMapSelection, facilityFloorKeys, floorLabel } from "@/lib/floor-availability";
+import { floorIsOperational, unitIsOperational, floorMapSelection, facilityFloorKeys, floorLabel, floorKey } from "@/lib/floor-availability";
 import { db } from "@/lib/db";
 import {
   publicApiAuthorized,
@@ -6,6 +6,7 @@ import {
   publicElementConfig,
 } from "@/lib/public-booking-contract";
 
+import { productLineFromRequest, unitSupportsProduct } from "@/lib/product-line";
 const noStore = { "cache-control": "private, no-store, max-age=0" };
 const publicStoreKeys = [
   "dbaName", "address1", "address2", "city", "province", "postalCode", "country",
@@ -37,6 +38,8 @@ export async function GET(
 ) {
   if (!publicApiAuthorized(request))
     return Response.json({ error: { code: "UNAUTHENTICATED", message: "Request rejected." } }, { status: 401 });
+  const product = productLineFromRequest(request);
+  if (!product) return Response.json({ error: { code: "INVALID_PRODUCT" } }, { status: 400 });
   const { slug } = await context.params;
   const facility = await db.facility.findFirst({
     where: { publicSlug: slug.toLowerCase(), active: true, publicBookingEnabled: true },
@@ -54,9 +57,9 @@ export async function GET(
       units: {
         select: {
           mapElements: floorMapSelection,
-          id: true, number: true, floor: true, zone: true, status: true,
+          useTypesOverride: true, id: true, number: true, floor: true, zone: true, status: true,
           monthlyRate: true, taxRate: true,
-          unitType: { select: { name: true, widthMetres: true, lengthMetres: true, areaSqMetres: true, features: true } },
+          unitType: { select: { useTypes: true, name: true, widthMetres: true, lengthMetres: true, areaSqMetres: true, features: true } },
         },
         orderBy: { number: "asc" },
       },
@@ -69,8 +72,8 @@ export async function GET(
               rotation: true, label: true, config: true, sortOrder: true,
               unit: {
                 select: {
-                  id: true, number: true, floor: true, status: true, monthlyRate: true, taxRate: true,
-                  unitType: { select: { name: true, widthMetres: true, lengthMetres: true, areaSqMetres: true, features: true } },
+                  useTypesOverride: true, id: true, number: true, floor: true, status: true, monthlyRate: true, taxRate: true,
+                  unitType: { select: { useTypes: true, name: true, widthMetres: true, lengthMetres: true, areaSqMetres: true, features: true } },
                 },
               },
             },
@@ -144,13 +147,13 @@ export async function GET(
       priceZar: Number(product.sellingPrice.toString()),
       availableQuantity: Math.max(0, product.quantityOnHand - product.quantityReserved),
     })),
-    units: facility.units.filter(unit => unitIsOperational(unit, facility.closedFloors)).map(unitView),
-    maps: facility.maps.filter(map => floorIsOperational(map.name, facility.closedFloors)).map((map) => ({
+    units: facility.units.filter(unit => unitIsOperational(unit, facility.closedFloors) && unitSupportsProduct(unit, product)).map(unitView),
+    maps: facility.maps.filter(map => floorIsOperational(map.name, facility.closedFloors) && (product !== "MICRO_WAREHOUSE" || floorKey(map.name) === "ground floor")).map((map) => ({
       id: map.id,
       name: map.name,
       width: map.width,
       height: map.height,
-      elements: map.elements.filter(element => !element.unit || floorIsOperational(element.unit.floor, facility.closedFloors)).map((element) => ({
+      elements: map.elements.filter(element => !element.unit || (floorIsOperational(element.unit.floor, facility.closedFloors) && unitSupportsProduct({ ...element.unit, mapElements: [{ map: { name: map.name } }] }, product))).map((element) => ({
         id: element.id,
         type: element.type,
         x: element.x,

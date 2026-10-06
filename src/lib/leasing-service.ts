@@ -672,6 +672,8 @@ export async function moveIn(
         facilityId: input.facilityId,
         customerId: customer.id,
         accountId: account.id,
+        productLine: reservation?.productLine ?? "STORAGE",
+        businessDetails: reservation?.businessDetails ?? undefined,
         status: "DRAFT",
         startDate: input.startDate,
         paymentMethod: input.paymentMethod,

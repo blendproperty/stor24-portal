@@ -57,7 +57,9 @@ export async function createPublicLead(input: PublicLeadInput, ipHash: string) {
       customer = await tx.customer.create({
         data: {
           organisationId: facility.organisationId,
-          type: "INDIVIDUAL",
+          type: input.productLine === "MICRO_WAREHOUSE" ? "BUSINESS" : "INDIVIDUAL",
+          companyName: input.businessDetails?.companyName,
+          taxNumber: input.businessDetails?.taxNumber,
           firstName: input.firstName,
           lastName: input.lastName,
           email: input.email,
@@ -80,6 +82,8 @@ export async function createPublicLead(input: PublicLeadInput, ipHash: string) {
       data: {
         facilityId: facility.id,
         customerId: customer.id,
+        productLine: input.productLine ?? "STORAGE",
+        businessDetails: input.businessDetails,
         stage: "NEW",
         source: "PUBLIC_QUOTE_FORM",
         expectedMoveIn: input.intendedMoveIn,

@@ -9,6 +9,8 @@ import { z } from "zod";
  * creates a Customer + Lead only, not a Reservation.
  */
 export const publicLeadSchema = z.object({
+  productLine: z.enum(["STORAGE", "MICRO_WAREHOUSE"]).default("STORAGE"),
+  businessDetails: z.object({ companyName: z.string().trim().max(150), registrationNumber: z.string().trim().max(80).optional(), taxNumber: z.string().trim().max(80).optional(), intendedUse: z.string().trim().max(500).optional() }).optional(),
   firstName: z.string().trim().min(1).max(100),
   lastName: z.string().trim().min(1).max(100),
   email: z.email().transform((value) => value.trim().toLowerCase()),
@@ -28,4 +30,4 @@ export const publicLeadSchema = z.object({
   honeypot: z.string().max(0).optional(),
 });
 
-export type PublicLeadInput = z.infer<typeof publicLeadSchema>;
+export type PublicLeadInput = Omit<z.infer<typeof publicLeadSchema>, "productLine"> & { productLine?: "STORAGE" | "MICRO_WAREHOUSE" };

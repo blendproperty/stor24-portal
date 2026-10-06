@@ -1,6 +1,7 @@
 "use client";
 
 import { FloorAvailabilityControls } from "@/components/floor-availability-controls";
+import { unitSupportsProduct } from "@/lib/product-line";
 import { unitIsOperational } from "@/lib/floor-availability";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
@@ -27,11 +28,13 @@ type UnitType = {
   widthMetres: string | null;
   lengthMetres: string | null;
   areaSqMetres: string | null;
+  useTypes?: string[];
   features: string[];
 };
 type Unit = {
   id: string;
   facilityId: string;
+  useTypesOverride?: string[];
   unitTypeId: string;
   number: string;
   floor: string | null;
@@ -77,9 +80,9 @@ type UatResetPreview = {
 };
 
 const decimalRead = z.string().refine(value => value.trim() !== "" && Number.isFinite(Number(value)));
-const typeRead = z.object({ id: z.string().min(1), facilityId: z.string().min(1), name: z.string(), widthMetres: decimalRead.nullable(), lengthMetres: decimalRead.nullable(), areaSqMetres: decimalRead.nullable(), features: z.array(z.string()) });
+const typeRead = z.object({ id: z.string().min(1), facilityId: z.string().min(1), name: z.string(), widthMetres: decimalRead.nullable(), lengthMetres: decimalRead.nullable(), areaSqMetres: decimalRead.nullable(), useTypes: z.array(z.string()).optional(), features: z.array(z.string()) });
 const facilityRead = z.object({ id: z.string().min(1), name: z.string(), code: z.string(), closedFloors: z.array(z.string()).optional(), maps: z.array(z.object({ name: z.string() })).optional() });
-const unitRead = z.object({ id: z.string().min(1), facilityId: z.string().min(1), unitTypeId: z.string().min(1), number: z.string(), floor: z.string().nullable(), zone: z.string().nullable(), status: z.string().min(1), monthlyRate: decimalRead, taxRate: decimalRead, unitType: typeRead, mapElements: z.array(z.object({ map: z.object({ name: z.string() }) })).optional() });
+const unitRead = z.object({ id: z.string().min(1), facilityId: z.string().min(1), useTypesOverride: z.array(z.string()).optional(), unitTypeId: z.string().min(1), number: z.string(), floor: z.string().nullable(), zone: z.string().nullable(), status: z.string().min(1), monthlyRate: decimalRead, taxRate: decimalRead, unitType: typeRead, mapElements: z.array(z.object({ map: z.object({ name: z.string() }) })).optional() });
 
 const editableStatuses = ["AVAILABLE", "SERVICE", "UNAVAILABLE"];
 const statusLabel = (status: string) =>
@@ -102,6 +105,7 @@ export function UnitInventoryWorkspace({
   const readRequest = useRef<AbortController | null>(null);
   useEffect(() => () => { readRequest.current?.abort(); readRequest.current = null; }, []);
   const [facilityId, setFacilityId] = useState(initialFacilities[0]?.id ?? "");
+  const [productFilter, setProductFilter] = useState("");
   const [typeId, setTypeId] = useState("");
   const [status, setStatus] = useState("");
   const [query, setQuery] = useState("");
@@ -128,6 +132,7 @@ export function UnitInventoryWorkspace({
   const visible = allUnits.filter(
     (unit) =>
       (!facilityId || unit.facilityId === facilityId) &&
+      (!productFilter || unitSupportsProduct(unit, productFilter === "MICRO_WAREHOUSE" ? "MICRO_WAREHOUSE" : "STORAGE")) &&
       (!typeId || unit.unitTypeId === typeId) &&
       (!status || (status === "UNDER_CONSTRUCTION" ? !unitIsOperational(unit, unit.facility.closedFloors) : unit.status === status && (status !== "AVAILABLE" || unitIsOperational(unit, unit.facility.closedFloors)))) &&
       (!query ||
@@ -329,6 +334,7 @@ export function UnitInventoryWorkspace({
           widthMetres: width || undefined,
           lengthMetres: length || undefined,
           areaSqMetres: area || undefined,
+          useTypes: String(form.get("useTypes") || "STORAGE").split(","),
           features: String(form.get("features") ?? "")
             .split(",")
             .map((item) => item.trim())
@@ -336,6 +342,7 @@ export function UnitInventoryWorkspace({
         }
       : {
           facilityId: targetFacility,
+          useTypesOverride: String(form.get("useTypesOverride") || "").split(",").filter(Boolean),
           unitTypeId: form.get("unitTypeId"),
           number: form.get("number"),
           floor: form.get("floor") || undefined,
@@ -591,6 +598,10 @@ export function UnitInventoryWorkspace({
           </select>
         </label>
         <label>
+          Product
+          <select value={productFilter} onChange={e=>setProductFilter(e.target.value)}><option value="">All products</option><option value="STORAGE">Self-Storage</option><option value="MICRO_WAREHOUSE">Micro Warehousing (ground floor)</option></select>
+        </label>
+        <label>
           Unit type
           <select
             value={typeId}
@@ -719,7 +730,7 @@ export function UnitInventoryWorkspace({
                         </StatusPill>
                         {!unitIsOperational(unit, unit.facility.closedFloors) && <span className="unit-floor-held">Floor under construction</span>}
                       </td>
-                      <td>{money(unit.monthlyRate)}</td>
+                      <td>{money(unit.monthlyRate)}<small style={{display:"block"}}>{(unit.useTypesOverride?.length ? unit.useTypesOverride : unit.unitType.useTypes ?? ["STORAGE"]).map(p => p === "MICRO_WAREHOUSE" ? "Micro Warehousing" : "Self-Storage").join(" · ")}</small></td>
                       <td>
                         <button
                           className="icon-button"
@@ -1207,6 +1218,7 @@ function InventoryDialog({
                   </small>
                 ) : null}
               </label>
+              <label>Product eligibility<select name="useTypes" defaultValue={editingType?.useTypes?.join(",") || "STORAGE"}><option value="STORAGE">Self-Storage only</option><option value="MICRO_WAREHOUSE">Micro Warehousing only</option><option value="STORAGE,MICRO_WAREHOUSE">Both</option></select></label>
               <Field
                 name="features"
                 label="Features (comma separated)"
@@ -1237,6 +1249,7 @@ function InventoryDialog({
                 value={editingUnit?.number}
                 required
               />
+              <label>Unit product eligibility<select name="useTypesOverride" defaultValue={editingUnit?.useTypesOverride?.join(",") || ""}><option value="">Use unit type default</option><option value="STORAGE">Self-Storage only</option><option value="MICRO_WAREHOUSE">Micro Warehousing only</option><option value="STORAGE,MICRO_WAREHOUSE">Both</option></select><small>Micro Warehousing is offered on the ground floor only. Existing bookings retain their product.</small></label>
               <Field name="floor" label="Floor" value={editingUnit?.floor} />
               <Field
                 name="zone"

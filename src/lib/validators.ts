@@ -96,9 +96,11 @@ export const unitTypeSchema = z.object({
   widthMetres: z.coerce.number().positive().optional(),
   lengthMetres: z.coerce.number().positive().optional(),
   areaSqMetres: z.coerce.number().positive().optional(),
+  useTypes: z.array(z.enum(["STORAGE", "MICRO_WAREHOUSE"])).min(1).max(2).default(["STORAGE"]),
   features: z.array(z.string().trim().min(1).max(80)).max(30).default([]),
 });
 export const unitSchema = z.object({
+  useTypesOverride: z.array(z.enum(["STORAGE", "MICRO_WAREHOUSE"])).max(2).default([]),
   facilityId: id,
   unitTypeId: id,
   number: z.string().trim().min(1).max(40),
