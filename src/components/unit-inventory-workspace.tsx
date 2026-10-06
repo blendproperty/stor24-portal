@@ -679,7 +679,7 @@ export function UnitInventoryWorkspace({
           </label>
         </fieldset>
       </section>
-      {facilityId ? <UnitFacilityMap key={facilityId} facilityId={facilityId} visibleIds={visible.map(u=>u.id)} onEdit={id=>{const unit=allUnits.find(u=>u.id===id);if(unit)setDialog({kind:"unit",unit});}} onRefresh={()=>void refresh()} /> : null}
+      {facilityId ? <UnitFacilityMap key={`unit-map-${facilityId}`} facilityId={facilityId} visibleIds={visible.map(u=>u.id)} onEdit={id=>{const unit=allUnits.find(u=>u.id===id);if(unit)setDialog({kind:"unit",unit});}} onRefresh={()=>void refresh()} /> : null}
       <section className="inventory-layout">
         <div className="panel">
           <div className="table-wrap">
