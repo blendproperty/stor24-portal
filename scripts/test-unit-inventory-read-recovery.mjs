@@ -14,6 +14,7 @@ await new Promise(r=>server.listen(0,"127.0.0.1",r));const browser=await chromiu
 try{for(const width of [1440,390,320]){
  const page=await browser.newPage({viewport:{width,height:900}});let mode="network";const errors=[],methods=[],pending=[];
  page.on("pageerror",e=>errors.push(e.message));
+ await page.route("**/api/v1/facility-map?*",route=>route.fulfill({json:{data:[]}}));
  await page.route("**/api/v1/leasing/**",route=>{
   const resource=new URL(route.request().url()).pathname.split("/").at(-1);methods.push(route.request().method());
   if(route.request().method()==="POST")return route.fulfill({status:201,json:{data:{...type,...route.request().postDataJSON(),id:"new-type"}}});

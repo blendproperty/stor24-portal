@@ -13,6 +13,7 @@ const server=createServer((req,res)=>{res.setHeader("content-type",req.url==="/a
 await new Promise(r=>server.listen(0,"127.0.0.1",r));const browser=await chromium.launch();await mkdir("output/renumber-preview-recovery",{recursive:true});
 try {for(const width of [1440,390,320]) {
  const page=await browser.newPage({viewport:{width,height:900}});let mode="network",requests=0,pending;const errors=[];page.on("pageerror",e=>errors.push(e.message));
+ await page.route("**/api/v1/facility-map?*",route=>route.fulfill({json:{data:[]}}));
  await page.route("**/api/v1/leasing/units/renumber",route=>{
   const body=route.request().postDataJSON();assert.equal(body.action,"preview");assert.equal(body.facilityId,"store");requests++;
   if(mode==="network")return route.abort();if(mode==="hold"){pending=route;return;}
