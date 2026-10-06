@@ -67,7 +67,7 @@ export async function reportPdf(
     bold = font;
   let page = pdf.addPage([842, 595]),
     y = 550;
-  const clean = (s: string) => s.replace(/[\x00-\x1f\x7f]/g, " ");
+  const clean = (s: string) => s.replace(/[\x00-\x1f\x7f\u00a0\u202f]/g, " ");
   const line = (text: string, size = 10, strong = false) => {
     if (y < 45) {
       page = pdf.addPage([842, 595]);
