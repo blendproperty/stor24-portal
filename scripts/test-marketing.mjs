@@ -111,6 +111,7 @@ const css = (
   .join("\n")
   .replace('@import "tailwindcss";', "");
 const requests = [];
+let advertisingFailures = 0;
 const server = createServer(async (req, res) => {
   if (req.url === "/brand/Satoshi-Variable.ttf") {
     res.setHeader("content-type", "font/ttf");
@@ -139,6 +140,11 @@ const server = createServer(async (req, res) => {
   }
   if (req.url.startsWith("/api/v1/marketing/advertising")) {
     res.setHeader("content-type", "application/json");
+    if (advertisingFailures > 0) {
+      advertisingFailures -= 1;
+      res.statusCode = 503;
+      return res.end(JSON.stringify({error:{message:"Synthetic advertising outage"}}));
+    }
     return res.end(JSON.stringify({ data: [
       { provider: "Google Ads", status: "connected", message: "Verified STOR24 campaign fixture", retrievedAt: new Date().toISOString(), rows: [{provider:"Google Ads",campaignId:"24315692802",name:"=Synthetic campaign",date:today,currency:"ZAR",spend:150,impressions:1000,clicks:20,conversions:2}] },
       { provider: "Meta Ads", status: "unconfigured", message: "Company-managed reporting access required", retrievedAt:null, rows:[] }
@@ -204,6 +210,7 @@ if (process.env.PREVIEW_ONLY) {
       await expect(page.getByLabel("Meta reporting access token")).toHaveValue("");
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `connection overflow ${width}`);
       await page.screenshot({path:`output/marketing/advertising-connection-${width}.png`,fullPage:true});
+      if (width === 1440) advertisingFailures = 1;
       await page.goto(base);
       await expect(
         page.getByRole("heading", {
@@ -211,6 +218,10 @@ if (process.env.PREVIEW_ONLY) {
           exact: true,
         }),
       ).toBeVisible();
+      if (width === 1440) {
+        await expect(page.getByRole("alert")).toContainText("Advertising could not load");
+        await page.getByRole("button", {name:"Refresh marketing",exact:true}).click();
+      }
       await expect(page.getByRole("heading", {name:/Google Ads.*Connected/})).toBeVisible();
       await expect(page.getByRole("heading", {name:/Meta Ads.*Connection needed/})).toBeVisible();
       await expect(page.getByRole("button", {name:"Export Meta Ads"})).toBeDisabled();
