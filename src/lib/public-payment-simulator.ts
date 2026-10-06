@@ -1,3 +1,4 @@
+import {publicCheckoutTotal} from "./public-initial-rent";
 import { createHash, randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
 import { runSimulatedPaymentFollowUp } from "@/lib/public-payment-follow-up";
@@ -16,7 +17,7 @@ export async function startSimulatedPayment(reference: string, idempotencyKey: s
   if (!publicPaymentSimulatorEnabled()) return { ok: false as const, code: "DISABLED" };
   const reservation = await db.reservation.findUnique({
     where: { publicReference: reference },
-    include: { facility: true, unit: true, customer: true, publicPaymentSessions: { orderBy: { createdAt: "desc" }, take: 1 } },
+    include: { facility: true, unit: true, customer: true, packageSelection: true, publicPaymentSessions: { orderBy: { createdAt: "desc" }, take: 1 } },
   });
   if (!reservation || reservation.status !== "ACTIVE" || !reservation.contactVerifiedAt || !reservation.customer.emailVerifiedAt || reservation.journey !== "RENTAL")
     return { ok: false as const, code: "RESERVATION_UNAVAILABLE" };
@@ -27,8 +28,8 @@ export async function startSimulatedPayment(reference: string, idempotencyKey: s
   const expiresAt = new Date(Date.now() + 20 * 60 * 1000);
   const providerReference = `SIM-${randomBytes(6).toString("hex").toUpperCase()}`;
   const session = await db.publicPaymentSession.create({ data: {
-    reservationId: reservation.id, amount: reservation.quotedRate, currency: "ZAR",
-    description: `First month's storage - Unit ${reservation.unit.number}`,
+    reservationId: reservation.id, amount: publicCheckoutTotal(reservation), currency: "ZAR",
+    description: `Initial storage and selected goods - Unit ${reservation.unit.number}`,
     checkoutTokenHash: tokenHash(token), idempotencyKey, providerReference, expiresAt,
   }});
   await db.auditEvent.create({ data: { organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, action: "public_payment.simulator_started", entityType: "PublicPaymentSession", entityId: session.id, requestId: idempotencyKey, after: { providerReference, amount: session.amount.toString(), expiresAt: expiresAt.toISOString() } } });

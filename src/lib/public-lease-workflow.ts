@@ -1,3 +1,4 @@
+import {publicInitialRent,publicCheckoutTotal} from "./public-initial-rent";
 import { identityGate } from "@/lib/identity-document-service";
 import { createHash, randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
@@ -43,6 +44,7 @@ export async function preparePublicReservationLease(reference: string, paymentMe
       unitNumber: reservation.unit.number,
       unitTypeName: reservation.unit.unitType.name,
       customerName: customerName(reservation.customer),
+      initialRent: reservation.initialRentSnapshot ? publicInitialRent(reservation) : null,
       monthlyRate: Number(reservation.quotedRate),
       startDate: reservation.intendedMoveIn,
       paymentMethod,
@@ -84,7 +86,7 @@ export async function preparePublicReservationLease(reference: string, paymentMe
 export async function getPublicReservationLease(token: string) {
   const lease = await db.publicReservationLease.findUnique({
     where: { signingToken: token },
-    include: { reservation: { include: { customer: true, facility: true, unit: { include: { unitType: true } } } } },
+    include: { reservation: { include: { customer: true, facility: true, packageSelection: true, unit: { include: { unitType: true } } } } },
   });
   if (!lease) return null;
   if (lease.status !== "SIGNED" && lease.reservation.status !== "ACTIVE") return null;
@@ -104,6 +106,8 @@ export async function getPublicReservationLease(token: string) {
     facilityName: lease.reservation.facility.name,
     unitNumber: lease.reservation.unit.number,
     unitTypeName: lease.reservation.unit.unitType.name,
+    initialRent: publicInitialRent(lease.reservation),
+    checkoutTotalZar: publicCheckoutTotal(lease.reservation),
     monthlyRateZar: Number(lease.reservation.quotedRate),
     intendedMoveIn: lease.reservation.intendedMoveIn?.toISOString() ?? null,
     paymentMethod: lease.paymentMethod,

@@ -140,9 +140,10 @@ export function buildReviewLeaseClauses(ctx: LeaseClauseContext) {
 
 export function renderReviewLeaseDocument(ctx: LeaseClauseContext) {
   const legacy = renderLeaseDocument(ctx);
+  const initial = ctx.initialRent ? `Initial rent: ${ctx.initialRent.lines.map(line => `${line.period}: R ${line.amount.toFixed(2)}`).join("; ")}. Initial rent total R ${ctx.initialRent.total.toFixed(2)}. Includes remaining move-in days and, for starts after day 15, the following month. Optional goods remain separately itemised; VAT treatment remains subject to confirmation before production payment.` : null;
   const schedule = legacy.split("\n\n")[1].replace(" (excl. applicable tax)", " (VAT treatment to be confirmed before production payment)");
   return ["STOR24 STORAGE AGREEMENT", `Version: ${STORAGE_TERMS_VERSION}`, STORAGE_TERMS_STATUS, "", "YOUR BOOKING SCHEDULE", schedule,
-    "Deposit / first-period calculation: no additional charge authorised by this draft; final itemised schedule required before production payment.", "", "YOUR SUMMARY ACKNOWLEDGEMENTS",
+    initial ?? "Deposit / first-period calculation: no additional charge authorised by this draft; final itemised schedule required before production payment.", "", "YOUR SUMMARY ACKNOWLEDGEMENTS",
     ...buildReviewLeaseClauses(ctx).flatMap(c => [c.title, c.body, ""]), storageTermsText()].join("\n");
 }
 
