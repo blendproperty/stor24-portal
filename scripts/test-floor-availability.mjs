@@ -22,6 +22,7 @@ const server = createServer(async (request, response) => {
   if (url.pathname === "/fixture.js") { response.setHeader("content-type", "text/javascript"); response.end(bundle.outputFiles[0].text); return; }
   if (url.pathname === "/fixture.css") { response.setHeader("content-type", "text/css"); response.end(css); return; }
   if (url.pathname === "/fixture-data") { response.setHeader("content-type", "application/json"); response.end(JSON.stringify(fixture())); return; }
+  if (url.pathname === "/api/v1/facility-map") { response.setHeader("content-type", "application/json"); response.end(JSON.stringify({ data: [] })); return; }
   if (url.pathname === "/api/v1/floor-availability") {
     let body = ""; for await (const chunk of request) body += chunk;
     const input = JSON.parse(body); writes++;

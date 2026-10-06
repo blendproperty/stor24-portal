@@ -1,3 +1,4 @@
+import { requireEditableCombinationUnit } from "@/lib/unit-combination-service";
 import { requireOperationalUnit } from "@/lib/floor-availability-service";
 import { apiError, jsonBody } from "@/lib/api";
 import { db } from "@/lib/db";
@@ -248,6 +249,8 @@ export async function PATCH(
         }
       }
       if (resource === "units") {
+        const combined = await db.unit.findUnique({where:{id:current.id},select:{combinedIntoUnitId:true,combinationSnapshot:true}});
+        if(combined?.combinedIntoUnitId || combined?.combinationSnapshot) throw new Error("CONFLICT");
         const unitData = parsed.data as {
           unitTypeId?: string;
           status?: string;
@@ -308,6 +311,7 @@ export async function PATCH(
         auditBefore = { number: current.number ?? "" };
         auditAfter = { number: nextNumber, mapLabelSynchronized: true };
         entity = await db.$transaction(async (tx) => {
+          await requireEditableCombinationUnit(tx,current.facilityId,current.id);
           const updated = await tx.unit.update({
             where: { id: current.id },
             data,
@@ -348,6 +352,7 @@ export async function PATCH(
         return Response.json({ data: entity });
       } else {
         entity = await db.$transaction(async tx => {
+          await requireEditableCombinationUnit(tx,current.facilityId,current.id);
           const saved = await tx.unit.update({ where: { id: current.id }, data });
           await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "units.updated", entityType: "units", entityId: current.id, before: { useTypesOverride: current.useTypesOverride, businessAttributesOverride: JSON.stringify(current.businessAttributesOverride ?? null) }, after: { useTypesOverride: saved.useTypesOverride, businessAttributesOverride: JSON.stringify(saved.businessAttributesOverride) } } });
           return saved;
@@ -422,6 +427,7 @@ export async function DELETE(
       }
       if (resource === "units") {
         return await db.$transaction(async tx => {
+          await requireEditableCombinationUnit(tx,entity.facilityId,id);
           if (!force) {
             await tx.unit.update({
               where: { id },

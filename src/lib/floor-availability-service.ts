@@ -11,7 +11,7 @@ export async function requireOperationalUnit(tx: Prisma.TransactionClient, facil
   await tx.$queryRaw`SELECT "id" FROM "Facility" WHERE "id" = ${facilityId} FOR UPDATE`;
   await tx.$queryRaw`SELECT "id" FROM "Unit" WHERE "id" = ${unitId} AND "facilityId" = ${facilityId} FOR UPDATE`;
   const unit = await tx.unit.findFirst({ where: { id: unitId, facilityId }, include: { mapElements: floorMapSelection, facility: { select: { closedFloors: true } } } });
-  if (!unit) throw new Error("UNIT_UNAVAILABLE");
+  if (!unit || unit.combinedIntoUnitId) throw new Error("UNIT_UNAVAILABLE");
   if (!unitIsOperational(unit, unit.facility.closedFloors)) throw new Error("FLOOR_NOT_OPERATIONAL");
 }
 

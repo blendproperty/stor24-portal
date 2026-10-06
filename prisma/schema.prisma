@@ -325,6 +325,8 @@ model UnitType {
 }
 
 model Unit {
+  combinedIntoUnitId String?
+  combinationSnapshot Json?
   businessAttributesOverride Json?
   useTypesOverride String[] @default([])
   id                  String               @id @default(cuid())

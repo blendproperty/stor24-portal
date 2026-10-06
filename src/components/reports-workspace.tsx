@@ -1,10 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ReportPreview } from "@/components/report-preview";
 import { Download, Filter, LockKeyhole } from "lucide-react";
 import { isCurrentSnapshotReport, type ReportDefinition } from "@/lib/reporting";
 
 export function ReportsWorkspace({ reports, facilities, initialFrom, initialTo, canExport }: { reports: readonly ReportDefinition[]; facilities: { id: string; name: string }[]; initialFrom: string; initialTo: string; canExport: boolean }) {
+  const [previewRun,setPreviewRun] = useState(0);
+  const [previewQuery, setPreviewQuery] = useState("");
+  const [format, setFormat] = useState<"CSV" | "XLSX" | "PDF">("CSV");
   const [group, setGroup] = useState("All");
   const [reportKey, setReportKey] = useState(reports[0]?.key ?? "");
   const [from, setFrom] = useState(initialFrom);
@@ -21,7 +25,7 @@ export function ReportsWorkspace({ reports, facilities, initialFrom, initialTo, 
   const visible = group === "All" ? reports : reports.filter((report) => report.group === group);
   const isSnapshot = isCurrentSnapshotReport(reportKey);
   const isAgeing = reportKey === "receivables-ageing";
-  const exportHref = `/api/v1/reports/export?${new URLSearchParams({ reportKey, from: isSnapshot ? initialTo : isAgeing ? to : from, to: isSnapshot ? initialTo : to, format: "CSV", groupBy: "month", ...(facilityId ? { facilityId } : {}) })}`;
+  const exportHref = `/api/v1/reports/export?${new URLSearchParams({ reportKey, from: isSnapshot ? initialTo : isAgeing ? to : from, to: isSnapshot ? initialTo : to, format, groupBy: "month", ...(facilityId ? { facilityId } : {}) })}`;
 
   async function exportCsv() {
     if (request.current || !canExport || access) return;
@@ -42,16 +46,16 @@ export function ReportsWorkspace({ reports, facilities, initialFrom, initialTo, 
         }
         setFailed(true); setMessage(response.status === 422 && typeof payload.error?.message === "string" ? payload.error.message : "The report could not be prepared. Your selections are retained; please try again."); return;
       }
-      if (response.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "text/csv") throw new Error("INVALID_EXPORT");
+      if (response.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== ({CSV:"text/csv",XLSX:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",PDF:"application/pdf"}[format])) throw new Error("INVALID_EXPORT");
       const blob = await response.blob();
       if (controller.signal.aborted) throw new Error("EXPORT_ABORTED");
       if (!blob.size) { setMessage("No rows matched these report parameters. Review the report, dates and facility."); return; }
       const url = URL.createObjectURL(blob);
       try {
         const link = document.createElement("a");
-        link.href = url; link.download = isSnapshot ? `stor24-${reportKey}-current.csv` : isAgeing ? `stor24-${reportKey}-as-of-${to}.csv` : `stor24-${reportKey}-${from}-${to}.csv`;
+        link.href = url; link.download = isSnapshot ? `stor24-${reportKey}-current.${format.toLowerCase()}` : isAgeing ? `stor24-${reportKey}-as-of-${to}.${format.toLowerCase()}` : `stor24-${reportKey}-${from}-${to}.${format.toLowerCase()}`;
         document.body.appendChild(link); link.click(); link.remove();
-        setMessage("CSV download prepared. Check your browser downloads.");
+        setMessage(`${format} download prepared. Check your browser downloads.`);
       } finally { setTimeout(() => URL.revokeObjectURL(url), 5_000); }
     } catch {
       setFailed(true); setMessage("The report could not be prepared. Your selections are retained; please try again.");
@@ -71,12 +75,13 @@ export function ReportsWorkspace({ reports, facilities, initialFrom, initialTo, 
           {!isSnapshot ? <label>{isAgeing ? "As of (SAST)" : "To"}<input disabled={busy} type="date" value={to} onChange={(event) => setTo(event.target.value)} /></label> : null}
           <label>Facility<select disabled={busy} value={facilityId} onChange={(event) => setFacilityId(event.target.value)}><option value="">All permitted facilities</option>{facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}</select></label>
         </div>
-        <div className="report-actions">
-          <button className="button button-primary" disabled={busy || !canExport || !reportKey || !!access} onClick={() => void exportCsv()}><Download size={16}/>{busy ? "Preparing CSV…" : "Export CSV"}</button>
+        <div className="report-actions"><button className="button button-secondary" disabled={busy || !reportKey || !!access} onClick={() => {if (!isSnapshot && (!to || (!isAgeing && (!from || from > to)))) {setFailed(true);setMessage("Choose a valid reporting period.");return;}setPreviewQuery(exportHref.split("?")[1]);setPreviewRun(v=>v+1);}}>View report</button><label>Download format<select value={format} onChange={e=>setFormat(e.target.value as "CSV" | "XLSX" | "PDF")}><option value="CSV">CSV</option><option value="XLSX">Excel (.xlsx)</option><option value="PDF">PDF</option></select></label>
+          <button className="button button-primary" disabled={busy || !canExport || !reportKey || !!access} onClick={() => void exportCsv()}><Download size={16}/>{busy ? `Preparing ${format}…` : `Export ${format}`}</button>
           {!canExport ? <span className="permission-note"><LockKeyhole size={15}/> Export access is unavailable. Please contact your administrator if you require access.</span> : null}
         </div>
         {message ? <div role={failed ? "alert" : "status"} className="report-export-feedback"><p>{message}</p>{access === "signed-out" ? <a className="button button-primary" href="/login?next=%2Freports">Sign in again</a> : access === "denied" ? <button className="button button-secondary" onClick={() => window.location.reload()}>Reload report access</button> : null}</div> : null}
       </section>
+      {previewQuery ? <ReportPreview key={previewRun} query={previewQuery} title={reports.find(r=>r.key===new URLSearchParams(previewQuery).get("reportKey"))?.name ?? "Report"}/> : null}
       <div className="filter-tabs">{groups.map((item) => <button className={group === item ? "active" : ""} onClick={() => setGroup(item)} key={item}>{item}</button>)}</div>
       <section className="report-card-grid">
         {visible.map((report) => <article className="panel report-card" key={report.key}><span>{report.group}</span><h3>{report.name}</h3><p>{report.description}</p><small>{report.formats.join(" / ")}</small><button type="button" className="report-select-button" disabled={busy} aria-pressed={reportKey === report.key} onClick={() => { setReportKey(report.key); reportSelect.current?.focus(); }}>Select {report.name}</button></article>)}

@@ -13,6 +13,7 @@ const server=createServer((req,res)=>{res.setHeader("content-type",req.url==="/a
 await new Promise(r=>server.listen(0,"127.0.0.1",r));const browser=await chromium.launch();await mkdir("output/hold-release-recovery",{recursive:true});
 try {for(const width of [1440,390,320]) for(const action of ["store","unit"]) {
  const page=await browser.newPage({viewport:{width,height:900}});let mode="network",writes=0,pending,released=false;const errors=[];page.on("pageerror",e=>errors.push(e.message));page.on("dialog",d=>d.accept());
+ await page.route("**/api/v1/facility-map?*",route=>route.fulfill({json:{data:[]}}));
  await page.route("**/api/v1/leasing/**",route=>{
   const req=route.request(),resource=new URL(req.url()).pathname.split("/").at(-1);
   if(req.method()==="GET")return mode==="refresh-fail"?route.abort():route.fulfill({json:{data:resource==="facilities"?[facility]:resource==="unit-types"?[type]:[{...unit,status:released?"AVAILABLE":"RESERVED"}]}});

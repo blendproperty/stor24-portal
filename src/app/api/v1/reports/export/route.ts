@@ -1,3 +1,4 @@
+import { reportExcel, reportPdf } from "@/lib/report-documents";
 import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
 import { buildReportRows } from "@/lib/report-data-service";
 import { findPermittedReport, isCurrentSnapshotReport, reportParametersSchema, toCsv } from "@/lib/reporting";
@@ -36,6 +37,12 @@ export async function GET(request: Request) {
     if (!decision.allowed) return Response.json({ error: { code: "DLP_EXPORT_BLOCKED", message: "Data protection blocked this export. Contact your administrator with the request reference.", requestId: decision.requestId } }, { status: 422, headers });
     if (parsed.data.format === "JSON") {
       return Response.json({ data: rows, meta: { parameters: parsed.data, currentSnapshot: isSnapshot, source: "stor24-production-database", classification: decision.classification, policyVersion: decision.policyVersion, requestId: decision.requestId } }, { headers });
+    }
+    if (parsed.data.format === "XLSX" || parsed.data.format === "PDF") {
+      const excel = parsed.data.format === "XLSX";
+      const period = isSnapshot ? "Current snapshot" : `${parsed.data.from} to ${parsed.data.to} SAST`;
+      const bytes = excel ? await reportExcel(definition.name, definition.key, rows, period) : await reportPdf(definition.name, definition.key, rows, period);
+      return new Response(Buffer.from(bytes), { headers: { ...headers, "content-type": excel ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : "application/pdf", "content-disposition": `attachment; filename="${definition.key}.${excel ? "xlsx" : "pdf"}"` } });
     }
     return new Response(toCsv(rows), {
       headers: {

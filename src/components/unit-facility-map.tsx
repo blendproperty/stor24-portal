@@ -1,0 +1,347 @@
+"use client";
+import { useEffect, useState } from "react";
+type Unit = {
+  id: string;
+  number: string;
+  status: string;
+  floorOperational?: boolean;
+  monthlyRate: string;
+  combinedIntoUnitId?: string | null;
+  unitType: { areaSqMetres: string | null; useTypes?: string[] };
+  useTypesOverride?: string[];
+};
+type Element = {
+  id: string;
+  unitId: string | null;
+  type: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  label: string | null;
+  unit: Unit | null;
+};
+type Map = {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  elements: Element[];
+};
+const color = (u: Unit | null) =>
+  !u
+    ? "#eceee9"
+    : u.combinedIntoUnitId
+      ? "#d2d8d6"
+      : u.floorOperational === false
+        ? "#d8dce0"
+        : u.status === "AVAILABLE"
+          ? "#d5ede2"
+          : ["RESERVED", "HELD"].includes(u.status)
+            ? "#ffcfaa"
+            : u.status === "OCCUPIED"
+              ? "#a0c4d3"
+              : "#e2e2de";
+export function UnitFacilityMap({
+  facilityId,
+  visibleIds,
+  onEdit,
+  onRefresh,
+}: {
+  facilityId: string;
+  visibleIds: string[];
+  onEdit: (id: string) => void;
+  onRefresh: () => void;
+}) {
+  const [maps, setMaps] = useState<Map[]>([]),
+    [mapId, setMapId] = useState(""),
+    [selected, setSelected] = useState<string[]>([]),
+    [combining, setCombining] = useState(false),
+    [ready, setReady] = useState(false),
+    [error, setError] = useState(""),
+    [busy, setBusy] = useState(false),
+    [preview, setPreview] = useState<{
+      area: number;
+      monthlyRate: number;
+      token: string;
+    } | null>(null),
+    [refresh, setRefresh] = useState(0);
+  useEffect(() => {
+    const abort = new AbortController();
+    fetch(`/api/v1/facility-map?facilityId=${encodeURIComponent(facilityId)}`, {
+      cache: "no-store",
+      signal: abort.signal,
+    })
+      .then(async (r) => {
+        const p = await r.json();
+        if (!r.ok) throw new Error(p.error?.message ?? "Map unavailable");
+        const data =
+          p.data.find((f: { id: string }) => f.id === facilityId)?.maps ?? [];
+        setMaps(data);
+        setMapId(data[0]?.id ?? "");
+        setError("");
+      })
+      .catch((e) => {
+        if (!abort.signal.aborted) setError(e.message);
+      });
+    return () => abort.abort();
+  }, [facilityId, refresh]);
+  const map = maps.find((m) => m.id === mapId),
+    units = selected
+      .map((id) => map?.elements.find((e) => e.unitId === id)?.unit)
+      .filter((u): u is Unit => Boolean(u));
+  async function action(kind: "preview" | "apply") {
+    setBusy(true);
+    setError("");
+    try {
+      const r = await fetch("/api/v1/leasing/units/combine", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          facilityId,
+          unitIds: selected,
+          action: kind,
+          physicalConnectionConfirmed: ready,
+          expectedToken: preview?.token,
+        }),
+      });
+      const p = await r.json();
+      if (!r.ok)
+        throw new Error(
+          p.error?.message ?? "Unable to update this combination.",
+        );
+      if (kind === "preview") setPreview(p.data);
+      else {
+        setPreview(null);
+        setSelected([]);
+        setReady(false);
+        setRefresh((v) => v + 1);
+        onRefresh();
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Combination failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="panel panel-spacious inventory-facility-map">
+      <div className="panel-heading">
+        <div>
+          <h2>Facility map</h2>
+          <p className="panel-subtitle">
+            Select a unit to inspect its availability and products. Current
+            table filters also highlight the map.
+          </p>
+        </div>
+        <a className="button button-secondary" href="/map">
+          Edit layout
+        </a>
+      </div>
+      {error ? <p role="alert">{error}</p> : null}
+      {maps.length ? (
+        <>
+          <div className="report-actions">
+            <label>
+              Floor
+              <select
+                value={mapId}
+                onChange={(e) => {
+                  setMapId(e.target.value);
+                  setSelected([]);
+                  setPreview(null);
+                }}
+              >
+                {maps.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={combining}
+                onChange={(e) => {
+                  setCombining(e.target.checked);
+                  setSelected([]);
+                  setPreview(null);
+                }}
+              />{" "}
+              Select adjacent units to combine
+            </label>
+          </div>
+          <p className="map-status-legend">
+            <span>● Available</span>
+            <span>● Held / reserved</span>
+            <span>● Occupied</span>
+            <span>● Closed floor / unavailable</span>
+          </p>
+          {map ? (
+            <div className="inventory-map-scroll">
+              <svg
+                viewBox={`0 0 ${map.width} ${map.height}`}
+                aria-label={`${map.name} unit availability map`}
+                role="group"
+              >
+                {map.elements.map((e) => (
+                  <g
+                    key={e.id}
+                    transform={`rotate(${e.rotation} ${e.x + e.width / 2} ${e.y + e.height / 2})`}
+                    role={e.unit ? "button" : undefined}
+                    tabIndex={e.unit ? 0 : undefined}
+                    aria-label={
+                      e.unit
+                        ? `Unit ${e.unit.number}, ${e.unit.floorOperational === false ? "Closed floor" : e.unit.status}, ${e.unit.unitType.areaSqMetres ?? "unknown"} square metres`
+                        : undefined
+                    }
+                    style={{
+                      cursor: e.unit ? "pointer" : undefined,
+                      opacity:
+                        e.unit && !visibleIds.includes(e.unit.id) ? 0.25 : 1,
+                    }}
+                    onClick={() => {
+                      if (e.unit) {
+                        setPreview(null);
+                        setReady(false);
+                        setSelected((s) =>
+                          combining
+                            ? s.includes(e.unit!.id)
+                              ? s.filter((id) => id !== e.unit!.id)
+                              : [...s.slice(-1), e.unit!.id]
+                            : [e.unit!.id],
+                        );
+                      }
+                    }}
+                    onKeyDown={(event) => {
+                      if (
+                        e.unit &&
+                        (event.key === "Enter" || event.key === " ")
+                      ) {
+                        event.preventDefault();
+                        setPreview(null);
+                        setReady(false);
+                        setSelected((s) =>
+                          combining
+                            ? [...s.slice(-1), e.unit!.id]
+                            : [e.unit!.id],
+                        );
+                      }
+                    }}
+                  >
+                    <rect
+                      x={e.x}
+                      y={e.y}
+                      width={e.width}
+                      height={e.height}
+                      fill={color(e.unit)}
+                      stroke={
+                        e.unit && selected.includes(e.unit.id)
+                          ? "#ff5500"
+                          : "#45655c"
+                      }
+                      strokeWidth={
+                        e.unit && selected.includes(e.unit.id) ? 4 : 1
+                      }
+                    />
+                    <text
+                      x={e.x + e.width / 2}
+                      y={e.y + e.height / 2}
+                      dominantBaseline="middle"
+                      textAnchor="middle"
+                      fontSize={Math.max(
+                        6,
+                        Math.min(16, e.height / 3, e.width / 3),
+                      )}
+                      fill="#12392f"
+                    >
+                      {e.unit?.number ?? e.label ?? ""}
+                    </text>
+                  </g>
+                ))}
+              </svg>
+            </div>
+          ) : null}
+          <div className="report-actions">
+            {units.map((u) => (
+              <div key={u.id}>
+                <strong>Unit {u.number}</strong>
+                <p>
+                  {u.unitType.areaSqMetres} m² · R
+                  {Number(u.monthlyRate).toLocaleString("en-ZA")} / month ·{" "}
+                  {u.floorOperational === false ? "Closed floor" : u.status}
+                </p>
+                <p>
+                  {(u.useTypesOverride?.length
+                    ? u.useTypesOverride
+                    : (u.unitType.useTypes ?? ["STORAGE"])
+                  )
+                    .map((p) =>
+                      p === "MICRO_WAREHOUSE"
+                        ? "Micro Warehousing"
+                        : "Self-Storage",
+                    )
+                    .join(" · ")}
+                </p>
+                <button
+                  className="button button-secondary"
+                  onClick={() => onEdit(u.id)}
+                >
+                  Edit unit
+                </button>
+              </div>
+            ))}
+          </div>
+          {combining ? (
+            <div className="combination-controls">
+              <p>
+                Combine two available, adjacent units into one rentable space.
+                The second unit is blocked from separate booking. Physical
+                connection must be confirmed before applying; software does not
+                remove a wall.
+              </p>
+              <button
+                className="button button-secondary"
+                disabled={selected.length !== 2 || busy}
+                onClick={() => void action("preview")}
+              >
+                Preview combination
+              </button>
+              {preview ? (
+                <>
+                  <p>
+                    <strong>
+                      {preview.area} m² · R
+                      {preview.monthlyRate.toLocaleString("en-ZA")} / month
+                    </strong>{" "}
+                    (sum of current rates)
+                  </p>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={ready}
+                      onChange={(e) => setReady(e.target.checked)}
+                    />{" "}
+                    The units share a suitable boundary and the approved
+                    physical connection is complete and safe for occupation.
+                  </label>
+                  <button
+                    className="button button-primary"
+                    disabled={!ready || busy}
+                    onClick={() => void action("apply")}
+                  >
+                    Combine units
+                  </button>
+                </>
+              ) : null}
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <p>No saved map is available for this facility.</p>
+      )}
+    </section>
+  );
+}

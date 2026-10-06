@@ -1,4 +1,5 @@
 "use client";
+import { UnitFacilityMap } from "@/components/unit-facility-map";
 
 import { FloorAvailabilityControls } from "@/components/floor-availability-controls";
 import { unitSupportsProduct } from "@/lib/product-line";
@@ -33,6 +34,7 @@ type UnitType = {
   features: string[];
 };
 type Unit = {
+  combinedIntoUnitId?: string | null;
   id: string;
   facilityId: string;
   businessAttributesOverride?: unknown;
@@ -84,7 +86,7 @@ type UatResetPreview = {
 const decimalRead = z.string().refine(value => value.trim() !== "" && Number.isFinite(Number(value)));
 const typeRead = z.object({ id: z.string().min(1), facilityId: z.string().min(1), name: z.string(), widthMetres: decimalRead.nullable(), lengthMetres: decimalRead.nullable(), areaSqMetres: decimalRead.nullable(), businessAttributes: z.record(z.string(),z.union([z.string(),z.number(),z.boolean()])).nullable().optional(), useTypes: z.array(z.string()).optional(), features: z.array(z.string()) });
 const facilityRead = z.object({ id: z.string().min(1), name: z.string(), code: z.string(), closedFloors: z.array(z.string()).optional(), maps: z.array(z.object({ name: z.string() })).optional() });
-const unitRead = z.object({ id: z.string().min(1), facilityId: z.string().min(1), businessAttributesOverride: z.record(z.string(),z.union([z.string(),z.number(),z.boolean()])).nullable().optional(), useTypesOverride: z.array(z.string()).optional(), unitTypeId: z.string().min(1), number: z.string(), floor: z.string().nullable(), zone: z.string().nullable(), status: z.string().min(1), monthlyRate: decimalRead, taxRate: decimalRead, unitType: typeRead, mapElements: z.array(z.object({ map: z.object({ name: z.string() }) })).optional() });
+const unitRead = z.object({ combinedIntoUnitId:z.string().nullable().optional(), id: z.string().min(1), facilityId: z.string().min(1), businessAttributesOverride: z.record(z.string(),z.union([z.string(),z.number(),z.boolean()])).nullable().optional(), useTypesOverride: z.array(z.string()).optional(), unitTypeId: z.string().min(1), number: z.string(), floor: z.string().nullable(), zone: z.string().nullable(), status: z.string().min(1), monthlyRate: decimalRead, taxRate: decimalRead, unitType: typeRead, mapElements: z.array(z.object({ map: z.object({ name: z.string() }) })).optional() });
 
 const editableStatuses = ["AVAILABLE", "SERVICE", "UNAVAILABLE"];
 const statusLabel = (status: string) =>
@@ -129,7 +131,7 @@ export function UnitInventoryWorkspace({
     (facility) => facility.id === facilityId,
   );
   const allUnits = facilities.flatMap((facility) =>
-    facility.units.map((unit) => ({ ...unit, facility })),
+    facility.units.filter(unit=>!unit.combinedIntoUnitId).map((unit) => ({ ...unit, facility })),
   );
   const visible = allUnits.filter(
     (unit) =>
@@ -677,6 +679,7 @@ export function UnitInventoryWorkspace({
           </label>
         </fieldset>
       </section>
+      {facilityId ? <UnitFacilityMap key={`unit-map-${facilityId}`} facilityId={facilityId} visibleIds={visible.map(u=>u.id)} onEdit={id=>{const unit=allUnits.find(u=>u.id===id);if(unit)setDialog({kind:"unit",unit});}} onRefresh={()=>void refresh()} /> : null}
       <section className="inventory-layout">
         <div className="panel">
           <div className="table-wrap">
