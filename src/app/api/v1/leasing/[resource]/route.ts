@@ -1,4 +1,4 @@
-import { requireEditableCombinationUnit } from "@/lib/unit-combination-service";
+import { requireEditableCombinationUnit, requireEditableCombinationUnitType } from "@/lib/unit-combination-service";
 import { requireOperationalUnit } from "@/lib/floor-availability-service";
 import { apiError, jsonBody } from "@/lib/api";
 import { db } from "@/lib/db";
@@ -326,6 +326,7 @@ export async function PATCH(
         return Response.json({ data: entity });
       } else if (resource === "unit-types") {
         const updated = await db.$transaction(async tx => {
+          await requireEditableCombinationUnitType(tx,current.facilityId,current.id);
           const saved = await tx.unitType.update({ where: { id: current.id }, data });
           await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "unit-types.updated", entityType: "unit-types", entityId: current.id, before: { useTypes: current.useTypes, businessAttributes: JSON.stringify(current.businessAttributes ?? null) }, after: { useTypes: saved.useTypes, businessAttributes: JSON.stringify(saved.businessAttributes) } } });
           return saved;
@@ -470,6 +471,7 @@ export async function DELETE(
       } else {
         if (resource === "unit-types") {
           return await db.$transaction(async tx => {
+            await requireEditableCombinationUnitType(tx,entity.facilityId,id);
             const assigned = await tx.unit.count({ where: { unitTypeId: id } });
             if (assigned && !force)
               return Response.json(
