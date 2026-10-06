@@ -135,7 +135,7 @@ export function UnitFacilityMap({
             table filters also highlight the map.
           </p>
         </div>
-        <a className="button button-secondary" href="/facility-map">
+        <a className="button button-secondary" href="/map">
           Edit layout
         </a>
       </div>
