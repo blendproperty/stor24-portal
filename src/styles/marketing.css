@@ -841,3 +841,7 @@ dialog.marketing-modal {
   white-space: nowrap;
   cursor: pointer;
 }
+
+.advertising-connection{max-width:900px;margin:0 auto}.advertising-connection form{display:grid;gap:18px;max-width:560px;margin:24px 0}.advertising-connection label{display:grid;gap:8px;font-weight:700}.advertising-connection input{width:100%;min-width:0;min-height:48px;padding:12px;border:1px solid #cbd5dc;border-radius:10px;background:#fff;color:#18272d}.advertising-connection input:focus-visible{outline:2px solid #06776e;outline-offset:2px}
+
+.advertising-connection + .advertising-connection{margin-top:24px}.advertising-connection code{overflow-wrap:anywhere;white-space:normal}.advertising-connection li{margin:12px 0}

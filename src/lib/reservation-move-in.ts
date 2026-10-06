@@ -1,3 +1,4 @@
+import {publicInitialRent,publicCheckoutTotal} from "./public-initial-rent";
 import { requireOperationalUnit } from "@/lib/floor-availability-service";
 import { unitIsOperational, floorMapSelection } from "@/lib/floor-availability";
 import { identityGate } from "@/lib/identity-document-service";
@@ -29,7 +30,7 @@ export async function reservationReadiness(database: Database, scope: RequestSco
     where: { accountNumber: `ST24-T-${reservation.id}`, customerId: reservation.customerId },
     include: { payments: { include: { merchandiseOrder: { select: { id: true } } } }, ledgerEntries: true, tenancy: { select: { id: true } } },
   });
-  const requiredCents = Math.round(Number(reservation.quotedRate) * 100) + Math.round(Number(reservation.packageSelection?.priceSnapshot ?? 0) * 100);
+  const requiredCents = Math.round(publicCheckoutTotal(reservation) * 100);
   const receipts = account?.payments.filter(payment => {
     if (payment.status !== "SUCCEEDED" || payment.currency !== "ZAR" || !payment.processedAt || payment.merchandiseOrder) return false;
     if (isTestPayment(payment)) return false;
@@ -106,10 +107,20 @@ export async function confirmReservationMoveIn(scope: RequestScope, reservationI
     if (!lease.signedPdf || createHash("sha256").update(lease.signedPdf).digest("hex") !== lease.signedPdfSha256 || createHash("sha256").update(lease.content).digest("hex") !== lease.sha256) throw new Error("MOVE_IN_DOCUMENT_REVIEW");
     const tenancy = await tx.tenancy.create({ data: {
       facilityId: existing.facilityId, customerId: existing.customerId, accountId: state.account.id,
+      productLine: existing.productLine, businessDetails: existing.businessDetails ?? undefined,
       status: "ACTIVE", startDate: state.reservation.intendedMoveIn, paymentMethod: lease.paymentMethod,
       occupancies: { create: { unitId: unit.id, status: "ACTIVE", startDate: state.reservation.intendedMoveIn, monthlyRate: existing.quotedRate, accessState: "PENDING" } },
       documents: { create: { type: "LEASE_AGREEMENT", provider: "PUBLIC_RESERVATION", externalId: lease.id, storageKey: `public-reservation:${lease.id}`, status: "SIGNED", content: lease.content, sha256: lease.sha256, signerName: lease.signerName, signerIp: lease.signerIp, signerUserAgent: lease.signerUserAgent, clauseVersion: lease.version, signedAt: lease.signedAt, idempotencyKey: `reservation-lease:${lease.id}` } },
     } });
+    if(existing.initialRentSnapshot){
+      const initial=publicInitialRent(state.reservation);
+      const refs=initial.lines.map(line=>`RENT-${line.period}`);
+      if(await tx.ledgerEntry.count({where:{accountId:state.account.id,externalRef:{in:refs}}}))throw Error("MOVE_IN_REVIEW_REQUIRED");
+      for(const line of initial.lines)await tx.ledgerEntry.create({data:{accountId:state.account.id,type:"CHARGE",amount:line.amount,description:`Initial rent ${line.period}`,effectiveAt:state.reservation.intendedMoveIn,externalRef:`RENT-${line.period}`,createdById:scope.userId,metadata:{reservationId,coveredPeriod:line.period,initialRentPolicy:initial.policy!}}});
+      const goods=Number(state.reservation.packageSelection?.priceSnapshot??0);
+      if(goods>0)await tx.ledgerEntry.create({data:{accountId:state.account.id,type:"CHARGE",amount:goods,description:"Booking goods",effectiveAt:state.reservation.intendedMoveIn,externalRef:`BOOKING-GOODS-${reservationId}`,createdById:scope.userId}});
+      await tx.account.update({where:{id:state.account.id},data:{balance:{increment:publicCheckoutTotal(state.reservation)}}});
+    }
     const occupancy = await tx.occupancy.findFirstOrThrow({ where: { tenancyId: tenancy.id, unitId: unit.id } });
     await requestPhotoActivation(tx, scope, reservationId, occupancy.id);
     const claimed = await tx.reservation.updateMany({ where: { id: reservationId, status: "ACTIVE", convertedTenancyId: null }, data: { status: "CONVERTED", convertedTenancyId: tenancy.id } });

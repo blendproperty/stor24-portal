@@ -26,6 +26,7 @@ export type LeaseClauseContext = {
   unitTypeName?: string;
   customerName: string;
   monthlyRate: number;
+  initialRent?: {lines:{period:string;amount:number}[];total:number} | null;
   startDate: Date;
   paymentMethod: PublicLeasePaymentMethod;
   storagePackage?: { name: string; priceZar: number; contents: string } | null;

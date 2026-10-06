@@ -127,6 +127,23 @@ const server = createServer(async (req, res) => {
         "\n.app-shell{display:block}.app-shell .content{max-width:1400px;padding:32px;margin:auto}.app-shell .move-in-navigation{left:24px;right:24px}@font-face{font-family:Satoshi;src:url(/brand/Satoshi-Variable.ttf);font-weight:300 900}body{background:#f1f5f8;--font-satoshi:Satoshi;font-family:Satoshi,Arial,sans-serif} @media(max-width:650px){.app-shell .content{padding:16px}.app-shell .move-in-navigation{left:12px;right:12px}}",
     );
   }
+  if (req.url === "/api/v1/marketing/connection") {
+    assert.equal(req.method, "POST");
+    let raw = "";
+    for await (const chunk of req) raw += chunk;
+    const input = JSON.parse(raw);
+    assert.match(input.token, /^synthetic-only-/);
+    res.setHeader("content-type", "application/json");
+    res.statusCode = input.token.includes("fail") ? 503 : 200;
+    return res.end(JSON.stringify(res.statusCode === 503 ? {error:{message:"Synthetic provider unavailable"}} : {data:{configured:true}}));
+  }
+  if (req.url.startsWith("/api/v1/marketing/advertising")) {
+    res.setHeader("content-type", "application/json");
+    return res.end(JSON.stringify({ data: [
+      { provider: "Google Ads", status: "connected", message: "Verified STOR24 campaign fixture", retrievedAt: new Date().toISOString(), rows: [{provider:"Google Ads",campaignId:"24315692802",name:"=Synthetic campaign",date:today,currency:"ZAR",spend:150,impressions:1000,clicks:20,conversions:2}] },
+      { provider: "Meta Ads", status: "unconfigured", message: "Company-managed reporting access required", retrievedAt:null, rows:[] }
+    ] }));
+  }
   if (req.url.startsWith("/api/v1/marketing/traffic")) {
     res.setHeader("content-type", "application/json");
     return res.end(
@@ -174,6 +191,19 @@ if (process.env.PREVIEW_ONLY) {
       const page = await browser.newPage({ viewport: { width, height: 1000 } });
       const errors = [];
       page.on("pageerror", (e) => errors.push(e.message));
+      await page.goto(base + "/settings/advertising");
+      await expect(page.getByRole("heading",{name:"Website traffic: Google Analytics"})).toBeVisible();
+      await expect(page.getByRole("link",{name:/Enable the Google Analytics/})).toHaveAttribute("href","https://console.cloud.google.com/apis/library/analyticsdata.googleapis.com?project=synthetic-company-project");
+      await page.getByLabel("Meta reporting access token").fill("synthetic-only-fail-" + "a".repeat(32));
+      await page.getByRole("button", {name:"Verify and connect"}).click();
+      await expect(page.getByRole("status")).toContainText("Synthetic provider unavailable");
+      await expect(page.getByLabel("Meta reporting access token")).toHaveValue("synthetic-only-fail-" + "a".repeat(32));
+      await page.getByLabel("Meta reporting access token").fill("synthetic-only-success-" + "a".repeat(32));
+      await page.getByRole("button", {name:"Verify and connect"}).click();
+      await expect(page.getByRole("status")).toContainText("connected and verified");
+      await expect(page.getByLabel("Meta reporting access token")).toHaveValue("");
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `connection overflow ${width}`);
+      await page.screenshot({path:`output/marketing/advertising-connection-${width}.png`,fullPage:true});
       await page.goto(base);
       await expect(
         page.getByRole("heading", {
@@ -181,6 +211,18 @@ if (process.env.PREVIEW_ONLY) {
           exact: true,
         }),
       ).toBeVisible();
+      await expect(page.getByRole("heading", {name:/Google Ads.*Connected/})).toBeVisible();
+      await expect(page.getByRole("heading", {name:/Meta Ads.*Connection needed/})).toBeVisible();
+      await expect(page.getByRole("button", {name:"Export Meta Ads"})).toBeDisabled();
+      if (width === 1440) {
+        const downloaded = page.waitForEvent("download");
+        await page.getByRole("button", {name:"Export Google Ads"}).click();
+        const file = await downloaded;
+        const report = await readFile(await file.path(), "utf8");
+        assert.ok(report.includes("24315692802"));
+        assert.ok(report.includes("'=Synthetic campaign"));
+        assert.ok(report.includes("ZAR"));
+      }
       await expect(
         page.locator(".marketing-kpis article").first(),
       ).toContainText("12");

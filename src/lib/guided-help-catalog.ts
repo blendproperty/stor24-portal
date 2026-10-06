@@ -11,6 +11,11 @@ function guide(id: string, title: string, category: string, route: string, scree
 }
 
 export const extendedGuides: WorkflowGuide[] = [
+  guide("advertising", "Connect and verify advertising reports", "Administration", "/settings/advertising", "Advertising reporting", "Connect the verified company account and distinguish provider reporting from CRM outcomes.", [
+    ["Review the verified account", "Google reports cover only the two configured STOR24 campaigns, excluding Midpoint campaigns in the shared company account. Meta is bound to the verified STOR24 ZAR account. Reporting never activates an advertisement or changes spend.", ".marketing-card"],
+    ["Verify company-managed read access", "An owner can enter a company-managed Meta system-user reporting token with ads_read access. Verify and connect checks the exact account before saving encrypted credentials. Never paste a personal session cookie or put tokens in report names, emails or support screenshots.", ".marketing-card", undefined, "Use only approved company-managed reporting credentials for the displayed account."],
+    ["Check the live marketing report", "Return to Marketing, choose up to 90 days and check provider status and retrieval time. Unavailable or connection needed means data is missing, not zero spend. Connected with no rows means the provider returned no delivery for that period. Export contains the retrieved campaign rows; provider conversions and all-click measures remain distinct from CRM leads and leases.", ".marketing-card"],
+  ]),
   guide("rent-reviews", "Review tenant duration and group rent increases", "Finance", "/billing/rent-reviews", "Rent reviews", "Check days in a unit, recorded price history and future increases before approval.", [
     ["Review the facility report", "Choose the facility and View duration report. Unknown historical price changes remain unknown; do not assume move-in was the last increase. Download CSV uses the protected report data.", ".panel-spacious"],
     ["Check the recorded increase history", "After loading a report, review Group increase history. It retains the latest 25 approval batches, their references and old and new scheduled rates. Scheduling a rate is separate from posting an invoice; confirm the account billing plan before the effective month.", ".panel-spacious"],

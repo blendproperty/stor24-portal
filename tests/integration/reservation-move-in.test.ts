@@ -1,3 +1,4 @@
+import {newPublicInitialRent} from "../../src/lib/public-initial-rent";
 import { deliverBookingConfirmation } from "../../src/lib/payments/booking-confirmation-email";
 import { seedApprovedPhoto } from "./helpers/approved-photo";
 import assert from "node:assert/strict";
@@ -40,6 +41,26 @@ test("isolated PostgreSQL signed reservation handover", async t => {
     assert.equal((await db.unit.findUniqueOrThrow({ where: { id: f.unit.id } })).status, "RESERVED");
   }
   try {
+    await t.test("public prepaid schedule requires full payment and records both periods exactly once",async()=>{
+      const f=await fixture(),date=new Date('2026-02-16T00:00:00+02:00');
+      const businessDetails={companyName:"Synthetic company only",businessUse:"Synthetic business snapshot"};
+      await db.unitType.update({where:{id:f.unit.unitTypeId},data:{useTypes:["MICRO_WAREHOUSE"]}});
+      await db.unit.update({where:{id:f.unit.id},data:{floor:"Ground Floor"}});
+      await db.reservation.update({where:{id:f.reservation.id},data:{productLine:"MICRO_WAREHOUSE",businessDetails,quotedRate:2800,intendedMoveIn:date,initialRentSnapshot:newPublicInitialRent(2800,date)}});
+      assert.equal((await getReservationMoveInReadiness(f.scope,f.reservation.id)).paymentVerified,false);
+      await db.payment.update({where:{id:f.payment.id},data:{amount:4100}});
+      await db.ledgerEntry.update({where:{id:f.receipt.id},data:{amount:4100}});
+      await db.account.update({where:{id:f.account.id},data:{balance:-4100}});
+      assert.equal((await getReservationMoveInReadiness(f.scope,f.reservation.id)).requiredAmount,4100);
+      const result=await confirmReservationMoveIn(f.scope,f.reservation.id);
+      const tenancy=await db.tenancy.findUniqueOrThrow({where:{id:result.tenancyId}});
+      assert.equal(tenancy.productLine,"MICRO_WAREHOUSE");assert.deepEqual(tenancy.businessDetails,businessDetails);
+      assert.equal((await confirmReservationMoveIn(f.scope,f.reservation.id)).idempotent,true);
+      const lines=await db.ledgerEntry.findMany({where:{accountId:f.account.id,type:'CHARGE'},orderBy:{externalRef:'asc'}});
+      assert.deepEqual(lines.map(l=>[l.externalRef,Number(l.amount)]),[['RENT-2026-02',1300],['RENT-2026-03',2800]]);
+      assert.equal(Number((await db.account.findUniqueOrThrow({where:{id:f.account.id}})).balance),0);
+      assert.equal(Number((await db.occupancy.findFirstOrThrow({where:{tenancyId:result.tenancyId}})).monthlyRate),2800);
+    });
     await t.test("verified sandbox confirmation is queued once and sends once without financial changes", async () => {
       const f = await fixture();
       await db.customer.update({where:{id:f.customer.id},data:{email:"confirmation@example.invalid",emailVerifiedAt:new Date()}});

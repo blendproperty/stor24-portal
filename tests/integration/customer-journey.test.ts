@@ -1,4 +1,5 @@
 import { facialPhotoPolicy } from "../../src/lib/facial-photo-security";
+import { publicInitialRent, publicCheckoutTotal } from "../../src/lib/public-initial-rent";
 import { submitTenantPhoto, previewFacialPhoto, reviewFacialPhoto, expireFacialPhotos } from "../../src/lib/facial-photo-service";
 import { getMoveInProgress } from "../../src/lib/move-in-progress";
 import assert from "node:assert/strict";
@@ -145,7 +146,7 @@ test("isolated PostgreSQL connected customer journey", async t => {
     });
     await t.test("J04/J13 unpaid handover blocks; a synthetic staff receipt posts once", async () => {
       await assert.rejects(confirmReservationMoveIn(scope, reservation.id), /MOVE_IN_NOT_READY/);
-      const receipt = { reservationId: reservation.id, requestId: randomUUID(), amount: 100, method: "EFT" as const, reference: "SYNTHETIC-RECEIPT-ONLY", receivedAt: new Date(Date.now() - 1000), realPaymentConfirmed: true as const };
+      const receipt = { reservationId: reservation.id, requestId: randomUUID(), amount: publicCheckoutTotal(reservation), method: "EFT" as const, reference: "SYNTHETIC-RECEIPT-ONLY", receivedAt: new Date(Date.now() - 1000), realPaymentConfirmed: true as const };
       const [a, b] = await Promise.all([recordReservationReceipt(scope, receipt), recordReservationReceipt(scope, receipt)]);
       assert.equal(a.paymentId, b.paymentId);
       await assert.rejects(recordReservationReceipt(scope, { ...receipt, requestId: randomUUID() }), /REFERENCE_EXISTS/);
@@ -217,10 +218,14 @@ test("isolated PostgreSQL connected customer journey", async t => {
       assert.equal((await moveOut(scope, leaving)).replayed, true);
       await assert.rejects(moveOut(scope, { ...leaving, finalCharge: 26 }), /CONFLICT/);
       const balance = (await db.account.findUniqueOrThrow({ where: { id: account.id } })).balance;
-      assert.equal(Number(balance), -75); // 100 receipt, 25 final charge; no invented rent/proration rule.
+      assert.equal(Number(balance), 25); // Initial rent is charged and paid; only the final charge remains.
       const statement = await getStatementData({ id: account.id, customer: { organisationId: org.id } }, "2026-01-01", "2099-12-31");
-      assert.equal(statement.closingBalance, "-75.00");
-      assert.equal(statement.rows.length, 2);
+      assert.equal(statement.closingBalance, "25.00");
+      const initialRent = publicInitialRent(reservation);
+      assert.equal(statement.rows.length, 2 + initialRent.lines.length);
+      const rentCharges = await db.ledgerEntry.findMany({ where: { accountId: account.id, externalRef: { startsWith: "RENT-" } } });
+      assert.equal(rentCharges.length, initialRent.lines.length);
+      assert.equal(rentCharges.reduce((sum, entry) => sum + Number(entry.amount), 0), initialRent.total);
       assert.equal(await db.payment.count({ where: { accountId: account.id } }), 1);
       await expireIdentityDocuments();
       assert.equal((await db.identityDocument.findUniqueOrThrow({ where: { id: documentId } })).encryptedPages, null);

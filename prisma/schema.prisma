@@ -466,6 +466,7 @@ model Reservation {
   status             ReservationStatus @default(ACTIVE)
   journey            ReservationJourney @default(RENTAL)
   quotedRate         Decimal           @db.Decimal(12, 2)
+  initialRentSnapshot Json?
   holdExpiresAt      DateTime?
   intendedMoveIn     DateTime?
   paymentMethod      String?
