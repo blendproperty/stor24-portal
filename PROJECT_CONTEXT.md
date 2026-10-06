@@ -1,5 +1,16 @@
 # STOR 24 CRM and Operations Platform — Project Context
 
+## Micro Warehousing implementation candidate — 6 October 2026
+
+- **Implementation:** confirmed physical unit attributes with per-unit overrides, facility business amenities in audited store configuration, and single-pool Micro Warehousing unit-type eligibility with audited unit overrides, staff inventory filters and a ground-floor live-map overlay. Customer-safe API filters both map and list server-side; reservation eligibility is checked after canonical facility/unit locks. Leads, reservations and move-in tenancies retain product-line and business-details snapshots. Existing inventory defaults to Self-Storage; no production units were automatically reclassified.
+- **Testing:** TypeScript and five targeted product/business-attribute contract tests passed. At source20db1c7, CI validate (567 unit tests, type/lint/build), isolated database shared-pool/concurrent reservation checks, dependency/secrets/static analysis and CodeQL passed. Inventory read/save recovery at1440/390/320 and company setup recovery passed locally. The physical-attribute extension has its own pending exact-source protected CI/database run; guided workflow and production promotion remain pending.
+- **Commit and push:** tested core20db1c7 pushed on `codex/micro-warehousing-20261006`; physical-attribute extension and this validation entry are promoted together. Exact merge/deployed SHA remains pending.
+- **Merge:** not yet merged at this entry.
+- **Deployment and configuration:** not yet deployed at this entry. No provider, payment, access or financial automation is enabled by this work.
+- **Live production verification:** pending. Website/CRM/CMS delivery must each be checked after release; a build or API health result alone is not lifecycle acceptance.
+- **Open gates:** owner selection of pilot ground-floor units and their exclusive/shared designation; business permitted-use rules and legal addendum; authenticated booking CAPTCHA/OTP/customer UAT; real payment/access/finance provider acceptance, data reconciliation, staff training, approvals and independent backup/recovery remain OPEN. Later reporting/add-ons/multi-user access/offline conversions and optional use-case routes in the draft scope are not implemented by this MVP. Existing legal signing amounts and provider boundaries are retained.
+
+
 ## Meeting requirements released and verified - 5 October 2026
 
 - **Implementation:** Brett's nine meeting requirements and Mike Sweidan's 5 October “Stor24 meeting” email were checked. Live CRM release includes tenant duration/days since a recorded price change, future group percentage/Rand rent review by tenure or recorded change history, group audit/reporting, voluntary market-profile capture and summaries, configurable first-response SLA, and staff first-rent methods/cutoff. Existing customer percentage/Rand discount controls, facility/unit maintenance and own-insurance wording were verified. Facility map remains expressly deferred to Brett and Mark. Missing price/source/gender history is not invented. Signed public checkout amounts and legal versions were not changed; proration flexibility is currently the staff move-in/calculator workflow, not repriced public checkout.

@@ -313,6 +313,8 @@ model UnitType {
   widthMetres  Decimal? @db.Decimal(8, 2)
   lengthMetres Decimal? @db.Decimal(8, 2)
   areaSqMetres Decimal? @db.Decimal(8, 2)
+  businessAttributes Json?
+  useTypes     String[] @default(["STORAGE"])
   features     String[]
   units        Unit[]
   leads        Lead[]
@@ -323,6 +325,8 @@ model UnitType {
 }
 
 model Unit {
+  businessAttributesOverride Json?
+  useTypesOverride String[] @default([])
   id                  String               @id @default(cuid())
   facilityId          String
   facility            Facility             @relation(fields: [facilityId], references: [id], onDelete: Cascade)
@@ -421,6 +425,8 @@ model Customer {
 }
 
 model Lead {
+  productLine String @default("STORAGE")
+  businessDetails Json?
   id                String        @id @default(cuid())
   facilityId        String
   facility          Facility      @relation(fields: [facilityId], references: [id], onDelete: Cascade)
@@ -444,6 +450,8 @@ model Lead {
 }
 
 model Reservation {
+  productLine String @default("STORAGE")
+  businessDetails Json?
   id                 String            @id @default(cuid())
   facilityId         String
   facility           Facility          @relation(fields: [facilityId], references: [id], onDelete: Cascade)
@@ -561,6 +569,8 @@ model PublicPaymentSession {
 }
 
 model Tenancy {
+  productLine String @default("STORAGE")
+  businessDetails Json?
   id          String        @id @default(cuid())
   facilityId  String
   facility    Facility      @relation(fields: [facilityId], references: [id], onDelete: Cascade)

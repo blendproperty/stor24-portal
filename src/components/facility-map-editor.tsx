@@ -1,5 +1,7 @@
 "use client";
 
+import { unitSupportsProduct } from "@/lib/product-line";
+import { floorKey } from "@/lib/floor-availability";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
@@ -36,6 +38,7 @@ import { PageHeader } from "@/components/page-header";
 import { moveLayer, type LayerMove } from "@/lib/layer-order";
 
 type UnitType = {
+  useTypes?: string[];
   id: string;
   name: string;
   widthMetres: string | null;
@@ -43,6 +46,8 @@ type UnitType = {
   areaSqMetres: string | null;
 };
 type Unit = {
+  floor?: string | null;
+  useTypesOverride?: string[];
   id: string;
   number: string;
   status: string;
@@ -142,6 +147,7 @@ export function FacilityMapEditor() {
   const [unitDialog, setUnitDialog] = useState(false);
   const [duplicateDialog, setDuplicateDialog] = useState(false);
   const [duplicateTarget, setDuplicateTarget] = useState("");
+  const [microOnly, setMicroOnly] = useState(false);
   const [mode, setMode] = useState<"build" | "live">("build");
   const [expanded, setExpanded] = useState(false);
   const mapScrollRef = useRef<HTMLDivElement>(null);
@@ -704,6 +710,7 @@ export function FacilityMapEditor() {
             Live view
           </button>
         </div>
+        {mode === "live" && <label><input type="checkbox" checked={microOnly} onChange={e=>{const checked=e.target.checked;setMicroOnly(checked);if(checked){const ground=maps.find(m=>floorKey(m.name)==="ground floor");if(ground)selectFloor(ground.name);}}}/> Micro Warehousing only · ground floor</label>}
         <label>
           Store
           <select
@@ -723,7 +730,7 @@ export function FacilityMapEditor() {
             value={floorName}
             onChange={(event) => selectFloor(event.target.value)}
           >
-            {maps.map((map) => (
+            {maps.filter(map=>mode !== "live" || !microOnly || floorKey(map.name)==="ground floor").map((map) => (
               <option value={map.name} key={map.id}>
                 {map.name}
               </option>
@@ -922,6 +929,7 @@ export function FacilityMapEditor() {
               {elements.map((element, layerIndex) => (
                 <div
                   key={element.id}
+                  hidden={mode === "live" && microOnly && (floorKey(floorName) !== "ground floor" || (element.type === "UNIT" && (!element.unitDetails || !unitSupportsProduct({ ...element.unitDetails, floor: element.unitDetails.floor || floorName }, "MICRO_WAREHOUSE"))))}
                   className={`map-editor-element map-editor-${element.type.toLowerCase()} ${selectedId === element.id ? "selected" : ""} ${element.status ? `map-status-${element.status.toLowerCase()}` : ""} ${mode === "live" ? "live" : ""}`}
                   style={{
                     left: element.x,

@@ -90,15 +90,26 @@ export const facilitySchema = z.object({
     .optional(),
   publicBookingEnabled: z.boolean().default(false),
 });
+export const businessAttributesSchema = z.object({
+ hasPower:z.boolean().optional(),hasLighting:z.boolean().optional(),driveUpAccess:z.boolean().optional(),
+ powerSpec:z.string().trim().max(200).optional(),doorType:z.string().trim().max(100).optional(),
+ doorWidthMm:z.number().int().positive().max(20000).optional(),doorHeightMm:z.number().int().positive().max(20000).optional(),
+ ceilingHeightMm:z.number().int().positive().max(30000).optional(),distanceToLoadingBayM:z.number().int().nonnegative().max(10000).optional(),
+ palletCapacityEstimate:z.number().int().nonnegative().max(10000).optional(),
+});
 export const unitTypeSchema = z.object({
   facilityId: id,
   name: z.string().trim().min(1).max(100),
   widthMetres: z.coerce.number().positive().optional(),
   lengthMetres: z.coerce.number().positive().optional(),
   areaSqMetres: z.coerce.number().positive().optional(),
+  businessAttributes: businessAttributesSchema.optional(),
+  useTypes: z.array(z.enum(["STORAGE", "MICRO_WAREHOUSE"])).min(1).max(2).default(["STORAGE"]),
   features: z.array(z.string().trim().min(1).max(80)).max(30).default([]),
 });
 export const unitSchema = z.object({
+  businessAttributesOverride: businessAttributesSchema.optional(),
+  useTypesOverride: z.array(z.enum(["STORAGE", "MICRO_WAREHOUSE"])).max(2).default([]),
   facilityId: id,
   unitTypeId: id,
   number: z.string().trim().min(1).max(40),
