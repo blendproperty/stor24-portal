@@ -627,6 +627,7 @@ export function UnitInventoryWorkspace({
           Status
           <select
             value={status}
+            aria-label="Status"
             onChange={(event) => setStatus(event.target.value)}
           >
             <option value="">All statuses</option>
