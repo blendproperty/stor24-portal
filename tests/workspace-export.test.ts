@@ -45,5 +45,8 @@ test("workspace export authority, origin, facility and bounded shape are enforce
   assert.equal((await f.post(rows, { facilityId: "b" })).status, 403);
   assert.equal((await f.post([["Repeated", "Repeated"], ["a", "b"]])).status, 422);
   assert.equal((await f.post(rows, { kind: "unknown" })).status, 422);
+  assert.equal((await f.post([["x".repeat(101)], ["Synthetic"]])).status, 422);
+  const headers = Array.from({length: 100}, (_, i) => `Column ${i} ${"x".repeat(80)}`);
+  assert.equal((await f.post([headers, ...Array.from({length: 5000}, () => [])])).status, 422);
   assert.equal(f.state.audits.length, 0);
 });

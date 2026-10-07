@@ -18,9 +18,16 @@ export async function POST(request: Request) {
     if (actor.allowedFacilityIds !== null) { scope.facilityIds = actor.allowedFacilityIds.filter(id => scope.unrestrictedFacilities || scope.facilityIds.includes(id)); scope.unrestrictedFacilities = false; }
     if (!scope.unrestrictedFacilities && !scope.facilityIds.length) throw new Error("FORBIDDEN");
     if (input.facilityId) await requireFacility(scope, input.facilityId);
-    if (input.rows[0].some(value => typeof value !== "string")) throw new Error("CSV_INVALID");
+    if (!input.rows[0].length || input.rows[0].some(value => typeof value !== "string" || value.length > 100)) throw new Error("CSV_INVALID");
     const headers = input.rows[0].map(String);
     if (headers.some(h => !h.trim()) || new Set(headers).size !== headers.length || input.rows.some(row => row.length > headers.length)) throw new Error("CSV_INVALID");
+    // Bound expanded object-key overhead before materialising repeated column names.
+    const keyBytes = new TextEncoder().encode(JSON.stringify(headers)).byteLength;
+    let expandedBytes = 2;
+    for (const row of input.rows.slice(1)) {
+      expandedBytes += keyBytes + new TextEncoder().encode(JSON.stringify(row)).byteLength + headers.length * 4 + 4;
+      if (expandedBytes > DLP_MAX_BYTES) throw new Error("CSV_INVALID");
+    }
     const rows = input.rows.slice(1).map(row => Object.fromEntries(headers.map((key, index) => [key, row[index] ?? ""])));
     const currentActor = await requirePermission("reports.export");
     const access = currentRoleAccess(currentActor.user.roleAssignments, "data.personal_export");

@@ -45,7 +45,7 @@ export function personalExportFields(rows: ReadonlyArray<Record<string, unknown>
   for (const row of rows) for (const [key, value] of Object.entries(row)) {
     if (value === null || value === "") continue;
     if (personalKey.test(key.replace(/[^a-z0-9]/gi, "").toLowerCase()) ||
-        (typeof value === "string" && (/[^\s@]+@[^\s@]+\.[^\s@]+/.test(value) || /(?:\+27|\b0)[ -]?(?:\d[ -]?){8,9}\b/.test(value)))) fields.add(key);
+        (typeof value === "string" && (/@[^\s@.]+\.[^\s@]+/.test(value) || /(?:\+27|\b0)[ -]?(?:\d[ -]?){8,9}\b/.test(value)))) fields.add(key);
   }
   return [...fields].sort();
 }
