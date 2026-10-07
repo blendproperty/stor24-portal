@@ -22,7 +22,7 @@ export async function leadsWorkspace(scope: RequestScope) {
       include: { customer: { select: { id: true, firstName: true, lastName: true, companyName: true, email: true, phone: true } },
         facility: { select: { id: true, name: true } }, desiredUnitType: { select: { name: true } },
         assignedTo: { select: { id: true, name: true } },
-        reservations: { select: { id: true, status: true, journey: true, quotedRate: true, convertedTenancyId: true, convertedTenancy: { select: { status: true } }, unit: { select: { number: true } } } } } }),
+        reservations: { select: { id: true, status: true, journey: true, quotedRate: true, convertedTenancyId: true, publicLease: { select: { id: true, status: true, signedAt: true, signedPdfSha256: true } }, convertedTenancy: { select: { status: true, accountId: true, documents: { where: { type: "LEASE_AGREEMENT" }, select: { id: true, status: true, signedAt: true } } } }, unit: { select: { number: true } } } } } }),
     db.lead.count({ where }),
     db.user.findMany({ where: { organisationId: scope.organisationId, active: true,
       roleAssignments: { some: { OR: [{ facilityId: null }, { facilityId: { in: facilities.map(f => f.id) } }] } } },

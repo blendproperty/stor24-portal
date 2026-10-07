@@ -53,7 +53,7 @@ export async function moveInAction(data: FormData) {
   const scope = await requireScope();
   const result = await moveIn(scope, parsed);
   await dispatchBlendSignLease(scope, result, parsed);
-  revalidatePath("/tenants"); revalidatePath("/operations/accounts"); redirect("/operations/accounts");
+  revalidatePath("/tenants"); revalidatePath("/operations/accounts"); redirect(`/operations/accounts?accountId=${encodeURIComponent(result.tenancy.accountId)}`);
 }
 
 export async function confirmReservationMoveInAction(data: FormData): Promise<{ error: string } | undefined> {
