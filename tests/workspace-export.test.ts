@@ -31,10 +31,12 @@ test("workspace CSV downloads audit exact server-released bytes and protect form
 test("workspace exports cannot bypass personal grants, existing credential blocks or saved audits", async () => {
   const f = await fixture(), rows = [["Campaign", "Spend"], ["synthetic@example.invalid", 2]];
   assert.equal((await f.post(rows)).status, 403);
+  assert.equal((await f.post([["synthetic@example.invalid"]])).status, 403);
   f.state.personal = true; assert.equal((await f.post(rows)).status, 200);
   f.state.personal = false; f.state.owner = true; assert.equal((await f.post(rows, { kind: "advertising" })).status, 200);
   assert.equal((await f.post([["Customer"], ["Synthetic"]], { kind: "rent-review" })).status, 200);
   assert.equal((await f.post([["Campaign"], ["-----BEGIN PRIVATE KEY-----"]])).status, 422);
+  assert.equal((await f.post([["-----BEGIN PRIVATE KEY-----"]])).status, 422);
   assert.equal((await f.post([["Contact synthetic@example.invalid"], ["Synthetic"]])).status, 200);
   f.state.failAudit = true; assert.equal((await f.post(rows)).status, 500);
   assert.equal((await f.post([["Contact synthetic@example.invalid"], ["Synthetic"]])).status, 500);
