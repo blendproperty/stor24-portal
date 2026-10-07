@@ -4,7 +4,7 @@ import { inspectReportExport, personalExportFields } from "@/lib/dlp-policy";
 import { rateLimit } from "@/lib/request-security";
 
 /** Persist the decision before releasing bytes. An audit outage blocks release. */
-export async function guardReportExport(input: { organisationId: string; actorId: string; reportKey: string; facilityId?: string; channel?: "report-preview" | "report-download"; personalDataAllowed?: boolean; columnLabels?: string[]; payloadSource?: "database" | "browser-selected"; format?: string; period?: { from: string; to: string }; rows: ReadonlyArray<Record<string, unknown>> }) {
+export async function guardReportExport(input: { organisationId: string; actorId: string; reportKey: string; facilityId?: string; channel?: "report-preview" | "report-download"; personalDataAllowed?: boolean; personalColumnKeys?: string[]; columnLabels?: string[]; payloadSource?: "database" | "browser-selected"; format?: string; period?: { from: string; to: string }; rows: ReadonlyArray<Record<string, unknown>> }) {
   const decision = inspectReportExport(input.reportKey, input.rows);
   const headerRows = input.columnLabels ? [{ csvHeader: input.columnLabels.join(" ") }] : [];
   if (headerRows.length) {
@@ -13,7 +13,7 @@ export async function guardReportExport(input: { organisationId: string; actorId
     decision.reasons = [...new Set([...decision.reasons, ...headerDecision.reasons])].sort();
     if (headerDecision.classification === "restricted") decision.classification = "restricted";
   }
-  const personalFields = input.channel === "report-preview" ? [] : [...new Set([...personalExportFields(input.rows), ...personalExportFields(headerRows)])];
+  const personalFields = input.channel === "report-preview" ? [] : [...new Set([...personalExportFields(input.rows), ...personalExportFields(headerRows), ...(input.personalColumnKeys ?? [])])];
   const auditedPersonalFields = input.payloadSource === "browser-selected"
     ? personalFields.map(key => key === "csvHeader" ? "Column labels" : `Column ${Object.keys(input.rows[0] ?? {}).indexOf(key) + 1}`) : personalFields;
   if (personalFields.length) decision.classification = "restricted";

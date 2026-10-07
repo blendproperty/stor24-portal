@@ -51,8 +51,9 @@ test("private file release routes must retain a DLP boundary, with only public s
     if(!/content-disposition|Content-Disposition|tenantPdf\(/.test(source))continue;
     if(file.replaceAll("\\","/")==="public/v1/storage-terms/pdf/route.ts")continue;
     if(file.replaceAll("\\","/")==="v1/move-in-training/route.ts") { assert.match(source,/trainingSample\(/); continue; }
-    assert.match(source,/protectDlpResponse|guardDlpTransfer|guardReportExport|hostedMandatePdf/,`Unprotected file release: ${file}`);covered++;
+    assert.match(source,/protectDlpResponse|guardDlpTransfer|guardReportExport|authoriseReportResult|hostedMandatePdf/,`Unprotected file release: ${file}`);covered++;
   }
+  assert.match(readFileSync("src/lib/visual-report-service.ts","utf8"),/await guardReportExport\(/);
   assert.ok(covered>=12);
 });
 

@@ -42,6 +42,7 @@ jobs:
       - run: npx tsx --test tests/integration/mfa-recovery-atomicity.test.ts
       - run: npx tsx --test tests/integration/password-change-revocation.test.ts
       - run: npx tsx --test tests/integration/account-payment-retry.test.ts
+      - run: npx tsx --test tests/integration/visual-reporting.test.ts
       - run: npx tsx --test tests/integration/daily-close.test.ts
       - run: npx tsx --test tests/integration/configuration-atomicity.test.ts
       - run: npx tsx --test tests/integration/operations-alerts.test.ts
