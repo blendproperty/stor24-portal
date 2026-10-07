@@ -5,7 +5,7 @@
 - **Commit and push:** canonical context on existing review branch; remote readback required after push. Legal artifact local only.
 - **Merge:** none.
 - **Deployment and configuration:** none; software/contract proration and all existing provider gates remain unresolved.
-- **Live production verification:** none. Liezl/Mark email remains a draft; verify actual Drafts folder, revised body and single attachment before handoff.
+- **Live production verification:** none. Verified in actual Drafts folder with isDraft filter: To Liezl, Cc Mark, revised single-document explanation and exactly one non-inline attachment (47,569-byte STOR24 Word agreement). Unsent.
 - **Open gates:** counsel review and legal/commercial approval, confirmed contracting particulars, original notice discrepancy, provider/payment/access UAT, software alignment, data and training remain open.
 
 ## Exact original agreement with online-only addendum — 7 October 2026
@@ -3087,4 +3087,5 @@ A CRM capability is complete only when it is database-backed, scoped, permission
 - **Deployment/configuration:** automatic Deploy to VPS37438032057 succeeded08:45:41 UTC. Read-only runtime verification confirmed checkout ef70571268c2eba5d3a9bebf416f17fba77a091e and healthy application image sha256:e760429286395adf307304205fae5b094367bea64453ace29b5ba2db6831989d. This correction adds no migration/provider setting and preserves the separate origin-renewal change.
 - **Live production verification:** owner's existing Units browser tab reloaded; Ground floor selected by default,142 unit buttons,35 Micro filter matches, no Single door/Double door/copy annotations, no page overflow. Actual unit40 showed23m²/R2800 per month and both product badges. Zoom changed surface width775.25 to1007.83; Fit map restored775.25 and retained selection. Real units40+41 preview returned46m²/R5600; Apply remained disabled without physical confirmation. Cancelled preview and left Unit40 selected in the clean Micro view. Live screenshot visually inspected. Read-only database confirmed530 units,0 components,0 combinations and55 of55 qualifying units retain both overrides with55 authorisation audits. No live Apply/customer/payment/lease write was made.
 - **Remaining gates:** physical approval/operator combination UAT, future split/edit workflow, customer identity/lease/payment, analytics/provider/access/finance acceptance, data, training, recovery and prior approval gates remain open. UI production verification does not imply completed physical work or provider/business launch.
+
 
