@@ -21,6 +21,17 @@ jobs:
         with:
           node-version: 22
       - run: npm audit --audit-level=low
+      - name: Verify patched image runtime on production Alpine base
+        run: |
+          docker run --rm -v "$PWD:/source:ro" node:22-alpine sh -ec '
+            mkdir -p /app/tests
+            cp /source/package.json /source/package-lock.json /app/
+            cp -R /source/vendor /app/vendor
+            cp /source/tests/sharp-runtime.test.ts /app/tests/
+            cd /app
+            npm ci
+            ./node_modules/.bin/tsx --test tests/sharp-runtime.test.ts
+          '
   secrets:
     runs-on: ubuntu-latest
     timeout-minutes: 10

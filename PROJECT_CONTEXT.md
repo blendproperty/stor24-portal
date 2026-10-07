@@ -1,3 +1,12 @@
+## PR 410 Sharp dependency security remediation - 7 October 2026
+
+- **Implementation:** updated both Sharp dependency/override pins from 0.35.4 to 0.35.5 and regenerated the lockfile, including all platform native/WASM packages and bundled libvips 1.3.4. PR410 branch incorporates current main 93de3b3; reports layout retained. GHSA-wq5f-xc86-pv6w affects the previously pinned image decoder. Existing JPEG/PNG validation and legitimate SVG training rendering retained. Added synthetic patched-runtime smoke test and a Security checks Alpine native-runtime step using the production Node22 Alpine base.
+- **Testing:** reproduced the dependency audit failure before editing; fresh task-local npm ci and npm audit --audit-level=low now report zero vulnerabilities. npm ls sharp confirms Next and the application share 0.35.5. All12 focused facial-photo, identity-document and runtime tests pass, including malformed/truncated/oversized input rejection, EXIF removal and synthetic SVG/PNG/JPEG decoding. Independent read-only investigation/review found no concrete bypass/regression. Full npm run check and protected CI pending. Local Docker daemon unavailable; Alpine check must pass in CI. No real identity data or production writes used.
+- **Commit and push:** candidate and evidence prepared for existing codex/reports-layout-20261006 / PR410; exact remote readback required after push.
+- **Merge:** not performed; protected checks and review remain required.
+- **Deployment and configuration:** not performed; no migration, secrets or provider configuration changes.
+- **Live production verification:** not performed; production remains unverified for this dependency update and reports layout. Preserve all existing provider, finance, privacy, reconciliation, data, UAT, training and business approval gates.
+
 ## Origin restriction active across STOR24 - 6 October 2026, 10:59 UTC
 
 - **Implementation:** independent Cloudflare socket-peer IPAllowList middleware protects website/apex/www, portal and CMS canonical HTTPS routers and legacy catch-alls. Default RemoteAddr is used; no caller-supplied forwarding-header strategy. Legacy GET/HEAD navigation, including API navigation, redirects canonical. Only exact legacy POST Netcash/Twilio/BlendSign callbacks and one authenticated generic-provider segment retain access; identity/admin/general APIs have no bypass. HTTP-01 and unrelated shared-host applications remain separate. The new read-only origin/forged-header probe feeds the existing readiness job, alert channels and dashboard aggregate.
