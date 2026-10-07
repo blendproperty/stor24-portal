@@ -47,6 +47,13 @@ test("isolated PostgreSQL reporting persistence, claims, expiry and history scop
       const result=await runScheduledReports(now);assert.equal(result.failed,1);
       const failed=await db.reportRun.findFirstOrThrow({where:{scheduleId:schedule.id,status:"FAILED"}});assert.equal(failed.encryptedResult,null);assert.equal(failed.failureCode,"FORBIDDEN");
     });
+    await t.test("all eighteen adapters execute real scoped PostgreSQL queries",async()=>{
+      for(const dataset of visualReportDatasets){
+        const scope={organisationId:org.id,userId:user.id,unrestrictedFacilities:true,facilityIds:[]};
+        const rows=await visualReportSource(scope,defaultVisualQuery(dataset.key,"2026-10-01","2026-10-31"));
+        if(dataset.key==="audit"){assert.equal(rows.length,5);assert.ok(rows.every(row=>row.actor==="Synthetic employee"&&row.facility==="Reporting fixture store"));}else assert.deepEqual(rows,[],dataset.key);
+      }
+    });
     await t.test("encrypted historical rows remain separate and cannot cross a facility scope",async()=>{
       const id=randomUUID(),rows=[{facility:"Reporting fixture store",unit:"Historical A1"}];
       await db.reportHistoryImport.create({data:{id,organisationId:org.id,facilityId:other.id,dataset:"units",name:"Synthetic history",extractedAt:new Date(),importedById:user.id,approvalReference:"CI validation only",sourceSha256:"synthetic",rowCount:1,encryptedRows:encryptReportArtifact(JSON.stringify(rows),`${org.id}:history:${id}`)}});

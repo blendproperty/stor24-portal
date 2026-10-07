@@ -2,7 +2,7 @@ import { guardDlpTransfer } from "@/lib/dlp-transfer-service";
 import { authErrorResponse, requireOwner } from '@/lib/auth-guards';
 import { operationsDiagnostics } from '@/lib/operations-diagnostics';
 export const dynamic = 'force-dynamic';
-export async function GET(request?: Request) {
+export async function GET(request: Request) {
   try {
     const auth = await requireOwner();
     // Host/monitor evidence belongs only to the fixed monitored organisation.
