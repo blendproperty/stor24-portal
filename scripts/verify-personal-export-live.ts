@@ -25,7 +25,7 @@ async function main() {
       return new SignJWT({ userId, name: user.name, email: user.email, role: "Synthetic", sessionVersion: user.sessionVersion }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("90s").sign(new TextEncoder().encode(process.env.AUTH_SECRET));
     }
     const ownerCookie = await cookie(owner.id); let delegateCookie = await cookie(delegate.id);
-    const request = (path: string, token: string, body?: unknown) => fetch(`http://127.0.0.1:3000${path}`, { method: body ? "PATCH" : "GET", headers: { cookie: `stor24_session=${token}`, origin: process.env.APP_URL ?? "http://127.0.0.1:3000", "content-type": "application/json" }, ...(body ? { body: JSON.stringify(body) } : {}), redirect: "manual" });
+    const request = (path: string, token: string, body?: unknown) => fetch(`http://127.0.0.1:3000${path}`, { method: body ? path === "/api/v1/reports/csv" ? "POST" : "PATCH" : "GET", headers: { cookie: `stor24_session=${token}`, origin: process.env.APP_URL ?? "http://127.0.0.1:3000", "content-type": "application/json" }, ...(body ? { body: JSON.stringify(body) } : {}), redirect: "manual" });
     const day = southAfricaDateKey(new Date());
     const route = `/api/v1/reports/export?reportKey=lead-conversion&from=${day}&to=${day}&facilityId=${facility.id}`;
     for (const format of ["CSV", "JSON", "XLSX", "PDF"]) {
@@ -48,13 +48,16 @@ async function main() {
     assert.equal((await request(`${route}&format=JSON`, delegateCookie)).status, 403);
     const preview = await request(route.replace("/export?", "/preview?") + "&format=JSON", delegateCookie);
     assert.equal(preview.status, 200);
+    const csvInput = { kind: "marketing", rows: [["Campaign", "Spend"], ["synthetic@example.invalid", 1]], facilityId: facility.id };
+    assert.equal((await request("/api/v1/reports/csv", delegateCookie, csvInput)).status, 403);
+    assert.equal((await request("/api/v1/reports/csv", ownerCookie, csvInput)).status, 200);
     const events = await db.auditEvent.findMany({ where: { organisationId: org.id } });
-    assert.equal(events.filter(e => e.action === "dlp.export.blocked").length, 5);
+    assert.equal(events.filter(e => e.action === "dlp.export.blocked").length, 6);
     assert.equal(events.filter(e => e.action === "user.permissions.updated").length, 2);
     assert.doesNotMatch(JSON.stringify(events), /Synthetic export proof|synthetic@example.invalid/);
     const page = await request("/audit/data-protection", ownerCookie); assert.equal(page.status, 200);
     assert.match(await page.text(), /Channel \/ format/);
-    console.log(JSON.stringify({ policy: DLP_POLICY_VERSION, ownerFormats: 4, wildcardFormatsDenied: 4, selfDelegationDenied: true, selfPromotionDenied: true, ownerGrantAndRevoke: true, sessionInvalidation: true, delegatedExport: 200, revokedExport: 403, authorisedPreview: 200, blockedAuditCount: 5, permissionAuditCount: 2, auditPage: 200, existingStaffOrCustomerChanges: 0, providerCalls: 0 }));
+    console.log(JSON.stringify({ policy: DLP_POLICY_VERSION, ownerFormats: 4, wildcardFormatsDenied: 4, selfDelegationDenied: true, selfPromotionDenied: true, ownerGrantAndRevoke: true, sessionInvalidation: true, delegatedExport: 200, revokedExport: 403, authorisedPreview: 200, blockedAuditCount: 6, browserSelectedCsvOwnerAllowed: true, browserSelectedCsvUnauthorisedDenied: true, permissionAuditCount: 2, auditPage: 200, existingStaffOrCustomerChanges: 0, providerCalls: 0 }));
   } finally {
     await db.auditEvent.deleteMany({ where: { organisationId: org.id } });
     await db.rateLimitBucket.deleteMany({ where: { key: { startsWith: `dlp:${org.id}:` } } });

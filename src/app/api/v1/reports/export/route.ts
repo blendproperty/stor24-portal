@@ -33,7 +33,8 @@ export async function GET(request: Request) {
     if (!scope.unrestrictedFacilities && scope.facilityIds.length === 0) throw new Error("FORBIDDEN");
     const isSnapshot = isCurrentSnapshotReport(definition.key);
     const rows = await buildReportRows(scope, parsed.data);
-    const personalAccess = currentRoleAccess(session.user.roleAssignments, "data.personal_export");
+    const currentActor = await requirePermission("reports.export");
+    const personalAccess = currentRoleAccess(currentActor.user.roleAssignments, "data.personal_export");
     const personalFacilityIds = parsed.data.facilityId ? [parsed.data.facilityId] : scope.facilityIds;
     const personalDataAllowed = personalAccess.allowed && (personalAccess.allowedFacilityIds === null ||
       ((!!parsed.data.facilityId || !scope.unrestrictedFacilities) && personalFacilityIds.every(id => personalAccess.allowedFacilityIds!.includes(id))));
