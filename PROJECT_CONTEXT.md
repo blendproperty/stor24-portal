@@ -1,3 +1,9 @@
+## Reports release browser-selector correction - 7 October 2026
+
+- **Implementation:** report-export recovery fixture targets the Report combobox by exact accessible name rather than a broad label regex, which also matched the new catalogue region. Product accessibility names and export behavior retained; no assertion removed.
+- **Testing:** failed implementation CI37583157515 stopped on strict selector ambiguity. Corrected report-export recovery test passes at1440/390/320, covering validation/server/malformed/network/timeout recovery, duplicate requests, empty data, exact CSV downloads, access/session guidance and read-only reload. Prior Sharp security/Alpine and582-test/build evidence remains valid for unchanged product code. New exact-head full checks required; preceding final-doc browser run must not be treated as passed.
+- **Commit/push:** prepared on PR410 branch with context; remote readback required. **Merge:** pending protected checks. **Deployment/configuration:** not performed. **Live production verification:** pending. Brett authorized normal production release when ready; all existing provider/data/UAT/training/approval gates remain open.
+
 ## PR 410 Sharp dependency security remediation - 7 October 2026
 
 - **Implementation:** updated both Sharp dependency/override pins from 0.35.4 to 0.35.5 and regenerated the lockfile, including all platform native/WASM packages and bundled libvips 1.3.4. PR410 branch incorporates current main 93de3b3; reports layout retained. GHSA-wq5f-xc86-pv6w affects the previously pinned image decoder. Existing JPEG/PNG validation and legitimate SVG training rendering retained. Added synthetic patched-runtime smoke test and a Security checks Alpine native-runtime step using the production Node22 Alpine base.
