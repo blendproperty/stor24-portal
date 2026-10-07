@@ -1,3 +1,4 @@
+import { currentRoleAccess } from "@/lib/current-role-access";
 import { db } from "@/lib/db";
 import { requirePermission } from "@/lib/auth-guards";
 import { updateUserSchema } from "@/lib/validators";
@@ -8,9 +9,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (!sameOrigin(request)) return Response.json({ error: { message: "Request rejected." } }, { status: 403 });
   const parsed = updateUserSchema.safeParse(await request.json());
   if (!parsed.success) return Response.json({ error: { message: "Check the user changes." } }, { status: 422 });
+  const owner = currentRoleAccess(actor.user.roleAssignments).owner;
+  if (parsed.data.roleName && !owner) return Response.json({ error: { message: "Only a Super Admin (Organisation owner) may change security roles." } }, { status: 403 });
   const { id } = await context.params;
   const target = await db.user.findFirst({ where: { id, organisationId: actor.user.organisationId }, include: { roleAssignments: { include: { role: true } } } });
   if (!target) return Response.json({ error: { message: "User not found." } }, { status: 404 });
+  if (!owner && currentRoleAccess(target.roleAssignments, "data.personal_export").allowed) return Response.json({ error: { message: "Only a Super Admin may change access for a personal-data export administrator." } }, { status: 403 });
   if (target.id === actor.user.id && parsed.data.active === false) return Response.json({ error: { message: "You cannot deactivate your own account." } }, { status: 409 });
   if (target.id === actor.user.id && parsed.data.roleName && parsed.data.roleName !== "Organisation owner") return Response.json({ error: { message: "You cannot remove your own owner role." } }, { status: 409 });
   const removesOwner = target.roleAssignments.some((assignment) => assignment.role.name === "Organisation owner") && (parsed.data.active === false || (parsed.data.roleName && parsed.data.roleName !== "Organisation owner"));

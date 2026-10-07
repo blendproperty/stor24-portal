@@ -1,4 +1,5 @@
 "use client";
+import { auditedCsvDownload } from "@/lib/audited-csv-download";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MarketingCommandCentre } from "./marketing-command-centre";
 import { MarketingOutcomes } from "./marketing-outcomes";
@@ -23,7 +24,6 @@ import { marketingReport } from "@/lib/marketing-reporting";
 import {
   marketingSources,
   marketingMedia,
-  csvCell,
 } from "@/lib/marketing-contract";
 import { southAfricaDateKey } from "@/lib/south-africa-time";
 const money = (n: number) =>
@@ -124,7 +124,7 @@ export function MarketingDashboard({ canManage }: { canManage: boolean }) {
         southAfricaDateKey(new Date(a.occurredAt)) <= to,
     )
     .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
-  function exportCsv() {
+  async function exportCsv() {
     if (!report) return;
     let rows: (string | number)[][] = [
       [
@@ -239,17 +239,10 @@ export function MarketingDashboard({ canManage }: { canManage: boolean }) {
           ),
         ];
     }
-    const url = URL.createObjectURL(
-      new Blob([rows.map((row) => row.map(csvCell).join(",")).join("\r\n")], {
-        type: "text/csv;charset=utf-8",
-      }),
-    );
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `stor24-marketing-${tab.replaceAll(" ", "-")}-${from}-${to}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try { await auditedCsvDownload({ kind: "marketing", rows, filename: `stor24-marketing-${tab.replaceAll(" ", "-")}-${from}-${to}.csv`, from, to, ...(facility ? { facilityId: facility } : {}) }); }
+    catch (e) { setError(e instanceof Error ? e.message : "Export unavailable."); }
   }
+
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);

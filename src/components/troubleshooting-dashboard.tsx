@@ -27,10 +27,14 @@ export function TroubleshootingDashboard() {
   }
   useEffect(() => { const controller = new AbortController(); void load(controller.signal); return () => controller.abort(); }, []);
   function refresh() { setBusy(true); setError(''); void load(); }
-  function download() {
+  async function download() {
     if (!data) return;
-    const file = new Blob([JSON.stringify({ ...data, exportedAt: new Date().toISOString(), note: 'Operational evidence only. Provider acceptance is not recipient delivery; local backups are not independent recovery.' }, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(file); const link = document.createElement('a'); link.href = url; link.download = 'stor24-troubleshooting.json'; link.click(); URL.revokeObjectURL(url);
+    try {
+      const response = await fetch('/api/v1/operations/diagnostics?export=json', { cache: 'no-store', signal: AbortSignal.timeout(35_000) });
+      if (!response.ok) throw Error();
+      const url = URL.createObjectURL(await response.blob()), link = document.createElement('a');
+      link.href = url; link.download = 'stor24-troubleshooting.json'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch { setError('The diagnostic export could not be authorised or audited. Contact a Super Admin.'); }
   }
   return <div className="page-stack troubleshooting-workspace">
     <PageHeader eyebrow="Administration · System health" title="Troubleshooting" description="A clear view of what is working, what needs attention and where to investigate next." />

@@ -28,6 +28,7 @@ const messages: Record<string, string> = {
 };
 function failure(e: unknown) {
   const code = e instanceof Error ? e.message : "";
+  if (code === "PERSONAL_EXPORT_FORBIDDEN") return Response.json({ error: "Personal-data exports require explicit Super Admin (Organisation owner) authorisation." }, { status: 403 });
   if (["UNAUTHENTICATED", "FORBIDDEN", "SETTLEMENT_ORG_PERMISSION"].includes(code)) return Response.json({ error: messages[code] ?? (code === "UNAUTHENTICATED" ? "Sign in is required." : "You do not have permission for this action.") }, { status: code === "UNAUTHENTICATED" ? 401 : 403 });
   if (e instanceof z.ZodError || e instanceof SyntaxError) return Response.json({ error: "Check the dates, references, file and confirmation." }, { status: 400 });
   if (messages[code]) return Response.json({ error: messages[code] }, { status: 409 });
@@ -42,7 +43,7 @@ export async function GET(request: Request) {
     const id = params.has("id") ? z.string().cuid().parse(params.get("id")) : null;
     if (exporting) {
       if (!id) return Response.json({ error: "Choose a statement." }, { status: 400 });
-      return await protectDlpResponse(new Response(await settlementCsv(scope, id), { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": 'attachment; filename="settlement-review.csv"', "cache-control": "no-store", "x-content-type-options": "nosniff" } }), { organisationId: scope.organisationId, actorId: scope.userId, resourceId: id }, "confidential");
+      return await protectDlpResponse(new Response(await settlementCsv(scope, id), { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": 'attachment; filename="settlement-review.csv"', "cache-control": "no-store", "x-content-type-options": "nosniff" } }), { organisationId: scope.organisationId, actorId: scope.userId, resourceId: id, personalDataExport: { facilityIds: scope.facilityIds, unrestrictedFacilities: scope.unrestrictedFacilities } }, "confidential");
     }
     return Response.json(id ? await settlementDetail(scope, id) : await settlementWorkspace(scope), { headers: { "cache-control": "no-store" } });
   } catch (e) { return failure(e); }

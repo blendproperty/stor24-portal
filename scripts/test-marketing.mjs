@@ -4,6 +4,7 @@ import { chromium, expect } from "@playwright/test";
 import { createServer } from "node:http";
 import { readFile, mkdir } from "node:fs/promises";
 import assert from "node:assert/strict";
+const csvCell = value => { const text = String(value ?? ""); return '"' + (/^[\s]*[=+@-]/.test(text) ? "'" : "") + text.replaceAll('"', '""') + '"'; };
 const cid = "c" + "a".repeat(24),
   lid = "c" + "b".repeat(24),
   today = new Date(Date.now() + 7200000).toISOString().slice(0, 10);
@@ -127,6 +128,14 @@ const server = createServer(async (req, res) => {
       css +
         "\n.app-shell{display:block}.app-shell .content{max-width:1400px;padding:32px;margin:auto}.app-shell .move-in-navigation{left:24px;right:24px}@font-face{font-family:Satoshi;src:url(/brand/Satoshi-Variable.ttf);font-weight:300 900}body{background:#f1f5f8;--font-satoshi:Satoshi;font-family:Satoshi,Arial,sans-serif} @media(max-width:650px){.app-shell .content{padding:16px}.app-shell .move-in-navigation{left:12px;right:12px}}",
     );
+  }
+  if (req.url === "/api/v1/reports/csv") {
+    assert.equal(req.method, "POST");
+    let raw = ""; for await (const chunk of req) raw += chunk;
+    const input = JSON.parse(raw);
+    assert.ok(["marketing", "advertising"].includes(input.kind));
+    res.setHeader("content-type", "text/csv");
+    return res.end(input.rows.map(row => row.map(csvCell).join(",")).join("\r\n"));
   }
   if (req.url === "/api/v1/marketing/connection") {
     assert.equal(req.method, "POST");
