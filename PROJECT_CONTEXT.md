@@ -1,3 +1,13 @@
+## Single professional STOR24 agreement — 7 October 2026
+
+- **Implementation:** user requires one STOR24 Word document, not source-branded PDF plus separate addendum. Prepared nine-page `STOR24_Storage_Agreement_With_Online_Addendum_2026-10-07.docx`: STOR24 schedule, original 18 contractual clauses with brand substitutions, original debit-order authority/mandate and online-only addendum at the end. OCR transcription errors checked against source pages and corrected, not substantive clauses. Entity/facility/contact particulars remain explicit confirmation fields; source operator identifiers not reused. Previous PDF/addendum package superseded for this handoff.
+- **Testing:** all nine rendered pages inspected; source clauses 1-18 retained after brand and OCR corrections. Original liability/insurance, unfettered discretion, deposit, minimum, full-next-month proration, cancellation and recovery retained; no gross-negligence carveout or after-15th cutoff introduced. Full legal approval remains outstanding.
+- **Commit and push:** canonical context on existing review branch; remote readback required after push. Legal artifact local only.
+- **Merge:** none.
+- **Deployment and configuration:** none; software/contract proration and all existing provider gates remain unresolved.
+- **Live production verification:** none. Liezl/Mark email remains a draft; verify actual Drafts folder, revised body and single attachment before handoff.
+- **Open gates:** counsel review and legal/commercial approval, confirmed contracting particulars, original notice discrepancy, provider/payment/access UAT, software alignment, data and training remain open.
+
 ## Exact original agreement with online-only addendum — 7 October 2026
 
 - **Implementation:** Brett clarified that Faeez's agreement must remain word for word, with only online payment and booking/signing additions. The earlier consolidated draft below is superseded and must not be sent or published. Prepared a six-page review PDF containing the five original source PDF pages unchanged followed by a separate one-page online-only addendum, plus an editable DOCX of that addendum. No after-15th proration cutoff, liability qualification, legal saving clause, privacy clause or other substantive rewrite is included. Original mid-month prorata plus full next month remains. Original StoreSmart names and particulars remain visible pending expressly authorised STOR24 substitutions. Mike's 7 October 12:13 SAST email and attached comparison reviewed; its suggested commercial/legal changes are proposals, not approved amendments.
