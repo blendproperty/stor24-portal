@@ -35,6 +35,12 @@ export function ReportsWorkspace({ reports, facilities, initialFrom, initialTo, 
     const timeout = setTimeout(() => controller.abort(), 30_000);
     try {
       const response = await fetch(exportHref, { cache: "no-store", signal: controller.signal });
+      if (response.status === 403) {
+        const payload = await response.clone().json().catch(() => null);
+        if (payload?.error?.code === "PERSONAL_EXPORT_FORBIDDEN") {
+          setFailed(true); setMessage("This report contains personal data. Ask a Super Admin (Organisation owner) to authorise personal-data exports, or choose an operational report without personal fields."); return;
+        }
+      }
       if (response.status === 401 || response.status === 403) {
         setAccess(response.status === 401 ? "signed-out" : "denied"); setFailed(true);
         setMessage(response.status === 401 ? "Your session has ended. Sign in again to export this report." : "Report access is unavailable. Please contact your administrator if you require access."); return;
@@ -68,7 +74,7 @@ export function ReportsWorkspace({ reports, facilities, initialFrom, initialTo, 
         <div className="panel-heading"><div><h2>Report parameters</h2><p className="panel-subtitle">Choose a report and store. Set the period, then view or export. Dates use SAST.</p></div><Filter className="muted-icon" /></div>
         {isSnapshot ? <p>Current snapshot: this report shows the records available when exported, not a historical date range. The export includes its snapshot timestamp.</p> : null}
         {isAgeing ? <p>Ageing uses all account entries up to the selected South African date. Current recorded balances and holds are labelled separately; accounts needing reconciliation have blank ageing amounts.</p> : null}
-        <p className="permission-note"><LockKeyhole size={15}/> Exports are confidential and checked by data protection. Share only with authorised recipients. Export decisions are recorded in the system audit.</p>
+        <p className="permission-note"><LockKeyhole size={15}/> Exports are confidential and checked by data protection. Share only with authorised recipients. Export decisions are recorded in the system audit. Personal-data exports require Super Admin (Organisation owner) authorisation.</p>
         <div className={`parameter-grid ${isSnapshot ? "parameter-grid-snapshot" : isAgeing ? "parameter-grid-ageing" : ""}`}>
           <label>Report<select aria-label="Report" ref={reportSelect} disabled={busy} value={reportKey} onChange={(event) => setReportKey(event.target.value)}>{reports.map((report) => <option value={report.key} key={report.key}>{report.name}</option>)}</select></label>
           {!isAgeing && !isSnapshot ? <label>From<input disabled={busy} type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label> : null}

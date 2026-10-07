@@ -504,7 +504,7 @@ export function UsersWorkspace() {
             <p className="modal-copy">
               Tick what this employee may access. Saving creates a custom
               security level for this employee and signs out their existing
-              sessions.
+              sessions. Personal-data export access must be explicitly selected; only Super Admins (Organisation owners) can grant or revoke it.
             </p>
             <p className="permission-summary">{selectedPermissions.length} permissions selected</p>
             </div>

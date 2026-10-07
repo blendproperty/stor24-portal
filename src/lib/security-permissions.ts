@@ -25,7 +25,7 @@ export const securityPermissionGroups = [
     ["facility.*", "Manage store setup"], ["inventory.*", "Manage units and inventory"], ["daily_close.*", "Perform daily close"], ["facility_map.view", "View facility map"], ["phone.view", "Use phone workspace"],
   ] },
   { label: "Reports and communications", permissions: [
-    ["reports.view", "View reports"], ["reports.financial", "View financial reports"], ["reports.sales", "View sales reports"], ["reports.collections", "View collections reports"], ["reports.export", "Export reports"], ["reports.schedule", "Schedule reports"], ["communications.view", "View communications"],
+    ["reports.view", "View reports"], ["reports.financial", "View financial reports"], ["reports.sales", "View sales reports"], ["reports.collections", "View collections reports"], ["reports.export", "Export reports"], ["data.personal_export", "Export personal data (Super Admin authorisation)"], ["reports.schedule", "Schedule reports"], ["communications.view", "View communications"],
   ] },
   { label: "Administration", permissions: [
     ["configuration.view", "View company configuration"], ["configuration.manage", "Change company configuration"], ["users.view", "View employees"], ["users.manage", "Manage employees and access"], ["integrations.view", "View integrations"], ["integrations.manage", "Manage integrations"],

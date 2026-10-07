@@ -1,3 +1,4 @@
+import { currentRoleAccess } from "@/lib/current-role-access";
 import { reportExcel, reportPdf } from "@/lib/report-documents";
 import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
 import { buildReportRows } from "@/lib/report-data-service";
@@ -32,8 +33,13 @@ export async function GET(request: Request) {
     if (!scope.unrestrictedFacilities && scope.facilityIds.length === 0) throw new Error("FORBIDDEN");
     const isSnapshot = isCurrentSnapshotReport(definition.key);
     const rows = await buildReportRows(scope, parsed.data);
-    const decision = await guardReportExport({ organisationId: session.organisationId, actorId: session.user.id, reportKey: definition.key, facilityId: parsed.data.facilityId, rows });
+    const personalAccess = currentRoleAccess(session.user.roleAssignments, "data.personal_export");
+    const personalFacilityIds = parsed.data.facilityId ? [parsed.data.facilityId] : scope.facilityIds;
+    const personalDataAllowed = personalAccess.allowed && (personalAccess.allowedFacilityIds === null ||
+      ((!!parsed.data.facilityId || !scope.unrestrictedFacilities) && personalFacilityIds.every(id => personalAccess.allowedFacilityIds!.includes(id))));
+    const decision = await guardReportExport({ organisationId: session.organisationId, actorId: session.user.id, reportKey: definition.key, facilityId: parsed.data.facilityId, rows, personalDataAllowed, format: parsed.data.format, period: { from: parsed.data.from, to: parsed.data.to } });
     const headers = { ...dlpPrivateHeaders, "x-stor24-data-classification": decision.classification, "x-stor24-dlp-policy": decision.policyVersion, "x-request-id": decision.requestId };
+    if (decision.reasons.includes("PERSONAL_EXPORT_PERMISSION_REQUIRED")) return Response.json({ error: { code: "PERSONAL_EXPORT_FORBIDDEN", message: "This report contains personal data. Only a Super Admin (Organisation owner) or an administrator they explicitly authorise may export it.", requestId: decision.requestId } }, { status: 403, headers });
     if (!decision.allowed) return Response.json({ error: { code: "DLP_EXPORT_BLOCKED", message: "Data protection blocked this export. Contact your administrator with the request reference.", requestId: decision.requestId } }, { status: 422, headers });
     if (parsed.data.format === "JSON") {
       return Response.json({ data: rows, meta: { parameters: parsed.data, currentSnapshot: isSnapshot, source: "stor24-production-database", classification: decision.classification, policyVersion: decision.policyVersion, requestId: decision.requestId } }, { headers });

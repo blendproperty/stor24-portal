@@ -1,12 +1,13 @@
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireOwner } from "@/lib/auth-guards";
+import { requireOwner, authErrorResponse } from "@/lib/auth-guards";
 import { sameOrigin } from "@/lib/request-security";
 import { securityPermissionKeys } from "@/lib/security-permissions";
 
 const schema = z.object({ permissions: z.array(z.enum(securityPermissionKeys)).max(securityPermissionKeys.length) });
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
+  try {
   const actor = await requireOwner();
   if (!sameOrigin(request)) return Response.json({ error: { message: "Request rejected." } }, { status: 403 });
   const parsed = schema.safeParse(await request.json());
@@ -34,4 +35,5 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     } });
   });
   return Response.json({ data: { role: roleName, permissions: uniquePermissions } });
+  } catch (error) { return authErrorResponse(error); }
 }

@@ -1,5 +1,5 @@
 // Deterministic application export policy. Never return matching content in findings.
-export const DLP_POLICY_VERSION = "2026-10-06.1";
+export const DLP_POLICY_VERSION = "2026-10-07.1";
 export const DLP_MAX_ROWS = 5000;
 export const DLP_MAX_BYTES = 5 * 1024 * 1024;
 export type DlpDecision = { allowed: boolean; classification: "confidential" | "restricted"; reasons: string[]; rowCount: number; policyVersion: string };
@@ -37,3 +37,15 @@ export function inspectReportExport(reportKey: string, rows: ReadonlyArray<Recor
   return { allowed: reasons.size === 0, classification: reasons.has("RESTRICTED_FIELD") || reasons.has("CREDENTIAL_PATTERN") || reasons.has("PAYMENT_CARD_PATTERN") ? "restricted" : "confidential", reasons: [...reasons].sort(), rowCount: rows.length, policyVersion: DLP_POLICY_VERSION };
 }
 export const dlpPrivateHeaders = { "cache-control": "private, no-store, max-age=0", "x-content-type-options": "nosniff", "referrer-policy": "no-referrer" };
+
+/** Identity/contact columns and personal contact values require a separate explicit grant. */
+export function personalExportFields(rows: ReadonlyArray<Record<string, unknown>>) {
+  const fields = new Set<string>();
+  const personalKey = /^(customer|customerid|tenant|tenantid|userid|accountid|name|firstname|lastname|fullname|companyname|account|accountnumber|assignedto|owner|email.*|.*email|phone.*|.*phone|mobile.*|.*mobile|contact.*|address.*|.*address|dateofbirth|birthdate|dob)$/;
+  for (const row of rows) for (const [key, value] of Object.entries(row)) {
+    if (value === null || value === "") continue;
+    if (personalKey.test(key.replace(/[^a-z0-9]/gi, "").toLowerCase()) ||
+        (typeof value === "string" && (/[^\s@]+@[^\s@]+\.[^\s@]+/.test(value) || /(?:\+27|\b0)[ -]?(?:\d[ -]?){8,9}\b/.test(value)))) fields.add(key);
+  }
+  return [...fields].sort();
+}
