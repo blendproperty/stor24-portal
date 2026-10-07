@@ -1,9 +1,10 @@
+import { currentRoleAccess } from "@/lib/current-role-access";
 import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
 import { dlpRecipientHash, rateLimit } from "@/lib/request-security";
 import { DLP_POLICY_VERSION, inspectReportExport, dlpPrivateHeaders } from "@/lib/dlp-policy";
 
-export type DlpContext = { organisationId: string; facilityId?: string; actorId?: string; resourceId: string; approvedRecipient?: string };
+export type DlpContext = { organisationId: string; facilityId?: string; actorId?: string; resourceId: string; approvedRecipient?: string; personalDataExport?: { facilityIds: string[]; unrestrictedFacilities: boolean } };
 export type DlpTransfer = DlpContext & { channel: "EMAIL" | "SMS" | "WHATSAPP" | "DOWNLOAD"; classification: "confidential" | "restricted"; content?: string; byteLength?: number; recipient?: string };
 export async function guardDlpTransfer(input: DlpTransfer) {
   if (!input.organisationId || !input.resourceId) throw new Error("DLP_CONTEXT_REQUIRED");
@@ -18,12 +19,17 @@ export async function guardDlpTransfer(input: DlpTransfer) {
   // restarts and correlates split transfers without storing raw recipients.
   const principal = input.actorId ?? (input.recipient ? dlpRecipientHash(input.recipient.trim().toLowerCase()) : input.resourceId);
   if (await rateLimit(`dlp:${input.organisationId}:${input.channel}:${principal}`, 60, 3600000)) reasons.add("TRANSFER_RATE_LIMIT");
+  if (input.personalDataExport) {
+    const actor = input.actorId ? await db.user.findFirst({ where: { id: input.actorId, organisationId: input.organisationId, active: true }, include: { roleAssignments: { include: { role: true } } } }) : null;
+    const access = currentRoleAccess(actor?.roleAssignments ?? [], "data.personal_export");
+    if (!access.allowed || (access.allowedFacilityIds !== null && (input.personalDataExport.unrestrictedFacilities || input.personalDataExport.facilityIds.length === 0 || !input.personalDataExport.facilityIds.every(id => access.allowedFacilityIds!.includes(id))))) reasons.add("PERSONAL_EXPORT_PERMISSION_REQUIRED");
+  }
   const allowed = reasons.size === 0;
   await db.auditEvent.create({ data: { organisationId: input.organisationId, facilityId: input.facilityId, actorId: input.actorId,
     entityType: "DlpTransfer", entityId: input.resourceId, requestId, action: allowed ? "dlp.transfer.allowed" : "dlp.transfer.blocked",
-    after: { policyVersion: DLP_POLICY_VERSION, classification: input.classification, channel: input.channel, byteCount: bytes, reasons: [...reasons].sort(), ...(input.recipient ? { recipientHash: dlpRecipientHash(input.recipient.trim().toLowerCase()) } : {}) },
+    after: { policyVersion: DLP_POLICY_VERSION, classification: input.classification, channel: input.channel, personalDataExport: !!input.personalDataExport, byteCount: bytes, reasons: [...reasons].sort(), ...(input.recipient ? { recipientHash: dlpRecipientHash(input.recipient.trim().toLowerCase()) } : {}) },
   } });
-  if (!allowed) throw new Error("DLP_TRANSFER_BLOCKED");
+  if (!allowed) throw new Error(reasons.has("PERSONAL_EXPORT_PERMISSION_REQUIRED") ? "PERSONAL_EXPORT_FORBIDDEN" : "DLP_TRANSFER_BLOCKED");
   return { ...dlpPrivateHeaders, "x-stor24-data-classification": input.classification, "x-stor24-dlp-policy": DLP_POLICY_VERSION, "x-request-id": requestId };
 }
 

@@ -5,10 +5,10 @@ import { createRequire } from "node:module";
 import { readFileSync, readdirSync } from "node:fs";
 
 async function fixture() {
-  const state = { audits: [] as Record<string, unknown>[], failAudit: false, limited: false, sends: 0 };
+  const state = { audits: [] as Record<string, unknown>[], failAudit: false, limited: false, sends: 0, personalPermissions: [] as string[], facilityId: "a" as string | null, actorActive: true };
   const built = await build({ stdin: { contents: 'export * from "./src/lib/dlp-transfer-service"; export {emailProvider} from "./src/lib/email"; export {TwilioSmsProvider,TwilioWhatsAppProvider} from "./src/lib/integrations/twilio-provider";', loader: "ts", resolveDir: process.cwd() }, bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "synthetic-dlp", setup(builder) {
     builder.onResolve({ filter: /^@\/lib\/(db|request-security)$/ }, args => ({ path: args.path, namespace: "fixture" }));
-    builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db={auditEvent:{create:async({data})=>{if(__state.failAudit)throw Error('SYNTHETIC_AUDIT_OUTAGE');__state.audits.push(data);return data;}}};" : "export const dlpRecipientHash=value=>'synthetic-hash';export const rateLimit=async()=>__state.limited;" }));
+    builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db={user:{findFirst:async()=>__state.actorActive?{roleAssignments:[{facilityId:__state.facilityId,role:{name:'Manager',permissions:__state.personalPermissions}}]}:null},auditEvent:{create:async({data})=>{if(__state.failAudit)throw Error('SYNTHETIC_AUDIT_OUTAGE');__state.audits.push(data);return data;}}};" : "export const dlpRecipientHash=value=>'synthetic-hash';export const rateLimit=async()=>__state.limited;" }));
   } }] });
   type Api = { guardDlpTransfer: (input: Record<string, unknown>) => Promise<Record<string,string>>; protectDlpResponse: (response: Response, context: Record<string,unknown>) => Promise<Response>; emailProvider: () => {send: (input: Record<string,unknown>)=>Promise<void>}; TwilioSmsProvider: new()=>{send:(input:Record<string,unknown>,context:Record<string,unknown>)=>Promise<{ok:boolean}>}; TwilioWhatsAppProvider:new()=>{sendTemplate:(recipient:string,sid:string,variables:Record<string,string>,context:Record<string,unknown>)=>Promise<{ok:boolean}>} };
   const loaded = { exports: {} as Api };
@@ -54,4 +54,20 @@ test("private file release routes must retain a DLP boundary, with only public s
     assert.match(source,/protectDlpResponse|guardDlpTransfer|guardReportExport|hostedMandatePdf/,`Unprotected file release: ${file}`);covered++;
   }
   assert.ok(covered>=12);
+});
+
+test("bulk personal transfers require explicit live scoped grants, revoke immediately and audit failures", async () => {
+  const f = await fixture();
+  const input = { ...context, channel: "DOWNLOAD", classification: "confidential", content: "Synthetic CSV", personalDataExport: { facilityIds: ["a"], unrestrictedFacilities: false } };
+  f.state.personalPermissions = ["*"];
+  await assert.rejects(f.api.guardDlpTransfer(input), /PERSONAL_EXPORT_FORBIDDEN/);
+  assert.equal(f.state.audits[0].action, "dlp.transfer.blocked");
+  f.state.personalPermissions = ["data.personal_export"];
+  await f.api.guardDlpTransfer(input);
+  await assert.rejects(f.api.guardDlpTransfer({ ...input, personalDataExport: { facilityIds: ["b"], unrestrictedFacilities: false } }), /PERSONAL_EXPORT_FORBIDDEN/);
+  await assert.rejects(f.api.guardDlpTransfer({ ...input, personalDataExport: { facilityIds: [], unrestrictedFacilities: true } }), /PERSONAL_EXPORT_FORBIDDEN/);
+  f.state.actorActive = false;
+  await assert.rejects(f.api.guardDlpTransfer(input), /PERSONAL_EXPORT_FORBIDDEN/);
+  f.state.failAudit = true;
+  await assert.rejects(f.api.guardDlpTransfer(input), /SYNTHETIC_AUDIT_OUTAGE/);
 });

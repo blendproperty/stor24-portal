@@ -1,10 +1,10 @@
 # Data loss prevention — application and server controls
 
-Date: 1 October 2026. Policy 2026-10-01.2. Microsoft 365 DLP remains open by Brett's explicit instruction after the signed-in account was denied administrator access.
+Updated: 7 October 2026. Policy 2026-10-07.1. Microsoft 365 DLP remains open by Brett's explicit instruction after the signed-in account was denied administrator access.
 
 ## Mandatory application boundaries
 
-Reports (CSV and JSON) preserve current-role, organisation and intersected facility permissions. Known reports are confidential. Unknown categories, restricted field names, nested data, detected credentials/payment-card patterns, more than 5,000 rows or more than 5 MiB UTF-8 row data block release. Encoding overhead can increase the final response size.
+Reports (CSV, JSON, XLSX and PDF) preserve current-role, organisation and intersected facility permissions. Known reports are confidential. Unknown categories, restricted field names, nested data, detected credentials/payment-card patterns, more than 5,000 rows or more than 5 MiB UTF-8 row data block release. Encoding overhead can increase the final response size.
 
 Private documents, signed agreements, mandates, statements, invoices, identity/photo previews and collection/settlement exports pass the shared transfer guard after existing exact-resource ownership/access checks. Transfers above 20 MiB block. CSV/HTML content is inspected; signed PDFs/images preserve their original bytes and use access, size, rate and audit controls rather than binary OCR/content discovery. Public legal terms and synthetic training images are explicit non-sensitive exemptions. This is not a general file-system scanner or arbitrary API content scanner.
 
@@ -15,6 +15,19 @@ A durable PostgreSQL counter limits transfers to 60 per hour per organisation/ch
 Every allowed or blocked evaluation persists a safe AuditEvent before release. Database/limiter/audit outage blocks the transfer. Events record policy, classification, resource, request, actor/scope, counts, reason codes and destination hashes where relevant. They exclude raw matches/message content/recipients. Permission failures occur before the guard. Allowed means permission to release, not delivered/read confirmation. All private API responses have no-store/nosniff/no-referrer headers. Classification headers do not provide persistent file labels after download.
 
 The organisation/facility-scoped Data protection page shows the latest 100 DLP decisions and backup evidence. System audit shows safe reasons. Use request references to investigate; never paste sensitive matches into tickets. Audit records share the application database and are not an independent immutable archive. Current rules are mandatory versioned code; no production bypass switch exists.
+
+
+## Personal-data export authority
+
+A Super Admin is the current organisation-wide Organisation owner. Downloads containing customer/tenant names, account identifiers, email/mobile/phone fields, addresses or detected contact values require that owner or an exact `data.personal_export` grant. General `*`, `data.*` and report permissions cannot imply this grant. The grant is intersected with existing report/export organisation and facility scope; it cannot replace either permission. Existing secrets, identity/bank fields, cards, size and rate rules still block exports even for owners.
+
+Only owners can grant/revoke individual permissions or change security roles. Use Users > Edit permissions > Export personal data (Super Admin authorisation), alongside the required report/export permissions. Each change is transactional, audited and increments the target's session version. Personal-export administrators cannot delegate this grant or promote themselves. Existing roles receive no automatic opt-in.
+
+Marketing/advertising and rent-review CSVs use a bounded same-origin server endpoint, preserving formula escaping and authorising/auditing the actual returned bytes. Their browser-selected payload provenance is recorded explicitly; server audit does not independently certify the supplied figures against the database. Diagnostic JSON exports use an owner-only server transfer guard.
+
+Personal bulk collection and settlement downloads require the same exact grant against current active database assignments. Authorised report viewing and individual customer-document workflows retain their exact-resource access controls; this policy does not prevent screenshots/copying information a user can legitimately view. Report download audits additionally record format, period and personal column names, never their values. The Data Protection register distinguishes preview and download, actor, format/count and block reasons. An allowed audit means authorised release, not proof that the user saved or opened the file.
+
+`scripts/verify-personal-export-live.ts` is an explicitly opted-in operator proof using a new disposable synthetic organisation only. It exercises all formats, wildcard denial, owner delegation/revocation, session invalidation, non-delegation and saved audit decisions through real HTTP handlers, then removes its synthetic records. It must not be run against existing staff or customers.
 
 ## Encrypted server backups and restore proof
 

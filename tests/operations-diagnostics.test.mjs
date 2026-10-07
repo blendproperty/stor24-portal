@@ -41,9 +41,9 @@ test('monitor writer retains bounded, deduplicated history without provider/cont
   } finally { await rm(root, { recursive: true }); }
 });
 async function apiFixture() {
-  const bundle = await build({ stdin: { contents: 'export {GET} from "./src/app/api/v1/operations/diagnostics/route";export {setOwner} from "@/lib/auth-guards";export {reads} from "@/lib/operations-diagnostics";', resolveDir: process.cwd() }, bundle: true, write: false, platform: 'node', format: 'esm', plugins: [{ name: 'isolated', setup(b) {
-    b.onResolve({ filter: /^@\/lib\/(auth-guards|operations-diagnostics)$/ }, args => ({ path: args.path, namespace: 'fixture' }));
-    b.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path.endsWith('auth-guards') ? 'let owner;export const setOwner=x=>owner=x;export async function requireOwner(){if(!owner)throw Error("FORBIDDEN");return {user:{organisationId:owner}}}export const authErrorResponse=()=>Response.json({error:"forbidden"},{status:403});' : 'export const reads=[];export async function operationsDiagnostics(org){reads.push(org);return {cards:[]}}' }));
+  const bundle = await build({ stdin: { contents: 'export {GET} from "./src/app/api/v1/operations/diagnostics/route";export {setOwner} from "@/lib/auth-guards";export {reads} from "@/lib/operations-diagnostics";export {guardState} from "@/lib/dlp-transfer-service";', resolveDir: process.cwd() }, bundle: true, write: false, platform: 'node', format: 'esm', plugins: [{ name: 'isolated', setup(b) {
+    b.onResolve({ filter: /^@\/lib\/(auth-guards|operations-diagnostics|dlp-transfer-service)$/ }, args => ({ path: args.path, namespace: 'fixture' }));
+    b.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path.endsWith('dlp-transfer-service') ? 'export const guardState={records:[],fail:false};export async function guardDlpTransfer(input){guardState.records.push(input);if(guardState.fail)throw Error("AUDIT_DOWN");return {"cache-control":"private, no-store","x-request-id":"synthetic"};}' : args.path.endsWith('auth-guards') ? 'let owner;export const setOwner=x=>owner=x;export async function requireOwner(){if(!owner)throw Error("FORBIDDEN");return {user:{id:"synthetic-owner",organisationId:owner}}}export const authErrorResponse=e=>Response.json({error:e.message==="FORBIDDEN"?"forbidden":"internal"},{status:e.message==="FORBIDDEN"?403:500});' : 'export const reads=[];export async function operationsDiagnostics(org){reads.push(org);return {cards:[]}}' }));
   } }] });
   return import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
 }
@@ -67,4 +67,18 @@ test('actual dashboard aggregation scopes database reads, strips private data an
     const data = await f.operationsDiagnostics('only-this-org'); assert.ok(f.state.reads.every(where => where.organisationId === 'only-this-org')); assert.equal(data.cards.find(c => c.id === 'disk').state, 'critical'); assert.equal(data.activeRecipients, 1); assert.equal(data.queues.incoming.failed, 2); assert.equal(data.connections[0].provider, 'Other integration'); assert.ok(!JSON.stringify(data).includes('private'));
     f.state.fail = true; await writeFile(path.join(root, 'operations.json'), '{broken'); const partial = await f.operationsDiagnostics('only-this-org'); assert.equal(partial.cards.find(c => c.id === 'database').state, 'critical'); assert.equal(partial.cards.find(c => c.id === 'disk').state, 'unknown'); assert.equal(partial.cards.find(c => c.id === 'backup').state, 'good'); assert.equal(partial.queues.outgoing.failed, 2);
   } finally { if (previous === undefined) delete process.env.DLP_BACKUP_STATUS_PATH; else process.env.DLP_BACKUP_STATUS_PATH = previous; await rm(root, { recursive: true }); }
+});
+
+test('diagnostic download audits owner-scoped content and blocks release on audit failure', async () => {
+  const prior=process.env.STOR24_ALERT_ORGANISATION_ID;process.env.STOR24_ALERT_ORGANISATION_ID='monitored-org';
+  try {
+    const f=await apiFixture();f.setOwner('monitored-org');f.guardState.fail=false;f.guardState.records.length=0;
+    const request=()=>new Request('https://example.invalid/api/v1/operations/diagnostics?export=json');
+    const response=await f.GET(request());assert.equal(response.status,200);
+    assert.match(response.headers.get('content-disposition'),/stor24-troubleshooting.json/);
+    assert.deepEqual((await response.json()).cards,[]);
+    assert.equal(f.guardState.records[0].actorId,'synthetic-owner');assert.equal(f.guardState.records[0].organisationId,'monitored-org');
+    f.guardState.fail=true;const denied=await f.GET(request());assert.equal(denied.status,500);assert.doesNotMatch(await denied.text(),/cards|AUDIT_DOWN/);
+    f.guardState.fail=false;
+  } finally { if(prior===undefined)delete process.env.STOR24_ALERT_ORGANISATION_ID;else process.env.STOR24_ALERT_ORGANISATION_ID=prior; }
 });

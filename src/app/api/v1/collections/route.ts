@@ -11,6 +11,7 @@ const messages: Record<string, string> = {
 };
 function failure(e: unknown) {
   const code = e instanceof Error ? e.message : "";
+  if (code === "PERSONAL_EXPORT_FORBIDDEN") return Response.json({ error: "Personal-data exports require explicit Super Admin (Organisation owner) authorisation." }, { status: 403 });
   if (["UNAUTHENTICATED", "FORBIDDEN"].includes(code)) return Response.json({ error: code === "UNAUTHENTICATED" ? "Sign in is required." : "You do not have permission for this action." }, { status: code === "UNAUTHENTICATED" ? 401 : 403 });
   if (e instanceof z.ZodError || e instanceof SyntaxError) return Response.json({ error: "Check the dates, amount, notes and confirmation." }, { status: 400 });
   if (messages[code]) return Response.json({ error: messages[code] }, { status: 409 });
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams, exporting = params.get("export") === "csv";
     const scope = await requirePermissionScope(exporting ? "collections.export" : "collections.view");
     const data = await collectionsWorkspace(scope, params.get("asOf") ?? southAfricaDateKey(new Date()));
-    if (exporting) return await protectDlpResponse(new Response(collectionCsv(data, { search: params.get("search") ?? "", facility: params.get("facility") ?? "", owner: params.get("owner") ?? "", mode: params.get("mode") ?? "all" }), { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="collections-${data.asOf}.csv"`, "cache-control": "no-store", "x-content-type-options": "nosniff" } }), { organisationId: scope.organisationId, actorId: scope.userId, resourceId: "collections" }, "confidential");
+    if (exporting) return await protectDlpResponse(new Response(collectionCsv(data, { search: params.get("search") ?? "", facility: params.get("facility") ?? "", owner: params.get("owner") ?? "", mode: params.get("mode") ?? "all" }), { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="collections-${data.asOf}.csv"`, "cache-control": "no-store", "x-content-type-options": "nosniff" } }), { organisationId: scope.organisationId, actorId: scope.userId, resourceId: "collections", personalDataExport: { facilityIds: scope.facilityIds, unrestrictedFacilities: scope.unrestrictedFacilities } }, "confidential");
     return Response.json(data, { headers: { "cache-control": "no-store" } });
   } catch (e) { return failure(e); }
 }

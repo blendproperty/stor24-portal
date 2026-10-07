@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { build } from "esbuild";
 import { createRequire } from "node:module";
-import { inspectReportExport, DLP_MAX_ROWS, DLP_MAX_BYTES } from "../src/lib/dlp-policy";
+import { inspectReportExport, DLP_MAX_ROWS, DLP_MAX_BYTES, personalExportFields } from "../src/lib/dlp-policy";
 
 test("normal operational and empty reports remain confidential and exportable", () => {
   assert.equal(inspectReportExport("rent-roll", [{ customer: "Synthetic customer", account: "TEST-1", balance: 100 }]).allowed, true);
@@ -25,14 +25,14 @@ test("row and UTF-8 data size limits block bulk release", () => {
 
 type Audit = { action: string; organisationId: string; actorId: string; after: unknown };
 async function fixture() {
-  const state = { rows: [{ customer: "Synthetic customer", balance: 100 }] as Record<string, unknown>[], audits: [] as Audit[], failAudit: false, allowed: true };
+  const state = { rows: [{ customer: "Synthetic customer", balance: 100 }] as Record<string, unknown>[], audits: [] as Audit[], failAudit: false, allowed: true, personalPermissions: ["data.personal_export"] as string[] };
   const result = await build({ entryPoints: ["src/app/api/v1/reports/export/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "dlp-fixture", setup(builder) {
     builder.onResolve({ filter: /^@\/lib\/(db|auth-guards|scope|report-data-service)$/ }, args => ({ path: args.path, namespace: "fixture" }));
     builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents:
       args.path.endsWith("/db") ? "export const db={$queryRaw:async()=>[{count:1}],auditEvent:{create:async({data})=>{if(__state.failAudit)throw Error('AUDIT_DOWN');__state.audits.push(data);return data;}}};" :
       args.path.endsWith("/scope") ? "export const requirePermissionScope=async()=>({organisationId:'org-a',facilityIds:['facility-a'],unrestrictedFacilities:false});" :
       args.path.endsWith("/report-data-service") ? "export const buildReportRows=async()=>__state.rows;" :
-      "export const requirePermission=async()=>{if(!__state.allowed)throw Error('FORBIDDEN');return {organisationId:'org-a',user:{id:'actor-a'},permissions:['*'],allowedFacilityIds:['facility-a']};};export const authErrorResponse=e=>Response.json({error:{code:e.message==='FORBIDDEN'?'FORBIDDEN':'INTERNAL_ERROR'}},{status:e.message==='FORBIDDEN'?403:500});"
+      "export const requirePermission=async()=>{if(!__state.allowed)throw Error('FORBIDDEN');return {organisationId:'org-a',user:{id:'actor-a',roleAssignments:[{facilityId:'facility-a',role:{name:'Custom access · actor-a',permissions:__state.personalPermissions}}]},permissions:['*'],allowedFacilityIds:['facility-a']};};export const authErrorResponse=e=>Response.json({error:{code:e.message==='FORBIDDEN'?'FORBIDDEN':'INTERNAL_ERROR'}},{status:e.message==='FORBIDDEN'?403:500});"
     }));
   } }] });
   const loaded = { exports: {} as { GET: (request: Request) => Promise<Response> } };
@@ -42,14 +42,14 @@ async function fixture() {
 }
 test("CSV and JSON pass the same audited policy boundary and private response headers", async () => {
   const f = await fixture();
-  for (const format of ["CSV", "JSON"]) {
+  for (const format of ["CSV", "JSON", "XLSX", "PDF"]) {
     const response = await f.get(format);
     assert.equal(response.status, 200);
     assert.match(response.headers.get("cache-control")!, /no-store/);
-    assert.equal(response.headers.get("x-stor24-data-classification"), "confidential");
+    assert.equal(response.headers.get("x-stor24-data-classification"), "restricted");
     assert.ok(response.headers.get("x-request-id"));
   }
-  assert.equal(f.state.audits.length, 2);
+  assert.equal(f.state.audits.length, 4);
   assert.equal(f.state.audits[0].organisationId, "org-a");
   assert.equal(f.state.audits[0].actorId, "actor-a");
   assert.doesNotMatch(JSON.stringify(f.state.audits), /Synthetic customer/);
@@ -72,4 +72,31 @@ test("DLP does not grant report access to an unauthorised actor", async () => {
   const f = await fixture(); f.state.allowed = false;
   assert.equal((await f.get()).status, 403);
   assert.equal(f.state.audits.length, 0);
+});
+
+test("all download formats deny personal rows without explicit authorisation and audit before release", async () => {
+  const f = await fixture(); f.state.personalPermissions = ["*", "data.*", "reports.*"];
+  for (const format of ["CSV", "JSON", "XLSX", "PDF"]) {
+    const response = await f.get(format);
+    assert.equal(response.status, 403);
+    assert.doesNotMatch(await response.text(), /Synthetic customer/);
+  }
+  assert.equal(f.state.audits.length, 4);
+  assert.ok(f.state.audits.every(a => a.action === "dlp.export.blocked"));
+  f.state.rows = [{ facility: "Test store", totalUnits: 10 }];
+  assert.equal((await f.get()).status, 200);
+  f.state.personalPermissions = ["data.personal_export"];
+  f.state.rows = [{ customer: "Synthetic customer" }];
+  assert.equal((await f.get()).status, 200);
+  f.state.personalPermissions = [];
+  assert.equal((await f.get()).status, 403);
+});
+
+test("personal columns and embedded contact details are identified without retaining values", () => {
+  for (const key of ["customer", "accountNumber", "email", "mobileNumber", "phone_number", "postalAddress", "firstName", "assignedTo"]) {
+    assert.deepEqual(personalExportFields([{ [key]: "synthetic" }]), [key]);
+  }
+  assert.deepEqual(personalExportFields([{ note: "Contact synthetic@example.invalid" }]), ["note"]);
+  assert.deepEqual(personalExportFields([{ note: "Call +27 82 123 4567" }]), ["note"]);
+  assert.deepEqual(personalExportFields([{ facility: "Test", totalUnits: 10, balance: 100 }]), []);
 });

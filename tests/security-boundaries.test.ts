@@ -684,3 +684,35 @@ test("bulk market rates roll back on audit failure and retry once", async () => 
   const response = await apply(); assert.equal(response.status, 200); const result = await response.json();
   assert.equal(result.data.updated, 2); assert.equal(result.data.skipped, 1); assert.equal(units[2].monthlyRate, 55); assert.equal(audits, 1);
 });
+
+test("user managers cannot promote themselves or others to a security role", async () => {
+  const f = fixture(); f.grant("users.manage", null);
+  const route = await load("./src/app/api/v1/users/[id]/route.ts", f);
+  const response = await route.PATCH(new Request("https://example.invalid/api/v1/users/staff", { method: "PATCH", headers: { origin: "https://example.invalid", "content-type": "application/json" }, body: JSON.stringify({ roleName: "Organisation owner" }) }), { params: Promise.resolve({ id: "staff" }) });
+  assert.equal(response.status, 403);
+  assert.equal(f.writes.length, 0);
+});
+
+test("only current owners may grant personal export access through the permissions endpoint", async () => {
+  const f = fixture(); f.grant("users.manage", null);
+  const route = await load("./src/app/api/v1/users/[id]/permissions/route.ts", f);
+  const response = await route.PATCH(new Request("https://example.invalid/api/v1/users/staff/permissions", { method: "PATCH", headers: { origin: "https://example.invalid", "content-type": "application/json" }, body: JSON.stringify({ permissions: ["reports.export", "data.personal_export"] }) }), { params: Promise.resolve({ id: "staff" }) });
+  assert.equal(response.status, 403);
+  assert.equal(f.writes.length, 0);
+});
+
+test("owner delegation and revocation are transactional, audited and invalidate sessions", async () => {
+  const f = fixture(); f.grant("*", null, "Organisation owner");
+  f.tables.user.push({ id: "delegate", organisationId: "org", active: true, roleAssignments: [] });
+  f.db.role = { upsert: async (input: Row) => { f.writes.push({ model: "role", ...input }); return { id: "custom-role" }; } };
+  f.db.roleAssignment = { deleteMany: async (input: Row) => { f.writes.push({ model: "roleAssignment", ...input }); }, create: async (input: Row) => { f.writes.push({ model: "roleAssignment", ...input }); } };
+  const route = await load("./src/app/api/v1/users/[id]/permissions/route.ts", f);
+  for (const permissions of [["reports.export", "data.personal_export"], ["reports.export"]]) {
+    const response = await route.PATCH(new Request("https://example.invalid/api/v1/users/delegate/permissions", { method: "PATCH", headers: { origin: "https://example.invalid", "content-type": "application/json" }, body: JSON.stringify({ permissions }) }), { params: Promise.resolve({ id: "delegate" }) });
+    assert.equal(response.status, 200);
+    const audit = f.writes.filter(w => w.model === "auditEvent").at(-1)!;
+    assert.equal(audit.data.action, "user.permissions.updated");
+    assert.deepEqual(audit.data.after.permissions, [...permissions].sort());
+    assert.ok(f.writes.some(w => w.model === "user" && w.where.id === "delegate" && w.data.sessionVersion.increment === 1));
+  }
+});
