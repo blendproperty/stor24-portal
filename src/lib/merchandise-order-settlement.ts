@@ -45,16 +45,25 @@ export async function settleVerifiedMerchandisePayment(paymentId: string, verifi
 }
 
 /** Bounded worker primitive; callers must schedule this before checkout can be enabled. */
-export async function expireMerchandiseOrders(now = new Date()) {
-  const expired = await db.merchandiseOrder.findMany({ where: { status: "AWAITING_PAYMENT", expiresAt: { lte: now } }, select: { id: true }, orderBy: { expiresAt: "asc" }, take: 100 });
+export type ExpiryCursor = { id: string; expiresAt: Date };
+
+export async function expireMerchandiseBatch(now = new Date(), after?: ExpiryCursor) {
+  const expired = await db.merchandiseOrder.findMany({ where: {
+    status: "AWAITING_PAYMENT", expiresAt: { lte: now },
+    ...(after ? { OR: [{ expiresAt: { gt: after.expiresAt } }, { expiresAt: after.expiresAt, id: { gt: after.id } }] } : {}),
+  }, select: { id: true, expiresAt: true }, orderBy: [{ expiresAt: "asc" }, { id: "asc" }], take: 100 });
   let count = 0;
   let failures = 0;
   for (const candidate of expired) {
     try {
     const changed = await db.$transaction(async tx => {
       await tx.$queryRaw`SELECT "id" FROM "MerchandiseOrder" WHERE "id" = ${candidate.id} FOR UPDATE`;
-      const order = await tx.merchandiseOrder.findUniqueOrThrow({ where: { id: candidate.id }, include: { items: true } });
+      const order = await tx.merchandiseOrder.findUniqueOrThrow({ where: { id: candidate.id }, include: { items: true, payment: { select: { status: true } } } });
       if (order.status !== "AWAITING_PAYMENT" || order.expiresAt > now) return false;
+      // A succeeded payment with a stale order status requires reconciliation.
+      // Never release its stock or attempt to repair financial records here.
+      if (["SUCCEEDED", "TEST_SUCCEEDED"].includes(order.payment?.status ?? "")) throw new Error("MERCHANDISE_PAYMENT_RECONCILIATION_REQUIRED");
+      if (order.stockHeld && (!order.items.length || order.items.some(item => !Number.isSafeInteger(item.quantity) || item.quantity <= 0))) throw new Error("MERCHANDISE_STOCK_REVIEW_REQUIRED");
       if (order.stockHeld) for (const item of [...order.items].sort((a, b) => a.productId.localeCompare(b.productId))) {
         const released = await tx.product.updateMany({ where: { id: item.productId, quantityReserved: { gte: item.quantity } }, data: { quantityReserved: { decrement: item.quantity } } });
         if (released.count !== 1) throw new Error("MERCHANDISE_STOCK_REVIEW_REQUIRED");
@@ -71,6 +80,12 @@ export async function expireMerchandiseOrders(now = new Date()) {
       console.error("Merchandise expiry requires review", { orderId: candidate.id });
     }
   }
-  if (failures) throw new Error("MERCHANDISE_EXPIRY_PARTIAL_FAILURE");
-  return count;
+  return { expired: count, failures, scanned: expired.length, cursor: expired.at(-1) };
+}
+
+/** Authenticated fallback remains a single bounded batch and reports partial failure. */
+export async function expireMerchandiseOrders(now = new Date()) {
+  const result = await expireMerchandiseBatch(now);
+  if (result.failures) throw new Error("MERCHANDISE_EXPIRY_PARTIAL_FAILURE");
+  return result.expired;
 }
