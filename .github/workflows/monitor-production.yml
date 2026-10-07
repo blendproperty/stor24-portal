@@ -23,6 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Verify public application and database readiness
         env:
           HEALTH_URL: https://portal.stor24.co.za/api/health
@@ -34,6 +35,8 @@ jobs:
               throw new Error(`Unhealthy STOR24 response: ${JSON.stringify(value)}`);
             }
           ' "$response"
+      - name: Verify Cloudflare origin protection cannot be bypassed directly
+        run: bash scripts/origin-access-health.sh
 
   backup:
     runs-on: ubuntu-latest
