@@ -35,7 +35,7 @@ async function main() {
       assert.equal(allowed.status, 200); assert.equal(allowed.headers.get("x-stor24-dlp-policy"), DLP_POLICY_VERSION); assert.ok((await allowed.arrayBuffer()).byteLength > 0);
     }
     const permissionsPath = `/api/v1/users/${delegate.id}/permissions`;
-    const basePermissions = ["reports.view", "reports.sales", "reports.export"];
+    const basePermissions = ["reports.view", "reports.sales", "reports.export", "leads.view"];
     assert.equal((await request(permissionsPath, delegateCookie, { permissions: [...basePermissions, "data.personal_export"] })).status, 403);
     assert.equal((await request(`/api/v1/users/${delegate.id}`, delegateCookie, { roleName: "Organisation owner" })).status, 403);
     assert.equal((await request(permissionsPath, ownerCookie, { permissions: [...basePermissions, "data.personal_export"] })).status, 200);
