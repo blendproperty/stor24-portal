@@ -1,3 +1,13 @@
+## Exact original agreement with online-only addendum — 7 October 2026
+
+- **Implementation:** Brett clarified that Faeez's agreement must remain word for word, with only online payment and booking/signing additions. The earlier consolidated draft below is superseded and must not be sent or published. Prepared a six-page review PDF containing the five original source PDF pages unchanged followed by a separate one-page online-only addendum, plus an editable DOCX of that addendum. No after-15th proration cutoff, liability qualification, legal saving clause, privacy clause or other substantive rewrite is included. Original mid-month prorata plus full next month remains. Original StoreSmart names and particulars remain visible pending expressly authorised STOR24 substitutions. Mike's 7 October 12:13 SAST email and attached comparison reviewed; its suggested commercial/legal changes are proposals, not approved amendments.
+- **Testing:** rendered all five combined source pages and compared their pixels against the original PDF; all identical. Addendum rendered via Word and visually inspected; combined PDF has six pages. Source OCR is not used to rewrite the contract. No legal approval or product validation established.
+- **Commit and push:** context correction recorded on existing review branch; verify remote readback after push. Source and review artifacts stay local.
+- **Merge:** none.
+- **Deployment and configuration:** none. Product proration may differ from original terms and remains an explicit unresolved alignment gate; no silent software changes.
+- **Live production verification:** none. Liezl/Mark draft is being corrected and remains unsent; sending verification is a separate step.
+- **Open gates:** counsel approval of online execution/payment addendum, exact operator/entity/site/contact substitutions, original notice discrepancy, software/contract alignment, approved mandate/provider collection, UAT, data, training and all business/legal gates remain. No original enforceability issues have been resolved by rewriting source terms.
+
 ## Full original-aligned terms review draft — 7 October 2026
 
 - **Implementation:** full consolidated Word review draft created locally as `output/STOR24_Terms_Alignment_2026-10-07/STOR24_Full_Terms_and_Conditions_Original_Aligned_Review_2026-10-07.docx`. Includes all 18 original source clauses, explicit booking/payment/proration/electronic acceptance additions, proposed Liezl liability qualifications, a Booking Schedule, execution fields and full separate debit-order mandate. Original deposit, minimum commitment, cancellation, interest, recovery and disposal protections retained for review. Comments identify unresolved decisions; this is not approved customer wording.
