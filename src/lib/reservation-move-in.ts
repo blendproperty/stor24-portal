@@ -1,4 +1,4 @@
-import {publicInitialRent,publicCheckoutTotal} from "./public-initial-rent";
+import {publicInitialRent,publicCheckoutTotal,publicCheckoutReview} from "./public-initial-rent";
 import { requireOperationalUnit } from "@/lib/floor-availability-service";
 import { unitIsOperational, floorMapSelection } from "@/lib/floor-availability";
 import { identityGate } from "@/lib/identity-document-service";
@@ -30,7 +30,8 @@ export async function reservationReadiness(database: Database, scope: RequestSco
     where: { accountNumber: `ST24-T-${reservation.id}`, customerId: reservation.customerId },
     include: { payments: { include: { merchandiseOrder: { select: { id: true } } } }, ledgerEntries: true, tenancy: { select: { id: true } } },
   });
-  const requiredCents = Math.round(publicCheckoutTotal(reservation) * 100);
+  const pricing = publicCheckoutReview(reservation);
+  const requiredCents = Math.round(pricing.amount * 100);
   const receipts = account?.payments.filter(payment => {
     if (payment.status !== "SUCCEEDED" || payment.currency !== "ZAR" || !payment.processedAt || payment.merchandiseOrder) return false;
     if (isTestPayment(payment)) return false;
@@ -48,6 +49,7 @@ export async function reservationReadiness(database: Database, scope: RequestSco
   const signed = reservation.publicLease?.status === "SIGNED" && Boolean(reservation.publicLease.signedAt && reservation.publicLease.signedPdfSha256);
   const startDate = reservation.intendedMoveIn ? southAfricaDateKey(reservation.intendedMoveIn) : null;
   const blockers: string[] = [];
+  if (pricing.needsReview) blockers.push("The saved booking amount needs review before payment or key handover. Do not change a signed agreement without an approved correction.");
   if (!unitIsOperational(reservation.unit, reservation.facility.closedFloors)) blockers.push("This floor is not operational. Staff must arrange an operational unit before move-in.");
   if (!forPhoto && !(await identityGate(database, scope.organisationId, reservation.id, reservation.createdAt, "HANDOVER"))) blockers.push("The identity document needs staff acceptance before key handover.");
   // Photo collection eligibility must not depend on approval of the photo being collected.
@@ -69,6 +71,7 @@ export async function reservationReadiness(database: Database, scope: RequestSco
   return { reservation, account, receipts, view: {
     mandateStatus: reservation.publicLease?.paymentMethod === "DEBIT_ORDER" ? reservation.publicLease.mandate?.status ?? "NOT_STARTED" : null,
     signed, leaseId: reservation.publicLease?.id ?? null, signedAt: reservation.publicLease?.signedAt?.toISOString() ?? null,
+    ...(pricing.needsReview ? { amountReviewRequired: true } : {}),
     requiredAmount: requiredCents / 100, paidAmount: paidCents / 100,
     paymentVerified: requiredCents > 0 && paidCents >= requiredCents,
     testPayment, startDate, ready: blockers.length === 0, blockers,
