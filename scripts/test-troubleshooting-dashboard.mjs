@@ -23,6 +23,7 @@ try {
     const page = await browser.newPage({ viewport: { width, height: 1000 } }); const errors = []; let fail = true; let reads = 0;
     page.on('pageerror', e => errors.push(e.message));
     await page.route('**/api/v1/operations/diagnostics', async route => { assert.equal(route.request().method(), 'GET'); reads++; return fail ? route.abort() : route.fulfill({ json: { data } }); });
+    await page.route('**/api/v1/operations/diagnostics?export=json', async route => { assert.equal(route.request().method(), 'GET'); return route.fulfill({ contentType: 'application/json', body: JSON.stringify(data) }); });
     await page.goto(`http://127.0.0.1:${server.address().port}`); await expect(page.getByRole('alert')).toContainText('could not refresh');
     fail = false; await page.getByRole('button', { name: 'Refresh checks' }).click(); await expect(page.getByText('88% used')).toBeVisible(); await expect(page.getByText('Evidence is stale', { exact: true })).toBeVisible();
     const storage = page.getByRole('article').filter({ hasText: 'Server storage' }); await storage.locator('summary').click(); await expect(storage.getByText('Review the server evidence before changing any service.', { exact: true })).toBeVisible();
