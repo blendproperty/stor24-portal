@@ -1,3 +1,13 @@
+## Full original-aligned terms review draft — 7 October 2026
+
+- **Implementation:** full consolidated Word review draft created locally as `output/STOR24_Terms_Alignment_2026-10-07/STOR24_Full_Terms_and_Conditions_Original_Aligned_Review_2026-10-07.docx`. Includes all 18 original source clauses, explicit booking/payment/proration/electronic acceptance additions, proposed Liezl liability qualifications, a Booking Schedule, execution fields and full separate debit-order mandate. Original deposit, minimum commitment, cancellation, interest, recovery and disposal protections retained for review. Comments identify unresolved decisions; this is not approved customer wording.
+- **Testing:** source clause count and material-term content checks passed; Word PDF export succeeded and all nine pages were visually inspected. OCR grammar and operator pronouns corrected; source remains authoritative. No product tests or legal enforceability determination.
+- **Commit and push:** canonical context update on `codex/terms-legal-review-20261006`; remote context readback required after push. The Word draft and original source remain local and are not committed.
+- **Merge:** none.
+- **Deployment and configuration:** none; no accepted terms, website or provider changes.
+- **Live production verification:** none. A complete review artifact does not establish legal/commercial approval, collection readiness or customer UAT.
+- **Open gates:** all legal, commercial, entity, notice/minimum/proration, deposit, recovery, approved provider mandate, privacy/access, UAT, data, training and approval gates recorded below remain open. August attachment fresh-byte identity remains unverified. No email sent or tracker marked complete in this step.
+
 ## Original contract baseline correction — 7 October 2026
 
 - **Implementation:** Brett directs alignment with Faeez/Pinny's original contract plus limited online booking/payment/proration/electronic-signing provisions and Liezl's legal amendments. Verified Faeez's 19 August RE: Agreement source email and downloaded its five-page Storesmart Lease Agreement.pdf through Outlook. Preserved the source PDF unchanged and prepared a separate three-page booking supplement in local `output/STOR24_Terms_Alignment_2026-10-07`. The 6 October replacement approach below is superseded for review: software gaps were not authority to change minimum commitment, deposits, liability, cancellation, recovery or other contractual protections. A consolidated approved contract remains outstanding.
