@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { build } from "esbuild";
 import { createRequire } from "node:module";
+const privateKeyMarker = ["-----BEGIN", "PRIVATE KEY-----"].join(" ");
 async function fixture() {
   const state = { personal: false, owner: false, authorised: true, failAudit: false, audits: [] as Record<string, unknown>[] };
   const built = await build({ entryPoints: ["src/app/api/v1/reports/csv/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "synthetic", setup(builder) {
@@ -35,8 +36,8 @@ test("workspace exports cannot bypass personal grants, existing credential block
   f.state.personal = true; assert.equal((await f.post(rows)).status, 200);
   f.state.personal = false; f.state.owner = true; assert.equal((await f.post(rows, { kind: "advertising" })).status, 200);
   assert.equal((await f.post([["Customer"], ["Synthetic"]], { kind: "rent-review" })).status, 200);
-  assert.equal((await f.post([["Campaign"], ["-----BEGIN PRIVATE KEY-----"]])).status, 422);
-  assert.equal((await f.post([["-----BEGIN PRIVATE KEY-----"]])).status, 422);
+  assert.equal((await f.post([["Campaign"], [privateKeyMarker]])).status, 422);
+  assert.equal((await f.post([[privateKeyMarker]])).status, 422);
   assert.equal((await f.post([["Contact synthetic@example.invalid"], ["Synthetic"]])).status, 200);
   f.state.failAudit = true; assert.equal((await f.post(rows)).status, 500);
   assert.equal((await f.post([["Contact synthetic@example.invalid"], ["Synthetic"]])).status, 500);
