@@ -26,3 +26,9 @@ test("multiple bookings require a deliberate selection and cancelled bookings ca
  assert.doesNotMatch(html,/Continue to lease agreement/);
  assert.doesNotMatch(render([{...base,status:"CANCELLED"}]),/Continue to agreement details|reservation=booking/);
 });
+test("active tenancy cannot mark key handover complete without its saved audit",()=>{
+ const active={...base,status:"CONVERTED",convertedTenancyId:"tenancy",convertedTenancy:{status:"ACTIVE",accountId:"account",documents:[{id:"lease",status:"SIGNED",signedAt:"2026-10-01"}]}};
+ assert.match(render([active],4),/Active tenancy · check handover/);
+ assert.doesNotMatch(render([active],4),/Key handover recorded/);
+ assert.match(render([{...active,handedOver:true}],4),/Key handover recorded/);
+});

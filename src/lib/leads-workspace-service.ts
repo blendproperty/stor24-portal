@@ -31,6 +31,12 @@ export async function leadsWorkspace(scope: RequestScope) {
   const evidence = leads.length ? await db.auditEvent.findMany({ where: { organisationId: scope.organisationId,
     entityType: "Lead", entityId: { in: leads.map(l => l.id) }, action: { in: ["public_lead.created", "lead.attribution.captured", "lead.market_profile.captured"] } },
     select: { entityId: true, after: true }, orderBy: { occurredAt: "asc" } }) : [];
+  const tenancyIds = leads.flatMap(lead => lead.reservations.flatMap(r => r.convertedTenancyId ? [r.convertedTenancyId] : []));
+  const handovers = tenancyIds.length ? await db.auditEvent.findMany({
+    where: { organisationId: scope.organisationId, entityType: "Tenancy", entityId: { in: tenancyIds }, action: "tenancy.key_handover_confirmed" },
+    select: { entityId: true },
+  }) : [];
+  const handedOver = new Set(handovers.map(event => event.entityId));
   const attribution = new Map(evidence.flatMap(event => {
     const after = event.after as { attribution?: unknown } | null;
     const parsed = leadAttributionSchema.safeParse(after?.attribution);
@@ -40,7 +46,7 @@ export async function leadsWorkspace(scope: RequestScope) {
   return { facilities, staff: staff.map(person => ({ id: person.id, name: person.name, facilityIds: person.roleAssignments.map(a => a.facilityId) })), count,
     leads: leads.map(lead => ({ ...lead, attribution: attribution.get(lead.id) ?? null,marketProfile:marketProfiles.get(lead.id)??null,
       stage: lead.reservations.some(r => r.status === "CONVERTED" && r.convertedTenancyId && ["ACTIVE", "NOTICE_GIVEN"].includes(r.convertedTenancy?.status ?? "")) ? "WON" : lead.stage,
-      reservations: lead.reservations.map(r => ({ ...r, quotedRate: Number(r.quotedRate) })) })) };
+      reservations: lead.reservations.map(r => ({ ...r, handedOver: Boolean(r.status === "CONVERTED" && r.convertedTenancyId && handedOver.has(r.convertedTenancyId)), quotedRate: Number(r.quotedRate) })) })) };
 }
 
 export async function updateLead(scope: RequestScope, id: string, input: LeadUpdate) {
