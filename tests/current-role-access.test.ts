@@ -25,7 +25,7 @@ test("explicit organisation-wide and scoped wildcard grants retain their intende
 test("personal export requires owner or exact explicit grant and retains facility scope", () => {
   assert.equal(currentRoleAccess([assignment("Manager",null,["*","data.*","reports.*"])],"data.personal_export").allowed,false);
   assert.equal(currentRoleAccess([assignment("Organisation owner",null)],"data.personal_export").allowed,true);
-  const delegated = [assignment("Custom access · test","a",["data.personal_export"])];
+  const delegated = [assignment("Custom access Â· test","a",["data.personal_export"])];
   assert.deepEqual(currentRoleAccess(delegated,"data.personal_export").allowedFacilityIds,["a"]);
   assert.equal(currentRoleAccess(delegated,"data.personal_export","b").allowed,false);
   assert.equal(currentRoleAccess([],"data.personal_export").allowed,false);
