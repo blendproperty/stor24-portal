@@ -32,3 +32,10 @@ test("active tenancy cannot mark key handover complete without its saved audit",
  assert.doesNotMatch(render([active],4),/Key handover recorded/);
  assert.match(render([{...active,handedOver:true}],4),/Key handover recorded/);
 });
+
+
+test("an unlinked enquiry cannot offer a reservation action",()=>{
+ const html=renderToStaticMarkup(<LeadLeaseJourney bookings={[]} step={2} setStep={()=>{}} bookingId="" setBookingId={()=>{}} canReserve busy={false} reserving={false} onReserve={()=>{}}/>);
+ assert.match(html,/needs a linked customer/);
+ assert.doesNotMatch(html,/Choose an available unit<\/button>/);
+});
