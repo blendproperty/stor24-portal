@@ -28,6 +28,7 @@ type Unit = {
 type Facility = { id: string; name: string };
 type Customer = { id: string; name: string; email: string | null };
 type Reservation = {
+  leadId?: string | null;
   canRecordPayment?: boolean;
   canReviewPhoto?: boolean;
   progress?: MoveInProgress;
@@ -233,6 +234,7 @@ export function MoveInWorkspace({
               : "Complete the booking details, then send the lease agreement for review and signature."
         }
       />
+      {selectedReservation?.leadId && <a className="button button-secondary" href={`/leads?lead=${encodeURIComponent(selectedReservation.leadId)}`}>Back to enquiry journey</a>}
       {(step === 1 || !selectedReservation?.readiness) && <MoveInProgressNav steps={[
         { label: "Select unit", icon: Warehouse, status: selectedId ? `Unit ${selected?.number}` : "Choose a unit", complete: Boolean(selectedId), onClick: () => setStep(1) },
         { label: "Agreement", icon: FileCheck2, status: selectedReservation?.readiness?.signed ? "Signed" : "Not signed", complete: Boolean(selectedReservation?.readiness?.signed), onClick: selectedId ? () => setStep(2) : undefined },
