@@ -3,6 +3,13 @@ import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ReservationMoveInConfirmation } from "../src/components/reservation-move-in-confirmation";
 
+test("invalid pricing shows review instead of a zero amount or payment actions", () => {
+  const html = renderToStaticMarkup(<ReservationMoveInConfirmation reservationId="booking" customerName="CI customer" unitNumber="107" canRecordPayment onBack={() => {}} readiness={{ amountReviewRequired: true, mandateStatus: null, signed: true, leaseId: "original", signedAt: "2026-09-18", requiredAmount: 0, paidAmount: 100, paymentVerified: false, testPayment: false, startDate: "2026-09-18", ready: false, blockers: ["The saved booking amount needs review before payment or key handover."] }} />);
+  assert.match(html, /Saved booking amount needs review/);
+  assert.match(html, /disabled="">Confirm move-in/);
+  assert.doesNotMatch(html, /of R 0|Booking test payment|Record verified receipt|name="handoverConfirmed"/);
+});
+
 test("a signed paid booking presents handover and the original document, never another signing form", () => {
   const html = renderToStaticMarkup(<ReservationMoveInConfirmation reservationId="booking" customerName="CI customer" unitNumber="107" onBack={() => {}} readiness={{ mandateStatus: null, signed: true, leaseId: "original", signedAt: "2026-09-18", requiredAmount: 1100, paidAmount: 1100, paymentVerified: true, testPayment: false, startDate: "2026-09-18", ready: true, blockers: [] }} />);
   assert.match(html, /Ready for key collection/);

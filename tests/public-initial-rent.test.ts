@@ -1,6 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {newPublicInitialRent,publicInitialRent,publicCheckoutTotal} from '../src/lib/public-initial-rent';
+import {newPublicInitialRent,publicInitialRent,publicCheckoutTotal,publicCheckoutReview} from '../src/lib/public-initial-rent';
+
+test('readiness isolates invalid saved pricing while transaction checkout stays strict', () => {
+ for (const quotedRate of [0, -100, Number.NaN, Infinity, 20_000_001]) {
+  assert.deepEqual(publicCheckoutReview({quotedRate}), {amount: 0, needsReview: true});
+  assert.throws(() => publicCheckoutTotal({quotedRate}), /INVALID_CHECKOUT_AMOUNT/);
+ }
+ const invalidSnapshot = {quotedRate:100, initialRentSnapshot:{version:1}};
+ assert.deepEqual(publicCheckoutReview(invalidSnapshot), {amount:0, needsReview:true});
+ assert.throws(() => publicCheckoutTotal(invalidSnapshot), /INVALID_INITIAL_RENT_SNAPSHOT/);
+ const rows = [{quotedRate:100}, {quotedRate:0}, {quotedRate:250,packageSelection:{priceSnapshot:50}}].map(publicCheckoutReview);
+ assert.deepEqual(rows, [{amount:100,needsReview:false},{amount:0,needsReview:true},{amount:300,needsReview:false}]);
+ assert.throws(() => publicCheckoutReview({quotedRate:{valueOf(){throw Error('UNEXPECTED');}}}), /UNEXPECTED/);
+});
 test('public first rent keeps exact prepaid periods, inclusive SAST dates and goods separate',()=>{
  const date=new Date('2026-02-15T22:00:00Z');const initialRentSnapshot=newPublicInitialRent(2800,date);
  const r={quotedRate:2800,intendedMoveIn:date,initialRentSnapshot,packageSelection:{priceSnapshot:65}};
