@@ -81,3 +81,6 @@
 @media(max-width:600px) { .app-shell .report-library-categories,.report-online-kpis { grid-template-columns:1fr; } .report-online-chart { padding:14px; } }
 
 .app-shell .leads-filters .leads-search input { padding-left:40px; }
+
+.report-online-bar meter::-webkit-meter-optimum-value { background:#e85412; }
+.report-online-bar meter::-moz-meter-bar { background:#e85412; }

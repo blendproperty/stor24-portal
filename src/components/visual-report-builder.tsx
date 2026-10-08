@@ -57,7 +57,8 @@ export function VisualReportBuilder({facilities,from,to,canExport,canSchedule,ca
     if(!response.ok){const payload=await response.json();throw new Error(payload.error?.message??"Batch export failed.");}
     const url=URL.createObjectURL(await response.blob()),link=document.createElement("a");link.href=url;link.download="stor24-report-bundle.zip";link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setMessage("Prepared report bundle.");
   });
-  const groups=["All",...new Set(catalogue?.templates.map(t=>t.group)??[])];
+  const categoryOrder=["Tenants","Units","Finance","Marketing","Management","Insurance","Merchandise","Deposits"];
+  const groups=["All",...[...new Set(catalogue?.templates.map(t=>t.group)??[])].sort((a,b)=>{const rank=(g:string)=>categoryOrder.includes(g)?categoryOrder.indexOf(g):categoryOrder.length;return rank(a)-rank(b)||a.localeCompare(b);})];
   const filteredTemplates = catalogue?.templates.filter(t=>(group==="All"||t.group===group)&&`${t.name} ${t.group}`.toLowerCase().includes(search.toLowerCase())) ?? [];
   return <div className="visual-report-workspace">
     <nav className="report-builder-tabs" aria-label="Reporting sections">{([['library','Report library'],['view','Online report'],['build','Build a report'],['saved','Saved reports'],['inbox','Schedules & history'],['history','SiteLink history']] as const).map(([key,label])=><button key={key} className={`button ${tab===key?'button-primary':'button-secondary'}`} disabled={busy} aria-pressed={tab===key} onClick={()=>setTab(key)}>{label}</button>)}</nav>
