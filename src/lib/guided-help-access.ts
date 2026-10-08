@@ -27,6 +27,7 @@ export const guideAccessRules: Record<string, Rule> = {
   tenants: rule("operations.view", ["", "operations.manage", "operations.manage", "ledger.view", "reservations.manage,move_in.create,ledger.view"]),
   leads: rule("leads.view", ["leads.create,operations.manage", "", "reservations.manage", "reservations.manage,operations.manage"]),
   "unsigned-move-in": rule("move_in.create", ["reservations.manage", "", "", "integrations.view,operations.manage"]),
+  "assisted-signing": rule("move_in.create", ["", "", ""]),
   accounts: rule("ledger.view", ["", "", "", "payments.manage,operations.manage,billing.documents.send"]),
   payments: rule("ledger.view,payments.manage", ["", "", "", ""]),
   transfer: rule("ledger.view,operations.manage", ["", "", "", "inventory.view,access.view"]),

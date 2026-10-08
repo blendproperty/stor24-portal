@@ -41,19 +41,24 @@ export async function reserveAction(data: FormData) {
 }
 
 /**
- * Starts a move-in and sends the lease out for signature (DocuSign-style)
- * instead of completing it inline. The unit is held (RESERVED) and the
- * tenancy is created as DRAFT; both flip to live (OCCUPIED / ACTIVE) only
- * once the customer signs via the public /sign/[token] link emailed here.
- * See completeLeaseSigning() in leasing-service.ts for that second half.
+ * Creates the pending lease, then continues directly to assisted signing.
+ * Email follow-up is an explicit alternative. Saved signing evidence still
+ * determines completion; opening a signing session never completes a lease.
  */
 export async function moveInAction(data: FormData) {
-  await requirePermission("move_in.create");
   const parsed = moveInSchema.parse({ reservationId: text(data, "reservationId"), facilityId: text(data, "facilityId"), customerId: text(data, "customerId"), unitId: text(data, "unitId"), startDate: text(data, "startDate"), monthlyRate: number(data, "monthlyRate"), initialCharge: number(data, "initialCharge") ?? 0, initialRentPolicy: text(data,"initialRentMode") && text(data,"initialRentMode") !== "MANUAL" ? {mode:text(data,"initialRentMode"),cutoffDay:number(data,"initialRentCutoff"),approvalReference:text(data,"initialRentApproval")} : undefined, accessState: "PENDING", paymentMethod: text(data, "paymentMethod") });
-  const scope = await requireScope();
+  const scope = await requirePermissionScope("move_in.create", parsed.facilityId);
   const result = await moveIn(scope, parsed);
-  await dispatchBlendSignLease(scope, result, parsed);
-  revalidatePath("/tenants"); revalidatePath("/operations/accounts"); redirect(`/operations/accounts?accountId=${encodeURIComponent(result.tenancy.accountId)}`);
+  const invitationDelivery = data.get("invitationDelivery") === "EMAIL" ? "EMAIL" : "ASSISTED";
+  try {
+    await dispatchBlendSignLease(scope, result, { ...parsed, invitationDelivery });
+  } catch {
+    // Preserve the saved booking/account and offer recovery without a second move-in.
+    revalidatePath("/operations/accounts");
+    redirect(`/operations/lease-signing?document=${encodeURIComponent(result.document.id)}&dispatch=failed`);
+  }
+  revalidatePath("/tenants"); revalidatePath("/operations/accounts");
+  redirect(invitationDelivery === "ASSISTED" ? `/operations/lease-signing?document=${encodeURIComponent(result.document.id)}` : `/operations/accounts?accountId=${encodeURIComponent(result.tenancy.accountId)}`);
 }
 
 export async function confirmReservationMoveInAction(data: FormData): Promise<{ error: string } | undefined> {

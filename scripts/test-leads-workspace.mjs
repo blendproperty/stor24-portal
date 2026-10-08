@@ -55,7 +55,7 @@ try{
   await page.getByLabel('Monthly quote (R)').fill('0');await page.getByRole('button',{name:'Confirm reservation',exact:true}).click();await expect(page.getByRole('dialog').getByRole('alert')).toContainText('greater than zero');await page.getByLabel('Monthly quote (R)').fill('1400');
   rejectReservation=true;await page.getByRole('button',{name:'Confirm reservation',exact:true}).click();await expect(page.getByRole('dialog').getByRole('alert')).toContainText('no longer available');await expect(page.getByLabel('Available unit')).toHaveValue('unit');
   rejectReservation=false;await page.getByRole('button',{name:'Confirm reservation',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Review and send the lease agreement'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Review and sign the lease agreement'})).toBeVisible();
   if(reservation.leadId!=='lead0'||reservation.customerId!=='customer0'||reservation.unitId!=='unit')throw Error('Lost enquiry/customer/unit context');
   await expect(page.getByRole('link',{name:'Continue to agreement details'})).toHaveAttribute('href','/operations/move-in?reservation=saved%2Fbooking');
   await page.screenshot({path:`output/leads-design/lease-step-${width}.png`,fullPage:false});

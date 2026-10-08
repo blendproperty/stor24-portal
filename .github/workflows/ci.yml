@@ -78,6 +78,7 @@ jobs:
       - run: node scripts/test-facial-photos.mjs
       - run: node scripts/test-identity.mjs
       - run: node scripts/test-move-in-flow.mjs
+      - run: node scripts/test-assisted-signing.mjs
       - run: node scripts/test-move-in-training.mjs
       - run: node scripts/test-restricted-navigation.mjs
       - run: node scripts/test-premium-workspace.mjs
