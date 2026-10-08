@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { MarketingCommandCentre } from "./marketing-command-centre";
 import { MarketingOutcomes } from "./marketing-outcomes";
 import { MarketingDialog } from "./marketing-dialog";
+import { MarketingABCPanel } from "./marketing-abc";
 import {MarketingAdvertising} from "./marketing-advertising";
 import { MarketingSearchConsole } from "./marketing-search-console";
 import { MarketingTrafficChart } from "./marketing-traffic";
@@ -502,6 +503,7 @@ export function MarketingDashboard({ canManage }: { canManage: boolean }) {
           <nav className="marketing-tabs" aria-label="Marketing views">
             {[
               "overview",
+              "abc insights",
               "channels",
               "budgets",
               "placements",
@@ -519,6 +521,7 @@ export function MarketingDashboard({ canManage }: { canManage: boolean }) {
               </button>
             ))}
           </nav>
+          {(tab === "overview" || tab === "abc insights") && <MarketingABCPanel key={`abc-${from}-${to}-${reportVersion}`} from={from} to={to} campaignNames={Object.fromEntries((data?.campaigns ?? []).map(c => [c.id,c.name]))} />}
           {data && (
             <MarketingCommandCentre
               data={data}
