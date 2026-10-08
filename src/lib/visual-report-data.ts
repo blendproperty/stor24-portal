@@ -7,6 +7,8 @@ import { REPORT_SOURCE_LIMIT, ReportError } from "@/lib/visual-report-engine";
 import { visualReportDatasets, type VisualReportQuery, type VisualReportRow } from "@/lib/visual-report-contract";
 import { decryptReportArtifact } from "@/lib/visual-report-security";
 import { z } from "zod";
+import { collectionsWorkspace } from "./collections-service";
+import { nativeUnpaidRows } from "./native-unpaid-report";
 
 const iso=(date:Date|null|undefined)=>date?.toISOString()??null;
 const name=(c:{companyName:string|null;firstName:string|null;lastName:string|null}|null)=>c?(c.companyName||[c.firstName,c.lastName].filter(Boolean).join(" ")):null;
@@ -24,6 +26,17 @@ async function rawVisualReportSource(scope:RequestScope, query:VisualReportQuery
   const interval=query.intervalMode?{startDate:query.intervalMode==="whole-period"?{lte:period.gte}:{lt:period.lt},OR:[{endDate:null},{endDate:query.intervalMode==="whole-period"?{gte:period.lt}:{gt:period.gte}}]}:{};
   const bounded=<T>(rows:T[])=>{if(rows.length>REPORT_SOURCE_LIMIT)throw new ReportError("REPORT_LIMIT");return rows;};
   switch(query.dataset) {
+    case "unpaid-native": {
+      const narrowed = query.facilityId ? { ...scope, unrestrictedFacilities: false, facilityIds: [query.facilityId] } : scope;
+      let workspace;
+      try { workspace = await collectionsWorkspace(narrowed, query.to); }
+      catch (error) {
+        if (error instanceof Error && error.message === "COLLECTION_DATE") throw new ReportError("REPORT_ASOF_FUTURE");
+        if (error instanceof Error && error.message === "COLLECTION_LIMIT") throw new ReportError("REPORT_LIMIT");
+        throw error;
+      }
+      return nativeUnpaidRows(workspace.rows, query.to, query.metrics.some(m => m.field === "amount"));
+    }
     case "tenants": return bounded(await db.tenancy.findMany({where:{facility,...range("startDate","start"),...range("endDate","end"),...range("noticeDate","notice")},take,orderBy:{id:"asc"},select:{...tenancySelect,status:true,productLine:true,paymentMethod:true,startDate:true,endDate:true,noticeDate:true,customer:{select:{...customerSelect,email:true,phone:true}},account:{select:{accountNumber:true,balance:true,currency:true}},occupancies:{where:{status:{in:["ACTIVE","NOTICE_GIVEN"]}},select:{monthlyRate:true,unit:{select:{number:true}}},take:101}}})).map(t=> {
       if(t.occupancies.length>100)throw new ReportError("REPORT_LIMIT");
       // Sum Decimal values through Prisma Decimal, preserving exact cents.
@@ -71,6 +84,7 @@ export async function visualReportSource(scope:RequestScope, query:VisualReportQ
   }
   if(visualReportDatasets.find(d=>d.key===query.dataset)?.importOnly)throw new ReportError("REPORT_HISTORY_REQUIRED");
   const rows=await rawVisualReportSource(scope,query);
+  if(query.dataset==="unpaid-native")return rows;
   const org=await db.organisation.findUniqueOrThrow({where:{id:scope.organisationId},select:{currency:true}});
   return rows.map(row=>({...row,currency:row.currency??org.currency}));
 }
