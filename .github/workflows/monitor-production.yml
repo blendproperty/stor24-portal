@@ -114,7 +114,7 @@ jobs:
             if (!entry) throw new Error("Invalid dashboard evidence");
             process.stdout.write(JSON.stringify(entry));
           ' | ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" 'cd /opt/stor24-crm && node scripts/write-monitor-status.mjs'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: production-alert-result
