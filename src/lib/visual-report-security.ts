@@ -27,13 +27,15 @@ function key() {
   return createHash("sha256").update(`stor24:report-artifact:v1:${secret}`).digest();
 }
 export function encryptReportArtifact(value:string,binding:string) {
-  const iv=randomBytes(12),cipher=createCipheriv("aes-256-gcm",key(),iv);cipher.setAAD(Buffer.from(binding));
+  const iv=randomBytes(12),cipher=createCipheriv("aes-256-gcm",key(),iv,{authTagLength:16});cipher.setAAD(Buffer.from(binding));
   const bytes=Buffer.concat([cipher.update(value,"utf8"),cipher.final()]);
   return ["v1",iv.toString("base64url"),cipher.getAuthTag().toString("base64url"),bytes.toString("base64url")].join(".");
 }
 export function decryptReportArtifact(value:string,binding:string) {
   const [v,iv,tag,data,extra]=value.split(".");
   if(v!=="v1"||!iv||!tag||!data||extra)throw new ReportError("REPORT_STORAGE_UNAVAILABLE");
-  const cipher=createDecipheriv("aes-256-gcm",key(),Buffer.from(iv,"base64url"));cipher.setAAD(Buffer.from(binding));cipher.setAuthTag(Buffer.from(tag,"base64url"));
+  const nonce=Buffer.from(iv,"base64url"),authTag=Buffer.from(tag,"base64url");
+  if(nonce.length!==12||authTag.length!==16)throw new ReportError("REPORT_STORAGE_UNAVAILABLE");
+  const cipher=createDecipheriv("aes-256-gcm",key(),nonce,{authTagLength:16});cipher.setAAD(Buffer.from(binding));cipher.setAuthTag(authTag);
   return Buffer.concat([cipher.update(Buffer.from(data,"base64url")),cipher.final()]).toString("utf8");
 }
