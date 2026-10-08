@@ -46,6 +46,7 @@ export const guideAccessRules: Record<string, Rule> = {
   access: rule("access.view", ["", "access.manage", "move_in.create", "integrations.manage"]),
   calendar: rule("operations.view", ["", "", "operations.manage"]),
   prorate: rule("move_in.create|operations.manage|billing.view", ["", "", ""]),
+  "custom-reports": rule("reports.view|reports.financial|reports.sales|reports.collections", ["", "", "reports.export"]),
   reports: rule("reports.view|reports.financial|reports.sales|reports.collections", ["", "reports.export", "reports.export", "ledger.view"]),
   graphs: rule("reports.view", ["", "", "ledger.view,payments.view", "inventory.view"]),
   marketing: rule("leads.view", ["", "leads.create", ""]),

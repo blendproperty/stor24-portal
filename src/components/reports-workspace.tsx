@@ -5,12 +5,12 @@ import { ReportPreview } from "@/components/report-preview";
 import { Download, Filter, LockKeyhole } from "lucide-react";
 import { isCurrentSnapshotReport, type ReportDefinition } from "@/lib/reporting";
 
-export function ReportsWorkspace({ reports, facilities, initialFrom, initialTo, canExport }: { reports: readonly ReportDefinition[]; facilities: { id: string; name: string }[]; initialFrom: string; initialTo: string; canExport: boolean }) {
+export function ReportsWorkspace({ reports, facilities, initialFrom, initialTo, canExport, initialReportKey }: { reports: readonly ReportDefinition[]; facilities: { id: string; name: string }[]; initialFrom: string; initialTo: string; canExport: boolean; initialReportKey?: string }) {
   const [previewRun,setPreviewRun] = useState(0);
   const [previewQuery, setPreviewQuery] = useState("");
   const [format, setFormat] = useState<"CSV" | "XLSX" | "PDF">("CSV");
   const [group, setGroup] = useState("All");
-  const [reportKey, setReportKey] = useState(reports[0]?.key ?? "");
+  const [reportKey, setReportKey] = useState(reports.find(r=>r.key===initialReportKey)?.key ?? reports[0]?.key ?? "");
   const [from, setFrom] = useState(initialFrom);
   const [to, setTo] = useState(initialTo);
   const [facilityId, setFacilityId] = useState("");
