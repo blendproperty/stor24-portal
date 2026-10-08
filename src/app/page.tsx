@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { OperationsReminders } from "@/components/operations-reminders";
 import { ArrowUpRight, CalendarClock, DoorOpen, ListChecks, Users } from "lucide-react";
 import { PortfolioOverview } from "@/components/portfolio-overview";
 import { PageHeader } from "@/components/page-header";
@@ -24,6 +25,7 @@ export default async function DashboardPage() {
   return <div className="page-stack overview-workspace">
     <PageHeader eyebrow="Operations centre" title="Stor24 operational overview" description="Live, facility-scoped occupancy, receivables, leads and priority work." action={canVisit("/operations/move-in", access) && <Link className="button button-primary" href="/operations/move-in"><DoorOpen size={17}/>New move-in</Link>}/>
     <PortfolioOverview {...data.metrics} access={access}/>
+    <OperationsReminders/>
     <section className="dashboard-grid">
       <article className="panel panel-spacious" data-guide="dashboard-queue">
         <div className="panel-heading"><div><p className="eyebrow">Now</p><h2>Priority work queue</h2></div><Link className="text-link" href="/operations">View operations <ArrowUpRight size={15}/></Link></div>
