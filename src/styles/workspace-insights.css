@@ -1,0 +1,53 @@
+/* Shared, scoped intelligence surfaces: imported after the legacy workspace rules. */
+.app-shell .market-profile-summary { padding:28px; border-radius:18px; }
+.profile-heading,.profile-card-heading,.report-category-heading { display:flex; justify-content:space-between; align-items:center; gap:16px; }
+.profile-heading h2 { margin:6px 0 0; font-size:21px; letter-spacing:-.025em; }
+.profile-source,.report-category-heading>span { border:1px solid #dce5eb; border-radius:24px; padding:8px 12px; font-size:11px; color:#607985; white-space:nowrap; }
+.market-profile-summary>.leads-caption { margin:14px 0 22px; line-height:1.65; max-width:100ch; }
+.app-shell .market-profile-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }
+.market-profile-grid>article { min-width:0; background:#f7f9fa; border:1px solid #e2e9ed; border-radius:14px; padding:20px; }
+.profile-card-heading { align-items:flex-start; margin-bottom:22px; }
+.profile-card-heading h3 { margin:0; font-size:14px; }
+.profile-card-heading>span { color:#697d87; font-size:11px; text-align:right; }
+.profile-answer { margin:14px 0; }
+.profile-answer>div:first-child { display:flex; justify-content:space-between; gap:12px; font-size:12px; text-transform:capitalize; margin-bottom:8px; }
+.profile-answer strong { white-space:nowrap; }
+.profile-answer small { color:#6d7c84; font-weight:500; margin-left:6px; }
+.profile-track { height:7px; border-radius:20px; background:#e5ebee; overflow:hidden; }
+.profile-track>span { display:block; height:100%; background:#16836d; border-radius:20px; }
+.profile-track>.profile-unknown { background:#a8b7bf; }
+.market-profile-grid .profile-completeness { margin:20px 0 0; padding-top:14px; border-top:1px solid #e2e9ed; font-size:11px; color:#697d87; }
+.report-library-categories { display:grid; gap:30px; margin-top:28px; }
+.report-library-category { min-width:0; padding-top:24px; border-top:1px solid #dce5eb; }
+.report-category-heading h3 { font-size:22px; margin:6px 0 0; letter-spacing:-.025em; }
+.app-shell .report-builder-library { grid-template-columns:repeat(3,minmax(0,1fr)); margin-top:18px; gap:14px; }
+.app-shell .report-template-card { background:#fafbfc; padding:22px; gap:12px; border-radius:14px; }
+.report-template-card h3 { font-size:15px; line-height:1.4; }
+.report-template-card p { color:#697d87; font-size:12px; line-height:1.65; }
+.report-template-card>.button,.report-template-card>a.button { margin-top:auto; align-self:flex-start; }
+.report-readiness { background:#fff1dd; border-radius:6px; padding:6px 8px; align-self:flex-start; }
+.app-shell .marketing-workspace { gap:28px; }
+.app-shell .marketing-card { padding:28px; box-shadow:0 5px 18px #16313b05; }
+.marketing-provider-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:22px; align-items:start; }
+.marketing-provider-grid .marketing-card { height:100%; }
+.marketing-provider-status { display:inline-flex; border:1px solid #dce5eb; background:#f4f7f8; padding:7px 11px; border-radius:20px; font-size:11px; margin-bottom:18px; }
+.marketing-provider-status[data-status=connected] { color:#08705b; background:#eaf7f1; }
+.marketing-search-totals { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; padding:20px 0; margin-bottom:16px; border-block:1px solid #e2e9ed; }
+.marketing-search-totals>div { display:grid; gap:6px; }
+.marketing-search-totals strong { font-size:24px; letter-spacing:-.04em; }
+.marketing-search-totals span { font-size:11px; color:#607985; }
+.merchandise-table tr[data-unavailable=true] { background:#f0f2f3; color:#7d8990; }
+.merchandise-table tr[data-unavailable=true] .catalogue-table-thumb { filter:grayscale(1); opacity:.45; }
+@media(min-width:1600px) { .app-shell .report-builder-library { grid-template-columns:repeat(4,minmax(0,1fr)); } }
+@media(max-width:1100px) { .app-shell .report-builder-library { grid-template-columns:repeat(2,minmax(0,1fr)); } .marketing-provider-grid { grid-template-columns:1fr; } }
+@media(max-width:700px) { .app-shell .market-profile-grid,.app-shell .report-builder-library { grid-template-columns:1fr; } .app-shell .market-profile-summary,.app-shell .marketing-card { padding:20px; } .profile-heading { align-items:flex-start; flex-direction:column; } .profile-card-heading { flex-wrap:wrap; } .marketing-search-totals { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+.carousel-product-toggle:disabled { filter:grayscale(1); opacity:.45; cursor:not-allowed; }
+
+.report-library-category>summary { cursor:pointer; list-style:none; padding:8px 0; }
+.report-library-category>summary::after { content:"+"; font-size:24px; color:#607985; }
+.report-library-category[open]>summary::after { content:"−"; }
+.report-library-category>summary>div { flex:1; }
+
+.package-table tr[data-unavailable=true],.data-table tr[data-unavailable=true] { background:#f0f2f3; color:#7d8990; }
+.data-table tr[data-unavailable=true] .package-list-art { filter:grayscale(1); opacity:.55; }
