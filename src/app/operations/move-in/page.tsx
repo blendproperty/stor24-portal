@@ -21,7 +21,7 @@ export default async function MoveInPage({ searchParams }: { searchParams: Promi
     canReviewPhoto: auth.role === "Organisation owner" || auth.user.roleAssignments.some(a => (!a.facilityId || a.facilityId === reservation.facilityId) && hasPermission(a.role.permissions, "access.view")),
     canReviewIdentity: auth.role === "Organisation owner" || auth.user.roleAssignments.some(a => (!a.facilityId || a.facilityId === reservation.facilityId) && hasPermission(a.role.permissions, "identity.review")),
     canRecordPayment: auth.role === "Organisation owner" || auth.user.roleAssignments.some(a => (!a.facilityId || a.facilityId === reservation.facilityId) && hasPermission(a.role.permissions, "payments.manage")),
-    id: reservation.id, facilityId: reservation.facilityId, customerId: reservation.customerId, unitId: reservation.unitId,
+    leadId: reservation.leadId, id: reservation.id, facilityId: reservation.facilityId, customerId: reservation.customerId, unitId: reservation.unitId,
     label: `${reservation.unit.number} · ${reservation.customer.companyName || reservation.customer.firstName || "Customer"}`,
     paymentMethod: reservation.paymentMethod, intendedMoveIn: reservation.intendedMoveIn ? southAfricaDateKey(reservation.intendedMoveIn) : null,
     quotedRate: Number(reservation.quotedRate),
