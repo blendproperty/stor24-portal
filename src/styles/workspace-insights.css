@@ -79,3 +79,5 @@
 @media(max-width:1400px) { .app-shell .report-library-categories { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 @media(max-width:950px) { .app-shell .report-library-categories { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media(max-width:600px) { .app-shell .report-library-categories,.report-online-kpis { grid-template-columns:1fr; } .report-online-chart { padding:14px; } }
+
+.app-shell .leads-filters .leads-search input { padding-left:40px; }
