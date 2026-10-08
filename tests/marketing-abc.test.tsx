@@ -40,7 +40,7 @@ test("all ABC requests retain exact host / channel filters and independent provi
     const bodies: Record<string, unknown>[] = [];
     globalThis.fetch = async (url, init) => {
       if (String(url) === "https://oauth2.googleapis.com/token") return Response.json({ access_token: "private-token" });
-      assert.match(String(url), /^https:\/\/analyticsdata.googleapis.com\/v1(?:beta|alpha)\/properties\/123:run(?:Report|FunnelReport)$/);
+      assert.match(String(url), /^https:\/\/analyticsdata\.googleapis\.com\/v1(?:beta|alpha)\/properties\/123:run(?:Report|FunnelReport)$/);
       const body = JSON.parse(String(init?.body)); bodies.push(body);
       assert.match(JSON.stringify(body.dimensionFilter), /hostName/); assert.match(JSON.stringify(body.dimensionFilter), /stor24.co.za/); assert.match(JSON.stringify(body.dimensionFilter), /sessionDefaultChannelGroup/);
       if (String(url).endsWith("runFunnelReport")) {
