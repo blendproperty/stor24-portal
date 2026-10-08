@@ -521,7 +521,7 @@ export function MarketingDashboard({ canManage }: { canManage: boolean }) {
               </button>
             ))}
           </nav>
-          {(tab === "overview" || tab === "abc insights") && <MarketingABCPanel key={`abc-${from}-${to}-${reportVersion}`} from={from} to={to} />}
+          {(tab === "overview" || tab === "abc insights") && <MarketingABCPanel key={`abc-${from}-${to}-${reportVersion}`} from={from} to={to} campaignNames={Object.fromEntries((data?.campaigns ?? []).map(c => [c.id,c.name]))} />}
           {data && (
             <MarketingCommandCentre
               data={data}
