@@ -11,7 +11,7 @@ test("isolated PostgreSQL tablet visit and booking boundaries", async t => {
   const key = randomUUID(), org = await db.organisation.create({ data: { name: "Walk-in CI", slug: key } });
   const facility = await db.facility.create({ data: { organisationId: org.id, name: "CI store", code: key, publicSlug: key, publicBookingEnabled: true } });
   const user = await db.user.create({ data: { organisationId: org.id, name: "CI staff", email: `${key}@example.invalid` } });
-  const role = await db.role.create({ data: { organisationId: org.id, name: "CI booking staff", permissions: ["reservations.create"] } });
+  const role = await db.role.create({ data: { organisationId: org.id, name: "CI booking staff", permissions: ["reservations.manage"] } });
   await db.roleAssignment.create({ data: { userId: user.id, roleId: role.id, facilityId: facility.id } });
   const scope = { userId: user.id, organisationId: org.id, facilityIds: [facility.id], unrestrictedFacilities: false };
   const type = await db.unitType.create({ data: { facilityId: facility.id, name: "CI", features: [] } });
@@ -33,7 +33,7 @@ test("isolated PostgreSQL tablet visit and booking boundaries", async t => {
       const next = await prepare();
       await db.role.update({ where: { id: role.id }, data: { permissions: [] } });
       await assert.rejects(redeemWalkIn(next.launch), /WALK_IN_UNAVAILABLE/);
-      await db.role.update({ where: { id: role.id }, data: { permissions: ["reservations.create"] } });
+      await db.role.update({ where: { id: role.id }, data: { permissions: ["reservations.manage"] } });
     });
     await t.test("one visit creates one walk-in booking, rollback preserves units, clearing retains the booking", async () => {
       const { v, launch } = await prepare(), { token } = await redeemWalkIn(launch);

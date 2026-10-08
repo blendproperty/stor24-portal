@@ -20,7 +20,7 @@ export async function redeemWalkIn(launch: string) {
   return db.$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "WalkInVisit" WHERE "launchTokenHash" = ${hash} FOR UPDATE`;
     const visit = await tx.walkInVisit.findUnique({ where: { launchTokenHash: hash }, include });
-    if (!walkInUsable(visit) || !visit || !currentRoleAccess(visit.createdBy.roleAssignments, "reservations.create", visit.facilityId).allowed || visit.redeemedAt || visit.launchExpiresAt <= new Date()) throw new Error("WALK_IN_UNAVAILABLE");
+    if (!walkInUsable(visit) || !visit || !currentRoleAccess(visit.createdBy.roleAssignments, "reservations.manage", visit.facilityId).allowed || visit.redeemedAt || visit.launchExpiresAt <= new Date()) throw new Error("WALK_IN_UNAVAILABLE");
     const token = walkInToken();
     await tx.walkInVisit.update({ where: { id: visit.id }, data: { customerTokenHash: walkInTokenHash(token), redeemedAt: new Date() } });
     return { token, expiresAt: visit.expiresAt.toISOString() };
@@ -28,7 +28,7 @@ export async function redeemWalkIn(launch: string) {
 }
 export async function activeWalkIn(token: string) {
   const visit = await db.walkInVisit.findUnique({ where: { customerTokenHash: walkInTokenHash(token) }, include });
-  if (!walkInUsable(visit) || !visit || !currentRoleAccess(visit.createdBy.roleAssignments, "reservations.create", visit.facilityId).allowed) throw new Error("WALK_IN_UNAVAILABLE");
+  if (!walkInUsable(visit) || !visit || !currentRoleAccess(visit.createdBy.roleAssignments, "reservations.manage", visit.facilityId).allowed) throw new Error("WALK_IN_UNAVAILABLE");
   return visit;
 }
 export async function walkInView(token: string) {
