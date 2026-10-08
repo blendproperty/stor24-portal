@@ -1,12 +1,9 @@
-import Link from "next/link";
-import { ClipboardList } from "lucide-react";
+import { OperationsRemindersPanel, type OperationsReminder as Reminder } from "@/components/operations-reminders-panel";
 import { db } from "@/lib/db";
 import { facilityWhere, requirePermissionScope, type RequestScope } from "@/lib/scope";
 import { collectionsWorkspace } from "@/lib/collections-service";
 import { collectionCallCount, reorderItemCount } from "@/lib/operations-reminder-policy";
-import { southAfricaDateKey, formatSouthAfricaDateTime } from "@/lib/south-africa-time";
-
-type Reminder = { label: string; description: string; href: string; count: number | null };
+import { southAfricaDateKey } from "@/lib/south-africa-time";
 
 // Authorise and scope each queue separately: navigation permissions alone do not
 // establish permission to read another facility's aggregate counts.
@@ -32,10 +29,5 @@ export async function OperationsReminders() {
     queue("operations.view", { label: "Service required", description: "Open and in-progress maintenance requests", href: "/operations#operations-maintenance" }, scope => db.maintenanceRequest.count({ where: { organisationId: scope.organisationId, facility: facilityWhere(scope), status: { notIn: ["COMPLETED", "CANCELLED"] } } })),
   ]);
   const visible = items.filter((item): item is Reminder => item !== null);
-  if (!visible.length) return null;
-  return <section className="panel panel-spacious" aria-label="Operations reminders">
-    <div className="panel-heading"><div><p className="eyebrow">Daily attention</p><h2>Reminders</h2><p className="panel-subtitle">Updated {formatSouthAfricaDateTime(now)} SAST. Reload this page to refresh counts.</p></div><ClipboardList size={22}/></div>
-    <div className="work-list">{visible.map(item => <Link className="work-row" href={item.href} key={item.label}><span className="work-icon"><ClipboardList size={18}/></span><span className="work-copy"><strong>{item.label}</strong><small>{item.description}</small></span><span className="work-count" aria-label={item.count === null ? "Count unavailable" : `${item.count} items`}>{item.count ?? "Unavailable"}</span></Link>)}</div>
-    <p className="panel-subtitle">Counts show recorded work in your permitted facilities. Opening a queue does not process payments or change access.</p>
-  </section>;
+  return <OperationsRemindersPanel items={visible} updatedAt={now}/>;
 }
