@@ -53,3 +53,6 @@ jobs:
             done
             test "$(docker inspect --format "{{.State.Health.Status}}" "$container")" = healthy
           '
+          curl --fail --silent --show-error --connect-timeout 10 --max-time 150 \
+            --request POST --header "x-cron-key: $REPORT_CRON_KEY" \
+            'https://stor24-site.srv938083.hstgr.cloud/api/v1/reports/worker'
