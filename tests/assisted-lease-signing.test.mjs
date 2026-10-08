@@ -5,10 +5,10 @@ import vm from 'node:vm';
 import ts from 'typescript';
 
 function load(path, mocks) {
-  const module = {exports:{}};
+  const fixtureModule = {exports:{}};
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(path,'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,
-    {module,exports:module.exports,Response,Date,require:name=>{if (!(name in mocks)) throw new Error(`Unexpected import ${name}`);return mocks[name];}});
-  return module.exports;
+    {module:fixtureModule,exports:fixtureModule.exports,Response,Date,require:name=>{if (!(name in mocks)) throw new Error(`Unexpected import ${name}`);return mocks[name];}});
+  return fixtureModule.exports;
 }
 test('assisted move-in keeps its saved lease on dispatch failure and scopes creation to the chosen facility', async () => {
   let dispatchFails = false, mode, permission, redirected;
