@@ -1,0 +1,2845 @@
+{
+  "date": "2026-10-08",
+  "source": "Pinny Hack email Rate Card, 2026-10-08 09:48 SAST; Unit Schedule L6:N60 and B6:G318",
+  "sha256": "d70c9c9f85647018355cd4fe014efff1a307a4add322ecb6e147938d1e674c68",
+  "vatBasis": "inclusive",
+  "rates": [
+    {
+      "row": 6,
+      "floor": "Ground",
+      "area": 2,
+      "monthlyRate": 825
+    },
+    {
+      "row": 7,
+      "floor": "Ground",
+      "area": 3,
+      "monthlyRate": 900
+    },
+    {
+      "row": 8,
+      "floor": "Ground",
+      "area": 4,
+      "monthlyRate": 950
+    },
+    {
+      "row": 9,
+      "floor": "Ground",
+      "area": 5,
+      "monthlyRate": 1150
+    },
+    {
+      "row": 10,
+      "floor": "Ground",
+      "area": 6,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 11,
+      "floor": "Ground",
+      "area": 7,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 12,
+      "floor": "Ground",
+      "area": 8,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 13,
+      "floor": "Ground",
+      "area": 9,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 14,
+      "floor": "Ground",
+      "area": 10,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 15,
+      "floor": "Ground",
+      "area": 11,
+      "monthlyRate": 1750
+    },
+    {
+      "row": 16,
+      "floor": "Ground",
+      "area": 12,
+      "monthlyRate": 1800
+    },
+    {
+      "row": 17,
+      "floor": "Ground",
+      "area": 13,
+      "monthlyRate": 1850
+    },
+    {
+      "row": 18,
+      "floor": "Ground",
+      "area": 14,
+      "monthlyRate": 1900
+    },
+    {
+      "row": 19,
+      "floor": "Ground",
+      "area": 15,
+      "monthlyRate": 2000
+    },
+    {
+      "row": 20,
+      "floor": "Ground",
+      "area": 18,
+      "monthlyRate": 2350
+    },
+    {
+      "row": 21,
+      "floor": "Ground",
+      "area": 19,
+      "monthlyRate": 2350
+    },
+    {
+      "row": 22,
+      "floor": "Ground",
+      "area": 20,
+      "monthlyRate": 2400
+    },
+    {
+      "row": 23,
+      "floor": "Ground",
+      "area": 21,
+      "monthlyRate": 2550
+    },
+    {
+      "row": 24,
+      "floor": "Ground",
+      "area": 22,
+      "monthlyRate": 2750
+    },
+    {
+      "row": 25,
+      "floor": "Ground",
+      "area": 23,
+      "monthlyRate": 2800
+    },
+    {
+      "row": 26,
+      "floor": "Ground",
+      "area": 24,
+      "monthlyRate": 2850
+    },
+    {
+      "row": 27,
+      "floor": "Ground",
+      "area": 25,
+      "monthlyRate": 3000
+    },
+    {
+      "row": 28,
+      "floor": "Ground",
+      "area": 29,
+      "monthlyRate": 3500
+    },
+    {
+      "row": 29,
+      "floor": "Ground",
+      "area": 29.6,
+      "monthlyRate": 4500
+    },
+    {
+      "row": 30,
+      "floor": "Ground",
+      "area": 33,
+      "monthlyRate": 3900
+    },
+    {
+      "row": 31,
+      "floor": "Ground",
+      "area": 34,
+      "monthlyRate": 4000
+    },
+    {
+      "row": 32,
+      "floor": "Ground",
+      "area": 35,
+      "monthlyRate": 4400
+    },
+    {
+      "row": 33,
+      "floor": "Ground",
+      "area": 36,
+      "monthlyRate": 4500
+    },
+    {
+      "row": 34,
+      "floor": "Ground",
+      "area": 49,
+      "monthlyRate": 5500
+    },
+    {
+      "row": 35,
+      "floor": "Ground",
+      "area": 70,
+      "monthlyRate": 7000
+    },
+    {
+      "row": 36,
+      "floor": "Ground",
+      "area": 76,
+      "monthlyRate": 7500
+    },
+    {
+      "row": 37,
+      "floor": "First",
+      "area": 3,
+      "monthlyRate": 750
+    },
+    {
+      "row": 38,
+      "floor": "First",
+      "area": 4,
+      "monthlyRate": 850
+    },
+    {
+      "row": 39,
+      "floor": "First",
+      "area": 5,
+      "monthlyRate": 1000
+    },
+    {
+      "row": 40,
+      "floor": "First",
+      "area": 6,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 41,
+      "floor": "First",
+      "area": 7,
+      "monthlyRate": 1400
+    },
+    {
+      "row": 42,
+      "floor": "First",
+      "area": 8,
+      "monthlyRate": 1450
+    },
+    {
+      "row": 43,
+      "floor": "First",
+      "area": 9,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 44,
+      "floor": "First",
+      "area": 10,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 45,
+      "floor": "First",
+      "area": 11,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 46,
+      "floor": "First",
+      "area": 12,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 47,
+      "floor": "First",
+      "area": 13,
+      "monthlyRate": 1750
+    },
+    {
+      "row": 48,
+      "floor": "First",
+      "area": 14,
+      "monthlyRate": 1800
+    },
+    {
+      "row": 49,
+      "floor": "First",
+      "area": 15,
+      "monthlyRate": 1850
+    },
+    {
+      "row": 50,
+      "floor": "First",
+      "area": 16,
+      "monthlyRate": 1850
+    },
+    {
+      "row": 51,
+      "floor": "First",
+      "area": 17,
+      "monthlyRate": 1900
+    },
+    {
+      "row": 52,
+      "floor": "First",
+      "area": 19,
+      "monthlyRate": 2000
+    },
+    {
+      "row": 53,
+      "floor": "First",
+      "area": 22,
+      "monthlyRate": 2350
+    },
+    {
+      "row": 54,
+      "floor": "First",
+      "area": 23,
+      "monthlyRate": 2550
+    },
+    {
+      "row": 55,
+      "floor": "First",
+      "area": 33,
+      "monthlyRate": 2850
+    },
+    {
+      "row": 56,
+      "floor": "First",
+      "area": 34,
+      "monthlyRate": 3000
+    },
+    {
+      "row": 57,
+      "floor": "First",
+      "area": 35,
+      "monthlyRate": 3250
+    },
+    {
+      "row": 58,
+      "floor": "First",
+      "area": 37,
+      "monthlyRate": 3500
+    },
+    {
+      "row": 59,
+      "floor": "First",
+      "area": 38,
+      "monthlyRate": 3500
+    },
+    {
+      "row": 60,
+      "floor": "First",
+      "area": 41,
+      "monthlyRate": 3950
+    }
+  ],
+  "units": [
+    {
+      "row": 6,
+      "floor": "Ground",
+      "number": "1",
+      "category": "-",
+      "location": "Internal",
+      "area": 36
+    },
+    {
+      "row": 7,
+      "floor": "Ground",
+      "number": "2",
+      "category": "-",
+      "location": "Internal",
+      "area": 36
+    },
+    {
+      "row": 8,
+      "floor": "Ground",
+      "number": "3",
+      "category": "-",
+      "location": "Internal",
+      "area": 34
+    },
+    {
+      "row": 9,
+      "floor": "Ground",
+      "number": "4",
+      "category": "-",
+      "location": "Internal",
+      "area": 35
+    },
+    {
+      "row": 10,
+      "floor": "Ground",
+      "number": "5",
+      "category": "-",
+      "location": "Internal",
+      "area": 35
+    },
+    {
+      "row": 11,
+      "floor": "Ground",
+      "number": "6",
+      "category": "-",
+      "location": "Internal",
+      "area": 33
+    },
+    {
+      "row": 12,
+      "floor": "Ground",
+      "number": "7",
+      "category": "-",
+      "location": "Internal",
+      "area": 36
+    },
+    {
+      "row": 13,
+      "floor": "Ground",
+      "number": "8",
+      "category": "-",
+      "location": "Internal",
+      "area": 35
+    },
+    {
+      "row": 14,
+      "floor": "Ground",
+      "number": "9",
+      "category": "-",
+      "location": "Internal",
+      "area": 33
+    },
+    {
+      "row": 15,
+      "floor": "Ground",
+      "number": "10",
+      "category": "-",
+      "location": "Internal",
+      "area": 35
+    },
+    {
+      "row": 16,
+      "floor": "Ground",
+      "number": "11",
+      "category": "-",
+      "location": "Internal",
+      "area": 34
+    },
+    {
+      "row": 17,
+      "floor": "Ground",
+      "number": "12",
+      "category": "-",
+      "location": "Internal",
+      "area": 18
+    },
+    {
+      "row": 18,
+      "floor": "Ground",
+      "number": "13",
+      "category": "-",
+      "location": "Internal",
+      "area": 13
+    },
+    {
+      "row": 19,
+      "floor": "Ground",
+      "number": "14",
+      "category": "-",
+      "location": "Internal",
+      "area": 19
+    },
+    {
+      "row": 20,
+      "floor": "Ground",
+      "number": "15",
+      "category": "-",
+      "location": "Internal",
+      "area": 2
+    },
+    {
+      "row": 21,
+      "floor": "Ground",
+      "number": "16",
+      "category": "-",
+      "location": "Internal",
+      "area": 2
+    },
+    {
+      "row": 22,
+      "floor": "Ground",
+      "number": "17",
+      "category": "-",
+      "location": "Internal",
+      "area": 22
+    },
+    {
+      "row": 23,
+      "floor": "Ground",
+      "number": "18",
+      "category": "-",
+      "location": "Internal",
+      "area": 23
+    },
+    {
+      "row": 24,
+      "floor": "Ground",
+      "number": "19",
+      "category": "-",
+      "location": "Internal",
+      "area": 12
+    },
+    {
+      "row": 25,
+      "floor": "Ground",
+      "number": "20",
+      "category": "-",
+      "location": "Internal",
+      "area": 10
+    },
+    {
+      "row": 26,
+      "floor": "Ground",
+      "number": "21",
+      "category": "-",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 27,
+      "floor": "Ground",
+      "number": "22",
+      "category": "-",
+      "location": "Internal",
+      "area": 10
+    },
+    {
+      "row": 28,
+      "floor": "Ground",
+      "number": "23",
+      "category": "-",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 29,
+      "floor": "Ground",
+      "number": "24",
+      "category": "-",
+      "location": "Internal",
+      "area": 13
+    },
+    {
+      "row": 30,
+      "floor": "Ground",
+      "number": "25",
+      "category": "-",
+      "location": "Internal",
+      "area": 9
+    },
+    {
+      "row": 31,
+      "floor": "Ground",
+      "number": "26",
+      "category": "-",
+      "location": "Internal",
+      "area": 12
+    },
+    {
+      "row": 32,
+      "floor": "Ground",
+      "number": "27",
+      "category": "-",
+      "location": "Internal",
+      "area": 8
+    },
+    {
+      "row": 33,
+      "floor": "Ground",
+      "number": "28",
+      "category": "-",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 34,
+      "floor": "Ground",
+      "number": "29",
+      "category": "-",
+      "location": "Internal",
+      "area": 12
+    },
+    {
+      "row": 35,
+      "floor": "Ground",
+      "number": "30",
+      "category": "-",
+      "location": "Internal",
+      "area": 35
+    },
+    {
+      "row": 36,
+      "floor": "Ground",
+      "number": "31",
+      "category": "-",
+      "location": "Internal",
+      "area": 8
+    },
+    {
+      "row": 37,
+      "floor": "Ground",
+      "number": "32",
+      "category": "-",
+      "location": "Internal",
+      "area": 13
+    },
+    {
+      "row": 38,
+      "floor": "Ground",
+      "number": "33",
+      "category": "-",
+      "location": "Internal",
+      "area": 8
+    },
+    {
+      "row": 39,
+      "floor": "Ground",
+      "number": "34",
+      "category": "-",
+      "location": "Internal",
+      "area": 14
+    },
+    {
+      "row": 40,
+      "floor": "Ground",
+      "number": "35",
+      "category": "-",
+      "location": "Internal",
+      "area": 10
+    },
+    {
+      "row": 41,
+      "floor": "Ground",
+      "number": "36",
+      "category": "-",
+      "location": "Internal",
+      "area": 12
+    },
+    {
+      "row": 42,
+      "floor": "Ground",
+      "number": "37",
+      "category": "-",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 43,
+      "floor": "Ground",
+      "number": "38",
+      "category": "-",
+      "location": "Internal",
+      "area": 9
+    },
+    {
+      "row": 44,
+      "floor": "Ground",
+      "number": "39",
+      "category": "-",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 45,
+      "floor": "Ground",
+      "number": "40",
+      "category": "-",
+      "location": "Internal",
+      "area": 23
+    },
+    {
+      "row": 46,
+      "floor": "Ground",
+      "number": "41",
+      "category": "-",
+      "location": "Internal",
+      "area": 23
+    },
+    {
+      "row": 47,
+      "floor": "Ground",
+      "number": "42",
+      "category": "-",
+      "location": "Internal",
+      "area": 12
+    },
+    {
+      "row": 48,
+      "floor": "Ground",
+      "number": "43",
+      "category": "-",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 49,
+      "floor": "Ground",
+      "number": "44",
+      "category": "-",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 50,
+      "floor": "Ground",
+      "number": "45",
+      "category": "-",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 51,
+      "floor": "Ground",
+      "number": "47",
+      "category": "-",
+      "location": "Internal",
+      "area": 14
+    },
+    {
+      "row": 52,
+      "floor": "Ground",
+      "number": "48",
+      "category": "-",
+      "location": "Internal",
+      "area": 12
+    },
+    {
+      "row": 53,
+      "floor": "Ground",
+      "number": "49",
+      "category": "-",
+      "location": "Internal",
+      "area": 12
+    },
+    {
+      "row": 54,
+      "floor": "Ground",
+      "number": "50",
+      "category": "-",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 55,
+      "floor": "Ground",
+      "number": "51",
+      "category": "-",
+      "location": "Internal",
+      "area": 3
+    },
+    {
+      "row": 56,
+      "floor": "Ground",
+      "number": "52",
+      "category": "-",
+      "location": "Internal",
+      "area": 3
+    },
+    {
+      "row": 57,
+      "floor": "Ground",
+      "number": "53",
+      "category": "-",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 58,
+      "floor": "Ground",
+      "number": "54",
+      "category": "-",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 59,
+      "floor": "Ground",
+      "number": "55",
+      "category": "-",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 60,
+      "floor": "Ground",
+      "number": "56",
+      "category": "-",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 61,
+      "floor": "Ground",
+      "number": "57",
+      "category": "-",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 62,
+      "floor": "Ground",
+      "number": "58",
+      "category": "-",
+      "location": "Internal",
+      "area": 5
+    },
+    {
+      "row": 63,
+      "floor": "Ground",
+      "number": "59",
+      "category": "-",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 64,
+      "floor": "Ground",
+      "number": "60",
+      "category": "-",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 65,
+      "floor": "Ground",
+      "number": "61",
+      "category": "-",
+      "location": "Internal",
+      "area": 5
+    },
+    {
+      "row": 66,
+      "floor": "Ground",
+      "number": "62",
+      "category": "-",
+      "location": "Internal",
+      "area": 9
+    },
+    {
+      "row": 67,
+      "floor": "Ground",
+      "number": "63",
+      "category": "-",
+      "location": "Internal",
+      "area": 25
+    },
+    {
+      "row": 68,
+      "floor": "Ground",
+      "number": "64",
+      "category": "-",
+      "location": "Internal",
+      "area": 23
+    },
+    {
+      "row": 69,
+      "floor": "Ground",
+      "number": "65",
+      "category": "-",
+      "location": "Internal",
+      "area": 23
+    },
+    {
+      "row": 70,
+      "floor": "Ground",
+      "number": "66",
+      "category": "-",
+      "location": "Internal",
+      "area": 23
+    },
+    {
+      "row": 71,
+      "floor": "Ground",
+      "number": "67",
+      "category": "-",
+      "location": "Internal",
+      "area": 24
+    },
+    {
+      "row": 72,
+      "floor": "Ground",
+      "number": "68",
+      "category": "-",
+      "location": "Internal",
+      "area": 23
+    },
+    {
+      "row": 73,
+      "floor": "Ground",
+      "number": "69",
+      "category": "-",
+      "location": "Internal",
+      "area": 12
+    },
+    {
+      "row": 74,
+      "floor": "Ground",
+      "number": "70",
+      "category": "-",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 75,
+      "floor": "Ground",
+      "number": "71",
+      "category": "-",
+      "location": "Internal",
+      "area": 4
+    },
+    {
+      "row": 76,
+      "floor": "Ground",
+      "number": "72",
+      "category": "-",
+      "location": "Internal",
+      "area": 8
+    },
+    {
+      "row": 77,
+      "floor": "Ground",
+      "number": "73",
+      "category": "-",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 78,
+      "floor": "Ground",
+      "number": "74",
+      "category": "-",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 79,
+      "floor": "Ground",
+      "number": "75",
+      "category": "-",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 80,
+      "floor": "Ground",
+      "number": "76",
+      "category": "-",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 81,
+      "floor": "Ground",
+      "number": "77",
+      "category": "-",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 82,
+      "floor": "Ground",
+      "number": "78",
+      "category": "-",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 83,
+      "floor": "Ground",
+      "number": "79",
+      "category": "-",
+      "location": "Internal",
+      "area": 14
+    },
+    {
+      "row": 84,
+      "floor": "Ground",
+      "number": "80",
+      "category": "-",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 85,
+      "floor": "Ground",
+      "number": "81",
+      "category": "-",
+      "location": "Internal",
+      "area": 14
+    },
+    {
+      "row": 86,
+      "floor": "Ground",
+      "number": "82",
+      "category": "-",
+      "location": "Internal",
+      "area": 13
+    },
+    {
+      "row": 87,
+      "floor": "Ground",
+      "number": "83",
+      "category": "-",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 88,
+      "floor": "Ground",
+      "number": "84",
+      "category": "-",
+      "location": "Internal",
+      "area": 12
+    },
+    {
+      "row": 89,
+      "floor": "Ground",
+      "number": "85",
+      "category": "-",
+      "location": "Internal",
+      "area": 12
+    },
+    {
+      "row": 90,
+      "floor": "Ground",
+      "number": "86",
+      "category": "-",
+      "location": "Internal",
+      "area": 10
+    },
+    {
+      "row": 91,
+      "floor": "Ground",
+      "number": "87",
+      "category": "-",
+      "location": "Internal",
+      "area": 24
+    },
+    {
+      "row": 92,
+      "floor": "Ground",
+      "number": "88",
+      "category": "-",
+      "location": "Internal",
+      "area": 23
+    },
+    {
+      "row": 93,
+      "floor": "Ground",
+      "number": "89",
+      "category": "-",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 94,
+      "floor": "Ground",
+      "number": "90",
+      "category": "-",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 95,
+      "floor": "Ground",
+      "number": "91",
+      "category": "-",
+      "location": "Internal",
+      "area": 22
+    },
+    {
+      "row": 96,
+      "floor": "Ground",
+      "number": "92",
+      "category": "-",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 97,
+      "floor": "Ground",
+      "number": "93",
+      "category": "-",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 98,
+      "floor": "Ground",
+      "number": "94",
+      "category": "-",
+      "location": "Internal",
+      "area": 23
+    },
+    {
+      "row": 99,
+      "floor": "Ground",
+      "number": "95",
+      "category": "-",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 100,
+      "floor": "Ground",
+      "number": "96",
+      "category": "-",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 101,
+      "floor": "Ground",
+      "number": "97",
+      "category": "-",
+      "location": "Internal",
+      "area": 23
+    },
+    {
+      "row": 102,
+      "floor": "Ground",
+      "number": "98",
+      "category": "-",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 103,
+      "floor": "Ground",
+      "number": "99",
+      "category": "-",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 104,
+      "floor": "Ground",
+      "number": "100",
+      "category": "-",
+      "location": "Internal",
+      "area": 22
+    },
+    {
+      "row": 105,
+      "floor": "Ground",
+      "number": "101",
+      "category": "-",
+      "location": "Internal",
+      "area": 13
+    },
+    {
+      "row": 106,
+      "floor": "Ground",
+      "number": "102",
+      "category": "-",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 107,
+      "floor": "Ground",
+      "number": "103",
+      "category": "-",
+      "location": "Internal",
+      "area": 5
+    },
+    {
+      "row": 108,
+      "floor": "Ground",
+      "number": "104",
+      "category": "-",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 109,
+      "floor": "Ground",
+      "number": "105",
+      "category": "-",
+      "location": "Internal",
+      "area": 8
+    },
+    {
+      "row": 110,
+      "floor": "Ground",
+      "number": "106",
+      "category": "-",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 111,
+      "floor": "Ground",
+      "number": "107",
+      "category": "-",
+      "location": "Internal",
+      "area": 5
+    },
+    {
+      "row": 112,
+      "floor": "Ground",
+      "number": "108",
+      "category": "-",
+      "location": "Internal",
+      "area": 70
+    },
+    {
+      "row": 113,
+      "floor": "Ground",
+      "number": "109",
+      "category": "-",
+      "location": "Internal",
+      "area": 35
+    },
+    {
+      "row": 114,
+      "floor": "Ground",
+      "number": "110",
+      "category": "-",
+      "location": "Internal",
+      "area": 35
+    },
+    {
+      "row": 115,
+      "floor": "Ground",
+      "number": "111",
+      "category": "-",
+      "location": "Internal",
+      "area": 49
+    },
+    {
+      "row": 116,
+      "floor": "Ground",
+      "number": "112",
+      "category": "-",
+      "location": "Internal",
+      "area": 14
+    },
+    {
+      "row": 117,
+      "floor": "Ground",
+      "number": "113",
+      "category": "-",
+      "location": "Internal",
+      "area": 76
+    },
+    {
+      "row": 118,
+      "floor": "Ground",
+      "number": "114",
+      "category": "-",
+      "location": "Internal",
+      "area": 49
+    },
+    {
+      "row": 119,
+      "floor": "Ground",
+      "number": "115",
+      "category": "-",
+      "location": "Internal",
+      "area": 29
+    },
+    {
+      "row": 120,
+      "floor": "Ground",
+      "number": "116",
+      "category": "-",
+      "location": "Internal",
+      "area": 21
+    },
+    {
+      "row": 121,
+      "floor": "Ground",
+      "number": "117",
+      "category": "-",
+      "location": "Internal",
+      "area": 20
+    },
+    {
+      "row": 122,
+      "floor": "Ground",
+      "number": "118",
+      "category": "-",
+      "location": "Internal",
+      "area": 12
+    },
+    {
+      "row": 123,
+      "floor": "Ground",
+      "number": "119",
+      "category": "-",
+      "location": "Internal",
+      "area": 12
+    },
+    {
+      "row": 124,
+      "floor": "Ground",
+      "number": "120",
+      "category": "-",
+      "location": "Internal",
+      "area": 4
+    },
+    {
+      "row": 125,
+      "floor": "Ground",
+      "number": "121",
+      "category": "-",
+      "location": "Internal",
+      "area": 4
+    },
+    {
+      "row": 126,
+      "floor": "Ground",
+      "number": "122",
+      "category": "-",
+      "location": "Internal",
+      "area": 4
+    },
+    {
+      "row": 127,
+      "floor": "Ground",
+      "number": "123",
+      "category": "-",
+      "location": "Internal",
+      "area": 3
+    },
+    {
+      "row": 128,
+      "floor": "Ground",
+      "number": "124",
+      "category": "-",
+      "location": "Internal",
+      "area": 4
+    },
+    {
+      "row": 129,
+      "floor": "Ground",
+      "number": "125",
+      "category": "-",
+      "location": "Internal",
+      "area": 4
+    },
+    {
+      "row": 130,
+      "floor": "Ground",
+      "number": "126",
+      "category": "-",
+      "location": "Internal",
+      "area": 3
+    },
+    {
+      "row": 131,
+      "floor": "Ground",
+      "number": "127",
+      "category": "-",
+      "location": "Internal",
+      "area": 3
+    },
+    {
+      "row": 132,
+      "floor": "Ground",
+      "number": "128",
+      "category": "-",
+      "location": "Internal",
+      "area": 4
+    },
+    {
+      "row": 133,
+      "floor": "Ground",
+      "number": "129",
+      "category": "-",
+      "location": "Internal",
+      "area": 4
+    },
+    {
+      "row": 134,
+      "floor": "Ground",
+      "number": "130",
+      "category": "-",
+      "location": "Internal",
+      "area": 12
+    },
+    {
+      "row": 135,
+      "floor": "Ground",
+      "number": "131",
+      "category": "-",
+      "location": "Internal",
+      "area": 8
+    },
+    {
+      "row": 136,
+      "floor": "Ground",
+      "number": "132",
+      "category": "-",
+      "location": "Internal",
+      "area": 10
+    },
+    {
+      "row": 137,
+      "floor": "Ground",
+      "number": "133",
+      "category": "-",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 138,
+      "floor": "Ground",
+      "number": "134",
+      "category": "-",
+      "location": "Internal",
+      "area": 9
+    },
+    {
+      "row": 139,
+      "floor": "Ground",
+      "number": "135",
+      "category": "-",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 140,
+      "floor": "Ground",
+      "number": "136",
+      "category": "-",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 141,
+      "floor": "Ground",
+      "number": "137",
+      "category": "-",
+      "location": "Internal",
+      "area": 14
+    },
+    {
+      "row": 142,
+      "floor": "Ground",
+      "number": "138",
+      "category": "-",
+      "location": "Internal",
+      "area": 15
+    },
+    {
+      "row": 143,
+      "floor": "Ground",
+      "number": "139",
+      "category": "-",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 144,
+      "floor": "Ground",
+      "number": "140",
+      "category": "-",
+      "location": "Internal",
+      "area": 8
+    },
+    {
+      "row": 145,
+      "floor": "Ground",
+      "number": "530",
+      "category": "-",
+      "location": "Outdoor",
+      "area": 29.6
+    },
+    {
+      "row": 146,
+      "floor": "Ground",
+      "number": "531",
+      "category": "-",
+      "location": "Outdoor",
+      "area": 29.6
+    },
+    {
+      "row": 147,
+      "floor": "Ground",
+      "number": "532",
+      "category": "-",
+      "location": "Outdoor",
+      "area": 29.6
+    },
+    {
+      "row": 148,
+      "floor": "First",
+      "number": "FF-001",
+      "category": "Y",
+      "location": "Internal",
+      "area": 17
+    },
+    {
+      "row": 149,
+      "floor": "First",
+      "number": "FF-002",
+      "category": "F",
+      "location": "Internal",
+      "area": 13
+    },
+    {
+      "row": 150,
+      "floor": "First",
+      "number": "FF-003",
+      "category": "A",
+      "location": "Internal",
+      "area": 33
+    },
+    {
+      "row": 151,
+      "floor": "First",
+      "number": "FF-004",
+      "category": "A",
+      "location": "Internal",
+      "area": 37
+    },
+    {
+      "row": 152,
+      "floor": "First",
+      "number": "FF-005",
+      "category": "A",
+      "location": "Internal",
+      "area": 35
+    },
+    {
+      "row": 153,
+      "floor": "First",
+      "number": "FF-006",
+      "category": "A",
+      "location": "Internal",
+      "area": 34
+    },
+    {
+      "row": 154,
+      "floor": "First",
+      "number": "FF-007",
+      "category": "H",
+      "location": "Internal",
+      "area": 14
+    },
+    {
+      "row": 155,
+      "floor": "First",
+      "number": "FF-008",
+      "category": "F",
+      "location": "Internal",
+      "area": 13
+    },
+    {
+      "row": 156,
+      "floor": "First",
+      "number": "FF-009",
+      "category": "H",
+      "location": "Internal",
+      "area": 13
+    },
+    {
+      "row": 157,
+      "floor": "First",
+      "number": "FF-010",
+      "category": "H",
+      "location": "Internal",
+      "area": 15
+    },
+    {
+      "row": 158,
+      "floor": "First",
+      "number": "FF-011",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 159,
+      "floor": "First",
+      "number": "FF-012",
+      "category": "H",
+      "location": "Internal",
+      "area": 15
+    },
+    {
+      "row": 160,
+      "floor": "First",
+      "number": "FF-013",
+      "category": "H",
+      "location": "Internal",
+      "area": 14
+    },
+    {
+      "row": 161,
+      "floor": "First",
+      "number": "FF-014",
+      "category": "Y",
+      "location": "Internal",
+      "area": 22
+    },
+    {
+      "row": 162,
+      "floor": "First",
+      "number": "FF-015",
+      "category": "Y",
+      "location": "Internal",
+      "area": 17
+    },
+    {
+      "row": 163,
+      "floor": "First",
+      "number": "FF-016",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 164,
+      "floor": "First",
+      "number": "FF-017",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 165,
+      "floor": "First",
+      "number": "FF-018",
+      "category": "E",
+      "location": "Internal",
+      "area": 8
+    },
+    {
+      "row": 166,
+      "floor": "First",
+      "number": "FF-019",
+      "category": "E",
+      "location": "Internal",
+      "area": 8
+    },
+    {
+      "row": 167,
+      "floor": "First",
+      "number": "FF-020",
+      "category": "C",
+      "location": "Internal",
+      "area": 3
+    },
+    {
+      "row": 168,
+      "floor": "First",
+      "number": "FF-021",
+      "category": "C",
+      "location": "Internal",
+      "area": 3
+    },
+    {
+      "row": 169,
+      "floor": "First",
+      "number": "FF-022",
+      "category": "C",
+      "location": "Internal",
+      "area": 3
+    },
+    {
+      "row": 170,
+      "floor": "First",
+      "number": "FF-023",
+      "category": "C",
+      "location": "Internal",
+      "area": 3
+    },
+    {
+      "row": 171,
+      "floor": "First",
+      "number": "FF-024",
+      "category": "C",
+      "location": "Internal",
+      "area": 3
+    },
+    {
+      "row": 172,
+      "floor": "First",
+      "number": "FF-025",
+      "category": "B",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 173,
+      "floor": "First",
+      "number": "FF-026",
+      "category": "B",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 174,
+      "floor": "First",
+      "number": "FF-027",
+      "category": "B",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 175,
+      "floor": "First",
+      "number": "FF-028",
+      "category": "B",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 176,
+      "floor": "First",
+      "number": "FF-029",
+      "category": "B",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 177,
+      "floor": "First",
+      "number": "FF-030",
+      "category": "B",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 178,
+      "floor": "First",
+      "number": "FF-031",
+      "category": "C",
+      "location": "Internal",
+      "area": 3
+    },
+    {
+      "row": 179,
+      "floor": "First",
+      "number": "FF-032",
+      "category": "C",
+      "location": "Internal",
+      "area": 3
+    },
+    {
+      "row": 180,
+      "floor": "First",
+      "number": "FF-033",
+      "category": "E",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 181,
+      "floor": "First",
+      "number": "FF-034",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 182,
+      "floor": "First",
+      "number": "FF-035",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 183,
+      "floor": "First",
+      "number": "FF-036",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 184,
+      "floor": "First",
+      "number": "FF-037",
+      "category": "E",
+      "location": "Internal",
+      "area": 9
+    },
+    {
+      "row": 185,
+      "floor": "First",
+      "number": "FF-038",
+      "category": "E",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 186,
+      "floor": "First",
+      "number": "FF-039",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 187,
+      "floor": "First",
+      "number": "FF-040",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 188,
+      "floor": "First",
+      "number": "FF-041",
+      "category": "E",
+      "location": "Internal",
+      "area": 10
+    },
+    {
+      "row": 189,
+      "floor": "First",
+      "number": "FF-042",
+      "category": "E",
+      "location": "Internal",
+      "area": 9
+    },
+    {
+      "row": 190,
+      "floor": "First",
+      "number": "FF-043",
+      "category": "S",
+      "location": "Internal",
+      "area": 22
+    },
+    {
+      "row": 191,
+      "floor": "First",
+      "number": "FF-044",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 192,
+      "floor": "First",
+      "number": "FF-045",
+      "category": "E",
+      "location": "Internal",
+      "area": 10
+    },
+    {
+      "row": 193,
+      "floor": "First",
+      "number": "FF-046",
+      "category": "E",
+      "location": "Internal",
+      "area": 10
+    },
+    {
+      "row": 194,
+      "floor": "First",
+      "number": "FF-047",
+      "category": "E",
+      "location": "Internal",
+      "area": 10
+    },
+    {
+      "row": 195,
+      "floor": "First",
+      "number": "FF-048",
+      "category": "E",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 196,
+      "floor": "First",
+      "number": "FF-049",
+      "category": "E",
+      "location": "Internal",
+      "area": 10
+    },
+    {
+      "row": 197,
+      "floor": "First",
+      "number": "FF-050",
+      "category": "E",
+      "location": "Internal",
+      "area": 10
+    },
+    {
+      "row": 198,
+      "floor": "First",
+      "number": "FF-051",
+      "category": "E",
+      "location": "Internal",
+      "area": 10
+    },
+    {
+      "row": 199,
+      "floor": "First",
+      "number": "FF-052",
+      "category": "E",
+      "location": "Internal",
+      "area": 10
+    },
+    {
+      "row": 200,
+      "floor": "First",
+      "number": "FF-053",
+      "category": "E",
+      "location": "Internal",
+      "area": 10
+    },
+    {
+      "row": 201,
+      "floor": "First",
+      "number": "FF-054",
+      "category": "F",
+      "location": "Internal",
+      "area": 13
+    },
+    {
+      "row": 202,
+      "floor": "First",
+      "number": "FF-055",
+      "category": "E",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 203,
+      "floor": "First",
+      "number": "FF-056",
+      "category": "E",
+      "location": "Internal",
+      "area": 10
+    },
+    {
+      "row": 204,
+      "floor": "First",
+      "number": "FF-057",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 205,
+      "floor": "First",
+      "number": "FF-058",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 206,
+      "floor": "First",
+      "number": "FF-059",
+      "category": "E",
+      "location": "Internal",
+      "area": 10
+    },
+    {
+      "row": 207,
+      "floor": "First",
+      "number": "FF-060",
+      "category": "E",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 208,
+      "floor": "First",
+      "number": "FF-061",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 209,
+      "floor": "First",
+      "number": "FF-062",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 210,
+      "floor": "First",
+      "number": "FF-063",
+      "category": "E",
+      "location": "Internal",
+      "area": 10
+    },
+    {
+      "row": 211,
+      "floor": "First",
+      "number": "FF-064",
+      "category": "E",
+      "location": "Internal",
+      "area": 9
+    },
+    {
+      "row": 212,
+      "floor": "First",
+      "number": "FF-065",
+      "category": "S",
+      "location": "Internal",
+      "area": 41
+    },
+    {
+      "row": 213,
+      "floor": "First",
+      "number": "FF-066",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 214,
+      "floor": "First",
+      "number": "FF-067",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 215,
+      "floor": "First",
+      "number": "FF-068",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 216,
+      "floor": "First",
+      "number": "FF-069",
+      "category": "E",
+      "location": "Internal",
+      "area": 10
+    },
+    {
+      "row": 217,
+      "floor": "First",
+      "number": "FF-070",
+      "category": "E",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 218,
+      "floor": "First",
+      "number": "FF-071",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 219,
+      "floor": "First",
+      "number": "FF-072",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 220,
+      "floor": "First",
+      "number": "FF-073",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 221,
+      "floor": "First",
+      "number": "FF-074",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 222,
+      "floor": "First",
+      "number": "FF-075",
+      "category": "F",
+      "location": "Internal",
+      "area": 10
+    },
+    {
+      "row": 223,
+      "floor": "First",
+      "number": "FF-076",
+      "category": "F",
+      "location": "Internal",
+      "area": 13
+    },
+    {
+      "row": 224,
+      "floor": "First",
+      "number": "FF-077",
+      "category": "E",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 225,
+      "floor": "First",
+      "number": "FF-078",
+      "category": "E",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 226,
+      "floor": "First",
+      "number": "FF-079",
+      "category": "E",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 227,
+      "floor": "First",
+      "number": "FF-080",
+      "category": "B",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 228,
+      "floor": "First",
+      "number": "FF-081",
+      "category": "B",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 229,
+      "floor": "First",
+      "number": "FF-082",
+      "category": "B",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 230,
+      "floor": "First",
+      "number": "FF-083",
+      "category": "B",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 231,
+      "floor": "First",
+      "number": "FF-084",
+      "category": "B",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 232,
+      "floor": "First",
+      "number": "FF-085",
+      "category": "B",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 233,
+      "floor": "First",
+      "number": "FF-086",
+      "category": "B",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 234,
+      "floor": "First",
+      "number": "FF-087",
+      "category": "B",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 235,
+      "floor": "First",
+      "number": "FF-088",
+      "category": "B",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 236,
+      "floor": "First",
+      "number": "FF-089",
+      "category": "H",
+      "location": "Internal",
+      "area": 14
+    },
+    {
+      "row": 237,
+      "floor": "First",
+      "number": "FF-090",
+      "category": "B",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 238,
+      "floor": "First",
+      "number": "FF-091",
+      "category": "B",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 239,
+      "floor": "First",
+      "number": "FF-092",
+      "category": "B",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 240,
+      "floor": "First",
+      "number": "FF-093",
+      "category": "B",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 241,
+      "floor": "First",
+      "number": "FF-094",
+      "category": "B",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 242,
+      "floor": "First",
+      "number": "FF-095",
+      "category": "B",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 243,
+      "floor": "First",
+      "number": "FF-096",
+      "category": "B",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 244,
+      "floor": "First",
+      "number": "FF-097",
+      "category": "B",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 245,
+      "floor": "First",
+      "number": "FF-098",
+      "category": "B",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 246,
+      "floor": "First",
+      "number": "FF-099",
+      "category": "B",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 247,
+      "floor": "First",
+      "number": "FF-100",
+      "category": "B",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 248,
+      "floor": "First",
+      "number": "FF-101",
+      "category": "E",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 249,
+      "floor": "First",
+      "number": "FF-102",
+      "category": "F",
+      "location": "Internal",
+      "area": 13
+    },
+    {
+      "row": 250,
+      "floor": "First",
+      "number": "FF-103",
+      "category": "F",
+      "location": "Internal",
+      "area": 12
+    },
+    {
+      "row": 251,
+      "floor": "First",
+      "number": "FF-104",
+      "category": "F",
+      "location": "Internal",
+      "area": 12
+    },
+    {
+      "row": 252,
+      "floor": "First",
+      "number": "FF-105",
+      "category": "F",
+      "location": "Internal",
+      "area": 12
+    },
+    {
+      "row": 253,
+      "floor": "First",
+      "number": "FF-106",
+      "category": "F",
+      "location": "Internal",
+      "area": 12
+    },
+    {
+      "row": 254,
+      "floor": "First",
+      "number": "FF-107",
+      "category": "F",
+      "location": "Internal",
+      "area": 12
+    },
+    {
+      "row": 255,
+      "floor": "First",
+      "number": "FF-108",
+      "category": "F",
+      "location": "Internal",
+      "area": 12
+    },
+    {
+      "row": 256,
+      "floor": "First",
+      "number": "FF-109",
+      "category": "F",
+      "location": "Internal",
+      "area": 12
+    },
+    {
+      "row": 257,
+      "floor": "First",
+      "number": "FF-110",
+      "category": "F",
+      "location": "Internal",
+      "area": 10
+    },
+    {
+      "row": 258,
+      "floor": "First",
+      "number": "FF-111",
+      "category": "S",
+      "location": "Internal",
+      "area": 23
+    },
+    {
+      "row": 259,
+      "floor": "First",
+      "number": "FF-112",
+      "category": "F",
+      "location": "Internal",
+      "area": 12
+    },
+    {
+      "row": 260,
+      "floor": "First",
+      "number": "FF-113",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 261,
+      "floor": "First",
+      "number": "FF-114",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 262,
+      "floor": "First",
+      "number": "FF-115",
+      "category": "E",
+      "location": "Internal",
+      "area": 10
+    },
+    {
+      "row": 263,
+      "floor": "First",
+      "number": "FF-116",
+      "category": "E",
+      "location": "Internal",
+      "area": 12
+    },
+    {
+      "row": 264,
+      "floor": "First",
+      "number": "FF-117",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 265,
+      "floor": "First",
+      "number": "FF-118",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 266,
+      "floor": "First",
+      "number": "FF-119",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 267,
+      "floor": "First",
+      "number": "FF-120",
+      "category": "F",
+      "location": "Internal",
+      "area": 11
+    },
+    {
+      "row": 268,
+      "floor": "First",
+      "number": "FF-121",
+      "category": "E",
+      "location": "Internal",
+      "area": 10
+    },
+    {
+      "row": 269,
+      "floor": "First",
+      "number": "FF-122",
+      "category": "B",
+      "location": "Internal",
+      "area": 7
+    },
+    {
+      "row": 270,
+      "floor": "First",
+      "number": "FF-123",
+      "category": "E",
+      "location": "Internal",
+      "area": 8
+    },
+    {
+      "row": 271,
+      "floor": "First",
+      "number": "FF-124",
+      "category": "B",
+      "location": "Internal",
+      "area": 8
+    },
+    {
+      "row": 272,
+      "floor": "First",
+      "number": "FF-125",
+      "category": "B",
+      "location": "Internal",
+      "area": 5
+    },
+    {
+      "row": 273,
+      "floor": "First",
+      "number": "FF-126",
+      "category": "B",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 274,
+      "floor": "First",
+      "number": "FF-127",
+      "category": "B",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 275,
+      "floor": "First",
+      "number": "FF-128",
+      "category": "B",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 276,
+      "floor": "First",
+      "number": "FF-129",
+      "category": "B",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 277,
+      "floor": "First",
+      "number": "FF-130",
+      "category": "B",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 278,
+      "floor": "First",
+      "number": "FF-131",
+      "category": "B",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 279,
+      "floor": "First",
+      "number": "FF-132",
+      "category": "B",
+      "location": "Internal",
+      "area": 15
+    },
+    {
+      "row": 280,
+      "floor": "First",
+      "number": "FF-133",
+      "category": "C",
+      "location": "Internal",
+      "area": 3
+    },
+    {
+      "row": 281,
+      "floor": "First",
+      "number": "FF-134",
+      "category": "C",
+      "location": "Internal",
+      "area": 3
+    },
+    {
+      "row": 282,
+      "floor": "First",
+      "number": "FF-135",
+      "category": "B",
+      "location": "Internal",
+      "area": 5
+    },
+    {
+      "row": 283,
+      "floor": "First",
+      "number": "FF-136",
+      "category": "V",
+      "location": "Internal",
+      "area": 19
+    },
+    {
+      "row": 284,
+      "floor": "First",
+      "number": "FF-137",
+      "category": "Y",
+      "location": "Internal",
+      "area": 17
+    },
+    {
+      "row": 285,
+      "floor": "First",
+      "number": "FF-138",
+      "category": "H",
+      "location": "Internal",
+      "area": 14
+    },
+    {
+      "row": 286,
+      "floor": "First",
+      "number": "FF-139",
+      "category": "H",
+      "location": "Internal",
+      "area": 14
+    },
+    {
+      "row": 287,
+      "floor": "First",
+      "number": "FF-140",
+      "category": "B",
+      "location": "Internal",
+      "area": 5
+    },
+    {
+      "row": 288,
+      "floor": "First",
+      "number": "FF-141",
+      "category": "A",
+      "location": "Internal",
+      "area": 38
+    },
+    {
+      "row": 289,
+      "floor": "First",
+      "number": "FF-142",
+      "category": "A",
+      "location": "Internal",
+      "area": 34
+    },
+    {
+      "row": 290,
+      "floor": "First",
+      "number": "FF-143",
+      "category": "A",
+      "location": "Internal",
+      "area": 35
+    },
+    {
+      "row": 291,
+      "floor": "First",
+      "number": "FF-144",
+      "category": "Y",
+      "location": "Internal",
+      "area": 16
+    },
+    {
+      "row": 292,
+      "floor": "First",
+      "number": "FF-145",
+      "category": "C",
+      "location": "Internal",
+      "area": 3
+    },
+    {
+      "row": 293,
+      "floor": "First",
+      "number": "FF-146",
+      "category": "C",
+      "location": "Internal",
+      "area": 4
+    },
+    {
+      "row": 294,
+      "floor": "First",
+      "number": "FF-147",
+      "category": "B",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 295,
+      "floor": "First",
+      "number": "FF-148",
+      "category": "C",
+      "location": "Internal",
+      "area": 3
+    },
+    {
+      "row": 296,
+      "floor": "First",
+      "number": "FF-149",
+      "category": "C",
+      "location": "Internal",
+      "area": 4
+    },
+    {
+      "row": 297,
+      "floor": "First",
+      "number": "FF-150",
+      "category": "B",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 298,
+      "floor": "First",
+      "number": "FF-151",
+      "category": "H",
+      "location": "Internal",
+      "area": 16
+    },
+    {
+      "row": 299,
+      "floor": "First",
+      "number": "FF-152",
+      "category": "F",
+      "location": "Internal",
+      "area": 12
+    },
+    {
+      "row": 300,
+      "floor": "First",
+      "number": "FF-153",
+      "category": "F",
+      "location": "Internal",
+      "area": 13
+    },
+    {
+      "row": 301,
+      "floor": "First",
+      "number": "FF-154",
+      "category": "B",
+      "location": "Internal",
+      "area": 5
+    },
+    {
+      "row": 302,
+      "floor": "First",
+      "number": "FF-155",
+      "category": "B",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 303,
+      "floor": "First",
+      "number": "FF-156",
+      "category": "C",
+      "location": "Internal",
+      "area": 3
+    },
+    {
+      "row": 304,
+      "floor": "First",
+      "number": "FF-157",
+      "category": "C",
+      "location": "Internal",
+      "area": 4
+    },
+    {
+      "row": 305,
+      "floor": "First",
+      "number": "FF-158",
+      "category": "C",
+      "location": "Internal",
+      "area": 3
+    },
+    {
+      "row": 306,
+      "floor": "First",
+      "number": "FF-159",
+      "category": "C",
+      "location": "Internal",
+      "area": 4
+    },
+    {
+      "row": 307,
+      "floor": "First",
+      "number": "FF-160",
+      "category": "B",
+      "location": "Internal",
+      "area": 8
+    },
+    {
+      "row": 308,
+      "floor": "First",
+      "number": "FF-161",
+      "category": "C",
+      "location": "Internal",
+      "area": 3
+    },
+    {
+      "row": 309,
+      "floor": "First",
+      "number": "FF-162",
+      "category": "C",
+      "location": "Internal",
+      "area": 4
+    },
+    {
+      "row": 310,
+      "floor": "First",
+      "number": "FF-163",
+      "category": "C",
+      "location": "Internal",
+      "area": 3
+    },
+    {
+      "row": 311,
+      "floor": "First",
+      "number": "FF-164",
+      "category": "C",
+      "location": "Internal",
+      "area": 4
+    },
+    {
+      "row": 312,
+      "floor": "First",
+      "number": "FF-165",
+      "category": "B",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 313,
+      "floor": "First",
+      "number": "FF-166",
+      "category": "C",
+      "location": "Internal",
+      "area": 5
+    },
+    {
+      "row": 314,
+      "floor": "First",
+      "number": "FF-167",
+      "category": "C",
+      "location": "Internal",
+      "area": 4
+    },
+    {
+      "row": 315,
+      "floor": "First",
+      "number": "FF-168",
+      "category": "C",
+      "location": "Internal",
+      "area": 4
+    },
+    {
+      "row": 316,
+      "floor": "First",
+      "number": "FF-169",
+      "category": "Y",
+      "location": "Internal",
+      "area": 19
+    },
+    {
+      "row": 317,
+      "floor": "First",
+      "number": "FF-170",
+      "category": "B",
+      "location": "Internal",
+      "area": 6
+    },
+    {
+      "row": 318,
+      "floor": "First",
+      "number": "FF-171",
+      "category": "B",
+      "location": "Internal",
+      "area": 12
+    }
+  ],
+  "secondFloor": "External Assumptions C28 and provisional bay areas; not applied"
+}
