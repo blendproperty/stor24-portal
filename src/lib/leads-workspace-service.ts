@@ -22,7 +22,7 @@ export async function leadsWorkspace(scope: RequestScope) {
       include: { customer: { select: { id: true, firstName: true, lastName: true, companyName: true, email: true, phone: true } },
         facility: { select: { id: true, name: true } }, desiredUnitType: { select: { name: true } },
         assignedTo: { select: { id: true, name: true } },
-        reservations: { select: { id: true, status: true, journey: true, quotedRate: true, convertedTenancyId: true, convertedTenancy: { select: { status: true } }, unit: { select: { number: true } } } } } }),
+        reservations: { select: { id: true, status: true, journey: true, quotedRate: true, convertedTenancyId: true, publicLease: { select: { id: true, status: true, signedAt: true, signedPdfSha256: true } }, convertedTenancy: { select: { status: true, accountId: true, documents: { where: { type: "LEASE_AGREEMENT" }, select: { id: true, status: true, signedAt: true } } } }, unit: { select: { number: true } } } } } }),
     db.lead.count({ where }),
     db.user.findMany({ where: { organisationId: scope.organisationId, active: true,
       roleAssignments: { some: { OR: [{ facilityId: null }, { facilityId: { in: facilities.map(f => f.id) } }] } } },
@@ -31,6 +31,12 @@ export async function leadsWorkspace(scope: RequestScope) {
   const evidence = leads.length ? await db.auditEvent.findMany({ where: { organisationId: scope.organisationId,
     entityType: "Lead", entityId: { in: leads.map(l => l.id) }, action: { in: ["public_lead.created", "lead.attribution.captured", "lead.market_profile.captured"] } },
     select: { entityId: true, after: true }, orderBy: { occurredAt: "asc" } }) : [];
+  const tenancyIds = leads.flatMap(lead => lead.reservations.flatMap(r => r.convertedTenancyId ? [r.convertedTenancyId] : []));
+  const handovers = tenancyIds.length ? await db.auditEvent.findMany({
+    where: { organisationId: scope.organisationId, entityType: "Tenancy", entityId: { in: tenancyIds }, action: "tenancy.key_handover_confirmed" },
+    select: { entityId: true },
+  }) : [];
+  const handedOver = new Set(handovers.map(event => event.entityId));
   const attribution = new Map(evidence.flatMap(event => {
     const after = event.after as { attribution?: unknown } | null;
     const parsed = leadAttributionSchema.safeParse(after?.attribution);
@@ -40,7 +46,7 @@ export async function leadsWorkspace(scope: RequestScope) {
   return { facilities, staff: staff.map(person => ({ id: person.id, name: person.name, facilityIds: person.roleAssignments.map(a => a.facilityId) })), count,
     leads: leads.map(lead => ({ ...lead, attribution: attribution.get(lead.id) ?? null,marketProfile:marketProfiles.get(lead.id)??null,
       stage: lead.reservations.some(r => r.status === "CONVERTED" && r.convertedTenancyId && ["ACTIVE", "NOTICE_GIVEN"].includes(r.convertedTenancy?.status ?? "")) ? "WON" : lead.stage,
-      reservations: lead.reservations.map(r => ({ ...r, quotedRate: Number(r.quotedRate) })) })) };
+      reservations: lead.reservations.map(r => ({ ...r, handedOver: Boolean(r.status === "CONVERTED" && r.convertedTenancyId && handedOver.has(r.convertedTenancyId)), quotedRate: Number(r.quotedRate) })) })) };
 }
 
 export async function updateLead(scope: RequestScope, id: string, input: LeadUpdate) {

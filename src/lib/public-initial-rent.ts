@@ -27,3 +27,13 @@ export function publicCheckoutTotal(reservation: Parameters<typeof publicInitial
   if (!Number.isFinite(amount) || amount <= 0 || amount > 20_000_000) throw Error('INVALID_CHECKOUT_AMOUNT');
   return Math.round(amount * 100) / 100;
 }
+
+/** Readiness screens must show invalid saved pricing as a blocker, never reprice it. */
+export function publicCheckoutReview(reservation: Parameters<typeof publicCheckoutTotal>[0]) {
+  try {
+    return { amount: publicCheckoutTotal(reservation), needsReview: false };
+  } catch (error) {
+    if (!(error instanceof Error) || !["INVALID_CHECKOUT_AMOUNT", "INVALID_INITIAL_RENT", "INVALID_INITIAL_RENT_SNAPSHOT"].includes(error.message)) throw error;
+    return { amount: 0, needsReview: true };
+  }
+}

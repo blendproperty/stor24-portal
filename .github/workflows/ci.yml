@@ -61,6 +61,7 @@ jobs:
       - run: node scripts/test-report-export-recovery.mjs
       - run: node scripts/test-audited-workspace-download.mjs
       - run: node scripts/test-reports-and-unit-map.mjs
+      - run: npx tsx scripts/test-visual-report-builder.mjs
       - run: node scripts/test-task-create-recovery.mjs
       - run: node scripts/test-maintenance-status-recovery.mjs
       - run: node scripts/test-maintenance-create-recovery.mjs
@@ -88,6 +89,7 @@ jobs:
         with:
           name: guided-help-browser-evidence
           path: |
+            output/visual-report-builder/
             output/marketing/
             output/operations-alert-recipients/
             output/troubleshooting/

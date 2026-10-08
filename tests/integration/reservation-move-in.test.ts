@@ -41,6 +41,19 @@ test("isolated PostgreSQL signed reservation handover", async t => {
     assert.equal((await db.unit.findUniqueOrThrow({ where: { id: f.unit.id } })).status, "RESERVED");
   }
   try {
+    await t.test("invalid saved pricing returns a blocker and cannot hand over a paid signed booking", async () => {
+      const f = await fixture();
+      for (const quotedRate of [0, -100, 20000001]) {
+        await db.reservation.update({where:{id:f.reservation.id},data:{quotedRate}});
+        const readiness = await getReservationMoveInReadiness(f.scope, f.reservation.id);
+        assert.equal(readiness.amountReviewRequired, true);
+        assert.equal(readiness.paymentVerified, false);
+        assert.equal(readiness.ready, false);
+        assert.match(readiness.blockers.join(" "), /saved booking amount needs review/);
+        await assert.rejects(confirmReservationMoveIn(f.scope, f.reservation.id), /MOVE_IN_NOT_READY/);
+        await unchanged(f);
+      }
+    });
     await t.test("public prepaid schedule requires full payment and records both periods exactly once",async()=>{
       const f=await fixture(),date=new Date('2026-02-16T00:00:00+02:00');
       const businessDetails={companyName:"Synthetic company only",businessUse:"Synthetic business snapshot"};
