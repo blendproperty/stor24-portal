@@ -50,7 +50,7 @@ export function LeaseSigningSession({ documentId }: { documentId: string }) {
   return <div className="page-stack">
     <PageHeader eyebrow="Lead to lease" title={session?.completed ? "Lease agreement signed" : "Review and sign now"}
       description="Complete agreement review and signing during the visit or call, then continue with this customer's account." />
-    <section className="panel move-in-form" aria-label="Agreement signing session" data-guide="assisted-signing">
+    <section className="panel lease-signing-panel" aria-label="Agreement signing session" data-guide="assisted-signing">
       <p>For a walk-in, let the customer review, initial and sign on the counter device. For a phone-in, share the customer signing link and stay on the call. The customer provides their own acceptance and signature.</p>
       <p>After customer signing, the authorised representative completes their signing step if required. BlendSign sends the completed agreement afterwards.</p>
       {error && <p className="form-error" role="alert">{error}</p>}

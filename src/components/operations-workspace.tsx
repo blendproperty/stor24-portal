@@ -473,6 +473,7 @@ export function OperationsWorkspace({ view = "operations", reminders }: { view?:
       {[["Open tasks", openTasks.length], ["Service required", service.length], ["Reorder items", reorder.length], ["Daily closes", data?.dailyCloses.length ?? 0]].map(([label, value]) => <div className="summary-cell" key={label}><span>{label}</span><strong>{value}</strong></div>)}
     </section>
     <section className="panel panel-spacious"><div className="panel-heading"><div><p className="eyebrow">Accounts</p><h2>Customer account workflows</h2><p className="panel-subtitle">Start the primary rental and billing workflows from one place.</p></div></div><div className="operations-account-grid">
+      <Link href="/operations/walk-in"><strong>Walk-in on tablet</strong><span>Hand over the website booking journey to a customer.</span></Link>
       <Link href="/operations/move-in"><strong>Move in</strong><span>Select a vacant unit and create the tenancy account.</span></Link>
       <Link href="/operations/accounts"><strong>Payments</strong><span>Post and review customer payments.</span></Link>
       <Link href="/operations/accounts"><strong>Transfer</strong><span>Move an active tenant to another available unit.</span></Link>

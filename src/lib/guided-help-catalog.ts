@@ -11,6 +11,11 @@ function guide(id: string, title: string, category: string, route: string, scree
 }
 
 export const extendedGuides: WorkflowGuide[] = [
+  guide("walk-in-tablet", "Hand the website journey to a walk-in customer", "Customer journey", "/operations/walk-in", "Walk-in tablet", "Prepare the counter tablet, let the customer complete the website journey, then continue from the saved booking.", [
+    ["Prepare the correct store", "Choose the customer’s store and prepare a tablet visit. This creates a temporary handover, not a customer or booking. Open it within five minutes on the counter tablet, or copy the link into Staff: start a prepared visit in the installed STOR24 Counter app.", '.lease-signing-panel'],
+    ["Hand the device to the customer", "Choose Hand device to customer explicitly. The customer selects a unit, enters their own details, verifies their contact details, supplies identity and reads and initials the saved agreement clauses before signing. Staff must not provide the customer’s acceptance or signature.", '.lease-signing-panel'],
+    ["Clear the tablet and complete Move In", "When the customer finishes, use Finish visit and clear tablet before another customer uses the device. The booking is retained. Refresh this staff page, choose the exact recent booking and continue Move In; payment, identity, access and key-handover checks still apply.", '.lease-signing-panel'],
+  ]),
   guide("assisted-signing", "Complete signing during a visit or call", "Customer journey", "/operations/lease-signing", "Agreement signing", "Guide the customer through agreement review and signing without waiting for an emailed return.", [
     ["Review with the customer", "Check the saved lease and customer before opening signing. For a walk-in, let the customer review, initial and sign on the counter device. For a phone-in, copy and share the customer signing link during the call; the customer provides their own acceptance and signature.", '[data-guide="assisted-signing"]'],
     ["Complete each signing step", "Open the current signer's link. Return to this screen after signing and refresh the status. Customer signing comes before the authorised representative, unless authorised automatic countersigning is configured. Opening or copying a link never records a signature.", '[data-guide="assisted-signing"]'],

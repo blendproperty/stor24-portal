@@ -3,6 +3,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 
 export const publicReservationSchema = z.object({
+  walkInToken: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   facilitySlug: z.string().trim().toLowerCase().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(100),
   unitId: z.string().trim().min(1).max(64),
   storagePackageId: z.string().trim().cuid().optional(),
