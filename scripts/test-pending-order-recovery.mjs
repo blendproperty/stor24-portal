@@ -24,12 +24,13 @@ try {
   mode="hold";await page.evaluate(()=>window.showUnit('B'));
   await expect(page.getByRole("status")).toContainText("Checking pending orders");
   await expect(page.getByRole("link")).toHaveCount(0);
+  await expect.poll(()=>Boolean(pending)).toBe(true);
   mode="success";await page.evaluate(()=>window.showUnit('C'));
   await expect(page.getByRole("link")).toHaveAttribute("href","/my/orders/order-C");
   await pending.fulfill({json:{data:[{id:"late-B",status:"PAYMENT_REVIEW",total:"1",currency:"ZAR"}]}}).catch(()=>{});
   await expect(page.getByRole("link")).toHaveAttribute("href","/my/orders/order-C");
-  mode="hold";await page.clock.install();await page.evaluate(()=>window.showUnit('D'));
-  await expect(page.getByRole("status")).toBeVisible();await page.clock.fastForward(21000);
+  pending=undefined;mode="hold";await page.clock.install();await page.evaluate(()=>window.showUnit('D'));
+  await expect(page.getByRole("status")).toBeVisible();await expect.poll(()=>Boolean(pending)).toBe(true);await page.clock.fastForward(21000);
   await expect(page.getByRole("alert")).toContainText("could not check");await pending.abort().catch(()=>{});
   mode="malformed";await page.getByRole("button",{name:"Retry order check"}).click();await expect(page.getByRole("alert")).toBeVisible();
   mode="empty";await page.getByRole("button",{name:"Retry order check"}).click();await expect(page.getByRole("status")).toHaveCount(0);await expect(page.getByRole("alert")).toHaveCount(0);await expect(page.getByRole("link")).toHaveCount(0);
