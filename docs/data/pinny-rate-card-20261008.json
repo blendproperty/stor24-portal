@@ -2841,5 +2841,11 @@
       "area": 12
     }
   ],
-  "secondFloor": "External Assumptions C28 and provisional bay areas; not applied"
+  "secondFloor": "Brett explicitly authorised R50/m2 on every existing second-floor unit on 8 October 2026; current sizes and numbers retained. Provisional bulk bay geometry is outside this pricing update.",
+  "applicationScope": {
+    "ground": "142 current numbers and areas already match; 125 asking rents updated, 17 unchanged",
+    "first": "Use floor and current area only. 190 units match card rates; 185 updated. Retain prices for the four unlisted 18/36/45/49m2 units. No renumbering or size changes.",
+    "second": "194 existing units: VAT-inclusive asking rent = current area x R50/m2. No renumbering or size changes.",
+    "history": "Existing reservation quotes, signed/occupancy rates and finance records unchanged"
+  }
 }
