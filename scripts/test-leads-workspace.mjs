@@ -29,7 +29,7 @@ const server=createServer(async(req,res)=>{
   if(req.url==='/api/v1/reservations')return res.end(JSON.stringify({data:{facilities:[{id:'store',units:[{id:'unit',facilityId:'store',number:'101',monthlyRate:'1400'}],maps:[{id:'map',name:'Ground floor',width:600,height:400,elements:[{id:'shape',type:'UNIT',x:20,y:20,width:100,height:80,rotation:0,label:'101',unitId:'unit'},{id:'closed',type:'UNIT',x:140,y:20,width:100,height:80,rotation:0,label:'102',unitId:'blocked'}]}]}]}}));
   return res.end(JSON.stringify({data:[]}));
  }
- res.end('<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/app.css"></head><body><div id="root"></div><script type="module" src="/app.js"></script></body></html>');
+ res.end('<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/app.css"></head><body><div id="root"></div><script type="module" src="/app.js"></script></body></html>');
 });
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const browser=await chromium.launch();await mkdir('output/leads-design',{recursive:true});

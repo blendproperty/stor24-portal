@@ -193,7 +193,7 @@ const server = createServer(async (req, res) => {
   }
   res.setHeader("content-type", "text/html");
   res.end(
-    '<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/fixture.css"></head><body><div id="root"></div><script type="module" src="/fixture.js"></script></body></html>',
+    '<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/fixture.css"></head><body><div id="root"></div><script type="module" src="/fixture.js"></script></body></html>',
   );
 });
 await new Promise((r) => server.listen(0, "127.0.0.1", r));
