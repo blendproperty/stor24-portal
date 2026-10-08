@@ -1,0 +1,26 @@
+{
+  "verifiedDate": "2026-10-08",
+  "sourceSha256": "d70c9c9f85647018355cd4fe014efff1a307a4add322ecb6e147938d1e674c68",
+  "workbookCounts": {
+    "Ground": 142,
+    "First": 171,
+    "Second": 9
+  },
+  "existingCounts": {
+    "First Floor": 194,
+    "Ground floor": 142,
+    "Second Floor": 194
+  },
+  "groundNumbersSizesRatesMatch": true,
+  "firstFloorRatesMatchingCurrentAreas": 190,
+  "firstFloorMissingRateAreas": [
+    18.0,
+    36.0,
+    45.0,
+    49.0
+  ],
+  "secondFloorExternalFormulaCount": 9,
+  "developmentDeployment": "Pending target confirmation; private technical staging has zero facilities, units and reservations and no public URL",
+  "deferred": "Upper-floor physical mapping, numbering, sizes and map geometry remain unchanged per Brett, 8 October 2026",
+  "productionWrites": 0
+}

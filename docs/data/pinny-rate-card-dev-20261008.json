@@ -1,0 +1,2925 @@
+{
+  "source": "Uploaded Rate Card.xlsx by Pinny; Unit Schedule B6:H327 and L6:N60",
+  "sha256": "d70c9c9f85647018355cd4fe014efff1a307a4add322ecb6e147938d1e674c68",
+  "vatBasis": "inclusive",
+  "rates": [
+    {
+      "row": 6,
+      "floor": "Ground",
+      "area": 2,
+      "monthlyRate": 825
+    },
+    {
+      "row": 7,
+      "floor": "Ground",
+      "area": 3,
+      "monthlyRate": 900
+    },
+    {
+      "row": 8,
+      "floor": "Ground",
+      "area": 4,
+      "monthlyRate": 950
+    },
+    {
+      "row": 9,
+      "floor": "Ground",
+      "area": 5,
+      "monthlyRate": 1150
+    },
+    {
+      "row": 10,
+      "floor": "Ground",
+      "area": 6,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 11,
+      "floor": "Ground",
+      "area": 7,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 12,
+      "floor": "Ground",
+      "area": 8,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 13,
+      "floor": "Ground",
+      "area": 9,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 14,
+      "floor": "Ground",
+      "area": 10,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 15,
+      "floor": "Ground",
+      "area": 11,
+      "monthlyRate": 1750
+    },
+    {
+      "row": 16,
+      "floor": "Ground",
+      "area": 12,
+      "monthlyRate": 1800
+    },
+    {
+      "row": 17,
+      "floor": "Ground",
+      "area": 13,
+      "monthlyRate": 1850
+    },
+    {
+      "row": 18,
+      "floor": "Ground",
+      "area": 14,
+      "monthlyRate": 1900
+    },
+    {
+      "row": 19,
+      "floor": "Ground",
+      "area": 15,
+      "monthlyRate": 2000
+    },
+    {
+      "row": 20,
+      "floor": "Ground",
+      "area": 18,
+      "monthlyRate": 2350
+    },
+    {
+      "row": 21,
+      "floor": "Ground",
+      "area": 19,
+      "monthlyRate": 2350
+    },
+    {
+      "row": 22,
+      "floor": "Ground",
+      "area": 20,
+      "monthlyRate": 2400
+    },
+    {
+      "row": 23,
+      "floor": "Ground",
+      "area": 21,
+      "monthlyRate": 2550
+    },
+    {
+      "row": 24,
+      "floor": "Ground",
+      "area": 22,
+      "monthlyRate": 2750
+    },
+    {
+      "row": 25,
+      "floor": "Ground",
+      "area": 23,
+      "monthlyRate": 2800
+    },
+    {
+      "row": 26,
+      "floor": "Ground",
+      "area": 24,
+      "monthlyRate": 2850
+    },
+    {
+      "row": 27,
+      "floor": "Ground",
+      "area": 25,
+      "monthlyRate": 3000
+    },
+    {
+      "row": 28,
+      "floor": "Ground",
+      "area": 29,
+      "monthlyRate": 3500
+    },
+    {
+      "row": 29,
+      "floor": "Ground",
+      "area": 29.6,
+      "monthlyRate": 4500
+    },
+    {
+      "row": 30,
+      "floor": "Ground",
+      "area": 33,
+      "monthlyRate": 3900
+    },
+    {
+      "row": 31,
+      "floor": "Ground",
+      "area": 34,
+      "monthlyRate": 4000
+    },
+    {
+      "row": 32,
+      "floor": "Ground",
+      "area": 35,
+      "monthlyRate": 4400
+    },
+    {
+      "row": 33,
+      "floor": "Ground",
+      "area": 36,
+      "monthlyRate": 4500
+    },
+    {
+      "row": 34,
+      "floor": "Ground",
+      "area": 49,
+      "monthlyRate": 5500
+    },
+    {
+      "row": 35,
+      "floor": "Ground",
+      "area": 70,
+      "monthlyRate": 7000
+    },
+    {
+      "row": 36,
+      "floor": "Ground",
+      "area": 76,
+      "monthlyRate": 7500
+    },
+    {
+      "row": 37,
+      "floor": "First",
+      "area": 3,
+      "monthlyRate": 750
+    },
+    {
+      "row": 38,
+      "floor": "First",
+      "area": 4,
+      "monthlyRate": 850
+    },
+    {
+      "row": 39,
+      "floor": "First",
+      "area": 5,
+      "monthlyRate": 1000
+    },
+    {
+      "row": 40,
+      "floor": "First",
+      "area": 6,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 41,
+      "floor": "First",
+      "area": 7,
+      "monthlyRate": 1400
+    },
+    {
+      "row": 42,
+      "floor": "First",
+      "area": 8,
+      "monthlyRate": 1450
+    },
+    {
+      "row": 43,
+      "floor": "First",
+      "area": 9,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 44,
+      "floor": "First",
+      "area": 10,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 45,
+      "floor": "First",
+      "area": 11,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 46,
+      "floor": "First",
+      "area": 12,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 47,
+      "floor": "First",
+      "area": 13,
+      "monthlyRate": 1750
+    },
+    {
+      "row": 48,
+      "floor": "First",
+      "area": 14,
+      "monthlyRate": 1800
+    },
+    {
+      "row": 49,
+      "floor": "First",
+      "area": 15,
+      "monthlyRate": 1850
+    },
+    {
+      "row": 50,
+      "floor": "First",
+      "area": 16,
+      "monthlyRate": 1850
+    },
+    {
+      "row": 51,
+      "floor": "First",
+      "area": 17,
+      "monthlyRate": 1900
+    },
+    {
+      "row": 52,
+      "floor": "First",
+      "area": 19,
+      "monthlyRate": 2000
+    },
+    {
+      "row": 53,
+      "floor": "First",
+      "area": 22,
+      "monthlyRate": 2350
+    },
+    {
+      "row": 54,
+      "floor": "First",
+      "area": 23,
+      "monthlyRate": 2550
+    },
+    {
+      "row": 55,
+      "floor": "First",
+      "area": 33,
+      "monthlyRate": 2850
+    },
+    {
+      "row": 56,
+      "floor": "First",
+      "area": 34,
+      "monthlyRate": 3000
+    },
+    {
+      "row": 57,
+      "floor": "First",
+      "area": 35,
+      "monthlyRate": 3250
+    },
+    {
+      "row": 58,
+      "floor": "First",
+      "area": 37,
+      "monthlyRate": 3500
+    },
+    {
+      "row": 59,
+      "floor": "First",
+      "area": 38,
+      "monthlyRate": 3500
+    },
+    {
+      "row": 60,
+      "floor": "First",
+      "area": 41,
+      "monthlyRate": 3950
+    }
+  ],
+  "units": [
+    {
+      "row": 6,
+      "floor": "Ground",
+      "number": "1",
+      "area": 36,
+      "cachedMonthlyRate": 4500,
+      "monthlyRate": 4500
+    },
+    {
+      "row": 7,
+      "floor": "Ground",
+      "number": "2",
+      "area": 36,
+      "cachedMonthlyRate": 4500,
+      "monthlyRate": 4500
+    },
+    {
+      "row": 8,
+      "floor": "Ground",
+      "number": "3",
+      "area": 34,
+      "cachedMonthlyRate": 4000,
+      "monthlyRate": 4000
+    },
+    {
+      "row": 9,
+      "floor": "Ground",
+      "number": "4",
+      "area": 35,
+      "cachedMonthlyRate": 4400,
+      "monthlyRate": 4400
+    },
+    {
+      "row": 10,
+      "floor": "Ground",
+      "number": "5",
+      "area": 35,
+      "cachedMonthlyRate": 4400,
+      "monthlyRate": 4400
+    },
+    {
+      "row": 11,
+      "floor": "Ground",
+      "number": "6",
+      "area": 33,
+      "cachedMonthlyRate": 3900,
+      "monthlyRate": 3900
+    },
+    {
+      "row": 12,
+      "floor": "Ground",
+      "number": "7",
+      "area": 36,
+      "cachedMonthlyRate": 4500,
+      "monthlyRate": 4500
+    },
+    {
+      "row": 13,
+      "floor": "Ground",
+      "number": "8",
+      "area": 35,
+      "cachedMonthlyRate": 4400,
+      "monthlyRate": 4400
+    },
+    {
+      "row": 14,
+      "floor": "Ground",
+      "number": "9",
+      "area": 33,
+      "cachedMonthlyRate": 3900,
+      "monthlyRate": 3900
+    },
+    {
+      "row": 15,
+      "floor": "Ground",
+      "number": "10",
+      "area": 35,
+      "cachedMonthlyRate": 4400,
+      "monthlyRate": 4400
+    },
+    {
+      "row": 16,
+      "floor": "Ground",
+      "number": "11",
+      "area": 34,
+      "cachedMonthlyRate": 4000,
+      "monthlyRate": 4000
+    },
+    {
+      "row": 17,
+      "floor": "Ground",
+      "number": "12",
+      "area": 18,
+      "cachedMonthlyRate": 2350,
+      "monthlyRate": 2350
+    },
+    {
+      "row": 18,
+      "floor": "Ground",
+      "number": "13",
+      "area": 13,
+      "cachedMonthlyRate": 1850,
+      "monthlyRate": 1850
+    },
+    {
+      "row": 19,
+      "floor": "Ground",
+      "number": "14",
+      "area": 19,
+      "cachedMonthlyRate": 2350,
+      "monthlyRate": 2350
+    },
+    {
+      "row": 20,
+      "floor": "Ground",
+      "number": "15",
+      "area": 2,
+      "cachedMonthlyRate": 825,
+      "monthlyRate": 825
+    },
+    {
+      "row": 21,
+      "floor": "Ground",
+      "number": "16",
+      "area": 2,
+      "cachedMonthlyRate": 825,
+      "monthlyRate": 825
+    },
+    {
+      "row": 22,
+      "floor": "Ground",
+      "number": "17",
+      "area": 22,
+      "cachedMonthlyRate": 2750,
+      "monthlyRate": 2750
+    },
+    {
+      "row": 23,
+      "floor": "Ground",
+      "number": "18",
+      "area": 23,
+      "cachedMonthlyRate": 2800,
+      "monthlyRate": 2800
+    },
+    {
+      "row": 24,
+      "floor": "Ground",
+      "number": "19",
+      "area": 12,
+      "cachedMonthlyRate": 1800,
+      "monthlyRate": 1800
+    },
+    {
+      "row": 25,
+      "floor": "Ground",
+      "number": "20",
+      "area": 10,
+      "cachedMonthlyRate": 1650,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 26,
+      "floor": "Ground",
+      "number": "21",
+      "area": 11,
+      "cachedMonthlyRate": 1750,
+      "monthlyRate": 1750
+    },
+    {
+      "row": 27,
+      "floor": "Ground",
+      "number": "22",
+      "area": 10,
+      "cachedMonthlyRate": 1650,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 28,
+      "floor": "Ground",
+      "number": "23",
+      "area": 11,
+      "cachedMonthlyRate": 1750,
+      "monthlyRate": 1750
+    },
+    {
+      "row": 29,
+      "floor": "Ground",
+      "number": "24",
+      "area": 13,
+      "cachedMonthlyRate": 1850,
+      "monthlyRate": 1850
+    },
+    {
+      "row": 30,
+      "floor": "Ground",
+      "number": "25",
+      "area": 9,
+      "cachedMonthlyRate": 1650,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 31,
+      "floor": "Ground",
+      "number": "26",
+      "area": 12,
+      "cachedMonthlyRate": 1800,
+      "monthlyRate": 1800
+    },
+    {
+      "row": 32,
+      "floor": "Ground",
+      "number": "27",
+      "area": 8,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 33,
+      "floor": "Ground",
+      "number": "28",
+      "area": 11,
+      "cachedMonthlyRate": 1750,
+      "monthlyRate": 1750
+    },
+    {
+      "row": 34,
+      "floor": "Ground",
+      "number": "29",
+      "area": 12,
+      "cachedMonthlyRate": 1800,
+      "monthlyRate": 1800
+    },
+    {
+      "row": 35,
+      "floor": "Ground",
+      "number": "30",
+      "area": 35,
+      "cachedMonthlyRate": 4400,
+      "monthlyRate": 4400
+    },
+    {
+      "row": 36,
+      "floor": "Ground",
+      "number": "31",
+      "area": 8,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 37,
+      "floor": "Ground",
+      "number": "32",
+      "area": 13,
+      "cachedMonthlyRate": 1850,
+      "monthlyRate": 1850
+    },
+    {
+      "row": 38,
+      "floor": "Ground",
+      "number": "33",
+      "area": 8,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 39,
+      "floor": "Ground",
+      "number": "34",
+      "area": 14,
+      "cachedMonthlyRate": 1900,
+      "monthlyRate": 1900
+    },
+    {
+      "row": 40,
+      "floor": "Ground",
+      "number": "35",
+      "area": 10,
+      "cachedMonthlyRate": 1650,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 41,
+      "floor": "Ground",
+      "number": "36",
+      "area": 12,
+      "cachedMonthlyRate": 1800,
+      "monthlyRate": 1800
+    },
+    {
+      "row": 42,
+      "floor": "Ground",
+      "number": "37",
+      "area": 11,
+      "cachedMonthlyRate": 1750,
+      "monthlyRate": 1750
+    },
+    {
+      "row": 43,
+      "floor": "Ground",
+      "number": "38",
+      "area": 9,
+      "cachedMonthlyRate": 1650,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 44,
+      "floor": "Ground",
+      "number": "39",
+      "area": 6,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 45,
+      "floor": "Ground",
+      "number": "40",
+      "area": 23,
+      "cachedMonthlyRate": 2800,
+      "monthlyRate": 2800
+    },
+    {
+      "row": 46,
+      "floor": "Ground",
+      "number": "41",
+      "area": 23,
+      "cachedMonthlyRate": 2800,
+      "monthlyRate": 2800
+    },
+    {
+      "row": 47,
+      "floor": "Ground",
+      "number": "42",
+      "area": 12,
+      "cachedMonthlyRate": 1800,
+      "monthlyRate": 1800
+    },
+    {
+      "row": 48,
+      "floor": "Ground",
+      "number": "43",
+      "area": 11,
+      "cachedMonthlyRate": 1750,
+      "monthlyRate": 1750
+    },
+    {
+      "row": 49,
+      "floor": "Ground",
+      "number": "44",
+      "area": 11,
+      "cachedMonthlyRate": 1750,
+      "monthlyRate": 1750
+    },
+    {
+      "row": 50,
+      "floor": "Ground",
+      "number": "45",
+      "area": 11,
+      "cachedMonthlyRate": 1750,
+      "monthlyRate": 1750
+    },
+    {
+      "row": 51,
+      "floor": "Ground",
+      "number": "47",
+      "area": 14,
+      "cachedMonthlyRate": 1900,
+      "monthlyRate": 1900
+    },
+    {
+      "row": 52,
+      "floor": "Ground",
+      "number": "48",
+      "area": 12,
+      "cachedMonthlyRate": 1800,
+      "monthlyRate": 1800
+    },
+    {
+      "row": 53,
+      "floor": "Ground",
+      "number": "49",
+      "area": 12,
+      "cachedMonthlyRate": 1800,
+      "monthlyRate": 1800
+    },
+    {
+      "row": 54,
+      "floor": "Ground",
+      "number": "50",
+      "area": 11,
+      "cachedMonthlyRate": 1750,
+      "monthlyRate": 1750
+    },
+    {
+      "row": 55,
+      "floor": "Ground",
+      "number": "51",
+      "area": 3,
+      "cachedMonthlyRate": 900,
+      "monthlyRate": 900
+    },
+    {
+      "row": 56,
+      "floor": "Ground",
+      "number": "52",
+      "area": 3,
+      "cachedMonthlyRate": 900,
+      "monthlyRate": 900
+    },
+    {
+      "row": 57,
+      "floor": "Ground",
+      "number": "53",
+      "area": 6,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 58,
+      "floor": "Ground",
+      "number": "54",
+      "area": 6,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 59,
+      "floor": "Ground",
+      "number": "55",
+      "area": 6,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 60,
+      "floor": "Ground",
+      "number": "56",
+      "area": 6,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 61,
+      "floor": "Ground",
+      "number": "57",
+      "area": 7,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 62,
+      "floor": "Ground",
+      "number": "58",
+      "area": 5,
+      "cachedMonthlyRate": 1150,
+      "monthlyRate": 1150
+    },
+    {
+      "row": 63,
+      "floor": "Ground",
+      "number": "59",
+      "area": 6,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 64,
+      "floor": "Ground",
+      "number": "60",
+      "area": 6,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 65,
+      "floor": "Ground",
+      "number": "61",
+      "area": 5,
+      "cachedMonthlyRate": 1150,
+      "monthlyRate": 1150
+    },
+    {
+      "row": 66,
+      "floor": "Ground",
+      "number": "62",
+      "area": 9,
+      "cachedMonthlyRate": 1650,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 67,
+      "floor": "Ground",
+      "number": "63",
+      "area": 25,
+      "cachedMonthlyRate": 3000,
+      "monthlyRate": 3000
+    },
+    {
+      "row": 68,
+      "floor": "Ground",
+      "number": "64",
+      "area": 23,
+      "cachedMonthlyRate": 2800,
+      "monthlyRate": 2800
+    },
+    {
+      "row": 69,
+      "floor": "Ground",
+      "number": "65",
+      "area": 23,
+      "cachedMonthlyRate": 2800,
+      "monthlyRate": 2800
+    },
+    {
+      "row": 70,
+      "floor": "Ground",
+      "number": "66",
+      "area": 23,
+      "cachedMonthlyRate": 2800,
+      "monthlyRate": 2800
+    },
+    {
+      "row": 71,
+      "floor": "Ground",
+      "number": "67",
+      "area": 24,
+      "cachedMonthlyRate": 2850,
+      "monthlyRate": 2850
+    },
+    {
+      "row": 72,
+      "floor": "Ground",
+      "number": "68",
+      "area": 23,
+      "cachedMonthlyRate": 2800,
+      "monthlyRate": 2800
+    },
+    {
+      "row": 73,
+      "floor": "Ground",
+      "number": "69",
+      "area": 12,
+      "cachedMonthlyRate": 1800,
+      "monthlyRate": 1800
+    },
+    {
+      "row": 74,
+      "floor": "Ground",
+      "number": "70",
+      "area": 6,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 75,
+      "floor": "Ground",
+      "number": "71",
+      "area": 4,
+      "cachedMonthlyRate": 950,
+      "monthlyRate": 950
+    },
+    {
+      "row": 76,
+      "floor": "Ground",
+      "number": "72",
+      "area": 8,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 77,
+      "floor": "Ground",
+      "number": "73",
+      "area": 7,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 78,
+      "floor": "Ground",
+      "number": "74",
+      "area": 6,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 79,
+      "floor": "Ground",
+      "number": "75",
+      "area": 7,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 80,
+      "floor": "Ground",
+      "number": "76",
+      "area": 6,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 81,
+      "floor": "Ground",
+      "number": "77",
+      "area": 6,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 82,
+      "floor": "Ground",
+      "number": "78",
+      "area": 6,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 83,
+      "floor": "Ground",
+      "number": "79",
+      "area": 14,
+      "cachedMonthlyRate": 1900,
+      "monthlyRate": 1900
+    },
+    {
+      "row": 84,
+      "floor": "Ground",
+      "number": "80",
+      "area": 11,
+      "cachedMonthlyRate": 1750,
+      "monthlyRate": 1750
+    },
+    {
+      "row": 85,
+      "floor": "Ground",
+      "number": "81",
+      "area": 14,
+      "cachedMonthlyRate": 1900,
+      "monthlyRate": 1900
+    },
+    {
+      "row": 86,
+      "floor": "Ground",
+      "number": "82",
+      "area": 13,
+      "cachedMonthlyRate": 1850,
+      "monthlyRate": 1850
+    },
+    {
+      "row": 87,
+      "floor": "Ground",
+      "number": "83",
+      "area": 11,
+      "cachedMonthlyRate": 1750,
+      "monthlyRate": 1750
+    },
+    {
+      "row": 88,
+      "floor": "Ground",
+      "number": "84",
+      "area": 12,
+      "cachedMonthlyRate": 1800,
+      "monthlyRate": 1800
+    },
+    {
+      "row": 89,
+      "floor": "Ground",
+      "number": "85",
+      "area": 12,
+      "cachedMonthlyRate": 1800,
+      "monthlyRate": 1800
+    },
+    {
+      "row": 90,
+      "floor": "Ground",
+      "number": "86",
+      "area": 10,
+      "cachedMonthlyRate": 1650,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 91,
+      "floor": "Ground",
+      "number": "87",
+      "area": 24,
+      "cachedMonthlyRate": 2850,
+      "monthlyRate": 2850
+    },
+    {
+      "row": 92,
+      "floor": "Ground",
+      "number": "88",
+      "area": 23,
+      "cachedMonthlyRate": 2800,
+      "monthlyRate": 2800
+    },
+    {
+      "row": 93,
+      "floor": "Ground",
+      "number": "89",
+      "area": 6,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 94,
+      "floor": "Ground",
+      "number": "90",
+      "area": 6,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 95,
+      "floor": "Ground",
+      "number": "91",
+      "area": 22,
+      "cachedMonthlyRate": 2750,
+      "monthlyRate": 2750
+    },
+    {
+      "row": 96,
+      "floor": "Ground",
+      "number": "92",
+      "area": 7,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 97,
+      "floor": "Ground",
+      "number": "93",
+      "area": 6,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 98,
+      "floor": "Ground",
+      "number": "94",
+      "area": 23,
+      "cachedMonthlyRate": 2800,
+      "monthlyRate": 2800
+    },
+    {
+      "row": 99,
+      "floor": "Ground",
+      "number": "95",
+      "area": 7,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 100,
+      "floor": "Ground",
+      "number": "96",
+      "area": 6,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 101,
+      "floor": "Ground",
+      "number": "97",
+      "area": 23,
+      "cachedMonthlyRate": 2800,
+      "monthlyRate": 2800
+    },
+    {
+      "row": 102,
+      "floor": "Ground",
+      "number": "98",
+      "area": 6,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 103,
+      "floor": "Ground",
+      "number": "99",
+      "area": 6,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 104,
+      "floor": "Ground",
+      "number": "100",
+      "area": 22,
+      "cachedMonthlyRate": 2750,
+      "monthlyRate": 2750
+    },
+    {
+      "row": 105,
+      "floor": "Ground",
+      "number": "101",
+      "area": 13,
+      "cachedMonthlyRate": 1850,
+      "monthlyRate": 1850
+    },
+    {
+      "row": 106,
+      "floor": "Ground",
+      "number": "102",
+      "area": 6,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 107,
+      "floor": "Ground",
+      "number": "103",
+      "area": 5,
+      "cachedMonthlyRate": 1150,
+      "monthlyRate": 1150
+    },
+    {
+      "row": 108,
+      "floor": "Ground",
+      "number": "104",
+      "area": 6,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 109,
+      "floor": "Ground",
+      "number": "105",
+      "area": 8,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 110,
+      "floor": "Ground",
+      "number": "106",
+      "area": 6,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 111,
+      "floor": "Ground",
+      "number": "107",
+      "area": 5,
+      "cachedMonthlyRate": 1150,
+      "monthlyRate": 1150
+    },
+    {
+      "row": 112,
+      "floor": "Ground",
+      "number": "108",
+      "area": 70,
+      "cachedMonthlyRate": 7000,
+      "monthlyRate": 7000
+    },
+    {
+      "row": 113,
+      "floor": "Ground",
+      "number": "109",
+      "area": 35,
+      "cachedMonthlyRate": 4400,
+      "monthlyRate": 4400
+    },
+    {
+      "row": 114,
+      "floor": "Ground",
+      "number": "110",
+      "area": 35,
+      "cachedMonthlyRate": 4400,
+      "monthlyRate": 4400
+    },
+    {
+      "row": 115,
+      "floor": "Ground",
+      "number": "111",
+      "area": 49,
+      "cachedMonthlyRate": 5500,
+      "monthlyRate": 5500
+    },
+    {
+      "row": 116,
+      "floor": "Ground",
+      "number": "112",
+      "area": 14,
+      "cachedMonthlyRate": 1900,
+      "monthlyRate": 1900
+    },
+    {
+      "row": 117,
+      "floor": "Ground",
+      "number": "113",
+      "area": 76,
+      "cachedMonthlyRate": 7500,
+      "monthlyRate": 7500
+    },
+    {
+      "row": 118,
+      "floor": "Ground",
+      "number": "114",
+      "area": 49,
+      "cachedMonthlyRate": 5500,
+      "monthlyRate": 5500
+    },
+    {
+      "row": 119,
+      "floor": "Ground",
+      "number": "115",
+      "area": 29,
+      "cachedMonthlyRate": 3500,
+      "monthlyRate": 3500
+    },
+    {
+      "row": 120,
+      "floor": "Ground",
+      "number": "116",
+      "area": 21,
+      "cachedMonthlyRate": 2550,
+      "monthlyRate": 2550
+    },
+    {
+      "row": 121,
+      "floor": "Ground",
+      "number": "117",
+      "area": 20,
+      "cachedMonthlyRate": 2400,
+      "monthlyRate": 2400
+    },
+    {
+      "row": 122,
+      "floor": "Ground",
+      "number": "118",
+      "area": 12,
+      "cachedMonthlyRate": 1800,
+      "monthlyRate": 1800
+    },
+    {
+      "row": 123,
+      "floor": "Ground",
+      "number": "119",
+      "area": 12,
+      "cachedMonthlyRate": 1800,
+      "monthlyRate": 1800
+    },
+    {
+      "row": 124,
+      "floor": "Ground",
+      "number": "120",
+      "area": 4,
+      "cachedMonthlyRate": 950,
+      "monthlyRate": 950
+    },
+    {
+      "row": 125,
+      "floor": "Ground",
+      "number": "121",
+      "area": 4,
+      "cachedMonthlyRate": 950,
+      "monthlyRate": 950
+    },
+    {
+      "row": 126,
+      "floor": "Ground",
+      "number": "122",
+      "area": 4,
+      "cachedMonthlyRate": 950,
+      "monthlyRate": 950
+    },
+    {
+      "row": 127,
+      "floor": "Ground",
+      "number": "123",
+      "area": 3,
+      "cachedMonthlyRate": 900,
+      "monthlyRate": 900
+    },
+    {
+      "row": 128,
+      "floor": "Ground",
+      "number": "124",
+      "area": 4,
+      "cachedMonthlyRate": 950,
+      "monthlyRate": 950
+    },
+    {
+      "row": 129,
+      "floor": "Ground",
+      "number": "125",
+      "area": 4,
+      "cachedMonthlyRate": 950,
+      "monthlyRate": 950
+    },
+    {
+      "row": 130,
+      "floor": "Ground",
+      "number": "126",
+      "area": 3,
+      "cachedMonthlyRate": 900,
+      "monthlyRate": 900
+    },
+    {
+      "row": 131,
+      "floor": "Ground",
+      "number": "127",
+      "area": 3,
+      "cachedMonthlyRate": 900,
+      "monthlyRate": 900
+    },
+    {
+      "row": 132,
+      "floor": "Ground",
+      "number": "128",
+      "area": 4,
+      "cachedMonthlyRate": 950,
+      "monthlyRate": 950
+    },
+    {
+      "row": 133,
+      "floor": "Ground",
+      "number": "129",
+      "area": 4,
+      "cachedMonthlyRate": 950,
+      "monthlyRate": 950
+    },
+    {
+      "row": 134,
+      "floor": "Ground",
+      "number": "130",
+      "area": 12,
+      "cachedMonthlyRate": 1800,
+      "monthlyRate": 1800
+    },
+    {
+      "row": 135,
+      "floor": "Ground",
+      "number": "131",
+      "area": 8,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 136,
+      "floor": "Ground",
+      "number": "132",
+      "area": 10,
+      "cachedMonthlyRate": 1650,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 137,
+      "floor": "Ground",
+      "number": "133",
+      "area": 7,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 138,
+      "floor": "Ground",
+      "number": "134",
+      "area": 9,
+      "cachedMonthlyRate": 1650,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 139,
+      "floor": "Ground",
+      "number": "135",
+      "area": 7,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 140,
+      "floor": "Ground",
+      "number": "136",
+      "area": 6,
+      "cachedMonthlyRate": 1250,
+      "monthlyRate": 1250
+    },
+    {
+      "row": 141,
+      "floor": "Ground",
+      "number": "137",
+      "area": 14,
+      "cachedMonthlyRate": 1900,
+      "monthlyRate": 1900
+    },
+    {
+      "row": 142,
+      "floor": "Ground",
+      "number": "138",
+      "area": 15,
+      "cachedMonthlyRate": 2000,
+      "monthlyRate": 2000
+    },
+    {
+      "row": 143,
+      "floor": "Ground",
+      "number": "139",
+      "area": 11,
+      "cachedMonthlyRate": 1750,
+      "monthlyRate": 1750
+    },
+    {
+      "row": 144,
+      "floor": "Ground",
+      "number": "140",
+      "area": 8,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 145,
+      "floor": "Ground",
+      "number": "530",
+      "area": 29.6,
+      "cachedMonthlyRate": 4500,
+      "monthlyRate": 4500
+    },
+    {
+      "row": 146,
+      "floor": "Ground",
+      "number": "531",
+      "area": 29.6,
+      "cachedMonthlyRate": 4500,
+      "monthlyRate": 4500
+    },
+    {
+      "row": 147,
+      "floor": "Ground",
+      "number": "532",
+      "area": 29.6,
+      "cachedMonthlyRate": 4500,
+      "monthlyRate": 4500
+    },
+    {
+      "row": 148,
+      "floor": "First",
+      "number": "FF-001",
+      "area": 17,
+      "cachedMonthlyRate": 1900,
+      "monthlyRate": 1900
+    },
+    {
+      "row": 149,
+      "floor": "First",
+      "number": "FF-002",
+      "area": 13,
+      "cachedMonthlyRate": 1750,
+      "monthlyRate": 1750
+    },
+    {
+      "row": 150,
+      "floor": "First",
+      "number": "FF-003",
+      "area": 33,
+      "cachedMonthlyRate": 2850,
+      "monthlyRate": 2850
+    },
+    {
+      "row": 151,
+      "floor": "First",
+      "number": "FF-004",
+      "area": 37,
+      "cachedMonthlyRate": 3500,
+      "monthlyRate": 3500
+    },
+    {
+      "row": 152,
+      "floor": "First",
+      "number": "FF-005",
+      "area": 35,
+      "cachedMonthlyRate": 3250,
+      "monthlyRate": 3250
+    },
+    {
+      "row": 153,
+      "floor": "First",
+      "number": "FF-006",
+      "area": 34,
+      "cachedMonthlyRate": 3000,
+      "monthlyRate": 3000
+    },
+    {
+      "row": 154,
+      "floor": "First",
+      "number": "FF-007",
+      "area": 14,
+      "cachedMonthlyRate": 1800,
+      "monthlyRate": 1800
+    },
+    {
+      "row": 155,
+      "floor": "First",
+      "number": "FF-008",
+      "area": 13,
+      "cachedMonthlyRate": 1750,
+      "monthlyRate": 1750
+    },
+    {
+      "row": 156,
+      "floor": "First",
+      "number": "FF-009",
+      "area": 13,
+      "cachedMonthlyRate": 1750,
+      "monthlyRate": 1750
+    },
+    {
+      "row": 157,
+      "floor": "First",
+      "number": "FF-010",
+      "area": 15,
+      "cachedMonthlyRate": 1850,
+      "monthlyRate": 1850
+    },
+    {
+      "row": 158,
+      "floor": "First",
+      "number": "FF-011",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 159,
+      "floor": "First",
+      "number": "FF-012",
+      "area": 15,
+      "cachedMonthlyRate": 1850,
+      "monthlyRate": 1850
+    },
+    {
+      "row": 160,
+      "floor": "First",
+      "number": "FF-013",
+      "area": 14,
+      "cachedMonthlyRate": 1800,
+      "monthlyRate": 1800
+    },
+    {
+      "row": 161,
+      "floor": "First",
+      "number": "FF-014",
+      "area": 22,
+      "cachedMonthlyRate": 2350,
+      "monthlyRate": 2350
+    },
+    {
+      "row": 162,
+      "floor": "First",
+      "number": "FF-015",
+      "area": 17,
+      "cachedMonthlyRate": 1900,
+      "monthlyRate": 1900
+    },
+    {
+      "row": 163,
+      "floor": "First",
+      "number": "FF-016",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 164,
+      "floor": "First",
+      "number": "FF-017",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 165,
+      "floor": "First",
+      "number": "FF-018",
+      "area": 8,
+      "cachedMonthlyRate": 1450,
+      "monthlyRate": 1450
+    },
+    {
+      "row": 166,
+      "floor": "First",
+      "number": "FF-019",
+      "area": 8,
+      "cachedMonthlyRate": 1450,
+      "monthlyRate": 1450
+    },
+    {
+      "row": 167,
+      "floor": "First",
+      "number": "FF-020",
+      "area": 3,
+      "cachedMonthlyRate": 750,
+      "monthlyRate": 750
+    },
+    {
+      "row": 168,
+      "floor": "First",
+      "number": "FF-021",
+      "area": 3,
+      "cachedMonthlyRate": 750,
+      "monthlyRate": 750
+    },
+    {
+      "row": 169,
+      "floor": "First",
+      "number": "FF-022",
+      "area": 3,
+      "cachedMonthlyRate": 750,
+      "monthlyRate": 750
+    },
+    {
+      "row": 170,
+      "floor": "First",
+      "number": "FF-023",
+      "area": 3,
+      "cachedMonthlyRate": 750,
+      "monthlyRate": 750
+    },
+    {
+      "row": 171,
+      "floor": "First",
+      "number": "FF-024",
+      "area": 3,
+      "cachedMonthlyRate": 750,
+      "monthlyRate": 750
+    },
+    {
+      "row": 172,
+      "floor": "First",
+      "number": "FF-025",
+      "area": 7,
+      "cachedMonthlyRate": 1400,
+      "monthlyRate": 1400
+    },
+    {
+      "row": 173,
+      "floor": "First",
+      "number": "FF-026",
+      "area": 6,
+      "cachedMonthlyRate": 1200,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 174,
+      "floor": "First",
+      "number": "FF-027",
+      "area": 6,
+      "cachedMonthlyRate": 1200,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 175,
+      "floor": "First",
+      "number": "FF-028",
+      "area": 6,
+      "cachedMonthlyRate": 1200,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 176,
+      "floor": "First",
+      "number": "FF-029",
+      "area": 6,
+      "cachedMonthlyRate": 1200,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 177,
+      "floor": "First",
+      "number": "FF-030",
+      "area": 6,
+      "cachedMonthlyRate": 1200,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 178,
+      "floor": "First",
+      "number": "FF-031",
+      "area": 3,
+      "cachedMonthlyRate": 750,
+      "monthlyRate": 750
+    },
+    {
+      "row": 179,
+      "floor": "First",
+      "number": "FF-032",
+      "area": 3,
+      "cachedMonthlyRate": 750,
+      "monthlyRate": 750
+    },
+    {
+      "row": 180,
+      "floor": "First",
+      "number": "FF-033",
+      "area": 7,
+      "cachedMonthlyRate": 1400,
+      "monthlyRate": 1400
+    },
+    {
+      "row": 181,
+      "floor": "First",
+      "number": "FF-034",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 182,
+      "floor": "First",
+      "number": "FF-035",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 183,
+      "floor": "First",
+      "number": "FF-036",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 184,
+      "floor": "First",
+      "number": "FF-037",
+      "area": 9,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 185,
+      "floor": "First",
+      "number": "FF-038",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 186,
+      "floor": "First",
+      "number": "FF-039",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 187,
+      "floor": "First",
+      "number": "FF-040",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 188,
+      "floor": "First",
+      "number": "FF-041",
+      "area": 10,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 189,
+      "floor": "First",
+      "number": "FF-042",
+      "area": 9,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 190,
+      "floor": "First",
+      "number": "FF-043",
+      "area": 22,
+      "cachedMonthlyRate": 2350,
+      "monthlyRate": 2350
+    },
+    {
+      "row": 191,
+      "floor": "First",
+      "number": "FF-044",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 192,
+      "floor": "First",
+      "number": "FF-045",
+      "area": 10,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 193,
+      "floor": "First",
+      "number": "FF-046",
+      "area": 10,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 194,
+      "floor": "First",
+      "number": "FF-047",
+      "area": 10,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 195,
+      "floor": "First",
+      "number": "FF-048",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 196,
+      "floor": "First",
+      "number": "FF-049",
+      "area": 10,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 197,
+      "floor": "First",
+      "number": "FF-050",
+      "area": 10,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 198,
+      "floor": "First",
+      "number": "FF-051",
+      "area": 10,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 199,
+      "floor": "First",
+      "number": "FF-052",
+      "area": 10,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 200,
+      "floor": "First",
+      "number": "FF-053",
+      "area": 10,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 201,
+      "floor": "First",
+      "number": "FF-054",
+      "area": 13,
+      "cachedMonthlyRate": 1750,
+      "monthlyRate": 1750
+    },
+    {
+      "row": 202,
+      "floor": "First",
+      "number": "FF-055",
+      "area": 7,
+      "cachedMonthlyRate": 1400,
+      "monthlyRate": 1400
+    },
+    {
+      "row": 203,
+      "floor": "First",
+      "number": "FF-056",
+      "area": 10,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 204,
+      "floor": "First",
+      "number": "FF-057",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 205,
+      "floor": "First",
+      "number": "FF-058",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 206,
+      "floor": "First",
+      "number": "FF-059",
+      "area": 10,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 207,
+      "floor": "First",
+      "number": "FF-060",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 208,
+      "floor": "First",
+      "number": "FF-061",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 209,
+      "floor": "First",
+      "number": "FF-062",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 210,
+      "floor": "First",
+      "number": "FF-063",
+      "area": 10,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 211,
+      "floor": "First",
+      "number": "FF-064",
+      "area": 9,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 212,
+      "floor": "First",
+      "number": "FF-065",
+      "area": 41,
+      "cachedMonthlyRate": 3950,
+      "monthlyRate": 3950
+    },
+    {
+      "row": 213,
+      "floor": "First",
+      "number": "FF-066",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 214,
+      "floor": "First",
+      "number": "FF-067",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 215,
+      "floor": "First",
+      "number": "FF-068",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 216,
+      "floor": "First",
+      "number": "FF-069",
+      "area": 10,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 217,
+      "floor": "First",
+      "number": "FF-070",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 218,
+      "floor": "First",
+      "number": "FF-071",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 219,
+      "floor": "First",
+      "number": "FF-072",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 220,
+      "floor": "First",
+      "number": "FF-073",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 221,
+      "floor": "First",
+      "number": "FF-074",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 222,
+      "floor": "First",
+      "number": "FF-075",
+      "area": 10,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 223,
+      "floor": "First",
+      "number": "FF-076",
+      "area": 13,
+      "cachedMonthlyRate": 1750,
+      "monthlyRate": 1750
+    },
+    {
+      "row": 224,
+      "floor": "First",
+      "number": "FF-077",
+      "area": 7,
+      "cachedMonthlyRate": 1400,
+      "monthlyRate": 1400
+    },
+    {
+      "row": 225,
+      "floor": "First",
+      "number": "FF-078",
+      "area": 7,
+      "cachedMonthlyRate": 1400,
+      "monthlyRate": 1400
+    },
+    {
+      "row": 226,
+      "floor": "First",
+      "number": "FF-079",
+      "area": 7,
+      "cachedMonthlyRate": 1400,
+      "monthlyRate": 1400
+    },
+    {
+      "row": 227,
+      "floor": "First",
+      "number": "FF-080",
+      "area": 7,
+      "cachedMonthlyRate": 1400,
+      "monthlyRate": 1400
+    },
+    {
+      "row": 228,
+      "floor": "First",
+      "number": "FF-081",
+      "area": 6,
+      "cachedMonthlyRate": 1200,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 229,
+      "floor": "First",
+      "number": "FF-082",
+      "area": 6,
+      "cachedMonthlyRate": 1200,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 230,
+      "floor": "First",
+      "number": "FF-083",
+      "area": 6,
+      "cachedMonthlyRate": 1200,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 231,
+      "floor": "First",
+      "number": "FF-084",
+      "area": 7,
+      "cachedMonthlyRate": 1400,
+      "monthlyRate": 1400
+    },
+    {
+      "row": 232,
+      "floor": "First",
+      "number": "FF-085",
+      "area": 6,
+      "cachedMonthlyRate": 1200,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 233,
+      "floor": "First",
+      "number": "FF-086",
+      "area": 6,
+      "cachedMonthlyRate": 1200,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 234,
+      "floor": "First",
+      "number": "FF-087",
+      "area": 6,
+      "cachedMonthlyRate": 1200,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 235,
+      "floor": "First",
+      "number": "FF-088",
+      "area": 6,
+      "cachedMonthlyRate": 1200,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 236,
+      "floor": "First",
+      "number": "FF-089",
+      "area": 14,
+      "cachedMonthlyRate": 1800,
+      "monthlyRate": 1800
+    },
+    {
+      "row": 237,
+      "floor": "First",
+      "number": "FF-090",
+      "area": 7,
+      "cachedMonthlyRate": 1400,
+      "monthlyRate": 1400
+    },
+    {
+      "row": 238,
+      "floor": "First",
+      "number": "FF-091",
+      "area": 7,
+      "cachedMonthlyRate": 1400,
+      "monthlyRate": 1400
+    },
+    {
+      "row": 239,
+      "floor": "First",
+      "number": "FF-092",
+      "area": 7,
+      "cachedMonthlyRate": 1400,
+      "monthlyRate": 1400
+    },
+    {
+      "row": 240,
+      "floor": "First",
+      "number": "FF-093",
+      "area": 6,
+      "cachedMonthlyRate": 1200,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 241,
+      "floor": "First",
+      "number": "FF-094",
+      "area": 7,
+      "cachedMonthlyRate": 1400,
+      "monthlyRate": 1400
+    },
+    {
+      "row": 242,
+      "floor": "First",
+      "number": "FF-095",
+      "area": 7,
+      "cachedMonthlyRate": 1400,
+      "monthlyRate": 1400
+    },
+    {
+      "row": 243,
+      "floor": "First",
+      "number": "FF-096",
+      "area": 7,
+      "cachedMonthlyRate": 1400,
+      "monthlyRate": 1400
+    },
+    {
+      "row": 244,
+      "floor": "First",
+      "number": "FF-097",
+      "area": 7,
+      "cachedMonthlyRate": 1400,
+      "monthlyRate": 1400
+    },
+    {
+      "row": 245,
+      "floor": "First",
+      "number": "FF-098",
+      "area": 7,
+      "cachedMonthlyRate": 1400,
+      "monthlyRate": 1400
+    },
+    {
+      "row": 246,
+      "floor": "First",
+      "number": "FF-099",
+      "area": 6,
+      "cachedMonthlyRate": 1200,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 247,
+      "floor": "First",
+      "number": "FF-100",
+      "area": 7,
+      "cachedMonthlyRate": 1400,
+      "monthlyRate": 1400
+    },
+    {
+      "row": 248,
+      "floor": "First",
+      "number": "FF-101",
+      "area": 7,
+      "cachedMonthlyRate": 1400,
+      "monthlyRate": 1400
+    },
+    {
+      "row": 249,
+      "floor": "First",
+      "number": "FF-102",
+      "area": 13,
+      "cachedMonthlyRate": 1750,
+      "monthlyRate": 1750
+    },
+    {
+      "row": 250,
+      "floor": "First",
+      "number": "FF-103",
+      "area": 12,
+      "cachedMonthlyRate": 1650,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 251,
+      "floor": "First",
+      "number": "FF-104",
+      "area": 12,
+      "cachedMonthlyRate": 1650,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 252,
+      "floor": "First",
+      "number": "FF-105",
+      "area": 12,
+      "cachedMonthlyRate": 1650,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 253,
+      "floor": "First",
+      "number": "FF-106",
+      "area": 12,
+      "cachedMonthlyRate": 1650,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 254,
+      "floor": "First",
+      "number": "FF-107",
+      "area": 12,
+      "cachedMonthlyRate": 1650,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 255,
+      "floor": "First",
+      "number": "FF-108",
+      "area": 12,
+      "cachedMonthlyRate": 1650,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 256,
+      "floor": "First",
+      "number": "FF-109",
+      "area": 12,
+      "cachedMonthlyRate": 1650,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 257,
+      "floor": "First",
+      "number": "FF-110",
+      "area": 10,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 258,
+      "floor": "First",
+      "number": "FF-111",
+      "area": 23,
+      "cachedMonthlyRate": 2550,
+      "monthlyRate": 2550
+    },
+    {
+      "row": 259,
+      "floor": "First",
+      "number": "FF-112",
+      "area": 12,
+      "cachedMonthlyRate": 1650,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 260,
+      "floor": "First",
+      "number": "FF-113",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 261,
+      "floor": "First",
+      "number": "FF-114",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 262,
+      "floor": "First",
+      "number": "FF-115",
+      "area": 10,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 263,
+      "floor": "First",
+      "number": "FF-116",
+      "area": 12,
+      "cachedMonthlyRate": 1650,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 264,
+      "floor": "First",
+      "number": "FF-117",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 265,
+      "floor": "First",
+      "number": "FF-118",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 266,
+      "floor": "First",
+      "number": "FF-119",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 267,
+      "floor": "First",
+      "number": "FF-120",
+      "area": 11,
+      "cachedMonthlyRate": 1600,
+      "monthlyRate": 1600
+    },
+    {
+      "row": 268,
+      "floor": "First",
+      "number": "FF-121",
+      "area": 10,
+      "cachedMonthlyRate": 1500,
+      "monthlyRate": 1500
+    },
+    {
+      "row": 269,
+      "floor": "First",
+      "number": "FF-122",
+      "area": 7,
+      "cachedMonthlyRate": 1400,
+      "monthlyRate": 1400
+    },
+    {
+      "row": 270,
+      "floor": "First",
+      "number": "FF-123",
+      "area": 8,
+      "cachedMonthlyRate": 1450,
+      "monthlyRate": 1450
+    },
+    {
+      "row": 271,
+      "floor": "First",
+      "number": "FF-124",
+      "area": 8,
+      "cachedMonthlyRate": 1450,
+      "monthlyRate": 1450
+    },
+    {
+      "row": 272,
+      "floor": "First",
+      "number": "FF-125",
+      "area": 5,
+      "cachedMonthlyRate": 1000,
+      "monthlyRate": 1000
+    },
+    {
+      "row": 273,
+      "floor": "First",
+      "number": "FF-126",
+      "area": 6,
+      "cachedMonthlyRate": 1200,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 274,
+      "floor": "First",
+      "number": "FF-127",
+      "area": 6,
+      "cachedMonthlyRate": 1200,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 275,
+      "floor": "First",
+      "number": "FF-128",
+      "area": 6,
+      "cachedMonthlyRate": 1200,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 276,
+      "floor": "First",
+      "number": "FF-129",
+      "area": 6,
+      "cachedMonthlyRate": 1200,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 277,
+      "floor": "First",
+      "number": "FF-130",
+      "area": 6,
+      "cachedMonthlyRate": 1200,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 278,
+      "floor": "First",
+      "number": "FF-131",
+      "area": 6,
+      "cachedMonthlyRate": 1200,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 279,
+      "floor": "First",
+      "number": "FF-132",
+      "area": 15,
+      "cachedMonthlyRate": 1850,
+      "monthlyRate": 1850
+    },
+    {
+      "row": 280,
+      "floor": "First",
+      "number": "FF-133",
+      "area": 3,
+      "cachedMonthlyRate": 750,
+      "monthlyRate": 750
+    },
+    {
+      "row": 281,
+      "floor": "First",
+      "number": "FF-134",
+      "area": 3,
+      "cachedMonthlyRate": 750,
+      "monthlyRate": 750
+    },
+    {
+      "row": 282,
+      "floor": "First",
+      "number": "FF-135",
+      "area": 5,
+      "cachedMonthlyRate": 1000,
+      "monthlyRate": 1000
+    },
+    {
+      "row": 283,
+      "floor": "First",
+      "number": "FF-136",
+      "area": 19,
+      "cachedMonthlyRate": 2000,
+      "monthlyRate": 2000
+    },
+    {
+      "row": 284,
+      "floor": "First",
+      "number": "FF-137",
+      "area": 17,
+      "cachedMonthlyRate": 1900,
+      "monthlyRate": 1900
+    },
+    {
+      "row": 285,
+      "floor": "First",
+      "number": "FF-138",
+      "area": 14,
+      "cachedMonthlyRate": 1800,
+      "monthlyRate": 1800
+    },
+    {
+      "row": 286,
+      "floor": "First",
+      "number": "FF-139",
+      "area": 14,
+      "cachedMonthlyRate": 1800,
+      "monthlyRate": 1800
+    },
+    {
+      "row": 287,
+      "floor": "First",
+      "number": "FF-140",
+      "area": 5,
+      "cachedMonthlyRate": 1000,
+      "monthlyRate": 1000
+    },
+    {
+      "row": 288,
+      "floor": "First",
+      "number": "FF-141",
+      "area": 38,
+      "cachedMonthlyRate": 3500,
+      "monthlyRate": 3500
+    },
+    {
+      "row": 289,
+      "floor": "First",
+      "number": "FF-142",
+      "area": 34,
+      "cachedMonthlyRate": 3000,
+      "monthlyRate": 3000
+    },
+    {
+      "row": 290,
+      "floor": "First",
+      "number": "FF-143",
+      "area": 35,
+      "cachedMonthlyRate": 3250,
+      "monthlyRate": 3250
+    },
+    {
+      "row": 291,
+      "floor": "First",
+      "number": "FF-144",
+      "area": 16,
+      "cachedMonthlyRate": 1850,
+      "monthlyRate": 1850
+    },
+    {
+      "row": 292,
+      "floor": "First",
+      "number": "FF-145",
+      "area": 3,
+      "cachedMonthlyRate": 750,
+      "monthlyRate": 750
+    },
+    {
+      "row": 293,
+      "floor": "First",
+      "number": "FF-146",
+      "area": 4,
+      "cachedMonthlyRate": 850,
+      "monthlyRate": 850
+    },
+    {
+      "row": 294,
+      "floor": "First",
+      "number": "FF-147",
+      "area": 6,
+      "cachedMonthlyRate": 1200,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 295,
+      "floor": "First",
+      "number": "FF-148",
+      "area": 3,
+      "cachedMonthlyRate": 750,
+      "monthlyRate": 750
+    },
+    {
+      "row": 296,
+      "floor": "First",
+      "number": "FF-149",
+      "area": 4,
+      "cachedMonthlyRate": 850,
+      "monthlyRate": 850
+    },
+    {
+      "row": 297,
+      "floor": "First",
+      "number": "FF-150",
+      "area": 6,
+      "cachedMonthlyRate": 1200,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 298,
+      "floor": "First",
+      "number": "FF-151",
+      "area": 16,
+      "cachedMonthlyRate": 1850,
+      "monthlyRate": 1850
+    },
+    {
+      "row": 299,
+      "floor": "First",
+      "number": "FF-152",
+      "area": 12,
+      "cachedMonthlyRate": 1650,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 300,
+      "floor": "First",
+      "number": "FF-153",
+      "area": 13,
+      "cachedMonthlyRate": 1750,
+      "monthlyRate": 1750
+    },
+    {
+      "row": 301,
+      "floor": "First",
+      "number": "FF-154",
+      "area": 5,
+      "cachedMonthlyRate": 1000,
+      "monthlyRate": 1000
+    },
+    {
+      "row": 302,
+      "floor": "First",
+      "number": "FF-155",
+      "area": 6,
+      "cachedMonthlyRate": 1200,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 303,
+      "floor": "First",
+      "number": "FF-156",
+      "area": 3,
+      "cachedMonthlyRate": 750,
+      "monthlyRate": 750
+    },
+    {
+      "row": 304,
+      "floor": "First",
+      "number": "FF-157",
+      "area": 4,
+      "cachedMonthlyRate": 850,
+      "monthlyRate": 850
+    },
+    {
+      "row": 305,
+      "floor": "First",
+      "number": "FF-158",
+      "area": 3,
+      "cachedMonthlyRate": 750,
+      "monthlyRate": 750
+    },
+    {
+      "row": 306,
+      "floor": "First",
+      "number": "FF-159",
+      "area": 4,
+      "cachedMonthlyRate": 850,
+      "monthlyRate": 850
+    },
+    {
+      "row": 307,
+      "floor": "First",
+      "number": "FF-160",
+      "area": 8,
+      "cachedMonthlyRate": 1450,
+      "monthlyRate": 1450
+    },
+    {
+      "row": 308,
+      "floor": "First",
+      "number": "FF-161",
+      "area": 3,
+      "cachedMonthlyRate": 750,
+      "monthlyRate": 750
+    },
+    {
+      "row": 309,
+      "floor": "First",
+      "number": "FF-162",
+      "area": 4,
+      "cachedMonthlyRate": 850,
+      "monthlyRate": 850
+    },
+    {
+      "row": 310,
+      "floor": "First",
+      "number": "FF-163",
+      "area": 3,
+      "cachedMonthlyRate": 750,
+      "monthlyRate": 750
+    },
+    {
+      "row": 311,
+      "floor": "First",
+      "number": "FF-164",
+      "area": 4,
+      "cachedMonthlyRate": 850,
+      "monthlyRate": 850
+    },
+    {
+      "row": 312,
+      "floor": "First",
+      "number": "FF-165",
+      "area": 6,
+      "cachedMonthlyRate": 1200,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 313,
+      "floor": "First",
+      "number": "FF-166",
+      "area": 5,
+      "cachedMonthlyRate": 1000,
+      "monthlyRate": 1000
+    },
+    {
+      "row": 314,
+      "floor": "First",
+      "number": "FF-167",
+      "area": 4,
+      "cachedMonthlyRate": 850,
+      "monthlyRate": 850
+    },
+    {
+      "row": 315,
+      "floor": "First",
+      "number": "FF-168",
+      "area": 4,
+      "cachedMonthlyRate": 850,
+      "monthlyRate": 850
+    },
+    {
+      "row": 316,
+      "floor": "First",
+      "number": "FF-169",
+      "area": 19,
+      "cachedMonthlyRate": 2000,
+      "monthlyRate": 2000
+    },
+    {
+      "row": 317,
+      "floor": "First",
+      "number": "FF-170",
+      "area": 6,
+      "cachedMonthlyRate": 1200,
+      "monthlyRate": 1200
+    },
+    {
+      "row": 318,
+      "floor": "First",
+      "number": "FF-171",
+      "area": 12,
+      "cachedMonthlyRate": 1650,
+      "monthlyRate": 1650
+    },
+    {
+      "row": 319,
+      "floor": "Second",
+      "number": "Bay 01",
+      "area": 343,
+      "cachedMonthlyRate": 17150,
+      "externalRateFormula": "=G319*[1]Assumptions!$C$28",
+      "monthlyRate": null
+    },
+    {
+      "row": 320,
+      "floor": "Second",
+      "number": "Bay 02",
+      "area": 295,
+      "cachedMonthlyRate": 14750,
+      "externalRateFormula": "=G320*[1]Assumptions!$C$28",
+      "monthlyRate": null
+    },
+    {
+      "row": 321,
+      "floor": "Second",
+      "number": "Bay 03",
+      "area": 235,
+      "cachedMonthlyRate": 11750,
+      "externalRateFormula": "=G321*[1]Assumptions!$C$28",
+      "monthlyRate": null
+    },
+    {
+      "row": 322,
+      "floor": "Second",
+      "number": "Bay 04",
+      "area": 240,
+      "cachedMonthlyRate": 12000,
+      "externalRateFormula": "=G322*[1]Assumptions!$C$28",
+      "monthlyRate": null
+    },
+    {
+      "row": 323,
+      "floor": "Second",
+      "number": "Bay 05",
+      "area": 230,
+      "cachedMonthlyRate": 11500,
+      "externalRateFormula": "=G323*[1]Assumptions!$C$28",
+      "monthlyRate": null
+    },
+    {
+      "row": 324,
+      "floor": "Second",
+      "number": "Bay 06",
+      "area": 185,
+      "cachedMonthlyRate": 9250,
+      "externalRateFormula": "=G324*[1]Assumptions!$C$28",
+      "monthlyRate": null
+    },
+    {
+      "row": 325,
+      "floor": "Second",
+      "number": "Bay 07",
+      "area": 280,
+      "cachedMonthlyRate": 14000,
+      "externalRateFormula": "=G325*[1]Assumptions!$C$28",
+      "monthlyRate": null
+    },
+    {
+      "row": 326,
+      "floor": "Second",
+      "number": "Bay 08",
+      "area": 131,
+      "cachedMonthlyRate": 6550,
+      "externalRateFormula": "=G326*[1]Assumptions!$C$28",
+      "monthlyRate": null
+    },
+    {
+      "row": 327,
+      "floor": "Second",
+      "number": "Bay 09",
+      "area": 183,
+      "cachedMonthlyRate": 9150,
+      "externalRateFormula": "=G327*[1]Assumptions!$C$28",
+      "monthlyRate": null
+    }
+  ],
+  "secondFloorNote": "Cached values retained as evidence only; external Assumptions C28 is unavailable. No inferred literal rate."
+}
