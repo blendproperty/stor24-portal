@@ -47,11 +47,34 @@ test("isolated PostgreSQL reporting persistence, claims, expiry and history scop
       const result=await runScheduledReports(now);assert.equal(result.failed,1);
       const failed=await db.reportRun.findFirstOrThrow({where:{scheduleId:schedule.id,status:"FAILED"}});assert.equal(failed.encryptedResult,null);assert.equal(failed.failureCode,"FORBIDDEN");
     });
-    await t.test("all eighteen adapters execute real scoped PostgreSQL queries",async()=>{
+    await t.test("all native adapters execute real scoped PostgreSQL queries",async()=>{
       for(const dataset of visualReportDatasets.filter(d=>!d.importOnly)){
         const scope={organisationId:org.id,userId:user.id,unrestrictedFacilities:true,facilityIds:[]};
-        const rows=await visualReportSource(scope,defaultVisualQuery(dataset.key,"2026-10-01","2026-10-31"));
+        const rows=await visualReportSource(scope,defaultVisualQuery(dataset.key,"2026-10-01",dataset.key==="unpaid-native"?"2026-10-01":"2026-10-31"));
         if(dataset.key==="audit"){assert.equal(rows.length,5);assert.ok(rows.every(row=>row.actor==="Synthetic employee"&&row.facility==="Reporting fixture store"));}else assert.deepEqual(rows,[],dataset.key);
+      }
+    });
+    await t.test("native unpaid charges retain approved allocations, receipt quarantine and selected facility isolation",async()=>{
+      const customer=await db.customer.create({data:{organisationId:org.id,firstName:"Synthetic allocation"}});
+      try {
+        const account=await db.account.create({data:{customerId:customer.id,accountNumber:randomUUID(),balance:100,currency:"ZAR"}});
+        await db.tenancy.create({data:{facilityId:facility.id,customerId:customer.id,accountId:account.id,status:"ACTIVE",startDate:new Date("2026-10-01")}});
+        await db.ledgerEntry.create({data:{accountId:account.id,type:"CHARGE",amount:100,description:"Synthetic rent",effectiveAt:new Date("2026-10-01")}});
+        await db.collectionCase.create({data:{accountId:account.id,terms:{dueDays:0,allocation:"OLDEST_DUE_FIRST",approvalReference:"Synthetic approval"}}});
+        const scope={organisationId:org.id,userId:user.id,unrestrictedFacilities:true,facilityIds:[]};
+        const query={...defaultVisualQuery("unpaid-native","2026-10-01","2026-10-01"),facilityId:facility.id};
+        const rows=await visualReportSource(scope,query);assert.equal(rows.length,1);assert.equal(rows[0].amount,"100.00");assert.equal(rows[0].currency,"ZAR");assert.equal(rows[0].review,null);
+        assert.deepEqual(await visualReportSource(scope,{...query,facilityId:other.id}),[]);
+        await db.ledgerEntry.create({data:{accountId:account.id,type:"PAYMENT",amount:25,description:"Synthetic unverified receipt",effectiveAt:new Date("2026-10-01"),externalRef:randomUUID()}});
+        await db.account.update({where:{id:account.id},data:{balance:75}});
+        const quarantined=await visualReportSource(scope,query);assert.equal(quarantined[0].amount,null);assert.equal(quarantined[0].currency,null);assert.match(String(quarantined[0].review),/unverified receipt/);
+        await assert.rejects(()=>visualReportSource(scope,{...query,groupBy:["currency"],metrics:[{field:"amount",operation:"sum"}]}),/REPORT_FINANCE_REVIEW_REQUIRED/);
+      } finally {
+        await db.ledgerEntry.deleteMany({where:{account:{customerId:customer.id}}});
+        await db.collectionCase.deleteMany({where:{account:{customerId:customer.id}}});
+        await db.tenancy.deleteMany({where:{customerId:customer.id}});
+        await db.account.deleteMany({where:{customerId:customer.id}});
+        await db.customer.delete({where:{id:customer.id}});
       }
     });
     await t.test("encrypted historical rows remain separate and cannot cross a facility scope",async()=>{
