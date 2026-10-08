@@ -21,4 +21,4 @@ jobs:
           test -n "$REPORT_CRON_KEY"
           curl --fail --silent --show-error --max-time 150 --connect-timeout 10 \
             --request POST --header "x-cron-key: $REPORT_CRON_KEY" \
-            'https://stor24-site.srv938083.hstgr.cloud/api/v1/reports/worker'
+            'https://portal.stor24.co.za/api/v1/reports/worker'
