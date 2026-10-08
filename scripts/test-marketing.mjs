@@ -105,6 +105,7 @@ const css = (
       "src/app/globals.css",
       "src/styles/stor24-brand.css",
       "src/styles/staff-workspace.css",
+      "src/styles/workspace-insights.css",
       "src/styles/marketing.css",
     ].map((p) => readFile(p, "utf8")),
   )
@@ -147,6 +148,7 @@ const server = createServer(async (req, res) => {
     res.statusCode = input.token.includes("fail") ? 503 : 200;
     return res.end(JSON.stringify(res.statusCode === 503 ? {error:{message:"Synthetic provider unavailable"}} : {data:{configured:true}}));
   }
+  if (req.url.startsWith("/api/v1/marketing/search")) { res.setHeader("content-type","application/json");return res.end(JSON.stringify({data:{status:"unconfigured",message:"Fixture Search Console reporting connection not configured",totals:null,pages:[],retrievedAt:null}})); }
   if (req.url.startsWith("/api/v1/marketing/advertising")) {
     res.setHeader("content-type", "application/json");
     if (advertisingFailures > 0) {
