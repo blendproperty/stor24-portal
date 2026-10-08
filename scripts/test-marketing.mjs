@@ -105,6 +105,7 @@ const css = (
       "src/app/globals.css",
       "src/styles/stor24-brand.css",
       "src/styles/staff-workspace.css",
+      "src/styles/workspace-insights.css",
       "src/styles/marketing.css",
     ].map((p) => readFile(p, "utf8")),
   )
@@ -147,6 +148,7 @@ const server = createServer(async (req, res) => {
     res.statusCode = input.token.includes("fail") ? 503 : 200;
     return res.end(JSON.stringify(res.statusCode === 503 ? {error:{message:"Synthetic provider unavailable"}} : {data:{configured:true}}));
   }
+  if (req.url.startsWith("/api/v1/marketing/search")) { res.setHeader("content-type","application/json");return res.end(JSON.stringify({data:{status:"unconfigured",message:"Fixture Search Console reporting connection not configured",totals:null,pages:[],retrievedAt:null}})); }
   if (req.url.startsWith("/api/v1/marketing/advertising")) {
     res.setHeader("content-type", "application/json");
     if (advertisingFailures > 0) {
@@ -191,7 +193,7 @@ const server = createServer(async (req, res) => {
   }
   res.setHeader("content-type", "text/html");
   res.end(
-    '<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/fixture.css"></head><body><div id="root"></div><script type="module" src="/fixture.js"></script></body></html>',
+    '<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/fixture.css"></head><body><div id="root"></div><script type="module" src="/fixture.js"></script></body></html>',
   );
 });
 await new Promise((r) => server.listen(0, "127.0.0.1", r));

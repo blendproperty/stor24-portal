@@ -5,6 +5,7 @@ import { MarketingCommandCentre } from "./marketing-command-centre";
 import { MarketingOutcomes } from "./marketing-outcomes";
 import { MarketingDialog } from "./marketing-dialog";
 import {MarketingAdvertising} from "./marketing-advertising";
+import { MarketingSearchConsole } from "./marketing-search-console";
 import { MarketingTrafficChart } from "./marketing-traffic";
 import {
   BarChart3,
@@ -529,7 +530,7 @@ export function MarketingDashboard({ canManage }: { canManage: boolean }) {
           )}
           {tab === "overview" && (
             <>
-              <MarketingTrafficChart key={`${from}-${to}-${reportVersion}`} from={from} to={to} />
+              <div className="marketing-provider-grid"><MarketingTrafficChart key={`${from}-${to}-${reportVersion}`} from={from} to={to} /><MarketingSearchConsole key={`search-${from}-${to}-${reportVersion}`} from={from} to={to}/></div>
               <MarketingAdvertising key={`ads-${from}-${to}-${reportVersion}`} from={from} to={to} />
               <MarketingOutcomes report={report} />
               <div className="marketing-chart-grid">
