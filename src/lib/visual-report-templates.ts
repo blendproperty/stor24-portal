@@ -6,6 +6,8 @@ const equal=(field:string,value:string):VisualReportQuery["filters"][number]=>({
 const template=(key:string,name:string,group:string,dataset:string,options:Partial<VisualReportTemplate>={}):VisualReportTemplate=>({key,name,group,dataset,...options});
 const ledger=(key:string,name:string,type?:string)=>template(key,name,"Finance","ledger",{dateField:"date",...(type?{filters:[equal("type",type)]}:{})});
 export const visualReportTemplates:VisualReportTemplate[]=[
+  template("unpaid-native", "Unpaid charges under approved STOR24 terms", "Finance", "unpaid-native", {columns:["facility","account","customer","charge","due","amount","currency","review","hold"]}),
+  template("native-sign-ins", "STOR24 sign-in event counts", "Management", "audit", {dateField:"date",filters:[{field:"action",operator:"contains",value:"user.login."}],groupBy:["actor","action"],metrics:[{field:"*",operation:"count"}]}),
   template("directory","Tenant directory","Tenants","tenants",{columns:["facility","account","customer","email","phone","units","status"]}),
   template("lease-roll","Detailed rent roll","Tenants","tenants"),
   template("vacated","Vacated leases","Tenants","tenants",{dateField:"end"}),

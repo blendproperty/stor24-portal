@@ -1,6 +1,8 @@
 import { authErrorResponse } from "./auth-guards";
 import { dlpPrivateHeaders } from "./dlp-policy";
 const errors:Record<string,[number,string]>={
+  REPORT_ASOF_FUTURE:[422,"Unpaid charges require an end date no later than today in South Africa."],
+  REPORT_FINANCE_REVIEW_REQUIRED:[422,"Some scoped accounts need receipt, allocation or ledger reconciliation. Preview the review rows before totaling unpaid charges."],
   REPORT_HISTORY_REQUIRED:[422,"Select an approved history extract for this report, or import its source CSV in SiteLink history."],
   REPORT_HISTORY_REQUIRED_FIELDS:[422,"Map and populate every required source field for this report. Missing required values cannot produce a valid report."],
   REPORT_REQUEST_LIMIT:[413,"The report request is too large."],
