@@ -1,6 +1,8 @@
 import { authErrorResponse } from "./auth-guards";
 import { dlpPrivateHeaders } from "./dlp-policy";
 const errors:Record<string,[number,string]>={
+  REPORT_HISTORY_REQUIRED:[422,"Select an approved history extract for this report, or import its source CSV in SiteLink history."],
+  REPORT_HISTORY_REQUIRED_FIELDS:[422,"Map and populate every required source field for this report. Missing required values cannot produce a valid report."],
   REPORT_REQUEST_LIMIT:[413,"The report request is too large."],
   REPORT_CSV_INVALID:[422,"The CSV must have unique column headers, valid quoting and consistent row lengths."],
   REPORT_HISTORY_MAPPING:[422,"Map Source record ID and each selected field to a source CSV column."],

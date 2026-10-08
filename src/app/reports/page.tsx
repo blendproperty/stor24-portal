@@ -11,8 +11,8 @@ import { currentRoleAccess } from '@/lib/current-role-access';
 
 export const metadata = { title: "Reports" };
 
-export default async function ReportsPage({searchParams}:{searchParams?:Promise<{reportKey?:string}>} = {}) {
-  const requestedReport=(await searchParams)?.reportKey;
+export default async function ReportsPage(props:{searchParams?:Promise<{reportKey?:string}>}) {
+  const requestedReport=(await props?.searchParams)?.reportKey;
   const session = await requireSession();
   const permissions = session.permissions;
   const scope = await requireScope();

@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { historicalReportDatasets } from "./historical-report-datasets";
 
 export type ReportField = { key: string; label: string; type: "text" | "number" | "money" | "date" | "boolean"; personal?: boolean };
-export type ReportDataset = { key: string; name: string; group: string; permission: string; extraPermission?: string; basis: string; grain: string; fields: ReportField[] };
+export type ReportDataset = { key: string; name: string; group: string; permission: string; extraPermission?: string; importOnly?: boolean; requiredFields?: string[]; basis: string; grain: string; fields: ReportField[] };
 const text = (key: string, label: string, personal = false): ReportField => ({ key, label, type: "text", ...(personal ? { personal } : {}) });
 const money = (key: string, label: string): ReportField => ({ key, label, type: "money" });
 const number = (key: string, label: string): ReportField => ({ key, label, type: "number" });
@@ -30,6 +31,8 @@ export const visualReportDatasets: ReportDataset[] = [
   { key: "adjustments", name: "Credits, refunds & write-offs", group: "Finance", permission: "reports.financial", extraPermission: "adjustments.view", basis: "Recorded adjustment requests and their approvals/postings. A request is not a paid refund; payout date/reference must be recorded.", grain: "One adjustment.", fields: [facility, account, customer, text("kind", "Adjustment kind"), text("status", "Status"), money("amount", "Amount"), money("tax", "Tax"), text("currency", "Currency"), text("reason", "Reason"), date("date", "Requested"), date("posted", "Posted"), date("payout", "Recorded payout date")] },
   { key: "marketing", name: "Marketing activity & spend", group: "Marketing", permission: "reports.sales", extraPermission: "leads.view", basis: "Recorded campaign activity, spend, clicks and impressions; not verified ad-platform billing or bank settlement.", grain: "One campaign activity; campaign lifetime budgets are excluded to prevent duplication.", fields: [facility, text("campaign", "Campaign"), text("source", "Source"), text("medium", "Medium"), text("kind", "Activity type"), text("title", "Activity"), date("date", "Occurred"), money("spend", "Recorded spend"), number("clicks", "Clicks"), number("impressions", "Impressions")] },
 ];
+
+visualReportDatasets.push(...historicalReportDatasets);
 
 // All monetary datasets expose their currency so totals cannot combine unlike amounts.
 for (const dataset of visualReportDatasets) {

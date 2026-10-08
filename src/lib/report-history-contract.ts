@@ -26,6 +26,7 @@ export function prepareReportHistory(input:HistoryImportInput,facilityName:strin
   const allowed=new Set([...dataset.fields.map(f=>f.key),"sourceRecordId"]);
   if(Object.entries(input.mapping).some(([key,header])=>!allowed.has(key)||!headers.includes(header)))throw new Error("REPORT_HISTORY_MAPPING");
   if(dataset.fields.some(f=>f.type==="money")&&!input.mapping.currency)throw new Error("REPORT_HISTORY_CURRENCY");
+  if(dataset.requiredFields?.some(key=>!input.mapping[key]))throw new Error("REPORT_HISTORY_REQUIRED_FIELDS");
   const seen=new Set<string>();const rows:VisualReportRow[]=parsed.slice(1).map(cells=>{
     if(cells.length!==headers.length)throw new Error("REPORT_CSV_INVALID");
     const source=Object.fromEntries(headers.map((h,i)=>[h,cells[i].trim()]));const sourceRecordId=source[input.mapping.sourceRecordId];
@@ -41,6 +42,7 @@ export function prepareReportHistory(input:HistoryImportInput,facilityName:strin
       else if(field.type==="boolean"){if(!["true","false","yes","no","1","0"].includes(value.toLowerCase()))throw new Error("REPORT_HISTORY_FIELD");row[field.key]=["true","yes","1"].includes(value.toLowerCase());}
       else {if(field.key==="currency"&&!/^[A-Z]{3}$/.test(value))throw new Error("REPORT_HISTORY_CURRENCY");row[field.key]=value;}
     }
+    if(dataset.requiredFields?.some(key=>row[key]===null))throw new Error("REPORT_HISTORY_REQUIRED_FIELDS");
     if(dataset.fields.some(f=>f.type==="money")&&typeof row.currency!=="string")throw new Error("REPORT_HISTORY_CURRENCY");
     return row;
   });

@@ -4,7 +4,7 @@ import { unitIsOperational } from "@/lib/floor-availability";
 import { effectiveUseTypes } from "@/lib/product-line";
 import { isTestPayment } from "@/lib/payments/payment-evidence";
 import { REPORT_SOURCE_LIMIT, ReportError } from "@/lib/visual-report-engine";
-import type { VisualReportQuery, VisualReportRow } from "@/lib/visual-report-contract";
+import { visualReportDatasets, type VisualReportQuery, type VisualReportRow } from "@/lib/visual-report-contract";
 import { decryptReportArtifact } from "@/lib/visual-report-security";
 import { z } from "zod";
 
@@ -69,6 +69,7 @@ export async function visualReportSource(scope:RequestScope, query:VisualReportQ
     await requireFacility(scope,imported.facilityId);
     return z.array(z.record(z.string(),z.union([z.string(),z.number().finite(),z.boolean(),z.null()]))).max(REPORT_SOURCE_LIMIT).parse(JSON.parse(decryptReportArtifact(imported.encryptedRows,`${scope.organisationId}:history:${imported.id}`)));
   }
+  if(visualReportDatasets.find(d=>d.key===query.dataset)?.importOnly)throw new ReportError("REPORT_HISTORY_REQUIRED");
   const rows=await rawVisualReportSource(scope,query);
   const org=await db.organisation.findUniqueOrThrow({where:{id:scope.organisationId},select:{currency:true}});
   return rows.map(row=>({...row,currency:row.currency??org.currency}));

@@ -1,7 +1,7 @@
 import { defaultVisualQuery } from "./visual-report-engine";
-import { visualReportSchema, type VisualReportQuery } from "./visual-report-contract";
+import { visualReportSchema, type VisualReportQuery, visualReportDatasets } from "./visual-report-contract";
 
-export type VisualReportTemplate = { key: string; name: string; group: string; dataset?: string; dateField?: string; intervalMode?:VisualReportQuery["intervalMode"]; columns?: string[]; filters?: VisualReportQuery["filters"]; groupBy?: string[]; metrics?: VisualReportQuery["metrics"]; reason?: string; legacyKey?: string };
+export type VisualReportTemplate = { key: string; name: string; group: string; dataset?: string; dateField?: string; intervalMode?:VisualReportQuery["intervalMode"]; columns?: string[]; filters?: VisualReportQuery["filters"]; groupBy?: string[]; metrics?: VisualReportQuery["metrics"]; reason?: string; nativeGap?: string; legacyKey?: string };
 const equal=(field:string,value:string):VisualReportQuery["filters"][number]=>({field,operator:"eq",value});
 const template=(key:string,name:string,group:string,dataset:string,options:Partial<VisualReportTemplate>={}):VisualReportTemplate=>({key,name,group,dataset,...options});
 const ledger=(key:string,name:string,type?:string)=>template(key,name,"Finance","ledger",{dateField:"date",...(type?{filters:[equal("type",type)]}:{})});
@@ -94,7 +94,7 @@ export const visualReportTemplates:VisualReportTemplate[]=[
     ["gate-passages","Gate passage history","Management","Provider-confirmed gate passage events are required; access decisions are available separately."],
     ["tenant-notes-history","Complete tenant notes history","Tenants","Requires immutable note revisions; current customer note text is not historical evidence."],
     ["batch-letters","Start-of-day letters","Management","Requires approved letter templates, recipient/consent rules and a reviewed communications workflow."],
-  ].map(([key,name,group,reason])=>({key,name,group,reason})),
+  ].map(([key,name,group,reason])=>{const imported=visualReportDatasets.find(d=>d.key===`history-${key}`);return imported?{key,name,group,dataset:imported.key,dateField:"date",nativeGap:reason}:{key,name,group,reason};}),
 ];
 export function queryFromTemplate(template:VisualReportTemplate,from:string,to:string):VisualReportQuery {
   if(!template.dataset)throw new Error("REPORT_TEMPLATE_UNAVAILABLE");
