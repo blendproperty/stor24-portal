@@ -51,3 +51,5 @@
 
 .package-table tr[data-unavailable=true],.data-table tr[data-unavailable=true] { background:#f0f2f3; color:#7d8990; }
 .data-table tr[data-unavailable=true] .package-list-art { filter:grayscale(1); opacity:.55; }
+
+.app-shell .leads-filters .leads-search input { padding-left:40px; }
