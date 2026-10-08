@@ -46,7 +46,7 @@ const bundle=await build({entryPoints:['tests/browser/screen-design-fixture.jsx'
  b.onResolve({filter:/^@\/lib\/(dashboard-service|scope|db|auth-guards|calendar-service|finance\/collection-total|integrations\/whatsapp-automation|integrations\/hikcentral-configuration)$/},a=>({path:a.path,namespace:'services'}));
  b.onLoad({filter:/.*/,namespace:'services'},()=>({contents:mock,loader:'js'}));
 }}]});
-const css=(await Promise.all(['src/app/globals.css','src/styles/stor24-brand.css','src/styles/guided-help.css','src/styles/staff-workspace.css'].map(p=>readFile(p,'utf8')))).join('\n').replace('@import "tailwindcss";','');
+const css=(await Promise.all(['src/app/globals.css','src/styles/stor24-brand.css','src/styles/guided-help.css','src/styles/staff-workspace.css','src/styles/workspace-insights.css'].map(p=>readFile(p,'utf8')))).join('\n').replace('@import "tailwindcss";','');
 const writes=[];
 const server=createServer(async(req,res)=>{
  if(req.method!=='GET'){writes.push(req.url);res.writeHead(405);return res.end();}
@@ -54,6 +54,7 @@ const server=createServer(async(req,res)=>{
  if(req.url==='/fixture.css'){res.setHeader('content-type','text/css');return res.end(css+'\n'+(bundle.outputFiles.find(x=>x.path.endsWith('.css'))?.text??''))}
  if(req.url==='/brand/stor24-logo-white.svg'){res.setHeader('content-type','image/svg+xml');return res.end(await readFile('public/brand/stor24-logo-white.svg'))}
  if(req.url==='/brand/Satoshi-Variable.ttf'){res.setHeader('content-type','font/ttf');return res.end(await readFile('public/brand/Satoshi-Variable.ttf'))}
+ if(req.url==='/api/v1/reports/builder'){res.setHeader('content-type','application/json');return res.end(JSON.stringify({data:{datasets:[{key:'units',name:'Units & prices',group:'Units',grain:'One unit',basis:'Synthetic inventory fixture',fields:[{key:'facility',label:'Store',type:'text'},{key:'unit',label:'Unit',type:'text'}]}],templates:[{key:'price-list',name:'Price list',group:'Units',dataset:'units'},{key:'ageing',name:'Aged receivables',group:'Finance',legacyKey:'receivables-ageing'}],saved:[],schedules:[],runs:[],history:[]}}))}
  if(req.url.startsWith('/api/')){res.setHeader('content-type','application/json');return res.end(JSON.stringify({data:[]}))}
  res.setHeader('content-type','text/html');res.end('<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/fixture.css"><style>@font-face{font-family:Satoshi;src:url(/brand/Satoshi-Variable.ttf);font-weight:300 900}body{--font-satoshi:Satoshi}</style></head><body><div id="root"></div><script type="module" src="/fixture.js"></script></body></html>');
 });
@@ -70,7 +71,7 @@ if(process.env.PREVIEW_ONLY){console.log('Design preview: '+base)}else{
     if(route==='/billing'){await expect(page.getByRole('heading',{name:'Bill & collect'})).toBeVisible();assert.equal(await page.locator('.finance-workstream .module-card').count(),10)}
     if(route==='/'){await expect(page.getByRole('img',{name:/Physical occupancy 64.0 percent/})).toBeVisible();assert.equal(await page.locator('.daily-workflow').count(),4);await expect(page.getByRole('region',{name:'Operations reminders'})).toBeVisible();assert.equal(await page.getByRole('region',{name:'Operations reminders'}).getByRole('link').count(),5)}
     if(route==='/graphs'){await expect(page.getByRole('img',{name:/Nov: 45%/})).toBeVisible();assert.equal(await page.locator('.daily-leads-chart small').count(),7)}
-    if(route==='/reports'){await page.getByRole('button',{name:'Select Receivables ageing',exact:true}).click();await expect(page.getByLabel('Report',{exact:true})).toHaveValue('receivables-ageing');await expect(page.getByLabel('As of (SAST)')).toBeVisible()}
+    if(route==='/reports'){await expect(page.getByRole('heading',{name:'Report library',exact:true})).toBeVisible();await expect(page.getByRole('region',{name:'Units reports',exact:true})).toBeVisible();const ageing=page.getByRole('region',{name:'Finance reports',exact:true}).getByRole('link',{name:'View online and download',exact:true});await expect(ageing).toHaveAttribute('href','/reports?reportKey=receivables-ageing');await ageing.click();await page.getByRole('button',{name:'Select Receivables ageing',exact:true}).click();await expect(page.getByLabel('Report',{exact:true})).toHaveValue('receivables-ageing');await expect(page.getByLabel('As of (SAST)')).toBeVisible()}
     await page.screenshot({path:'output/screen-redesign/design/'+(route==='/'?'home':route.slice(1))+'-'+width+'.png',fullPage:true});
    }
   }
