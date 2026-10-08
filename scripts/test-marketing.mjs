@@ -105,8 +105,8 @@ const css = (
       "src/app/globals.css",
       "src/styles/stor24-brand.css",
       "src/styles/staff-workspace.css",
-      "src/styles/workspace-insights.css",
       "src/styles/marketing.css",
+      "src/styles/workspace-insights.css",
     ].map((p) => readFile(p, "utf8")),
   )
 )
@@ -114,6 +114,9 @@ const css = (
   .replace('@import "tailwindcss";', "");
 const requests = [];
 let advertisingFailures = 0;
+const abcRequests=[];
+const report=rows=>({status:"connected",rows,limited:false,caveats:[]});
+const abcFixture={status:"connected",retrievedAt:new Date().toISOString(),comparisonPeriod:{from:"2026-08-10",to:"2026-09-08"},previous:report([{dimensions:[],metrics:[10,8,24,5,.5,60,500]}]),daily:report([{dimensions:["20261001"],metrics:[10,6]},{dimensions:["20261002"],metrics:[10,6]}]),totals:report([{dimensions:[],metrics:[20,15,50,12,.6,90,1000]}]),acquisition:report([{dimensions:["Organic Search","google / organic","(organic)"],metrics:[20,12,.6,2]}]),pages:report([{dimensions:["/"],metrics:[50,15,1000]}]),events:report([{dimensions:["booking_started"],metrics:[20,15]},{dimensions:["feedback_price"],metrics:[2,2]}]),devices:report([{dimensions:["mobile"],metrics:[20,.6,90]}]),conversionPages:report([{dimensions:["/book","reservation_requested"],metrics:[4,4]}]),clicks:report([{dimensions:["/","public_link_click","Navigate","https://stor24.co.za/contact"],metrics:[7,5]}]),funnels:{booking:{status:"connected",caveats:[],steps:["Unit finder opened","Units & prices viewed","Unit selected","Customer details opened","Reservation saved"].map((name,i)=>({name,users:[20,12,8,6,4][i],abandoned:[8,4,2,2,0][i],abandonmentRate:[.4,1/3,.25,1/3,0][i]}))},enquiry:{status:"unavailable",steps:[],caveats:[]}}};
 const server = createServer(async (req, res) => {
   if (req.url === "/brand/Satoshi-Variable.ttf") {
     res.setHeader("content-type", "font/ttf");
@@ -148,6 +151,7 @@ const server = createServer(async (req, res) => {
     res.statusCode = input.token.includes("fail") ? 503 : 200;
     return res.end(JSON.stringify(res.statusCode === 503 ? {error:{message:"Synthetic provider unavailable"}} : {data:{configured:true}}));
   }
+  if (req.url.startsWith("/api/v1/marketing/abc")) {abcRequests.push(req.url);res.setHeader("content-type","application/json");return res.end(JSON.stringify({data:abcFixture}));}
   if (req.url.startsWith("/api/v1/marketing/search")) { res.setHeader("content-type","application/json");return res.end(JSON.stringify({data:{status:"unconfigured",message:"Fixture Search Console reporting connection not configured",totals:null,pages:[],retrievedAt:null}})); }
   if (req.url.startsWith("/api/v1/marketing/advertising")) {
     res.setHeader("content-type", "application/json");
@@ -233,9 +237,21 @@ if (process.env.PREVIEW_ONLY) {
         await expect(page.getByRole("alert")).toContainText("Advertising could not load");
         await page.getByRole("button", {name:"Refresh marketing",exact:true}).click();
       }
-      await expect(page.getByRole("heading", {name:/Google Ads.*Connected/})).toBeVisible();
-      await expect(page.getByRole("heading", {name:/Meta Ads.*Connection needed/})).toBeVisible();
+      await expect(page.locator(".advertising-provider").filter({has:page.getByRole("heading",{name:"Google Ads",exact:true})})).toContainText("Connected");
+      await expect(page.locator(".advertising-provider").filter({has:page.getByRole("heading",{name:"Meta Ads",exact:true})})).toContainText("Connection needed");
       await expect(page.getByRole("button", {name:"Export Meta Ads"})).toBeDisabled();
+      const abc=page.locator(".marketing-abc");
+      await expect(abc).toContainText("Largest measured drop-off: Unit finder opened");
+      await expect(abc).toContainText("Funnel report unavailable");
+      await abc.getByLabel("Channel",{exact:true}).selectOption("Organic Search");
+      await expect(abc).toContainText("Google Analytics connected");
+      assert.match(abcRequests.at(-1),/channel=Organic\+Search/);
+      await abc.getByRole("button",{name:"Clear ABC filters"}).click();
+      await expect(abc.getByRole("button",{name:"Clear ABC filters"})).toBeDisabled();
+      for(const button of await page.locator(".advertising-provider .button").all()){
+        const box=await button.evaluate(e=>({height:e.getBoundingClientRect().height,padding:parseFloat(getComputedStyle(e).paddingLeft)}));assert.ok(box.height>=44&&box.padding>=16);
+      }
+      await page.screenshot({path:`output/marketing/abc-${width}.png`,fullPage:true});
       if (width === 1440) {
         const downloaded = page.waitForEvent("download");
         await page.getByRole("button", {name:"Export Google Ads"}).click();
@@ -250,6 +266,7 @@ if (process.env.PREVIEW_ONLY) {
       ).toContainText("12");
       for (const tab of [
         "overview",
+        "abc insights",
         "channels",
         "budgets",
         "placements",
