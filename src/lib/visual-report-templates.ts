@@ -94,7 +94,7 @@ export const visualReportTemplates:VisualReportTemplate[]=[
     ["gate-passages","Gate passage history","Management","Provider-confirmed gate passage events are required; access decisions are available separately."],
     ["tenant-notes-history","Complete tenant notes history","Tenants","Requires immutable note revisions; current customer note text is not historical evidence."],
     ["batch-letters","Start-of-day letters","Management","Requires approved letter templates, recipient/consent rules and a reviewed communications workflow."],
-  ].map(([key,name,group,reason])=>{const imported=visualReportDatasets.find(d=>d.key===`history-${key}`);return imported?{key,name,group,dataset:imported.key,dateField:"date",nativeGap:reason}:{key,name,group,reason};}),
+  ].map(([key,name,group,reason])=>{const imported=visualReportDatasets.find(d=>d.key===`history-${key}`);return imported?{key,name,group,dataset:imported.key,dateField:"date",...(key==="marketing-roll"?{filters:[{field:"consent",operator:"eq" as const,value:true}]}:{}),nativeGap:reason}:{key,name,group,reason};}),
 ];
 export function queryFromTemplate(template:VisualReportTemplate,from:string,to:string):VisualReportQuery {
   if(!template.dataset)throw new Error("REPORT_TEMPLATE_UNAVAILABLE");

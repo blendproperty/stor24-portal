@@ -102,3 +102,16 @@ test("report worker handler requires its dedicated key even without a staff sess
     (globalThis as Row).__reportFixture.authenticated=false;assert.equal((await call("synthetic-worker-key")).status,200);
   }finally{if(previous===undefined)delete process.env.REPORT_CRON_SECRET_SHA256;else process.env.REPORT_CRON_SECRET_SHA256=previous;}
 });
+
+
+test("specialized history requires an extract and runs approved journal lines without native posting",async()=>{
+  const f=await fixture();f.user.roleAssignments=[{facilityId:null,role:{name:"Organisation owner",permissions:["*"]}}];
+  const previous=process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY;process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY="synthetic-report-key-at-least-32-characters";
+  try{
+    const query=defaultVisualQuery("history-general-journal","2026-10-01","2026-10-31");
+    const missing=await f.api.builder.POST(request({kind:"preview",query}));assert.equal(missing.status,422);assert.equal((await missing.json()).error.code,"REPORT_HISTORY_REQUIRED");
+    const csv="id,date,code,debit,credit,basis,currency\nline1,2026-10-01,4000,12.34,0.00,CASH,ZAR";
+    const imported=await f.api.history.POST(request({kind:"import",dataset:query.dataset,facilityId:"a",name:"Synthetic journal",extractedAt:"2026-10-01T08:00:00+02:00",approvalReference:"Synthetic reconciliation",csv,mapping:{sourceRecordId:"id",date:"date",accountCode:"code",debit:"debit",credit:"credit",accountingBasis:"basis",currency:"currency"}}));assert.equal(imported.status,201);
+    const id=(await imported.json()).data.id;const result=await f.api.builder.POST(request({kind:"preview",query:{...query,historyImportId:id,facilityId:"a"}}));assert.equal(result.status,200);assert.equal((await result.json()).data[0].debit,"12.34");assert.equal(f.tables.reportHistoryImport.length,1);assert.equal(f.tables.unit.length,1);
+  }finally{if(previous===undefined)delete process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY;else process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY=previous;}
+});
