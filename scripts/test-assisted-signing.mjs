@@ -10,7 +10,7 @@ const context={accountId:'account /1',reservationId:'booking',leadId:'lead',comp
 const server=createServer(async(req,res)=>{
   if(req.url==='/app.js'){res.setHeader('content-type','text/javascript');return res.end(bundle.outputFiles[0].text);}
   if(req.url.startsWith('/api/')){res.setHeader('content-type','application/json');if(req.method==='POST'){prepared++;dispatch=false;return res.end(JSON.stringify({data:{prepared:true}}));}if(failed){res.statusCode=503;return res.end(JSON.stringify({error:{message:'Signing status unavailable'}}));}return res.end(JSON.stringify({data:{...context,completed:complete,dispatchRequired:dispatch,signers:complete||dispatch?[]:context.signers}}));}
-  res.setHeader('content-type','text/html');res.end(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}body{margin:0;padding:16px}main{max-width:1400px;margin:auto}</style></head><body><main><div id="root"></div></main><script type="module" src="/app.js"></script></body></html>`);
+  res.setHeader('content-type','text/html');res.end(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}body{margin:0;padding:16px}main{max-width:1400px;margin:auto}</style></head><body><main class="app-shell"><div id="root"></div></main><script type="module" src="/app.js"></script></body></html>`);
 });
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const browser=await chromium.launch();await mkdir('output/assisted-signing',{recursive:true});
@@ -22,6 +22,8 @@ try {
     await expect(page.getByRole('link',{name:'Open signing for Example customer'})).toBeVisible();
     await expect(page.getByRole('link',{name:'Open signing for Example customer'})).toHaveAttribute('rel','noopener noreferrer');
     await expect(page.getByRole('link',{name:'Review saved account'})).toHaveAttribute('href','/operations/accounts?accountId=account%20%2F1');
+    assert.ok(await page.locator(".lease-signing-panel").evaluate(e => parseFloat(getComputedStyle(e).paddingLeft) >= 20));
+    await page.screenshot({path:`output/assisted-signing/pending-${width}.png`,fullPage:true});
     failed=true;await page.getByRole('button',{name:'Refresh signing status'}).click();await expect(page.getByRole('alert')).toHaveText('Signing status unavailable');await expect(page.getByRole('link',{name:'Open signing for Example customer'})).toHaveCount(0);
     failed=false;dispatch=true;await page.getByRole('button',{name:'Refresh signing status'}).click();await expect(page.getByRole('button',{name:'Prepare signing for saved lease'})).toBeVisible();await page.getByRole('button',{name:'Prepare signing for saved lease'}).click();await expect(page.getByRole('link',{name:'Open signing for Example customer'})).toBeVisible();
     complete=true;await page.getByRole('button',{name:'Refresh signing status'}).click();await expect(page.getByRole('heading',{name:'Lease agreement signed'})).toBeVisible();await expect(page.getByRole('link',{name:'Continue to payment and account'})).toBeVisible();await expect(page.getByRole('link',{name:'Open signing for Example customer'})).toHaveCount(0);

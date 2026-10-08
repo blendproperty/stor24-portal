@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       return Response.json({
         error: {
           code: error.code,
-          message: error.code === "UNIT_UNAVAILABLE"
+          message: error.code === "WALK_IN_UNAVAILABLE" ? "This visit cannot start another booking. Ask staff to review the saved visit." : error.code === "UNIT_UNAVAILABLE"
             ? "That unit is no longer available. Please choose another unit."
             : error.code === "FACILITY_NOT_FOUND"
               ? "That store is not available for online booking."
@@ -47,6 +47,7 @@ export async function POST(request: Request) {
               : "This reservation request conflicts with an earlier request.",
         },
       }, { status: error.status });
+    if (error instanceof Error && error.message === "WALK_IN_UNAVAILABLE") return Response.json({ error: { code: "WALK_IN_UNAVAILABLE", message: "This visit has ended. Ask staff to start a new visit." } }, { status: 410 });
     if (error instanceof Error && error.message === "OTP_DELIVERY_FAILED") return Response.json({ error: { code: "VERIFICATION_DELIVERY_FAILED", message: "We could not send the verification code. Check the mobile number and try again." } }, { status: 502 });
     return Response.json({ error: { code: "INTERNAL_ERROR", message: "The reservation could not be completed." } }, { status: 500 });
   }
