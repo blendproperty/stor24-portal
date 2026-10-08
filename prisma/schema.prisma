@@ -216,6 +216,8 @@ model Organisation {
   integrations           IntegrationConnection[]
   reportSchedules        ReportSchedule[]
   reportRuns              ReportRun[]
+  savedReports            SavedReport[]
+  reportHistoryImports    ReportHistoryImport[]
   communicationTemplates CommunicationTemplate[]
   communications         CommunicationLog[]
   webhookInbox           WebhookInbox[]
@@ -261,6 +263,7 @@ model UserInvitation {
 }
 
 model Facility {
+  reportHistoryImports ReportHistoryImport[]
   marketingCampaigns MarketingCampaign[]
   id                    String                  @id @default(cuid())
   organisationId        String
@@ -1593,6 +1596,42 @@ model ReportSchedule {
   @@index([facilityId, reportKey])
 }
 
+model SavedReport {
+  id             String       @id @default(cuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  ownerId        String
+  name           String
+  definition     Json
+  visibility     String       @default("PRIVATE")
+  archived       Boolean      @default(false)
+  revision       Int          @default(1)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organisationId, ownerId, archived])
+  @@index([organisationId, visibility, archived])
+}
+
+model ReportHistoryImport {
+  id                String       @id
+  organisationId    String
+  organisation      Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  facilityId        String
+  facility          Facility     @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  dataset           String
+  name              String
+  extractedAt       DateTime
+  importedById      String
+  approvalReference String
+  sourceSha256      String
+  rowCount          Int
+  encryptedRows     String
+  createdAt         DateTime     @default(now())
+
+  @@index([organisationId, facilityId, dataset, createdAt])
+}
+
 model ReportRun {
   id             String          @id @default(cuid())
   organisationId String
@@ -1609,6 +1648,8 @@ model ReportRun {
   status         ReportRunStatus @default(QUEUED)
   rowCount       Int?
   storageKey     String?
+  encryptedResult String?
+  expiresAt      DateTime?
   failureCode    String?
   failureMessage String?
   startedAt      DateTime?
@@ -1617,6 +1658,7 @@ model ReportRun {
 
   @@index([organisationId, status, createdAt])
   @@index([scheduleId, createdAt])
+  @@index([expiresAt])
 }
 
 model CommunicationTemplate {

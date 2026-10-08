@@ -25,12 +25,28 @@ export const db={document:{findMany:async()=>[]},webhookInbox:{groupBy:async()=>
 export const getOperationsCalendar=async()=>Array.from({length:7},(_,i)=>({key:'2026-10-'+String(i+3).padStart(2,'0'),items:i%2===0?[{id:'task'+i,kind:'task',at:new Date('2026-10-03T10:00:00Z'),title:'Example follow-up',detail:'Training store',href:'/leads?lead=fixture'}]:[]}));
 `;
 const bundle=await build({entryPoints:['tests/browser/screen-design-fixture.jsx'],bundle:true,write:false,outdir:'output/screen-redesign/bundle',define:{'process.env':'{}'},format:'esm',jsx:'automatic',plugins:[{name:'design-fixture',setup(b){
+ // Resolve only the server data boundary; render the real shared panel in the
+ // browser fixture, without importing Prisma or pretending React client-side
+ // rendering can execute an async Server Component.
+ b.onResolve({filter:/^@\/components\/operations-reminders$/},a=>({path:a.path,namespace:'reminder-data'}));
+ b.onLoad({filter:/.*/,namespace:'reminder-data'},()=>({loader:'jsx',resolveDir:root,contents:`
+ import React from 'react';
+ import {OperationsRemindersPanel} from './src/components/operations-reminders-panel';
+ export function OperationsReminders(){
+ const rows=[
+ {label:'Reminders',description:'Open tasks due today or overdue',href:'/operations#operations-tasks',count:3},
+ {label:'Call past dues',description:'Due collection follow-ups',href:'/collections',count:1},
+ {label:'Reorder',description:'Available stock at threshold',href:'/operations/merchandise',count:5},
+ {label:'Move-out',description:'Notice-given tenancies due',href:'/operations/accounts',count:0},
+ {label:'Service required',description:'Open maintenance',href:'/operations#operations-maintenance',count:0}];
+ return <OperationsRemindersPanel items={location.search.includes('restricted')?rows.filter(r=>['Reminders','Service required'].includes(r.label)):rows} updatedAt={new Date('2026-10-08T05:00:00Z')}/>;
+ }` }));
  b.onResolve({filter:/^next\/(link|image|navigation)$/},a=>({path:a.path,namespace:'next-stub'}));
  b.onLoad({filter:/.*/,namespace:'next-stub'},a=>({loader:'jsx',resolveDir:root,contents:a.path==='next/navigation'?`export const usePathname=()=>location.pathname;export const useRouter=()=>({replace(h){location.href=h},refresh(){}});`:a.path==='next/image'?`import React from 'react';export default function Image({priority,fill,...props}){return <img {...props}/>}`:`import React from 'react';export default function Link(props){return <a {...props}/>}`}));
  b.onResolve({filter:/^@\/lib\/(dashboard-service|scope|db|auth-guards|calendar-service|finance\/collection-total|integrations\/whatsapp-automation|integrations\/hikcentral-configuration)$/},a=>({path:a.path,namespace:'services'}));
  b.onLoad({filter:/.*/,namespace:'services'},()=>({contents:mock,loader:'js'}));
 }}]});
-const css=(await Promise.all(['src/app/globals.css','src/styles/stor24-brand.css','src/styles/guided-help.css','src/styles/staff-workspace.css'].map(p=>readFile(p,'utf8')))).join('\n').replace('@import "tailwindcss";','');
+const css=(await Promise.all(['src/app/globals.css','src/styles/stor24-brand.css','src/styles/guided-help.css','src/styles/staff-workspace.css','src/styles/workspace-insights.css'].map(p=>readFile(p,'utf8')))).join('\n').replace('@import "tailwindcss";','');
 const writes=[];
 const server=createServer(async(req,res)=>{
  if(req.method!=='GET'){writes.push(req.url);res.writeHead(405);return res.end();}
@@ -38,6 +54,7 @@ const server=createServer(async(req,res)=>{
  if(req.url==='/fixture.css'){res.setHeader('content-type','text/css');return res.end(css+'\n'+(bundle.outputFiles.find(x=>x.path.endsWith('.css'))?.text??''))}
  if(req.url==='/brand/stor24-logo-white.svg'){res.setHeader('content-type','image/svg+xml');return res.end(await readFile('public/brand/stor24-logo-white.svg'))}
  if(req.url==='/brand/Satoshi-Variable.ttf'){res.setHeader('content-type','font/ttf');return res.end(await readFile('public/brand/Satoshi-Variable.ttf'))}
+ if(req.url==='/api/v1/reports/builder'){res.setHeader('content-type','application/json');return res.end(JSON.stringify({data:{datasets:[{key:'units',name:'Units & prices',group:'Units',grain:'One unit',basis:'Synthetic inventory fixture',fields:[{key:'facility',label:'Store',type:'text'},{key:'unit',label:'Unit',type:'text'}]}],templates:[{key:'price-list',name:'Price list',group:'Units',dataset:'units'},{key:'ageing',name:'Aged receivables',group:'Finance',legacyKey:'receivables-ageing'}],saved:[],schedules:[],runs:[],history:[]}}))}
  if(req.url.startsWith('/api/')){res.setHeader('content-type','application/json');return res.end(JSON.stringify({data:[]}))}
  res.setHeader('content-type','text/html');res.end('<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/fixture.css"><style>@font-face{font-family:Satoshi;src:url(/brand/Satoshi-Variable.ttf);font-weight:300 900}body{--font-satoshi:Satoshi}</style></head><body><div id="root"></div><script type="module" src="/fixture.js"></script></body></html>');
 });
@@ -52,9 +69,9 @@ if(process.env.PREVIEW_ONLY){console.log('Design preview: '+base)}else{
     await page.goto(base+route);await expect(page.getByRole('heading',{name:title,exact:true})).toBeVisible();
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,route+' overflow '+width);
     if(route==='/billing'){await expect(page.getByRole('heading',{name:'Bill & collect'})).toBeVisible();assert.equal(await page.locator('.finance-workstream .module-card').count(),10)}
-    if(route==='/'){await expect(page.getByRole('img',{name:/Physical occupancy 64.0 percent/})).toBeVisible();assert.equal(await page.locator('.daily-workflow').count(),4)}
+    if(route==='/'){await expect(page.getByRole('img',{name:/Physical occupancy 64.0 percent/})).toBeVisible();assert.equal(await page.locator('.daily-workflow').count(),4);await expect(page.getByRole('region',{name:'Operations reminders'})).toBeVisible();assert.equal(await page.getByRole('region',{name:'Operations reminders'}).getByRole('link').count(),5)}
     if(route==='/graphs'){await expect(page.getByRole('img',{name:/Nov: 45%/})).toBeVisible();assert.equal(await page.locator('.daily-leads-chart small').count(),7)}
-    if(route==='/reports'){await page.getByRole('button',{name:'Select Receivables ageing',exact:true}).click();await expect(page.getByLabel('Report',{exact:true})).toHaveValue('receivables-ageing');await expect(page.getByLabel('As of (SAST)')).toBeVisible()}
+    if(route==='/reports'){await expect(page.getByRole('heading',{name:'Report library',exact:true})).toBeVisible();await expect(page.getByRole('region',{name:'Units reports',exact:true})).toBeVisible();const ageing=page.getByRole('region',{name:'Finance reports',exact:true}).getByRole('link',{name:'View online and download',exact:true});await expect(ageing).toHaveAttribute('href','/reports?reportKey=receivables-ageing');await ageing.click();await page.getByRole('button',{name:'Select Receivables ageing',exact:true}).click();await expect(page.getByLabel('Report',{exact:true})).toHaveValue('receivables-ageing');await expect(page.getByLabel('As of (SAST)')).toBeVisible()}
     await page.screenshot({path:'output/screen-redesign/design/'+(route==='/'?'home':route.slice(1))+'-'+width+'.png',fullPage:true});
    }
   }
@@ -91,6 +108,8 @@ if(process.env.PREVIEW_ONLY){console.log('Design preview: '+base)}else{
   await expect(page.locator('.portfolio-signal[href="/collections"]')).toHaveCount(0);
   await expect(page.locator('.daily-workflow[href="/reports"]')).toHaveCount(0);
   await expect(page.locator('.portfolio-signal[href="/tenants"]')).toBeVisible();
+  assert.equal(await page.getByRole('region',{name:'Operations reminders'}).getByRole('link').count(),2);
+  await expect(page.getByRole('region',{name:'Operations reminders'}).getByRole('link',{name:/Call past dues|Reorder|Move-out/})).toHaveCount(0);
   assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);console.log('Seven actual pages pass design/real-value/layout checks at five widths; no writes.');
  }finally{await browser.close();server.close()}
 }

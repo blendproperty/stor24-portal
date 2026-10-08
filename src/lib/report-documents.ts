@@ -5,6 +5,7 @@ import ExcelJS from "exceljs";
 import { PDFDocument, rgb } from "pdf-lib";
 import type { ReportRow } from "./report-data-service";
 import { reportInsights } from "./report-insights";
+import { visualReportTablePdf } from "./report-table-pdf";
 let fontBytes: Promise<Buffer> | undefined;
 const heading = (s: string) =>
   s.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase());
@@ -22,12 +23,19 @@ export async function reportExcel(
   summary.addRow([period]);
   summary.addRow(["Generated", new Date().toISOString()]);
   summary.addRow(["Confidential — authorised recipients only"]);
-  const insights = reportInsights(key, rows);
   summary.addRow([]);
-  for (const m of insights.metrics) summary.addRow([m.label, m.value]);
-  summary.addRow([insights.chartTitle]);
-  for (const b of insights.bars) summary.addRow([b.label, b.value]);
-  summary.addRow([insights.guidance]);
+  if (key === "visual-report") {
+    summary.addRow(["Result rows", rows.length]);
+    summary.addRow(["Amounts and totals", "As selected in the report definition; see the Data sheet."]);
+    summary.getRow(2).alignment = { wrapText: true, vertical: "top" };
+    summary.getRow(2).height = Math.max(30, Math.ceil(period.length / 90) * 15);
+  } else {
+    const insights = reportInsights(key, rows);
+    for (const m of insights.metrics) summary.addRow([m.label, m.value]);
+    summary.addRow([insights.chartTitle]);
+    for (const b of insights.bars) summary.addRow([b.label, b.value]);
+    summary.addRow([insights.guidance]);
+  }
   summary.columns = [{ width: 75 }, { width: 25 }];
   const sheet = book.addWorksheet("Data", {
     views: [{ state: "frozen", ySplit: 1 }],
@@ -36,6 +44,7 @@ export async function reportExcel(
   sheet.addRow(headers.map(heading));
   for (const row of rows) sheet.addRow(headers.map((h) => row[h] ?? ""));
   sheet.columns = headers.map(() => ({ width: 25 }));
+  if (key === "visual-report") sheet.pageSetup = { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: "1:1" };
   if (headers.length)
     sheet.autoFilter = {
       from: { row: 1, column: 1 },
@@ -65,6 +74,7 @@ export async function reportPdf(
   );
   const font = await pdf.embedFont(await fontBytes, { subset: true }),
     bold = font;
+  if (key === "visual-report") return visualReportTablePdf(pdf, font, title, rows, period);
   let page = pdf.addPage([842, 595]),
     y = 550;
   const clean = (s: string) => s.replace(/[\x00-\x1f\x7f\u00a0\u202f]/g, " ");

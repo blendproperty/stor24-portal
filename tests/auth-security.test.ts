@@ -68,3 +68,8 @@ test("reset tokens are random and only stable after hashing", () => {
   assert.notEqual(hashResetToken(first), first);
   assert.match(hashResetToken(first), /^[a-f0-9]{64}$/);
 });
+
+test("report worker exemption is exact and does not expose reports or descendants",()=>{
+  assert.equal(isPublicPathname("/api/v1/reports/worker"),true);
+  for(const path of ["/api/v1/reports","/api/v1/reports/builder","/api/v1/reports/history","/api/v1/reports/runs/x","/api/v1/reports/worker/child"])assert.equal(isPublicPathname(path),false);
+});

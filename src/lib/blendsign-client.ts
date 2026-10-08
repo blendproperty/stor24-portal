@@ -24,6 +24,7 @@ type LeaseEnvelopeInput = {
   representative: { name: string; email: string };
   autoCountersign?: boolean;
   simulation?: boolean;
+  invitationDelivery?: "EMAIL" | "ASSISTED";
 };
 
 export type BlendSignEnvelope = {
@@ -149,6 +150,7 @@ export async function createBlendSignLeaseEnvelope(input: LeaseEnvelopeInput): P
       templateKey: blendSignTemplateKey(input.paymentMethod),
       externalReference: input.tenancyId,
       title: `${input.simulation ? "UAT TEST - " : ""}Stor24 lease - unit ${input.unit.number}`,
+      invitationDelivery: input.invitationDelivery ?? "EMAIL",
       data,
       recipients: [
         { role: "Signer 1", name, email: input.customer.email },
@@ -166,4 +168,17 @@ export async function createBlendSignLeaseEnvelope(input: LeaseEnvelopeInput): P
       signingUrl: absoluteBlendSignUrl(baseUrl, signer.signingUrl),
     })),
   };
+}
+
+export async function fetchBlendSignSigningSession(envelopeId: string) {
+  const base = process.env.BLENDSIGN_BASE_URL?.replace(/\/$/, "");
+  if (!base || !process.env.BLENDSIGN_API_KEY) throw new Error("BLENDSIGN_CONFIG_REQUIRED");
+  const response = await fetch(`${base}/api/v1/envelopes/${encodeURIComponent(envelopeId)}/signing-session`, {
+    headers: { authorization: `Bearer ${process.env.BLENDSIGN_API_KEY}` },
+    cache: "no-store", signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) throw new Error("BLENDSIGN_SESSION_UNAVAILABLE");
+  const session = await response.json() as { envelopeId: string; status: string; signers: { name: string; order: number; status: string; signingUrl: string | null }[] };
+  if (session.envelopeId !== envelopeId || !Array.isArray(session.signers)) throw new Error("BLENDSIGN_SESSION_INVALID");
+  return { ...session, signers: session.signers.map(signer => ({ ...signer, signingUrl: signer.signingUrl ? absoluteBlendSignUrl(base, signer.signingUrl) : null })) };
 }

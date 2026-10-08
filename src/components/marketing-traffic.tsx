@@ -33,7 +33,7 @@ export function MarketingTrafficChart({
   const max = Math.max(1, ...(data?.days.map((d) => d.sessions) ?? []));
   return (
     <section className="marketing-card">
-      <h2>Website traffic</h2>
+      <p className="eyebrow">WEBSITE ENGAGEMENT</p><h2>Google Analytics · website traffic</h2><span className="marketing-provider-status" data-status={data?.status}>{error ? "Unavailable" : data?.status === "connected" ? "Connected" : data?.status === "unconfigured" ? "Connection needed" : data?.status === "unavailable" ? "Unavailable" : "Loading"}</span><p>Property-wide website activity. Store filters apply to CRM outcomes.</p>
       <p>{error || data?.message || "Loading website traffic…"}</p>
       {data?.totals && (
         <>

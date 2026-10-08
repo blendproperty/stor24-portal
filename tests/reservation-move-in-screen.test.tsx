@@ -16,7 +16,7 @@ test("a signed paid booking presents handover and the original document, never a
   assert.match(html, /Confirm move-in \/ key handover/);
   assert.match(html, /public-leases\/original\/signed-pdf/);
   assert.match(html, /<input(?=[^>]*name="handoverConfirmed")(?=[^>]*required)[^>]*>/);
-  assert.doesNotMatch(html, /Send lease for signature|pending attorney|name="initialCharge"/);
+  assert.doesNotMatch(html, /Continue to agreement signing|Send lease for signature|pending attorney|name="initialCharge"/);
 });
 
 test("test payments keep the signed agreement visible and disable handover", () => {

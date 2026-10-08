@@ -61,6 +61,7 @@ jobs:
       - run: node scripts/test-report-export-recovery.mjs
       - run: node scripts/test-audited-workspace-download.mjs
       - run: node scripts/test-reports-and-unit-map.mjs
+      - run: npx tsx scripts/test-visual-report-builder.mjs
       - run: node scripts/test-task-create-recovery.mjs
       - run: node scripts/test-maintenance-status-recovery.mjs
       - run: node scripts/test-maintenance-create-recovery.mjs
@@ -77,6 +78,7 @@ jobs:
       - run: node scripts/test-facial-photos.mjs
       - run: node scripts/test-identity.mjs
       - run: node scripts/test-move-in-flow.mjs
+      - run: node scripts/test-assisted-signing.mjs
       - run: node scripts/test-move-in-training.mjs
       - run: node scripts/test-restricted-navigation.mjs
       - run: node scripts/test-premium-workspace.mjs
@@ -88,6 +90,7 @@ jobs:
         with:
           name: guided-help-browser-evidence
           path: |
+            output/visual-report-builder/
             output/marketing/
             output/operations-alert-recipients/
             output/troubleshooting/

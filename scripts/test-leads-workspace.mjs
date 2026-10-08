@@ -3,7 +3,7 @@ import {chromium,expect} from '@playwright/test';
 import {createServer} from 'node:http';
 import {readFile,mkdir} from 'node:fs/promises';
 const bundle=await build({stdin:{contents:"import React from 'react';import{createRoot}from'react-dom/client';import{LeadsWorkspace}from'./src/components/leads-workspace';createRoot(document.getElementById('root')).render(<LeadsWorkspace/>);",resolveDir:process.cwd(),loader:'jsx'},bundle:true,write:false,format:'esm',jsx:'automatic'});
-const css=(await Promise.all(['src/app/globals.css','src/styles/stor24-brand.css','src/styles/staff-workspace.css'].map(p=>readFile(p,'utf8')))).join('\n').replace('@import "tailwindcss";','')+'\nbody{font-family:Arial,sans-serif;padding:24px;background:#f4f6f3}';
+const css=(await Promise.all(['src/app/globals.css','src/styles/stor24-brand.css','src/styles/staff-workspace.css','src/styles/workspace-insights.css'].map(p=>readFile(p,'utf8')))).join('\n').replace('@import "tailwindcss";','')+'\nbody{display:block;font-family:Arial,sans-serif;padding:24px;background:#f4f6f3}';
 let stage,bookings,patch,reservation,capture,rejectReservation,newLead,refreshFailed;
 const booking=(extra={})=>({id:'saved/booking',status:'ACTIVE',journey:'RENTAL',quotedRate:1400,convertedTenancyId:null,unit:{number:'101'},publicLease:null,convertedTenancy:null,...extra});
 const make=()=>({leads:[...Array.from({length:8},(_,i)=>({id:`lead${i}`,stage:i===0?stage:['NEW','CONTACTED','QUALIFIED','QUOTED','VIEWING_BOOKED','RESERVED','WON','LOST'][i],source:i%2?'Phone':'PUBLIC_QUOTE_FORM',createdAt:new Date(Date.now()-i*7*86400000).toISOString(),updatedAt:'2026-10-02T08:00:00Z',notes:'Household furniture',expectedMoveIn:'2026-10-15T00:00:00Z',nextActionAt:null,assignedToId:null,assignedTo:null,facility:{id:'store',name:'Midpoint'},desiredUnitType:{name:'10 m²'},customer:{id:`customer${i}`,firstName:`Example ${i+1}`,lastName:'Customer',email:'example@example.invalid',phone:'+27000000000',companyName:null},attribution:null,reservations:i===0?bookings:[]})),...(newLead?[newLead]:[])],count:newLead?9:8,facilities:[{id:'store',name:'Midpoint',canCreate:true,canManage:true,canReserve:true}],staff:[{id:'staff',name:'Example Sales Owner',facilityIds:['store']}]});
@@ -29,7 +29,7 @@ const server=createServer(async(req,res)=>{
   if(req.url==='/api/v1/reservations')return res.end(JSON.stringify({data:{facilities:[{id:'store',units:[{id:'unit',facilityId:'store',number:'101',monthlyRate:'1400'}],maps:[{id:'map',name:'Ground floor',width:600,height:400,elements:[{id:'shape',type:'UNIT',x:20,y:20,width:100,height:80,rotation:0,label:'101',unitId:'unit'},{id:'closed',type:'UNIT',x:140,y:20,width:100,height:80,rotation:0,label:'102',unitId:'blocked'}]}]}]}}));
   return res.end(JSON.stringify({data:[]}));
  }
- res.end('<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/app.css"></head><body><div id="root"></div><script type="module" src="/app.js"></script></body></html>');
+ res.end('<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/app.css"></head><body class="app-shell"><div id="root"></div><script type="module" src="/app.js"></script></body></html>');
 });
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const browser=await chromium.launch();await mkdir('output/leads-design',{recursive:true});
@@ -39,6 +39,8 @@ try{
   const page=await browser.newPage({viewport:{width,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
   const base=`http://127.0.0.1:${server.address().port}`;
   await page.goto(base);await expect(page.getByRole('heading',{name:'Leads & sales performance'})).toBeVisible();await expect(page.locator('.leads-name')).toHaveCount(8);
+  if(!await page.locator('.leads-search').evaluate(label=>{const input=label.querySelector('input'),icon=label.querySelector('svg');return input.getBoundingClientRect().left+parseFloat(getComputedStyle(input).paddingLeft)>icon.getBoundingClientRect().right+4;}))throw Error('Search text overlaps the icon');
+  await expect(page.locator('.profile-card-heading').first()).toContainText('8 enquiries');
   await page.getByRole('button',{name:'Example 1 Customer',exact:true}).click();
   const nav=page.getByRole('navigation',{name:'Lead to lease progress'});await expect(nav.locator('li')).toHaveCount(4);
   await expect(page.getByRole('heading',{name:'Activity history'})).toBeVisible();
@@ -53,7 +55,7 @@ try{
   await page.getByLabel('Monthly quote (R)').fill('0');await page.getByRole('button',{name:'Confirm reservation',exact:true}).click();await expect(page.getByRole('dialog').getByRole('alert')).toContainText('greater than zero');await page.getByLabel('Monthly quote (R)').fill('1400');
   rejectReservation=true;await page.getByRole('button',{name:'Confirm reservation',exact:true}).click();await expect(page.getByRole('dialog').getByRole('alert')).toContainText('no longer available');await expect(page.getByLabel('Available unit')).toHaveValue('unit');
   rejectReservation=false;await page.getByRole('button',{name:'Confirm reservation',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Review and send the lease agreement'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Review and sign the lease agreement'})).toBeVisible();
   if(reservation.leadId!=='lead0'||reservation.customerId!=='customer0'||reservation.unitId!=='unit')throw Error('Lost enquiry/customer/unit context');
   await expect(page.getByRole('link',{name:'Continue to agreement details'})).toHaveAttribute('href','/operations/move-in?reservation=saved%2Fbooking');
   await page.screenshot({path:`output/leads-design/lease-step-${width}.png`,fullPage:false});
@@ -77,3 +79,4 @@ try{
   console.log(`${width}px: four stages, customer context, saved reservation, signing evidence, pending account, multiple bookings, conflict recovery, keyboard and viewport passed`);await page.close();
  }
 }finally{await browser.close();server.close();}
+
