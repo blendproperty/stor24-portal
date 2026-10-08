@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { CheckCircle2, ClipboardList, PackageCheck, Plus, RefreshCw, Search, Wrench } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { DailyCloseForm } from "@/components/daily-close-form";
@@ -19,7 +19,7 @@ type Close = DailyCloseRecord;
 type Facility = { id: string; name: string; units: { id: string; number: string; status: string }[] };
 type OperationsData = { tasks: Task[]; maintenance: Maintenance[]; products: Product[]; storagePackages: StoragePackage[]; dailyCloses: Close[]; notes: unknown[]; facilities: Facility[]; dailyCloseFacilityIds?: string[] };
 
-export function OperationsWorkspace({ view = "operations" }: { view?: "operations" | "merchandise" }) {
+export function OperationsWorkspace({ view = "operations", reminders }: { view?: "operations" | "merchandise"; reminders?: ReactNode }) {
   const [data, setData] = useState<OperationsData | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -465,6 +465,7 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
 
   return <div className="page-stack facility-operations-workspace">
     <PageHeader eyebrow="Facility workflows" title="Operations centre" description="Prioritise tasks, keep maintenance moving and close the day with confidence." action={<button className="button button-primary" onClick={() => setShowTask(true)}><Plus size={16}/> New task</button>} />
+    {reminders}
     {maintenanceMessage && !showMaintenance ? <div role="alert"><p>{maintenanceMessage}</p>{maintenanceUncertain ? <button className="button button-primary" onClick={() => window.location.reload()}>Reload maintenance status</button> : null}</div> : null}
     {taskMessage ? <div role={taskNeedsCheck ? "alert" : "status"}><p>{taskMessage}</p>{taskNeedsCheck ? <button className="button button-primary" disabled={taskBusy} onClick={checkTaskStatus}>{taskBusy ? "Checking…" : "Check task status"}</button> : null}</div> : null}
     {error ? <p className="form-error">{error}</p> : null}{readRecovery}
@@ -479,10 +480,10 @@ export function OperationsWorkspace({ view = "operations" }: { view?: "operation
       <Link href="/operations/merchandise"><strong>Merchandise</strong><span>Open the dedicated products, stock and package workspace.</span></Link>
     </div></section>
     <section className="dashboard-grid">
-      <article className="panel panel-spacious"><div className="panel-heading"><div><p className="eyebrow">Work queues</p><h2>Assigned operational tasks</h2></div><ClipboardList size={21}/></div>
+      <article id="operations-tasks" className="panel panel-spacious"><div className="panel-heading"><div><p className="eyebrow">Work queues</p><h2>Assigned operational tasks</h2></div><ClipboardList size={21}/></div>
         <div className="work-list">{openTasks.length ? openTasks.map((task) => <div className="work-row" key={task.id}><span className={`work-icon ${task.priority === "URGENT" ? "work-icon-danger" : task.priority === "HIGH" ? "work-icon-warning" : ""}`}><ClipboardList size={18}/></span><div className="work-copy"><strong>{task.title}</strong><small>{task.facility?.name ?? "Portfolio"} · {task.assignee?.name ?? "Unassigned"} · {task.dueAt ? `${formatSouthAfricaDateTime(task.dueAt)} SAST` : "No due date"}</small>{task.description && <details><summary>View request details</summary><p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{task.description}</p>{task.customerId && <Link href={`/tenants?customer=${encodeURIComponent(task.customerId)}`}>Open customer record →</Link>}</details>}</div><button className="text-button" disabled={taskBusy || taskNeedsCheck} onClick={() => completeTask(task.id)}>{taskBusy ? "Please wait…" : "Complete"}</button></div>) : <div className="empty-state"><CheckCircle2 size={32}/><strong>No open tasks</strong><p>Create a task to start the facility work queue.</p></div>}</div>
       </article>
-      <article className="panel panel-spacious"><div className="panel-heading"><div><p className="eyebrow">Service required</p><h2>Maintenance queue</h2></div><button className="button button-secondary" disabled={busy || maintenanceUncertain} onClick={() => setShowMaintenance(true)}><Plus size={16}/> New request</button></div>
+      <article id="operations-maintenance" className="panel panel-spacious"><div className="panel-heading"><div><p className="eyebrow">Service required</p><h2>Maintenance queue</h2></div><button className="button button-secondary" disabled={busy || maintenanceUncertain} onClick={() => setShowMaintenance(true)}><Plus size={16}/> New request</button></div>
         <div className="work-list">{service.length ? service.map((item) => <div className="work-row" key={item.id}><span className="work-icon work-icon-warning"><Wrench size={18}/></span><span className="work-copy"><strong>{item.title}</strong><small>{item.facility.name}{item.unit ? ` · Unit ${item.unit.number}` : ""}</small></span><StatusPill tone={item.priority === "URGENT" ? "danger" : "warning"}>{item.status}</StatusPill><span className="inline-actions">{item.status !== "IN_PROGRESS" ? <button className="text-button" disabled={busy || maintenanceUncertain} onClick={() => updateMaintenance(item.id, "IN_PROGRESS")}>Start</button> : null}<button className="text-button" disabled={busy || maintenanceUncertain} onClick={() => updateMaintenance(item.id, "COMPLETED")}>Complete</button><button className="text-button" disabled={busy || maintenanceUncertain} onClick={() => updateMaintenance(item.id, "CANCELLED")}>Cancel</button></span></div>) : <div className="empty-state"><Wrench size={32}/><strong>No service requests</strong><p>Unit and facility maintenance will appear here.</p></div>}</div>
       </article>
     </section>
