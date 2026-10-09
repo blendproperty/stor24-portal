@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { validateAlertRecipients } from '../src/lib/operations-alert-policy.mjs';
 import { loadAlertRecipients } from './load-alert-recipients.mjs';
+import { alertDetails } from './production-alert-details.mjs';
 
 const SUCCESS = 'success';
 export function notificationKind(current, previous, test = false) {
@@ -30,7 +31,8 @@ export async function deliverAlert(env, kind, fetcher = fetch) {
 async function deliverDestinations(env, kind, fetcher) {
   const results = [];
   const allowed = env.ALERT_CHANNELS === undefined ? ['EMAIL', 'SMS', 'WHATSAPP'] : env.ALERT_CHANNELS.split(',');
-  const text = `STOR24 ${kind} ALERT. Application: ${env.READINESS_RESULT}. Backup/resources: ${env.BACKUP_RESULT}. ${kind === 'TEST' ? 'Delivery test only; no outage detected. ' : ''}Review the production monitor in GitHub.`;
+  const detail = alertDetails(env, kind);
+  const text = detail.text;
   const request = async (channel, url, options) => {
     try {
       const response = await fetcher(url, { ...options, signal: AbortSignal.timeout(15000) });
@@ -50,7 +52,7 @@ async function deliverDestinations(env, kind, fetcher) {
     const from = match ? { email: match[2].trim(), name: match[1].trim().replace(/^"|"$/g, '') } : { email: env.EMAIL_FROM.trim() };
     for (const email of emails) results.push(await request('EMAIL', 'https://api.sendgrid.com/v3/mail/send', {
       method: 'POST', headers: { Authorization: `Bearer ${env.SENDGRID_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ personalizations: [{ to: [{ email }] }], from, subject: `STOR24 ${kind} ALERT`, content: [{ type: 'text/plain', value: text }] }),
+      body: JSON.stringify({ personalizations: [{ to: [{ email }] }], from, subject: `STOR24 ${kind} ALERT — ${detail.severity}`, content: [{ type: 'text/plain', value: text }, { type: 'text/html', value: detail.html }] }),
     }));
   }
   }
@@ -72,7 +74,7 @@ async function deliverDestinations(env, kind, fetcher) {
         if (!approval.ok || value.whatsapp?.status !== 'approved') { results.push({ channel, accepted: false, status: 'TEMPLATE_NOT_APPROVED' }); continue; }
       } catch { results.push({ channel, accepted: false, status: 'APPROVAL_CHECK_FAILED' }); continue; }
       fields = { To: `whatsapp:${to}`, From: `whatsapp:${from.replace(/^whatsapp:/, '')}`, ContentSid: sid,
-        ContentVariables: JSON.stringify({ '1': kind, '2': `Application ${env.READINESS_RESULT}; backup/resources ${env.BACKUP_RESULT}`, '3': new Date().toISOString() }) };
+        ContentVariables: JSON.stringify({ '1': `${kind} (${detail.severity})`, '2': detail.summary, '3': detail.time }) };
     }
     results.push(await request(channel, `https://api.twilio.com/2010-04-01/Accounts/${env.TWILIO_ACCOUNT_SID}/Messages.json`, {
       method: 'POST', headers: { Authorization: auth, 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(fields),
@@ -104,7 +106,18 @@ export async function run(env, fetcher = fetch) {
       if (jobs.jobs?.some(j => j.name === 'alerts' && j.status === 'completed' && j.conclusion !== 'skipped')) return { status: 'SUPPRESSED', cooldownMinutes: 30 };
     }
   }
-  return { status: 'ATTEMPTED', kind, results: await deliverAlert(env, kind, fetcher) };
+  // Log access is best-effort; a log retrieval failure must not prevent alert delivery.
+  let backupLog = '';
+  try {
+    const jobs = await get(`${api}/actions/runs/${env.GITHUB_RUN_ID}/jobs?per_page=100`);
+    const backupJob = jobs.jobs?.find(j => j.name === 'backup');
+    if (backupJob && /^\d+$/.test(String(backupJob.id))) {
+      const response = await fetcher(`${api}/actions/jobs/${backupJob.id}/logs`, { headers, signal: AbortSignal.timeout(15000) });
+      if (response.ok) backupLog = (await response.text()).slice(0, 200000);
+    }
+  } catch { /* Keep generic, honest details when evidence is unavailable. */ }
+  const enriched = { ...env, BACKUP_LOG: backupLog };
+  return { status: 'ATTEMPTED', kind, severity: alertDetails(enriched, kind).severity, results: await deliverAlert(enriched, kind, fetcher) };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
