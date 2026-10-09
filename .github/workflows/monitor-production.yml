@@ -27,10 +27,15 @@ jobs:
       - name: Verify public application and database readiness
         env:
           HEALTH_URL: https://portal.stor24.co.za/api/health
+          EXPECT_MERCHANDISE_WORKER: ${{ vars.MERCHANDISE_EXPIRY_WORKER_ENABLED }}
         run: |
           response="$(curl --fail --silent --show-error --max-time 35 --connect-timeout 10 --retry 3 --retry-delay 5 --retry-all-errors -A 'stor24-production-monitor/1.1 (+github-actions)' "$HEALTH_URL")"
           node -e '
             const value = JSON.parse(process.argv[1]);
+            if (process.env.EXPECT_MERCHANDISE_WORKER === "true" &&
+                (value.merchandiseExpiry?.enabled !== true || value.merchandiseExpiry?.status !== "ok")) {
+              throw new Error("Merchandise expiry scheduler unavailable or stale");
+            }
             if (value.service !== "stor24-crm" || value.status !== "ok" || value.database !== "ok") {
               throw new Error(`Unhealthy STOR24 response: ${JSON.stringify(value)}`);
             }

@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { fulfilMerchandiseOrder } from "../../src/lib/merchandise-order-fulfilment";
 import { db } from "../../src/lib/db";
 import { cancelTenantMerchandise, holdTenantMerchandise } from "../../src/lib/merchandise-order-service";
-import { expireMerchandiseOrders, settleVerifiedMerchandisePayment } from "../../src/lib/merchandise-order-settlement";
+import { expireMerchandiseBatch, expireMerchandiseOrders, settleVerifiedMerchandisePayment } from "../../src/lib/merchandise-order-settlement";
 
 test("isolated PostgreSQL merchandise settlement and cancellation", async t => {
   assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci");
@@ -170,6 +170,58 @@ test("isolated PostgreSQL merchandise settlement and cancellation", async t => {
       await db.product.update({ where: { id: bad.product.id }, data: { quantityReserved: 2 } });
       assert.equal(await expireMerchandiseOrders(now), 1);
       assert.equal(await expireMerchandiseOrders(now), 0);
+    });
+    await t.test("keyset batches release more than 100 holds without starving behind inconsistent rows", async () => {
+      const f = await fixture();
+      await db.product.update({ where: { id: f.product.id }, data: { quantityReserved: 0 } });
+      await db.merchandiseOrder.update({ where: { id: f.order.id }, data: { expiresAt: new Date("2019-01-01") } });
+      const ids = Array.from({ length: 105 }, () => randomUUID());
+      await db.merchandiseOrder.createMany({ data: ids.map(id => ({ id, accountId: f.account.id, organisationId: f.order.organisationId, facilityId: f.order.facilityId, unitId: "ci-unit", total: "10.00", idempotencyKey: id, expiresAt: new Date("2019-01-02") })) });
+      const product = await db.product.create({ data: { organisationId: f.order.organisationId, facilityId: f.order.facilityId, sku: randomUUID(), name: "CI backlog", category: "Boxes", sellingPrice: "10.00", quantityOnHand: 200, quantityReserved: 105 } });
+      await db.merchandiseOrderItem.createMany({ data: ids.map(orderId => ({ orderId, productId: product.id, name: "Box", sku: product.sku, quantity: 1, unitPrice: "10.00" })) });
+      const now = new Date("2019-01-03");
+      const first = await expireMerchandiseBatch(now);
+      assert.equal(first.scanned, 100);
+      assert.equal(first.failures, 1);
+      assert.equal(first.expired, 99);
+      const second = await expireMerchandiseBatch(now, first.cursor);
+      assert.equal(second.expired, 6);
+      assert.equal(second.failures, 0);
+      assert.equal((await db.product.findUniqueOrThrow({ where: { id: product.id } })).quantityReserved, 0);
+      assert.equal((await db.product.findUniqueOrThrow({ where: { id: product.id } })).quantityOnHand, 200);
+      assert.equal(await db.auditEvent.count({ where: { entityId: { in: ids }, action: "merchandise_order.expired" } }), 105);
+      assert.equal(await expireMerchandiseOrders(now).catch(() => -1), -1);
+      await db.product.update({ where: { id: f.product.id }, data: { quantityReserved: 2 } });
+      assert.equal(await expireMerchandiseOrders(now), 1);
+      assert.equal(await expireMerchandiseOrders(now), 0);
+    });
+    await t.test("settlement racing expiry never resurrects released stock or double posts", async () => {
+      const f = await fixture();
+      const now = new Date("2018-01-02");
+      await db.merchandiseOrder.update({ where: { id: f.order.id }, data: { expiresAt: new Date("2018-01-01") } });
+      await Promise.all([expireMerchandiseOrders(now), settleVerifiedMerchandisePayment(f.payment.id, f.verified)]);
+      const order = await db.merchandiseOrder.findUniqueOrThrow({ where: { id: f.order.id } });
+      assert.ok(["PAID", "PAYMENT_REVIEW"].includes(order.status));
+      const product = await db.product.findUniqueOrThrow({ where: { id: f.product.id } });
+      assert.equal(product.quantityOnHand, 10);
+      assert.equal(product.quantityReserved, order.status === "PAID" ? 2 : 0);
+      assert.equal(order.stockHeld, order.status === "PAID");
+      assert.equal(await db.ledgerEntry.count({ where: { accountId: f.account.id, type: "PAYMENT" } }), 1);
+      await settleVerifiedMerchandisePayment(f.payment.id, f.verified);
+      await expireMerchandiseOrders(now);
+      assert.equal(await db.ledgerEntry.count({ where: { accountId: f.account.id, type: "PAYMENT" } }), 1);
+    });
+    await t.test("succeeded payment with inconsistent order status cannot release stock", async () => {
+      const f = await fixture();
+      const now = new Date("2017-01-02");
+      await db.payment.update({ where: { id: f.payment.id }, data: { status: "SUCCEEDED", processedAt: new Date("2017-01-01") } });
+      await db.merchandiseOrder.update({ where: { id: f.order.id }, data: { expiresAt: new Date("2017-01-01") } });
+      await assert.rejects(expireMerchandiseOrders(now), /MERCHANDISE_EXPIRY_PARTIAL_FAILURE/);
+      assert.equal((await db.product.findUniqueOrThrow({ where: { id: f.product.id } })).quantityReserved, 2);
+      assert.equal((await db.merchandiseOrder.findUniqueOrThrow({ where: { id: f.order.id } })).status, "AWAITING_PAYMENT");
+      assert.equal(await db.auditEvent.count({ where: { entityId: f.order.id, action: "merchandise_order.expired" } }), 0);
+      // Keep the independent later expiry scenarios clean in this synthetic DB.
+      await db.merchandiseOrder.update({ where: { id: f.order.id }, data: { status: "PAYMENT_REVIEW" } });
     });
     await t.test("concurrent duplicate checkout holds stock once", async () => {
       const f = await fixture();
