@@ -1,3 +1,5 @@
+import { activeWalkIn } from "./walk-in-service";
+import { walkInUsable } from "./walk-in-policy";
 import {newPublicInitialRent,publicInitialRent,publicCheckoutTotal} from "./public-initial-rent";
 import { unitSupportsProduct } from "@/lib/product-line";
 import { releaseLeadBookingStage } from "@/lib/lead-booking-stage";
@@ -23,8 +25,8 @@ import { bookingPreferenceRecord } from "@/lib/privacy-preferences";
 
 export class PublicBookingError extends Error {
   constructor(
-    public readonly code: "FACILITY_NOT_FOUND" | "UNIT_UNAVAILABLE" | "IDEMPOTENCY_CONFLICT" | "VIEWING_SLOT_UNAVAILABLE",
-    public readonly status: 404 | 409 | 422,
+    public readonly code: "WALK_IN_UNAVAILABLE" | "FACILITY_NOT_FOUND" | "UNIT_UNAVAILABLE" | "IDEMPOTENCY_CONFLICT" | "VIEWING_SLOT_UNAVAILABLE",
+    public readonly status: 404 | 409 | 410 | 422,
   ) {
     super(code);
   }
@@ -166,7 +168,7 @@ export async function releaseExpiredPublicReservations(now = new Date()) {
   // Signing commits the booking beyond its original shopping hold. Staff must
   // resolve signed bookings explicitly, including any payment reconciliation.
   const expirable = {
-    status: "ACTIVE", source: { in: ["PUBLIC_WEBSITE", "PUBLIC_VIEWING"] },
+    status: "ACTIVE", source: { in: ["PUBLIC_WEBSITE", "PUBLIC_VIEWING", "PUBLIC_WALK_IN"] },
     holdExpiresAt: { lte: now }, publicLease: { isNot: { status: "SIGNED" } },
   } satisfies Prisma.ReservationWhereInput;
   const expired = await db.reservation.findMany({
@@ -205,12 +207,15 @@ export async function releaseExpiredPublicReservations(now = new Date()) {
 
 export async function createPublicReservation(input: PublicReservationInput, ipHash: string) {
   await releaseExpiredPublicReservations();
+  const walkIn = input.walkInToken ? await activeWalkIn(input.walkInToken) : null;
+  if (walkIn && walkIn.facility.publicSlug !== input.facilitySlug) throw new PublicBookingError("WALK_IN_UNAVAILABLE", 410);
   const verificationEnabled = publicReservationVerificationEnabled();
   const existing = await db.reservation.findUnique({
     where: { idempotencyKey: input.idempotencyKey },
     include: reservationInclude,
   });
   if (existing) {
+    if (walkIn && (walkIn.reservationId !== existing.id || existing.status !== "ACTIVE")) throw new PublicBookingError("WALK_IN_UNAVAILABLE", 410);
     if (existing.facility.publicSlug !== input.facilitySlug || existing.productLine !== (input.productLine ?? "STORAGE") || existing.unitId !== input.unitId)
       throw new PublicBookingError("IDEMPOTENCY_CONFLICT", 409);
     return {
@@ -235,6 +240,12 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
 
   try {
     const reservation = await db.$transaction(async (tx) => {
+      if (walkIn) {
+        await tx.$queryRaw`SELECT "id" FROM "WalkInVisit" WHERE "id" = ${walkIn.id} FOR UPDATE`;
+        const current = await tx.walkInVisit.findUnique({ where: { id: walkIn.id }, include: { facility: true, createdBy: true } });
+        if (!walkInUsable(current) || !current || current.reservationId || current.facilityId !== facility.id || current.organisationId !== facility.organisationId)
+          throw new PublicBookingError("WALK_IN_UNAVAILABLE", 410);
+      }
       try { await requireOperationalUnit(tx, facility.id, input.unitId); } catch (error) {
         if (error instanceof Error && ["FLOOR_NOT_OPERATIONAL", "UNIT_UNAVAILABLE"].includes(error.message)) throw new PublicBookingError("UNIT_UNAVAILABLE", 409);
         throw error;
@@ -267,7 +278,7 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
         throw new PublicBookingError("UNIT_UNAVAILABLE", 409);
       }
 
-      const source = input.journey === "VIEWING" ? "PUBLIC_VIEWING" : "PUBLIC_WEBSITE";
+      const source = walkIn ? "PUBLIC_WALK_IN" : input.journey === "VIEWING" ? "PUBLIC_VIEWING" : "PUBLIC_WEBSITE";
       const consent = bookingPreferenceRecord(input.communicationConsent, input.privacyNoticeVersion, source);
       let customer = verificationEnabled ? null : await tx.customer.findFirst({ where: { organisationId: facility.organisationId, email: { equals: input.email, mode: "insensitive" } }, orderBy: { updatedAt: "desc" } });
       if (!customer) customer = await tx.customer.create({ data: { organisationId: facility.organisationId, type: input.productLine === "MICRO_WAREHOUSE" ? "BUSINESS" : "INDIVIDUAL", companyName: input.businessDetails?.companyName, taxNumber: input.businessDetails?.taxNumber, firstName: input.firstName, lastName: input.lastName, email: input.email, phone: normalizeTwilioRecipient(input.phone) ?? input.phone, communicationConsent: consent } });
@@ -279,6 +290,7 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
           businessDetails: input.businessDetails,
           customerId: customer.id,
           desiredUnitTypeId: unit.unitTypeId,
+          assignedToId: walkIn?.createdById,
           stage: input.journey === "VIEWING" ? "VIEWING_BOOKED" : "RESERVED",
           source,
           expectedMoveIn: input.intendedMoveIn,
@@ -313,6 +325,7 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
         },
         include: reservationInclude,
       });
+      if (walkIn) await tx.walkInVisit.update({ where: { id: walkIn.id }, data: { reservationId: created.id, status: "IN_PROGRESS" } });
       if (selectedPackage) {
         const itemSnapshot = selectedPackage.items.map((item) => ({ productId: item.productId, sku: item.product.sku, name: item.product.name, quantity: item.quantity, unitPriceZar: Number(item.product.sellingPrice) }));
         for (const item of selectedPackage.items) await tx.product.update({ where: { id: item.productId }, data: { quantityReserved: { increment: item.quantity } } });

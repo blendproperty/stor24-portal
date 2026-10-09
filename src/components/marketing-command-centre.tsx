@@ -1,3 +1,4 @@
+import { MarketProfileSummary } from "./market-profile-summary";
 import { useMemo, useState } from "react";
 import type { MarketingWorkspace } from "@/lib/marketing-service";
 import { marketingIntelligence, ratio } from "@/lib/marketing-intelligence";
@@ -131,7 +132,7 @@ export function MarketingCommandCentre({
   if (view === "overview")
     return (
       <>
-        <section className="panel panel-spacious market-profile-summary"><h2>Customer market summary</h2><p>Same selected store and date range. Self-reported responses; unrecorded answers remain unknown. Gender is voluntary and is never inferred from advertising or customer identity.</p><div className="market-profile-grid">{[{title:"Storage use",rows:current.storageUses},{title:"How they heard about us",rows:current.discoverySources},{title:"Gender",rows:current.genders}].map(group=><div key={group.title}><h3>{group.title}</h3>{group.rows.map(row=><p key={row.label}>{row.label.replaceAll("_"," ").toLowerCase()}: <strong>{row.count}</strong></p>)}</div>)}</div></section>
+
         <section className="marketing-executive">
           <div>
             <p className="marketing-eyebrow">PERFORMANCE AT A GLANCE</p>
@@ -189,6 +190,7 @@ export function MarketingCommandCentre({
             </article>
           ))}
         </div>
+        <MarketProfileSummary caption="Selected store and reporting period. Self-reported answers; missing responses remain unknown. Gender is voluntary and never inferred." groups={[{title:"Storage use",rows:current.storageUses},{title:"How they heard about us",rows:current.discoverySources},{title:"Gender",rows:current.genders}]}/>
         <section className="marketing-card">
           <h2>What needs attention</h2>
           <div className="marketing-attention">

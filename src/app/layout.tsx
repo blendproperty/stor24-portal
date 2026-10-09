@@ -10,6 +10,7 @@ import "../styles/guided-help.css";
 import "../styles/mri-workspace.css";
 import "../styles/staff-workspace.css";
 import "../styles/marketing.css";
+import "../styles/workspace-insights.css";
 
 const satoshi = localFont({
   src: "../../public/brand/Satoshi-Variable.ttf",

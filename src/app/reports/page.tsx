@@ -1,5 +1,6 @@
 import { PageHeader } from "@/components/page-header";
 import { ReportsWorkspace } from "@/components/reports-workspace";
+import { VisualReportBuilder } from "@/components/visual-report-builder";
 import { requireSession } from "@/lib/auth-guards";
 import { availableReports } from "@/lib/reporting";
 import { hasPermission } from "@/lib/permissions";
@@ -11,7 +12,8 @@ import { currentRoleAccess } from '@/lib/current-role-access';
 
 export const metadata = { title: "Reports" };
 
-export default async function ReportsPage() {
+export default async function ReportsPage(props:{searchParams?:Promise<{reportKey?:string}>}) {
+  const requestedReport=(await props?.searchParams)?.reportKey;
   const session = await requireSession();
   const permissions = session.permissions;
   const scope = await requireScope();
@@ -23,13 +25,14 @@ export default async function ReportsPage() {
       <PageHeader
         eyebrow="Analytics"
         title="Reports"
-        description="Governed operational and financial reporting for individual facilities and the portfolio."
+        description="Choose a report by category, explore it online, or download a professional report for your stores."
       />
       <div className="report-shortcuts">
+      <section className="panel report-shortcut"><h2>Report library & custom reports</h2><p>Choose a template or build your own report with fields, filters and totals. Save reports, create bundles and review scheduled snapshots.</p><Link href="/reports/builder" className="button button-primary">Open report builder</Link></section>
       {hasPermission(permissions,'leads.view')&&<section className="panel report-shortcut"><h2>Marketing and customer profile</h2><p>Compare enquiry sources, personal or business storage and voluntarily recorded gender with the selected reporting period and store.</p><Link href="/marketing" className="button button-secondary">Open marketing reports</Link></section>}
       {currentRoleAccess(session.user.roleAssignments).owner && <section className="panel report-shortcut"><h2>Tenant duration & rent changes</h2><p>Days in each unit, days since a recorded price change and scheduled group increases.</p><Link className="button button-secondary" href="/billing/rent-reviews">Open tenant duration report</Link></section>}
       </div>
-      <ReportsWorkspace reports={availableReports(permissions)} facilities={facilities} initialFrom={from} initialTo={today} canExport={hasPermission(permissions, "reports.export")} />
+      {requestedReport ? <ReportsWorkspace reports={availableReports(permissions)} facilities={facilities} initialFrom={from} initialTo={today} initialReportKey={requestedReport} canExport={hasPermission(permissions, "reports.export")} /> : <VisualReportBuilder facilities={facilities} from={from} to={today} canExport={currentRoleAccess(session.user.roleAssignments,"reports.export").allowed} canSchedule={currentRoleAccess(session.user.roleAssignments,"reports.schedule").allowed} canShare={currentRoleAccess(session.user.roleAssignments).owner}/>}
     </div>
   );
 }

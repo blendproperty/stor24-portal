@@ -462,6 +462,9 @@ export function AccountsWorkspace({
                   </strong>
                 </div>
               </div>
+              {selected.tenancy?.status === "DRAFT" && selected.tenancy.documents.filter(d => d.provider === "BLENDSIGN" && !d.signedAt && !["SIGNED", "CANCELLED", "DECLINED", "EXPIRED", "VOIDED"].includes(d.status)).slice(0, 1).map(d => (
+                <div className="account-actions" key={d.id}><Link className="button button-primary" href={`/operations/lease-signing?document=${encodeURIComponent(d.id)}`}>Review and sign now</Link><p>Complete signing with the customer during this visit or call.</p></div>
+              ))}
               {selected.tenancy?.documents.some(
                 (document) => document.status === "SIGNED",
               ) ? (

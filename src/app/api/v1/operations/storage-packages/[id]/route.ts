@@ -15,10 +15,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
     const input = storagePackageUpdateSchema.parse(await request.json());
     const productCount = await db.product.count({
-      where: { id: { in: input.items.map((item) => item.productId) }, organisationId, facilityId: existing.facilityId, active: true },
+      where: { id: { in: input.items.map((item) => item.productId) }, organisationId, facilityId: existing.facilityId, ...(input.active ? { active: true } : {}) },
     });
     if (productCount !== input.items.length) {
-      return Response.json({ error: { code: "INVALID_PACKAGE_PRODUCTS", message: "Every package item must be an active product at the package facility." } }, { status: 422 });
+      return Response.json({ error: { code: "INVALID_PACKAGE_PRODUCTS", message: "Every package item must belong to the package facility; published packages require active products." } }, { status: 422 });
     }
 
     const { items, ...packageData } = input;

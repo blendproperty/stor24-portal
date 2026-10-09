@@ -129,7 +129,10 @@ if (process.env.PREVIEW_ONLY) {
    await expect(page.locator('.move-in-selection')).toContainText('Unit 530');
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth),true,`move-in overflow ${width}`);
    await page.screenshot({path:`output/premium-workspace/move-in-${width}.png`,fullPage:true});
-   await next.click(); await expect(page.getByRole('button',{name:'Send lease for signature'})).toBeVisible();
+   await next.click(); await expect(page.getByRole('button',{name:'Continue to agreement signing'})).toBeVisible();
+   await expect(page.getByRole('combobox',{name:'Signing process'})).toHaveValue('ASSISTED');
+   await page.getByRole('combobox',{name:'Signing process'}).selectOption('EMAIL');
+   await expect(page.getByRole('combobox',{name:'Signing process'})).toHaveValue('EMAIL');
    await page.getByRole('button',{name:'Add a new customer'}).click();
    await expect(page.getByRole('dialog',{name:'Add customer',exact:true})).toBeVisible();
    await page.getByRole('button',{name:'Close add customer'}).click();

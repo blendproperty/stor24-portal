@@ -231,7 +231,7 @@ export function MoveInWorkspace({
             ? "Select an available unit using size or floor-area availability."
             : selectedReservation?.readiness
               ? "Review the existing signed agreement, payment and move-in date before recording key handover."
-              : "Complete the booking details, then send the lease agreement for review and signature."
+              : "Complete the booking details, then review and sign the agreement with the customer now."
         }
       />
       {selectedReservation?.leadId && <a className="button button-secondary" href={`/leads?lead=${encodeURIComponent(selectedReservation.leadId)}`}>Back to enquiry journey</a>}
@@ -544,12 +544,19 @@ export function MoveInWorkspace({
             <section className="lease-sign-panel">
               <h3>Lease agreement</h3>
               <p className="lease-summary" style={{ fontStyle: "italic" }}>
-                No signed agreement is linked to this booking. The customer will
-                receive an emailed link to review every clause, initial each one
-                and sign — the unit stays held (not occupied) until they do.
+                Review the agreement and complete customer signing during this visit or call.
+                The customer provides their own acceptance, initials and signature.
+                For a walk-in, open signing on the counter device; for a phone-in,
+                share the signing link and stay on the call. The completed copy is sent afterwards.
               </p>
               <small>Agreement wording remains subject to legal approval. This is separate from the customer signing status.</small>
             </section>
+            <label>Signing process
+              <select name="invitationDelivery" defaultValue="ASSISTED">
+                <option value="ASSISTED">Review and sign now (walk-in or phone-in)</option>
+                <option value="EMAIL">Email invitation for later signing</option>
+              </select>
+            </label>
             {!selectedCustomer?.email && customerId ? (
               <p className="form-error">
                 Add an email address to this customer before sending the lease.
@@ -568,7 +575,7 @@ export function MoveInWorkspace({
                 className="button button-primary"
                 disabled={!canSendForSignature}
               >
-                Send lease for signature
+                Continue to agreement signing
               </button>
             </div>
           </form>

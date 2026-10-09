@@ -10,5 +10,5 @@ import Integrations from "../../src/app/integrations/page";
 import Settings from "../../src/app/settings/page";
 const screens={"/":Home,"/billing":Billing,"/calendar":Calendar,"/graphs":Performance,"/reports":Reports,"/integrations":Integrations};
 const Screen=screens[location.pathname];
-const content=Screen ? await Screen() : <Settings/>;
+const content=Screen ? await Screen({searchParams:Promise.resolve(Object.fromEntries(new URLSearchParams(location.search)))}) : <Settings/>;
 createRoot(document.getElementById("root")).render(<AppShell access={{owner:true,permissions:["*"]}} facilityLabel="Training portfolio" session={null}>{content}</AppShell>);

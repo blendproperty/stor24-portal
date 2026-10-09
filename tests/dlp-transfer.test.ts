@@ -22,7 +22,8 @@ test("outbound messages check approved recipients, credentials and split-transfe
   assert.equal((await f.api.guardDlpTransfer(message))["x-stor24-data-classification"],"confidential");
   for (const change of [{recipient:"wrong@example.invalid"},{content:"4111 1111 1111 1111"},{content:"-----BEGIN PRIVATE KEY-----"}]) await assert.rejects(f.api.guardDlpTransfer({...message,...change}),/DLP_TRANSFER_BLOCKED/);
   f.state.limited=true; await assert.rejects(f.api.guardDlpTransfer(message),/DLP_TRANSFER_BLOCKED/);
-  assert.doesNotMatch(JSON.stringify(f.state.audits),/4111|PRIVATE KEY|recipient@example|wrong@example|Synthetic booking/);
+  // Match the complete fixture PAN; random audit UUIDs can legitimately contain its four-digit prefix.
+  assert.doesNotMatch(JSON.stringify(f.state.audits),/4111[\s-]*1111[\s-]*1111[\s-]*1111|PRIVATE KEY|recipient@example|wrong@example|Synthetic booking/);
 });
 test("private document releases preserve original bytes and fail closed on size or audit outages",async()=>{
   const f=await fixture(), bytes=new Uint8Array([37,80,68,70,45,49]);
@@ -51,8 +52,9 @@ test("private file release routes must retain a DLP boundary, with only public s
     if(!/content-disposition|Content-Disposition|tenantPdf\(/.test(source))continue;
     if(file.replaceAll("\\","/")==="public/v1/storage-terms/pdf/route.ts")continue;
     if(file.replaceAll("\\","/")==="v1/move-in-training/route.ts") { assert.match(source,/trainingSample\(/); continue; }
-    assert.match(source,/protectDlpResponse|guardDlpTransfer|guardReportExport|hostedMandatePdf/,`Unprotected file release: ${file}`);covered++;
+    assert.match(source,/protectDlpResponse|guardDlpTransfer|guardReportExport|authoriseReportResult|hostedMandatePdf/,`Unprotected file release: ${file}`);covered++;
   }
+  assert.match(readFileSync("src/lib/visual-report-service.ts","utf8"),/await guardReportExport\(/);
   assert.ok(covered>=12);
 });
 
@@ -71,3 +73,5 @@ test("bulk personal transfers require explicit live scoped grants, revoke immedi
   f.state.failAudit = true;
   await assert.rejects(f.api.guardDlpTransfer(input), /SYNTHETIC_AUDIT_OUTAGE/);
 });
+
+
