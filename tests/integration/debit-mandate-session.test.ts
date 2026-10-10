@@ -54,6 +54,11 @@ test("isolated staff mandate sessions bind one signed lease and never simulate a
       await db.occupancy.updateMany({ where: { tenancyId: tenancy.id }, data: { monthlyRate: 2000 } });
       await assert.rejects(readStaffMandateSession(session.signingToken), /MANDATE_AGREEMENT_CHANGED/);
       await db.occupancy.updateMany({ where: { tenancyId: tenancy.id }, data: { monthlyRate: 1000 } });
+      const foreignCustomer = await db.customer.create({ data: { organisationId: org.id, firstName: "Other CI customer" } });
+      await db.account.update({ where: { id: account.id }, data: { customerId: foreignCustomer.id } });
+      await assert.rejects(readStaffMandateSession(session.signingToken), /MANDATE_AGREEMENT_CHANGED/);
+      await assert.rejects(prepareStaffMandateSession(scope, document.id), /MANDATE_AGREEMENT_CHANGED/);
+      await db.account.update({ where: { id: account.id }, data: { customerId: customer.id } });
       await db.debitMandateSession.update({ where: { id: session.id }, data: { expiresAt: new Date(0) } });
       assert.equal(await readStaffMandateSession(session.signingToken), null);
       const renewed = await prepareStaffMandateSession(scope, document.id);
