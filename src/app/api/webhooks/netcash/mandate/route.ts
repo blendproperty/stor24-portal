@@ -11,7 +11,9 @@ export async function POST(request: Request) {
   const data = new URLSearchParams(raw);
   const reference = data.get("AccountRef"); const correlation = data.get("Field1");
   if (!reference || !correlation || !/^[A-Za-z0-9-]{2,22}$/.test(reference) || !/^[A-Za-z0-9_-]{32,50}$/.test(correlation)) return new Response(null, { status: 400 });
-  const mandate = await db.publicDebitMandate.findUnique({ where: { reference }, include: { lease: { select: { signingToken: true } } } });
+  const mandate = await db.publicDebitMandate.findUnique({ where: { reference }, include: { lease: { select: { signingToken: true } }, session: { select: { signingToken: true, expiresAt: true } } } });
   if (!mandate || mandate.correlation !== correlation) return new Response(null, { status: 400 });
-  return new Response(null, { status: 303, headers: { location: `https://stor24.co.za/book/debit-order/${encodeURIComponent(mandate.lease.signingToken)}`, "cache-control": "no-store", "referrer-policy": "no-referrer" } });
+  const token = mandate.lease?.signingToken ?? (mandate.session && mandate.session.expiresAt > new Date() ? mandate.session.signingToken : null);
+  if (!token) return new Response(null, { status: 400 });
+  return new Response(null, { status: 303, headers: { location: `https://stor24.co.za/book/debit-order/${encodeURIComponent(token)}`, "cache-control": "no-store", "referrer-policy": "no-referrer" } });
 }

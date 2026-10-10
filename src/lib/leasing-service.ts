@@ -160,6 +160,7 @@ export async function listLeasing(scope: RequestScope) {
           where: relatedFacilityWhere,
           include: {
             facility: true,
+            mandateSession: { select: { mandate: { select: { id: true, reference: true, status: true, signedPdfSha256: true } } } },
             account: true,
             occupancies: {
               include: { unit: { include: { unitType: true } } },

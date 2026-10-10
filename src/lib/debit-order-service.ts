@@ -9,6 +9,7 @@ import { NETCASH_SOFTWARE_VENDOR_KEY } from "./integrations/netcash-configuratio
 import { billingPeriodSchema } from "./monthly-billing-policy";
 import type { MandateTerms } from "./payments/netcash-mandate";
 import { refreshHostedMandate } from "./public-hosted-mandate";
+import { assertStaffMandateSource } from "./debit-mandate-session";
 import { isTestPayment } from "./payments/payment-evidence";
 
 const DOMAIN = "DEBIT_COLLECTION";
@@ -27,9 +28,20 @@ function accountsWhere(scope: RequestScope, facilityId?: string) {
   return { customer: { organisationId: scope.organisationId }, tenancy: { facility: { ...facilityWhere(scope), ...(facilityId ? { id: facilityId } : {}) } } };
 }
 async function accountContext(client: Client, scope: RequestScope, accountId: string) {
-  const account = await client.account.findFirst({ where: { id: accountId, ...accountsWhere(scope) }, include: { tenancy: { include: { reservation: { include: { publicLease: { include: { mandate: true } } } } } } } });
+  const account = await client.account.findFirst({
+    where: { id: accountId, ...accountsWhere(scope) },
+    include: { tenancy: { include: {
+      occupancies: { where: { status: { in: ["PENDING", "ACTIVE", "NOTICE_GIVEN"] } } },
+      mandateSession: { include: { mandate: true, document: true } },
+      reservation: { include: { publicLease: { include: { mandate: true } } } },
+    } } },
+  });
   if (!account?.tenancy || account.customerId !== account.tenancy.customerId) throw new Error("DEBIT_ACCOUNT_NOT_FOUND");
-  const mandate = account.tenancy.reservation?.publicLease?.mandate;
+  const mandate = account.tenancy.mandateSession?.mandate ?? account.tenancy.reservation?.publicLease?.mandate;
+  if (account.tenancy.mandateSession) {
+    try { assertStaffMandateSource({ ...account.tenancy.mandateSession, tenancy: account.tenancy }); }
+    catch { throw new Error("DEBIT_SIGNED_MANDATE_REQUIRED"); }
+  }
   return { account, tenancy: account.tenancy, mandate };
 }
 function assertMandate(m: Awaited<ReturnType<typeof accountContext>>["mandate"], connection: Awaited<ReturnType<typeof getNetcashConnection>>) {
@@ -52,7 +64,7 @@ export async function getDebitPlan(scope: RequestScope, accountId: string) {
 }
 export async function refreshAccountDebitMandate(scope: RequestScope, accountId: string) {
   const { tenancy } = await accountContext(db, scope, accountId);
-  const token = tenancy.reservation?.publicLease?.signingToken;
+  const token = tenancy.mandateSession?.signingToken ?? tenancy.reservation?.publicLease?.signingToken;
   if (!token) throw new Error("DEBIT_SIGNED_MANDATE_REQUIRED");
   await refreshHostedMandate(token);
   return getDebitPlan(scope, accountId);
@@ -86,7 +98,7 @@ async function preview(client: Client, scope: RequestScope, facilityId: string, 
     const row: DebitCandidate = { accountId: account.id, accountNumber: account.accountNumber, amount: 0 };
     try {
       const { tenancy, mandate } = await accountContext(client, scope, account.id);
-      if (tenancy.reservation?.publicLease?.status !== "SIGNED" || tenancy.reservation.customerId !== account.customerId) throw new Error("DEBIT_SIGNED_MANDATE_REQUIRED");
+      if (tenancy.mandateSession ? tenancy.mandateSession.document.status !== "SIGNED" || !tenancy.mandateSession.document.signedAt : tenancy.reservation?.publicLease?.status !== "SIGNED" || tenancy.reservation.customerId !== account.customerId) throw new Error("DEBIT_SIGNED_MANDATE_REQUIRED");
       if (await client.financialAdjustment.count({ where: { accountId: account.id, status: { in: ["PENDING_APPROVAL", "APPROVED"] } } })) throw new Error("DEBIT_ADJUSTMENT_PENDING");
       const profile = await client.configurationProfile.findFirst({ where: { organisationId: scope.organisationId, facilityId, domain: DOMAIN, name: account.id } });
       if (!profile) throw new Error("DEBIT_PLAN_REQUIRED");
@@ -96,7 +108,7 @@ async function preview(client: Client, scope: RequestScope, facilityId: string, 
       const m = assertMandate(mandate, connection);
       if (Date.now() - m.verifiedAt!.getTime() > 86_400_000) throw new Error("DEBIT_MANDATE_REFRESH_REQUIRED");
       const terms = m.terms as unknown as MandateTerms;
-      const preferences = tenancy.reservation!.publicLease!.debitOrderPreferences as { firstCollectionDate?: string } | null;
+      const preferences = (tenancy.mandateSession?.preferences ?? tenancy.reservation?.publicLease?.debitOrderPreferences) as { firstCollectionDate?: string } | null;
       if (!preferences?.firstCollectionDate || !validDebitDate(preferences.firstCollectionDate) || actionDate < preferences.firstCollectionDate) throw new Error("DEBIT_BEFORE_MANDATE_START");
       if (Number(actionDate.slice(8)) !== terms.debitDay) throw new Error("DEBIT_MANDATE_DATE_MISMATCH");
       const reserved = await client.debitOrderInstruction.findUnique({ where: { accountId_period: { accountId: account.id, period } } });

@@ -9,14 +9,13 @@ import { mandatePolicy } from "@/lib/payments/netcash-mandate-policy";
 import { addHostedMandate, requestMandateData, retrieveMandateData, requestMandatePdf, retrieveMandatePdf, validateMandateTerms, verifyMandateReport, type MandateTerms } from "@/lib/payments/netcash-mandate";
 import { NETCASH_SOFTWARE_VENDOR_KEY } from "@/lib/integrations/netcash-configuration";
 import { parseDebitOrderPreferences } from "@/lib/debit-order-preferences";
+import { findMandateLease } from "@/lib/debit-mandate-session";
 
 function view(m: { status: string; reference: string; hostedUrl: string | null; verifiedAt: Date | null; failureCode: string | null; signedPdfSha256?: string | null }) {
   return { status: m.status, reference: m.reference, hostedUrl: m.status === "AWAITING_SIGNATURE" ? m.hostedUrl : null, verifiedAt: m.verifiedAt?.toISOString() ?? null, failureCode: m.failureCode, pdfAvailable: !!m.signedPdfSha256, collectionEnabled: false };
 }
 async function findLease(token: string) {
-  const lease = await db.publicReservationLease.findUnique({ where: { signingToken: token }, include: { mandate: true, reservation: { include: { customer: true } } } });
-  if (!lease || lease.status !== "SIGNED" || lease.paymentMethod !== "DEBIT_ORDER") throw new Error("MANDATE_BOOKING_UNAVAILABLE");
-  return lease;
+  return findMandateLease(token);
 }
 export async function hostedMandateStatus(token: string) {
   const lease = await findLease(token);
@@ -31,8 +30,10 @@ export async function startHostedMandate(token: string) {
   const policy = mandatePolicy();
   if (!policy || policy.organisationId !== lease.reservation.customer.organisationId) throw new Error("MANDATE_CONFIGURATION_REQUIRED");
   if (lease.mandate) return view(lease.mandate); // One provider request per signed lease, even after ambiguous timeout.
-  const same = await preparePublicReservationLease(lease.reservation.publicReference!, "DEBIT_ORDER");
-  if (!same.ok || same.status !== "SIGNED") throw new Error("MANDATE_AGREEMENT_CHANGED");
+  if (!lease.sourceSessionId) {
+    const same = await preparePublicReservationLease(lease.reservation.publicReference!, "DEBIT_ORDER");
+    if (!same.ok || same.status !== "SIGNED") throw new Error("MANDATE_AGREEMENT_CHANGED");
+  }
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Johannesburg", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const preferences = parseDebitOrderPreferences(lease.debitOrderPreferences, today);
   // Standard eMandate exposes commencement month/day, NOT a separate first-payment
@@ -48,9 +49,11 @@ export async function startHostedMandate(token: string) {
   validateMandateTerms(terms);
   // Unique leaseId is the concurrency guard. A losing caller must NOT call provider.
   const m = await db.$transaction(async tx => {
-    const claim = await tx.publicReservationLease.updateMany({ where: { id: lease.id, mandate: { is: null }, debitOrderPreferences: { equals: lease.debitOrderPreferences! } }, data: { debitOrderRequestedAt: lease.debitOrderRequestedAt ?? new Date() } });
+    const claim = lease.sourceSessionId
+      ? await tx.debitMandateSession.updateMany({ where: { id: lease.id, mandate: { is: null }, preferences: { equals: lease.debitOrderPreferences! } }, data: { requestedAt: lease.debitOrderRequestedAt ?? new Date() } })
+      : await tx.publicReservationLease.updateMany({ where: { id: lease.id, mandate: { is: null }, debitOrderPreferences: { equals: lease.debitOrderPreferences! } }, data: { debitOrderRequestedAt: lease.debitOrderRequestedAt ?? new Date() } });
     if (!claim.count) throw new Error("MANDATE_DETAILS_CHANGED");
-    const created = await tx.publicDebitMandate.create({ data: { leaseId: lease.id, reference: terms.reference, correlation: terms.correlation, terms, environment: connection.config.environment, connectionId: connection.id, connectionFingerprint: debitConnectionFingerprint(connection.config) } });
+    const created = await tx.publicDebitMandate.create({ data: { ...(lease.sourceSessionId ? { sessionId: lease.id } : { leaseId: lease.id }), reference: terms.reference, correlation: terms.correlation, terms, environment: connection.config.environment, connectionId: connection.id, connectionFingerprint: debitConnectionFingerprint(connection.config) } });
     await tx.auditEvent.create({ data: { organisationId: customer.organisationId, facilityId: lease.reservation.facilityId, action: "public_mandate.creation_started", entityType: "PublicDebitMandate", entityId: created.id, after: { reference: terms.reference, amount: terms.amount, approvedBy: policy.approvedBy, collectionEnabled: false } } });
     return created;
   });
