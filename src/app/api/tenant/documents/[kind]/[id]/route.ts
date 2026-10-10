@@ -7,6 +7,7 @@ import { tenantError, tenantPdf, tenantPrivateHeaders } from "@/lib/tenant-porta
 import { fetchBlendSignArtifact } from "@/lib/blendsign-client";
 import { renderTenantDocumentPdf } from "@/lib/finance/tenant-document-pdf";
 import { formatSouthAfricaDate } from "@/lib/south-africa-time";
+import { createHash } from "node:crypto";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ kind: string; id: string }> }) {
   try {
@@ -14,7 +15,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ kin
     if (await tenantRateLimit(`tenant:download:${session.tokenHash}`, 20, 60000)) throw new Error("TENANT_RATE_LIMITED");
     const customer = tenantCustomerScope(session);
     let response: Response;
-    if (kind === "agreement") {
+    if (kind === "mandate") {
+      const mandate = await db.publicDebitMandate.findFirst({ where: { id, status: "SIGNED", OR: [{ lease: { reservation: { customer } } }, { session: { tenancy: { customer } } }] }, select: { signedPdf: true, signedPdfSha256: true } });
+      if (!mandate?.signedPdf || !mandate.signedPdfSha256 || createHash("sha256").update(mandate.signedPdf).digest("hex") !== mandate.signedPdfSha256) throw new Error("TENANT_NOT_FOUND");
+      response = tenantPdf(mandate.signedPdf, "stor24-signed-debit-order-mandate.pdf");
+    } else if (kind === "agreement") {
       const lease = await db.publicReservationLease.findFirst({ where: { id, status: "SIGNED", signedPdf: { not: null }, reservation: { customer } }, select: { signedPdf: true } });
       if (!lease?.signedPdf) throw new Error("TENANT_NOT_FOUND");
       response = tenantPdf(lease.signedPdf, "stor24-signed-agreement.pdf");
