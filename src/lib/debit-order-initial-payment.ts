@@ -32,7 +32,7 @@ export async function startDebitOrderInitialPayment(token: string) {
   if (!same.ok || same.status !== "SIGNED") throw new Error("MANDATE_AGREEMENT_CHANGED");
   return db.$transaction(async tx => {
     // Cross-device concurrent requests must not issue two checkout forms.
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`debit-initial:${lease.id}`}))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`debit-initial:${lease.id}`}, 0))`;
     await tx.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id" = ${lease.reservation.id} FOR UPDATE`;
     const current = await findMandateLease(token);
     if (current.id !== lease.id || current.expiresAt <= new Date() || JSON.stringify(current.reservation) !== JSON.stringify(lease.reservation)) throw new Error("MANDATE_AGREEMENT_CHANGED");

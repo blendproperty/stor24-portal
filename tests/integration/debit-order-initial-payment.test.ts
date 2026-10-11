@@ -32,7 +32,7 @@ test("isolated database serialises initial debit-order checkout across devices w
   new Function("require","module","exports","__state",output.outputFiles[0].text)(createRequire(import.meta.url),loaded,loaded.exports,state);
   try {
     const results = await Promise.allSettled([loaded.exports.startDebitOrderInitialPayment("synthetic"),loaded.exports.startDebitOrderInitialPayment("synthetic")]);
-    assert.equal(results.filter(r=>r.status==="fulfilled").length,1);
+    assert.equal(results.filter(r=>r.status==="fulfilled").length,1,results.map(r=>r.status==="rejected" ? String(r.reason) : r.status).join("; "));
     assert.equal(results.filter(r=>r.status==="rejected" && /INITIAL_PAYMENT_ALREADY_STARTED/.test(String(r.reason))).length,1);
     assert.equal(starts,1);
     assert.equal(await db.payment.count({where:{accountId:account.id}}),1);
