@@ -2,7 +2,7 @@ import { publicInitialRent, publicCheckoutTotal } from "./public-initial-rent";
 import { parseDebitOrderPreferences } from "./debit-order-preferences";
 
 type Booking = Parameters<typeof publicCheckoutTotal>[0];
-export function debitOrderSchedule(booking: Booking, input: unknown, today: string, allowedDays?: number[]) {
+export function debitOrderSchedule(booking: Booking, input: unknown, today: string, allowedDays?: number[], existingMandate = false) {
   let initialPayment: { lines: { period: string; amount: number }[]; goods: number; total: number } | null = null;
   let earliestDate = today;
   try {
@@ -25,6 +25,6 @@ export function debitOrderSchedule(booking: Booking, input: unknown, today: stri
     suggestedDate = `${next.toISOString().slice(0, 7)}-${String(day).padStart(2, "0")}`;
   }
   const preferences = parseDebitOrderPreferences(input, earliestDate);
-  const ready = !!preferences && Number(preferences.firstCollectionDate.slice(8)) === preferences.collectionDay && (!allowedDays || (allowedDays.includes(preferences.collectionDay) && preferences.firstCollectionDate.slice(0, 4) === today.slice(0, 4)));
+  const ready = !!preferences && Number(preferences.firstCollectionDate.slice(8)) === preferences.collectionDay && (!allowedDays || (allowedDays.includes(preferences.collectionDay) && (existingMandate || preferences.firstCollectionDate.slice(0, 4) === today.slice(0, 4))));
   return { initialPayment, earliestDate, suggestedDate, ready, code: ready ? null : "MANDATE_SCHEDULE_REVIEW_REQUIRED", message: ready ? null : `Choose matching first and monthly collection days on or after ${earliestDate}, after the rental months included in your first payment.${allowedDays ? " The current Netcash mandate also requires an approved debit day in this calendar year; contact STOR24 for a later year." : ""}` };
 }

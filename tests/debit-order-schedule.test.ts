@@ -68,3 +68,23 @@ test("unsigned and expired capabilities cannot start the initial checkout; accou
     assert.equal(network.mock.callCount(),0);
   } finally {restore();restoreAccount();network.mock.restore();}
 });
+test("existing authority cannot expose a signing link for covered months or a changed recurring amount", async () => {
+  let terms = {amount:"1250.00",commencementMonth:10,debitDay:1};
+  let preferences = {firstCollectionDate:"2026-10-31",collectionDay:1};
+  const restore = stub(db.publicReservationLease,"findUnique",async()=>({id:"lease",status:"SIGNED",paymentMethod:"DEBIT_ORDER",expiresAt:new Date(Date.now()+60000),debitOrderPreferences:preferences,reservation:{...booking,status:"ACTIVE",customer:{organisationId:"test-org"}},mandate:{status:"AWAITING_SIGNATURE",reference:"synthetic",hostedUrl:"https://short.surf/example",verifiedAt:null,terms}}));
+  try {
+    let result = await hostedMandateStatus("fake-token");
+    assert.equal(result.mandate?.hostedUrl,null); assert.equal(result.mandate?.reviewRequired,true);
+    preferences = {firstCollectionDate:"2026-12-01",collectionDay:1}; terms = {amount:"1300.00",commencementMonth:12,debitDay:1};
+    result = await hostedMandateStatus("fake-token");
+    assert.equal(result.mandate?.hostedUrl,null); assert.equal(result.mandate?.reviewRequired,true);
+  } finally {restore();}
+});
+test("a valid older mandate keeps its date without being recreated", async () => {
+  const date = new Date("2026-06-30T00:00:00+02:00");
+  const restore = stub(db.publicReservationLease,"findUnique",async()=>({id:"lease",status:"SIGNED",paymentMethod:"DEBIT_ORDER",expiresAt:new Date(Date.now()+60000),debitOrderPreferences:{firstCollectionDate:"2026-08-01",collectionDay:1},reservation:{quotedRate:1250,intendedMoveIn:date,initialRentSnapshot:newPublicInitialRent(1250,date),status:"ACTIVE",customer:{organisationId:"test-org"}},mandate:{status:"AWAITING_SIGNATURE",reference:"synthetic",hostedUrl:"https://short.surf/example",verifiedAt:null,terms:{amount:"1250.00",commencementMonth:8,debitDay:1}}}));
+  try {
+    const result = await hostedMandateStatus("fake-token");
+    assert.equal(result.mandate?.reviewRequired,false); assert.equal(result.mandate?.hostedUrl,"https://short.surf/example");
+  } finally {restore();}
+});

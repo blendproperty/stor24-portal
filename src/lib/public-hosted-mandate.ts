@@ -18,21 +18,38 @@ function view(m: { status: string; reference: string; hostedUrl: string | null; 
 async function findLease(token: string) {
   return findMandateLease(token);
 }
+function reviewedSchedule(lease: Awaited<ReturnType<typeof findLease>>, policy = mandatePolicy()) {
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Johannesburg", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const scoped = policy?.organisationId === lease.reservation.customer.organisationId ? policy : null;
+  const preferences = parseDebitOrderPreferences(lease.debitOrderPreferences, "0000-01-01");
+  // Existing authority retains its original date/year; verify its anchor against
+  // invoice coverage rather than rejecting it just because that date has passed.
+  const anchor = lease.mandate && preferences && preferences.firstCollectionDate < today ? preferences.firstCollectionDate : today;
+  const schedule = debitOrderSchedule(lease.reservation, lease.debitOrderPreferences, anchor, scoped?.allowedDays, !!lease.mandate);
+  if (lease.mandate) {
+    const terms = lease.mandate.terms as unknown as MandateTerms;
+    if (!schedule.ready || !preferences || !terms || Number(terms.amount) !== Number(lease.reservation.quotedRate) || terms.debitDay !== preferences.collectionDay || terms.commencementMonth !== Number(preferences.firstCollectionDate.slice(5, 7))) return { ...schedule, ready: false, code: "MANDATE_SCHEDULE_REVIEW_REQUIRED", message: "Your existing bank mandate needs STOR24 invoice and schedule review. Do not sign it again or create another mandate." };
+  }
+  return schedule;
+}
+function safeView(lease: Awaited<ReturnType<typeof findLease>>, m: Parameters<typeof view>[0]) {
+  const reviewRequired = !reviewedSchedule(lease).ready;
+  return { ...view(m), ...(reviewRequired ? { hostedUrl: null } : {}), reviewRequired };
+}
 export async function hostedMandateStatus(token: string) {
   const lease = await findLease(token);
   const policy = mandatePolicy();
   const scoped = policy?.organisationId === lease.reservation.customer.organisationId ? policy : null;
   const available = lease.reservation.status === "ACTIVE" && lease.expiresAt > new Date();
-  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Johannesburg", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-  const schedule = debitOrderSchedule(lease.reservation, lease.debitOrderPreferences, today, scoped?.allowedDays);
-  return { enabled: !!scoped && available, schedule, allowedDays: scoped?.allowedDays ?? [], noticeDays: scoped?.noticeDays ?? null, holiday: scoped?.holiday ?? null, mandate: lease.mandate ? { ...view(lease.mandate), ...(!available ? { hostedUrl: null } : {}) } : null };
+  const schedule = reviewedSchedule(lease, scoped);
+  return { enabled: !!scoped && available, schedule, allowedDays: scoped?.allowedDays ?? [], noticeDays: scoped?.noticeDays ?? null, holiday: scoped?.holiday ?? null, mandate: lease.mandate ? { ...safeView(lease, lease.mandate), ...(!available ? { hostedUrl: null } : {}) } : null };
 }
 export async function startHostedMandate(token: string) {
   const lease = await findLease(token);
   if (lease.expiresAt <= new Date() || lease.reservation.status !== "ACTIVE") throw new Error("MANDATE_BOOKING_UNAVAILABLE");
   const policy = mandatePolicy();
   if (!policy || policy.organisationId !== lease.reservation.customer.organisationId) throw new Error("MANDATE_CONFIGURATION_REQUIRED");
-  if (lease.mandate) return view(lease.mandate); // One provider request per signed lease, even after ambiguous timeout.
+  if (lease.mandate) return safeView(lease, lease.mandate); // One provider request per signed lease, even after ambiguous timeout.
   if (!lease.sourceSessionId) {
     const same = await preparePublicReservationLease(lease.reservation.publicReference!, "DEBIT_ORDER");
     if (!same.ok || same.status !== "SIGNED") throw new Error("MANDATE_AGREEMENT_CHANGED");
@@ -75,9 +92,9 @@ export async function refreshHostedMandate(token: string) {
   const lease = await findLease(token);
   const m = lease.mandate;
   if (!m) throw new Error("MANDATE_NOT_STARTED");
-  if (m.status === "CREATING" || m.status === "REVIEW_REQUIRED" || (m.lastCheckedAt && Date.now() - m.lastCheckedAt.getTime() < 30_000)) return view(m);
+  if (m.status === "CREATING" || m.status === "REVIEW_REQUIRED" || (m.lastCheckedAt && Date.now() - m.lastCheckedAt.getTime() < 30_000)) return safeView(lease, m);
   const claimed = await db.publicDebitMandate.updateMany({ where: { id: m.id, lastCheckedAt: m.lastCheckedAt }, data: { lastCheckedAt: new Date() } });
-  if (!claimed.count) return view(m);
+  if (!claimed.count) return safeView(lease, m);
   const connection = await getNetcashConnection(lease.reservation.customer.organisationId);
   const key = connection.config.debitOrderServiceKey;
   if (!key) throw new Error("MANDATE_CONFIGURATION_REQUIRED");
@@ -94,18 +111,18 @@ export async function refreshHostedMandate(token: string) {
       const date = new Date().toISOString().slice(0, 10).replaceAll("-", "");
       const pdfToken = await requestMandatePdf(key, m.reference, NETCASH_SOFTWARE_VENDOR_KEY, date);
       await db.publicDebitMandate.update({ where: { id: m.id }, data: { pdfToken } });
-      return view(m);
+      return safeView(lease, m);
     }
     const pdf = await retrieveMandatePdf(key, m.pdfToken, m.reference);
     const document = await PDFDocument.load(pdf);
     if (document.getPageCount() < 1) throw new Error("MANDATE_PDF_INVALID");
     const signedPdfSha256 = createHash("sha256").update(pdf).digest("hex");
-    return view(await db.publicDebitMandate.update({ where: { id: m.id }, data: { signedPdf: pdf, signedPdfSha256 } }));
+    return safeView(lease, await db.publicDebitMandate.update({ where: { id: m.id }, data: { signedPdf: pdf, signedPdfSha256 } }));
   }
   if (!m.reportToken || !m.reportRequestedAt || Date.now() - m.reportRequestedAt.getTime() > 120_000) {
     const reportToken = await requestMandateData(key);
     await db.publicDebitMandate.update({ where: { id: m.id }, data: { reportToken, reportRequestedAt: new Date() } });
-    return view(m); // Provider asynchronous report: next customer refresh retrieves it.
+    return safeView(lease, m); // Provider asynchronous report: next customer refresh retrieves it.
   }
   const report = await retrieveMandateData(key, m.reportToken);
   const status = verifyMandateReport(report, m.terms as MandateTerms);
@@ -117,7 +134,7 @@ export async function refreshHostedMandate(token: string) {
       await tx.auditEvent.create({ data: { organisationId: lease.reservation.customer.organisationId, facilityId: lease.reservation.facilityId, action: "public_mandate.provider_status_verified", entityType: "PublicDebitMandate", entityId: m.id, after: { status, reference: m.reference, collectionEnabled: false } } });
       await tx.task.updateMany({ where: { id: `public-debit-order-${lease.id}`, customerId: lease.reservation.customerId }, data: { title: status === "SIGNED" ? `Confirm first payment and move-in ${lease.reservation.publicReference}` : `Review mandate ${lease.reservation.publicReference}`, description: `Netcash mandate ${m.reference}: ${status}, independently checked with the provider. No collection has been submitted. Confirm the initial payment, any deposit/package charges and move-in readiness separately. Do not request bank details by email.`, priority: "HIGH" } });
     }
-    return view(updated);
+    return safeView(lease, updated);
   });
 }
 export async function hostedMandatePdf(token: string) {
