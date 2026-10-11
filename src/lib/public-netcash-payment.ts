@@ -13,10 +13,11 @@ export function publicNetcashPaymentStatus(status: string, failureCode: string |
   return status;
 }
 
-export async function startPublicNetcashSandboxPayment(reference: string, idempotencyKey: string) {
+export async function startPublicNetcashSandboxPayment(reference: string, idempotencyKey: string, debitOrderJourney = false) {
   const reservation = await db.reservation.findUnique({
     where: { publicReference: reference },
     include: {
+      publicLease: { select: { paymentMethod: true } },
       facility: { select: { name: true } },
       unit: { select: { number: true } },
       customer: true,
@@ -32,6 +33,7 @@ export async function startPublicNetcashSandboxPayment(reference: string, idempo
   ) {
     return { ok: false as const, code: "RESERVATION_UNAVAILABLE" };
   }
+  if (reservation.publicLease?.paymentMethod === "DEBIT_ORDER" && !debitOrderJourney) return { ok: false as const, code: "DEBIT_ORDER_PAYMENT_JOURNEY_REQUIRED" };
 
   // This sends the reservation's real quoted rate to Netcash so a completed
   // transaction here is a true proof the integration handles what a

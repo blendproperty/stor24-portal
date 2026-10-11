@@ -10,6 +10,7 @@ import { addHostedMandate, requestMandateData, retrieveMandateData, requestManda
 import { NETCASH_SOFTWARE_VENDOR_KEY } from "@/lib/integrations/netcash-configuration";
 import { parseDebitOrderPreferences } from "@/lib/debit-order-preferences";
 import { findMandateLease } from "@/lib/debit-mandate-session";
+import { debitOrderSchedule } from "./debit-order-schedule";
 
 function view(m: { status: string; reference: string; hostedUrl: string | null; verifiedAt: Date | null; failureCode: string | null; signedPdfSha256?: string | null }) {
   return { status: m.status, reference: m.reference, hostedUrl: m.status === "AWAITING_SIGNATURE" ? m.hostedUrl : null, verifiedAt: m.verifiedAt?.toISOString() ?? null, failureCode: m.failureCode, pdfAvailable: !!m.signedPdfSha256, collectionEnabled: false };
@@ -22,7 +23,9 @@ export async function hostedMandateStatus(token: string) {
   const policy = mandatePolicy();
   const scoped = policy?.organisationId === lease.reservation.customer.organisationId ? policy : null;
   const available = lease.reservation.status === "ACTIVE" && lease.expiresAt > new Date();
-  return { enabled: !!scoped && available, allowedDays: scoped?.allowedDays ?? [], noticeDays: scoped?.noticeDays ?? null, holiday: scoped?.holiday ?? null, mandate: lease.mandate ? { ...view(lease.mandate), ...(!available ? { hostedUrl: null } : {}) } : null };
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Johannesburg", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const schedule = debitOrderSchedule(lease.reservation, lease.debitOrderPreferences, today, scoped?.allowedDays);
+  return { enabled: !!scoped && available, schedule, allowedDays: scoped?.allowedDays ?? [], noticeDays: scoped?.noticeDays ?? null, holiday: scoped?.holiday ?? null, mandate: lease.mandate ? { ...view(lease.mandate), ...(!available ? { hostedUrl: null } : {}) } : null };
 }
 export async function startHostedMandate(token: string) {
   const lease = await findLease(token);
@@ -35,6 +38,8 @@ export async function startHostedMandate(token: string) {
     if (!same.ok || same.status !== "SIGNED") throw new Error("MANDATE_AGREEMENT_CHANGED");
   }
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Johannesburg", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const schedule = debitOrderSchedule(lease.reservation, lease.debitOrderPreferences, today, policy.allowedDays);
+  if (!schedule.ready) throw new Error(schedule.code!);
   const preferences = parseDebitOrderPreferences(lease.debitOrderPreferences, today);
   // Standard eMandate exposes commencement month/day, NOT a separate first-payment
   // date or year. Never silently translate mismatched dates or a future year.

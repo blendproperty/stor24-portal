@@ -63,7 +63,7 @@ export function staffMandateLease(session: Session) {
 }
 
 export async function findMandateLease(token: string) {
-  const publicLease = await db.publicReservationLease.findUnique({ where: { signingToken: token }, include: { mandate: true, reservation: { include: { customer: true, facility: true, unit: { include: { unitType: true } } } } } });
+  const publicLease = await db.publicReservationLease.findUnique({ where: { signingToken: token }, include: { mandate: true, reservation: { include: { packageSelection: true, customer: true, facility: true, unit: { include: { unitType: true } } } } } });
   if (publicLease) {
     if (publicLease.status !== "SIGNED" || publicLease.paymentMethod !== "DEBIT_ORDER") throw new Error("MANDATE_BOOKING_UNAVAILABLE");
     return { ...publicLease, sourceSessionId: null };

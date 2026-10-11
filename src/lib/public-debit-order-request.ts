@@ -1,6 +1,8 @@
 import { db } from "@/lib/db";
 import { parseDebitOrderPreferences } from "@/lib/debit-order-preferences";
 import { findMandateLease } from "@/lib/debit-mandate-session";
+import { debitOrderSchedule } from "./debit-order-schedule";
+import { mandatePolicy } from "./payments/netcash-mandate-policy";
 
 export async function requestPublicDebitOrderSetup(signingToken: string, input: unknown) {
   const lease = await findMandateLease(signingToken).catch(() => null);
@@ -15,6 +17,9 @@ export async function requestPublicDebitOrderSetup(signingToken: string, input: 
   const moveIn = lease.reservation.intendedMoveIn?.toISOString().slice(0, 10) ?? today;
   const preferences = parseDebitOrderPreferences(input, moveIn > today ? moveIn : today);
   if (!preferences) return { ok: false as const, code: "COLLECTION_PREFERENCES_REQUIRED" };
+  const policy = mandatePolicy();
+  const schedule = debitOrderSchedule(lease.reservation, preferences, today, policy?.organisationId === lease.reservation.customer.organisationId ? policy.allowedDays : undefined);
+  if (!schedule.ready) return { ok: false as const, code: schedule.code!, message: schedule.message };
 
   const taskId = `public-debit-order-${lease.id}`;
   return db.$transaction(async (tx) => {

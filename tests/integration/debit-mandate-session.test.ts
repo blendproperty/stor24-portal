@@ -45,8 +45,9 @@ test("isolated staff mandate sessions bind one signed lease and never simulate a
       await assert.rejects(prepareStaffMandateSession(scope, otherDocument.id), /MANDATE_AGREEMENT_CHANGED/);
       const session = await db.debitMandateSession.findUniqueOrThrow({ where: { tenancyId: tenancy.id } });
       const saved = await requestPublicDebitOrderSetup(session.signingToken, { firstCollectionDate: "2099-02-01", collectionDay: 1 });
-      assert.equal(saved.ok, true);
-      assert.equal((await readStaffMandateSession(session.signingToken))?.preferences && saved.ok, true);
+      assert.equal(saved.ok, false);
+      assert.equal(!saved.ok && saved.code, "MANDATE_INITIAL_RENT_REVIEW_REQUIRED");
+      assert.equal((await readStaffMandateSession(session.signingToken))?.preferences, null);
       assert.equal((await db.tenancy.findUniqueOrThrow({ where: { id: tenancy.id } })).status, "DRAFT");
     });
     await t.test("changed terms invalidate setup; expired links renew without a new provider mandate", async () => {
