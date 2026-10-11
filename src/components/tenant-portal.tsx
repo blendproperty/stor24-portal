@@ -13,6 +13,7 @@ import { packageItems } from "@/lib/tenant-merchandise";
 import { tenantIdentityMessage, type TenantIdentity } from "@/lib/tenant-identity-presentation";
 
 type PortalData = {
+  debitOrders?: { id: string; kind: string; unitId: string | null; accountId: string | null; mandate: { id: string; reference: string; status: string; signedPdfSha256: string | null } | null }[];
   onboarding?: { reservationId: string; ready: boolean; paidAmount: number; requiredAmount: number; startDate: string | null; blockers: string[]; mandateStatus: string | null }[];
   testPayments?: { id: string; accountId: string; amount: string; currency: string; status: string }[];
   units: { key: string; unitId: string; number: string; facilityName: string; accountId: string | null; status: string; accessState?: string; reservations: { id: string; publicReference: string | null; identityDocument?: TenantIdentity | null; packageSelection: null | { packageName: string; status: string; priceSnapshot: string; itemsSnapshot: { name: string; quantity: number }[]; fulfilledAt: string | null } }[] }[];
@@ -39,6 +40,16 @@ export function TenantPortal({ organisation, initialAccount, initialFrom, initia
   const loginHint = useRef<string | undefined>(undefined);
   const photoSection = useRef<HTMLDivElement>(null), arrivalFocused = useRef(false);
   function clearStatement() { statementRequest.current++; setStatement(null); }
+  async function openMandate(id: string, kind: string) {
+    setBusy(true); setError("");
+    try {
+      const response = await fetch("/api/tenant/debit-order", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, kind }) });
+      const payload = await response.json();
+      if (!response.ok || !payload.data?.setupUrl) throw new Error(payload.error || "Your mandate setup is unavailable.");
+      window.location.assign(payload.data.setupUrl);
+    } catch (error) { setError(error instanceof Error ? error.message : "Please retry mandate setup."); }
+    finally { setBusy(false); }
+  }
   async function loadStatement(url: string) {
     const version = ++statementRequest.current;
     const result = await request(url);
@@ -173,7 +184,9 @@ export function TenantPortal({ organisation, initialAccount, initialFrom, initia
         {data.testPayments?.some(p => p.accountId === effectiveAccountId) && <section className="tenant-card tenant-test-activity"><h2>Test payment activity</h2><p>Sandbox payments are testing records. They are not rent receipts and do not authorise key collection.</p>{data.testPayments.filter(p => p.accountId === effectiveAccountId).map(p => <p key={p.id}>{currency(p.amount, p.currency)} · {p.status === "TEST_SUCCEEDED" || p.status === "SUCCEEDED" ? "Test verified" : "Test pending"}</p>)}</section>}
         {data.accounts.find(a => a.id === effectiveAccountId)?.financialReviewRequired && <p role="status" className="tenant-card">Historical test entries need reconciliation. The account balance and financial statements are unavailable until the store completes this review.</p>}
 
-        <section className="tenant-card" id="tenant-documents"><div className="tenant-section-title"><FileText size={21} aria-hidden="true" /><h2>{selectedUnitId ? "Documents for this unit" : "Documents for this account"}</h2></div><p>Agreements and payments linked to your selection. Other units’ documents are not mixed into this view.</p><div className="tenant-document-list">
+        <section className="tenant-card" id="tenant-documents"><div className="tenant-section-title"><FileText size={21} aria-hidden="true" /><h2>{selectedUnitId ? "Documents for this unit" : "Documents for this account"}</h2></div><p>Agreements and payments linked to your selection. Other units’ documents are not mixed into this view.</p>
+          {data.debitOrders?.filter(item => item.accountId ? item.accountId === effectiveAccountId : item.kind === "public" && unitAgreements.some(a => a.id === item.id)).map(item => <section key={`${item.kind}:${item.id}`} className="tenant-move-in-readiness" aria-label="Debit-order bank mandate"><h3>Separate debit-order bank mandate</h3><p>{item.mandate?.status === "SIGNED" ? item.mandate.signedPdfSha256 ? "Signed mandate confirmed and attached." : "Mandate signed; its PDF is still being retrieved." : "Your storage agreement is signed. Complete your separate bank authority before debit-order setup is complete."}</p><button className="tenant-primary" disabled={busy} onClick={() => void openMandate(item.id, item.kind)}>{item.mandate ? "Review bank mandate and confirmation" : "Set up and sign my bank mandate"}</button>{item.mandate?.signedPdfSha256 && <a href={`/api/tenant/documents/mandate/${item.mandate.id}`}>Download signed debit-order mandate PDF</a>}<p>A mandate is separate from payment confirmation and access activation.</p></section>)}
+          <div className="tenant-document-list">
           {unitAgreements.map(item => <a key={item.id} href={`/api/tenant/documents/agreement/${item.id}`}><FileText size={20} /><span>Signed agreement<small>{item.reservation.publicReference} · {formatSouthAfricaDate(item.signedAt)}</small></span><Download size={18} /></a>)}
           {unitDocuments.map(item => <a key={item.id} href={`/api/tenant/documents/issued/${item.id}`}><FileText size={20} /><span>{item.type.replaceAll("_", " ")}<small>{formatSouthAfricaDate(item.createdAt)} · {item.type === "LEASE_AGREEMENT" ? "PDF" : "Original issued HTML document"}</small></span><Download size={18} /></a>)}
           {unitPayments.map(item => <a key={item.id} href={`/api/tenant/documents/receipt/${item.id}`}><FileText size={20} /><span>Payment receipt · {currency(item.amount, item.currency)}<small>{formatSouthAfricaDate(item.processedAt ?? item.createdAt)} · {item.account.accountNumber}</small></span><Download size={18} /></a>)}

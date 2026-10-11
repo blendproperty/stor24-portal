@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/page-header";
 type Session = {
   accountId: string; reservationId: string | null; leadId: string | null;
   completed: boolean; reconciling?: boolean; dispatchRequired?: boolean;
+  paymentMethod?: string | null; mandate?: { status: string; signedPdfSha256: string | null } | null;
   signers: { name: string; order: number; status: string; signingUrl: string | null }[];
 };
 
@@ -14,9 +15,10 @@ export function LeaseSigningSession({ documentId }: { documentId: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [mandateUrl, setMandateUrl] = useState<string | null>(null);
   const load = useCallback(async () => {
     if (!documentId) { setError("Choose the saved lease from its account."); return; }
-    setBusy(true); setError(""); setCopied(false);
+    setBusy(true); setError(""); setCopied(false); setMandateUrl(null);
     try {
       const response = await fetch(`/api/v1/documents/${encodeURIComponent(documentId)}/signing-session`, { cache: "no-store" });
       const payload = await response.json();
@@ -46,6 +48,16 @@ export function LeaseSigningSession({ documentId }: { documentId: string }) {
     } catch (error) { setError(error instanceof Error ? error.message : "Signing could not be prepared."); }
     finally { setBusy(false); }
   }
+  async function prepareMandate() {
+    setBusy(true); setError(""); setMandateUrl(null);
+    try {
+      const response = await fetch(`/api/v1/documents/${encodeURIComponent(documentId)}/mandate-session`, { method: "POST" });
+      const payload = await response.json();
+      if (!response.ok || !payload.data?.setupUrl) throw new Error("The separate debit-order mandate could not be prepared. Check the signed lease, customer and account terms before retrying.");
+      setMandateUrl(payload.data.setupUrl);
+    } catch (error) { setError(error instanceof Error ? error.message : "Mandate setup is unavailable."); }
+    finally { setBusy(false); }
+  }
   const signer = session?.signers.find(s => s.signingUrl);
   return <div className="page-stack">
     <PageHeader eyebrow="Lead to lease" title={session?.completed ? "Lease agreement signed" : "Review and sign now"}
@@ -67,6 +79,13 @@ export function LeaseSigningSession({ documentId }: { documentId: string }) {
       </div>
       {copied && <p role="status">Signing link copied. Share it with this signer during the call.</p>}
       {session?.completed && <p role="status">The signed agreement is saved. Continue with payment and move-in checks; signing does not confirm payment or key handover.</p>}
+      {session?.completed && session.paymentMethod === "DEBIT_ORDER" && <section className="form-section" aria-label="Separate debit-order mandate">
+        <h2>Complete the separate debit-order mandate</h2>
+        <p>The storage agreement is signed. The customer must also review the debit amount, schedule and bank authority, enter their bank details securely with Netcash, and sign the mandate using their own OTP.</p>
+        <p role="status">{session.mandate?.status === "SIGNED" ? session.mandate.signedPdfSha256 ? "Mandate confirmed and signed PDF attached. Payment and move-in checks remain separate." : "Mandate signed; signed PDF attachment is still pending." : "Bank mandate not yet confirmed. The storage agreement PDF is not the bank mandate."}</p>
+        <button className="button button-primary" disabled={busy} onClick={() => void prepareMandate()}>Prepare customer mandate signing</button>
+        {mandateUrl && <div className="form-actions"><a className="button button-primary" href={mandateUrl} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">Open customer mandate on this device</a><button className="button button-secondary" onClick={() => void copyLink(mandateUrl)}>Copy mandate link for customer&apos;s phone</button></div>}
+      </section>}
       <div className="form-actions">
         {session && <a className="button button-secondary" href={`/operations/accounts?accountId=${encodeURIComponent(session.accountId)}`}>{session.completed ? "Continue to payment and account" : "Review saved account"}</a>}
         {session?.leadId && <a className="button button-secondary" href={`/leads?lead=${encodeURIComponent(session.leadId)}`}>Back to enquiry journey</a>}

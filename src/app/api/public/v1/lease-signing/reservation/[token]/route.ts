@@ -3,13 +3,16 @@ import { publicApiAuthorized } from "@/lib/public-booking-contract";
 import { leaseSignatureSchema } from "@/lib/validators";
 import { privacyHash, rateLimit, requestIp } from "@/lib/request-security";
 import { z } from "zod";
+import { staffMandateBooking } from "@/lib/debit-mandate-session";
 
 const publicSignatureSchema = leaseSignatureSchema.extend({ termsAccepted: z.boolean().optional(), acceptedSha256: z.string().regex(/^[a-f0-9]{64}$/).optional() });
 
 export async function GET(request: Request, context: { params: Promise<{ token: string }> }) {
   if (!publicApiAuthorized(request)) return Response.json({ error: { message: "Request rejected." } }, { status: 401 });
   const { token } = await context.params;
-  const lease = await getPublicReservationLease(token);
+  let lease;
+  try { lease = await getPublicReservationLease(token) ?? await staffMandateBooking(token); }
+  catch { return Response.json({ error: { message: "The saved agreement or account terms need STOR24 review before mandate setup." } }, { status: 409, headers: { "cache-control": "no-store" } }); }
   if (!lease) return Response.json({ error: { code: "NOT_FOUND", message: "This lease is unavailable." } }, { status: 404 });
   return Response.json({ data: lease }, { headers: { "cache-control": "no-store" } });
 }

@@ -7,7 +7,8 @@ function failure(error: unknown) {
   const code = error instanceof Error && /^MANDATE_[A-Z0-9_]+$/.test(error.message) ? error.message : "MANDATE_TEMPORARILY_UNAVAILABLE";
   const messages: Record<string, string> = {
     MANDATE_CONFIGURATION_REQUIRED: "Secure mandate setup is awaiting STOR24 configuration. Your agreement is safe.",
-    MANDATE_SCHEDULE_REVIEW_REQUIRED: "For this monthly mandate, choose a first date on your selected monthly debit day in this calendar year. STOR24 must arrange any initial payment separately.",
+    MANDATE_SCHEDULE_REVIEW_REQUIRED: "Change your collection dates: recurring rent must start after the rental months in your first payment, on the approved monthly debit day in this calendar year.",
+    MANDATE_INITIAL_RENT_REVIEW_REQUIRED: "STOR24 must confirm your initial invoice and covered rental months before arranging recurring collections.",
     MANDATE_BOOKING_UNAVAILABLE: "STOR24 needs to confirm this reservation before mandate setup.",
     MANDATE_REPORT_PENDING: "Netcash is preparing confirmation. Please check again shortly.",
     MANDATE_BUSINESS_DETAILS_REQUIRED: "A business mandate needs the company and authorised signatory details. Please contact STOR24.",

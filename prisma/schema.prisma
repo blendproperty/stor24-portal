@@ -533,8 +533,10 @@ model PublicDebitMandate {
   environment    String?
   connectionId   String?
   connectionFingerprint String?
-  leaseId        String @unique
-  lease          PublicReservationLease @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+  leaseId        String? @unique
+  lease          PublicReservationLease? @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+  sessionId      String? @unique
+  session        DebitMandateSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   reference      String @unique
   correlation    String @unique
   status         String @default("CREATING")
@@ -548,6 +550,23 @@ model PublicDebitMandate {
   lastCheckedAt  DateTime?
   verifiedAt     DateTime?
   failureCode    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model DebitMandateSession {
+  id             String @id @default(cuid())
+  tenancyId      String @unique
+  tenancy        Tenancy @relation(fields: [tenancyId], references: [id], onDelete: Cascade)
+  documentId     String @unique
+  document       Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  signingToken   String @unique
+  expiresAt      DateTime
+  monthlyRate    Decimal @db.Decimal(12, 2)
+  source         Json
+  preferences    Json?
+  requestedAt    DateTime?
+  mandate        PublicDebitMandate?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
@@ -595,6 +614,7 @@ model Tenancy {
   occupancies Occupancy[]
   reservation Reservation?
   documents   Document[]
+  mandateSession DebitMandateSession?
   insuranceEnrollment InsuranceEnrollment?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
@@ -1109,6 +1129,7 @@ model Document {
   sentAt          DateTime?
   expiresAt       DateTime?
   signedAt        DateTime?
+  mandateSession  DebitMandateSession?
   createdAt       DateTime  @default(now())
 
   @@index([tenancyId, type])

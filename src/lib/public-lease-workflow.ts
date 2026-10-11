@@ -149,6 +149,6 @@ export async function completePublicReservationLease(token: string, input: { sig
 }
 
 export async function publicReservationHasSignedLease(reference: string) {
-  const lease = await db.publicReservationLease.findFirst({ where: { reservation: { publicReference: reference }, status: "SIGNED", signedAt: { not: null } }, select: { id: true, version: true, sha256: true, signedAt: true } });
+  const lease = await db.publicReservationLease.findFirst({ where: { reservation: { publicReference: reference }, status: "SIGNED", signedAt: { not: null } }, select: { id: true, version: true, sha256: true, signedAt: true, paymentMethod: true } });
   return lease;
 }

@@ -1,11 +1,11 @@
 import { db } from "@/lib/db";
 import { parseDebitOrderPreferences } from "@/lib/debit-order-preferences";
+import { findMandateLease } from "@/lib/debit-mandate-session";
+import { debitOrderSchedule } from "./debit-order-schedule";
+import { mandatePolicy } from "./payments/netcash-mandate-policy";
 
 export async function requestPublicDebitOrderSetup(signingToken: string, input: unknown) {
-  const lease = await db.publicReservationLease.findUnique({
-    where: { signingToken },
-    include: { mandate: true, reservation: { include: { customer: true, facility: true, unit: true } } },
-  });
+  const lease = await findMandateLease(signingToken).catch(() => null);
   if (!lease || lease.status !== "SIGNED" || lease.paymentMethod !== "DEBIT_ORDER") {
     return { ok: false as const, code: "DEBIT_ORDER_REQUEST_UNAVAILABLE" };
   }
@@ -17,11 +17,16 @@ export async function requestPublicDebitOrderSetup(signingToken: string, input: 
   const moveIn = lease.reservation.intendedMoveIn?.toISOString().slice(0, 10) ?? today;
   const preferences = parseDebitOrderPreferences(input, moveIn > today ? moveIn : today);
   if (!preferences) return { ok: false as const, code: "COLLECTION_PREFERENCES_REQUIRED" };
+  const policy = mandatePolicy();
+  const schedule = debitOrderSchedule(lease.reservation, preferences, today, policy?.organisationId === lease.reservation.customer.organisationId ? policy.allowedDays : undefined);
+  if (!schedule.ready) return { ok: false as const, code: schedule.code!, message: schedule.message };
 
   const taskId = `public-debit-order-${lease.id}`;
   return db.$transaction(async (tx) => {
   const requestedAt = lease.debitOrderRequestedAt ?? new Date();
-  const claimed = await tx.publicReservationLease.updateMany({ where: { id: lease.id, mandate: { is: null } }, data: { debitOrderPreferences: preferences, debitOrderRequestedAt: requestedAt } });
+  const claimed = lease.sourceSessionId
+    ? await tx.debitMandateSession.updateMany({ where: { id: lease.id, mandate: { is: null } }, data: { preferences, requestedAt } })
+    : await tx.publicReservationLease.updateMany({ where: { id: lease.id, mandate: { is: null } }, data: { debitOrderPreferences: preferences, debitOrderRequestedAt: requestedAt } });
   if (!claimed.count) return { ok: false as const, code: "MANDATE_ALREADY_STARTED" };
   const description = `Customer selected debit order and signed for Unit ${lease.reservation.unit.number}. Requested first collection: ${preferences.firstCollectionDate}; monthly day: ${preferences.collectionDay}. These are preferences, NOT a signed bank mandate or an approved collection schedule. Complete approved secure mandate before collection, activation or access. Never request bank details by ordinary email.`;
   const task = await tx.task.upsert({

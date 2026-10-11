@@ -156,4 +156,13 @@ jobs:
         env:
           DATABASE_URL: postgresql://ci:ci@localhost:5432/stor24_crm
       - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Customer account mandate browser checks
+        run: |
+          npm run start -- --port 3041 > /tmp/stor24-tenant-ui.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:3041/my > /dev/null; then break; fi
+            sleep 1
+          done
+          TENANT_TEST_ORIGIN=http://localhost:3041 node scripts/tenant-portal-browser-check.mjs
 
