@@ -149,3 +149,15 @@ test("PDF destinations include only the observed Netcash document hosts", () => 
   for(const url of ["http://mandates.netcash.co.za/file","https://mandates.netcash.co.za.evil.test/file","https://user@mandates.netcash.co.za/file","https://mandates.netcash.co.za:8443/file","https://localhost/file"])assert.throws(()=>safeMandatePdfUrl(url));
   assert.throws(()=>safeMandateUrl("https://mandates.netcash.co.za/synthetic"));
 });
+test("the exact Netcash legacy document redirect is upgraded before downloading",async()=>{
+ const downloads:string[]=[];
+ const request:typeof fetch=async(url,options)=>{
+  const action=(options?.headers as Record<string,string>)?.SOAPAction??"";
+  if(action.includes("RequestFileUploadReport"))return new Response(`<RequestFileUploadReportResult>###BEGIN\t${terms.reference.toUpperCase()}\tSUCCESSFUL\t12:00\tR0.00\t20261012\n###END\t12:00</RequestFileUploadReportResult>`);
+  if(action.includes("RetrieveMandatePDF"))return new Response(`<RetrieveMandatePDFResult>###BEGIN\t${terms.reference.toUpperCase()}\n${terms.reference}\thttps://short.surf/synthetic\n###END</RetrieveMandatePDFResult>`);
+  downloads.push(new URL(String(url)).protocol);
+  if(downloads.length===1)return new Response(null,{status:302,headers:{location:"http://mandates.netcash.co.za/synthetic"}});
+  assert.equal(new URL(String(url)).hostname,"mandates.netcash.co.za");return new Response("%PDF-synthetic");
+ };
+ await retrieveMandatePdf("test-key","20000000.1.2.3.4",terms.reference,request);assert.deepEqual(downloads,["https:","https:"]);
+});

@@ -177,7 +177,13 @@ export async function retrieveMandatePdf(key: string, token: string, reference: 
     const response = await request(url, { redirect: "manual", signal: AbortSignal.timeout(20_000), cache: "no-store" });
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       const location = response.headers.get("location"); if (!location) throw new Error("MANDATE_PDF_INVALID");
-      url = new URL(location, url); continue;
+      const next = new URL(location, url);
+      // Current Netcash short links return a legacy HTTP document location.
+      // This exact host supports verified HTTPS: upgrade before any request,
+      // never send PKey over HTTP or broaden redirects to arbitrary hosts.
+      if (next.protocol === "http:" && next.hostname === "mandates.netcash.co.za" && !next.port && !next.username && !next.password) next.protocol = "https:";
+      safeMandatePdfUrl(next.toString());
+      url = next; continue;
     }
     if (!response.ok) throw new Error("MANDATE_PDF_PENDING");
     const pdf = await boundedBody(response, 10_000_000);
