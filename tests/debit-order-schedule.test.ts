@@ -111,3 +111,17 @@ test("initial invoice remains available without any monthly mandate or saved dat
     assert.equal(result.invoice?.total,1290.32);assert.equal(result.earliestCollectionDate,"2026-12-01");
   } finally {restore();restoreAccount();}
 });
+
+
+test("public initial status never reports settlement from raw live success without verified ledger evidence", async () => {
+  const payment = {id:"p",status:"SUCCEEDED",amount:1290.32,currency:"ZAR",environment:"live",idempotencyKey:"real",provider:"NETCASH",method:"PAY_NOW",processedAt:new Date()};
+  const receipt = {id:"receipt",type:"PAYMENT",amount:1290.32,metadata:{paymentId:"p",verifiedStatus:true,environment:"live"},reversalOfId:null};
+  let entries:typeof receipt[]=[];
+  const restore = stub(db.publicReservationLease,"findUnique",async()=>({id:"lease",status:"SIGNED",paymentMethod:"DEBIT_ORDER",expiresAt:new Date(Date.now()+60000),mandate:null,reservation:{...booking,id:"booking",status:"ACTIVE",customerId:"owner"}}));
+  const restoreAccount = stub(db.account,"findUnique",async()=>({customerId:"owner",payments:[payment],ledgerEntries:entries}));
+  try {
+    assert.equal((await debitOrderInitialPaymentStatus("synthetic")).status,"REVIEW_REQUIRED");
+    entries=[receipt];let result=await debitOrderInitialPaymentStatus("synthetic");assert.equal(result.status,"SUCCEEDED");assert.equal(result.paymentVerified,true);
+    entries=[receipt,{...receipt,id:"refund",type:"REFUND"}];result=await debitOrderInitialPaymentStatus("synthetic");assert.equal(result.status,"REVIEW_REQUIRED");assert.equal(result.paymentVerified,false);
+  } finally {restore();restoreAccount();}
+});
