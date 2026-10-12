@@ -67,10 +67,21 @@ function currentReport(status = "2", patch: Record<number, string> = {}) {
 }
 test("current unsigned export binds its full start date and WSDL holiday ID without requiring bank entry", () => {
   assert.deepEqual(assessMandateReport(currentReport(), terms), {status:"AWAITING_SIGNATURE",matched:true,reason:null});
-  assert.equal(verifyMandateReport(currentReport("6", {21:"1",26:"synthetic-bank-data"}), terms), "SIGNED");
+  assert.equal(verifyMandateReport(currentReport("6", {21:"1",26:"synthetic-bank-data"}), terms), "REVIEW_REQUIRED");
   assert.equal(verifyMandateReport(currentReport("6"), terms), "REVIEW_REQUIRED");
   assert.equal(verifyMandateReport(currentReport("2", {21:"0",26:"synthetic-bank-data"}), terms), "REVIEW_REQUIRED");
   assert.equal(verifyMandateReport(currentReport("2", {21:"2"}), terms), "REVIEW_REQUIRED");
+});
+
+test("current accepted bank export requires complete banking fields and retains card rejection", () => {
+  const bank = {22:"Synthetic holder",23:"1",24:"632005",25:"0",26:"11111111111"};
+  for (const type of ["0", "1"]) assert.equal(verifyMandateReport(currentReport("6", {...bank,21:type}),terms),"SIGNED");
+  // A card expiry month is not a six-digit branch, even when its type is 1.
+  const invalid: Record<number,string>[] = [{21:"2"},{23:"0"},{21:"1",24:"10",25:"2027",26:"synthetic-card-token"},{26:"synthetic-card-token"},{22:""},{26:""}];
+  for (const patch of invalid)
+    assert.equal(verifyMandateReport(currentReport("6",{...bank,...patch}),terms),"REVIEW_REQUIRED");
+  assert.equal(verifyMandateReport(currentReport("2",bank),terms),"AWAITING_SIGNATURE");
+  assert.equal(verifyMandateReport(currentReport("6",{...bank,30:"changed"}),terms),"REVIEW_REQUIRED");
 });
 test("report formats cannot interchange holiday meanings, dates or commercial/correlation snapshots", () => {
   const patches: Record<number,string>[] = [{12:"20271001"},{12:"20261002"},{17:"1"},{3:"999.00"},{30:"changed"},{40:"1"},{11:"2"}];
