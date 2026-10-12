@@ -114,7 +114,9 @@ export async function refreshHostedMandate(token: string) {
       return safeView(lease, m);
     }
     const pdf = await retrieveMandatePdf(key, m.pdfToken, m.reference);
-    const document = await PDFDocument.load(pdf);
+    // Netcash protects its signed PDFs. Inspect their structure without
+    // decrypting, modifying or removing protection from the stored bytes.
+    const document = await PDFDocument.load(pdf, { ignoreEncryption: true });
     if (document.getPageCount() < 1) throw new Error("MANDATE_PDF_INVALID");
     const signedPdfSha256 = createHash("sha256").update(pdf).digest("hex");
     return safeView(lease, await db.publicDebitMandate.update({ where: { id: m.id }, data: { signedPdf: pdf, signedPdfSha256 } }));
