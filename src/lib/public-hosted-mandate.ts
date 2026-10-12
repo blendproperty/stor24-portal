@@ -6,14 +6,14 @@ import { debitConnectionFingerprint } from "./payments/netcash-debit-batch";
 import { preparePublicReservationLease } from "@/lib/public-lease-workflow";
 import { getNetcashConnection } from "@/lib/payments/netcash-client";
 import { mandatePolicy } from "@/lib/payments/netcash-mandate-policy";
-import { addHostedMandate, requestMandateData, retrieveMandateData, requestMandatePdf, retrieveMandatePdf, validateMandateTerms, verifyMandateReport, type MandateTerms } from "@/lib/payments/netcash-mandate";
+import { addHostedMandate, requestMandateData, retrieveMandateData, requestMandatePdf, retrieveMandatePdf, validateMandateTerms, assessMandateReport, canRecheckMandate, type MandateTerms } from "@/lib/payments/netcash-mandate";
 import { NETCASH_SOFTWARE_VENDOR_KEY } from "@/lib/integrations/netcash-configuration";
 import { parseDebitOrderPreferences } from "@/lib/debit-order-preferences";
 import { findMandateLease } from "@/lib/debit-mandate-session";
 import { debitOrderSchedule } from "./debit-order-schedule";
 
-function view(m: { status: string; reference: string; hostedUrl: string | null; verifiedAt: Date | null; failureCode: string | null; signedPdfSha256?: string | null }) {
-  return { status: m.status, reference: m.reference, hostedUrl: m.status === "AWAITING_SIGNATURE" ? m.hostedUrl : null, verifiedAt: m.verifiedAt?.toISOString() ?? null, failureCode: m.failureCode, pdfAvailable: !!m.signedPdfSha256, collectionEnabled: false };
+function view(m: { status: string; reference: string; hostedUrl: string | null; verifiedAt: Date | null; failureCode: string | null; signedPdfSha256?: string | null; reportToken?: string | null }) {
+  return { status: m.status, reference: m.reference, hostedUrl: m.status === "AWAITING_SIGNATURE" ? m.hostedUrl : null, verifiedAt: m.verifiedAt?.toISOString() ?? null, failureCode: m.failureCode, pdfAvailable: !!m.signedPdfSha256, checkAvailable: canRecheckMandate(m), verificationPending: Boolean(m.reportToken) && canRecheckMandate(m), collectionEnabled: false };
 }
 async function findLease(token: string) {
   return findMandateLease(token);
@@ -34,7 +34,7 @@ function reviewedSchedule(lease: Awaited<ReturnType<typeof findLease>>, policy =
 }
 function safeView(lease: Awaited<ReturnType<typeof findLease>>, m: Parameters<typeof view>[0]) {
   const reviewRequired = !reviewedSchedule(lease).ready;
-  return { ...view(m), ...(reviewRequired ? { hostedUrl: null } : {}), reviewRequired };
+  return { ...view(m), ...(reviewRequired ? { hostedUrl: null, checkAvailable: false, verificationPending: false } : {}), reviewRequired };
 }
 export async function hostedMandateStatus(token: string) {
   const lease = await findLease(token);
@@ -92,7 +92,7 @@ export async function refreshHostedMandate(token: string) {
   const lease = await findLease(token);
   const m = lease.mandate;
   if (!m) throw new Error("MANDATE_NOT_STARTED");
-  if (m.status === "CREATING" || m.status === "REVIEW_REQUIRED" || (m.lastCheckedAt && Date.now() - m.lastCheckedAt.getTime() < 30_000)) return safeView(lease, m);
+  if (!canRecheckMandate(m) || (m.lastCheckedAt && Date.now() - m.lastCheckedAt.getTime() < 30_000)) return safeView(lease, m);
   const claimed = await db.publicDebitMandate.updateMany({ where: { id: m.id, lastCheckedAt: m.lastCheckedAt }, data: { lastCheckedAt: new Date() } });
   if (!claimed.count) return safeView(lease, m);
   const connection = await getNetcashConnection(lease.reservation.customer.organisationId);
@@ -125,10 +125,13 @@ export async function refreshHostedMandate(token: string) {
     return safeView(lease, m); // Provider asynchronous report: next customer refresh retrieves it.
   }
   const report = await retrieveMandateData(key, m.reportToken);
-  const status = verifyMandateReport(report, m.terms as MandateTerms);
+  const assessment = assessMandateReport(report, m.terms as MandateTerms);
+  // An empty asynchronous report cannot recover a reviewed authority. Only
+  // the exact reference/correlation/commercial snapshot can restore its link.
+  const status = m.status === "REVIEW_REQUIRED" && !assessment.matched && assessment.reason === "MANDATE_REPORT_NOT_LISTED" ? m.status : assessment.status;
   // The raw account-wide report is neither persisted nor returned to the customer.
   return db.$transaction(async tx => {
-    const updated = await tx.publicDebitMandate.update({ where: { id: m.id }, data: { status, reportToken: null, verifiedAt: status === "SIGNED" ? new Date() : null, ...(status === "SIGNED" && legacyProvenance ? { environment: connection.config.environment, connectionId: connection.id, connectionFingerprint: debitConnectionFingerprint(connection.config) } : {}) } });
+    const updated = await tx.publicDebitMandate.update({ where: { id: m.id }, data: { status, failureCode: status === "REVIEW_REQUIRED" ? assessment.reason : null, reportToken: null, verifiedAt: status === "SIGNED" ? new Date() : null, ...(status === "SIGNED" && legacyProvenance ? { environment: connection.config.environment, connectionId: connection.id, connectionFingerprint: debitConnectionFingerprint(connection.config) } : {}) } });
     if (status === "SIGNED" && legacyProvenance) await tx.auditEvent.create({ data: { organisationId: lease.reservation.customer.organisationId, facilityId: lease.reservation.facilityId, action: "public_mandate.provenance_verified", entityType: "PublicDebitMandate", entityId: m.id, after: { environment: connection.config.environment, connectionId: connection.id, evidence: "matched signed provider report", collectionEnabled: false } } });
     if (status !== m.status) {
       await tx.auditEvent.create({ data: { organisationId: lease.reservation.customer.organisationId, facilityId: lease.reservation.facilityId, action: "public_mandate.provider_status_verified", entityType: "PublicDebitMandate", entityId: m.id, after: { status, reference: m.reference, collectionEnabled: false } } });
