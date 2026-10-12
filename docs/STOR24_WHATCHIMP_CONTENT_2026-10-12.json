@@ -1,0 +1,214 @@
+{
+  "number": "27600186824",
+  "botId": 475943,
+  "welcome": "Welcome to STOR24.\nI can help you find storage at Store 1 — Midpoint, choose a unit size and answer common questions.\n\nReply with a word or number:\n1 ENQUIRY — tell us what you need\n2 PRICES — live units and rental rates\n3 SIZE — help choosing a unit\n4 BUSINESS — Micro Warehousing\n5 BOOK — reserve or arrange a viewing\n6 LOCATION — store details\n7 FAQ — rental, access, security, packing and payments\n8 STAFF — speak to our team\n9 MY ACCOUNT — statements and documents\n\nType MENU anytime. Staff confirm quotations, availability, access and account decisions. Please never send passwords, OTPs, bank details or ID documents here.\nPrivacy: https://stor24.co.za/privacy",
+  "flows": [
+    {
+      "title": "Storage enquiry",
+      "keys": "1,enquiry,quote,quotation,new storage,storage enquiry",
+      "text": "Let us help you find the right space at Store 1 — Midpoint.\nPlease reply with:\n• Your name\n• Personal storage or business/Micro Warehousing\n• The main items and approximate quantity\n• Preferred start date and expected duration\n• Approximate size, if known\n• Whether you would like a viewing\n\nFor a staff quote, type STAFF first and send these details to our team in this chat. Enquiries do not reserve a unit. Current units and rates: https://stor24.co.za/book\nPlease do not send ID documents, bank details or OTPs. https://stor24.co.za/privacy"
+    },
+    {
+      "title": "Prices and availability",
+      "keys": "2,price,prices,cost,costs,rate,rates,availability,available units",
+      "text": "Prices depend on unit size and current availability. View the latest Midpoint units, monthly rental and booking details here: https://stor24.co.za/book\nFor Micro Warehousing: https://stor24.co.za/micro-warehousing\nPlease check the full quote for applicable deposits, once-off fees and other charges. I cannot hold stock or guarantee a price in this chat."
+    },
+    {
+      "title": "Unit size guide",
+      "keys": "3,size,sizes,unit size,space guide,calculator",
+      "text": "Choose a unit based on your items, not only the number of rooms. Try the 3D space guide: https://stor24.co.za/space-guide\nInclude boxes, furniture, appliances, bulky items and any aisle you need for access. The calculator is guidance, not a guarantee that every item will fit through the door. Staff can help check bulky items before you book."
+    },
+    {
+      "title": "Business and Micro Warehousing",
+      "keys": "4,business,micro,micro warehousing,warehouse,business storage,stock",
+      "text": "STOR24 offers business storage and Micro Warehousing for stock, equipment, tools, files and other permitted business items. Explore the spaces and current options: https://stor24.co.za/micro-warehousing\nFor advice, tell staff about your stock, volume, access frequency, deliveries and intended use. Staff must confirm suitability and any delivery or operating arrangements. Storage is not permission to run an unapproved business activity from a unit."
+    },
+    {
+      "title": "Booking and viewing",
+      "keys": "5,book,booking,reserve,reservation,viewing,visit,move in",
+      "text": "Choose live units and start your booking at https://stor24.co.za/book\nFollow the secure booking steps for contact verification, documents, agreements and the selected payment method. A hold or enquiry is not confirmation that you can move in. Staff confirm readiness and access. To arrange a viewing, type STAFF and provide your preferred date and time; appointments are subject to confirmation. Keep OTPs in the booking screen, never this chat."
+    },
+    {
+      "title": "Location and hours",
+      "keys": "6,location,locations,address,directions,hours,opening hours,midpoint,melrose",
+      "text": "STOR24 currently directs online bookings to Store 1 — Midpoint. Melrose is listed as coming soon; do not assume it is available to book.\nCurrent store contact details and directions: https://stor24.co.za/contact\nAccess and reception/viewing hours can differ. Ask staff to confirm the hours and your access arrangements before visiting; this bot does not promise 24-hour access."
+    },
+    {
+      "title": "FAQ topic menu",
+      "keys": "7,faq,faqs,questions,frequently asked questions",
+      "text": "Choose a topic by typing the word:\nACCESS — hours and authorised people\nSECURITY — facility precautions\nTERMS — rental duration, fees and changes\nPAYMENT — payment guidance\nDOCUMENTS — booking requirements\nPACKING — furniture and boxes\nPROHIBITED — items you may not store\nINSURANCE — cover questions\nTRANSPORT — collection or moving help\nSTUDENT — holidays and moving\nCHANGE — larger units, cancellation or extensions\nMY ACCOUNT — statements and documents\nSTAFF — personal assistance\n\nRead the published FAQs: https://stor24.co.za/faq"
+    },
+    {
+      "title": "Customer account and OTP help",
+      "keys": "9,my account,account,portal,statement,statements,invoice,invoices,otp,code,login",
+      "text": "For your statements, documents and customer account, use the secure portal: https://portal.stor24.co.za/my\nIf a booking verification code is missing, use the resend option in your booking screen and check the channel shown there. This enquiry number is separate from STOR24’s verification/notification sender. Do not post an OTP or password in chat. Staff can help with account or booking problems; I cannot see your balance, authenticate you or change your account."
+    },
+    {
+      "title": "Access and authorised visitors",
+      "keys": "10,access,access hours,authorised person,authorized person,gate,biometric,entry",
+      "text": "Unit access depends on the facility rules and your approved access arrangements. Ask the Midpoint team to confirm access hours before visiting.\nAnother person may access a unit only after the facility has approved the required authorisation and identification arrangements. Please contact staff first. This bot cannot open gates, issue access codes, register biometrics or override access restrictions."
+    },
+    {
+      "title": "Security",
+      "keys": "11,security,secure,safety,cctv",
+      "text": "STOR24’s published information describes controlled access, CCTV and monitored premises. Ask the Midpoint team about the specific arrangements that apply to your unit. Security precautions are not a guarantee against loss or damage. For an urgent security or access problem, call +27 11 380 9400; this bot is not an emergency response service."
+    },
+    {
+      "title": "Rental terms and fees",
+      "keys": "12,terms,contract,rental period,duration,deposit,fees,minimum,month to month,long term,short term",
+      "text": "Flexible short- and long-term storage options may be available. The agreed rental period, notice requirements, deposits and any once-off or additional charges must be confirmed in your quotation and agreement.\nRead the current terms: https://stor24.co.za/terms\nA general FAQ answer does not change your signed agreement. Staff can explain the applicable commercial terms."
+    },
+    {
+      "title": "Payments and refunds",
+      "keys": "13,payment,pay,payments,eft,card,debit order,refund,arrears,overdue",
+      "text": "Follow the payment instructions in your secure booking journey or customer account: https://portal.stor24.co.za/my\nAvailable methods and requirements depend on your booking. Mandate signing, payment settlement and move-in/access approval are separate steps. I cannot confirm a payment, promise a refund, change a debit order or release an account restriction. For billing help, select STAFF. Do not send card details, bank-account details, payment credentials or OTPs here."
+    },
+    {
+      "title": "Booking documents",
+      "keys": "14,documents,document,id,passport,proof of address,company documents",
+      "text": "Booking may require identification or a passport, proof of address, contact details and relevant company documents for business rentals. Follow the instructions in the secure booking journey: https://stor24.co.za/book\nPlease upload sensitive documents only through the approved secure process; do not send ID/passport images or bank documents to this bot. Staff confirm the exact requirements for your booking."
+    },
+    {
+      "title": "Packing and household furniture",
+      "keys": "15,packing,pack,furniture,boxes,appliances,household,personal storage",
+      "text": "Household furniture, appliances, clothing, boxes and other permitted personal belongings can be stored. Pack items securely, label boxes and protect fragile pieces. Empty and dry appliances, avoid packing damp items and allow space for access if needed. Bring the measurements of bulky items so staff can check doorway clearance and practical fit. Size guide: https://stor24.co.za/space-guide"
+    },
+    {
+      "title": "Prohibited items",
+      "keys": "16,prohibited,not allowed,forbidden,flammable,food,animals,chemicals",
+      "text": "Do not store illegal goods, explosives, flammable materials, dangerous chemicals, perishable food, live animals, or anything that could damage the facility or other customers’ belongings. Check the current agreement and ask staff before bringing an item you are unsure about: https://stor24.co.za/terms\nFor immediate danger, use the appropriate emergency service; do not wait for a chat reply."
+    },
+    {
+      "title": "Insurance",
+      "keys": "17,insurance,insured,cover,loss,damage",
+      "text": "Ask staff to confirm the insurance requirements for your storage agreement. Check whether your household or business policy covers belongings kept in storage, including its exclusions and limits. This bot cannot arrange cover, assess a claim or confirm that an item is insured."
+    },
+    {
+      "title": "Transport and collection",
+      "keys": "18,transport,collection,delivery,movers,moving help",
+      "text": "Transport or collection assistance may be possible, depending on your location and items. Ask staff to confirm availability, charges, booking and delivery/loading arrangements before making plans. Tell them your collection area, main items, stairs/access constraints and preferred date. No transport booking is confirmed by this bot."
+    },
+    {
+      "title": "Students and moving",
+      "keys": "19,student,students,holiday,holidays,moving,renovation,travel",
+      "text": "Storage can help between student terms, residences, moves or renovations. Share your items, planned start date and expected duration with staff. Check the agreement’s minimum period, notice and fees rather than assuming a special student rate. Find available Midpoint units: https://stor24.co.za/book"
+    },
+    {
+      "title": "Unit changes cancellation and extensions",
+      "keys": "20,change,upgrade,downgrade,larger,smaller,cancel,cancellation,extend,extension,move out",
+      "text": "A larger or smaller unit depends on availability and staff approval. Extensions, cancellations and move-out arrangements must follow your agreement and any notice requirements. Contact staff before changing your plans. I cannot cancel a booking, terminate a lease, amend rent or confirm a refund in chat. Use the secure portal for your documents: https://portal.stor24.co.za/my"
+    },
+    {
+      "title": "Problems complaints and urgent help",
+      "keys": "21,problem,complaint,complaints,urgent,emergency,help with booking",
+      "text": "For a booking, billing, access or service problem, select STAFF and describe what happened. You may include your booking reference, but do not send passwords, OTPs, identity documents or bank details.\nMidpoint contact: +27 11 380 9400 / bookings@stor24.co.za\nOur team will respond when available; this bot does not promise an immediate reply or emergency attendance."
+    },
+    {
+      "title": "Privacy and contact preferences",
+      "keys": "22,privacy,data,popi,marketing,unsubscribe",
+      "text": "We use your enquiry details to respond to your storage request. An enquiry does not subscribe you to marketing. Read the privacy notice: https://stor24.co.za/privacy\nDo not send sensitive documents, financial credentials, passwords or OTPs in this chat. For privacy requests or contact-preference changes, select STAFF. STOP can be used to opt out of this bot’s subscription; it does not cancel a rental agreement or change separate STOR24 operational notifications."
+    }
+  ],
+  "staffIntro": "Need a person? Tap Speak to staff below to pause the bot and request help in our shared inbox.\nThen send your name, whether you need personal or business storage, your main items, preferred start date and duration, or a short description of your problem.\nOur team will reply when available. For time-sensitive help: +27 11 380 9400 or bookings@stor24.co.za. Do not send OTPs, passwords, ID documents or bank details.",
+  "stopText": "To opt out of this STOR24 bot subscription, tap Stop bot messages below. This does not cancel a rental agreement or change your separate booking, payment or account notifications. For rental or account changes, contact +27 11 380 9400 / bookings@stor24.co.za.",
+  "flowLinks": [
+    {
+      "title": "STOR24 | Stop bot messages",
+      "url": "https://app.whatchimp.com/flowbuilder/whatsapp/edit/2164301/475943"
+    },
+    {
+      "title": "STOR24 | Welcome and storage menu",
+      "url": "https://app.whatchimp.com/flowbuilder/whatsapp/edit/2164205/475943"
+    },
+    {
+      "title": "STOR24 | Staff handoff",
+      "url": "https://app.whatchimp.com/flowbuilder/whatsapp/edit/2164246/475943"
+    },
+    {
+      "title": "STOR24 | Privacy and contact preferences",
+      "url": "https://app.whatchimp.com/flowbuilder/whatsapp/edit/2164243/475943"
+    },
+    {
+      "title": "STOR24 | Problems complaints and urgent help",
+      "url": "https://app.whatchimp.com/flowbuilder/whatsapp/edit/2164242/475943"
+    },
+    {
+      "title": "STOR24 | Unit changes cancellation and extensions",
+      "url": "https://app.whatchimp.com/flowbuilder/whatsapp/edit/2164241/475943"
+    },
+    {
+      "title": "STOR24 | Students and moving",
+      "url": "https://app.whatchimp.com/flowbuilder/whatsapp/edit/2164240/475943"
+    },
+    {
+      "title": "STOR24 | Transport and collection",
+      "url": "https://app.whatchimp.com/flowbuilder/whatsapp/edit/2164238/475943"
+    },
+    {
+      "title": "STOR24 | Insurance",
+      "url": "https://app.whatchimp.com/flowbuilder/whatsapp/edit/2164237/475943"
+    },
+    {
+      "title": "STOR24 | Prohibited items",
+      "url": "https://app.whatchimp.com/flowbuilder/whatsapp/edit/2164236/475943"
+    },
+    {
+      "title": "STOR24 | Packing and household furniture",
+      "url": "https://app.whatchimp.com/flowbuilder/whatsapp/edit/2164235/475943"
+    },
+    {
+      "title": "STOR24 | Booking documents",
+      "url": "https://app.whatchimp.com/flowbuilder/whatsapp/edit/2164231/475943"
+    },
+    {
+      "title": "STOR24 | Payments and refunds",
+      "url": "https://app.whatchimp.com/flowbuilder/whatsapp/edit/2164230/475943"
+    },
+    {
+      "title": "STOR24 | Rental terms and fees",
+      "url": "https://app.whatchimp.com/flowbuilder/whatsapp/edit/2164229/475943"
+    },
+    {
+      "title": "STOR24 | Security",
+      "url": "https://app.whatchimp.com/flowbuilder/whatsapp/edit/2164228/475943"
+    },
+    {
+      "title": "STOR24 | Access and authorised visitors",
+      "url": "https://app.whatchimp.com/flowbuilder/whatsapp/edit/2164227/475943"
+    },
+    {
+      "title": "STOR24 | Customer account and OTP help",
+      "url": "https://app.whatchimp.com/flowbuilder/whatsapp/edit/2164217/475943"
+    },
+    {
+      "title": "STOR24 | FAQ topic menu",
+      "url": "https://app.whatchimp.com/flowbuilder/whatsapp/edit/2164216/475943"
+    },
+    {
+      "title": "STOR24 | Location and hours",
+      "url": "https://app.whatchimp.com/flowbuilder/whatsapp/edit/2164215/475943"
+    },
+    {
+      "title": "STOR24 | Booking and viewing",
+      "url": "https://app.whatchimp.com/flowbuilder/whatsapp/edit/2164213/475943"
+    },
+    {
+      "title": "STOR24 | Business and Micro Warehousing",
+      "url": "https://app.whatchimp.com/flowbuilder/whatsapp/edit/2164212/475943"
+    },
+    {
+      "title": "STOR24 | Unit size guide",
+      "url": "https://app.whatchimp.com/flowbuilder/whatsapp/edit/2164211/475943"
+    },
+    {
+      "title": "STOR24 | Prices and availability",
+      "url": "https://app.whatchimp.com/flowbuilder/whatsapp/edit/2164210/475943"
+    },
+    {
+      "title": "STOR24 | Storage enquiry",
+      "url": "https://app.whatchimp.com/flowbuilder/whatsapp/edit/2164207/475943"
+    }
+  ],
+  "handoffEmail": "info@stor24.co.za",
+  "handoffMinutes": 1440
+}
