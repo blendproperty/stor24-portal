@@ -153,6 +153,18 @@ export async function requestMandatePdf(key: string, reference: string, vendor: 
   if (!/^\d+(?:\.\d+){2,}$/.test(token)) throw new Error("MANDATE_PDF_PENDING");
   return token;
 }
+function confirmationPdfLink(html: string, current: URL) {
+  const anchors = [...html.matchAll(/<a\b[^>]*>/gi)].filter(match => /\bid=["']eMandate_Confirmation_userControl_DownloadAnchor["']/i.test(match[0]));
+  if (anchors.length !== 1) throw new Error("MANDATE_PDF_INVALID");
+  const attribute = anchors[0][0].match(/\bonclick=(["'])(.*?)\1/i)?.[2];
+  const action = attribute ? decodeXml(attribute) : "";
+  const location = action.match(/^\s*openAndRefresh\((["'])([^"']+)\1\);?\s*$/)?.[2];
+  if (!location) throw new Error("MANDATE_PDF_INVALID");
+  const next = new URL(location,current);
+  safeMandatePdfUrl(next.toString());
+  if (next.origin !== current.origin || !next.pathname.endsWith("/DownloadBlank.aspx") || !/^EMF-\d{1,20}\.pdf$/.test(next.searchParams.get("pdfLink") ?? "")) throw new Error("MANDATE_PDF_INVALID");
+  return next;
+}
 export async function retrieveMandatePdf(key: string, token: string, reference: string, request: typeof fetch = fetch) {
   if (!/^\d+(?:\.\d+){2,}$/.test(token)) throw new Error("MANDATE_PDF_PENDING");
   const fields: Array<[string, string]> = [["ServiceKey", key], ["FileToken", token]];
@@ -172,8 +184,9 @@ export async function retrieveMandatePdf(key: string, token: string, reference: 
   let url = new URL(safeMandatePdfUrl(link));
   url.searchParams.set("PKey", key);
   const sessions = new Map<string, Map<string, string>>();
+  let confirmationFollowed = false;
   // Download server-side. Never expose the documented PKey URL to browsers/logs.
-  for (let hop = 0; hop < 4; hop++) {
+  for (let hop = 0; hop < 6; hop++) {
     safeMandatePdfUrl(url.toString());
     const cookies = sessions.get(url.hostname);
     const cookie = cookies ? [...cookies].map(([name,value]) => `${name}=${value}`).join("; ") : "";
@@ -210,6 +223,9 @@ export async function retrieveMandatePdf(key: string, token: string, reference: 
     }
     if (!response.ok) throw new Error("MANDATE_PDF_PENDING");
     const pdf = await boundedBody(response, 10_000_000);
+    if (response.headers.get("content-type")?.includes("text/html") && ["mandate.netcash.co.za", "mandates.netcash.co.za"].includes(url.hostname) && !confirmationFollowed) {
+      url = confirmationPdfLink(pdf.toString("utf8"),url); confirmationFollowed = true; continue;
+    }
     if (pdf.subarray(0, 5).toString() !== "%PDF-") throw new Error("MANDATE_PDF_INVALID");
     return pdf;
   }

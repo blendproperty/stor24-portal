@@ -177,3 +177,17 @@ test("document authentication cookies survive only on the exact Netcash host",as
   await retrieveMandatePdf("test-key","20000000.1.2.3.4",terms.reference,request);assert.equal(gets,3);
  }
 });
+test("signed confirmation follows only its specific same-host PDF download control",async()=>{
+ for(const hostile of [false,true]){
+  const gets:string[]=[];
+  const request:typeof fetch=async(url,options)=>{
+   const action=(options?.headers as Record<string,string>)?.SOAPAction??"";
+   if(action.includes("RequestFileUploadReport"))return new Response(`<RequestFileUploadReportResult>###BEGIN\t${terms.reference}\tSUCCESSFUL\t12:00\n###END\t12:00</RequestFileUploadReportResult>`);
+   if(action.includes("RetrieveMandatePDF"))return new Response(`<RetrieveMandatePDFResult>###BEGIN\t${terms.reference}\n${terms.reference}\thttps://mandates.netcash.co.za/Public/Default.aspx\n###END</RetrieveMandatePDFResult>`);
+   gets.push(String(url));if(gets.length===1)return new Response(`<a id="eMandate_Confirmation_userControl_DownloadAnchor" onclick="openAndRefresh(&#39;${hostile?"https://evil.example":".."}/DownloadBlank.aspx?pdfLink=EMF-123.pdf&#39;);">Download</a>`,{headers:{"content-type":"text/html"}});
+   assert.equal(new URL(String(url)).pathname,"/DownloadBlank.aspx");return new Response("%PDF-synthetic");
+  };
+  if(hostile){await assert.rejects(retrieveMandatePdf("test-key","20000000.1.2.3.4",terms.reference,request),/MANDATE_URL_INVALID/);assert.equal(gets.length,1);}
+  else {await retrieveMandatePdf("test-key","20000000.1.2.3.4",terms.reference,request);assert.equal(gets.length,2);}
+ }
+});
