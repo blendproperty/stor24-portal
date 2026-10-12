@@ -171,10 +171,27 @@ export async function retrieveMandatePdf(key: string, token: string, reference: 
   if (returnedReference !== reference) throw new Error("MANDATE_PDF_INVALID");
   let url = new URL(safeMandatePdfUrl(link));
   url.searchParams.set("PKey", key);
+  const sessions = new Map<string, Map<string, string>>();
   // Download server-side. Never expose the documented PKey URL to browsers/logs.
   for (let hop = 0; hop < 4; hop++) {
     safeMandatePdfUrl(url.toString());
-    const response = await request(url, { redirect: "manual", signal: AbortSignal.timeout(20_000), cache: "no-store" });
+    const cookies = sessions.get(url.hostname);
+    const cookie = cookies ? [...cookies].map(([name,value]) => `${name}=${value}`).join("; ") : "";
+    const response = await request(url, { redirect: "manual", signal: AbortSignal.timeout(20_000), cache: "no-store", ...(cookie ? { headers: { cookie } } : {}) });
+    // Netcash authenticates the PKey request then redirects to the document
+    // with a session cookie. Keep it only for this download and exact HTTPS
+    // host; never forward Netcash cookies to short.surf or another host.
+    if (["mandate.netcash.co.za", "mandates.netcash.co.za"].includes(url.hostname)) {
+      const values = response.headers.getSetCookie();
+      const jar = sessions.get(url.hostname) ?? new Map<string,string>();
+      for (const value of values) {
+        const pair = value.split(";",1)[0]; const equals = pair.indexOf("=");
+        const name = pair.slice(0,equals); const content = pair.slice(equals+1);
+        if (equals < 1 || !/^[A-Za-z0-9_.-]+$/.test(name) || /[\r\n]/.test(content)) continue;
+        if (!content || /;\s*Max-Age=0(?:;|$)/i.test(value)) jar.delete(name); else jar.set(name,content);
+      }
+      sessions.set(url.hostname,jar);
+    }
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       const location = response.headers.get("location"); if (!location) throw new Error("MANDATE_PDF_INVALID");
       const next = new URL(location, url);
