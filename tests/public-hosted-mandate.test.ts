@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test, { mock } from "node:test";
 import { db } from "../src/lib/db";
-import { startHostedMandate, hostedMandateStatus } from "../src/lib/public-hosted-mandate";
+import { startHostedMandate, hostedMandateStatus, refreshHostedMandate } from "../src/lib/public-hosted-mandate";
 import { POST as providerReturn } from "../src/app/api/webhooks/netcash/mandate/route";
 function stub(target: object, name: string, replacement: () => Promise<unknown>) {
   const original = Reflect.get(target, name); let calls = 0;
@@ -45,4 +45,9 @@ test("unmatched browser returns do not disclose booking tokens", async () => {
     const response = await providerReturn(new Request("https://crm.example/api/webhooks/netcash/mandate", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ AccountRef: "ST24-test", Field1: "wrong-correlation-not-matching-0001" }) }));
     assert.equal(response.status, 400); assert.equal(response.headers.get("location"), null);
   } finally { lookup.mock.restore(); }
+});
+test("ambiguous creation cannot be retried by refreshing a reviewed mandate", async () => {
+  const lookup = stub(db.publicReservationLease, "findUnique", async () => ({status:"SIGNED",paymentMethod:"DEBIT_ORDER",expiresAt:new Date(Date.now()+60000),reservation:{status:"ACTIVE",customer:{organisationId:"test-org"}},mandate:{status:"REVIEW_REQUIRED",reference:"test",hostedUrl:null,failureCode:"MANDATE_PROVIDER_OUTCOME_UNKNOWN",verifiedAt:null}}));
+  const network = mock.method(globalThis,"fetch",async()=>{throw Error("UNEXPECTED_NETWORK");});
+  try {const result=await refreshHostedMandate("fake-token");assert.equal(result.status,"REVIEW_REQUIRED");assert.equal(result.checkAvailable,false);assert.equal(network.mock.callCount(),0);} finally {lookup.mock.restore();network.mock.restore();}
 });

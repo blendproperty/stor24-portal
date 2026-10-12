@@ -91,22 +91,46 @@ export async function retrieveMandateData(key: string, token: string, request: t
   if (!/^\d+(?:\.\d+){2,}$/.test(token)) throw new Error("MANDATE_REPORT_UNAVAILABLE");
   return tag(await soap("RetrieveMandateData", mandateEnvelope("RetrieveMandateData", [["ServiceKey", key], ["FileToken", token]]), request), "RetrieveMandateDataResult");
 }
-export function verifyMandateReport(report: string, expected: MandateTerms) {
+export function assessMandateReport(report: string, expected: MandateTerms) {
   const lines = report.trim().split(/\r?\n/);
   if (!/^###BEGIN\t\d{8}$/.test(lines[0]) || lines.at(-1) !== "###END") throw new Error("MANDATE_REPORT_PENDING");
   const rows = lines.slice(1, -1).map(line => line.split("\t")).filter(row => row[1] === expected.reference);
-  if (!rows.length) return "AWAITING_SIGNATURE" as const;
+  if (!rows.length) return { status: "AWAITING_SIGNATURE" as const, matched: false, reason: "MANDATE_REPORT_NOT_LISTED" };
   if (rows.length !== 1) throw new Error("MANDATE_REPORT_AMBIGUOUS");
   const r = rows[0];
+  // Current NIWS export: 44 fields, CCYYMMDD commencement date and the
+  // WSDL's holiday enum IDs 1=preceding / 2=next. Older documented exports
+  // use a month and IDs 0/1. Select a format explicitly, never accept both
+  // meanings for holiday ID1 within the same format.
+  const dated = r.length === 44 && /^\d{8}$/.test(r[12]);
+  const legacy = r.length >= 41 && r.length <= 43 && /^\d{1,2}$/.test(r[12]);
+  const firstDate = expected.agreementDate.slice(0, 4) + String(expected.commencementMonth).padStart(2, "0") + String(expected.debitDay).padStart(2, "0");
+  const pending = ["1", "2", "8", "9", "10", "11"].includes(r[0]);
+  const missingBankDetails = dated && pending && r[21] === "0" && r[26] === "";
   // Match immutable commercial snapshot AND server-generated correlation, never
   // retain the bank/identity fields from this account-wide provider report.
-  if (r.length < 41 || r[30] !== expected.correlation || r[15] !== expected.agreementReference
-    || !/^\d+(?:\.\d+)?$/.test(r[3]) || Number(r[3]) !== Number(expected.amount)
-    || r[11] !== "1" || Number(r[12]) !== expected.commencementMonth || r[13] !== String(expected.debitDay).padStart(2, "0")
-    || r[14] !== expected.agreementDate || Number(r[16]) !== expected.noticeDays
-    || r[17] !== (expected.holiday === "VeryNextOrdinaryBusinessDay" ? "1" : "0")
-    || r[21] !== "1" || r[40] !== "0") return "REVIEW_REQUIRED" as const;
-  return ({ "6": "SIGNED", "3": "EXPIRED", "4": "FAILED", "5": "DECLINED", "7": "REVIEW_REQUIRED" } as const)[r[0] as "6"] ?? "AWAITING_SIGNATURE";
+  const checks: Record<string, boolean> = {
+    FORMAT: dated || legacy,
+    CORRELATION: r[30] === expected.correlation,
+    AGREEMENT: r[15] === expected.agreementReference && r[14] === expected.agreementDate,
+    AMOUNT: /^\d+(?:\.\d+)?$/.test(r[3]) && Number(r[3]) === Number(expected.amount),
+    SCHEDULE: r[11] === "1" && (dated ? r[12] === firstDate : Number(r[12]) === expected.commencementMonth) && r[13] === String(expected.debitDay).padStart(2, "0"),
+    NOTICE: Number(r[16]) === expected.noticeDays,
+    HOLIDAY: r[17] === (expected.holiday === "VeryNextOrdinaryBusinessDay" ? dated ? "2" : "1" : dated ? "1" : "0"),
+    BANK_TYPE: r[21] === "1" || missingBankDetails,
+    FIXED_AMOUNT: r[40] === "0",
+  };
+  const failed = Object.entries(checks).find(([, valid]) => !valid);
+  if (failed) return { status: "REVIEW_REQUIRED" as const, matched: false, reason: `MANDATE_REPORT_${failed[0]}_MISMATCH` };
+  const statuses: Record<string, "SIGNED" | "EXPIRED" | "FAILED" | "DECLINED" | "REVIEW_REQUIRED" | "AWAITING_SIGNATURE"> = { "6": "SIGNED", "3": "EXPIRED", "4": "FAILED", "5": "DECLINED", "7": "REVIEW_REQUIRED" };
+  const status = statuses[r[0]] ?? (pending ? "AWAITING_SIGNATURE" : "REVIEW_REQUIRED");
+  return { status, matched: true, reason: status === "REVIEW_REQUIRED" ? r[0] === "7" ? "MANDATE_REPORT_DETAILS_CHANGED" : "MANDATE_REPORT_UNKNOWN_STATUS" : null };
+}
+export function verifyMandateReport(report: string, expected: MandateTerms) {
+  return assessMandateReport(report, expected).status;
+}
+export function canRecheckMandate(m: { status: string; hostedUrl: string | null; failureCode: string | null }) {
+  return m.status !== "CREATING" && (m.status !== "REVIEW_REQUIRED" || Boolean(m.hostedUrl && (!m.failureCode || m.failureCode.startsWith("MANDATE_REPORT_"))));
 }
 
 export async function requestMandatePdf(key: string, reference: string, vendor: string, date: string, request: typeof fetch = fetch) {

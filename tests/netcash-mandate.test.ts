@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { addHostedMandate, buildAddMandateEnvelope, parseAddMandateResponse, requestMandateData, requestMandatePdf, retrieveMandatePdf, boundedBody, safeMandateUrl, verifyMandateReport, type MandateTerms } from "../src/lib/payments/netcash-mandate";
+import { addHostedMandate, buildAddMandateEnvelope, parseAddMandateResponse, requestMandateData, requestMandatePdf, retrieveMandatePdf, boundedBody, safeMandateUrl, verifyMandateReport, assessMandateReport, canRecheckMandate, type MandateTerms } from "../src/lib/payments/netcash-mandate";
 import { mandatePolicy } from "../src/lib/payments/netcash-mandate-policy";
 
 const terms: MandateTerms = { reference: "ST24-test-mandate", agreementReference: "ST24-test-agreement", agreementDate: "20260910", firstName: "Test & Sample", surname: "Person", phone: "0825551234", email: "test@example.com", amount: "1000.00", commencementMonth: 10, debitDay: 1, noticeDays: 30, holiday: "VeryNextOrdinaryBusinessDay", correlation: "test-correlation-not-a-real-token-0001" };
@@ -59,6 +59,31 @@ test("incomplete or duplicate account rows never confirm signature", () => {
   assert.throws(() => verifyMandateReport("200", terms), /MANDATE_REPORT_PENDING/);
   const row = report().split("\n")[1];
   assert.throws(() => verifyMandateReport(`###BEGIN\t20260910\n${row}\n${row}\n###END`, terms), /AMBIGUOUS/);
+});
+function currentReport(status = "2", patch: Record<number, string> = {}) {
+  const row = report(status).split("\n")[1].split("\t");
+  row.push(""); Object.assign(row, {12:"20261001",17:"2",21:"0",26:""}, patch);
+  return `###BEGIN\t20260910\n${row.join("\t")}\n###END`;
+}
+test("current unsigned export binds its full start date and WSDL holiday ID without requiring bank entry", () => {
+  assert.deepEqual(assessMandateReport(currentReport(), terms), {status:"AWAITING_SIGNATURE",matched:true,reason:null});
+  assert.equal(verifyMandateReport(currentReport("6", {21:"1",26:"synthetic-bank-data"}), terms), "SIGNED");
+  assert.equal(verifyMandateReport(currentReport("6"), terms), "REVIEW_REQUIRED");
+  assert.equal(verifyMandateReport(currentReport("2", {21:"0",26:"synthetic-bank-data"}), terms), "REVIEW_REQUIRED");
+  assert.equal(verifyMandateReport(currentReport("2", {21:"2"}), terms), "REVIEW_REQUIRED");
+});
+test("report formats cannot interchange holiday meanings, dates or commercial/correlation snapshots", () => {
+  const patches: Record<number,string>[] = [{12:"20271001"},{12:"20261002"},{17:"1"},{3:"999.00"},{30:"changed"},{40:"1"},{11:"2"}];
+  for (const patch of patches) assert.equal(verifyMandateReport(currentReport("2",patch),terms),"REVIEW_REQUIRED");
+  assert.equal(verifyMandateReport(currentReport("2",{17:"1"}),{...terms,holiday:"PrecedingOrdinaryBusinessDay"}),"AWAITING_SIGNATURE");
+  assert.equal(verifyMandateReport(report(),terms),"SIGNED");
+  assert.equal(assessMandateReport("###BEGIN\t20261012\n###END",terms).matched,false);
+  const row=currentReport().split("\n")[1];assert.throws(()=>assessMandateReport(`###BEGIN\t20261012\n${row}\n${row}\n###END`,terms),/AMBIGUOUS/);
+});
+test("rechecking only recovers existing links after report review, never ambiguous creation", () => {
+  assert.equal(canRecheckMandate({status:"REVIEW_REQUIRED",hostedUrl:"https://short.surf/example",failureCode:null}),true);
+  assert.equal(canRecheckMandate({status:"REVIEW_REQUIRED",hostedUrl:"https://short.surf/example",failureCode:"MANDATE_REPORT_SCHEDULE_MISMATCH"}),true);
+  for (const m of [{status:"CREATING",hostedUrl:null,failureCode:null},{status:"REVIEW_REQUIRED",hostedUrl:null,failureCode:null},{status:"REVIEW_REQUIRED",hostedUrl:"https://short.surf/example",failureCode:"MANDATE_PROVIDER_OUTCOME_UNKNOWN"}]) assert.equal(canRecheckMandate(m),false);
 });
 test("report request rejects service errors instead of treating them as file tokens", async () => {
   assert.equal(await requestMandateData("test", async () => new Response('<r><RequestMandateDataResult>12345.123456.123456789012345678</RequestMandateDataResult></r>')), "12345.123456.123456789012345678");
