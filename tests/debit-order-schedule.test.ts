@@ -2,7 +2,7 @@ import test, { mock } from "node:test";
 import assert from "node:assert/strict";
 import { debitOrderSchedule } from "../src/lib/debit-order-schedule";
 import { newPublicInitialRent } from "../src/lib/public-initial-rent";
-import { initialPaymentState } from "../src/lib/debit-order-initial-payment";
+import { initialPaymentState, verifiedInitialReceipt } from "../src/lib/debit-order-initial-payment";
 import { debitOrderInitialPaymentStatus, startDebitOrderInitialPayment } from "../src/lib/debit-order-initial-payment";
 import { db } from "../src/lib/db";
 import { requestPublicDebitOrderSetup } from "../src/lib/public-debit-order-request";
@@ -87,4 +87,41 @@ test("a valid older mandate keeps its date without being recreated", async () =>
     const result = await hostedMandateStatus("fake-token");
     assert.equal(result.mandate?.reviewRequired,false); assert.equal(result.mandate?.hostedUrl,"https://short.surf/example");
   } finally {restore();}
+});
+
+
+test("live initial success requires the matching provider receipt and cannot survive a reversal", () => {
+  const payment = {id:"p",status:"SUCCEEDED",amount:1290.32,currency:"ZAR",environment:"live",idempotencyKey:"real",provider:"NETCASH",method:"PAY_NOW",processedAt:new Date()};
+  const receipt = {id:"receipt",type:"PAYMENT",amount:1290.32,metadata:{paymentId:"p",verifiedStatus:true,environment:"live"},reversalOfId:null};
+  assert.equal(verifiedInitialReceipt(payment,[receipt]),true);
+  assert.equal(verifiedInitialReceipt(payment,[]),false);
+  assert.equal(verifiedInitialReceipt(payment,[{...receipt,metadata:{paymentId:"p",verifiedStatus:"false",environment:"live"}}]),false);
+  assert.equal(verifiedInitialReceipt({...payment,processedAt:null},[receipt]),false);
+  assert.equal(verifiedInitialReceipt({...payment,environment:"sandbox"},[receipt]),false);
+  assert.equal(verifiedInitialReceipt(payment,[{...receipt,amount:1250}]),false);
+  assert.equal(verifiedInitialReceipt(payment,[{...receipt,metadata:{paymentId:"other",verifiedStatus:true,environment:"live"}}]),false);
+  assert.equal(verifiedInitialReceipt(payment,[receipt,{...receipt,id:"reversal",type:"REVERSAL",reversalOfId:"receipt"}]),false);
+});
+test("initial invoice remains available without any monthly mandate or saved dates", async () => {
+  const restore = stub(db.publicReservationLease,"findUnique",async()=>({id:"lease",status:"SIGNED",paymentMethod:"DEBIT_ORDER",expiresAt:new Date(Date.now()+60000),mandate:null,reservation:{...booking,id:"booking",status:"ACTIVE",customerId:"owner"}}));
+  const restoreAccount = stub(db.account,"findUnique",async()=>null);
+  try {
+    const result = await debitOrderInitialPaymentStatus("synthetic");
+    assert.equal(result.status,"NOT_STARTED");assert.equal(result.paymentVerified,false);
+    assert.equal(result.invoice?.total,1290.32);assert.equal(result.earliestCollectionDate,"2026-12-01");
+  } finally {restore();restoreAccount();}
+});
+
+
+test("public initial status never reports settlement from raw live success without verified ledger evidence", async () => {
+  const payment = {id:"p",status:"SUCCEEDED",amount:1290.32,currency:"ZAR",environment:"live",idempotencyKey:"real",provider:"NETCASH",method:"PAY_NOW",processedAt:new Date()};
+  const receipt = {id:"receipt",type:"PAYMENT",amount:1290.32,metadata:{paymentId:"p",verifiedStatus:true,environment:"live"},reversalOfId:null};
+  let entries:typeof receipt[]=[];
+  const restore = stub(db.publicReservationLease,"findUnique",async()=>({id:"lease",status:"SIGNED",paymentMethod:"DEBIT_ORDER",expiresAt:new Date(Date.now()+60000),mandate:null,reservation:{...booking,id:"booking",status:"ACTIVE",customerId:"owner"}}));
+  const restoreAccount = stub(db.account,"findUnique",async()=>({customerId:"owner",payments:[payment],ledgerEntries:entries}));
+  try {
+    assert.equal((await debitOrderInitialPaymentStatus("synthetic")).status,"REVIEW_REQUIRED");
+    entries=[receipt];let result=await debitOrderInitialPaymentStatus("synthetic");assert.equal(result.status,"SUCCEEDED");assert.equal(result.paymentVerified,true);
+    entries=[receipt,{...receipt,id:"refund",type:"REFUND"}];result=await debitOrderInitialPaymentStatus("synthetic");assert.equal(result.status,"REVIEW_REQUIRED");assert.equal(result.paymentVerified,false);
+  } finally {restore();restoreAccount();}
 });

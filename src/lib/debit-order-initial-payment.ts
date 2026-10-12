@@ -7,7 +7,16 @@ import { startPublicNetcashSandboxPayment } from "./public-netcash-payment";
 import { preparePublicReservationLease } from "./public-lease-workflow";
 import { debitOrderSchedule } from "./debit-order-schedule";
 
-type Payment = { id: string; status: string; amount: unknown; currency: string; environment: string | null; idempotencyKey: string };
+type Payment = { id: string; status: string; amount: unknown; currency: string; environment: string | null; idempotencyKey: string; provider?: string | null; method?: string; processedAt?: Date | null };
+type Receipt = { id: string; type: string; amount: unknown; metadata: unknown; reversalOfId: string | null };
+export function verifiedInitialReceipt(payment: Payment, receipts: Receipt[]) {
+  if (payment.status !== "SUCCEEDED" || isTestPayment(payment) || payment.currency !== "ZAR" || !payment.processedAt || payment.provider !== "NETCASH" || payment.method !== "PAY_NOW") return false;
+  if (receipts.some(receipt => receipt.type === "REFUND" || receipt.type === "REVERSAL")) return false;
+  return receipts.some(receipt => {
+    const metadata = receipt.metadata as { paymentId?: unknown; verifiedStatus?: unknown; environment?: unknown } | null;
+    return receipt.type === "PAYMENT" && Number(receipt.amount) === Number(payment.amount) && metadata?.paymentId === payment.id && metadata.verifiedStatus === true && metadata.environment === "live" && !receipts.some(reversal => reversal.reversalOfId === receipt.id);
+  });
+}
 export function initialPaymentState(payments: Payment[], amount: number) {
   if (!payments.length) return { status: "NOT_STARTED", paymentId: null, isTest: true };
   // Multiple attempts or a different amount require reconciliation, not another form.
@@ -18,11 +27,14 @@ export function initialPaymentState(payments: Payment[], amount: number) {
 }
 export async function debitOrderInitialPaymentStatus(token: string) {
   const lease = await findMandateLease(token);
-  if (lease.sourceSessionId) return { status: "STAFF_REVIEW_REQUIRED", paymentId: null, isTest: false };
+  if (lease.sourceSessionId) return { status: "STAFF_REVIEW_REQUIRED", paymentId: null, isTest: false, paymentVerified: false, invoice: null, earliestCollectionDate: null };
   const amount = publicCheckoutTotal(lease.reservation);
-  const account = await db.account.findUnique({ where: { accountNumber: `ST24-T-${lease.reservation.id}` }, select: { customerId: true, payments: { select: { id: true, status: true, amount: true, currency: true, environment: true, idempotencyKey: true } } } });
+  const account = await db.account.findUnique({ where: { accountNumber: `ST24-T-${lease.reservation.id}` }, select: { customerId: true, payments: { select: { id: true, status: true, amount: true, currency: true, environment: true, idempotencyKey: true, processedAt: true, provider: true, method: true } }, ledgerEntries: { select: { id: true, type: true, amount: true, metadata: true, reversalOfId: true } } } });
   if (account && account.customerId !== lease.reservation.customerId) throw new Error("NETCASH_ACCOUNT_CONFLICT");
-  return initialPaymentState(account?.payments ?? [], amount);
+  const schedule = debitOrderSchedule(lease.reservation, null, new Date().toISOString().slice(0, 10));
+  const state = initialPaymentState(account?.payments ?? [], amount);
+  const paymentVerified = state.status === "SUCCEEDED" && account?.payments.length === 1 && verifiedInitialReceipt(account.payments[0], account.ledgerEntries ?? []);
+  return { ...state, ...(state.status === "SUCCEEDED" && !paymentVerified ? { status: "REVIEW_REQUIRED" } : {}), paymentVerified: Boolean(paymentVerified), invoice: schedule.initialPayment, earliestCollectionDate: schedule.earliestDate };
 }
 export async function startDebitOrderInitialPayment(token: string) {
   const lease = await findMandateLease(token);
