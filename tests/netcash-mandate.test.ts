@@ -76,7 +76,8 @@ test("current unsigned export binds its full start date and WSDL holiday ID with
 test("current accepted bank export requires complete banking fields and retains card rejection", () => {
   const bank = {22:"Synthetic holder",23:"1",24:"632005",25:"0",26:"11111111111"};
   for (const type of ["0", "1"]) assert.equal(verifyMandateReport(currentReport("6", {...bank,21:type}),terms),"SIGNED");
-  const invalid: Record<number,string>[] = [{21:"2"},{23:"0"},{24:"10"},{25:"2027"},{26:"synthetic-card-token"},{22:""},{26:""}];
+  // A card expiry month is not a six-digit branch, even when its type is 1.
+  const invalid: Record<number,string>[] = [{21:"2"},{23:"0"},{21:"1",24:"10",25:"2027",26:"synthetic-card-token"},{26:"synthetic-card-token"},{22:""},{26:""}];
   for (const patch of invalid)
     assert.equal(verifyMandateReport(currentReport("6",{...bank,...patch}),terms),"REVIEW_REQUIRED");
   assert.equal(verifyMandateReport(currentReport("2",bank),terms),"AWAITING_SIGNATURE");

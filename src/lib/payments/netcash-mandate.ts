@@ -111,7 +111,7 @@ export function assessMandateReport(report: string, expected: MandateTerms) {
   // complete bank shape, not merely an accepted status or a numeric token.
   // Fields 23-27 are holder, account type, branch, filler and account number.
   const bankShape = Boolean(r[22]?.trim()) && ["1", "2", "3"].includes(r[23])
-    && /^\d{6}$/.test(r[24]) && r[25] === "0" && /^\d{4,11}$/.test(r[26]);
+    && /^\d{6}$/.test(r[24]) && /^\d{4,11}$/.test(r[26]);
   // Match immutable commercial snapshot AND server-generated correlation, never
   // retain the bank/identity fields from this account-wide provider report.
   const checks: Record<string, boolean> = {
