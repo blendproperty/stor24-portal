@@ -25,11 +25,12 @@ test("isolated report recovery restores one existing authority without creation 
  const connection=await db.integrationConnection.create({data:{organisationId:org.id,category:"PAYMENTS",provider:"NETCASH",config}});
  const terms={reference:`CI${key.replaceAll("-","").slice(0,18)}`,agreementReference:reservation.publicReference!,agreementDate,amount:"950.00",commencementMonth:month,debitDay:1,noticeDays:30,holiday:"VeryNextOrdinaryBusinessDay",correlation:key};
  const mandate=await db.publicDebitMandate.create({data:{leaseId:lease.id,reference:terms.reference,correlation:key,terms,status:"REVIEW_REQUIRED",hostedUrl:"https://short.surf/synthetic",environment:"sandbox",connectionId:connection.id,connectionFingerprint:debitConnectionFingerprint({environment:"sandbox",merchantAccount:"51111111111",debitOrderServiceKey:serviceKey})}});
- let altered=false,empty=false;const methods:string[]=[];
+ let altered=false,empty=false,signed=false;const methods:string[]=[];
  const network=mock.method(globalThis,"fetch",async(_url:unknown,options?:RequestInit)=>{
   const action=String((options?.headers as Record<string,string>).SOAPAction);methods.push(action);
   if(action.includes("RequestMandateData"))return new Response("<RequestMandateDataResult>20000000.123.1.1</RequestMandateDataResult>");
-  assert.ok(action.includes("RetrieveMandateData"));if(empty)return new Response(`<RetrieveMandateDataResult>###BEGIN\t${agreementDate}\n###END</RetrieveMandateDataResult>`);const r=Array<string>(44).fill("");Object.assign(r,{0:"2",1:terms.reference,3:altered?"999.00":"950.0000",11:"1",12:firstDate.replaceAll("-",""),13:"01",14:agreementDate,15:terms.agreementReference,16:"30",17:"2",21:"0",30:key,40:"0"});
+  assert.ok(action.includes("RetrieveMandateData"));if(empty)return new Response(`<RetrieveMandateDataResult>###BEGIN\t${agreementDate}\n###END</RetrieveMandateDataResult>`);const r=Array<string>(44).fill("");Object.assign(r,{0:signed?"6":"2",1:terms.reference,3:altered?"999.00":"950.0000",11:"1",12:firstDate.replaceAll("-",""),13:"01",14:agreementDate,15:terms.agreementReference,16:"30",17:"2",21:"0",30:key,40:"0"});
+  if(signed)Object.assign(r,{22:"Synthetic holder",23:"1",24:"632005",25:"0",26:"11111111111"});
   return new Response(`<RetrieveMandateDataResult>###BEGIN\t${agreementDate}\n${r.join("\t")}\n###END</RetrieveMandateDataResult>`);
  });
  try{
@@ -43,6 +44,9 @@ test("isolated report recovery restores one existing authority without creation 
   const missing=await refreshHostedMandate(key);assert.equal(missing.status,"REVIEW_REQUIRED");assert.equal(missing.hostedUrl,null);empty=false;
   altered=true;await db.publicDebitMandate.update({where:{id:mandate.id},data:{status:"REVIEW_REQUIRED",failureCode:null,lastCheckedAt:null,reportToken:"20000000.123.1.1",reportRequestedAt:new Date()}});
   const blocked=await refreshHostedMandate(key);assert.equal(blocked.status,"REVIEW_REQUIRED");assert.equal(blocked.hostedUrl,null);assert.equal(blocked.failureCode,"MANDATE_REPORT_AMOUNT_MISMATCH");
+  altered=false;signed=true;await db.publicDebitMandate.update({where:{id:mandate.id},data:{status:"REVIEW_REQUIRED",failureCode:"MANDATE_REPORT_BANK_TYPE_MISMATCH",lastCheckedAt:null,reportToken:"20000000.123.1.1",reportRequestedAt:new Date()}});
+  const accepted=await refreshHostedMandate(key);assert.equal(accepted.status,"SIGNED");assert.ok(accepted.verifiedAt);assert.equal(accepted.hostedUrl,null);assert.equal(accepted.pdfAvailable,false);assert.equal(accepted.collectionEnabled,false);
+  assert.equal(await db.publicDebitMandate.count({where:{leaseId:lease.id}}),1);
   assert.equal(methods.filter(x=>x.includes("AddMandate")).length,0);
   assert.equal(await db.ledgerEntry.count({where:{account:{customerId:customer.id}}}),0);assert.equal(await db.payment.count({where:{account:{customerId:customer.id}}}),0);assert.equal(await db.debitOrderRun.count({where:{organisationId:org.id}}),0);
  }finally{network.mock.restore();await db.$disconnect();}

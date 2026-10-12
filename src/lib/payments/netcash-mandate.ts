@@ -107,6 +107,11 @@ export function assessMandateReport(report: string, expected: MandateTerms) {
   const firstDate = expected.agreementDate.slice(0, 4) + String(expected.commencementMonth).padStart(2, "0") + String(expected.debitDay).padStart(2, "0");
   const pending = ["1", "2", "8", "9", "10", "11"].includes(r[0]);
   const missingBankDetails = dated && pending && r[21] === "0" && r[26] === "";
+  // Observed current exports also use type 0 after bank signing. Require the
+  // complete bank shape, not merely an accepted status or a numeric token.
+  // Fields 23-27 are holder, account type, branch, filler and account number.
+  const bankShape = Boolean(r[22]?.trim()) && ["1", "2", "3"].includes(r[23])
+    && /^\d{6}$/.test(r[24]) && r[25] === "0" && /^\d{4,11}$/.test(r[26]);
   // Match immutable commercial snapshot AND server-generated correlation, never
   // retain the bank/identity fields from this account-wide provider report.
   const checks: Record<string, boolean> = {
@@ -117,7 +122,7 @@ export function assessMandateReport(report: string, expected: MandateTerms) {
     SCHEDULE: r[11] === "1" && (dated ? r[12] === firstDate : Number(r[12]) === expected.commencementMonth) && r[13] === String(expected.debitDay).padStart(2, "0"),
     NOTICE: Number(r[16]) === expected.noticeDays,
     HOLIDAY: r[17] === (expected.holiday === "VeryNextOrdinaryBusinessDay" ? dated ? "2" : "1" : dated ? "1" : "0"),
-    BANK_TYPE: r[21] === "1" || missingBankDetails,
+    BANK_TYPE: dated ? missingBankDetails || (["0", "1"].includes(r[21]) && bankShape) : r[21] === "1",
     FIXED_AMOUNT: r[40] === "0",
   };
   const failed = Object.entries(checks).find(([, valid]) => !valid);
