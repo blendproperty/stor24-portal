@@ -95,6 +95,7 @@ test("live initial success requires the matching provider receipt and cannot sur
   const receipt = {id:"receipt",type:"PAYMENT",amount:1290.32,metadata:{paymentId:"p",verifiedStatus:true,environment:"live"},reversalOfId:null};
   assert.equal(verifiedInitialReceipt(payment,[receipt]),true);
   assert.equal(verifiedInitialReceipt(payment,[]),false);
+  assert.equal(verifiedInitialReceipt(payment,[{...receipt,metadata:{paymentId:"p",verifiedStatus:"false",environment:"live"}}]),false);
   assert.equal(verifiedInitialReceipt({...payment,processedAt:null},[receipt]),false);
   assert.equal(verifiedInitialReceipt({...payment,environment:"sandbox"},[receipt]),false);
   assert.equal(verifiedInitialReceipt(payment,[{...receipt,amount:1250}]),false);
