@@ -81,6 +81,11 @@ type UatResetPreview = {
   customerTasksDetached: number;
   communicationsAnonymised: number;
   unitsReleased: number;
+  merchandiseOrders: number;
+  merchandiseRequests: number;
+  collectionCases: number;
+  financialAdjustments: number;
+  debitInstructions: number;
 };
 
 const decimalRead = z.string().refine(value => value.trim() !== "" && Number.isFinite(Number(value)));
@@ -250,32 +255,46 @@ export function UnitInventoryWorkspace({
   }
 
   async function uatReset(action: "preview" | "reset") {
-    if (saveBlocked || saveRequest.current) return;
+    if (busy || saveBlocked || saveRequest.current) return;
+    const controller = new AbortController();
+    saveRequest.current = controller;
+    const timer = setTimeout(() => controller.abort(), 45_000);
     setBusy(true);
     setError("");
     setNotice("");
-    const response = await fetch("/api/v1/admin/uat-reset", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(action === "preview"
-        ? { action }
-        : { action, confirmation: uatResetConfirmation }),
-    });
-    const result = await response.json().catch(() => ({}));
-    setBusy(false);
-    if (!response.ok) {
-      setError(result.error?.message ?? "The UAT reset could not be completed.");
-      return;
+    try {
+      const response = await fetch("/api/v1/admin/uat-reset", {
+        signal: controller.signal,
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(action === "preview"
+          ? { action }
+          : { action, confirmation: uatResetConfirmation }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(result.error?.message ?? "The UAT reset could not be completed.");
+        return;
+      }
+      if (action === "preview") {
+        setUatResetPreview(result.data);
+        setNotice("Reset preview ready. Review the counts below before confirming.");
+        return;
+      }
+      setUatResetPreview(null);
+      setUatResetConfirmation("");
+      await refresh();
+      setNotice(`${result.data.customers} test customer${result.data.customers === 1 ? "" : "s"} removed and ${result.data.unitsReleased} unit${result.data.unitsReleased === 1 ? "" : "s"} released. Inventory, rates and configuration were preserved.`);
+    } catch {
+      if (action === "reset") setSaveBlocked(true);
+      setError(action === "preview"
+        ? "The reset preview could not be loaded. Refresh inventory and try again."
+        : "We could not confirm whether the reset completed. Refresh inventory and review the customer counts before trying again.");
+    } finally {
+      clearTimeout(timer);
+      saveRequest.current = null;
+      setBusy(false);
     }
-    if (action === "preview") {
-      setUatResetPreview(result.data);
-      setNotice("Reset preview ready. Review the counts below before confirming.");
-      return;
-    }
-    setUatResetPreview(null);
-    setUatResetConfirmation("");
-    await refresh();
-    setNotice(`${result.data.customers} test customer${result.data.customers === 1 ? "" : "s"} removed and ${result.data.unitsReleased} unit${result.data.unitsReleased === 1 ? "" : "s"} released. Inventory, rates and configuration were preserved.`);
   }
 
   async function refresh() {
@@ -546,13 +565,17 @@ export function UnitInventoryWorkspace({
         <section className="panel uat-reset-preview" aria-label="UAT reset preview">
           <div>
             <p className="eyebrow">Destructive UAT reset preview</p>
-            <h2>{uatResetPreview.customers} test customers will be removed</h2>
+            <h2>All {uatResetPreview.customers} customers in your organisation will be removed</h2>
             <p>
-              This will remove {uatResetPreview.reservations} reservations, {uatResetPreview.tenancies} draft or test tenancies,
-              {" "}{uatResetPreview.occupancies} occupancy records, {uatResetPreview.documents} lease records and {uatResetPreview.paymentSessions} simulated payment sessions.
+              This will remove {uatResetPreview.reservations} reservations, {uatResetPreview.tenancies} tenancies,
+              {" "}{uatResetPreview.occupancies} occupancy records, {uatResetPreview.documents} lease records and {uatResetPreview.paymentSessions} payment sessions.
               {" "}{uatResetPreview.unitsReleased} linked units will return to Available.
             </p>
             <p>Facilities, units, unit types, rates, maps, integrations, templates and audit events will remain.</p>
+            <p>This also removes {uatResetPreview.payments} payments, {uatResetPreview.ledgerEntries} ledger entries,
+              {" "}{uatResetPreview.merchandiseOrders} merchandise orders, {uatResetPreview.merchandiseRequests} merchandise requests,
+              {" "}{uatResetPreview.collectionCases} collection cases, {uatResetPreview.financialAdjustments} financial adjustments
+              {" "}and {uatResetPreview.debitInstructions} debit instructions with their batches. Linked stock holds are released; physical stock is unchanged.</p>
           </div>
           <label>
             Type <strong>RESET TEST CUSTOMERS</strong> to confirm
@@ -569,7 +592,7 @@ export function UnitInventoryWorkspace({
             <button
               type="button"
               className="button button-danger"
-              disabled={busy || uatResetConfirmation !== "RESET TEST CUSTOMERS"}
+              disabled={busy || saveBlocked || uatResetConfirmation !== "RESET TEST CUSTOMERS"}
               onClick={() => void uatReset("reset")}
             >
               <Trash2 size={15} /> Delete test customers and release units
