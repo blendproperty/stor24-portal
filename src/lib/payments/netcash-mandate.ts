@@ -54,6 +54,14 @@ export function safeMandateUrl(value: string) {
   if (url.protocol !== "https:" || url.username || url.password || url.port || !["short.surf", "mandate.netcash.co.za"].includes(url.hostname)) throw new Error("MANDATE_URL_INVALID");
   return url.toString();
 }
+export function safeMandatePdfUrl(value: string) {
+  const url = new URL(value);
+  // The authenticated PDF manifest's short.surf link redirects to the plural
+  // Netcash mandates host. Keep document destinations explicit and separate
+  // from signing URLs; never allow arbitrary hosts or credential URLs.
+  if (url.protocol !== "https:" || url.username || url.password || url.port || !["short.surf", "mandate.netcash.co.za", "mandates.netcash.co.za"].includes(url.hostname)) throw new Error("MANDATE_URL_INVALID");
+  return url.toString();
+}
 export function parseAddMandateResponse(xml: string) {
   const code = tag(xml, "ErrorCode");
   if (code !== "000") throw new Error(["100", "200", "203"].includes(code) ? `MANDATE_PROVIDER_${code}` : "MANDATE_RESPONSE_INVALID");
@@ -145,30 +153,79 @@ export async function requestMandatePdf(key: string, reference: string, vendor: 
   if (!/^\d+(?:\.\d+){2,}$/.test(token)) throw new Error("MANDATE_PDF_PENDING");
   return token;
 }
+function confirmationPdfLink(html: string, current: URL) {
+  const anchors = [...html.matchAll(/<a\b[^>]*>/gi)].filter(match => /\bid=["']eMandate_Confirmation_userControl_DownloadAnchor["']/i.test(match[0]));
+  if (anchors.length !== 1) throw new Error("MANDATE_PDF_INVALID");
+  const attribute = anchors[0][0].match(/\bonclick=(["'])(.*?)\1/i)?.[2];
+  const action = attribute ? decodeXml(attribute) : "";
+  const location = action.match(/^\s*openAndRefresh\((["'])([^"']+)\1\);?\s*$/)?.[2];
+  if (!location) throw new Error("MANDATE_PDF_INVALID");
+  const next = new URL(location,current);
+  safeMandatePdfUrl(next.toString());
+  if (next.origin !== current.origin || !next.pathname.endsWith("/DownloadBlank.aspx") || !/^EMF-\d{1,20}\.pdf$/.test(next.searchParams.get("pdfLink") ?? "")) throw new Error("MANDATE_PDF_INVALID");
+  return next;
+}
 export async function retrieveMandatePdf(key: string, token: string, reference: string, request: typeof fetch = fetch) {
   if (!/^\d+(?:\.\d+){2,}$/.test(token)) throw new Error("MANDATE_PDF_PENDING");
   const fields: Array<[string, string]> = [["ServiceKey", key], ["FileToken", token]];
   const load = tag(await soap("RequestFileUploadReport", mandateEnvelope("RequestFileUploadReport", fields), request), "RequestFileUploadReportResult");
   const loadLines = load.trim().split(/\r?\n/);
   const header = loadLines[0].split("\t");
-  if (header[0] !== "###BEGIN" || header[1] !== reference || header[2] !== "SUCCESSFUL" || load.includes("###ERROR") || !loadLines.at(-1)?.startsWith("###END\t")) throw new Error("MANDATE_PDF_PENDING");
+  // Netcash uppercases batch titles in current six-field upload reports and
+  // manifest headings. Only those titles are case-insensitive; the account
+  // reference in the document row below remains an exact binding.
+  if (![4, 6].includes(header.length) || header[0] !== "###BEGIN" || header[1]?.toUpperCase() !== reference.toUpperCase() || header[2] !== "SUCCESSFUL" || load.includes("###ERROR") || !loadLines.at(-1)?.startsWith("###END\t")) throw new Error("MANDATE_PDF_PENDING");
   const report = tag(await soap("RetrieveMandatePDF", mandateEnvelope("RetrieveMandatePDF", fields), request), "RetrieveMandatePDFResult");
   const rows = report.trim().split(/\r?\n/);
-  if (rows[0] !== `###BEGIN\t${reference}` || rows.at(-1) !== "###END" || rows.length !== 3) throw new Error("MANDATE_PDF_PENDING");
+  const manifestHeader = rows[0].split("\t");
+  if (manifestHeader.length !== 2 || manifestHeader[0] !== "###BEGIN" || manifestHeader[1]?.toUpperCase() !== reference.toUpperCase() || rows.at(-1) !== "###END" || rows.length !== 3) throw new Error("MANDATE_PDF_PENDING");
   const [returnedReference, link] = rows[1].split("\t");
   if (returnedReference !== reference) throw new Error("MANDATE_PDF_INVALID");
-  let url = new URL(safeMandateUrl(link));
+  let url = new URL(safeMandatePdfUrl(link));
   url.searchParams.set("PKey", key);
+  const sessions = new Map<string, Map<string, string>>();
+  let confirmationFollowed = false;
   // Download server-side. Never expose the documented PKey URL to browsers/logs.
-  for (let hop = 0; hop < 4; hop++) {
-    safeMandateUrl(url.toString());
-    const response = await request(url, { redirect: "manual", signal: AbortSignal.timeout(20_000), cache: "no-store" });
+  for (let hop = 0; hop < 6; hop++) {
+    safeMandatePdfUrl(url.toString());
+    const cookies = sessions.get(url.hostname);
+    const cookie = cookies ? [...cookies].map(([name,value]) => `${name}=${value}`).join("; ") : "";
+    const response = await request(url, { redirect: "manual", signal: AbortSignal.timeout(20_000), cache: "no-store", ...(cookie ? { headers: { cookie } } : {}) });
+    // Netcash authenticates the PKey request then redirects to the document
+    // with a session cookie. Keep it only for this download and exact HTTPS
+    // host; never forward Netcash cookies to short.surf or another host.
+    if (["mandate.netcash.co.za", "mandates.netcash.co.za"].includes(url.hostname)) {
+      const values = response.headers.getSetCookie();
+      const jar = sessions.get(url.hostname) ?? new Map<string,string>();
+      for (const value of values) {
+        const pair = value.split(";",1)[0]; const equals = pair.indexOf("=");
+        const name = pair.slice(0,equals); const content = pair.slice(equals+1);
+        if (equals < 1 || !/^[A-Za-z0-9_.-]+$/.test(name) || /[\r\n]/.test(content)) continue;
+        if (!content || /;\s*Max-Age=0(?:;|$)/i.test(value)) jar.delete(name); else jar.set(name,content);
+      }
+      sessions.set(url.hostname,jar);
+    }
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       const location = response.headers.get("location"); if (!location) throw new Error("MANDATE_PDF_INVALID");
-      url = new URL(location, url); continue;
+      const next = new URL(location, url);
+      // Current Netcash short links return a legacy HTTP document location.
+      // This exact host supports verified HTTPS: upgrade before any request,
+      // never send PKey over HTTP or broaden redirects to arbitrary hosts.
+      if (next.protocol === "http:" && next.hostname === "mandates.netcash.co.za" && !next.port && !next.username && !next.password) next.protocol = "https:";
+      safeMandatePdfUrl(next.toString());
+      // Netcash's canonical-page redirect drops PKey. Retain the documented
+      // download credential only on the exact approved HTTPS Netcash hosts.
+      if (["mandate.netcash.co.za", "mandates.netcash.co.za"].includes(next.hostname)) {
+        for (const name of [...next.searchParams.keys()]) if (name.toLowerCase() === "pkey") next.searchParams.delete(name);
+        next.searchParams.set("PKey",key);
+      }
+      url = next; continue;
     }
     if (!response.ok) throw new Error("MANDATE_PDF_PENDING");
     const pdf = await boundedBody(response, 10_000_000);
+    if (response.headers.get("content-type")?.includes("text/html") && ["mandate.netcash.co.za", "mandates.netcash.co.za"].includes(url.hostname) && !confirmationFollowed) {
+      url = confirmationPdfLink(pdf.toString("utf8"),url); confirmationFollowed = true; continue;
+    }
     if (pdf.subarray(0, 5).toString() !== "%PDF-") throw new Error("MANDATE_PDF_INVALID");
     return pdf;
   }

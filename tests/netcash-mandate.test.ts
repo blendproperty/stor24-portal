@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { addHostedMandate, buildAddMandateEnvelope, parseAddMandateResponse, requestMandateData, requestMandatePdf, retrieveMandatePdf, boundedBody, safeMandateUrl, verifyMandateReport, assessMandateReport, canRecheckMandate, type MandateTerms } from "../src/lib/payments/netcash-mandate";
+import { addHostedMandate, buildAddMandateEnvelope, parseAddMandateResponse, requestMandateData, requestMandatePdf, retrieveMandatePdf, boundedBody, safeMandateUrl, safeMandatePdfUrl, verifyMandateReport, assessMandateReport, canRecheckMandate, type MandateTerms } from "../src/lib/payments/netcash-mandate";
 import { mandatePolicy } from "../src/lib/payments/netcash-mandate-policy";
 
 const terms: MandateTerms = { reference: "ST24-test-mandate", agreementReference: "ST24-test-agreement", agreementDate: "20260910", firstName: "Test & Sample", surname: "Person", phone: "0825551234", email: "test@example.com", amount: "1000.00", commencementMonth: 10, debitDay: 1, noticeDays: 30, holiday: "VeryNextOrdinaryBusinessDay", correlation: "test-correlation-not-a-real-token-0001" };
@@ -129,4 +129,65 @@ test("PDF retrieval binds exact account reference and never downloads from an un
 });
 test("oversized provider bodies are rejected", async () => {
   await assert.rejects(boundedBody(new Response("123456"), 5), /TOO_LARGE/);
+});
+
+test("current PDF batch headings are uppercase while the authority row stays exact", async () => {
+  let wrongTitle=false,wrongRow=false,downloads=0;
+  const request: typeof fetch=async(_url,options)=>{
+    const action=(options?.headers as Record<string,string>)?.SOAPAction??"";
+    const title=wrongTitle?"OTHER-AUTHORITY":terms.reference.toUpperCase();
+    if(action.includes("RequestFileUploadReport"))return new Response(`<RequestFileUploadReportResult>###BEGIN\t${title}\tSUCCESSFUL\t12:00\tR0.00\t20261012\n###END\t12:00</RequestFileUploadReportResult>`);
+    if(action.includes("RetrieveMandatePDF"))return new Response(`<RetrieveMandatePDFResult>###BEGIN\t${title}\n${wrongRow?terms.reference.toUpperCase():terms.reference}\thttps://short.surf/synthetic-pdf\n###END</RetrieveMandatePDFResult>`);
+    downloads++;return new Response("%PDF-synthetic-fixture");
+  };
+  assert.ok(await retrieveMandatePdf("test-key","20000000.1.2.3.4",terms.reference,request));assert.equal(downloads,1);
+  wrongTitle=true;await assert.rejects(retrieveMandatePdf("test-key","20000000.1.2.3.4",terms.reference,request),/MANDATE_PDF_PENDING/);
+  wrongTitle=false;wrongRow=true;await assert.rejects(retrieveMandatePdf("test-key","20000000.1.2.3.4",terms.reference,request),/MANDATE_PDF_INVALID/);assert.equal(downloads,1);
+});
+test("PDF destinations include only the observed Netcash document hosts", () => {
+  assert.equal(safeMandatePdfUrl("https://mandates.netcash.co.za/synthetic"),"https://mandates.netcash.co.za/synthetic");
+  for(const url of ["http://mandates.netcash.co.za/file","https://mandates.netcash.co.za.evil.test/file","https://user@mandates.netcash.co.za/file","https://mandates.netcash.co.za:8443/file","https://localhost/file"])assert.throws(()=>safeMandatePdfUrl(url));
+  assert.throws(()=>safeMandateUrl("https://mandates.netcash.co.za/synthetic"));
+});
+test("the exact Netcash legacy document redirect is upgraded before downloading",async()=>{
+ const downloads:string[]=[];
+ const request:typeof fetch=async(url,options)=>{
+  const action=(options?.headers as Record<string,string>)?.SOAPAction??"";
+  if(action.includes("RequestFileUploadReport"))return new Response(`<RequestFileUploadReportResult>###BEGIN\t${terms.reference.toUpperCase()}\tSUCCESSFUL\t12:00\tR0.00\t20261012\n###END\t12:00</RequestFileUploadReportResult>`);
+  if(action.includes("RetrieveMandatePDF"))return new Response(`<RetrieveMandatePDFResult>###BEGIN\t${terms.reference.toUpperCase()}\n${terms.reference}\thttps://short.surf/synthetic\n###END</RetrieveMandatePDFResult>`);
+  downloads.push(new URL(String(url)).protocol);
+  if(downloads.length===1)return new Response(null,{status:302,headers:{location:"http://mandates.netcash.co.za/synthetic"}});
+  assert.equal(new URL(String(url)).hostname,"mandates.netcash.co.za");return new Response("%PDF-synthetic");
+ };
+ await retrieveMandatePdf("test-key","20000000.1.2.3.4",terms.reference,request);assert.deepEqual(downloads,["https:","https:"]);
+});
+test("document authentication cookies survive only on the exact Netcash host",async()=>{
+ for(const outside of [false,true]){
+  let gets=0;
+  const request:typeof fetch=async(url,options)=>{
+   const action=(options?.headers as Record<string,string>)?.SOAPAction??"";
+   if(action.includes("RequestFileUploadReport"))return new Response(`<RequestFileUploadReportResult>###BEGIN\t${terms.reference}\tSUCCESSFUL\t12:00\n###END\t12:00</RequestFileUploadReportResult>`);
+   if(action.includes("RetrieveMandatePDF"))return new Response(`<RetrieveMandatePDFResult>###BEGIN\t${terms.reference}\n${terms.reference}\thttps://short.surf/synthetic\n###END</RetrieveMandatePDFResult>`);
+   gets++;assert.equal(new URL(String(url)).protocol,"https:");const headers=options?.headers as Record<string,string>|undefined;
+   if(gets===1)return new Response(null,{status:302,headers:{location:"http://mandates.netcash.co.za/synthetic?PKey=test-key"}});
+   if(gets===2){assert.equal(headers?.cookie,undefined);return new Response(null,{status:302,headers:{location:outside?"https://short.surf/synthetic-result":"https://mandates.netcash.co.za/synthetic-result","set-cookie":"session=synthetic-only; Path=/; HttpOnly; Secure"}});}
+   assert.equal(headers?.cookie,outside?undefined:"session=synthetic-only");
+   assert.equal(new URL(String(url)).searchParams.get("PKey"),outside?null:"test-key");return new Response("%PDF-synthetic");
+  };
+  await retrieveMandatePdf("test-key","20000000.1.2.3.4",terms.reference,request);assert.equal(gets,3);
+ }
+});
+test("signed confirmation follows only its specific same-host PDF download control",async()=>{
+ for(const hostile of [false,true]){
+  const gets:string[]=[];
+  const request:typeof fetch=async(url,options)=>{
+   const action=(options?.headers as Record<string,string>)?.SOAPAction??"";
+   if(action.includes("RequestFileUploadReport"))return new Response(`<RequestFileUploadReportResult>###BEGIN\t${terms.reference}\tSUCCESSFUL\t12:00\n###END\t12:00</RequestFileUploadReportResult>`);
+   if(action.includes("RetrieveMandatePDF"))return new Response(`<RetrieveMandatePDFResult>###BEGIN\t${terms.reference}\n${terms.reference}\thttps://mandates.netcash.co.za/Public/Default.aspx\n###END</RetrieveMandatePDFResult>`);
+   gets.push(String(url));if(gets.length===1)return new Response(`<a id="eMandate_Confirmation_userControl_DownloadAnchor" onclick="openAndRefresh(&#39;${hostile?"https://evil.example":".."}/DownloadBlank.aspx?pdfLink=EMF-123.pdf&#39;);">Download</a>`,{headers:{"content-type":"text/html"}});
+   assert.equal(new URL(String(url)).pathname,"/DownloadBlank.aspx");return new Response("%PDF-synthetic");
+  };
+  if(hostile){await assert.rejects(retrieveMandatePdf("test-key","20000000.1.2.3.4",terms.reference,request),/MANDATE_URL_INVALID/);assert.equal(gets.length,1);}
+  else {await retrieveMandatePdf("test-key","20000000.1.2.3.4",terms.reference,request);assert.equal(gets.length,2);}
+ }
 });
