@@ -200,6 +200,12 @@ export async function retrieveMandatePdf(key: string, token: string, reference: 
       // never send PKey over HTTP or broaden redirects to arbitrary hosts.
       if (next.protocol === "http:" && next.hostname === "mandates.netcash.co.za" && !next.port && !next.username && !next.password) next.protocol = "https:";
       safeMandatePdfUrl(next.toString());
+      // Netcash's canonical-page redirect drops PKey. Retain the documented
+      // download credential only on the exact approved HTTPS Netcash hosts.
+      if (["mandate.netcash.co.za", "mandates.netcash.co.za"].includes(next.hostname)) {
+        for (const name of [...next.searchParams.keys()]) if (name.toLowerCase() === "pkey") next.searchParams.delete(name);
+        next.searchParams.set("PKey",key);
+      }
       url = next; continue;
     }
     if (!response.ok) throw new Error("MANDATE_PDF_PENDING");

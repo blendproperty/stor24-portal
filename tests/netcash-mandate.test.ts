@@ -171,7 +171,8 @@ test("document authentication cookies survive only on the exact Netcash host",as
    gets++;assert.equal(new URL(String(url)).protocol,"https:");const headers=options?.headers as Record<string,string>|undefined;
    if(gets===1)return new Response(null,{status:302,headers:{location:"http://mandates.netcash.co.za/synthetic?PKey=test-key"}});
    if(gets===2){assert.equal(headers?.cookie,undefined);return new Response(null,{status:302,headers:{location:outside?"https://short.surf/synthetic-result":"https://mandates.netcash.co.za/synthetic-result","set-cookie":"session=synthetic-only; Path=/; HttpOnly; Secure"}});}
-   assert.equal(headers?.cookie,outside?undefined:"session=synthetic-only");return new Response("%PDF-synthetic");
+   assert.equal(headers?.cookie,outside?undefined:"session=synthetic-only");
+   assert.equal(new URL(String(url)).searchParams.get("PKey"),outside?null:"test-key");return new Response("%PDF-synthetic");
   };
   await retrieveMandatePdf("test-key","20000000.1.2.3.4",terms.reference,request);assert.equal(gets,3);
  }
