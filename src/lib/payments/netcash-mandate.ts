@@ -151,10 +151,14 @@ export async function retrieveMandatePdf(key: string, token: string, reference: 
   const load = tag(await soap("RequestFileUploadReport", mandateEnvelope("RequestFileUploadReport", fields), request), "RequestFileUploadReportResult");
   const loadLines = load.trim().split(/\r?\n/);
   const header = loadLines[0].split("\t");
-  if (header[0] !== "###BEGIN" || header[1] !== reference || header[2] !== "SUCCESSFUL" || load.includes("###ERROR") || !loadLines.at(-1)?.startsWith("###END\t")) throw new Error("MANDATE_PDF_PENDING");
+  // Netcash uppercases batch titles in current six-field upload reports and
+  // manifest headings. Only those titles are case-insensitive; the account
+  // reference in the document row below remains an exact binding.
+  if (![4, 6].includes(header.length) || header[0] !== "###BEGIN" || header[1]?.toUpperCase() !== reference.toUpperCase() || header[2] !== "SUCCESSFUL" || load.includes("###ERROR") || !loadLines.at(-1)?.startsWith("###END\t")) throw new Error("MANDATE_PDF_PENDING");
   const report = tag(await soap("RetrieveMandatePDF", mandateEnvelope("RetrieveMandatePDF", fields), request), "RetrieveMandatePDFResult");
   const rows = report.trim().split(/\r?\n/);
-  if (rows[0] !== `###BEGIN\t${reference}` || rows.at(-1) !== "###END" || rows.length !== 3) throw new Error("MANDATE_PDF_PENDING");
+  const manifestHeader = rows[0].split("\t");
+  if (manifestHeader.length !== 2 || manifestHeader[0] !== "###BEGIN" || manifestHeader[1]?.toUpperCase() !== reference.toUpperCase() || rows.at(-1) !== "###END" || rows.length !== 3) throw new Error("MANDATE_PDF_PENDING");
   const [returnedReference, link] = rows[1].split("\t");
   if (returnedReference !== reference) throw new Error("MANDATE_PDF_INVALID");
   let url = new URL(safeMandateUrl(link));

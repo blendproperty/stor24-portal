@@ -130,3 +130,17 @@ test("PDF retrieval binds exact account reference and never downloads from an un
 test("oversized provider bodies are rejected", async () => {
   await assert.rejects(boundedBody(new Response("123456"), 5), /TOO_LARGE/);
 });
+
+test("current PDF batch headings are uppercase while the authority row stays exact", async () => {
+  let wrongTitle=false,wrongRow=false,downloads=0;
+  const request: typeof fetch=async(_url,options)=>{
+    const action=(options?.headers as Record<string,string>)?.SOAPAction??"";
+    const title=wrongTitle?"OTHER-AUTHORITY":terms.reference.toUpperCase();
+    if(action.includes("RequestFileUploadReport"))return new Response(`<RequestFileUploadReportResult>###BEGIN\t${title}\tSUCCESSFUL\t12:00\tR0.00\t20261012\n###END\t12:00</RequestFileUploadReportResult>`);
+    if(action.includes("RetrieveMandatePDF"))return new Response(`<RetrieveMandatePDFResult>###BEGIN\t${title}\n${wrongRow?terms.reference.toUpperCase():terms.reference}\thttps://short.surf/synthetic-pdf\n###END</RetrieveMandatePDFResult>`);
+    downloads++;return new Response("%PDF-synthetic-fixture");
+  };
+  assert.ok(await retrieveMandatePdf("test-key","20000000.1.2.3.4",terms.reference,request));assert.equal(downloads,1);
+  wrongTitle=true;await assert.rejects(retrieveMandatePdf("test-key","20000000.1.2.3.4",terms.reference,request),/MANDATE_PDF_PENDING/);
+  wrongTitle=false;wrongRow=true;await assert.rejects(retrieveMandatePdf("test-key","20000000.1.2.3.4",terms.reference,request),/MANDATE_PDF_INVALID/);assert.equal(downloads,1);
+});
