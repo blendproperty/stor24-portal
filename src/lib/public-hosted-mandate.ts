@@ -121,8 +121,8 @@ export async function refreshHostedMandate(token: string) {
   }
   if (!m.reportToken || !m.reportRequestedAt || Date.now() - m.reportRequestedAt.getTime() > 120_000) {
     const reportToken = await requestMandateData(key);
-    await db.publicDebitMandate.update({ where: { id: m.id }, data: { reportToken, reportRequestedAt: new Date() } });
-    return safeView(lease, m); // Provider asynchronous report: next customer refresh retrieves it.
+    const queued = await db.publicDebitMandate.update({ where: { id: m.id }, data: { reportToken, reportRequestedAt: new Date() } });
+    return safeView(lease, queued); // Return the queued state so the client polls the existing report.
   }
   const report = await retrieveMandateData(key, m.reportToken);
   const assessment = assessMandateReport(report, m.terms as MandateTerms);
