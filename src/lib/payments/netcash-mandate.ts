@@ -54,6 +54,14 @@ export function safeMandateUrl(value: string) {
   if (url.protocol !== "https:" || url.username || url.password || url.port || !["short.surf", "mandate.netcash.co.za"].includes(url.hostname)) throw new Error("MANDATE_URL_INVALID");
   return url.toString();
 }
+export function safeMandatePdfUrl(value: string) {
+  const url = new URL(value);
+  // The authenticated PDF manifest's short.surf link redirects to the plural
+  // Netcash mandates host. Keep document destinations explicit and separate
+  // from signing URLs; never allow arbitrary hosts or credential URLs.
+  if (url.protocol !== "https:" || url.username || url.password || url.port || !["short.surf", "mandate.netcash.co.za", "mandates.netcash.co.za"].includes(url.hostname)) throw new Error("MANDATE_URL_INVALID");
+  return url.toString();
+}
 export function parseAddMandateResponse(xml: string) {
   const code = tag(xml, "ErrorCode");
   if (code !== "000") throw new Error(["100", "200", "203"].includes(code) ? `MANDATE_PROVIDER_${code}` : "MANDATE_RESPONSE_INVALID");
@@ -161,11 +169,11 @@ export async function retrieveMandatePdf(key: string, token: string, reference: 
   if (manifestHeader.length !== 2 || manifestHeader[0] !== "###BEGIN" || manifestHeader[1]?.toUpperCase() !== reference.toUpperCase() || rows.at(-1) !== "###END" || rows.length !== 3) throw new Error("MANDATE_PDF_PENDING");
   const [returnedReference, link] = rows[1].split("\t");
   if (returnedReference !== reference) throw new Error("MANDATE_PDF_INVALID");
-  let url = new URL(safeMandateUrl(link));
+  let url = new URL(safeMandatePdfUrl(link));
   url.searchParams.set("PKey", key);
   // Download server-side. Never expose the documented PKey URL to browsers/logs.
   for (let hop = 0; hop < 4; hop++) {
-    safeMandateUrl(url.toString());
+    safeMandatePdfUrl(url.toString());
     const response = await request(url, { redirect: "manual", signal: AbortSignal.timeout(20_000), cache: "no-store" });
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       const location = response.headers.get("location"); if (!location) throw new Error("MANDATE_PDF_INVALID");

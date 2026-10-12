@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { addHostedMandate, buildAddMandateEnvelope, parseAddMandateResponse, requestMandateData, requestMandatePdf, retrieveMandatePdf, boundedBody, safeMandateUrl, verifyMandateReport, assessMandateReport, canRecheckMandate, type MandateTerms } from "../src/lib/payments/netcash-mandate";
+import { addHostedMandate, buildAddMandateEnvelope, parseAddMandateResponse, requestMandateData, requestMandatePdf, retrieveMandatePdf, boundedBody, safeMandateUrl, safeMandatePdfUrl, verifyMandateReport, assessMandateReport, canRecheckMandate, type MandateTerms } from "../src/lib/payments/netcash-mandate";
 import { mandatePolicy } from "../src/lib/payments/netcash-mandate-policy";
 
 const terms: MandateTerms = { reference: "ST24-test-mandate", agreementReference: "ST24-test-agreement", agreementDate: "20260910", firstName: "Test & Sample", surname: "Person", phone: "0825551234", email: "test@example.com", amount: "1000.00", commencementMonth: 10, debitDay: 1, noticeDays: 30, holiday: "VeryNextOrdinaryBusinessDay", correlation: "test-correlation-not-a-real-token-0001" };
@@ -143,4 +143,9 @@ test("current PDF batch headings are uppercase while the authority row stays exa
   assert.ok(await retrieveMandatePdf("test-key","20000000.1.2.3.4",terms.reference,request));assert.equal(downloads,1);
   wrongTitle=true;await assert.rejects(retrieveMandatePdf("test-key","20000000.1.2.3.4",terms.reference,request),/MANDATE_PDF_PENDING/);
   wrongTitle=false;wrongRow=true;await assert.rejects(retrieveMandatePdf("test-key","20000000.1.2.3.4",terms.reference,request),/MANDATE_PDF_INVALID/);assert.equal(downloads,1);
+});
+test("PDF destinations include only the observed Netcash document hosts", () => {
+  assert.equal(safeMandatePdfUrl("https://mandates.netcash.co.za/synthetic"),"https://mandates.netcash.co.za/synthetic");
+  for(const url of ["http://mandates.netcash.co.za/file","https://mandates.netcash.co.za.evil.test/file","https://user@mandates.netcash.co.za/file","https://mandates.netcash.co.za:8443/file","https://localhost/file"])assert.throws(()=>safeMandatePdfUrl(url));
+  assert.throws(()=>safeMandateUrl("https://mandates.netcash.co.za/synthetic"));
 });
