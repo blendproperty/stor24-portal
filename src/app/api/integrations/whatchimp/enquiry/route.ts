@@ -3,6 +3,7 @@ import { enquiryRequestSchema, intakeConfigSchema, keyHash, matchesIntakeKey, WH
 import { captureWhatChimpEnquiry } from '@/lib/whatchimp-enquiry-service';
 import { rateLimit } from '@/lib/request-security';
 import { ZodError } from 'zod';
+import { parseWhatChimpBody } from '@/lib/whatchimp-enquiry-body';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
     if (matched.length !== 1) return Response.json({ ok: false, error: 'Authentication failed.' }, { status: 401, headers });
     if (await rateLimit(`whatchimp-intake:${matched[0].id}`, 300, 60000)) return Response.json({ ok: false, error: 'Please retry shortly.' }, { status: 429, headers });
     const body = await boundedBody(request);
-    const input = enquiryRequestSchema.parse(JSON.parse(body));
+    const input = enquiryRequestSchema.parse(await parseWhatChimpBody(body, request.headers.get('content-type')));
     const result = await captureWhatChimpEnquiry(matched[0].id, input, new Date(), keyHash(token));
     return Response.json(result, { headers });
   } catch (e) {

@@ -17,6 +17,8 @@ export function isPublicPathname(pathname: string) {
   if (pathname === "/api/v1/operations/alert-monitor-config") return true;
   if (pathname === "/api/v1/leads/sla-worker") return true;
   if (pathname === "/api/v1/reports/worker") return true;
+  // Only the dedicated enquiry handler accepts the scoped WhatChimp intake key.
+  if (pathname === "/api/integrations/whatchimp/enquiry") return true;
   // Tenant APIs enforce separate tenant sessions; never accept the staff cookie as tenant authentication.
   if (pathname === "/my" || /^\/my\/orders\/[A-Za-z0-9_-]+$/.test(pathname) || pathname.startsWith("/api/tenant/")) return true;
   return publicPagePrefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix)) ||
