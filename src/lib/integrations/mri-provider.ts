@@ -24,7 +24,7 @@ async function request(path: string, init: RequestInit, fetcher: typeof fetch) {
 }
 
 /** Only authentication and reads. Tokens remain in memory for this invocation. */
-export async function verifyMriAccess(credentials: { login: string; password: string; databaseIdentifier?: string }, fetcher: typeof fetch = fetch) {
+export async function verifyMriAccess(credentials: { login: string; password: string; databaseIdentifier?: string; expectedDatabaseLabel?: string }, fetcher: typeof fetch = fetch) {
   const raw = await request("/v2/Token", {
     method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
     body: new URLSearchParams({ grant_type: "password", username: credentials.login, password: credentials.password }).toString(),
@@ -39,6 +39,12 @@ export async function verifyMriAccess(credentials: { login: string; password: st
     const found = databasesSchema.safeParse(await request("/v2/Access/GetDatabaseAccessList", { method: "GET", headers }, fetcher));
     if (found.success) { databases = found.data; discoveryAvailable = true; }
   } catch { /* Manual provider-supplied identifier remains available. */ }
+  // Sandbox reads require current provider discovery of the exact authorised
+  // test target. A user-entered environment label cannot establish this.
+  if (credentials.expectedDatabaseLabel) {
+    const matches = databases.filter(d => d.DatabaseName === credentials.expectedDatabaseLabel);
+    if (!discoveryAvailable || matches.length !== 1 || matches[0].DatabaseIdentifier !== credentials.databaseIdentifier) throw new Error("MRI_SANDBOX_TARGET");
+  }
   if (!credentials.databaseIdentifier) return { authenticated: true as const, databaseReadable: false, discoveryAvailable, databases, propertyCount: null };
   const result = propertiesSchema.safeParse(await request("/v2/Properties/SearchProperties", {
     method: "POST", headers: { ...headers, "content-type": "application/json", DatabaseIdentifier: credentials.databaseIdentifier },
