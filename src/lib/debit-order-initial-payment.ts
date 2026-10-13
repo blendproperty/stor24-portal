@@ -7,16 +7,8 @@ import { startPublicNetcashSandboxPayment } from "./public-netcash-payment";
 import { preparePublicReservationLease } from "./public-lease-workflow";
 import { debitOrderSchedule } from "./debit-order-schedule";
 
-type Payment = { id: string; status: string; amount: unknown; currency: string; environment: string | null; idempotencyKey: string; provider?: string | null; method?: string; processedAt?: Date | null };
-type Receipt = { id: string; type: string; amount: unknown; metadata: unknown; reversalOfId: string | null };
-export function verifiedInitialReceipt(payment: Payment, receipts: Receipt[]) {
-  if (payment.status !== "SUCCEEDED" || isTestPayment(payment) || payment.currency !== "ZAR" || !payment.processedAt || payment.provider !== "NETCASH" || payment.method !== "PAY_NOW") return false;
-  if (receipts.some(receipt => receipt.type === "REFUND" || receipt.type === "REVERSAL")) return false;
-  return receipts.some(receipt => {
-    const metadata = receipt.metadata as { paymentId?: unknown; verifiedStatus?: unknown; environment?: unknown } | null;
-    return receipt.type === "PAYMENT" && Number(receipt.amount) === Number(payment.amount) && metadata?.paymentId === payment.id && metadata.verifiedStatus === true && metadata.environment === "live" && !receipts.some(reversal => reversal.reversalOfId === receipt.id);
-  });
-}
+import { verifiedInitialReceipt, type Payment } from "./payments/upfront-receipt";
+export { verifiedInitialReceipt } from "./payments/upfront-receipt";
 export function initialPaymentState(payments: Payment[], amount: number) {
   if (!payments.length) return { status: "NOT_STARTED", paymentId: null, isTest: true };
   // Multiple attempts or a different amount require reconciliation, not another form.

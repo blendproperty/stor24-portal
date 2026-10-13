@@ -72,11 +72,11 @@ const reservationInclude = {
   packageSelection: { select: { packageName: true, priceSnapshot: true, status: true } },
 } satisfies Prisma.ReservationInclude;
 
-function verificationHash(reservationId: string, code: string) {
+export function verificationHash(reservationId: string, code: string) {
   return createHash("sha256").update(`${process.env.PUBLIC_BOOKING_API_KEY}:${reservationId}:${code}`).digest("hex");
 }
 
-function emailVerificationHash(reservationId: string, code: string) {
+export function emailVerificationHash(reservationId: string, code: string) {
   return createHash("sha256").update(`${process.env.PUBLIC_BOOKING_API_KEY}:${reservationId}:email:${code}`).digest("hex");
 }
 
@@ -128,7 +128,7 @@ async function notifyPublicReservation(input: {
   } });
 }
 
-async function deliverVerificationCode(input: { code: string; phone: string; organisationId: string; facilityId: string; idempotencyKey: string }) {
+export async function deliverVerificationCode(input: { code: string; phone: string; organisationId: string; facilityId: string; idempotencyKey: string }) {
   const context = { organisationId: input.organisationId, facilityId: input.facilityId, idempotencyKey: input.idempotencyKey };
   const contentSid = process.env.TWILIO_WHATSAPP_VERIFICATION_SID ?? "";
   if (contentSid) {
@@ -142,7 +142,7 @@ async function deliverVerificationCode(input: { code: string; phone: string; org
   return sms.ok ? { ok: true as const, channel: "SMS" as const } : { ok: false as const };
 }
 
-async function deliverEmailVerificationCode(input: { code: string; email: string; organisationId: string; facilityId: string; customerId: string; idempotencyKey: string }) {
+export async function deliverEmailVerificationCode(input: { code: string; email: string; organisationId: string; facilityId: string; customerId: string; idempotencyKey: string }) {
   const subject = "Your Stor24 email verification code";
   const text = `Your Stor24 verification code is ${input.code}. It expires in 10 minutes. Do not share this code.`;
   try {
@@ -316,6 +316,7 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
           journey: input.journey,
           holdExpiresAt,
           intendedMoveIn: input.intendedMoveIn,
+          rentalPlan: input.journey === "RENTAL" ? { version: 1, expectedDuration: input.expectedRentalDuration ?? "UNSURE", futurePaymentMethod: null } : undefined,
           viewingAt: input.viewingAt,
           verificationExpiresAt: verificationEnabled ? holdExpiresAt : null,
           verificationCodeHash: verificationEnabled ? "PENDING" : null,

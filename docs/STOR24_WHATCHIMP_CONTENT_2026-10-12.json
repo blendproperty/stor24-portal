@@ -398,11 +398,21 @@
       "enquiryEdges": 11,
       "menuNodes": 24,
       "menuEdges": 23,
-      "handsetUat": "pending",
-      "summarySubstitution": "pending handset test",
+      "handsetUat": "user handset handoff screenshot; broader rendering and restart UAT pending",
+      "summarySubstitution": "verified in actual completed enquiry",
       "handoffEmailDelivery": "pending",
-      "abandonmentAndRestart": "pending handset test"
+      "abandonmentAndRestart": "pending handset test",
+      "observedHappyPath": "2026-10-13 user enquiry visible end to end in Omnichannel",
+      "savedFieldsInStaffInbox": 7,
+      "botPausedAfterHandoff": true
     },
     "scope": "Separate enquiry bot only; no CRM lead sync or OTP changes."
+  },
+  "accountDisplayTimezone": {
+    "revisionDate": "2026-10-13",
+    "timezone": "Africa/Johannesburg",
+    "offset": "+02:00",
+    "scope": "account-wide display preference",
+    "saveReloadVerified": true
   }
 }
