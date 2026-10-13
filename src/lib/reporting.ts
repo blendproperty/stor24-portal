@@ -15,6 +15,7 @@ export type ReportDefinition = {
 };
 
 export const reportDefinitions: readonly ReportDefinition[] = [
+  { key: "recurring-charges", name: "Recurring charges", group: "Finance", description: "Current approved monthly-plan projections with review exceptions. Review Netcash collections separately; CSV is a backup.", permission: "reports.financial", formats: ["CSV", "JSON"] },
   { key: "occupancy-revenue", name: "Occupancy & revenue", group: "Operations", description: "Current unit occupancy and monthly contracted/potential rent snapshot.", permission: "reports.view", formats: ["CSV", "JSON", "XLSX", "PDF"] },
   { key: "unit-availability", name: "Unit availability", group: "Operations", description: "Current unit states, rates and recorded reservation hold expiry.", permission: "reports.view", formats: ["CSV", "JSON", "XLSX", "PDF"] },
   { key: "move-activity", name: "Move activity", group: "Operations", description: "Move-ins, move-outs, transfers, notices and net rentals.", permission: "reports.view", formats: ["CSV", "JSON", "XLSX", "PDF"] },
@@ -33,6 +34,10 @@ export const reportParametersSchema = z.object({
   from: z.iso.date(),
   to: z.iso.date(),
   format: z.enum(["CSV", "JSON", "XLSX", "PDF"]).default("CSV"),
+  recurringStatus: z.enum(["READY", "REVIEW", "NOT_STARTED"]).optional(),
+  recurringPaymentMethod: z.enum(["CARD", "EFT", "DEBIT_ORDER", "UNRECORDED"]).optional(),
+  recurringCategory: z.enum(["RENT", "DISCOUNT", "INSURANCE", "OTHER"]).optional(),
+  recurringSearch: z.string().trim().max(100).optional(),
   groupBy: z.enum(["day", "week", "month", "facility"]).default("month"),
 }).refine((value) => value.from <= value.to, { message: "From date must be on or before to date.", path: ["from"] });
 
