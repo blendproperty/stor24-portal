@@ -1,3 +1,10 @@
+## STOR24 versus SiteLink comparison framing corrected — 13 October 2026
+
+- **Implementation:** documentation only. The linked assessment now compares SiteLink and STOR24 side by side across 22 capabilities, including shared support, different designs, partial coverage and unverified equivalence. It supersedes the earlier report's readiness/backlog framing. UAT, merchant approval, training, deployment and migration are not counted as feature gaps; all previously recorded gates below are preserved.
+- **Testing/validation:** rechecked portal main `92e86374ef8e8d6e3a0ce5a1bb25feec07114e7b` and website master `ad786b0bf1a21486dfdd4f78b53563d3033878e9`; reviewed current source anchors and official SiteLink product/payment/insurance and historical brochure evidence. Existing installed-module evidence remains partial; not-evidenced parity is not proof of absence. Documentation structure, evidence references, unchanged prior context and diff checks validated; no new runtime tests.
+- **Commit and push:** corrected assessment and both contexts recorded on the respective `codex/sitelink-gap-assessment-20261013` branches; pushed remote heads and context/report readback verified at handoff. **Merge:** no merge. **Deployment/configuration:** no production or provider change. **Live production verification:** none for this documentation revision.
+- **Comparison:** [STOR24 versus SiteLink](https://github.com/blendproperty/stor24-portal/blob/codex/sitelink-gap-assessment-20261013/docs/SITELINK_GAP_ASSESSMENT_2026-10-13.md). Existing business/provider/data/legal/insurance/UAT/training/approval gates remain separately recorded below.
+
 ## SiteLink replacement gap assessment — 13 October 2026
 
 - **Implementation:** documentation assessment only; no application/database/provider changes. Current remote portal baseline `92e86374ef8e8d6e3a0ce5a1bb25feec07114e7b` and website master `ad786b0bf1a21486dfdd4f78b53563d3033878e9` were checked. Full scope, source anchors and priorities: `docs/SITELINK_GAP_ASSESSMENT_2026-10-13.md`.
