@@ -2,8 +2,6 @@
 
 ## Current boundary
 
-### Built-in sandbox testing — 13 October 2026
-
 ### Sandbox journal batch preparation — 13 October 2026
 
 `/billing/mri/sandbox/mapping` stores independent test mappings, separate from primary finance rules. Taxable categories require explicit tax GL/code and journal side. `/billing/mri/sandbox/batches` saves bounded manual ZAR test sources and source-bound mapping snapshots while property and mapping setup is still pending. Fictional sample loading is an explicit staff action. Production tenant/ledger sources cannot be imported through this preparation contract.
@@ -15,6 +13,8 @@ Draft → independent review → approval requires a closed month, exactly balan
 An approved review CSV binds to the batch revision and includes the snapshot hash and debit/credit controls. It is audited through existing data protection and **is not an MRI import**. Generic configuration routes cannot read or overwrite MRI-controlled profiles or replace primary/sandbox connections; use the dedicated workflows. No schema migration, provider financial request, ledger/payment update or outbox replay is introduced.
 
 This is internal sandbox preparation. Dedicated property/entity, actual finance decisions, provider import/lookup contract, durable submission/reconciliation states and UAT remain open. The strict initial lane permits full same-snapshot reversals only, one immutable approved/void batch per period and positive two-decimal sources; more advanced correction/version workflows need a separate reviewed contract before real journaling.
+
+### Built-in sandbox testing — 13 October 2026
 
 `/billing/mri/sandbox`, linked from MRI accounting, prepares a separate `MRI_SANDBOX` connection from the existing encrypted API account and its exact discovered **BlendTest** target. Primary **Blend** settings are not replaced. Credentials/identifier are re-encrypted separately; no secret or target identifier is returned to the browser. Sandbox controls accept only prepare/check actions, not arbitrary target URLs, database identifiers, environment changes or financial submissions. Organisation-wide `mri.view`/`mri.manage`, same-origin checks, small request bounds, revision checks, rate limits and atomic audit protect the flow.
 
