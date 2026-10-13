@@ -12,7 +12,7 @@ Separate bot: `475943`, number ending `6824`. Existing Twilio verification and t
 - `submit`: botId, phone, enquiryKey. Requires all seven answers. Creates one follow-up task and returns the current routing decision. Retries do not duplicate the lead/task.
 - `route`: botId, phone, optional enquiryKey. Captures a direct request for staff, even without a completed questionnaire. Reuses the customer's latest WhatChimp enquiry; unresolved/empty optional provider key is treated as absent.
 
-Responses: `ok`, `enquiryKey`, `leadReference`, `routing` (`STAFF`, `AFTER_HOURS`, `HOURS_REVIEW`), `staffed`, `nextOpening`, `timezone`, `message`. Only a successful response permits a saved/received customer acknowledgement. Failures must offer retry/manual assistance and must not say the enquiry reached CRM.
+Responses: `ok`, `enquiryKey`, `leadReference`, `phase`, `routing` (`STAFF`, `AFTER_HOURS`, `HOURS_REVIEW`), `staffed`, `nextOpening`, `timezone`, `message`. Only a successful response permits a saved/received customer acknowledgement. Before each API call, reset the provider checkpoint to a number; map phase back into that field and require the expected literal START/SAVE_USE/etc/SUBMITTED/ROUTED before advancing. A failed API cannot reuse a prior success marker. Failures must offer retry/manual assistance and must not say the enquiry reached CRM. Native reset/condition behavior still requires provider readback and UAT.
 
 ## Progressive bot flow
 

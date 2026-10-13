@@ -24,6 +24,7 @@ test('isolated WhatChimp intake saves progressive answers, preserves staff state
     assert.equal(probe.routing, 'AFTER_HOURS');
     assert.equal(await db.lead.count({ where: { facilityId: facility.id } }), 0);
     const starts = await Promise.all([call({ ...base, action: 'start' }), call({ ...base, action: 'start' })]);
+    assert.equal(starts[0].phase, 'START');
     assert.equal(starts[0].enquiryKey, starts[1].enquiryKey);
     const enquiryKey = starts[0].enquiryKey!;
     assert.equal(await db.lead.count({ where: { facilityId: facility.id } }), 1);
@@ -31,7 +32,7 @@ test('isolated WhatChimp intake saves progressive answers, preserves staff state
     await assert.rejects(call({ ...base, phone: '+27810000002', action: 'update', enquiryKey, field: 'items', value: 'Boxes' }), /INTAKE_NOT_FOUND/);
     const answers = { use: 'Personal', items: 'Sofa and 10 boxes', start: 'End of month', duration: 'Over 3 months', size: 'Not sure', viewing: 'Yes', name: 'Fixture Person' };
     for (const field of enquiryFields) {
-      await call({ ...base, action: 'update', enquiryKey, field, value: answers[field] });
+      assert.equal((await call({ ...base, action: 'update', enquiryKey, field, value: answers[field] })).phase, `SAVE_${field.toUpperCase()}`);
       const record = await db.configurationProfile.findFirstOrThrow({ where: { organisationId: org.id, facilityId: facility.id, domain: WHAT_CHIMP_SESSION, name: enquiryKey } });
       assert.equal((record.config as { answers: Record<string, string> }).answers[field], answers[field]);
     }
@@ -40,6 +41,7 @@ test('isolated WhatChimp intake saves progressive answers, preserves staff state
     await db.lead.update({ where: { id: lead.id }, data: { notes: lead.notes + '\n\nStaff note stays intact.', stage: 'QUALIFIED' } });
     const submitted = await Promise.all([call({ ...base, action: 'submit', enquiryKey }), call({ ...base, action: 'submit', enquiryKey })]);
     assert.equal(submitted[0].routing, 'AFTER_HOURS');
+    assert.equal(submitted[0].phase, 'SUBMITTED');
     assert.equal(submitted[0].nextOpening, '2026-10-14T05:00:00.000Z');
     assert.equal(await db.task.count({ where: { organisationId: org.id } }), 1);
     const updated = await db.lead.findUniqueOrThrow({ where: { id: lead.id } });

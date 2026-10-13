@@ -8,7 +8,7 @@ export async function resolveIntakeCalendar(organisationId: string, facilityId: 
   const profiles = await db.configurationProfile.findMany({ where: { organisationId, facilityId, status: 'READY', OR: [{ domain: 'LEAD_SLA', name: 'policy' }, { domain: 'STORE_INFORMATION', name: 'Default' }] }, select: { domain: true, config: true } });
   return intakeCalendar(profiles.find(p => p.domain === 'LEAD_SLA')?.config, profiles.find(p => p.domain === 'STORE_INFORMATION')?.config);
 }
-export async function captureWhatChimpEnquiry(connectionId: string, input: EnquiryRequest, now = new Date(), verifiedKeyHash?: string, attempt = 0): Promise<{ ok: boolean; enquiryKey?: string; leadReference?: string; routing: string; staffed: boolean; nextOpening: string | null; timezone: string; message: string }> {
+export async function captureWhatChimpEnquiry(connectionId: string, input: EnquiryRequest, now = new Date(), verifiedKeyHash?: string, attempt = 0): Promise<{ ok: boolean; enquiryKey?: string; leadReference?: string; phase: string; routing: string; staffed: boolean; nextOpening: string | null; timezone: string; message: string }> {
   const connection = await db.configurationProfile.findUnique({ where: { id: connectionId } });
   if (!connection?.facilityId || connection.domain !== WHAT_CHIMP_DOMAIN || connection.status !== 'READY') throw Error('INTAKE_DISABLED');
   const config = intakeConfigSchema.parse(connection.config);
@@ -19,7 +19,7 @@ export async function captureWhatChimpEnquiry(connectionId: string, input: Enqui
   const hours = intakeHours(now, await resolveIntakeCalendar(organisationId, facilityId));
   const nextOpening = hours.nextOpening?.toISOString() ?? null;
   const routing = hours.staffed ? 'STAFF' : hours.confirmed ? 'AFTER_HOURS' : 'HOURS_REVIEW';
-  if (input.action === 'probe') return { ok: true, enquiryKey: '00000000-0000-4000-8000-000000000000', leadReference: 'CONNECTION_TEST_ONLY', routing, staffed: hours.staffed, nextOpening, timezone: 'Africa/Johannesburg', message: 'STOR24 enquiry connection is ready. No lead was created by this connection test.' };
+  if (input.action === 'probe') return { ok: true, enquiryKey: '00000000-0000-4000-8000-000000000000', leadReference: 'CONNECTION_TEST_ONLY', phase: 'PROBE', routing, staffed: hours.staffed, nextOpening, timezone: 'Africa/Johannesburg', message: 'STOR24 enquiry connection is ready. No lead was created by this connection test.' };
   const inbox = `https://app.whatchimp.com/all/livechat?subscriber_id=${input.phone.slice(1)}-${input.botId}&from_media=whatsapp`;
   try { return await db.$transaction(async tx => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`${organisationId}:${facilityId}:whatchimp:${input.phone}`}, 0))`;
@@ -71,7 +71,8 @@ export async function captureWhatChimpEnquiry(connectionId: string, input: Enqui
       if (input.action === 'update') await tx.auditEvent.create({ data: { organisationId, facilityId, action: 'whatchimp.enquiry.answer_saved', entityType: 'Lead', entityId: lead.id, after: { field: input.field, fieldCount: Object.keys(state.answers).length } } });
     }
     const message = !state.submitted ? 'Your enquiry details have been saved.' : hours.staffed ? 'Your enquiry has been saved in STOR24. You can now request our team in this chat. A staff member will reply when available.' : hours.confirmed ? 'Your enquiry has been saved in STOR24. Our team is currently offline and will follow up during the next working hours. You can continue using the storage menu or book online.' : 'Your enquiry has been saved in STOR24 for staff follow-up. We cannot confirm staffed hours right now. You can continue using the storage menu.';
-    return { ok: true, enquiryKey: record.name, leadReference: lead.id, routing, staffed: hours.staffed, nextOpening, timezone: 'Africa/Johannesburg', message };
+    const phase = input.action === 'update' ? `SAVE_${input.field.toUpperCase()}` : input.action === 'submit' ? 'SUBMITTED' : input.action === 'route' ? 'ROUTED' : 'START';
+    return { ok: true, enquiryKey: record.name, leadReference: lead.id, phase, routing, staffed: hours.staffed, nextOpening, timezone: 'Africa/Johannesburg', message };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }); }
   catch (e) { if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2034' && attempt < 2) return captureWhatChimpEnquiry(connectionId, input, now, verifiedKeyHash, attempt + 1); throw e; }
 }
