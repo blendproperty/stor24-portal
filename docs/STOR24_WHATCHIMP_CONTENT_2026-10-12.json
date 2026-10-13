@@ -288,9 +288,9 @@
   "mobileMenuRevisionDate": "2026-10-12",
   "crmIntegration": {
     "date": "2026-10-13",
-    "status": "actual_six_answer_capture_blocked_by_trial_quota",
+    "status": "real_enquiry_submitted_native_date_configured_uat_open",
     "botId": 475943,
-    "enquiryFlowId": 2166212,
+    "enquiryFlowId": 2166460,
     "staffFlowId": 2166213,
     "apiIds": {
       "start": 10107,
@@ -309,8 +309,13 @@
     "otp": "original Twilio senders unchanged",
     "capture": "seven structured answers and conversation link; not complete transcript sync",
     "nativeHuman": "route10117 then generic shared-inbox receipt; robot return retained",
-    "uat": "Real lead NEW and six answers saved; final name/submission/task blocked by trial200/200 and402 errors13:09/13:11",
-    "moveInUX": "Date or not sure text currently; native date picker plus Not sure recommended, not implemented",
-    "spending": "Pro checkout USD85/month; approval/payment pending"
+    "uat": "Real user enquiry submitted: seven answers, one WhatsApp-source NEW lead, exactly one follow-up task; calendar and human/after-hours handset UAT pending",
+    "moveInUX": "Not sure or Choose a date; published native date form maps77751 and guarded continuation10110 saves before duration",
+    "spending": "User upgraded existing account; Pro Monthly confirmed; no agent purchase",
+    "rollbackEnquiryFlowId": 2166212,
+    "dateContinuationFlowId": 2166437,
+    "nativeDateFormId": 42755,
+    "nativeMetaFlowId": "4613262398945605",
+    "crmFieldMapping": "Seven answers in structured session and sales notes; native Storage use selector not populated"
   }
 }
