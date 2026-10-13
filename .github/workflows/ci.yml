@@ -76,6 +76,7 @@ jobs:
       - run: node scripts/test-collections.mjs
       - run: node scripts/test-settlements.mjs
       - run: node scripts/test-mri.mjs
+      - run: node scripts/test-collection-notices.mjs
       - run: node scripts/test-mri-mapping.mjs
       - run: node scripts/test-mri-sandbox.mjs
       - run: node scripts/test-mri-batches.mjs
@@ -115,6 +116,7 @@ jobs:
             output/daily-close-form/
             output/daily-close-history/
             output/report-export-recovery/
+            output/collection-notices/
             output/mri-mapping/
             output/mri-sandbox/
             output/mri-batches/

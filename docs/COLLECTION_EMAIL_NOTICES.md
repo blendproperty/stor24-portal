@@ -1,0 +1,19 @@
+# Collection email notices — 13 October 2026
+
+The first notice rollout uses the existing email integration, as selected by Brett. `/collections/notices`, linked from Collections, reviews one scoped account and exact recipient/message at a time. It is an operational payment reminder, not a legal demand, fee assessment, debit collection or gate-action instruction.
+
+Eligibility reuses the existing collections due-date, receipt provenance, dispute, adjustment, pending-payment/debit-instruction and promise holds. This lane requires an active tenancy, reconciled ZAR overdue debt, a verified customer email and explicit `communicationConsent.email === true`. Missing consent is never assumed. Terms and unsupported/test receipt history remain blocked. Selecting an account is read-only.
+
+Prepare saves an encrypted message bound to the current account, ledger/receipt/case/contact/consent evidence and template version. One logical notice is reserved per organisation/account/South African calendar day. Stale messages must be refreshed while draft or reopened before refresh; attempted/cancelled records cannot be turned into another send. Generic configuration cannot inspect or replace controlled notice profiles.
+
+A non-contributor with scoped `collections.manage` must independently approve with a reference. Sending additionally requires scoped `billing.documents.send`, same-origin authority, current source/recipient/consent and an explicit sending confirmation. Request shape/size/rate limits apply. No role grants, provider credentials or sender settings are changed by this feature.
+
+An atomic, audited communication claim is committed before one provider attempt. Overlap and repeat clicks return the durable state without another send. The existing email provider performs audited DLP/recipient checks. Successful provider acceptance is recorded separately from inbox delivery: `deliveryVerified` remains false and `deliveredAt` is not invented. Timeout, failure or acceptance followed by persistence failure requires review, with no automatic retry. Communication outcomes without confirmed acceptance stay pending/manual-review rather than being reported as a proved delivery failure. Claim and result audit contain hashes/flags, not recipient or message content; the stored message is encrypted.
+
+Provider availability is read from existing SendGrid/Resend/Twilio configuration. A read-only production audit confirmed SendGrid, sender and integration encryption are configured; no values were printed and no changes or emails were sent. This is configuration evidence, not a new notice-delivery test.
+
+## Validation and remaining work
+
+Local unit suite: 706 results/705 pass/one existing skip. Eight isolated PostgreSQL results cover contact/consent/financial holds, organisation/facility scope, encrypted drafts, non-self approval, stale recipient/source, overlap/repeat attempts, provider uncertainty, acceptance-persistence failure and audit rollback. Existing collections database checks9/9 pass. Endpoint tests cover auth/scoped manage/send, origin, confirmation, recipient injection, size/rate limits and private headers. TypeScript, focused ESLint and production build pass; browser tests cover the review/send journey and inspected1440/390/320 rendering using fixtures. CI includes database/browser checks.
+
+No actual customer email was sent by Codex. Merge/deployment, authenticated staff acceptance, controlled approved-recipient send and inbox/provider evidence, training and support ownership remain separately tracked in PROJECT_CONTEXT.md. Scheduled/bulk notice campaigns, escalation ladders, SMS/WhatsApp templates, fee rules, legal demands, money collection and gate actions are not implemented or enabled by this first email workflow. Their policies/provider effects need distinct approval and testing.

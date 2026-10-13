@@ -21,6 +21,7 @@ export const guideAccessRules: Record<string, Rule> = {
   "move-in": rule("move_in.create", ["reservations.manage", "", "", "payments.manage", "", ""]),
   identity: rule("identity.review", ["", "", "", ""]),
   mri: rule("mri.view", ["", "mri.manage", "", "mri.manage"], true),
+  "collection-notices": rule("collections.view", ["", "collections.manage", "collections.manage", "collections.manage,billing.documents.send"]),
   "mri-mapping": rule("mri.view", ["mri.manage", "mri.manage", "mri.manage", ""], true),
   "mri-sandbox": rule("mri.view", ["mri.manage", "mri.manage", ""], true),
   "mri-batches": rule("mri.view", ["mri.manage", "mri.manage", "mri.manage", ""], true),
