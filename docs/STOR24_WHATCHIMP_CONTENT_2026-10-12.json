@@ -1,7 +1,7 @@
 {
   "number": "27600186824",
   "botId": 475943,
-  "welcome": "Welcome to STOR24.\nI can help you find storage at Store 1 — Midpoint, choose a unit size and answer common questions.\n\nReply with a word or number:\n1 ENQUIRY — tell us what you need\n2 PRICES — live units and rental rates\n3 SIZE — help choosing a unit\n4 BUSINESS — Micro Warehousing\n5 BOOK — reserve or arrange a viewing\n6 LOCATION — store details\n7 FAQ — rental, access, security, packing and payments\n8 STAFF — speak to our team\n9 MY ACCOUNT — statements and documents\n\nType MENU anytime. Staff confirm quotations, availability, access and account decisions. Please never send passwords, OTPs, bank details or ID documents here.\nPrivacy: https://stor24.co.za/privacy",
+  "welcome": "Welcome to STOR24.\nStorage at Midpoint, made simple.\n\nTap Choose an option below to get started.",
   "flows": [
     {
       "title": "Storage enquiry",
@@ -210,5 +210,80 @@
     }
   ],
   "handoffEmail": "info@stor24.co.za",
-  "handoffMinutes": 1440
+  "handoffMinutes": 1440,
+  "interactiveMenu": {
+    "header": "STOR24",
+    "body": "Welcome to STOR24.\nStorage at Midpoint, made simple.\n\nTap Choose an option below to get started.",
+    "footer": "Type MENU anytime. Never share OTPs or bank details.",
+    "listButton": "Choose an option",
+    "section": "How can we help?",
+    "choices": [
+      {
+        "title": "Storage enquiry",
+        "description": "Tell us what you need",
+        "answerTopic": "Storage enquiry"
+      },
+      {
+        "title": "Prices & availability",
+        "description": "Check current units and rental rates",
+        "answerTopic": "Prices and availability"
+      },
+      {
+        "title": "Choose a unit size",
+        "description": "Find the space that fits your items",
+        "answerTopic": "Unit size guide"
+      },
+      {
+        "title": "Business storage",
+        "description": "Explore Micro Warehousing",
+        "answerTopic": "Business and Micro Warehousing"
+      },
+      {
+        "title": "Book or view a unit",
+        "description": "Reserve online or arrange a visit",
+        "answerTopic": "Booking and viewing"
+      },
+      {
+        "title": "Location & hours",
+        "description": "Find our Midpoint store",
+        "answerTopic": "Location and hours"
+      },
+      {
+        "title": "FAQs",
+        "description": "Access, security, payments and more",
+        "answerTopic": "FAQ topic menu"
+      },
+      {
+        "title": "Speak to staff",
+        "description": "Get help from our team",
+        "answerTopic": "STAFF"
+      },
+      {
+        "title": "My account",
+        "description": "Statements, documents and OTP help",
+        "answerTopic": "Customer account and OTP help"
+      }
+    ]
+  },
+  "defaultFirstContact": {
+    "body": "Welcome to STOR24.\nFind storage at Midpoint or get help from our team.\n\nHow can we help?",
+    "footer": "Never share OTPs, bank details or ID documents here.",
+    "buttons": [
+      {
+        "label": "Storage menu",
+        "action": "Start a Flow",
+        "target": "STOR24 | Welcome and storage menu"
+      },
+      {
+        "label": "Book or view a unit",
+        "action": "Start a Flow",
+        "target": "STOR24 | Booking and viewing"
+      },
+      {
+        "label": "Speak to staff",
+        "action": "Chat with human"
+      }
+    ]
+  },
+  "mobileMenuRevisionDate": "2026-10-12"
 }
