@@ -6,7 +6,6 @@ const equal=(field:string,value:string):VisualReportQuery["filters"][number]=>({
 const template=(key:string,name:string,group:string,dataset:string,options:Partial<VisualReportTemplate>={}):VisualReportTemplate=>({key,name,group,dataset,...options});
 const ledger=(key:string,name:string,type?:string)=>template(key,name,"Finance","ledger",{dateField:"date",...(type?{filters:[equal("type",type)]}:{})});
 export const visualReportTemplates:VisualReportTemplate[]=[
-  {key:"recurring-native",name:"Current-plan recurring charges",group:"Finance",legacyKey:"recurring-charges"},
   template("unpaid-native", "Unpaid charges under approved STOR24 terms", "Finance", "unpaid-native", {columns:["facility","account","customer","charge","due","amount","currency","review","hold"]}),
   template("native-sign-ins", "STOR24 sign-in event counts", "Management", "audit", {dateField:"date",filters:[{field:"action",operator:"contains",value:"user.login."}],groupBy:["actor","action"],metrics:[{field:"*",operation:"count"}]}),
   template("directory","Tenant directory","Tenants","tenants",{columns:["facility","account","customer","email","phone","units","status"]}),
@@ -16,6 +15,7 @@ export const visualReportTemplates:VisualReportTemplate[]=[
   template("card-roll","Card payment-method roll","Tenants","tenants",{filters:[equal("paymentMethod","CARD")]}),
   template("debit-roll","Debit-order payment-method roll","Tenants","tenants",{filters:[equal("paymentMethod","DEBIT_ORDER")]}),
   template("eft-roll","EFT payment-method roll","Tenants","tenants",{filters:[equal("paymentMethod","EFT")]}),
+  {key:"recurring-native",name:"Current-plan recurring charges",group:"Finance",legacyKey:"recurring-charges"},
   {key:"past-due",name:"Past due balances",group:"Tenants",legacyKey:"receivables-ageing"},
   template("balances","Balances due (all recorded leases)","Tenants","tenants",{filters:[{field:"balance",operator:"gt",value:0}]}),
   template("contact-activity","Communication history","Tenants","communications",{dateField:"date"}),

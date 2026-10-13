@@ -15,7 +15,6 @@ export type ReportDefinition = {
 };
 
 export const reportDefinitions: readonly ReportDefinition[] = [
-  { key: "recurring-charges", name: "Recurring charges", group: "Finance", description: "Current approved monthly-plan projections with review exceptions. Review Netcash collections separately; CSV is a backup.", permission: "reports.financial", formats: ["CSV", "JSON"] },
   { key: "occupancy-revenue", name: "Occupancy & revenue", group: "Operations", description: "Current unit occupancy and monthly contracted/potential rent snapshot.", permission: "reports.view", formats: ["CSV", "JSON", "XLSX", "PDF"] },
   { key: "unit-availability", name: "Unit availability", group: "Operations", description: "Current unit states, rates and recorded reservation hold expiry.", permission: "reports.view", formats: ["CSV", "JSON", "XLSX", "PDF"] },
   { key: "move-activity", name: "Move activity", group: "Operations", description: "Move-ins, move-outs, transfers, notices and net rentals.", permission: "reports.view", formats: ["CSV", "JSON", "XLSX", "PDF"] },
@@ -26,6 +25,7 @@ export const reportDefinitions: readonly ReportDefinition[] = [
   { key: "collections-performance", name: "Collections workload", group: "Collections", description: "Current positive balances and period account activity requiring collections attention.", permission: "reports.collections", formats: ["CSV", "JSON", "XLSX", "PDF"] },
   { key: "insurance-participation", name: "Insurance participation", group: "Operations", description: "Recorded cover decisions, waivers and snapshotted premiums.", permission: "reports.view", formats: ["CSV", "JSON", "XLSX", "PDF"] },
   { key: "integration-health", name: "Integration health", group: "Integrations", description: "Current connection state, last health checks and recorded failures.", permission: "integrations.view", formats: ["CSV", "JSON", "XLSX", "PDF"] },
+  { key: "recurring-charges", name: "Recurring charges", group: "Finance", description: "Current approved monthly-plan projections with review exceptions. Review Netcash collections separately; CSV is a backup.", permission: "reports.financial", formats: ["CSV", "JSON"] },
 ] as const;
 
 export const reportParametersSchema = z.object({
