@@ -99,6 +99,7 @@ export function MriWorkspace() {
       <div><p className="mri-eyebrow">Finance / Integrations</p><h1>MRI accounting</h1><p className="mri-subtitle">Your accounting connection and monthly ledger review.</p></div>
       <span className="mri-mode"><LockKeyhole size={14} aria-hidden="true" /> Read-only workspace</span>
     </header>
+    <p><a href="/billing/mri/sandbox" className="mri-button mri-button-secondary">Open MRI sandbox testing</a></p>
     {error && <p role="alert" className="mri-message mri-message-error">{error}</p>}
     {notice && <p role="status" className="mri-message">{notice}</p>}
     {!config && !error && <div className="mri-loading" role="status">Loading your MRI connection…</div>}
@@ -158,6 +159,7 @@ export function MriWorkspace() {
         <aside className="mri-readiness" aria-labelledby="mri-readiness-title">
           <div className="mri-readiness-heading"><span className="mri-kicker">Journal readiness</span><span className="mri-badge mri-badge-amber">Posting off</span></div>
           <h2 id="mri-readiness-title">Before journals can be sent</h2><p>The connection is the first step. These requirements are still open.</p>
+          <p><a href="/billing/mri/mapping" className="mri-button mri-button-secondary">Set up finance mappings</a></p>
           <ol className="mri-checklist"><li><span>01</span><div><h3>Finance property</h3><p>Confirm the dedicated STOR24 property and entity in MRI.</p></div></li><li><span>02</span><div><h3>Journal method &amp; mappings</h3><p>Agree the supported import method, accounts, transaction codes and tax treatment.</p></div></li><li><span>03</span><div><h3>Test &amp; reconcile</h3><p>Build balanced journals, prove duplicate handling and reconcile an authorised test batch before live approval.</p></div></li></ol>
           <div className="mri-readiness-footer"><LockKeyhole size={16} aria-hidden="true" /><p>Journal posting is not yet available. No financial entries are sent from this screen.</p></div>
         </aside>

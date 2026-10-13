@@ -2,6 +2,28 @@
 
 ## Current boundary
 
+### Sandbox journal batch preparation — 13 October 2026
+
+`/billing/mri/sandbox/mapping` stores independent test mappings, separate from primary finance rules. Taxable categories require explicit tax GL/code and journal side. `/billing/mri/sandbox/batches` saves bounded manual ZAR test sources and source-bound mapping snapshots while property and mapping setup is still pending. Fictional sample loading is an explicit staff action. Production tenant/ledger sources cannot be imported through this preparation contract.
+
+The compiler uses integer cents and explicit included/additional/no-tax treatment. Unmapped categories, inconsistent tax, zero sources and unresolved reversals block the entire preview rather than returning a partial journal. Full reversals swap the original snapshot's debit/credit and tax directions; partial, cross-period and reversal-of-reversal cases remain blocked. Amounts are not inferred from account balances or treated as recognised income.
+
+Draft → independent review → approval requires a closed month, exactly balanced nonzero totals and an unchanged independently approved sandbox mapping. Canonical snapshot hashes survive JSON key ordering and reject content tampering. One batch per organisation/month prevents duplicate active periods; submitted source references are permanently reserved to that period even after reopening/voiding. Contributors and submitters cannot approve; approved and void snapshots cannot be edited. Pending review can reopen for corrections, with history retained in atomic audits. Changing mappings blocks approval/download of prior snapshots.
+
+An approved review CSV binds to the batch revision and includes the snapshot hash and debit/credit controls. It is audited through existing data protection and **is not an MRI import**. Generic configuration routes cannot read or overwrite MRI-controlled profiles or replace primary/sandbox connections; use the dedicated workflows. No schema migration, provider financial request, ledger/payment update or outbox replay is introduced.
+
+This is internal sandbox preparation. Dedicated property/entity, actual finance decisions, provider import/lookup contract, durable submission/reconciliation states and UAT remain open. The strict initial lane permits full same-snapshot reversals only, one immutable approved/void batch per period and positive two-decimal sources; more advanced correction/version workflows need a separate reviewed contract before real journaling.
+
+### Built-in sandbox testing — 13 October 2026
+
+`/billing/mri/sandbox`, linked from MRI accounting, prepares a separate `MRI_SANDBOX` connection from the existing encrypted API account and its exact discovered **BlendTest** target. Primary **Blend** settings are not replaced. Credentials/identifier are re-encrypted separately; no secret or target identifier is returned to the browser. Sandbox controls accept only prepare/check actions, not arbitrary target URLs, database identifiers, environment changes or financial submissions. Organisation-wide `mri.view`/`mri.manage`, same-origin checks, small request bounds, revision checks, rate limits and atomic audit protect the flow.
+
+Run sandbox check uses the actual MRI adapter: OAuth sign-in, current database discovery and a bounded property read. Discovery must match one exact BlendTest identifier before reading properties. A shared primary target, changed settings during a check, missing/ambiguous/changed provider discovery or failed network/authentication cannot inherit successful check evidence. Failure clears current authentication/read proof; primary configuration changes to the test target suppress old sandbox-isolation proof.
+
+**Actual provider verification:** with Brett's confirmation to use the stored test account, a controlled server-side read-only check at **2026-10-13T07:47:47.945Z** authenticated and read **BlendTest**, confirmed its identifier differs from saved Blend, and returned **zero accessible properties**. No credentials, token, identifier or property data were printed, no settings changed, and no MRI financial transaction was submitted. This verifies the provider connection, not deployment of the new app route or journal acceptance.
+
+**Current blocker:** create/assign the dedicated test property and entity and obtain finance test GL/tax/basis decisions. The older journal import/readback contract, balanced batches, duplicate/reversal controls and authorised reconciliation still need implementation and acceptance. The sandbox screen makes this boundary visible. Shared mapping proposals are not sandbox journal approval. A local fixture/simulator is not substituted for MRI.
+
 `/billing/mri` provides encrypted connection settings, documented v2 OAuth authentication, optional database discovery, a bounded read-only property query and monthly STOR24 ledger review. **Journal posting is not implemented or enabled.** Saving credentials, successful authentication or a source review cannot authorise posting. Provider authentication/database read must be tested live separately from the isolated adapter tests.
 
 The approved direction from the August correspondence is consolidated journals to a dedicated Property Central property/entity. STOR24 retains tenant, unit, payment and arrears detail. A per-payment outbox record is not a consolidated journal and must never be replayed as one.
@@ -60,3 +82,10 @@ Muhammad Ismail is the allocated MRI consultant; correspondence includes 20 non-
 - Which supported read operation retrieves a submitted batch by our unique external reference after a timeout, and which operation verifies its final posting status and totals? Confirm duplicate rejection, reversal/correction and closed-period behaviour.
 - Confirm authority to create and reverse an identified test batch in BlendTest, plus the dedicated STOR24 property/entity and approved GL, transaction, tax and deposit mappings. Access to a database alone does not provide these accounting decisions.
 - Finance must identify included source types and opening balances, approve the balancing rules and nominate an independent reviewer and reconciliation owner before live posting can be activated.
+# Finance mapping review controls — 13 October 2026
+
+`/billing/mri/mapping`, linked from MRI accounting, adds local finance-owned setup and review. No GL codes, property/entity identifiers, accounting basis or tax decisions are assumed. Drafts record source coverage and category-specific debit/credit accounts, tax treatment, tax GL/code and classification/sign/reversal rationale. All six movement types must be covered before review, but these rules do not yet classify ledger entries or compile journals.
+
+Organisation-wide `mri.view` allows inspection and a mapping review CSV; `mri.manage` allows draft/save/submit/approval. Approval must come from someone who has neither edited nor submitted the mapping and requires a finance reference. Revision checks and serializable transactions prevent silent concurrent overwrites. Editing clears approval, and mapping changes and full version evidence are audited atomically. Deterministic organisation-owned ConfigurationProfile records require no schema migration; unknown versions or duplicate configurations fail closed.
+
+The CSV is an audited, private finance **mapping review document**, not an approved MRI journal or certified provider import. Formula-like fields are escaped for spreadsheet review. Mapping approval does not validate MRI codes, authorise financial batches, enable posting or resolve the v1/v2 provider contract. All existing finance, provider, data and reconciliation gates below remain open. See `docs/SITELINK_GAP_ROLLOUT.md` for the sequence and `PROJECT_CONTEXT.md` for dated validation/promotion evidence.
