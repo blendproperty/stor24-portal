@@ -288,7 +288,7 @@
   "mobileMenuRevisionDate": "2026-10-12",
   "crmIntegration": {
     "date": "2026-10-13",
-    "status": "configured_handset_uat_pending",
+    "status": "actual_six_answer_capture_blocked_by_trial_quota",
     "botId": 475943,
     "enquiryFlowId": 2166212,
     "staffFlowId": 2166213,
@@ -309,6 +309,8 @@
     "otp": "original Twilio senders unchanged",
     "capture": "seven structured answers and conversation link; not complete transcript sync",
     "nativeHuman": "route10117 then generic shared-inbox receipt; robot return retained",
-    "uat": "Brett conversation resumed after prior human pause; awaiting new enquiry"
+    "uat": "Real lead NEW and six answers saved; final name/submission/task blocked by trial200/200 and402 errors13:09/13:11",
+    "moveInUX": "Date or not sure text currently; native date picker plus Not sure recommended, not implemented",
+    "spending": "Pro checkout USD85/month; approval/payment pending"
   }
 }
