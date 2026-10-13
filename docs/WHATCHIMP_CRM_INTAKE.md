@@ -29,3 +29,5 @@ Lead source is WhatsApp and stage starts NEW, with a linked prospect. Progressiv
 ## Validation and release gates
 
 Candidate implementation13October2026. Local npm installation failed because the disk filled; local tests are not claimed passed. Protected Linux CI includes the calendar/contract unit tests and an isolated PostgreSQL test of concurrency, incremental save, scope binding, incomplete/submitted protection, preserved staff notes/stage, after-hours tasks, changed calendars, disablement and no reservations/communications. Provider/API activation, seven native campaign/API connections, failure branches, actual progressive capture, during/after-hours handset tests, staff reply/resume and inbox/email receipt must be verified separately before declaring the connection live.
+
+Native transport: use WhatChimp FORM-DATA key/value rows for customer answers. The intake supports multipart and urlencoded text fields with the same 8 KiB cap, scoped authentication and strict DTO. Duplicate fields, file uploads and invalid form bodies are rejected. Keep JSON only for static probes; do not interpolate arbitrary customer text into raw JSON.
