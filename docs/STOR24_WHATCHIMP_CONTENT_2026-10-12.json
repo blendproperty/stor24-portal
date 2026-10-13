@@ -6,7 +6,9 @@
     {
       "title": "Storage enquiry",
       "keys": "1,enquiry,quote,quotation,new storage,storage enquiry",
-      "text": "Let us help you find the right space at Store 1 — Midpoint.\nPlease reply with:\n• Your name\n• Personal storage or business/Micro Warehousing\n• The main items and approximate quantity\n• Preferred start date and expected duration\n• Approximate size, if known\n• Whether you would like a viewing\n\nFor a staff quote, type STAFF first and send these details to our team in this chat. Enquiries do not reserve a unit. Current units and rates: https://stor24.co.za/book\nPlease do not send ID documents, bank details or OTPs. https://stor24.co.za/privacy"
+      "type": "guidedUserInput",
+      "flowId": 2164207,
+      "configuration": "guidedEnquiry"
     },
     {
       "title": "Prices and availability",
@@ -285,5 +287,122 @@
       }
     ]
   },
-  "mobileMenuRevisionDate": "2026-10-12"
+  "mobileMenuRevisionDate": "2026-10-12",
+  "guidedEnquiry": {
+    "revisionDate": "2026-10-13",
+    "flowId": 2164207,
+    "campaign": "STOR24 Storage Enquiry",
+    "questions": [
+      {
+        "field": "STOR24EnquiryUse",
+        "fieldId": 77749,
+        "type": "multiple_choice",
+        "question": "Let`s find your space at Midpoint.\n\nIs this for personal or business use?",
+        "choices": [
+          "Personal",
+          "Business",
+          "Not sure"
+        ],
+        "buttonTitle": "Choose storage type",
+        "replyValidation": "Text"
+      },
+      {
+        "field": "STOR24EnquiryItems",
+        "fieldId": 77750,
+        "type": "text",
+        "question": "What would you like to store?\nFor example: a sofa, a double bed and 10 boxes.",
+        "choices": [],
+        "buttonTitle": null,
+        "replyValidation": "Text"
+      },
+      {
+        "field": "STOR24EnquiryStart",
+        "fieldId": 77751,
+        "type": "text",
+        "question": "When would you like to start?\nA date or `not sure` is fine.",
+        "choices": [],
+        "buttonTitle": null,
+        "replyValidation": "Text"
+      },
+      {
+        "field": "STOR24EnquiryDuration",
+        "fieldId": 77752,
+        "type": "multiple_choice",
+        "question": "How long do you expect to need the space?",
+        "choices": [
+          "1–3 months",
+          "Over 3 months",
+          "Not sure"
+        ],
+        "buttonTitle": "Choose a duration",
+        "replyValidation": "Text"
+      },
+      {
+        "field": "STOR24EnquirySize",
+        "fieldId": 77753,
+        "type": "text",
+        "question": "What unit size do you have in mind?\nReply `not sure` if you`d like help choosing.",
+        "choices": [],
+        "buttonTitle": null,
+        "replyValidation": "Text"
+      },
+      {
+        "field": "STOR24EnquiryViewing",
+        "fieldId": 77754,
+        "type": "multiple_choice",
+        "question": "Would you like to view a unit before booking?",
+        "choices": [
+          "Yes",
+          "No",
+          "Not sure"
+        ],
+        "buttonTitle": "Choose an option",
+        "replyValidation": "Text"
+      },
+      {
+        "field": "STOR24EnquiryName",
+        "fieldId": 77755,
+        "type": "text",
+        "question": "Lastly, what name should our team use?",
+        "choices": [],
+        "buttonTitle": null,
+        "replyValidation": "Text"
+      }
+    ],
+    "review": {
+      "header": "Your storage enquiry",
+      "body": "Please check your details:\n\nName: #STOR24EnquiryName#\nUse: #STOR24EnquiryUse#\nItems: #STOR24EnquiryItems#\nStart: #STOR24EnquiryStart#\nDuration: #STOR24EnquiryDuration#\nSize: #STOR24EnquirySize#\nViewing: #STOR24EnquiryViewing#\n\nTap Send to staff to request help.\nThis enquiry does not reserve a unit.",
+      "footer": "Choose an action below.",
+      "buttons": [
+        {
+          "title": "Send to staff",
+          "action": "Chat with human"
+        },
+        {
+          "title": "Menu",
+          "action": "Start a Flow",
+          "flowId": 2164205
+        }
+      ]
+    },
+    "menuEntry": {
+      "header": "Find your storage space",
+      "body": "I will ask a few short questions, one at a time.\n\nTap Start enquiry to begin.",
+      "button": "Start enquiry",
+      "targetFlowId": 2164207
+    },
+    "humanConfirmation": "Your chat is now with the STOR24 team.\n\nIf you completed the enquiry, your answers are saved here. No need to repeat them.\n\nOtherwise, tell us briefly what you need help with. Our team will reply when available.\n\nPlease never send OTPs, passwords, ID documents or bank details. Tap the bot button below to return to automated help.",
+    "validation": {
+      "providerSaveReopen": true,
+      "enquiryNodes": 12,
+      "enquiryEdges": 11,
+      "menuNodes": 24,
+      "menuEdges": 23,
+      "handsetUat": "pending",
+      "summarySubstitution": "pending handset test",
+      "handoffEmailDelivery": "pending",
+      "abandonmentAndRestart": "pending handset test"
+    },
+    "scope": "Separate enquiry bot only; no CRM lead sync or OTP changes."
+  }
 }
