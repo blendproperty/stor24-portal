@@ -19,7 +19,9 @@ test('saved policy wins and invalid calendars never guess example hours', () => 
 });
 test('bot-only intake rejects unresolved fields, client organisation scope, malformed phones and missing session keys', () => {
   const base = { action: 'start', botId: '475943', phone: '27810000001' };
-  assert.equal(enquiryRequestSchema.parse(base).phone, '+27810000001');
+  const parsed = enquiryRequestSchema.parse(base);
+  assert.ok('phone' in parsed);
+  assert.equal(parsed.phone, '+27810000001');
   assert.equal(enquiryRequestSchema.safeParse({ ...base, botId: '474865' }).success, false);
   assert.equal(enquiryRequestSchema.safeParse({ ...base, organisationId: 'other' }).success, false);
   assert.equal(enquiryRequestSchema.safeParse({ ...base, phone: '#PHONE#' }).success, false);
