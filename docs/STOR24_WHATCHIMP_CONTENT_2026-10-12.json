@@ -285,5 +285,37 @@
       }
     ]
   },
-  "mobileMenuRevisionDate": "2026-10-12"
+  "mobileMenuRevisionDate": "2026-10-12",
+  "crmIntegration": {
+    "date": "2026-10-13",
+    "status": "real_enquiry_submitted_native_date_configured_uat_open",
+    "botId": 475943,
+    "enquiryFlowId": 2166460,
+    "staffFlowId": 2166213,
+    "apiIds": {
+      "start": 10107,
+      "use": 10108,
+      "items": 10109,
+      "startDate": 10110,
+      "duration": 10111,
+      "size": 10112,
+      "viewing": 10113,
+      "name": 10115,
+      "submit": 10116,
+      "route": 10117,
+      "probe": 10106
+    },
+    "calendar": "existing backend SLA; office calendar fallback; Africa/Johannesburg",
+    "otp": "original Twilio senders unchanged",
+    "capture": "seven structured answers and conversation link; not complete transcript sync",
+    "nativeHuman": "route10117 then generic shared-inbox receipt; robot return retained",
+    "uat": "Real user enquiry submitted: seven answers, one WhatsApp-source NEW lead, exactly one follow-up task; calendar and human/after-hours handset UAT pending",
+    "moveInUX": "Not sure or Choose a date; published native date form maps77751 and guarded continuation10110 saves before duration",
+    "spending": "User upgraded existing account; Pro Monthly confirmed; no agent purchase",
+    "rollbackEnquiryFlowId": 2166212,
+    "dateContinuationFlowId": 2166437,
+    "nativeDateFormId": 42755,
+    "nativeMetaFlowId": "4613262398945605",
+    "crmFieldMapping": "Seven answers in structured session and sales notes; native Storage use selector not populated"
+  }
 }
