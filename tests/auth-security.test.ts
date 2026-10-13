@@ -4,6 +4,11 @@ import { permissionGranted } from "../src/lib/permissions.ts";
 import { createResetToken, hashResetToken } from "../src/lib/password-reset.ts";
 import { isPublicPathname } from "../src/proxy.ts";
 
+test('WhatChimp intake delegates only its exact path to scoped handler authentication', () => {
+  assert.equal(isPublicPathname('/api/integrations/whatchimp/enquiry'), true);
+  for (const path of ['/api/integrations/whatchimp', '/api/integrations/whatchimp/enquiry/private', '/api/integrations/whatchimp/enquiry-extra', '/api/v1/leads']) assert.equal(isPublicPathname(path), false);
+});
+
 test('alert worker exemption is exact and never exposes recipient administration', () => {
   assert.equal(isPublicPathname('/api/v1/operations/alert-monitor-config'), true);
   for (const path of ['/api/v1/operations/alert-monitor-config/private', '/api/v1/operations/alert-recipients', '/api/v1/operations/alert-monitor-config-extra']) assert.equal(isPublicPathname(path), false);

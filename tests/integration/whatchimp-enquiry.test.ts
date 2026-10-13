@@ -22,6 +22,9 @@ test('isolated WhatChimp intake saves progressive answers, preserves staff state
     const call = (input: Parameters<typeof captureWhatChimpEnquiry>[1], date = after) => captureWhatChimpEnquiry(config.id, input, date, keyHash(token));
     const probe = await call({ action: 'probe', botId: '475943' });
     assert.equal(probe.routing, 'AFTER_HOURS');
+    const formProbe = await POST(new Request('http://localhost/api/integrations/whatchimp/enquiry', { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/x-www-form-urlencoded' }, body: 'action=probe&botId=475943' }));
+    assert.equal(formProbe.status, 200);
+    assert.equal((await formProbe.json()).phase, 'PROBE');
     assert.equal(await db.lead.count({ where: { facilityId: facility.id } }), 0);
     const starts = await Promise.all([call({ ...base, action: 'start' }), call({ ...base, action: 'start' })]);
     assert.equal(starts[0].phase, 'START');
