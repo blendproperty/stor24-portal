@@ -285,5 +285,30 @@
       }
     ]
   },
-  "mobileMenuRevisionDate": "2026-10-12"
+  "mobileMenuRevisionDate": "2026-10-12",
+  "crmIntegration": {
+    "date": "2026-10-13",
+    "status": "configured_handset_uat_pending",
+    "botId": 475943,
+    "enquiryFlowId": 2166212,
+    "staffFlowId": 2166213,
+    "apiIds": {
+      "start": 10107,
+      "use": 10108,
+      "items": 10109,
+      "startDate": 10110,
+      "duration": 10111,
+      "size": 10112,
+      "viewing": 10113,
+      "name": 10115,
+      "submit": 10116,
+      "route": 10117,
+      "probe": 10106
+    },
+    "calendar": "existing backend SLA; office calendar fallback; Africa/Johannesburg",
+    "otp": "original Twilio senders unchanged",
+    "capture": "seven structured answers and conversation link; not complete transcript sync",
+    "nativeHuman": "route10117 then generic shared-inbox receipt; robot return retained",
+    "uat": "Brett conversation resumed after prior human pause; awaiting new enquiry"
+  }
 }
