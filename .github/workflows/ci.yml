@@ -60,6 +60,7 @@ jobs:
       - run: node scripts/test-daily-close-form.mjs
       - run: node scripts/test-daily-close-history.mjs
       - run: node scripts/test-report-export-recovery.mjs
+      - run: node scripts/test-recurring-charges.mjs
       - run: node scripts/test-audited-workspace-download.mjs
       - run: node scripts/test-reports-and-unit-map.mjs
       - run: npx tsx scripts/test-visual-report-builder.mjs
@@ -116,6 +117,7 @@ jobs:
             output/daily-close-form/
             output/daily-close-history/
             output/report-export-recovery/
+            output/recurring-charges/
             output/collection-notices/
             output/mri-mapping/
             output/mri-sandbox/

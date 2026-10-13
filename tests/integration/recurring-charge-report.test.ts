@@ -1,0 +1,25 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { randomUUID } from "node:crypto";
+import { db } from "../../src/lib/db";
+import { recurringChargeReport } from "../../src/lib/recurring-charge-service";
+import { currentBillingPeriod,periodDates } from "../../src/lib/monthly-billing-policy";
+import { reportParametersSchema } from "../../src/lib/reporting";
+test("isolated recurring report scope, current approved sources and no financial/provider mutation",async t=>{
+ assert.equal(process.env.MERCHANDISE_DB_TEST,"isolated-ci");assert.equal(new URL(process.env.DATABASE_URL!).hostname,"localhost");
+ const nativeFetch=globalThis.fetch;globalThis.fetch=async()=>{throw Error("External network is forbidden")};
+ const key=randomUUID(),org=await db.organisation.create({data:{name:"Recurring report CI",slug:key}}),period=currentBillingPeriod(),dates=periodDates(period);
+ const stores=await Promise.all([0,1].map(i=>db.facility.create({data:{organisationId:org.id,code:randomUUID(),name:`CI store ${i}`}})));
+ const scope={organisationId:org.id,userId:"ci-read-only",facilityIds:[stores[0].id],unrestrictedFacilities:false};
+ const params=reportParametersSchema.parse({reportKey:"recurring-charges",from:dates.start,to:dates.end});
+ const plan={firstPeriod:period,proration:"FULL_MONTH",taxPercent:15,rentTaxable:true,insuranceEnabled:false,insuranceTaxable:false,charges:[],discount:null,approvalReference:"CI approved source"};
+ const fixture=async(index:number,approved:boolean)=>{const f=stores[index],customer=await db.customer.create({data:{organisationId:org.id,firstName:`CI ${index}`}}),account=await db.account.create({data:{customerId:customer.id,accountNumber:randomUUID()}}),tenancy=await db.tenancy.create({data:{customerId:customer.id,accountId:account.id,facilityId:f.id,status:"ACTIVE",startDate:dates.effectiveAt,paymentMethod:"DEBIT_ORDER"}});const type=await db.unitType.upsert({where:{facilityId_name:{facilityId:f.id,name:"CI"}},create:{facilityId:f.id,name:"CI",features:[]},update:{}});const unit=await db.unit.create({data:{facilityId:f.id,unitTypeId:type.id,number:randomUUID(),monthlyRate:1150}}),occupancy=await db.occupancy.create({data:{tenancyId:tenancy.id,unitId:unit.id,status:"ACTIVE",startDate:dates.effectiveAt,monthlyRate:1150}});if(approved)await db.configurationProfile.create({data:{organisationId:org.id,facilityId:f.id,domain:"MONTHLY_BILLING",name:account.id,status:"READY",config:plan}});return{account,tenancy,occupancy}};
+ try{
+  const own=await fixture(0,true),missing=await fixture(0,false),other=await fixture(1,true);
+  const before=await Promise.all([db.ledgerEntry.count(),db.payment.count(),db.document.count(),db.debitOrderRun.count(),db.communicationLog.count(),db.account.findUniqueOrThrow({where:{id:own.account.id}})]);
+  await t.test("permitted store only, missing approved plan remains a blank-amount exception",async()=>{const rows=await recurringChargeReport(scope,params);assert.equal(rows.length,2);assert.equal(rows.find(r=>r.account===own.account.accountNumber)?.amount,"1150.00");assert.equal(rows.find(r=>r.account===missing.account.accountNumber)?.amount,null);assert.ok(!rows.some(r=>r.account===other.account.accountNumber));assert.deepEqual(await recurringChargeReport({...scope,facilityIds:[]},params),[]);await assert.rejects(recurringChargeReport(scope,{...params,facilityId:stores[1].id}),/FACILITY_FORBIDDEN/)});
+  await t.test("approved scheduled rate applies and posted invoice remains an indicator, not collection eligibility",async()=>{await db.configurationProfile.create({data:{organisationId:org.id,facilityId:stores[0].id,domain:"OCCUPANCY_RENT_SCHEDULE",name:own.occupancy.id,status:"READY",config:{baseline:1150,changes:[{period,rate:1265,approvedAt:new Date().toISOString(),approvalReference:"CI increase",batchId:randomUUID()}]}}});await db.document.create({data:{tenancyId:own.tenancy.id,type:"INVOICE",status:"GENERATED",storageKey:"ci-only",externalId:"INV-CI",idempotencyKey:`monthly-invoice:${own.account.id}:${period}`}});const rows=await recurringChargeReport(scope,{...params,recurringStatus:"READY",recurringPaymentMethod:"DEBIT_ORDER",recurringSearch:own.account.accountNumber});assert.equal(rows.length,1);assert.equal(rows[0].amount,"1265.00");assert.equal(rows[0].invoice,"INV-CI");assert.equal(rows[0].basis,"Current approved plan projection");await db.document.deleteMany({where:{tenancyId:own.tenancy.id}})});
+  await t.test("source identity inconsistency fails rather than leaking a different customer's charges",async()=>{await db.tenancy.update({where:{id:own.tenancy.id},data:{customerId:other.tenancy.customerId}});await assert.rejects(recurringChargeReport(scope,params),/RECURRING_SOURCE_REVIEW/);await db.tenancy.update({where:{id:own.tenancy.id},data:{customerId:own.tenancy.customerId}})});
+  const after=await Promise.all([db.ledgerEntry.count(),db.payment.count(),db.document.count(),db.debitOrderRun.count(),db.communicationLog.count(),db.account.findUniqueOrThrow({where:{id:own.account.id}})]);assert.deepEqual(after,before);
+ }finally{globalThis.fetch=nativeFetch;await db.$disconnect()}
+});

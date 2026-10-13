@@ -12,10 +12,10 @@ async function api(body?: unknown, accountId?: string) {
   const response = await fetch(`/api/v1/billing/debit-orders${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`, body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : { cache: "no-store" });
   const value = await response.json(); if (!response.ok) throw new Error(value.error ?? "Unable to load debit orders."); return value;
 }
-export function DebitOrderWorkspace() {
+export function DebitOrderWorkspace({initialFacilityId,initialPeriod}: {initialFacilityId?:string;initialPeriod?:string} = {}) {
   const [data, setData] = useState<Workspace | null>(null);
   const [facilityId, setFacilityId] = useState("");
-  const [period, setPeriod] = useState(() => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Johannesburg", year: "numeric", month: "2-digit" }).format(new Date()).slice(0, 7));
+  const [period, setPeriod] = useState(() => initialPeriod ?? new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Johannesburg", year: "numeric", month: "2-digit" }).format(new Date()).slice(0, 7));
   const [actionDate, setActionDate] = useState("");
   const [preview, setPreview] = useState<Preview | null>(null);
   const [confirmed, setConfirmed] = useState(false);
@@ -28,7 +28,7 @@ export function DebitOrderWorkspace() {
   const [runConfirm, setRunConfirm] = useState<Record<string, string>>({});
   const [runReviews, setRunReviews] = useState<Record<string, Preview>>( {} );
   const load = useCallback(async () => { const next = await api(); setData(next); }, []);
-  useEffect(() => { let current = true; void api().then(value => { if (current) setData(value); }).catch(e => { if (current) setMessage(e.message); }); return () => { current = false; }; }, []);
+  useEffect(() => { let current = true; void api().then(value => { if (current) {setData(value); if (initialFacilityId && value.facilities.some((f:{id:string})=>f.id===initialFacilityId)) setFacilityId(initialFacilityId);} }).catch(e => { if (current) setMessage(e.message); }); return () => { current = false; }; }, [initialFacilityId]);
   useEffect(() => {
     let current = true;
     if (accountId) void api(undefined, accountId).then(value => { if (current) { setDetail(value); setPlan(value.plan ?? { active: true, firstPeriod: period, approvalReference: "", masterfileConfirmed: true }); } }).catch(e => { if (current) setMessage(e.message); });

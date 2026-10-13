@@ -28,6 +28,15 @@ export function reportInsights(key: string, rows: ReportRow[]): ReportInsight {
     chartTitle = "Records by facility",
     guidance =
       "Review the detail below and follow up on exceptions. Empty data is not evidence of a healthy operation.";
+  if (key === "recurring-charges") {
+    const ready = rows.filter(r => r.status === "READY");
+    const cents = ready.reduce((n,r)=>n+Math.round(Number(r.amount)*100),0);
+    const totals = new Map<string,number>();
+    for (const row of ready) { const label=String(row.facility); totals.set(label,(totals.get(label)??0)+Math.round(Number(row.amount)*100)); }
+    bars=[...totals].map(([label,value])=>({label,value:value/100})); chartTitle="Projected charges by facility (ZAR)";
+    metrics=[{label:"Projected charges",value:cents/100,money:true},{label:"Accounts in selected rows",value:new Set(rows.map(r=>`${r.facility}:${r.account}`)).size},{label:"Review / not started",value:rows.filter(r=>r.status!=="READY").length}];
+    guidance="Totals cover the selected charge lines only. Current approved-plan projections include tax and discounts; they are not outstanding debt or payment instructions. Review current invoices and mandates in the Netcash batch workflow before submitting.";
+  }
   if (key === "occupancy-revenue") {
     metrics = [
       { label: "Units", value: sum("totalUnits") },

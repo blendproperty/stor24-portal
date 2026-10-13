@@ -24,6 +24,7 @@ export async function GET(request: Request) {
       return Response.json({ error: { code: "REPORT_FORBIDDEN", message: "This report is not available to your role." } }, { status: 403 });
     }
 
+    if (!definition.formats.includes(parsed.data.format)) return Response.json({error:{code:"REPORT_FORMAT_UNSUPPORTED",message:"Choose CSV backup for this report."}},{status:422,headers:dlpPrivateHeaders});
     const scope = await requirePermissionScope(definition.permission);
     // Export is a separate facility-scoped capability; neither grant may widen the other.
     if (session.allowedFacilityIds !== null) {
@@ -59,6 +60,7 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
+    if (error instanceof Error && /^RECURRING_/.test(error.message)) return Response.json({ error: { code: error.message, message: error.message === "RECURRING_PERIOD_INVALID" ? "Choose one complete month from this month through the next twelve months. This is a current-plan projection." : "The recurring-charge source needs review or a smaller facility scope." } }, { status: 422, headers: dlpPrivateHeaders });
     if (error instanceof Error && error.message === "COLLECTION_DATE") return Response.json({ error: { code: "VALIDATION_ERROR", message: "Choose an ageing date on or before today in South Africa." } }, { status: 422 });
     if (error instanceof Error && error.message === "COLLECTION_LIMIT") return Response.json({ error: { code: "REPORT_LIMIT", message: "This ageing report exceeds the account limit. Select a smaller facility scope." } }, { status: 422 });
     if (error instanceof Error && error.message === "FACILITY_FORBIDDEN") return Response.json({ error: { code: "REPORT_FORBIDDEN", message: "You do not have report access to this facility. Please contact your administrator." } }, { status: 403 });

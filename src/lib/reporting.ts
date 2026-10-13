@@ -25,6 +25,7 @@ export const reportDefinitions: readonly ReportDefinition[] = [
   { key: "collections-performance", name: "Collections workload", group: "Collections", description: "Current positive balances and period account activity requiring collections attention.", permission: "reports.collections", formats: ["CSV", "JSON", "XLSX", "PDF"] },
   { key: "insurance-participation", name: "Insurance participation", group: "Operations", description: "Recorded cover decisions, waivers and snapshotted premiums.", permission: "reports.view", formats: ["CSV", "JSON", "XLSX", "PDF"] },
   { key: "integration-health", name: "Integration health", group: "Integrations", description: "Current connection state, last health checks and recorded failures.", permission: "integrations.view", formats: ["CSV", "JSON", "XLSX", "PDF"] },
+  { key: "recurring-charges", name: "Recurring charges", group: "Finance", description: "Current approved monthly-plan projections with review exceptions. Review Netcash collections separately; CSV is a backup.", permission: "reports.financial", formats: ["CSV", "JSON"] },
 ] as const;
 
 export const reportParametersSchema = z.object({
@@ -33,6 +34,10 @@ export const reportParametersSchema = z.object({
   from: z.iso.date(),
   to: z.iso.date(),
   format: z.enum(["CSV", "JSON", "XLSX", "PDF"]).default("CSV"),
+  recurringStatus: z.enum(["READY", "REVIEW", "NOT_STARTED"]).optional(),
+  recurringPaymentMethod: z.enum(["CARD", "EFT", "DEBIT_ORDER", "UNRECORDED"]).optional(),
+  recurringCategory: z.enum(["RENT", "DISCOUNT", "INSURANCE", "OTHER"]).optional(),
+  recurringSearch: z.string().trim().max(100).optional(),
   groupBy: z.enum(["day", "week", "month", "facility"]).default("month"),
 }).refine((value) => value.from <= value.to, { message: "From date must be on or before to date.", path: ["from"] });
 
