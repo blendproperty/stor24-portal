@@ -60,3 +60,11 @@ Muhammad Ismail is the allocated MRI consultant; correspondence includes 20 non-
 - Which supported read operation retrieves a submitted batch by our unique external reference after a timeout, and which operation verifies its final posting status and totals? Confirm duplicate rejection, reversal/correction and closed-period behaviour.
 - Confirm authority to create and reverse an identified test batch in BlendTest, plus the dedicated STOR24 property/entity and approved GL, transaction, tax and deposit mappings. Access to a database alone does not provide these accounting decisions.
 - Finance must identify included source types and opening balances, approve the balancing rules and nominate an independent reviewer and reconciliation owner before live posting can be activated.
+# Finance mapping review controls — 13 October 2026
+
+`/billing/mri/mapping`, linked from MRI accounting, adds local finance-owned setup and review. No GL codes, property/entity identifiers, accounting basis or tax decisions are assumed. Drafts record source coverage and category-specific debit/credit accounts, tax treatment, tax GL/code and classification/sign/reversal rationale. All six movement types must be covered before review, but these rules do not yet classify ledger entries or compile journals.
+
+Organisation-wide `mri.view` allows inspection and a mapping review CSV; `mri.manage` allows draft/save/submit/approval. Approval must come from someone who has neither edited nor submitted the mapping and requires a finance reference. Revision checks and serializable transactions prevent silent concurrent overwrites. Editing clears approval, and mapping changes and full version evidence are audited atomically. Deterministic organisation-owned ConfigurationProfile records require no schema migration; unknown versions or duplicate configurations fail closed.
+
+The CSV is an audited, private finance **mapping review document**, not an approved MRI journal or certified provider import. Formula-like fields are escaped for spreadsheet review. Mapping approval does not validate MRI codes, authorise financial batches, enable posting or resolve the v1/v2 provider contract. All existing finance, provider, data and reconciliation gates below remain open. See `docs/SITELINK_GAP_ROLLOUT.md` for the sequence and `PROJECT_CONTEXT.md` for dated validation/promotion evidence.
+
