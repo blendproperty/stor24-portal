@@ -1,3 +1,5 @@
+import { renderAlertEmail } from './production-alert-email.mjs';
+
 // Only allowlisted aggregate evidence reaches recipients; never forward raw job logs.
 export function backupEvidence(log = '') {
   if (/ssh: connect to host .*Connection timed out/.test(log)) return { severity: 'WARNING', failure: 'Monitoring connection timed out', details: 'SSH connection exceeded 20 seconds; backup and resource checks could not run.', impact: 'Backup and resource health unverified; no backup failure established.' };
@@ -28,6 +30,5 @@ export function alertDetails(env, kind, now = new Date()) {
   const action = kind === 'RECOVERY' ? 'Recovered at this observation; elapsed time between checks is not outage duration.' : remedy;
   const rows = [['Time', time], ['Status', kind], ['Failure', failure], ['Details', details], ['Severity', severity], ['Impact', impact], ['Response priority', priority], ['Action timeframe (suggested)', timeframe], ['Suggested remedy', remedy], ['Escalation', escalation], ['Action', action]];
   if (/^[\w.-]+\/[\w.-]+$/.test(env.GITHUB_REPOSITORY || '') && /^\d+$/.test(env.GITHUB_RUN_ID || '')) rows.push(['Monitor', `https://github.com/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}`]);
-  const escape = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  return { severity, priority, timeframe, time, rows, text: `STOR24 operations notification\n${rows.map(([k,v]) => `${k}: ${v}`).join('\n')}`, html: `<h2>STOR24 operations notification</h2><table style="border-collapse:collapse;font-family:Arial,sans-serif">${rows.map(([k,v]) => `<tr><th style="text-align:left;padding:10px;border:1px solid #ddd">${escape(k)}</th><td style="padding:10px;border:1px solid #ddd">${escape(v)}</td></tr>`).join('')}</table>`, summary: `Severity: ${severity}; Failure: ${failure}; Details: ${details}; Impact: ${impact}; Response priority: ${priority}; Suggested timeframe: ${timeframe}; Remedy: ${remedy}; Escalation: ${escalation}` };
+  return { severity, priority, timeframe, time, rows, text: `STOR24 operations notification\n${rows.map(([k,v]) => `${k}: ${v}`).join('\n')}`, html: renderAlertEmail({ kind, severity, time, priority, timeframe, impact, remedy, rows }), summary: `Severity: ${severity}; Failure: ${failure}; Details: ${details}; Impact: ${impact}; Response priority: ${priority}; Suggested timeframe: ${timeframe}; Remedy: ${remedy}; Escalation: ${escalation}` };
 }
