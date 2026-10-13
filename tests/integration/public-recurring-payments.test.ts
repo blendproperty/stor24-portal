@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { db } from "../../src/lib/db";
 import { newPublicInitialRent } from "../../src/lib/public-initial-rent";
-import { chooseFuturePayments } from "../../src/lib/public-recurring-payments";
+import { chooseFuturePayments, recurringPaymentStatus } from "../../src/lib/public-recurring-payments";
 import { sendMonthlyMandateInvitation } from "../../src/lib/monthly-mandate-invitation";
 
 test("isolated PostgreSQL serialises opt-in and claims one email without charging or changing the lease", async t => {
@@ -24,7 +24,9 @@ test("isolated PostgreSQL serialises opt-in and claims one email without chargin
   process.env.NETCASH_MANDATE_POLICY = JSON.stringify({ organisationId: organisation.id, approvedBy: "Synthetic CI", noticeDays: 30, holiday: "VeryNextOrdinaryBusinessDay", allowedDays: [1], recurringAmountBasis: "SIGNED_MONTHLY_RENT_ONLY", firstPaymentHandling: "SEPARATE_APPROVED_PAYMENT", postbackConfigured: true });
   try {
     await assert.rejects(chooseFuturePayments(key, "DEBIT_ORDER"), /UPFRONT_PAYMENT_REQUIRED/);
-    await db.payment.create({ data: { accountId: account.id, status: "SUCCEEDED", processedAt: new Date(), environment: "sandbox", amount: 1290.32, currency: "ZAR", method: "PAY_NOW", provider: "NETCASH", idempotencyKey: `netcash-public-test-${key}` } });
+    await db.payment.create({ data: { accountId: account.id, status: "TEST_SUCCEEDED", processedAt: new Date(), environment: "sandbox", amount: 1290.32, currency: "ZAR", method: "PAY_NOW", provider: "NETCASH", idempotencyKey: `netcash-public-test-${key}` } });
+    const status = await recurringPaymentStatus(key);
+    assert.equal(status.paymentReady, true); assert.equal(status.isTest, true); assert.equal(status.offered, true); assert.equal(status.setupEnabled, true); assert.equal(status.collectionEnabled, false);
     await Promise.all([chooseFuturePayments(key, "DEBIT_ORDER"), chooseFuturePayments(key, "DEBIT_ORDER")]);
     assert.equal(await db.auditEvent.count({ where: { entityId: reservation.id, action: "public_booking.future_payment_choice" } }), 1);
     const mandate = await db.publicDebitMandate.create({ data: { leaseId: reservation.publicLease!.id, reference: `CI-${key}`, correlation: key, environment: "sandbox", status: "AWAITING_SIGNATURE", hostedUrl: "https://emandate.netcash.co.za/synthetic", terms: { amount: "1250", debitDay: 1, commencementMonth: 12 } } });
