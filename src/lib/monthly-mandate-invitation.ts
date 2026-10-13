@@ -29,12 +29,13 @@ export async function sendMonthlyMandateInvitation(token: string, resend = false
   const text = `Hi ${customer.firstName || "there"},\n\n${opening} You asked to pay future monthly rent by debit order.\n\nReview and sign your separate bank mandate securely with Netcash:\n${m.hostedUrl}\n\nMonthly rent: R ${Number(lease.reservation.quotedRate).toFixed(2)}. Your collection dates are shown on the mandate and start after the rental months included in your upfront payment.\n\nSigning authorises future collections; it does not charge another upfront payment. Bank details are entered with Netcash. Never email your bank details or OTP to STOR24.\n\n${testMandate ? "This mandate is for testing and collections remain disabled." : "STOR24 will confirm your recurring setup separately. Staff handover checks still apply."}\n\nSTOR24`;
   try {
     await send({ to, subject: `${prefix}Sign your future monthly debit-order mandate`, text, html: `<p>${escapeEmailHtml(text).replaceAll("\n", "<br>")}</p><p><a href="${escapeEmailHtml(m.hostedUrl)}">Open secure Netcash signing</a></p>`, dlp: { organisationId: customer.organisationId, facilityId: lease.reservation.facilityId, resourceId: m.id, approvedRecipient: to } });
-    await database.publicDebitMandate.update({ where: { id: m.id }, data: { invitationSentAt: now, invitationFailed: false } });
-    await database.auditEvent.create({ data: { organisationId: customer.organisationId, facilityId: lease.reservation.facilityId, action: "monthly_mandate.invitation_email_accepted", entityType: "PublicDebitMandate", entityId: m.id, after: { isTest: testMandate, upfrontIsTest: payment.isTest, collectionEnabled: false } } });
-    return "EMAIL_ACCEPTED" as const;
   } catch {
     await database.publicDebitMandate.update({ where: { id: m.id }, data: { invitationFailed: true } });
     await database.auditEvent.create({ data: { organisationId: customer.organisationId, facilityId: lease.reservation.facilityId, action: "monthly_mandate.invitation_email_failed", entityType: "PublicDebitMandate", entityId: m.id } });
     return "FAILED" as const;
   }
+  // A later database/audit error must not rewrite provider acceptance as a failed send.
+  await database.publicDebitMandate.update({ where: { id: m.id }, data: { invitationSentAt: now, invitationFailed: false } });
+  await database.auditEvent.create({ data: { organisationId: customer.organisationId, facilityId: lease.reservation.facilityId, action: "monthly_mandate.invitation_email_accepted", entityType: "PublicDebitMandate", entityId: m.id, after: { isTest: testMandate, upfrontIsTest: payment.isTest, collectionEnabled: false } } });
+  return "EMAIL_ACCEPTED" as const;
 }

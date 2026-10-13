@@ -76,9 +76,13 @@ test("one mandate invitation across concurrent devices; email failure never chan
     mandate.invitationAttemptAt = null; mandate.invitationSentAt = null;
     assert.equal(await sendMonthlyMandateInvitation("synthetic", false, database as never, async () => { throw new Error("Simulated email failure"); }), "FAILED");
     assert.equal(mandate.invitationFailed, true); assert.equal(mandate.status, "AWAITING_SIGNATURE"); assert.equal(mandate.invitationSentAt, null);
+    mandate.invitationAttemptAt = null;
+    const failedAudit = { ...database, auditEvent: { create: async () => { throw new Error("Synthetic audit failure"); } } };
+    await assert.rejects(sendMonthlyMandateInvitation("synthetic", false, failedAudit as never, send), /Synthetic audit failure/);
+    assert.ok(mandate.invitationSentAt); assert.equal(mandate.invitationFailed, false); assert.equal(mandate.status, "AWAITING_SIGNATURE");
     mandate.terms.amount = "950";
-    assert.equal(await sendMonthlyMandateInvitation("synthetic", true, database as never, send), "NOT_READY"); assert.equal(sends, 1);
+    assert.equal(await sendMonthlyMandateInvitation("synthetic", true, database as never, send), "NOT_READY"); assert.equal(sends, 2);
     lease.reservation.rentalPlan.futurePaymentMethod = "MANUAL";
-    assert.equal(await sendMonthlyMandateInvitation("synthetic", false, database as never, send), "NOT_READY"); assert.equal(sends, 1);
+    assert.equal(await sendMonthlyMandateInvitation("synthetic", false, database as never, send), "NOT_READY"); assert.equal(sends, 2);
   } finally { restores.reverse().forEach(r => r()); if (oldSetup === undefined) delete process.env.NETCASH_MANDATE_SETUP_ENABLED; else process.env.NETCASH_MANDATE_SETUP_ENABLED = oldSetup; if (oldPolicy === undefined) delete process.env.NETCASH_MANDATE_POLICY; else process.env.NETCASH_MANDATE_POLICY = oldPolicy; }
 });
