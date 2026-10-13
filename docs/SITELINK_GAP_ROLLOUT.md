@@ -5,9 +5,9 @@ Updated: 13 October 2026. This is the implementation sequence requested by Brett
 | Order | Feature gap | Current rollout stage | Completion evidence required |
 |---|---|---|---|
 | 1 | Existing-tenant fixed monthly card autopay | Preparation/request backend merged through PR456 (`ffbec30`); live provider enrollment remains blocked. New booking choices remain once-off CARD/EFT. | Verified existing-tenant enrollment with no invented charge, merchant duration semantics, authoritative subscription and cycle identity, provider update/cancel behavior, secure tokens, separate idempotent cycle receipts, customer/staff UI and controlled provider/finance/mobile acceptance. |
-| 2 | Accounting/MRI export pipeline | Finance mapping/review and built-in BlendTest sandbox controls implemented/tested in PR463. Actual test API sign-in/read verified; zero accessible test properties. No balanced journals or provider posting yet. | Assigned sandbox entity/property; approved finance mappings/basis; balanced export batches, reversal/idempotency controls and accepted accounting readback. |
+| 2 | Accounting/MRI export pipeline | Mapping/review, BlendTest connection and internal sandbox batch preparation implemented/tested in PR463. Separate sandbox mappings, source snapshots, exact balanced previews, independent batch review and protected review CSV. Actual test API read verified; zero accessible properties. No provider financial posting. | Assigned test entity/property; real finance decisions; accepted import/lookup contract, production-source allocation, broader corrections, durable submission/reconciliation and provider/finance acceptance. |
 | 3 | Native financial/history reports | Queued; no changes in this branch. | Exact report/source definitions and reconciled test data for each selected native report. |
-| 4 | Collection notices/actions orchestration | Queued; no changes in this branch. | Preview/approval/audience/consent workflow, delivery evidence, audited rules and independent provider effects. |
+| 4 | Collection notices/actions orchestration | Email notices selected by Brett as the next independent rollout; separate implementation follows MRI batch preparation. | Preview/approval/audience/consent workflow, delivery evidence, audited rules and independent provider effects. |
 | 5 | Actual gate-passage event feed/reporting | Queued; no changes in this branch. | Provider-confirmed gate/direction/event identity; duplicate handling, scope and device verification. |
 
 Price Optimizer, corporate controls, insurance automation and wider provider adapters remain feature-parity questions requiring focused confirmation. They are not assumed requirements for this first queue.
@@ -51,6 +51,12 @@ Brett confirmed that no finance-approved MRI entity/property, GL/tax mapping or 
 - Validation: 704 unit results (703 pass, one existing skip); five isolated real PostgreSQL results; endpoint auth/scope/origin/size/rate/download guards; TypeScript, focused ESLint and production build; desktop/mobile browser flow and inspected 1440/390/320 layouts. Browser API responses are fixtures, not provider or live production evidence. CI includes the new database and browser checks.
 
 Next accounting increment requires reviewed source classification and balanced, source-bound batches with independent journal approval, period/duplicate/reversal controls and an accepted provider import contract. Local mapping approval alone cannot close the accounting feature gap. Finance code/basis approval, opening balances and exclusions, provider test authority, reconciliation, UAT/training and production activation remain open.
+
+### Internal sandbox batch controls
+
+Implemented while the test property and finance mappings are arranged: sandbox-only mappings; explicit tax journal side; bounded manual source snapshots; exact integer-cent included/additional-tax balancing; full original-bound reversals; mapping/source hashes; closed-month review; source/period duplicate guards; non-contributor approval; immutable approved/void records; and revision-bound protected review CSVs. Missing mappings can be saved as blocked drafts. No production financial sources or MRI financial submissions are permitted by this contract. Generic configuration cannot bypass these dedicated controls.
+
+This reduces the preparation gap; it does not close full accounting parity. Real source recognition (income, deposits, prepaid rent and provisions), actual provider import/readback and advanced correction/reversal contracts remain required. The existing reporting closing matrix records these definition/data dependencies; unsupported figures are not invented. Physical gate passage remains a distinct missing provider feed. Email collection notices are the next independently implementable feature authorised in this conversation.
 
 ### Sandbox integration clarification
 

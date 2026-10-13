@@ -45,7 +45,7 @@ export function MriSandboxWorkspace() {
       <section className="mapping-panel"><h2>Journal testing readiness</h2>
         {verified && config.propertyCount === 0 && <p className="mapping-error">MRI returned no accessible properties in BlendTest. Create or assign the dedicated test property and entity before testing journals.</p>}
         <ol><li>Verify sandbox access and the dedicated test property/entity.</li><li>Agree test GL accounts, tax codes, source classification and the accounting basis with finance.</li><li>Confirm the MRI journal import and lookup contract, then implement balanced batches, duplicate controls and reconciliation.</li></ol>
-        <p><a href="/billing/mri/mapping">Review finance mapping controls</a>. Those are shared finance proposals, not sandbox journal approval.</p>
+        <p><a href="/billing/mri/sandbox/mapping">Prepare sandbox-only finance mappings</a> and <a href="/billing/mri/sandbox/batches">prepare sandbox journal batches</a>. These internal controls do not submit financial entries.</p>
         <p><strong>Journal submission is not available yet.</strong> This screen performs real API authentication and reads only. No tenant ledger, payment, outbox or MRI financial entries are changed.</p>
       </section>
     </>}

@@ -26,7 +26,8 @@ function failure(error: unknown) {
 export async function GET(request: Request) {
   try {
     const scope = await requirePermissionScope("mri.view");
-    const review = await mriMappingReview(scope);
+    const lane = new URL(request.url).pathname.endsWith("/sandbox/mapping") ? "sandbox" : "primary";
+    const review = await mriMappingReview(scope, lane);
     if (new URL(request.url).searchParams.get("format") === "csv") return await protectDlpResponse(new Response(mappingReviewCsv(review), { headers: { ...headers, "content-type": "text/csv; charset=utf-8", "content-disposition": 'attachment; filename="mri-mapping-finance-review.csv"', "x-content-type-options": "nosniff" } }), { organisationId: scope.organisationId, actorId: scope.userId, resourceId: `mri-mapping:${review.revision ?? "unsaved"}` }, "confidential");
     let canManage = false;
     try { canManage = (await requirePermissionScope("mri.manage")).unrestrictedFacilities; } catch { /* Read-only users can inspect the review. */ }
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
     if (!scope.unrestrictedFacilities) throw new Error("MRI_ORG_PERMISSION");
     if (await rateLimit(`mri-mapping:${scope.organisationId}:${scope.userId}`, 30, 60000)) return Response.json({ error: "Wait a minute before making more mapping changes." }, { status: 429, headers });
     const input = JSON.parse((await boundedBody(new Response(request.body), 64000)).toString());
-    return Response.json({ review: await changeMriMapping(scope, input) }, { headers });
+    const lane = new URL(request.url).pathname.endsWith("/sandbox/mapping") ? "sandbox" : "primary";
+    return Response.json({ review: await changeMriMapping(scope, input, lane) }, { headers });
   } catch (e) { return failure(e); }
 }

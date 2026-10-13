@@ -14,7 +14,7 @@ test("all movement categories, source plan, GL accounts and explicit tax decisio
   value.rules = value.rules.map(r => ({ ...r, debitAccount: "CI-DEBIT", creditAccount: "CI-CREDIT", taxTreatment: "NO_TAX", rationale: "Synthetic classification, sign and reversal instructions" }));
   assert.deepEqual(mappingBlockers(value), []);
   value.rules[0].taxTreatment = "INCLUDED"; assert.ok(mappingBlockers(value).some(b => b.includes("tax GL")));
-  value.rules[0].taxAccount = "CI-TAX"; value.rules[0].taxCode = "CI-TAX-CODE"; assert.deepEqual(mappingBlockers(value), []);
+  value.rules[0].taxAccount = "CI-TAX"; value.rules[0].taxCode = "CI-TAX-CODE"; value.rules[0].taxSide = "CREDIT"; assert.deepEqual(mappingBlockers(value), []);
   value.rules[0].creditAccount = "ci-debit"; assert.ok(mappingBlockers(value).some(b => b.includes("must differ")));
   value.rules.pop(); assert.ok(mappingBlockers(value).some(b => b.includes("write off mapping")));
 });

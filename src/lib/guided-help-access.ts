@@ -23,6 +23,8 @@ export const guideAccessRules: Record<string, Rule> = {
   mri: rule("mri.view", ["", "mri.manage", "", "mri.manage"], true),
   "mri-mapping": rule("mri.view", ["mri.manage", "mri.manage", "mri.manage", ""], true),
   "mri-sandbox": rule("mri.view", ["mri.manage", "mri.manage", ""], true),
+  "mri-batches": rule("mri.view", ["mri.manage", "mri.manage", "mri.manage", ""], true),
+  "mri-sandbox-mapping": rule("mri.view", ["mri.manage", "mri.manage", "mri.manage"], true),
   settlements: rule("settlements.view", ["", "settlements.import", "settlements.import", "settlements.manage,settlements.approve,settlements.export"], true),
   "debit-orders": rule("debit_orders.view", ["", "debit_orders.manage", "debit_orders.manage", "debit_orders.submit"]),
   "monthly-billing": rule("billing.view", ["", "billing.manage", "billing.manage", "billing.manage"]),

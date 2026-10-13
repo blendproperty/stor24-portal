@@ -4,6 +4,18 @@
 
 ### Built-in sandbox testing — 13 October 2026
 
+### Sandbox journal batch preparation — 13 October 2026
+
+`/billing/mri/sandbox/mapping` stores independent test mappings, separate from primary finance rules. Taxable categories require explicit tax GL/code and journal side. `/billing/mri/sandbox/batches` saves bounded manual ZAR test sources and source-bound mapping snapshots while property and mapping setup is still pending. Fictional sample loading is an explicit staff action. Production tenant/ledger sources cannot be imported through this preparation contract.
+
+The compiler uses integer cents and explicit included/additional/no-tax treatment. Unmapped categories, inconsistent tax, zero sources and unresolved reversals block the entire preview rather than returning a partial journal. Full reversals swap the original snapshot's debit/credit and tax directions; partial, cross-period and reversal-of-reversal cases remain blocked. Amounts are not inferred from account balances or treated as recognised income.
+
+Draft → independent review → approval requires a closed month, exactly balanced nonzero totals and an unchanged independently approved sandbox mapping. Canonical snapshot hashes survive JSON key ordering and reject content tampering. One batch per organisation/month prevents duplicate active periods; submitted source references are permanently reserved to that period even after reopening/voiding. Contributors and submitters cannot approve; approved and void snapshots cannot be edited. Pending review can reopen for corrections, with history retained in atomic audits. Changing mappings blocks approval/download of prior snapshots.
+
+An approved review CSV binds to the batch revision and includes the snapshot hash and debit/credit controls. It is audited through existing data protection and **is not an MRI import**. Generic configuration routes cannot read or overwrite MRI-controlled profiles or replace primary/sandbox connections; use the dedicated workflows. No schema migration, provider financial request, ledger/payment update or outbox replay is introduced.
+
+This is internal sandbox preparation. Dedicated property/entity, actual finance decisions, provider import/lookup contract, durable submission/reconciliation states and UAT remain open. The strict initial lane permits full same-snapshot reversals only, one immutable approved/void batch per period and positive two-decimal sources; more advanced correction/version workflows need a separate reviewed contract before real journaling.
+
 `/billing/mri/sandbox`, linked from MRI accounting, prepares a separate `MRI_SANDBOX` connection from the existing encrypted API account and its exact discovered **BlendTest** target. Primary **Blend** settings are not replaced. Credentials/identifier are re-encrypted separately; no secret or target identifier is returned to the browser. Sandbox controls accept only prepare/check actions, not arbitrary target URLs, database identifiers, environment changes or financial submissions. Organisation-wide `mri.view`/`mri.manage`, same-origin checks, small request bounds, revision checks, rate limits and atomic audit protect the flow.
 
 Run sandbox check uses the actual MRI adapter: OAuth sign-in, current database discovery and a bounded property read. Discovery must match one exact BlendTest identifier before reading properties. A shared primary target, changed settings during a check, missing/ambiguous/changed provider discovery or failed network/authentication cannot inherit successful check evidence. Failure clears current authentication/read proof; primary configuration changes to the test target suppress old sandbox-isolation proof.

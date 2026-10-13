@@ -11,6 +11,7 @@ export const mriMappingSchema = z.object({
     category: text.min(1), movement: z.enum(MRI_MOVEMENTS),
     debitAccount: text, creditAccount: text, taxAccount: text, taxCode: text,
     taxTreatment: z.enum(["UNDECIDED", "NO_TAX", "INCLUDED", "EXCLUSIVE"]),
+    taxSide: z.enum(["UNDECIDED", "DEBIT", "CREDIT"]).default("UNDECIDED"),
     rationale: note,
   }).strict()).max(60),
 }).strict().superRefine((value, ctx) => {
@@ -23,7 +24,7 @@ export const mriMappingSchema = z.object({
 });
 export type MriMapping = z.infer<typeof mriMappingSchema>;
 export function emptyMriMapping(): MriMapping {
-  return { entityCode: "", propertyCode: "", basis: "UNDECIDED", scopeNotes: "", rules: MRI_MOVEMENTS.map(movement => ({ movement, category: movement.toLowerCase().replace("_", " "), debitAccount: "", creditAccount: "", taxAccount: "", taxCode: "", taxTreatment: "UNDECIDED", rationale: "" })) };
+  return { entityCode: "", propertyCode: "", basis: "UNDECIDED", scopeNotes: "", rules: MRI_MOVEMENTS.map(movement => ({ movement, category: movement.toLowerCase().replace("_", " "), debitAccount: "", creditAccount: "", taxAccount: "", taxCode: "", taxTreatment: "UNDECIDED", taxSide: "UNDECIDED", rationale: "" })) };
 }
 export function mappingBlockers(mapping: MriMapping): string[] {
   const result: string[] = [];
@@ -39,6 +40,7 @@ export function mappingBlockers(mapping: MriMapping): string[] {
     if (r.taxTreatment === "UNDECIDED") result.push(`${label}: confirm tax treatment.`);
     if (["INCLUDED", "EXCLUSIVE"].includes(r.taxTreatment) && !r.taxAccount) result.push(`${label}: supply the tax GL account.`);
     if (["INCLUDED", "EXCLUSIVE"].includes(r.taxTreatment) && !r.taxCode) result.push(`${label}: confirm the MRI tax code.`);
+    if (["INCLUDED", "EXCLUSIVE"].includes(r.taxTreatment) && r.taxSide === "UNDECIDED") result.push(`${label}: choose the tax journal side.`);
     if (r.taxTreatment === "NO_TAX" && r.taxAccount) result.push(`${label}: remove the tax GL account or choose a taxable treatment.`);
     if (!r.rationale) result.push(`${label}: document classification, signs, tax allocation and reversal handling where applicable.`);
   }
@@ -53,7 +55,7 @@ export function mappingReviewCsv(review: { mapping: MriMapping; status: string; 
     return `"${safe.replaceAll('"', '""')}"`;
   };
   const rows = [["Document", "Mapping finance review only - NOT an MRI journal import"], ["Status", review.status], ["Revision", review.revision], ["Entity", review.mapping.entityCode], ["Property", review.mapping.propertyCode], ["Basis", review.mapping.basis], ["Scope", review.mapping.scopeNotes], ["Approved at", review.approvedAt], ["Approval reference", review.approvalReference], [],
-    ["Movement", "Category", "Debit GL", "Credit GL", "Tax GL", "Tax code", "Tax treatment", "Rationale"],
-    ...review.mapping.rules.map(r => [r.movement, r.category, r.debitAccount, r.creditAccount, r.taxAccount, r.taxCode, r.taxTreatment, r.rationale])];
+    ["Movement", "Category", "Debit GL", "Credit GL", "Tax GL", "Tax code", "Tax treatment", "Tax side", "Rationale"],
+    ...review.mapping.rules.map(r => [r.movement, r.category, r.debitAccount, r.creditAccount, r.taxAccount, r.taxCode, r.taxTreatment, r.taxSide, r.rationale])];
   return "\uFEFF" + rows.map(r => r.map(cell).join(",")).join("\r\n") + "\r\n";
 }
