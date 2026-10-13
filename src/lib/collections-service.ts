@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { facilityWhere, type RequestScope } from "@/lib/scope";
@@ -9,7 +11,7 @@ import { ageAccount, collectionActionSchema, dateKey, effectiveEntries, moneyCen
 type Client = Prisma.TransactionClient;
 const json = (v: unknown) => JSON.parse(JSON.stringify(v)) as Prisma.InputJsonValue;
 const where = (scope: RequestScope) => ({ customer: { organisationId: scope.organisationId }, tenancy: { facility: facilityWhere(scope) } });
-const include = { customer: { select: { companyName: true, firstName: true, lastName: true } }, tenancy: { include: { facility: { select: { id: true, name: true } } } }, ledgerEntries: { orderBy: [{ effectiveAt: "asc" }, { id: "asc" }] }, payments: { include: { merchandiseOrder: { select: { id: true } } } }, adjustments: { where: { status: { in: ["PENDING_APPROVAL", "APPROVED"] } }, select: { id: true } }, debitInstructions: { where: { run: { status: { not: "CANCELLED" } } }, select: { id: true } }, collectionCase: { include: { activities: { orderBy: { createdAt: "desc" }, take: 30 }, promises: { orderBy: { createdAt: "desc" }, take: 20 } } } } satisfies Prisma.AccountInclude;
+const include = { customer: { select: { companyName: true, firstName: true, lastName: true, email: true, emailVerifiedAt: true, communicationConsent: true, updatedAt: true } }, tenancy: { include: { facility: { select: { id: true, name: true } } } }, ledgerEntries: { orderBy: [{ effectiveAt: "asc" }, { id: "asc" }] }, payments: { include: { merchandiseOrder: { select: { id: true } } } }, adjustments: { where: { status: { in: ["PENDING_APPROVAL", "APPROVED"] } }, select: { id: true } }, debitInstructions: { where: { run: { status: { not: "CANCELLED" } } }, select: { id: true } }, collectionCase: { include: { activities: { orderBy: { createdAt: "desc" }, take: 30 }, promises: { orderBy: { createdAt: "desc" }, take: 20 } } } } satisfies Prisma.AccountInclude;
 type Account = Prisma.AccountGetPayload<{ include: typeof include }>;
 async function accountFor(tx: Client, scope: RequestScope, id: string) {
   const account = await tx.account.findFirst({ where: { id, ...where(scope) }, include });
@@ -71,6 +73,24 @@ export async function collectionsWorkspace(scope: RequestScope, asOf: string) {
   }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 30000 });
 }
 export type CollectionsWorkspaceData = Awaited<ReturnType<typeof collectionsWorkspace>>;
+
+/** Reuses the same due-date, receipt and hold rules as the staff queue. */
+export async function collectionEmailSource(tx: Client, scope: RequestScope, accountId: string, asOf: string) {
+  const account = await accountFor(tx, scope, accountId), evaluated = evaluate(account, asOf, await receiptEvidence(tx, scope, [account]));
+  const blockers: string[] = [];
+  if (account.tenancy!.status !== "ACTIVE") blockers.push("Only active tenancies are in this first notice workflow.");
+  if (evaluated.ageing.issue) blockers.push(evaluated.ageing.issue);
+  if (evaluated.hold) blockers.push(evaluated.hold);
+  if (evaluated.ageing.overdue <= 0) blockers.push("No reconciled overdue amount is available.");
+  if (!account.customer.emailVerifiedAt || !z.email().safeParse(account.customer.email).success) blockers.push("A verified customer email address is required.");
+  if ((account.customer.communicationConsent as { email?: boolean } | null)?.email !== true) blockers.push("Explicit email communication consent is required.");
+  const bound = { asOf, accountId: account.id, facilityId: account.tenancy!.facilityId, facilityName:account.tenancy!.facility.name, accountNumber: account.accountNumber, customerId: account.customerId, customerUpdatedAt: account.customer.updatedAt.toISOString(), accountUpdatedAt: account.updatedAt.toISOString(), balance: account.balance.toString(), currency: account.currency, tenancyStatus: account.tenancy!.status,
+    ledger: account.ledgerEntries.map(e => ({ id: e.id, type: e.type, amount: e.amount.toString(), reversalOfId: e.reversalOfId, effectiveAt: e.effectiveAt.toISOString(), metadata: e.metadata })),
+    receipts: account.payments.map(p => ({ id: p.id, status: p.status, amount: p.amount.toString(), environment: p.environment, provider: p.provider, processedAt: p.processedAt?.toISOString() ?? null })).sort((a,b)=>a.id.localeCompare(b.id)),
+    verifiedReceipts: [...evaluated.verifiedReceiptIds].sort(), caseRevision: account.collectionCase?.revision ?? 0, terms: account.collectionCase?.terms ?? null, overdue: evaluated.ageing.overdue, blockers };
+  return { accountId: account.id, customerId: account.customerId, facilityId: account.tenancy!.facilityId, facility: account.tenancy!.facility.name, accountNumber: account.accountNumber, recipient: account.customer.email ?? "", asOf, overdueCents: evaluated.ageing.overdue, blockers,
+    fingerprint: createHash("sha256").update(JSON.stringify(bound)).digest("hex") };
+}
 
 export async function updateCollection(scope: RequestScope, raw: CollectionAction) {
   const input = collectionActionSchema.parse(raw), today = southAfricaDateKey(new Date());
