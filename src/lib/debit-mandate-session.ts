@@ -1,3 +1,5 @@
+import { paidUpfrontEvidence } from "./public-recurring-payments";
+import { readRentalPlan } from "./public-rental-plan";
 import { randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
 import { facilityWhere, type RequestScope } from "@/lib/scope";
@@ -65,7 +67,10 @@ export function staffMandateLease(session: Session) {
 export async function findMandateLease(token: string) {
   const publicLease = await db.publicReservationLease.findUnique({ where: { signingToken: token }, include: { mandate: true, reservation: { include: { packageSelection: true, customer: true, facility: true, unit: { include: { unitType: true } } } } } });
   if (publicLease) {
-    if (publicLease.status !== "SIGNED" || publicLease.paymentMethod !== "DEBIT_ORDER") throw new Error("MANDATE_BOOKING_UNAVAILABLE");
+    if (publicLease.status !== "SIGNED") throw new Error("MANDATE_BOOKING_UNAVAILABLE");
+    if (publicLease.paymentMethod !== "DEBIT_ORDER") {
+      if (!["CARD", "EFT"].includes(publicLease.paymentMethod) || readRentalPlan(publicLease.reservation.rentalPlan).futurePaymentMethod !== "DEBIT_ORDER" || (!publicLease.mandate && !(await paidUpfrontEvidence(publicLease.reservation)).ready)) throw new Error("UPFRONT_PAYMENT_REQUIRED");
+    }
     return { ...publicLease, sourceSessionId: null };
   }
   const session = await readStaffMandateSession(token);

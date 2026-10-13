@@ -76,6 +76,7 @@ jobs:
       - run: npx tsx --test tests/integration/debit-mandate-session.test.ts
       - run: npx tsx --test tests/integration/mandate-report-recovery.test.ts
       - run: npx tsx --test tests/integration/debit-order-initial-payment.test.ts
+      - run: npx tsx --test tests/integration/public-recurring-payments.test.ts
       - run: npx tsx --test tests/integration/adjustments.test.ts
       - run: npx tsx --test tests/integration/leads-workspace.test.ts
         env:

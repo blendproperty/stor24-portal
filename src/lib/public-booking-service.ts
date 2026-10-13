@@ -316,6 +316,7 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
           journey: input.journey,
           holdExpiresAt,
           intendedMoveIn: input.intendedMoveIn,
+          rentalPlan: input.journey === "RENTAL" ? { version: 1, expectedDuration: input.expectedRentalDuration ?? "UNSURE", futurePaymentMethod: null } : undefined,
           viewingAt: input.viewingAt,
           verificationExpiresAt: verificationEnabled ? holdExpiresAt : null,
           verificationCodeHash: verificationEnabled ? "PENDING" : null,
