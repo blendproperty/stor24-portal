@@ -7,7 +7,7 @@ import { newPublicInitialRent } from "../src/lib/public-initial-rent";
 import { findMandateLease } from "../src/lib/debit-mandate-session";
 import { sendMonthlyMandateInvitation } from "../src/lib/monthly-mandate-invitation";
 
-const payment = { id: "p-one", status: "SUCCEEDED", environment: "sandbox", idempotencyKey: "netcash-public-test-fixture", provider: "NETCASH", method: "PAY_NOW", currency: "ZAR", amount: 1290.32, processedAt: new Date() };
+const payment = { id: "p-one", status: "TEST_SUCCEEDED", environment: "sandbox", idempotencyKey: "netcash-public-test-fixture", provider: "NETCASH", method: "PAY_NOW", currency: "ZAR", amount: 1290.32, processedAt: new Date() };
 const date = new Date("2026-10-31T00:00:00+02:00");
 function fixture() {
   return { id: "lease", reservationId: "r", status: "SIGNED", signedAt: new Date(), paymentMethod: "CARD", expiresAt: new Date(Date.now() + 86400000), mandate: null as Record<string, unknown> | null, reservation: { id: "r", customerId: "customer", facilityId: "facility", publicReference: "ST24-TEST", status: "ACTIVE", quotedRate: 1250, intendedMoveIn: date, initialRentSnapshot: newPublicInitialRent(1250, date), packageSelection: null, rentalPlan: { version: 1, expectedDuration: "LONGER", futurePaymentMethod: null as string | null }, customer: { id: "customer", type: "INDIVIDUAL", companyName: null, organisationId: "organisation", firstName: "Test", email: "customer@example.test", emailVerifiedAt: new Date() }, facility: {}, unit: { number: "TEST" } } };
@@ -24,21 +24,27 @@ test("confirmed failed retries may precede one successful test receipt, but ambi
   assert.equal(recurringUpfrontEvidence([{ ...payment, id: "failed", status: "FAILED" }, payment], [], 1290.32).ready, true);
   for (const payments of [[{ ...payment, status: "PENDING" }], [payment, { ...payment, id: "other" }], [payment, { ...payment, status: "PENDING" }], [{ ...payment, amount: 1 }]]) assert.equal(recurringUpfrontEvidence(payments, [], 1290.32).ready, false);
   assert.equal(recurringUpfrontEvidence([payment], [{ id: "reversal", type: "REVERSAL", amount: 1290.32, metadata: null, reversalOfId: null }], 1290.32).ready, false);
+  assert.equal(recurringUpfrontEvidence([payment, { ...payment, id: "inconsistent", environment: "live" }], [], 1290.32).ready, false);
 });
 test("real success requires verified live ledger evidence; test evidence never becomes real paid rent", () => {
-  const live = { ...payment, environment: "live", idempotencyKey: "netcash-real-fixture" };
+  const live = { ...payment, status: "SUCCEEDED", environment: "live", idempotencyKey: "netcash-real-fixture" };
   assert.equal(recurringUpfrontEvidence([live], [], 1290.32).ready, false);
   const receipts = [{ id: "receipt", type: "PAYMENT", amount: 1290.32, metadata: { paymentId: live.id, verifiedStatus: true, environment: "live" }, reversalOfId: null }];
   assert.equal(recurringUpfrontEvidence([live], receipts, 1290.32).ready, true);
   assert.equal(recurringUpfrontEvidence([live], receipts, 1290.32).isTest, false);
   assert.equal(recurringUpfrontEvidence([payment], [], 1290.32).isTest, true);
+  assert.equal(recurringUpfrontEvidence([{ ...payment, status: "SUCCEEDED" }], [], 1290.32).ready, true); // Legacy sandbox success.
+  for (const invalid of [{ ...payment, environment: "live" }, { ...payment, environment: null }, { ...payment, processedAt: null }, { ...payment, method: "EFT" }, { ...payment, provider: "OTHER" }]) assert.equal(recurringUpfrontEvidence([invalid], [], 1290.32).ready, false);
 });
 test("choice is durable/idempotent only after payment, and never changes the signed initial method", async () => {
   const lease = fixture(); let payments = [{ ...payment, status: "FAILED" }]; let updates = 0;
   const restores = [stub(db.publicReservationLease, "findUnique", async () => lease), stub(db.account, "findUnique", async () => ({ customerId: "customer", payments, ledgerEntries: [] })), stub(db, "$transaction", async callback => (callback as (tx: unknown) => unknown)({ $queryRaw: async () => [], reservation: { update: async (args: { data: { rentalPlan: typeof lease.reservation.rentalPlan } }) => { updates++; lease.reservation.rentalPlan = args.data.rentalPlan; } }, auditEvent: { create: async () => ({}) } }))];
   try {
     await assert.rejects(chooseFuturePayments("synthetic", "DEBIT_ORDER"), /UPFRONT_PAYMENT_REQUIRED/); assert.equal(updates, 0);
-    payments = [payment]; await chooseFuturePayments("synthetic", "DEBIT_ORDER"); await chooseFuturePayments("synthetic", "DEBIT_ORDER");
+    payments = [payment];
+    const status = await recurringPaymentStatus("synthetic");
+    assert.equal(status.paymentReady, true); assert.equal(status.isTest, true); assert.equal(status.offered, true); assert.equal(status.collectionEnabled, false);
+    await chooseFuturePayments("synthetic", "DEBIT_ORDER"); await chooseFuturePayments("synthetic", "DEBIT_ORDER");
     assert.equal(updates, 1); assert.equal(lease.paymentMethod, "CARD"); assert.equal(lease.reservation.rentalPlan.futurePaymentMethod, "DEBIT_ORDER");
     lease.mandate = { id: "existing" }; await assert.rejects(chooseFuturePayments("synthetic", "MANUAL"), /EXISTING_MANDATE_REVIEW_REQUIRED/);
   } finally { restores.reverse().forEach(r => r()); }

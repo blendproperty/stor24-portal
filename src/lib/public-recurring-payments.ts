@@ -9,8 +9,8 @@ import { southAfricaDateKey } from "./south-africa-time";
 
 type Booking = Parameters<typeof publicCheckoutTotal>[0] & { id: string; customerId: string };
 export function recurringUpfrontEvidence(payments: Payment[], receipts: Receipt[], amount: number) {
-  const successful = payments.filter(p => p.status === "SUCCEEDED");
-  if (successful.length !== 1 || payments.some(p => !["SUCCEEDED", "FAILED", "CANCELLED"].includes(p.status))) return { ready: false, isTest: false, paymentId: null };
+  const successful = payments.filter(p => p.status === "SUCCEEDED" || (p.status === "TEST_SUCCEEDED" && p.environment === "sandbox"));
+  if (successful.length !== 1 || payments.some(p => !["SUCCEEDED", "TEST_SUCCEEDED", "FAILED", "CANCELLED"].includes(p.status) || (p.status === "TEST_SUCCEEDED" && p.environment !== "sandbox"))) return { ready: false, isTest: false, paymentId: null };
   const p = successful[0];
   if (Number(p.amount) !== amount || p.currency !== "ZAR" || p.provider !== "NETCASH" || p.method !== "PAY_NOW" || !p.processedAt || receipts.some(r => r.type === "REFUND" || r.type === "REVERSAL")) return { ready: false, isTest: false, paymentId: null };
   const test = isTestPayment(p);
