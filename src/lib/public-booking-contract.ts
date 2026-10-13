@@ -18,6 +18,7 @@ export const publicReservationSchema = z.object({
   email: z.email().transform((value) => value.trim().toLowerCase()),
   phone: z.string().trim().min(7).max(30),
   intendedMoveIn: z.coerce.date().optional(),
+  expectedRentalDuration: z.enum(["ONE_MONTH", "TWO_TO_THREE_MONTHS", "FOUR_TO_SIX_MONTHS", "LONGER", "UNSURE"]).optional(),
   journey: z.enum(["RENTAL", "VIEWING"]).default("RENTAL"),
   viewingAt: z.coerce.date().optional(),
   privacyNoticeVersion: z.string().trim().max(80).optional(),

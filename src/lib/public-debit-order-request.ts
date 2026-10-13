@@ -6,7 +6,7 @@ import { mandatePolicy } from "./payments/netcash-mandate-policy";
 
 export async function requestPublicDebitOrderSetup(signingToken: string, input: unknown) {
   const lease = await findMandateLease(signingToken).catch(() => null);
-  if (!lease || lease.status !== "SIGNED" || lease.paymentMethod !== "DEBIT_ORDER") {
+  if (!lease || lease.status !== "SIGNED") {
     return { ok: false as const, code: "DEBIT_ORDER_REQUEST_UNAVAILABLE" };
   }
   if (lease.mandate) return { ok: false as const, code: "MANDATE_ALREADY_STARTED" };
@@ -28,7 +28,7 @@ export async function requestPublicDebitOrderSetup(signingToken: string, input: 
     ? await tx.debitMandateSession.updateMany({ where: { id: lease.id, mandate: { is: null } }, data: { preferences, requestedAt } })
     : await tx.publicReservationLease.updateMany({ where: { id: lease.id, mandate: { is: null } }, data: { debitOrderPreferences: preferences, debitOrderRequestedAt: requestedAt } });
   if (!claimed.count) return { ok: false as const, code: "MANDATE_ALREADY_STARTED" };
-  const description = `Customer selected debit order and signed for Unit ${lease.reservation.unit.number}. Requested first collection: ${preferences.firstCollectionDate}; monthly day: ${preferences.collectionDay}. These are preferences, NOT a signed bank mandate or an approved collection schedule. Complete approved secure mandate before collection, activation or access. Never request bank details by ordinary email.`;
+  const description = `${lease.paymentMethod === "DEBIT_ORDER" ? "Customer selected debit order" : "Customer opted for future monthly debit orders after upfront confirmation"} and signed for Unit ${lease.reservation.unit.number}. Requested first collection: ${preferences.firstCollectionDate}; monthly day: ${preferences.collectionDay}. These are preferences, NOT a signed bank mandate or an approved collection schedule. Complete approved secure mandate before collection, activation or access. Never request bank details by ordinary email.`;
   const task = await tx.task.upsert({
     where: { id: taskId },
     create: {

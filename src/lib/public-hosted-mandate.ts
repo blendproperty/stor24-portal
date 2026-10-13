@@ -1,3 +1,5 @@
+import { paidUpfrontEvidence } from "./public-recurring-payments";
+import { sendMonthlyMandateInvitation } from "./monthly-mandate-invitation";
 import { createHash, randomBytes } from "node:crypto";
 import { guardDlpTransfer } from "@/lib/dlp-transfer-service";
 import { PDFDocument } from "pdf-lib";
@@ -12,8 +14,8 @@ import { parseDebitOrderPreferences } from "@/lib/debit-order-preferences";
 import { findMandateLease } from "@/lib/debit-mandate-session";
 import { debitOrderSchedule } from "./debit-order-schedule";
 
-function view(m: { status: string; reference: string; hostedUrl: string | null; verifiedAt: Date | null; failureCode: string | null; signedPdfSha256?: string | null; reportToken?: string | null }) {
-  return { status: m.status, reference: m.reference, hostedUrl: m.status === "AWAITING_SIGNATURE" ? m.hostedUrl : null, verifiedAt: m.verifiedAt?.toISOString() ?? null, failureCode: m.failureCode, pdfAvailable: !!m.signedPdfSha256, checkAvailable: canRecheckMandate(m), verificationPending: Boolean(m.reportToken) && canRecheckMandate(m), collectionEnabled: false };
+function view(m: { status: string; reference: string; hostedUrl: string | null; verifiedAt: Date | null; failureCode: string | null; signedPdfSha256?: string | null; reportToken?: string | null; invitationSentAt?: Date | null; invitationFailed?: boolean }) {
+  return { invitationStatus: m.invitationFailed ? "FAILED" : m.invitationSentAt ? "EMAIL_ACCEPTED" : "NOT_SENT", status: m.status, reference: m.reference, hostedUrl: m.status === "AWAITING_SIGNATURE" ? m.hostedUrl : null, verifiedAt: m.verifiedAt?.toISOString() ?? null, failureCode: m.failureCode, pdfAvailable: !!m.signedPdfSha256, checkAvailable: canRecheckMandate(m), verificationPending: Boolean(m.reportToken) && canRecheckMandate(m), collectionEnabled: false };
 }
 async function findLease(token: string) {
   return findMandateLease(token);
@@ -46,12 +48,21 @@ export async function hostedMandateStatus(token: string) {
 }
 export async function startHostedMandate(token: string) {
   const lease = await findLease(token);
+  if (lease.paymentMethod !== "DEBIT_ORDER") {
+    const upfront = await paidUpfrontEvidence(lease.reservation);
+    if (!upfront.ready) throw new Error("UPFRONT_PAYMENT_REQUIRED");
+    if (!upfront.isTest) throw new Error("MANDATE_LIVE_SETUP_NOT_APPROVED");
+  }
   if (lease.expiresAt <= new Date() || lease.reservation.status !== "ACTIVE") throw new Error("MANDATE_BOOKING_UNAVAILABLE");
   const policy = mandatePolicy();
   if (!policy || policy.organisationId !== lease.reservation.customer.organisationId) throw new Error("MANDATE_CONFIGURATION_REQUIRED");
-  if (lease.mandate) return safeView(lease, lease.mandate); // One provider request per signed lease, even after ambiguous timeout.
+  if (lease.mandate) {
+    if (lease.paymentMethod !== "DEBIT_ORDER") await sendMonthlyMandateInvitation(token);
+    const saved = await findLease(token);
+    return safeView(saved, saved.mandate!);
+  } // One provider request per signed lease, even after ambiguous timeout.
   if (!lease.sourceSessionId) {
-    const same = await preparePublicReservationLease(lease.reservation.publicReference!, "DEBIT_ORDER");
+    const same = await preparePublicReservationLease(lease.reservation.publicReference!, lease.paymentMethod as "CARD" | "EFT" | "DEBIT_ORDER");
     if (!same.ok || same.status !== "SIGNED") throw new Error("MANDATE_AGREEMENT_CHANGED");
   }
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Johannesburg", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
@@ -71,6 +82,11 @@ export async function startHostedMandate(token: string) {
   validateMandateTerms(terms);
   // Unique leaseId is the concurrency guard. A losing caller must NOT call provider.
   const m = await db.$transaction(async tx => {
+    if (!lease.sourceSessionId && lease.paymentMethod !== "DEBIT_ORDER") {
+      await tx.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id" = ${lease.reservation.id} FOR UPDATE`;
+      const current = await tx.reservation.findUnique({ where: { id: lease.reservation.id }, select: { rentalPlan: true, status: true } });
+      if (current?.status !== "ACTIVE" || (current.rentalPlan as { futurePaymentMethod?: unknown } | null)?.futurePaymentMethod !== "DEBIT_ORDER") throw new Error("MANDATE_DETAILS_CHANGED");
+    }
     const claim = lease.sourceSessionId
       ? await tx.debitMandateSession.updateMany({ where: { id: lease.id, mandate: { is: null }, preferences: { equals: lease.debitOrderPreferences! } }, data: { requestedAt: lease.debitOrderRequestedAt ?? new Date() } })
       : await tx.publicReservationLease.updateMany({ where: { id: lease.id, mandate: { is: null }, debitOrderPreferences: { equals: lease.debitOrderPreferences! } }, data: { debitOrderRequestedAt: lease.debitOrderRequestedAt ?? new Date() } });
@@ -79,14 +95,17 @@ export async function startHostedMandate(token: string) {
     await tx.auditEvent.create({ data: { organisationId: customer.organisationId, facilityId: lease.reservation.facilityId, action: "public_mandate.creation_started", entityType: "PublicDebitMandate", entityId: created.id, after: { reference: terms.reference, amount: terms.amount, approvedBy: policy.approvedBy, collectionEnabled: false } } });
     return created;
   });
+  let hostedUrl: string;
   try {
-    const hostedUrl = await addHostedMandate(connection.config.debitOrderServiceKey, terms);
-    return view(await db.publicDebitMandate.update({ where: { id: m.id }, data: { status: "AWAITING_SIGNATURE", hostedUrl } }));
+    hostedUrl = await addHostedMandate(connection.config.debitOrderServiceKey, terms);
   } catch (error) {
     const code = error instanceof Error && /^MANDATE_[A-Z0-9_]+$/.test(error.message) ? error.message : "MANDATE_PROVIDER_OUTCOME_UNKNOWN";
     await db.publicDebitMandate.update({ where: { id: m.id }, data: { status: "REVIEW_REQUIRED", failureCode: code } });
     throw new Error(code); // Never blindly reissue a potentially created mandate.
   }
+  await db.publicDebitMandate.update({ where: { id: m.id }, data: { status: "AWAITING_SIGNATURE", hostedUrl } });
+  if (lease.paymentMethod !== "DEBIT_ORDER") await sendMonthlyMandateInvitation(token);
+  return view(await db.publicDebitMandate.findUniqueOrThrow({ where: { id: m.id } }));
 }
 export async function refreshHostedMandate(token: string) {
   const lease = await findLease(token);
@@ -137,7 +156,7 @@ export async function refreshHostedMandate(token: string) {
     if (status === "SIGNED" && legacyProvenance) await tx.auditEvent.create({ data: { organisationId: lease.reservation.customer.organisationId, facilityId: lease.reservation.facilityId, action: "public_mandate.provenance_verified", entityType: "PublicDebitMandate", entityId: m.id, after: { environment: connection.config.environment, connectionId: connection.id, evidence: "matched signed provider report", collectionEnabled: false } } });
     if (status !== m.status) {
       await tx.auditEvent.create({ data: { organisationId: lease.reservation.customer.organisationId, facilityId: lease.reservation.facilityId, action: "public_mandate.provider_status_verified", entityType: "PublicDebitMandate", entityId: m.id, after: { status, reference: m.reference, collectionEnabled: false } } });
-      await tx.task.updateMany({ where: { id: `public-debit-order-${lease.id}`, customerId: lease.reservation.customerId }, data: { title: status === "SIGNED" ? `Confirm first payment and move-in ${lease.reservation.publicReference}` : `Review mandate ${lease.reservation.publicReference}`, description: `Netcash mandate ${m.reference}: ${status}, independently checked with the provider. No collection has been submitted. Confirm the initial payment, any deposit/package charges and move-in readiness separately. Do not request bank details by email.`, priority: "HIGH" } });
+      await tx.task.updateMany({ where: { id: `public-debit-order-${lease.id}`, customerId: lease.reservation.customerId }, data: { title: status === "SIGNED" ? `${lease.paymentMethod === "DEBIT_ORDER" ? "Confirm first payment and move-in" : "Review future monthly collection setup"} ${lease.reservation.publicReference}` : `Review mandate ${lease.reservation.publicReference}`, description: `Netcash mandate ${m.reference}: ${status}, independently checked with the provider. No collection has been submitted. Confirm the initial payment, any deposit/package charges and move-in readiness separately. Do not request bank details by email.`, priority: "HIGH" } });
     }
     return safeView(lease, updated);
   });

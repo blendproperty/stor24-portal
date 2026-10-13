@@ -118,6 +118,7 @@ export async function getPublicNetcashSandboxPayment(reference: string, paymentI
       id: true,
       status: true,
       journey: true,
+      rentalPlan: true,
       publicLease: { select: { status: true, signingToken: true, paymentMethod: true } },
     },
   });
@@ -146,6 +147,7 @@ export async function getPublicNetcashSandboxPayment(reference: string, paymentI
     failureCode: payment.failureCode,
     processedAt: payment.processedAt?.toISOString() ?? null,
     reservationStatus: reservation.status,
+    rentalPlan: reservation.rentalPlan,
     leaseToken: reservation.publicLease?.status === "SIGNED" ? reservation.publicLease.signingToken : null,
     paymentMethod: reservation.publicLease?.status === "SIGNED" ? reservation.publicLease.paymentMethod : null,
   };
