@@ -77,6 +77,7 @@ jobs:
       - run: node scripts/test-settlements.mjs
       - run: node scripts/test-mri.mjs
       - run: node scripts/test-mri-mapping.mjs
+      - run: node scripts/test-mri-sandbox.mjs
       - run: node scripts/test-facial-photos.mjs
       - run: node scripts/test-identity.mjs
       - run: node scripts/test-move-in-flow.mjs
@@ -114,6 +115,7 @@ jobs:
             output/daily-close-history/
             output/report-export-recovery/
             output/mri-mapping/
+            output/mri-sandbox/
             output/accounts-read-recovery/
             output/customer-read-recovery/
             output/customer-save-recovery/

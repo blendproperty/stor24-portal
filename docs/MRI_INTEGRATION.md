@@ -2,6 +2,16 @@
 
 ## Current boundary
 
+### Built-in sandbox testing — 13 October 2026
+
+`/billing/mri/sandbox`, linked from MRI accounting, prepares a separate `MRI_SANDBOX` connection from the existing encrypted API account and its exact discovered **BlendTest** target. Primary **Blend** settings are not replaced. Credentials/identifier are re-encrypted separately; no secret or target identifier is returned to the browser. Sandbox controls accept only prepare/check actions, not arbitrary target URLs, database identifiers, environment changes or financial submissions. Organisation-wide `mri.view`/`mri.manage`, same-origin checks, small request bounds, revision checks, rate limits and atomic audit protect the flow.
+
+Run sandbox check uses the actual MRI adapter: OAuth sign-in, current database discovery and a bounded property read. Discovery must match one exact BlendTest identifier before reading properties. A shared primary target, changed settings during a check, missing/ambiguous/changed provider discovery or failed network/authentication cannot inherit successful check evidence. Failure clears current authentication/read proof; primary configuration changes to the test target suppress old sandbox-isolation proof.
+
+**Actual provider verification:** with Brett's confirmation to use the stored test account, a controlled server-side read-only check at **2026-10-13T07:47:47.945Z** authenticated and read **BlendTest**, confirmed its identifier differs from saved Blend, and returned **zero accessible properties**. No credentials, token, identifier or property data were printed, no settings changed, and no MRI financial transaction was submitted. This verifies the provider connection, not deployment of the new app route or journal acceptance.
+
+**Current blocker:** create/assign the dedicated test property and entity and obtain finance test GL/tax/basis decisions. The older journal import/readback contract, balanced batches, duplicate/reversal controls and authorised reconciliation still need implementation and acceptance. The sandbox screen makes this boundary visible. Shared mapping proposals are not sandbox journal approval. A local fixture/simulator is not substituted for MRI.
+
 `/billing/mri` provides encrypted connection settings, documented v2 OAuth authentication, optional database discovery, a bounded read-only property query and monthly STOR24 ledger review. **Journal posting is not implemented or enabled.** Saving credentials, successful authentication or a source review cannot authorise posting. Provider authentication/database read must be tested live separately from the isolated adapter tests.
 
 The approved direction from the August correspondence is consolidated journals to a dedicated Property Central property/entity. STOR24 retains tenant, unit, payment and arrears detail. A per-payment outbox record is not a consolidated journal and must never be replayed as one.

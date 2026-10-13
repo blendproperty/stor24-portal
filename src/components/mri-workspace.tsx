@@ -99,6 +99,7 @@ export function MriWorkspace() {
       <div><p className="mri-eyebrow">Finance / Integrations</p><h1>MRI accounting</h1><p className="mri-subtitle">Your accounting connection and monthly ledger review.</p></div>
       <span className="mri-mode"><LockKeyhole size={14} aria-hidden="true" /> Read-only workspace</span>
     </header>
+    <p><a href="/billing/mri/sandbox" className="mri-button mri-button-secondary">Open MRI sandbox testing</a></p>
     {error && <p role="alert" className="mri-message mri-message-error">{error}</p>}
     {notice && <p role="status" className="mri-message">{notice}</p>}
     {!config && !error && <div className="mri-loading" role="status">Loading your MRI connection…</div>}

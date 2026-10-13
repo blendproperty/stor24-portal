@@ -1,5 +1,6 @@
 import { Prisma } from "@/generated/prisma/client";
 import { randomUUID } from "node:crypto";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import type { RequestScope } from "@/lib/scope";
 import { decryptIntegrationSecret, encryptIntegrationSecret, integrationEncryptionConfigured } from "@/lib/integrations/integration-secret-vault";
@@ -8,10 +9,12 @@ import { isTestPayment } from "@/lib/payments/payment-evidence";
 import { mriMonthRange, mriSettingsSchema, summariseMriSource } from "@/lib/mri-policy";
 
 type Stored = { version?: number; databaseLabel?: string; environment?: string; loginEncrypted?: string; passwordEncrypted?: string; databaseIdentifierEncrypted?: string; authenticated?: boolean; databaseReadable?: boolean; discoveryAvailable?: boolean; databases?: Array<{ key: string; label: string; identifierEncrypted: string }>; propertyCount?: number | null };
-const where = (organisationId: string) => ({ organisationId, facilityId: null, category: "ACCOUNTING", provider: "MRI" });
+type Lane = "primary" | "sandbox";
+export const MRI_SANDBOX_DATABASE = "BlendTest";
+const where = (organisationId: string, lane: Lane = "primary") => ({ organisationId, facilityId: null, category: "ACCOUNTING", provider: lane === "sandbox" ? "MRI_SANDBOX" : "MRI" });
 function orgScope(scope: RequestScope) { if (!scope.unrestrictedFacilities) throw new Error("MRI_ORG_PERMISSION"); }
-async function connection(tx: Prisma.TransactionClient, organisationId: string) {
-  const rows = await tx.integrationConnection.findMany({ where: where(organisationId), take: 2 });
+async function connection(tx: Prisma.TransactionClient, organisationId: string, lane: Lane = "primary") {
+  const rows = await tx.integrationConnection.findMany({ where: where(organisationId, lane), take: 2 });
   if (rows.length > 1) throw new Error("MRI_DUPLICATE_CONFIG");
   return rows[0] ?? null;
 }
@@ -22,9 +25,9 @@ function stored(config: unknown): Stored {
   return value;
 }
 
-export async function mriConfiguration(scope: RequestScope) {
+export async function mriConfiguration(scope: RequestScope, lane: Lane = "primary") {
   orgScope(scope);
-  const row = await connection(db, scope.organisationId), config = row ? stored(row.config) : {};
+  const row = await connection(db, scope.organisationId, lane), config = row ? stored(row.config) : {};
   return {
     revision: row?.updatedAt.toISOString() ?? null,
     databaseLabel: config.databaseLabel ?? "",
@@ -76,22 +79,31 @@ export async function saveMriConfiguration(scope: RequestScope, input: unknown) 
   return mriConfiguration(scope);
 }
 
-export async function checkMriConnection(scope: RequestScope, revision: string, fetcher: typeof fetch = fetch) {
+export async function checkMriConnection(scope: RequestScope, revision: string, fetcher: typeof fetch = fetch, lane: Lane = "primary") {
   orgScope(scope);
-  const initial = await connection(db, scope.organisationId);
+  const initial = await connection(db, scope.organisationId, lane);
   if (!initial || initial.updatedAt.toISOString() !== revision) throw new Error("MRI_CHANGED");
   const config = stored(initial.config);
   if (!config.loginEncrypted || !config.passwordEncrypted) throw new Error("MRI_CREDENTIALS");
+  const primary = lane === "sandbox" ? await connection(db, scope.organisationId) : null;
+  if (lane === "sandbox") {
+    if (config.environment !== "test" || config.databaseLabel !== MRI_SANDBOX_DATABASE || !config.databaseIdentifierEncrypted) throw new Error("MRI_SANDBOX_TARGET");
+    if (primary && stored(primary.config).databaseIdentifierEncrypted && decryptIntegrationSecret(stored(primary.config).databaseIdentifierEncrypted!) === decryptIntegrationSecret(config.databaseIdentifierEncrypted)) throw new Error("MRI_SANDBOX_SHARED_TARGET");
+  }
   let result: Awaited<ReturnType<typeof verifyMriAccess>> | null = null, code: string | null = null;
   try {
-    result = await verifyMriAccess({ login: decryptIntegrationSecret(config.loginEncrypted), password: decryptIntegrationSecret(config.passwordEncrypted), databaseIdentifier: config.databaseIdentifierEncrypted ? decryptIntegrationSecret(config.databaseIdentifierEncrypted) : undefined }, fetcher);
+    result = await verifyMriAccess({ login: decryptIntegrationSecret(config.loginEncrypted), password: decryptIntegrationSecret(config.passwordEncrypted), databaseIdentifier: config.databaseIdentifierEncrypted ? decryptIntegrationSecret(config.databaseIdentifierEncrypted) : undefined, ...(lane === "sandbox" ? { expectedDatabaseLabel: MRI_SANDBOX_DATABASE } : {}) }, fetcher);
   } catch (e) {
     const message = e instanceof Error ? e.message : "";
-    code = ["MRI_AUTH_REJECTED", "MRI_NETWORK", "MRI_RESPONSE_INVALID", "MRI_PROVIDER_UNAVAILABLE"].includes(message) ? message : "MRI_CREDENTIALS_UNREADABLE";
+    code = ["MRI_AUTH_REJECTED", "MRI_NETWORK", "MRI_RESPONSE_INVALID", "MRI_PROVIDER_UNAVAILABLE", "MRI_SANDBOX_TARGET"].includes(message) ? message : "MRI_CREDENTIALS_UNREADABLE";
   }
   await db.$transaction(async tx => {
-    const current = await connection(tx, scope.organisationId);
+    const current = await connection(tx, scope.organisationId, lane);
     if (!current || current.updatedAt.toISOString() !== revision) throw new Error("MRI_CHANGED");
+    if (lane === "sandbox") {
+      const currentPrimary = await connection(tx, scope.organisationId);
+      if ((currentPrimary?.updatedAt.toISOString() ?? null) !== (primary?.updatedAt.toISOString() ?? null)) throw new Error("MRI_CHANGED");
+    }
     const checkedAt = new Date(), updatedAt = new Date(Math.max(checkedAt.getTime(), current.updatedAt.getTime() + 1));
     const checked = { ...config, authenticated: result?.authenticated ?? false, databaseReadable: result?.databaseReadable ?? false, discoveryAvailable: result?.discoveryAvailable ?? false, propertyCount: result?.propertyCount ?? null,
       databases: (result?.databases ?? []).map(d => ({ key: randomUUID(), label: d.DatabaseName, identifierEncrypted: encryptIntegrationSecret(d.DatabaseIdentifier) })),
@@ -103,10 +115,46 @@ export async function checkMriConnection(scope: RequestScope, revision: string, 
       failureCode: code ?? (result?.databaseReadable ? "MRI_JOURNAL_NOT_ENABLED" : "MRI_DATABASE_REQUIRED"), failureMessage: null,
     } });
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "integration.mri.connection.checked", entityType: "IntegrationConnection", entityId: current.id,
-      after: { authenticated: checked.authenticated, databaseReadable: checked.databaseReadable, failureCode: code, postingEnabled: false },
+      after: { authenticated: checked.authenticated, databaseReadable: checked.databaseReadable, failureCode: code, sandbox: lane === "sandbox", postingEnabled: false },
     } });
   }, { isolationLevel: "Serializable" });
-  return mriConfiguration(scope);
+  return mriConfiguration(scope, lane);
+}
+
+export async function mriSandboxWorkspace(scope: RequestScope) {
+  orgScope(scope);
+  const [primary, sandbox, configuration] = await Promise.all([connection(db, scope.organisationId), connection(db, scope.organisationId, "sandbox"), mriConfiguration(scope, "sandbox")]);
+  const config = primary ? stored(primary.config) : null;
+  const target = sandbox ? stored(sandbox.config) : null;
+  const shared = Boolean(config?.databaseIdentifierEncrypted && target?.databaseIdentifierEncrypted && decryptIntegrationSecret(config.databaseIdentifierEncrypted) === decryptIntegrationSecret(target.databaseIdentifierEncrypted));
+  // Old check evidence cannot advertise safe isolation after primary settings
+  // have been changed to the sandbox target.
+  if (shared) { configuration.authenticated = false; configuration.databaseReadable = false; configuration.failureCode = "MRI_SANDBOX_SHARED_TARGET"; }
+  return { configuration, sourceRevision: primary?.updatedAt.toISOString() ?? null,
+    storedTestAvailable: Boolean(config?.loginEncrypted && config.passwordEncrypted && config.databases?.filter(d => d.label === MRI_SANDBOX_DATABASE).length === 1),
+    target: MRI_SANDBOX_DATABASE, postingEnabled: false };
+}
+
+/** Separate encrypted sandbox configuration: primary target remains unchanged. */
+export async function prepareStoredMriSandbox(scope: RequestScope, input: unknown) {
+  orgScope(scope);
+  const command = z.object({ sourceRevision: z.string().datetime(), revision: z.string().datetime().nullable() }).strict().parse(input);
+  if (!integrationEncryptionConfigured()) throw new Error("MRI_ENCRYPTION");
+  await db.$transaction(async tx => {
+    const primary = await connection(tx, scope.organisationId), old = await connection(tx, scope.organisationId, "sandbox");
+    if (old) stored(old.config);
+    if (!primary || primary.updatedAt.toISOString() !== command.sourceRevision || (old?.updatedAt.toISOString() ?? null) !== command.revision) throw new Error("MRI_CHANGED");
+    const source = stored(primary.config), matches = source.databases?.filter(d => d.label === MRI_SANDBOX_DATABASE) ?? [];
+    if (!source.loginEncrypted || !source.passwordEncrypted || matches.length !== 1) throw new Error("MRI_SANDBOX_UNAVAILABLE");
+    const identifier = decryptIntegrationSecret(matches[0].identifierEncrypted);
+    if (source.databaseIdentifierEncrypted && identifier === decryptIntegrationSecret(source.databaseIdentifierEncrypted)) throw new Error("MRI_SANDBOX_SHARED_TARGET");
+    // Re-encrypt rather than sharing the source secret envelope or opaque keys.
+    const config = { version: 1, environment: "test", databaseLabel: MRI_SANDBOX_DATABASE, loginEncrypted: encryptIntegrationSecret(decryptIntegrationSecret(source.loginEncrypted)), passwordEncrypted: encryptIntegrationSecret(decryptIntegrationSecret(source.passwordEncrypted)), databaseIdentifierEncrypted: encryptIntegrationSecret(identifier), authenticated: false, databaseReadable: false };
+    const data = { config, status: "CONFIGURED" as const, lastSuccessAt: null, lastHealthAt: null, failureCode: "MRI_CHECK_REQUIRED", failureMessage: null };
+    const saved = old ? await tx.integrationConnection.update({ where: { id: old.id }, data: { ...data, updatedAt: new Date(Math.max(Date.now(), old.updatedAt.getTime() + 1)) } }) : await tx.integrationConnection.create({ data: { ...where(scope.organisationId, "sandbox"), id: `mri-sandbox:${scope.organisationId}`, ...data } });
+    await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "integration.mri.sandbox.prepared", entityType: "IntegrationConnection", entityId: saved.id, after: { target: MRI_SANDBOX_DATABASE, environment: "test", credentialsStored: true, authenticated: false, postingEnabled: false } } });
+  }, { isolationLevel: "Serializable" });
+  return mriSandboxWorkspace(scope);
 }
 
 /** Read-only inventory for finance review, NOT balanced or approved journals. */
