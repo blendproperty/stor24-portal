@@ -36,6 +36,8 @@ This is a bounded source and installed-artifact assessment, not a production rep
 
 ## Direct SiteLink observations and limits
 
+Additional existing STOR24 counterparts were verified: approved rent reviews/increases (`src/lib/rent-review-service.ts:8-36`), insurance enrol/waive/cancel (`src/lib/insurance-service.ts:48-85`), and refund limits/approval/payout recording (`src/lib/adjustment-service.ts:70-72,138,158`). These are not missing features. Automatic insurance rollover/premium remittance, surcharge and maximum-rent policy equivalence were not established by the targeted source review; confirm the business requirement before adding them to the backlog.
+
 REA inspected installed .NET metadata without loading or executing SiteLink, logging in, contacting its hosted backend, or touching customer/payment/device state.
 
 - `SLNet.Accounting.dll` exposes accounting-export classes including MRIAccounting, QuickBooks, Yardi and Sage families, plus transaction-fill/file-output methods. Evidence `ev_b74046becc354c72e0df6179be6a535aa61177cb8444f5ca71583c769f589657`.
