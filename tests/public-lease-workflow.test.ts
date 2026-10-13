@@ -52,7 +52,9 @@ test("public debit-order setup is idempotent and never submits a collection", as
   const route = await readFile("src/app/api/public/v1/lease-signing/reservation/[token]/debit-order-request/route.ts", "utf8");
   assert.match(route, /publicApiAuthorized/);
   assert.match(service, /lease\.status !== "SIGNED"/);
-  assert.match(service, /lease\.paymentMethod !== "DEBIT_ORDER"/);
+  // Eligibility now includes confirmed upfront CARD/EFT with a separate opt-in.
+  // Behavioural payment/consent tests live in public-recurring-payments.test.ts.
+  assert.match(service, /await findMandateLease\(signingToken\)/);
   assert.match(service, /task\.upsert/);
   assert.match(service, /public_lease\.debit_order_setup_requested/);
   assert.doesNotMatch(service, /submitStandardDebitOrder|submitDebiCheckMandate|ledgerEntry|occupancy\.update|tenancy\.update/);
