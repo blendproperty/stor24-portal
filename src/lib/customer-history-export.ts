@@ -8,7 +8,7 @@ import { customerHistoryPdf, type HistoryExportRow } from "@/lib/customer-histor
 import { toCsv } from "@/lib/reporting";
 import { guardReportExport } from "@/lib/dlp-export-service";
 import { guardDlpTransfer } from "@/lib/dlp-transfer-service";
-import { readHistoryMessage } from "@/lib/customer-history-message";
+import { needsProviderMessage, readHistoryMessage } from "@/lib/customer-history-message";
 
 export function intersectHistoryScope(read: RequestScope, exported: RequestScope) {
   if(read.userId!==exported.userId||read.organisationId!==exported.organisationId)throw new Error("FORBIDDEN");
@@ -40,9 +40,9 @@ export async function releaseCustomerHistoryExport(input:{scope:RequestScope;cus
   const {customer,rows,visibility}=await buildCustomerHistoryExport(input.scope,input.customerId,input.query,input.access,input.selection);
   const messages=rows.filter(row=>row.kind==="COMMUNICATION");
   const proofs=messages.length?await db.communicationLog.findMany({where:{organisationId:input.scope.organisationId,customerId:input.customerId,id:{in:messages.map(row=>String(row.recordId))}},select:{id:true,provider:true,providerRef:true,recipientHash:true,channel:true,direction:true,messageType:true,metadata:true}}):[];
-  if(proofs.filter(p=>p.provider==="twilio"&&p.providerRef&&/^SM[a-f0-9]{32}$/i.test(p.providerRef)).length>50)throw new Error("HISTORY_EXPORT_LIMIT");
-  for(let i=0;i<proofs.length;i+=4){
-    await Promise.all(proofs.slice(i,i+4).map(async proof=>{const value=await readHistoryMessage(proof,customer.phone);const row=rows.find(row=>row.recordId===proof.id);if(row){row.body=value.body;row.subject="subject" in value?(value.subject??""):"";row.evidenceLimit=value.source;}}));
+  if(proofs.filter(needsProviderMessage).length>50)throw new Error("HISTORY_EXPORT_LIMIT");
+  for(let i=0;i<proofs.length;i+=8){
+    await Promise.all(proofs.slice(i,i+8).map(async proof=>{const value=await readHistoryMessage(proof,customer.phone);const row=rows.find(row=>row.recordId===proof.id);if(row){row.body=value.body;row.subject="subject" in value?(value.subject??""):"";row.evidenceLimit=value.source;}}));
   }
   const decision=await guardReportExport({organisationId:input.scope.organisationId,actorId:input.scope.userId,reportKey:"customer-contact-history",rows,personalDataAllowed:true,personalColumnKeys:["customerName","customerId","body","author"],format:input.format});
   if(!decision.allowed)throw new Error("HISTORY_EXPORT_BLOCKED");
