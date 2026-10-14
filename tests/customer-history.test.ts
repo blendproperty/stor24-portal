@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { build } from "esbuild";
 import { createRequire } from "node:module";
+import { randomUUID } from "node:crypto";
 import { customerNoteSchema, historyQuerySchema, decodeHistoryCursor, encodeHistoryCursor } from "../src/lib/customer-history-policy";
 
 test("customer notes validate category, body, immutable server fields and bounded filters", () => {
-  const input = { facilityId: "store", requestKey: "123e4567-e89b-42d3-a456-426614174000", category: "CALL", body: " A real call note " };
+  const input = { facilityId: "store", requestKey: randomUUID(), category: "CALL", body: " A real call note " };
   assert.equal(customerNoteSchema.parse(input).body, "A real call note");
   for (const bad of [{ ...input, body: " " }, { ...input, body: "x".repeat(5001) }, { ...input, category: "APPROVE_REFUND" }, { ...input, authorId: "spoof" }, { ...input, createdAt: "2026-01-01" }]) assert.equal(customerNoteSchema.safeParse(bad).success, false);
   assert.equal(historyQuerySchema.safeParse({ search: "x".repeat(201) }).success, false);
@@ -30,7 +31,7 @@ test("history HTTP endpoints preserve source permission gates, reject CSRF, and 
   const response = await loaded.exports.GET(new Request(url), context);
   assert.equal(response.status, 200); assert.equal(response.headers.get("cache-control"), "private, no-store");
   assert.deepEqual(seen, { communications: null, collections: null, write: null });
-  const input = { facilityId: "store", requestKey: "123e4567-e89b-42d3-a456-426614174000", category: "CALL", body: "Called customer" };
+  const input = { facilityId: "store", requestKey: randomUUID(), category: "CALL", body: "Called customer" };
   const request = (body = input, origin = "https://example.invalid") => new Request(url, { method: "POST", headers: { origin, "Content-Type": "application/json" }, body: JSON.stringify(body) });
   assert.equal((await loaded.exports.POST(request(), context)).status, 403);
   write = true;
