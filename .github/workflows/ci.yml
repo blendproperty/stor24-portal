@@ -35,6 +35,7 @@ jobs:
       - run: node scripts/test-accounts-read-recovery.mjs
       - run: node scripts/test-customer-read-recovery.mjs
       - run: node scripts/test-customer-save-recovery.mjs
+      - run: node scripts/test-customer-history.mjs
       - run: node scripts/test-company-setup-recovery.mjs
       - run: node scripts/test-password-form-recovery.mjs
       - run: node scripts/test-mfa-settings-recovery.mjs
@@ -132,6 +133,7 @@ jobs:
             output/accounts-read-recovery/
             output/customer-read-recovery/
             output/customer-save-recovery/
+            output/customer-history/
             output/operations-access-recovery/
             output/task-create-recovery/
             output/maintenance-status-recovery/
