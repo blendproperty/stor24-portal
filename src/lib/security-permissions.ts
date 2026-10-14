@@ -1,6 +1,6 @@
 export const securityPermissionGroups = [
   { label: "Customers and leasing", permissions: [
-    ["leads.*", "Manage leads"], ["reservations.*", "Manage reservations"], ["move_in.create", "Process move-ins"], ["operations.view", "View tenant operations"],
+    ["leads.*", "Manage leads"], ["reservations.*", "Manage reservations"], ["move_in.create", "Process move-ins"], ["operations.view", "View tenant operations"], ["operations.manage", "Edit customers and operational work"],
   ] },
   { label: "Accounting integration", permissions: [
     ["mri.view", "Review MRI accounting preparation"], ["mri.manage", "Manage encrypted MRI connection settings"],
@@ -12,17 +12,17 @@ export const securityPermissionGroups = [
     ["adjustments.view", "View adjustment requests and records"], ["adjustments.request", "Request or withdraw adjustments"], ["adjustments.approve", "Independently approve adjustments"], ["adjustments.record_refund", "Record externally completed refunds"],
   ] },
   { label: "Billing and debit orders", permissions: [
-    ["billing.view", "View monthly billing and invoices"], ["billing.manage", "Post approved monthly billing"],
+    ["billing.view", "View monthly billing and invoices"], ["billing.manage", "Post approved monthly billing"], ["billing.documents.send", "Send reviewed customer documents and notices"],
     ["debit_orders.view", "View debit-order runs"], ["debit_orders.manage", "Prepare and review debit-order runs"], ["debit_orders.submit", "Submit approved test debit-order runs"],
   ] },
   { label: "Ledgers and collections", permissions: [
-    ["ledger.*", "Manage tenant ledgers"], ["payments.*", "Take and reverse payments"], ["collections.*", "Manage collections"], ["collections.view", "View aged collections"], ["collections.manage", "Record collection follow-ups"], ["collections.policy", "Record approved collection terms"], ["collections.export", "Export aged collections"],
+    ["ledger.view", "View tenant ledgers and statements"], ["ledger.*", "Manage tenant ledgers"], ["payments.view", "Review payment records and provider evidence"], ["payments.manage", "Record receipts and prepare payment requests"], ["payments.*", "Take and reverse payments"], ["collections.*", "Manage collections"], ["collections.view", "View aged collections"], ["collections.manage", "Record collection follow-ups"], ["collections.policy", "Record approved collection terms"], ["collections.export", "Export aged collections"],
   ] },
   { label: "Identity and physical access", permissions: [
     ["identity.review", "Privately review customer identity documents"], ["access.view", "View physical access"], ["access.manage", "Enrol and revoke physical access"], ["access.suspend", "Suspend access"], ["access.restore", "Restore access"],
   ] },
   { label: "Store operations", permissions: [
-    ["facility.*", "Manage store setup"], ["inventory.*", "Manage units and inventory"], ["daily_close.*", "Perform daily close"], ["facility_map.view", "View facility map"], ["phone.view", "Use phone workspace"],
+    ["facility.*", "Manage store setup"], ["inventory.view", "View units and inventory"], ["inventory.*", "Manage units and inventory"], ["daily_close.*", "Perform daily close"], ["facility_map.view", "View facility map"], ["phone.view", "Use phone workspace"],
   ] },
   { label: "Reports and communications", permissions: [
     ["reports.view", "View reports"], ["reports.financial", "View financial reports"], ["reports.sales", "View sales reports"], ["reports.collections", "View collections reports"], ["reports.export", "Export reports"], ["data.personal_export", "Export personal data (Super Admin authorisation)"], ["reports.schedule", "Schedule reports"], ["communications.view", "View communications"],
