@@ -24,16 +24,18 @@ import { db } from "@/lib/db";
 import { enqueueMriExport } from "@/lib/finance/mri-export";
 import { checkPayNowTransactionStatus } from "@/lib/payments/netcash-client";
 import { settleVerifiedMerchandisePayment } from "@/lib/merchandise-order-settlement";
+import { boundedBody } from "@/lib/payments/netcash-mandate";
+import { netcashNotifyProjection } from "@/lib/payments/netcash-notify-policy";
+import { recordCardSubscriptionOutcome, confirmCardSubscriptionSchedule } from "@/lib/payments/card-autopay-enrollment-service";
 
 export async function POST(request: Request) {
-  const rawBody = await request.text();
-  let form: URLSearchParams;
+  let payload: Record<string, string>;
   try {
-    form = new URLSearchParams(rawBody);
+    const rawBody = (await boundedBody(new Response(request.body), 16384)).toString();
+    payload = netcashNotifyProjection(rawBody);
   } catch {
     return NextResponse.json({ error: "invalid_payload" }, { status: 400 });
   }
-  const payload = Object.fromEntries(form.entries());
   if (Object.keys(payload).length === 0) {
     return NextResponse.json({ error: "invalid_payload" }, { status: 400 });
   }
@@ -60,16 +62,17 @@ export async function POST(request: Request) {
   if (!account) {
     return NextResponse.json({ received: true, matched: false }, { status: 202 });
   }
+  const organisationId = payment.providerOrganisationId ?? account.customer.organisationId;
 
   const merchandiseOrder = await db.merchandiseOrder.findUnique({ where: { paymentId: payment.id }, select: { id: true, isTest: true } });
   let inbox = await db.webhookInbox.create({
     data: {
-      organisationId: account.customer.organisationId,
+      organisationId,
       provider: "NETCASH",
       eventType: "PAY_NOW_NOTIFY",
       externalEventId,
       payload: payload as object,
-      headers: Object.fromEntries(request.headers.entries()),
+      headers: { contentType: request.headers.get("content-type")?.split(";")[0] === "application/x-www-form-urlencoded" ? "application/x-www-form-urlencoded" : "unspecified" },
       status: "PENDING",
     },
   }).catch((err) => {
@@ -83,9 +86,9 @@ export async function POST(request: Request) {
   if (!inbox) {
     // Failed merchandise verification/settlement can be retried; order locks and
     // unique ledger references prevent double posting on concurrent deliveries.
-    inbox = await db.webhookInbox.findFirst({ where: { organisationId: account.customer.organisationId, provider: "NETCASH", externalEventId, status: { in: ["PENDING", "FAILED"] } } });
+    inbox = await db.webhookInbox.findFirst({ where: { organisationId, provider: "NETCASH", externalEventId, status: { in: ["PENDING", "FAILED"] } } });
     if (!inbox) {
-      await deliverBookingConfirmation(payment.id).catch(() => undefined);
+      if (!payment.idempotencyKey.startsWith("card-enrollment:")) await deliverBookingConfirmation(payment.id).catch(() => undefined);
       return NextResponse.json({ received: true, matched: true, duplicate: true });
     }
   }
@@ -110,6 +113,21 @@ export async function POST(request: Request) {
       }).catch(() => undefined);
     }
     return NextResponse.json({ received: true, matched: true, verified: false }, { status: 503 });
+  }
+
+  if (payment.idempotencyKey.startsWith("card-enrollment:")) {
+    try {
+      if (verified.requestTrace !== requestTrace) throw Error("CARD_AUTOPAY_PROVIDER_MISMATCH");
+      const result = await recordCardSubscriptionOutcome(organisationId, providerRef!, verified);
+      if (!result) throw Error("CARD_AUTOPAY_SOURCE_REVIEW");
+      if (result.reviewRequired) throw Error("CARD_AUTOPAY_PROVIDER_MISMATCH");
+      if (result.accepted) await confirmCardSubscriptionSchedule(organisationId, providerRef!).catch(() => undefined);
+      await db.webhookInbox.update({ where: { id: inbox.id }, data: { status: result.accepted ? "SUCCEEDED" : "PENDING", processedAt: result.accepted ? new Date() : null } });
+      return NextResponse.json({ received: true, matched: true, verified: true, accepted: result.accepted, isTest: true, allocation: result.allocation });
+    } catch {
+      await db.webhookInbox.update({ where: { id: inbox.id }, data: { status: "FAILED", failureCode: "CARD_SUBSCRIPTION_SOURCE_REVIEW", failureMessage: "The verified card event requires original source or transaction review. No balance, ledger or billing-period allocation changed." } });
+      return NextResponse.json({ received: true, matched: true, verified: true, settled: false }, { status: 503 });
+    }
   }
 
   const amountMatches = verified.amount !== undefined && Number(verified.amount) === Number(payment.amount);

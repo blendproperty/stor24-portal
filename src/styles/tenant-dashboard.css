@@ -1,4 +1,12 @@
 /* Customer account workspace. Keep entry and signing pages independent. */
+.is-signed-in .tenant-card-subscriptions{background:#fff;border:1px solid #dce5df;border-radius:14px;padding:24px;margin-bottom:22px;min-width:0;overflow-wrap:anywhere}
+.is-signed-in .tenant-card-subscriptions>div,.is-signed-in .tenant-card-subscriptions>article{margin:16px 0;padding:16px;border:1px solid #dce5df;border-radius:10px;background:#f7f9f6}
+.is-signed-in .tenant-card-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.is-signed-in .tenant-card-subscriptions label{display:block;margin:10px 0;max-width:100%}
+.is-signed-in .tenant-card-subscriptions input:not([type=checkbox]),.is-signed-in .tenant-card-subscriptions select{width:100%;min-width:0;min-height:44px;border:1px solid #ccdacf;border-radius:8px;padding:10px;background:white}
+.is-signed-in .tenant-card-subscriptions button{margin:6px 8px 6px 0;max-width:100%;white-space:normal;background:#184c36;color:white;border:0}
+.is-signed-in .tenant-card-subscriptions button:disabled{opacity:.5}
+@media(max-width:480px){.is-signed-in .tenant-card-subscriptions{padding:16px}.is-signed-in .tenant-card-fields{grid-template-columns:1fr}}
 .tenant-portal.is-signed-in{background:#f3f5f2;font-family:"Satoshi Handover",Arial,sans-serif;font-weight:400;font-size:14px;line-height:1.55}
 .is-signed-in,.is-signed-in *{box-sizing:border-box}
 .is-signed-in .tenant-header{padding:18px max(24px,calc((100vw - 1200px)/2));background:#fff;border-bottom:1px solid #dde5df;gap:22px}

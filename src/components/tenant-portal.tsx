@@ -8,6 +8,7 @@ import type { AccountStatementData } from "@/lib/finance/statement-data";
 import { preferredTenantAccount, tenantAccountLabel } from "@/lib/tenant-account-presentation";
 import { TenantFacePhoto } from "@/components/tenant-face-photo";
 import { TenantPurchases } from "@/components/tenant-purchases";
+import { TenantCardSubscriptions } from "@/components/tenant-card-subscriptions";
 import { tenantLoginHint } from "@/lib/tenant-login-hint";
 import { packageItems } from "@/lib/tenant-merchandise";
 import { tenantIdentityMessage, type TenantIdentity } from "@/lib/tenant-identity-presentation";
@@ -173,6 +174,7 @@ export function TenantPortal({ organisation, initialAccount, initialFrom, initia
             {selectedUnit.reservations.map(reservation => <TenantFacePhoto key={reservation.id} reservationId={reservation.id} />)}
           </div></details>}
         </section>}
+{selectedAccount?.tenancy && <TenantCardSubscriptions key={selectedAccount.id} accountId={selectedAccount.id} />}
 <div id="tenant-supplies">        {selectedUnit && <TenantPurchases unitKey={selectedUnit.key} unitId={selectedUnit.unitId} unitNumber={selectedUnit.number} accountId={selectedUnit.accountId} canShop={selectedUnit.status === "ACTIVE" && !!selectedUnit.accountId} bookingPackages={selectedUnit.reservations} hasTestPayment={hasTestPayment} />}
         {selectedUnit && data.merchandiseRequests.some(item => item.unitId === selectedUnit.unitId && (item.unitKey === selectedUnit.key || selectedUnit.reservations.some(reservation => item.unitKey === `reservation:${reservation.id}`))) && <details className="tenant-card"><summary>Earlier supply requests</summary><h3>Earlier requests — not paid orders</h3>{(data.merchandiseRequests ?? []).filter(item => item.unitId === selectedUnit.unitId && (item.unitKey === selectedUnit.key || selectedUnit.reservations.some(reservation => item.unitKey === `reservation:${reservation.id}`))).map(item => <article key={item.id} className="tenant-request"><strong>{currency(item.total)} · {formatSouthAfricaDate(item.createdAt)}</strong><p>Store follow-up: {item.task.status.replaceAll("_", " ").toLowerCase()}. This is a request, not a payment receipt.</p><ul>{packageItems(item.items).map((product, index) => <li key={index}>{product.quantity} × {product.name}</li>)}</ul><small>Reference {item.id}</small></article>)}</details>}
 </div>

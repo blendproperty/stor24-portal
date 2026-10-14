@@ -1003,6 +1003,10 @@ model Payment {
   provider       String?
   environment    String?
   providerRef    String?
+  providerOriginalRef String?
+  providerRequestTraceHash String? @unique
+  providerFacilityId String?
+  providerOrganisationId String?
   providerMerchantKey String?
   idempotencyKey String        @unique
   failureCode    String?
@@ -1013,6 +1017,7 @@ model Payment {
 
   @@unique([provider, providerRef])
   @@index([accountId, status, createdAt])
+  @@index([providerOrganisationId, providerFacilityId, createdAt])
 }
 
 model SettlementStatement {

@@ -54,7 +54,7 @@ export default async function NetcashPaymentsPage({searchParams}:{searchParams:P
   });
 
   const proofRows=await db.configurationProfile.findMany({where:{organisationId:scope.organisationId,domain:NETCASH_EVIDENCE_DOMAIN,name:{in:payments.map(p=>p.id)}}});
-  const visible=payments.filter(p=>!p.account.accountNumber.startsWith("ST24-T-")||operation.sources.some(r=>`ST24-T-${r.id}`===p.account.accountNumber&&r.customerId===p.account.customerId));
+  const visible=payments.filter(p=>!!p.providerFacilityId||!p.account.accountNumber.startsWith("ST24-T-")||operation.sources.some(r=>`ST24-T-${r.id}`===p.account.accountNumber&&r.customerId===p.account.customerId));
   const rows = visible.map((payment) => ({ payment, evidence:readNetcashEvidence(proofRows.find(r=>r.name===payment.id)?.config,payment), reconciliation: reconcileNetcashPayment(payment, payment.account.ledgerEntries) })).filter(r=>(params.mode!=="test"||r.reconciliation.state==="TEST")&&(params.mode!=="live"||r.reconciliation.state!=="TEST")&&(!params.method||r.evidence?.methodCode===params.method));
   const matched = rows.filter((row) => row.reconciliation.state === "MATCHED").length;
   const exceptions = rows.filter((row) => ["MISSING_LEDGER", "DUPLICATE_LEDGER"].includes(row.reconciliation.state)).length;
@@ -77,13 +77,13 @@ export default async function NetcashPaymentsPage({searchParams}:{searchParams:P
         {rows.map(({ payment, evidence, reconciliation }) => {
           const customer = payment.account.customer;
           const name = customer.companyName || [customer.firstName, customer.lastName].filter(Boolean).join(" ") || "Customer";
-          const unit = payment.account.accountNumber.startsWith("ST24-T-")?undefined:payment.account.tenancy?.occupancies[0]?.unit.number;
+          const unit = (payment.providerFacilityId||payment.account.accountNumber.startsWith("ST24-T-"))?undefined:payment.account.tenancy?.occupancies[0]?.unit.number;
           const Icon = reconciliation.state === "MATCHED" ? CheckCircle2 : reconciliation.state === "PENDING" ? Clock3 : reconciliation.state === "FAILED" ? XCircle : AlertTriangle;
           return <tr key={payment.id}>
             <td>{payment.createdAt.toLocaleString("en-ZA",{timeZone:"Africa/Johannesburg"})}</td>
             <td><strong>{name}</strong><small>{payment.account.accountNumber}{unit ? ` · Unit ${unit}` : ""}</small></td>
             <td><strong>{money(payment.amount)}</strong><small>{payment.method.replaceAll("_", " ")}</small><small>{evidence?`${evidence.method} · verified ${new Date(evidence.checkedAt).toLocaleString("en-ZA",{timeZone:"Africa/Johannesburg"})} SAST`:"Selected method not yet verified"}</small><NetcashEvidenceAction paymentId={payment.id}/></td>
-            <td><code>{payment.providerRef || "Awaiting reference"}</code></td>
+            <td><code>{payment.providerRef || payment.providerOriginalRef || "Awaiting reference"}</code></td>
             <td><span className={`status-pill ${payment.status === "SUCCEEDED" ? "success" : payment.status === "PENDING" ? "warning" : "neutral"}`}>{payment.status.replaceAll("_", " ")}</span>{payment.failureCode ? <small>{payment.failureCode}</small> : null}</td>
             <td><span className={`netcash-reconciliation-state ${stateClass[reconciliation.state]}`}><Icon size={14} />{stateLabel[reconciliation.state]}</span></td>
           </tr>;
