@@ -43,6 +43,7 @@ export const guideAccessRules: Record<string, Rule> = {
   collections: rule("collections.view", ["", "", "collections.manage", "collections.manage"]),
   adjustments: rule("adjustments.view", ["adjustments.request", "adjustments.request", "adjustments.approve", "adjustments.record_refund"]),
   "netcash-operations": rule("payments.view", ["", "", "", "integrations.manage"]),
+  "netcash-payment-requests": rule("payments.view,ledger.view", ["payments.manage", "payments.manage", ""]),
   operations: rule("operations.view", ["move_in.create,ledger.view,operations.manage", "operations.manage", "operations.manage", "operations.manage", "operations.manage,daily_close.perform"]),
   units: rule("inventory.view", ["", "inventory.manage", "inventory.manage", "inventory.manage", "operations.manage", "inventory.manage", "@owner"]),
   map: rule("facility_map.view", ["", "", "inventory.manage", "inventory.manage", "inventory.manage"]),

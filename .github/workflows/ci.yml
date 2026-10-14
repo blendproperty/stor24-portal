@@ -26,6 +26,7 @@ jobs:
       - run: node scripts/test-monthly-billing.mjs
       - run: node scripts/test-plan-history-netcash-evidence.mjs
       - run: node scripts/test-tenant-card-subscriptions.mjs
+      - run: node scripts/test-netcash-payment-requests.mjs
       - run: node scripts/test-debit-orders.mjs
       - run: node scripts/test-adjustments.mjs
       - run: node scripts/test-account-payment-retry.mjs

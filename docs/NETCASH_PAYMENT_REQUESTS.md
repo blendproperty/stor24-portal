@@ -1,0 +1,15 @@
+# Netcash account payment requests
+
+14 October 2026. This is a sandbox workflow for paying existing posted account debt, including a reviewed fixed partial amount. It does not create a new account charge, subscription or automatically send a message.
+
+Staff open Payment requests from Netcash payment operations. Both payment-view and ledger-view grants must cover the account store. Preparing a request additionally requires payment management there. Select the account, optionally enter a positive fixed amount no greater than its reconciled ZAR balance, review the statement and confirm once. The review expires after ten minutes and is signed against its exact source and merchant. Future/inconsistent ledger entries, historical test receipts posted as money, pending payments and unresolved collection instructions or card schedules hold preparation.
+
+One durable account-locked claim creates a pending sandbox intent before CreateInvoice is called. It uses the original payment reference and fixed amount; email, SMS, push, variable amounts and subscription templates are disabled. Repeated confirmation of the same review never repeats the provider call. Authentication/service rejection remains a test failure; timeout, unexpected response, configuration changes and persistence uncertainty require review rather than automatic retry. A locally held request is not described as cancelled at Netcash.
+
+The provider XML is validated against the published invoice structure and original merchant/reference. Tokens and method data are encrypted at rest. Generic configuration cannot expose or alter these records. Staff and the verified account-owning tenant can inspect safe returned instructions. Card, EFT, retail and QR groups are retained together. Only HTTPS links on the verified Netcash payment host are clickable; credential echoes, unsafe links and unknown methods remain explicitly held for review. Raw XML, the service key and standalone file/security tokens are not exposed. Rendered instructions are text, not provider HTML.
+
+Source changes and completed payment intents remove local payment instructions. This is not proof that an already copied provider link expired. Fixed-reference single-use behavior, actual link validity/expiry, method data, return routing and callbacks require controlled developer-account UAT before activation. Provider request acceptance is not a paid receipt, financial posting, settlement or recognized income. Test outcomes remain separate from balances and financial reports.
+
+`NETCASH_PAYMENT_REQUEST_SANDBOX_ENABLED` defaults off; the stored connection must explicitly be test. History remains readable when creation is disabled. Production company onboarding, live activation, bank reconciliation and remaining full-payment/finance/provider acceptance gates are tracked in PROJECT_CONTEXT.md. No actual CreateInvoice, customer payment, email or financial posting was performed by the automated validation.
+
+Primary contracts: https://api.netcash.co.za/inbound-payments/pay-now/billing/ ; https://www.netcash.co.za/netcash/xsd/invoices.xsd ; https://ws.netcash.co.za/PayNow/PayNow.svc?singleWsdl .
