@@ -47,6 +47,7 @@ try {
     await page.getByRole('button', { name: 'Apply filters' }).click();
     await expect(page.getByText('Recorded status: PENDING')).toHaveCount(0);
     mode = '422';
+    await page.getByRole('button', { name: 'Add note', exact: true }).click();
     await page.getByLabel('Staff note', { exact: true }).fill('Agreed customer follow-up');
     await page.getByRole('button', { name: 'Save staff note' }).click();
     await expect(page.getByRole('alert')).toContainText('Choose a store');
@@ -72,7 +73,8 @@ try {
     await expect(page.getByText('Other customer history')).toBeVisible();
     await expect(page.getByText('Agreed customer follow-up', { exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Switch customer' }).click();
-    await expect(page.getByRole('button', { name: 'Save staff note' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add note', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Add note', exact: true }).click();
     await page.getByLabel('Staff note', { exact: true }).fill('Timeout retry evidence');
     mode = 'hold'; await page.clock.install();
     const before = writes.length;

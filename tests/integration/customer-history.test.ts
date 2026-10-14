@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
+import { build } from "esbuild";
+import { createRequire } from "node:module";
+import { PDFDocument } from "pdf-lib";
 import { db } from "../../src/lib/db";
 import { addCustomerNote, customerHistory } from "../../src/lib/customer-history-service";
 import { compareHistoryEntries, type HistoryEntry } from "../../src/lib/customer-history-policy";
 import type { RequestScope } from "../../src/lib/scope";
+import { buildCustomerHistoryExport } from "../../src/lib/customer-history-export";
 
 test("isolated PostgreSQL shared customer notebook and scoped history", async t => {
   assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci");
@@ -89,6 +93,15 @@ test("isolated PostgreSQL shared customer notebook and scoped history", async t 
       assert.equal(found.length, 115);
       assert.equal(new Set(found.map(e => e.kind + e.id)).size, 115);
       assert.deepEqual(found, [...found].sort(compareHistoryEntries));
+      const fullExport=await buildCustomerHistoryExport(scope,customer.id,query,grants(scope));
+      assert.ok(fullExport.rows.filter(row=>row.kind!=="LEGACY_SUMMARY").length>=115);
+      assert.ok(found.every(entry=>fullExport.rows.some(row=>row.recordId===entry.id)));
+      assert.ok(fullExport.rows.some(row=>row.kind==="LEGACY_SUMMARY"));
+      assert.ok(!JSON.stringify(fullExport.rows).includes("Other store private"));
+      assert.ok(!JSON.stringify(fullExport.rows).includes("DO-NOT-RETURN"));
+      const single=await buildCustomerHistoryExport(scope,customer.id,query,grants(scope),{id:found[0].id,kind:found[0].kind});
+      assert.equal(single.rows.length,1);
+      await assert.rejects(buildCustomerHistoryExport(scope,customer.id,query,grants(scope),{id:"foreign-record",kind:"NOTE"}),/NOT_FOUND/);
       assert.ok(!found.some(e => e.body === "New after snapshot"));
       const filtered = await customerHistory(scope, customer.id, { kind: "ALL", category: "CALL", search: "completed" }, grants(scope));
       assert.equal(filtered.entries.length, 1);
@@ -101,6 +114,47 @@ test("isolated PostgreSQL shared customer notebook and scoped history", async t 
       assert.equal(await db.payment.count({ where: { accountId: account.id } }), 0);
       assert.equal(await db.collectionPromise.count({ where: { caseId: collection.id } }), 0);
       assert.equal(await db.webhookOutbox.count({ where: { organisationId: org.id } }), 0);
+    });
+    await t.test("actual download endpoint releases complete audited files only with current exact store grants", async () => {
+      const permissions=["operations.view","communications.view","collections.view"];
+      const role=await db.role.create({data:{organisationId:org.id,name:"Scoped history downloads",permissions}});
+      await db.roleAssignment.create({data:{userId:staff.id,roleId:role.id,facilityId:a.id}});
+      const output=await build({entryPoints:["src/app/api/v1/customers/[customerId]/history/export/route.ts"],bundle:true,write:false,platform:"node",format:"cjs",packages:"external",plugins:[{name:"real-history-api",setup(builder){
+        builder.onResolve({filter:/^@\/lib\/(db|session)$/},args=>({path:args.path,namespace:"fixture"}));
+        builder.onLoad({filter:/.*/,namespace:"fixture"},args=>({contents:args.path.endsWith("/db")?"export const db=__db;":"export const getSession=async()=>__session;"}));
+      }}]});
+      const loaded={exports:{} as {POST:(r:Request,c:unknown)=>Promise<Response>}};
+      new Function("require","module","exports","__db","__session",output.outputFiles[0].text)(createRequire(import.meta.url),loaded,loaded.exports,db,{userId:staff.id,sessionVersion:staff.sessionVersion});
+      const download=(body:unknown={format:"CSV"},id=customer.id,origin="https://example.invalid")=>loaded.exports.POST(new Request("https://example.invalid/api/v1/customers/one/history/export",{method:"POST",headers:{origin,"content-type":"application/json"},body:JSON.stringify(body)}),{params:Promise.resolve({customerId:id})});
+      assert.equal((await download()).status,403);
+      await db.role.update({where:{id:role.id},data:{permissions:[...permissions,"customer_history.export"]}});
+      assert.equal((await download(undefined,customer.id,"https://attacker.invalid")).status,403);
+      const foreignCustomer=await db.customer.create({data:{organisationId:other.id,firstName:"Foreign"}});
+      const otherStore=await db.customer.create({data:{organisationId:org.id,firstName:"Other store",leads:{create:{facilityId:b.id,source:"CI"}}}});
+      assert.equal((await download(undefined,foreignCustomer.id)).status,403);
+      assert.equal((await download(undefined,otherStore.id)).status,403);
+      const response=await download();assert.equal(response.status,200);
+      assert.match(response.headers.get("cache-control")!,/no-store/);
+      const bytes=new Uint8Array(await response.arrayBuffer());const csv=new TextDecoder().decode(bytes);
+      for(let i=0;i<60;i++)assert.ok(csv.includes(`Historical note ${i}`));
+      assert.ok(!csv.includes("Other store private"));assert.ok(!csv.includes("DO-NOT-RETURN"));
+      const audit=await db.auditEvent.findFirstOrThrow({where:{entityId:customer.id,action:"customer.history_downloaded"},orderBy:{occurredAt:"desc"}});
+      assert.equal((audit.after as {sha256:string}).sha256,createHash("sha256").update(bytes).digest("hex"));
+      const pdf=await download({format:"PDF",kind:"NOTE"});assert.equal(pdf.status,200);assert.ok((await PDFDocument.load(await pdf.arrayBuffer())).getPageCount()>1);
+      const selected=await db.customerNote.findFirstOrThrow({where:{customerId:customer.id,facilityId:a.id}});
+      assert.equal((await download({format:"CSV",entryId:selected.id,entryKind:"NOTE"})).status,200);
+      const excluded=await db.customerNote.findFirstOrThrow({where:{customerId:customer.id,facilityId:b.id}});
+      assert.equal((await download({format:"CSV",entryId:excluded.id,entryKind:"NOTE"})).status,404);
+      const saveAudit=db.auditEvent.create.bind(db.auditEvent);
+      db.auditEvent.create=(async args=>{if(args.data.action==="dlp.export.allowed")await db.role.update({where:{id:role.id},data:{permissions}});return saveAudit(args);}) as typeof db.auditEvent.create;
+      try{assert.equal((await download()).status,403);}finally{db.auditEvent.create=saveAudit;await db.role.update({where:{id:role.id},data:{permissions:[...permissions,"customer_history.export"]}});}
+      await db.$executeRawUnsafe(`ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_history_download_audit_failure CHECK (action <> 'customer.history_downloaded') NOT VALID`);
+      try{assert.equal((await download()).status,500);}finally{await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_history_download_audit_failure');}
+      const credential=await db.customerNote.create({data:{organisationId:org.id,customerId:customer.id,facilityId:a.id,authorId:staff.id,authorName:"Synthetic",category:"GENERAL",body:"Bearer "+"synthetic".repeat(6),requestKey:randomUUID()}});
+      assert.equal((await download({format:"CSV",entryId:credential.id,entryKind:"NOTE"})).status,422);
+      await db.role.update({where:{id:role.id},data:{permissions}});
+      assert.equal((await download()).status,403);
+      await db.roleAssignment.deleteMany({where:{userId:staff.id}});
     });
     await t.test("new unlinked customers stay creator-only; approved reset deletion retains its existing behaviour", async () => {
       const unlinked = await db.customer.create({ data: { organisationId: org.id, firstName: "Unlinked" } });
