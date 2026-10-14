@@ -1,5 +1,6 @@
 export const securityPermissionGroups = [
   { label: "Customers and leasing", permissions: [
+    ["customer_history.export", "Download a customer's contact history (scoped delegation)"],
     ["leads.*", "Manage leads"], ["reservations.*", "Manage reservations"], ["move_in.create", "Process move-ins"], ["operations.view", "View tenant operations"], ["operations.manage", "Edit customers and operational work"],
   ] },
   { label: "Accounting integration", permissions: [
