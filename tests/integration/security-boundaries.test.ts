@@ -297,6 +297,10 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
       assert.equal(await db.customer.findUnique({ where: { id: own.id } }), null);
       assert.equal(await db.auditEvent.count({ where: { entityId: own.id, action: "customers.deleted", actorId: actor.id } }), 1);
       assert.ok(await db.customer.findUnique({ where: { id: foreignCustomer.id } }));
+      const withNote = await db.customer.create({ data: { organisationId: org.id, firstName: "Synthetic notebook" } });
+      await db.customerNote.create({ data: { organisationId: org.id, customerId: withNote.id, facilityId: a.id, authorId: actor.id, authorName: actor.name, category: "GENERAL", body: "Retained note", requestKey: randomUUID() } });
+      assert.equal((await remove(withNote.id)).status, 409);
+      assert.equal(await db.customerNote.count({ where: { customerId: withNote.id } }), 1);
     });
     await t.test("lead DELETE rolls back on audit failure then retries once", async () => {
       const actor = await db.user.create({ data: { organisationId: org.id, email: `${key}-lead-delete@example.invalid`, name: "Synthetic deletion reviewer", passwordHash: "synthetic-not-a-real-password-hash" } });

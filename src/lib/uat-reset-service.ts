@@ -17,6 +17,7 @@ export type UatResetPreview = {
   biometricEnrollments: number;
   customerTasksDetached: number;
   communicationsAnonymised: number;
+  customerNotes: number;
   unitsReleased: number;
   merchandiseOrders: number;
   merchandiseRequests: number;
@@ -37,7 +38,7 @@ async function preview(tx: Tx, organisationId: string): Promise<UatResetPreview>
     return {
       customers: 0, leads: 0, reservations: 0, paymentSessions: 0, tenancies: 0,
       occupancies: 0, documents: 0, accounts: 0, payments: 0, ledgerEntries: 0,
-      biometricEnrollments: 0, customerTasksDetached: 0, communicationsAnonymised: 0,
+      biometricEnrollments: 0, customerTasksDetached: 0, communicationsAnonymised: 0, customerNotes: 0,
       unitsReleased: 0, merchandiseOrders: 0, merchandiseRequests: 0,
       collectionCases: 0, financialAdjustments: 0, debitInstructions: 0,
     };
@@ -85,6 +86,7 @@ async function preview(tx: Tx, organisationId: string): Promise<UatResetPreview>
     biometricEnrollments: biometrics,
     customerTasksDetached: tasks,
     communicationsAnonymised: communications,
+    customerNotes: await tx.customerNote.count({ where: { customerId: { in: customerIds }, organisationId } }),
     unitsReleased: units,
     merchandiseOrders: await tx.merchandiseOrder.count({ where: { accountId: { in: accountIds } } }),
     merchandiseRequests: await tx.tenantMerchandiseRequest.count({ where: { customerId: { in: customerIds } } }),

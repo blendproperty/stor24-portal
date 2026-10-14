@@ -12,6 +12,7 @@ await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromiu
 const customer={id:'syn-2',type:'INDIVIDUAL',firstName:'Synthetic',lastName:'Customer',companyName:null,email:'test@example.invalid',phone:null,identityRef:'SYNTHETIC-ONLY',taxNumber:null,dateOfBirth:null,notes:null,billingAddress:null,alternateContact:null,workContact:null,emergencyContact:null,communicationConsent:null,tenancies:[],leads:[],reservations:[]};
 try {for(const width of [1440,390,320]) {
  const page=await browser.newPage({viewport:{width,height:1000}});const errors=[];let mode='network',writes=0,reads=0;page.on('pageerror',e=>errors.push(e.message));
+ await page.route('**/api/v1/customers/*/history**',route=>route.fulfill({json:{data:{entries:[],nextCursor:null,facilities:[],writableFacilities:[],visibility:{communications:true,collections:true},legacyNotes:null}}}));
  await page.route('**/api/v1/leasing/customers',async route=>{
   if(route.request().method()==='GET'){reads++;return route.fulfill({json:{data:[customer]}});}writes++;const raw=route.request().postDataJSON(),payload=raw.data??raw;
   if(mode==='network')return route.abort();if(mode==='hold')return;
