@@ -14,6 +14,8 @@ Netcash operations retains live and test records, adds mode and independently ve
 
 ## Product coverage and remaining acceptance
 
+Older retained developer payments can recover their signed classifications through the preview-first, explicitly targeted server maintenance command in `NETCASH_TEST_EVIDENCE_RECOVERY.md`. The system audit retains its true maintenance identity; no staff session is fabricated and no financial/provider mutation is performed. Source validation and controlled real metadata recovery must be verified separately from the implementation tests and merchant-portal UAT.
+
 | Product / journey | Current verified implementation boundary | Remaining work / proof |
 |---|---|---|
 | Upfront Pay Now card and supported gateway methods | Hosted eCommerce form and server-verified outcome; actual test card/Instant EFT evidence confirmed. Methods remain merchant-profile choices. | Customer checkout/receipt UAT, correct provider account/profile methods, live onboarding and authoritative settlement. |

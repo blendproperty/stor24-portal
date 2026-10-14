@@ -7,6 +7,7 @@ export type RequestScope = {
   facilityIds: string[];
   unrestrictedFacilities: boolean;
 };
+export type FacilityScope = Pick<RequestScope, "organisationId" | "facilityIds" | "unrestrictedFacilities">;
 
 export async function requireScope(): Promise<RequestScope> {
   const session = await requireSession();
@@ -35,14 +36,14 @@ export async function requirePermissionScope(permission: string, facilityId?: st
   };
 }
 
-export function facilityWhere(scope: RequestScope) {
+export function facilityWhere(scope: FacilityScope) {
   return {
     organisationId: scope.organisationId,
     ...(scope.unrestrictedFacilities ? {} : { id: { in: scope.facilityIds } }),
   };
 }
 
-export async function requireFacility(scope: RequestScope, facilityId: string) {
+export async function requireFacility(scope: FacilityScope, facilityId: string) {
   const facility = await db.facility.findFirst({ where: { AND: [{ id: facilityId }, facilityWhere(scope)] } });
   if (!facility) throw new Error("FACILITY_FORBIDDEN");
   return facility;
