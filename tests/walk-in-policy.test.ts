@@ -1,6 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { walkInToken, walkInTokenHash, walkInUsable } from "../src/lib/walk-in-policy";
+import { walkInCode, walkInCodeHash, walkInToken, walkInTokenHash, walkInUsable } from "../src/lib/walk-in-policy";
+
+test("short codes are unambiguous, normalized and domain-separated from launch tokens", () => {
+  const code = walkInCode();
+  assert.match(code, /^[2-9A-HJ-NP-Z]{8}$/);
+  assert.equal(walkInCodeHash(code), walkInCodeHash(`${code.slice(0, 4)}-${code.slice(4)}`.toLowerCase()));
+  assert.notEqual(walkInCodeHash(code), code);
+  for (const invalid of ["", "12345678", "OOOOOOOO", "A".repeat(9)]) assert.throws(() => walkInCodeHash(invalid), /WALK_IN_UNAVAILABLE/);
+});
 test("walk-in credentials are independent, bounded and stored as hashes", () => {
   const first = walkInToken(), second = walkInToken();
   assert.match(first, /^[a-f0-9]{64}$/); assert.notEqual(first, second);
