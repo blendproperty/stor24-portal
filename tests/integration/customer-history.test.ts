@@ -143,6 +143,8 @@ test("isolated PostgreSQL shared customer notebook and scoped history", async t 
       const pdf=await download({format:"PDF",kind:"NOTE"});assert.equal(pdf.status,200);assert.ok((await PDFDocument.load(await pdf.arrayBuffer())).getPageCount()>1);
       const selected=await db.customerNote.findFirstOrThrow({where:{customerId:customer.id,facilityId:a.id}});
       assert.equal((await download({format:"CSV",entryId:selected.id,entryKind:"NOTE"})).status,200);
+      await db.communicationLog.createMany({data:Array.from({length:51},()=>({organisationId:org.id,customerId:customer.id,facilityId:a.id,channel:"SMS" as const,provider:"twilio",providerRef:"SM"+"d".repeat(32),recipientHash:"synthetic",idempotencyKey:randomUUID(),messageType:"ARCHIVED_NOTICE",metadata:{historyEvidence:{version:1,text:"Archived safe notice",subject:"Notice",redacted:true}}}))});
+      const retained=await download({format:"CSV",kind:"COMMUNICATION",search:"ARCHIVED_NOTICE"});assert.equal(retained.status,200);assert.equal(((await retained.text()).match(/Archived safe notice/g)??[]).length,51);
       const excluded=await db.customerNote.findFirstOrThrow({where:{customerId:customer.id,facilityId:b.id}});
       assert.equal((await download({format:"CSV",entryId:excluded.id,entryKind:"NOTE"})).status,404);
       const saveAudit=db.auditEvent.create.bind(db.auditEvent);
