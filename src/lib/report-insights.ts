@@ -9,6 +9,18 @@ const number = (value: unknown) =>
   value !== null && value !== "" && Number.isFinite(Number(value))
     ? Number(value)
     : 0;
+/** Store names are labels, not identities. Never combine distinct stores by name. */
+function facilityAmounts(rows:ReportRow[],errorCode:string){
+  const groups=new Map<string,{name:string;code:string;cents:number}>(),codes=new Map<string,string>();
+  for(const row of rows){
+    const id=row.facilityId,name=row.facility,code=row.facilityCode,cents=Math.round(Number(row.amount)*100);
+    if(typeof id!=="string"||!id.trim()||typeof name!=="string"||!name.trim()||typeof code!=="string"||!code.trim()||!["number","string"].includes(typeof row.amount)||row.amount===""||!Number.isSafeInteger(cents))throw Error(errorCode);
+    const existing=groups.get(id);if((existing&&(existing.name!==name||existing.code!==code))||(codes.has(code)&&codes.get(code)!==id))throw Error(errorCode);
+    const group=existing??{name,code,cents:0};group.cents+=cents;if(!Number.isSafeInteger(group.cents))throw Error(errorCode);groups.set(id,group);codes.set(code,id);
+  }
+  const names=new Map<string,number>();for(const group of groups.values())names.set(group.name,(names.get(group.name)??0)+1);
+  return [...groups.values()].map(group=>({label:names.get(group.name)!>1?`${group.name} · ${group.code}`:group.name,value:group.cents/100}));
+}
 export function reportInsights(key: string, rows: ReportRow[]): ReportInsight {
   const sum = (field: string) => rows.reduce((n, r) => n + number(r[field]), 0);
   const groups = (field: string) => {
@@ -31,18 +43,17 @@ export function reportInsights(key: string, rows: ReportRow[]): ReportInsight {
   if (key === "recurring-charges") {
     const ready = rows.filter(r => r.status === "READY");
     const cents = ready.reduce((n,r)=>n+Math.round(Number(r.amount)*100),0);
-    const totals = new Map<string,number>();
-    for (const row of ready) { const label=String(row.facility); totals.set(label,(totals.get(label)??0)+Math.round(Number(row.amount)*100)); }
-    bars=[...totals].map(([label,value])=>({label,value:value/100})); chartTitle="Projected charges by facility (ZAR)";
-    metrics=[{label:"Projected charges",value:cents/100,money:true},{label:"Accounts in selected rows",value:new Set(rows.map(r=>`${r.facility}:${r.account}`)).size},{label:"Review / not started",value:rows.filter(r=>r.status!=="READY").length}];
+    if(!Number.isSafeInteger(cents))throw Error("RECURRING_SOURCE_REVIEW");
+    bars=facilityAmounts(ready,"RECURRING_SOURCE_REVIEW");chartTitle="Projected charges by facility (ZAR)";
+    metrics=[{label:"Projected charges",value:cents/100,money:true},{label:"Accounts in selected rows",value:new Set(rows.map(r=>JSON.stringify([r.facilityId,r.account]))).size},{label:"Review / not started",value:rows.filter(r=>r.status!=="READY").length}];
     guidance="Totals cover the selected charge lines only. Current approved-plan projections include tax and discounts; they are not outstanding debt or payment instructions. Review current invoices and mandates in the Netcash batch workflow before submitting.";
   }
   if(key==='posted-recurring-charges'){
-    const posted=rows.filter(row=>row.status==='POSTED'),totals=new Map<string,number>();let total=0,tax=0;
-    for(const row of posted){const amount=Math.round(Number(row.amount)*100),includedTax=Math.round(Number(row.includedTax)*100);if(!Number.isSafeInteger(amount)||!Number.isSafeInteger(includedTax))throw Error('POSTED_REPORT_AMOUNT_REVIEW');total+=amount;tax+=includedTax;const label=String(row.facility);totals.set(label,(totals.get(label)??0)+amount);}
-    if(!Number.isSafeInteger(total)||!Number.isSafeInteger(tax)||[...totals.values()].some(value=>!Number.isSafeInteger(value)))throw Error('POSTED_REPORT_AMOUNT_REVIEW');
+    const posted=rows.filter(row=>row.status==='POSTED');let total=0,tax=0;
+    for(const row of posted){const amount=Math.round(Number(row.amount)*100),includedTax=Math.round(Number(row.includedTax)*100);if(!Number.isSafeInteger(amount)||!Number.isSafeInteger(includedTax))throw Error('POSTED_REPORT_AMOUNT_REVIEW');total+=amount;tax+=includedTax;}
+    if(!Number.isSafeInteger(total)||!Number.isSafeInteger(tax))throw Error('POSTED_REPORT_AMOUNT_REVIEW');
     metrics=[{label:'Verified original billed charges',value:total/100,money:true},{label:'Included tax',value:tax/100,money:true},{label:'Invoices with held amounts',value:rows.filter(row=>row.status==='REVIEW').length}];
-    bars=[...totals].map(([label,value])=>({label,value:value/100}));chartTitle='Verified original billed charges by facility (ZAR)';
+    bars=facilityAmounts(posted,'POSTED_REPORT_SOURCE_REVIEW');chartTitle='Verified original billed charges by facility (ZAR)';
     guidance='Coverage is limited to retained canonical monthly posting evidence; no rows do not establish zero activity. Totals include verified original monthly posting lines only; held invoices are excluded. The date range uses billing effective dates, with separate recorded-date review exceptions for unavailable periods. Later corrections, receipts, outstanding debt, settlement and income recognition are excluded. Legacy component categories remain unclassified. Use the reviewed Netcash collection workflow for current unpaid invoices.';
   }
   if (key === "occupancy-revenue") {
