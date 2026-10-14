@@ -80,6 +80,7 @@ type UatResetPreview = {
   biometricEnrollments: number;
   customerTasksDetached: number;
   communicationsAnonymised: number;
+  customerNotes: number;
   unitsReleased: number;
   merchandiseOrders: number;
   merchandiseRequests: number;
@@ -575,7 +576,8 @@ export function UnitInventoryWorkspace({
             <p>This also removes {uatResetPreview.payments} payments, {uatResetPreview.ledgerEntries} ledger entries,
               {" "}{uatResetPreview.merchandiseOrders} merchandise orders, {uatResetPreview.merchandiseRequests} merchandise requests,
               {" "}{uatResetPreview.collectionCases} collection cases, {uatResetPreview.financialAdjustments} financial adjustments
-              {" "}and {uatResetPreview.debitInstructions} debit instructions with their batches. Linked stock holds are released; physical stock is unchanged.</p>
+              {" "}and {uatResetPreview.debitInstructions} debit instructions with their batches.
+              {" "}{uatResetPreview.customerNotes ?? 0} dated customer staff notes are also removed. Linked stock holds are released; physical stock is unchanged.</p>
           </div>
           <label>
             Type <strong>RESET TEST CUSTOMERS</strong> to confirm

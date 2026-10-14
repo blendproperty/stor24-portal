@@ -2921,3 +2921,30 @@ a.module-card:focus-visible {
 .netcash-debicheck-templates select, .netcash-debicheck-templates input:not([type=checkbox]) { width: 100%; max-width: 100%; }
 .netcash-debicheck-templates .button { margin: 8px 8px 0 0; }
 .netcash-debicheck-templates article { margin-top: 24px; overflow-wrap: anywhere; }
+
+.customer-history { margin-top: 28px; border-top: 1px solid #d7dee0; padding-top: 24px; min-width: 0; }
+.customer-history-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.customer-history-heading h3 { margin: 4px 0 8px; }
+.customer-history-heading p { margin: 0 0 12px; }
+.customer-history-filters { display: grid; grid-template-columns: 1fr 1fr minmax(150px, 2fr) auto; gap: 12px; align-items: end; margin: 12px 0 20px; }
+.customer-history label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; min-width: 0; }
+.customer-history input, .customer-history select, .customer-history textarea { width: 100%; min-width: 0; border: 1px solid #becbd0; border-radius: 8px; padding: 10px; background: white; color: #182b32; font: inherit; }
+.customer-history textarea { resize: vertical; }
+.customer-history button { white-space: normal; }
+.customer-note-form { padding: 16px; background: #f5f8f7; border: 1px solid #d4e0dc; border-radius: 12px; margin-bottom: 20px; }
+.customer-note-form fieldset { border: 0; padding: 0; margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.customer-note-form legend { font-weight: 700; margin-bottom: 12px; }
+.customer-note-body { grid-column: 1 / -1; }
+.customer-timeline { list-style: none; padding: 0; margin: 20px 0; }
+.customer-timeline li { border-left: 3px solid #28765e; padding: 8px 0 18px 16px; margin-bottom: 18px; overflow-wrap: anywhere; }
+.customer-timeline-meta { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: #435960; }
+.customer-timeline h4 { font-size: 15px; margin: 8px 0; }
+.customer-timeline-body { white-space: pre-wrap; margin: 8px 0; }
+.customer-timeline-delivery { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; }
+@media (max-width: 1100px) { .customer-history-filters { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 600px) {
+  .customer-history-heading { flex-direction: column; }
+  .customer-history-filters, .customer-note-form fieldset { grid-template-columns: 1fr; }
+  .customer-note-body { grid-column: auto; }
+  .customer-history .button { max-width: 100%; }
+}
