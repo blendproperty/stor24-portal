@@ -16,6 +16,27 @@ function decode(value:string){
  if(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(text))return invalid();
  return text;
 }
+// Advance once through each attribute. A repeated whole-tag regular expression
+// can backtrack exponentially on a malformed provider response.
+function openingTag(tag:string){
+ const element=/^[A-Za-z][A-Za-z0-9]*/.exec(tag);if(!element)return invalid();
+ let cursor=element[0].length;const attributes=new Set<string>();
+ const whitespace=()=>{const start=cursor;while(cursor<tag.length&&/[\t\n\r ]/.test(tag[cursor]))cursor++;return cursor>start;};
+ while(cursor<tag.length){
+  const separated=whitespace();if(cursor===tag.length)break;
+  if(tag[cursor]==="/"&&cursor===tag.length-1)return{name:element[0],selfClosing:true};
+  if(!separated)return invalid();
+  const start=cursor;while(cursor<tag.length&&/[A-Za-z:]/.test(tag[cursor]))cursor++;
+  const name=tag.slice(start,cursor);
+  if(!/^(?:xmlns(?::[A-Za-z]+)?|[A-Za-z]+:[A-Za-z]+)$/.test(name)||attributes.has(name))return invalid();
+  attributes.add(name);whitespace();if(tag[cursor++]!=="=")return invalid();whitespace();
+  const quote=tag[cursor++];if(quote!=='"'&&quote!=="'")return invalid();
+  const end=tag.indexOf(quote,cursor);if(end<0)return invalid();
+  const value=decode(tag.slice(cursor,end));if(value.includes("<")||(name==="xmlns"&&value!==""))return invalid();
+  cursor=end+1;
+ }
+ return{name:element[0],selfClosing:false};
+}
 function tree(xml:string){
  if(Buffer.byteLength(xml,"utf8")>64000||/<!|<\?(?!xml\s)/i.test(xml))return invalid();
  xml=xml.replace(/^\uFEFF?\s*<\?xml\s[^?]*\?>/i,"").trim();
@@ -29,12 +50,9 @@ function tree(xml:string){
   if(tag.startsWith("/")){
    if(stack.length<2||tag.slice(1).trim()!==stack.at(-1)!.name)return invalid();stack.pop();
   }else{
-   const match=/^([A-Za-z][A-Za-z0-9]*)(\s+(?:xmlns(?::[A-Za-z]+)?|[A-Za-z]+:[A-Za-z]+)\s*=\s*(?:"[^"]*"|'[^']*'))*\s*(\/)?$/.exec(tag);
-   if(!match||++nodes>600||stack.length>8)return invalid();
-   // The published schema has an empty target namespace; namespaced roots
-   // cannot silently masquerade as this contract.
-   if(/xmlns\s*=\s*["'][^"']+["']/.test(tag))return invalid();
-   const node:Node={name:match[1],text:"",children:[]};stack.at(-1)!.children.push(node);if(!match[3])stack.push(node);
+   const parsed=openingTag(tag);
+   if(++nodes>600||stack.length>8)return invalid();
+   const node:Node={name:parsed.name,text:"",children:[]};stack.at(-1)!.children.push(node);if(!parsed.selfClosing)stack.push(node);
   }
   cursor=end+1;
  }
