@@ -2,6 +2,10 @@
 
 14 October 2026. Meeting item 18 covers the existing Faeez Baboo account at Store 1 - Midpoint. Access configuration and technical authorisation checks are separate from Faeez's own password login and hands-on workflow acceptance.
 
+## Account evidence refreshed during customer-history release - 14 October 2026
+
+Read-only production checks at14:39 SAST confirm the same26 grants, active account and Midpoint-only role; current sessionVersion is5. Audit records show password-reset completion at14:17:47 and a successful normal account login at14:17:56 SAST. These subsequent access/credential actions were not performed by the customer-history implementation. The earlier not-tried/sessionVersion2 record below is a historical checkpoint. Actual Faeez/covering-staff workflow acceptance remains open; an account audit does not identify the human tester or prove the agreed end-to-end workflows.
+
 ## Scope and approval separation
 
 Preserve the accepted account, unique custom role and single Midpoint assignment. The previous seven grants are retained. Add exact operations/customer management, inventory viewing, ledger viewing, payment reviewing/receipt recording, collections casework, correction requests, reviewed customer-document sending and relevant reports. The permission editor now exposes six existing backend permissions that previously required broader grants or could not be saved: operations.manage, inventory.view, ledger.view, payments.view, payments.manage and billing.documents.send. No authorisation guard or financial approval policy changes.
