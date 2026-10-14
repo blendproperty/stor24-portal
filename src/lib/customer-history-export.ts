@@ -50,7 +50,7 @@ export async function releaseCustomerHistoryExport(input:{scope:RequestScope;cus
   const summary=`Customer reference: ${customer.id} | ${rows.length} recorded entries | ${input.query.kind.toLowerCase()} | Communications: ${visibility.communications?"authorised":"restricted"} | Collections: ${visibility.collections?"authorised":"restricted"}`;
   const csv=toCsv(rows.length?rows:[{customerId:customer.id,customerName:name,recordId:"",kind:"NO_MATCHING_RECORDS",body:"No recorded history matches these filters."}]);
   const bytes=input.format==="PDF"?await customerHistoryPdf(name,rows,summary,new Date()):new TextEncoder().encode("\ufeff"+csv);
-  const contains=(previous:RequestScope,current:RequestScope)=>current.unrestrictedFacilities||(!previous.unrestrictedFacilities&&previous.facilityIds.every(id=>current.facilityIds.includes(id)));
+  const contains=(previous:RequestScope,current:RequestScope)=>previous.userId===current.userId&&previous.organisationId===current.organisationId&&(current.unrestrictedFacilities||(!previous.unrestrictedFacilities&&previous.facilityIds.every(id=>current.facilityIds.includes(id))));
   const fresh=intersectHistoryScope(await requirePermissionScope("operations.view"),await requirePermissionScope("customer_history.export"));
   if(!contains(input.scope,fresh))throw new Error("FORBIDDEN");
   for(const [kind,permission,previous]of [["COMMUNICATION","communications.view",input.access.communications],["COLLECTION","collections.view",input.access.collections]] as const){
