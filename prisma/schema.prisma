@@ -1943,6 +1943,7 @@ model WalkInVisit {
   reservationId String? @unique
   reservation Reservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
   launchTokenHash String @unique
+  shortCodeHash String? @unique
   customerTokenHash String? @unique
   status String @default("READY")
   launchExpiresAt DateTime
