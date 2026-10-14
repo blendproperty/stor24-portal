@@ -13,6 +13,7 @@ test("isolated PostgreSQL customer reset handles restrictive workflow records at
     const facility = await db.facility.create({ data: { organisationId: org.id, name: "CI store", code: key } });
     const user = await db.user.create({ data: { organisationId: org.id, name: "CI owner", email: `${key}@example.invalid` } });
     const customer = await db.customer.create({ data: { organisationId: org.id, firstName: "Synthetic customer" } });
+    await db.customerNote.create({ data: { organisationId: org.id, customerId: customer.id, facilityId: facility.id, authorId: user.id, authorName: user.name, category: "GENERAL", body: "Synthetic reset note", requestKey: key } });
     const account = await db.account.create({ data: { customerId: customer.id, accountNumber: key } });
     const type = await db.unitType.create({ data: { facilityId: facility.id, name: "CI type", features: [] } });
     const unit = await db.unit.create({ data: { facilityId: facility.id, unitTypeId: type.id, number: "CI-1", monthlyRate: 100, status: "OCCUPIED" } });
@@ -52,8 +53,10 @@ test("isolated PostgreSQL customer reset handles restrictive workflow records at
       assert.equal(preview.collectionCases, 1);
       assert.equal(preview.financialAdjustments, 1);
       assert.equal(preview.debitInstructions, 1);
+      assert.equal(preview.customerNotes, 1);
       assert.deepEqual(await resetUatCustomerData(f.input), preview);
       assert.equal(await db.customer.count({ where: { organisationId: f.org.id } }), 0);
+      assert.equal(await db.customerNote.count({ where: { organisationId: f.org.id } }), 0);
       assert.equal(await db.account.count({ where: { id: f.account.id } }), 0);
       assert.equal(await db.merchandiseOrderItem.count({ where: { productId: f.product.id } }), 0);
       assert.equal(await db.debitOrderRun.count({ where: { id: f.run.id } }), 0);

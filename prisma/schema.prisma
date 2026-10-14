@@ -201,6 +201,7 @@ enum AccessDecisionState {
 }
 
 model Organisation {
+  customerNotes CustomerNote[]
   walkInVisits WalkInVisit[]
   marketingCampaigns MarketingCampaign[]
   id                     String                  @id @default(cuid())
@@ -264,6 +265,7 @@ model UserInvitation {
 }
 
 model Facility {
+  customerNotes CustomerNote[]
   walkInVisits WalkInVisit[]
   reportHistoryImports ReportHistoryImport[]
   marketingCampaigns MarketingCampaign[]
@@ -395,6 +397,7 @@ model MapElement {
 }
 
 model Customer {
+  staffNotes CustomerNote[]
   id                   String             @id @default(cuid())
   organisationId       String
   organisation         Organisation       @relation(fields: [organisationId], references: [id], onDelete: Cascade)
@@ -1146,6 +1149,7 @@ model Document {
 }
 
 model User {
+  customerNotes CustomerNote[]
   walkInVisits WalkInVisit[]
   id                  String               @id @default(cuid())
   organisationId      String
@@ -1953,4 +1957,25 @@ model WalkInVisit {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([organisationId, facilityId, status, expiresAt])
+}
+
+model CustomerNote {
+  id String @id @default(cuid())
+  organisationId String
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  customerId String
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  facilityId String
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  authorId String
+  author User @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  authorName String
+  category String
+  body String
+  requestKey String
+  createdAt DateTime @default(now())
+
+  @@unique([customerId, requestKey])
+  @@index([organisationId, customerId, createdAt, id])
+  @@index([customerId, facilityId, createdAt, id])
 }
