@@ -38,6 +38,38 @@ test("ambiguous mutation responses are held and never automatically retried or e
   await assert.rejects(updatePayNowSubscription(key, change, async () => response("UpdateSubscriptions", "311")), /PAYNOW_REJECTED_311/);
 });
 
+test("complete SOAP structure and namespaces are required before accepting a subscription outcome", async () => {
+  const valid = await response("UpdateSubscriptions", "000").text();
+  const malformed = [
+    "<Envelope><UpdateSubscriptionsResult>000</UpdateSubscriptionsResult></Envelope>",
+    valid.slice(0, -13),
+    valid.replace("http://schemas.xmlsoap.org/soap/envelope/", "urn:foreign-soap"),
+    valid.replace("http://tempuri.org/", "urn:foreign-result"),
+    valid.replace("</s:Body>", "<UpdateSubscriptionsResponse xmlns='http://tempuri.org/'><UpdateSubscriptionsResult>000</UpdateSubscriptionsResult></UpdateSubscriptionsResponse></s:Body>"),
+    valid.replace("</UpdateSubscriptionsResult>", "</UpdateSubscriptionsResult><UpdateSubscriptionsResult>000</UpdateSubscriptionsResult>"),
+    valid.replace("<UpdateSubscriptionsResult>", "<UpdateSubscriptionsResult xmlns='urn:foreign-result'>"),
+    valid.replace("<UpdateSubscriptionsResult>", "<UpdateSubscriptionsResult xmlns:i='http://www.w3.org/2001/XMLSchema-instance' i:nil='true'>"),
+    valid.replace("000", "&undefined;"),
+    "<!DOCTYPE s:Envelope [<!ENTITY outcome '000'>]>" + valid.replace("000", "&outcome;"),
+    await response("DeleteSubscription", "000").text(),
+    valid + "<extra/>",
+  ];
+  for (const xml of malformed) {
+    let calls = 0;
+    await assert.rejects(updatePayNowSubscription(key, change, async () => { calls++; return new Response(xml); }), /^Error: PAYNOW_OUTCOME_UNCERTAIN$/);
+    assert.equal(calls, 1);
+  }
+  assert.deepEqual(await updatePayNowSubscription(key, change, async () => response("UpdateSubscriptions", "<![CDATA[000]]>")), { providerAccepted: true });
+});
+
+test("payment request strings decode once and accept qualified SOAP result names", async () => {
+  const input = { reference: "SYNTHETIC-103", description: "Storage", amount: "950.00" };
+  const invoice = "<PayNowInvoices><Text>A &amp; B</Text></PayNowInvoices>";
+  const qualified = `<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:p="http://tempuri.org/"><s:Body><p:CreateInvoiceResponse><p:CreateInvoiceResult><![CDATA[${invoice}]]></p:CreateInvoiceResult></p:CreateInvoiceResponse></s:Body></s:Envelope>`;
+  assert.equal(await createPayNowInvoiceRequest(key, vendor, input, async () => new Response(qualified)), invoice);
+  assert.equal(await createPayNowInvoiceRequest(key, vendor, input, async () => response("CreateInvoice", invoice.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"))), invoice);
+});
+
 test("provider payment request is fixed amount without email, SMS, push or implicit subscription template", async () => {
   const input = { reference: "SYNTHETIC-102", description: "Storage & supplies", amount: "950.00", email: "synthetic@example.invalid" };
   const fields = invoiceRequestFields(key, vendor, input);

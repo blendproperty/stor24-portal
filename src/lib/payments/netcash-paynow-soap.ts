@@ -4,6 +4,7 @@
  * https://ws.netcash.co.za/PayNow/PayNow.svc?singleWsdl
  */
 import { boundedBody } from "./netcash-mandate";
+import { payNowSoapResult } from "./netcash-paynow-response";
 
 export const PAYNOW_SOAP_ENDPOINT = "https://ws.netcash.co.za/PayNow/PayNow.svc";
 type Method = "CreateInvoice" | "UpdateSubscriptions" | "DeleteSubscription" | "RequestCreditCardRefund";
@@ -26,29 +27,12 @@ function calendarDate(value: string) {
 export function payNowSoapEnvelope(method: Method, fields: Field[]) {
   return `<?xml version="1.0" encoding="utf-8"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><${method} xmlns="http://tempuri.org/">${fields.map(([name, value]) => `<${name}>${escape(String(value))}</${name}>`).join("")}</${method}></s:Body></s:Envelope>`;
 }
-function result(xml: string, method: Method) {
-  if (/<!DOCTYPE|<!ENTITY|<(?:[\w-]+:)?Fault\b/i.test(xml)) throw Error("PAYNOW_OUTCOME_UNCERTAIN");
-  const matches = [...xml.matchAll(new RegExp(`<(?:[\\w-]+:)?${method}Result(?:\\s[^>]*)?>([\\s\\S]*?)<\\/(?:[\\w-]+:)?${method}Result>`, "g"))];
-  if (matches.length !== 1) throw Error("PAYNOW_OUTCOME_UNCERTAIN");
-  let value = matches[0][1];
-  if (value.startsWith("<![CDATA[") && value.endsWith("]]>")) value = value.slice(9, -3);
-  else {
-    if (value.includes("<")) throw Error("PAYNOW_OUTCOME_UNCERTAIN");
-    value = value.replace(/&(lt|gt|quot|apos|amp);|&#(\d+);|&#x([a-f\d]+);/gi, (_, character: string, decimal: string, hex: string) => {
-      if (character) return ({ lt: "<", gt: ">", quot: '"', apos: "'", amp: "&" })[character.toLowerCase()]!;
-      const code = decimal ? Number(decimal) : parseInt(hex, 16);
-      if (code <= 0 || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)) throw Error("PAYNOW_OUTCOME_UNCERTAIN");
-      return String.fromCodePoint(code);
-    });
-  }
-  return value.trim();
-}
 async function call(method: Method, fields: Field[], request: typeof fetch) {
   let response: Response;
   try {
     response = await request(PAYNOW_SOAP_ENDPOINT, { method: "POST", redirect: "error", cache: "no-store", signal: AbortSignal.timeout(20000), headers: { "content-type": "text/xml; charset=utf-8", SOAPAction: `"http://tempuri.org/IPayNow/${method}"` }, body: payNowSoapEnvelope(method, fields) });
     if (!response.ok) throw Error("PAYNOW_OUTCOME_UNCERTAIN");
-    return result((await boundedBody(response, 64000)).toString(), method);
+    return payNowSoapResult((await boundedBody(response, 64000)).toString(), method);
   } catch {
     // Never expose response bodies/keys or automatically replay a possible mutation.
     throw Error("PAYNOW_OUTCOME_UNCERTAIN");
