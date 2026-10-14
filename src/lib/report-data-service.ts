@@ -1,4 +1,5 @@
 import { recurringChargeReport } from "./recurring-charge-service";
+import { postedRecurringChargeReport } from "./posted-recurring-charge-service";
 import { rentReviewReport } from "@/lib/rent-review-service";
 import { unitIsOperational } from "@/lib/floor-availability";
 import { effectiveUseTypes, unitSupportsProduct } from "@/lib/product-line";
@@ -20,6 +21,7 @@ export async function buildReportRows(scope: RequestScope, parameters: ReportPar
 
   switch (parameters.reportKey) {
     case "recurring-charges": return recurringChargeReport(scope, parameters);
+    case "posted-recurring-charges": return postedRecurringChargeReport(scope, parameters);
     case "tenant-duration": {
       const facilities=await db.facility.findMany({where:facility,select:{id:true,name:true}});
       const reports=await Promise.all(facilities.map(async f=>({facility:f.name,report:await rentReviewReport(scope.organisationId,f.id)})));

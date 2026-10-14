@@ -37,6 +37,14 @@ export function reportInsights(key: string, rows: ReportRow[]): ReportInsight {
     metrics=[{label:"Projected charges",value:cents/100,money:true},{label:"Accounts in selected rows",value:new Set(rows.map(r=>`${r.facility}:${r.account}`)).size},{label:"Review / not started",value:rows.filter(r=>r.status!=="READY").length}];
     guidance="Totals cover the selected charge lines only. Current approved-plan projections include tax and discounts; they are not outstanding debt or payment instructions. Review current invoices and mandates in the Netcash batch workflow before submitting.";
   }
+  if(key==='posted-recurring-charges'){
+    const posted=rows.filter(row=>row.status==='POSTED'),totals=new Map<string,number>();let total=0,tax=0;
+    for(const row of posted){const amount=Math.round(Number(row.amount)*100),includedTax=Math.round(Number(row.includedTax)*100);if(!Number.isSafeInteger(amount)||!Number.isSafeInteger(includedTax))throw Error('POSTED_REPORT_AMOUNT_REVIEW');total+=amount;tax+=includedTax;const label=String(row.facility);totals.set(label,(totals.get(label)??0)+amount);}
+    if(!Number.isSafeInteger(total)||!Number.isSafeInteger(tax)||[...totals.values()].some(value=>!Number.isSafeInteger(value)))throw Error('POSTED_REPORT_AMOUNT_REVIEW');
+    metrics=[{label:'Verified original billed charges',value:total/100,money:true},{label:'Included tax',value:tax/100,money:true},{label:'Invoices with held amounts',value:rows.filter(row=>row.status==='REVIEW').length}];
+    bars=[...totals].map(([label,value])=>({label,value:value/100}));chartTitle='Verified original billed charges by facility (ZAR)';
+    guidance='Coverage is limited to retained canonical monthly posting evidence; no rows do not establish zero activity. Totals include verified original monthly posting lines only; held invoices are excluded. The date range uses billing effective dates, with separate recorded-date review exceptions for unavailable periods. Later corrections, receipts, outstanding debt, settlement and income recognition are excluded. Legacy component categories remain unclassified. Use the reviewed Netcash collection workflow for current unpaid invoices.';
+  }
   if (key === "occupancy-revenue") {
     metrics = [
       { label: "Units", value: sum("totalUnits") },
