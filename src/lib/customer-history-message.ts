@@ -1,8 +1,9 @@
 import { privacyHash } from "@/lib/request-security";
 import { normalizeTwilioRecipient } from "@/lib/integrations/twilio-provider";
-import { redactHistoryMessage } from "@/lib/customer-history-message-policy";
+import { archivedHistoryText, redactHistoryMessage } from "@/lib/customer-history-message-policy";
 
 type RecordProof={provider:string|null;providerRef:string|null;channel:string;direction:string;messageType:string|null;recipientHash:string;metadata?:unknown};
+export function needsProviderMessage(proof:RecordProof){return !/VERIFICATION|OTP|PASSWORD|LOGIN|AUTHENTICATION/i.test(proof.messageType??"")&&archivedHistoryText(proof.metadata)===null&&proof.provider==="twilio"&&/^(?:SM|MM)[a-f0-9]{32}$/i.test(proof.providerRef??"");}
 export async function readHistoryMessage(proof:RecordProof,customerPhone:string|null,request:typeof fetch=fetch) {
   if(/VERIFICATION|OTP|PASSWORD|LOGIN|AUTHENTICATION/i.test(proof.messageType??""))return {body:"",source:"Authentication content excluded"};
   const metadata=proof.metadata&&typeof proof.metadata==="object"&&!Array.isArray(proof.metadata)?proof.metadata as Record<string,unknown>:null;
@@ -11,7 +12,7 @@ export async function readHistoryMessage(proof:RecordProof,customerPhone:string|
     const evidence=archived as Record<string,unknown>;
     if(evidence.version===1&&typeof evidence.text==="string"&&evidence.text.length<=32000)return {body:redactHistoryMessage(evidence.text),subject:typeof evidence.subject==="string"?redactHistoryMessage(evidence.subject):"",source:"Retained message text; links and access codes omitted"};
   }
-  if(proof.provider!=="twilio"||!/^SM[a-f0-9]{32}$/i.test(proof.providerRef??""))return {body:"",source:"Original message text not retained in this historical log"};
+  if(proof.provider!=="twilio"||!/^(?:SM|MM)[a-f0-9]{32}$/i.test(proof.providerRef??""))return {body:"",source:"Original message text not retained in this historical log"};
   const account=process.env.TWILIO_ACCOUNT_SID,token=process.env.TWILIO_AUTH_TOKEN;
   if(!/^AC[a-f0-9]{32}$/i.test(account??"")||!token)return {body:"",source:"Provider message content unavailable"};
   try{
