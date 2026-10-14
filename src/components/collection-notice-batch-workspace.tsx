@@ -1,0 +1,43 @@
+"use client";
+import { useEffect, useState } from "react";
+import { z } from "zod";
+const accountSchema=z.object({id:z.string(),accountNumber:z.string(),name:z.string(),facility:z.string(),facilityId:z.string()});
+type Account=z.infer<typeof accountSchema>;
+const previewSchema=z.object({asOf:z.iso.date(),prepared:z.literal(false),emailSent:z.literal(false),items:z.array(z.object({source:z.object({accountId:z.string(),accountNumber:z.string(),facility:z.string(),asOf:z.iso.date(),fingerprint:z.string().regex(/^[a-f0-9]{64}$/),blockers:z.array(z.string())}),message:z.object({recipient:z.email(),subject:z.string(),text:z.string()}).nullable(),notice:z.object({status:z.string()}).nullable()})).min(1).max(20)});
+const savedSchema=z.object({prepared:z.literal(true),emailSent:z.literal(false),notices:z.array(z.object({accountId:z.string(),status:z.literal("DRAFT")})).min(1).max(20)});
+type Preview=z.infer<typeof previewSchema>;
+type Saved=z.infer<typeof savedSchema>;
+const endpoint="/api/v1/collections/notices/bulk";
+function exactAudience(values:string[],ids:string[]){return values.length===ids.length&&new Set(values).size===ids.length&&values.every(id=>ids.includes(id))}
+export function CollectionNoticeBatchWorkspace(){
+  const[accounts,setAccounts]=useState<Account[]>([]),[ids,setIds]=useState<string[]>([]),[search,setSearch]=useState(""),[facility,setFacility]=useState(""),[preview,setPreview]=useState<Preview|null>(null),[saved,setSaved]=useState<Saved|null>(null),[error,setError]=useState(""),[busy,setBusy]=useState(false),[confirmed,setConfirmed]=useState(false);
+  useEffect(()=>{const abort=new AbortController();fetch(endpoint,{cache:"no-store",signal:abort.signal}).then(async response=>{const value=await response.json();if(!response.ok)throw Error("Unable to load permitted accounts.");setAccounts(z.array(accountSchema).max(2000).parse(value.rows))}).catch(()=>{if(!abort.signal.aborted){setAccounts([]);setError("Unable to load permitted accounts. Reload before selecting an audience.")}});return()=>abort.abort()},[]);
+  function clearReview(){setPreview(null);setSaved(null);setConfirmed(false);setError("")}
+  function select(id:string,checked:boolean){clearReview();setIds(current=>checked?[...current,id]:current.filter(value=>value!==id))}
+  async function act(action:"preview"|"prepare"){
+    if(action==="prepare"&&(!preview||!confirmed))return;
+    setBusy(true);setError("");setSaved(null);const reviewed=preview;setPreview(null);setConfirmed(false);
+    try{
+      const body=action==="preview"?{action,accounts:ids}:{action,confirm:true,items:reviewed!.items.map(item=>({accountId:item.source.accountId,fingerprint:item.source.fingerprint}))};
+      const response=await fetch(endpoint,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)}),value=await response.json();
+      if(!response.ok)throw Error(typeof value.error==="string"?value.error:"Unable to prepare this audience.");
+      if(action==="preview"){const result=previewSchema.parse(value);if(!exactAudience(result.items.map(item=>item.source.accountId),ids)||result.items.some(item=>item.source.asOf!==result.asOf))throw Error("The audience response is incomplete. Preview again.");setPreview(result)}
+      else{const result=savedSchema.parse(value);if(!exactAudience(result.notices.map(item=>item.accountId),ids))throw Error("Draft preparation could not be verified. Reload each notice before retrying.");setSaved(result)}
+    }catch(e){setError(e instanceof z.ZodError?"The server response is incomplete. Reload saved notices and preview again.":e instanceof Error?e.message:"Unable to prepare this audience.")}finally{setBusy(false)}
+  }
+  const filtered=accounts.filter(account=>(!facility||account.facilityId===facility)&&`${account.accountNumber} ${account.name}`.toLowerCase().includes(search.toLowerCase())),facilities=[...new Map(accounts.map(account=>[account.facilityId,account.facility])).entries()];
+  const held=preview?.items.some(item=>item.source.blockers.length||!item.message||(item.notice&&item.notice.status!=="DRAFT"));
+  return <div className="collection-notices"><a href="/collections/notices">← Individual email notices</a><header><p className="notice-kicker">Collections · Audience preparation</p><h1>Prepare collection email audience</h1><p>Select up to 20 accounts. Review every recipient and exact message before saving drafts for independent approval.</p></header>
+    {error&&<p role="alert" className="notice-error">{error}</p>}
+    <section className="notice-panel"><h2>Select accounts</h2><label>Store<select aria-label="Store" value={facility} disabled={busy} onChange={event=>{clearReview();setFacility(event.target.value);setIds([])}}><option value="">All permitted stores</option>{facilities.map(([id,name])=><option key={id} value={id}>{name}</option>)}</select></label><label>Search accounts<input value={search} disabled={busy} onChange={event=>setSearch(event.target.value)}/></label><p>{ids.length} selected. Search filters the list; selected accounts remain in the audience. Changing store clears the selection.</p>
+      <div className="notice-audience-list">{filtered.map(account=><label className="notice-confirm" key={account.id}><input type="checkbox" checked={ids.includes(account.id)} disabled={busy||(!ids.includes(account.id)&&ids.length>=20)} onChange={event=>select(account.id,event.target.checked)}/><span>{account.accountNumber} · {account.name} · {account.facility}</span></label>)}</div>
+      {!filtered.length&&<p>No permitted accounts match this filter.</p>}<button disabled={busy||!ids.length} onClick={()=>act("preview")}>Preview selected audience</button><button disabled={busy||!ids.length} onClick={()=>{clearReview();setIds([])}}>Clear selection</button>
+    </section>
+    {busy&&<p role="status">Checking the selected accounts…</p>}
+    {preview&&<section className="notice-panel"><h2>Review recipients and messages</h2>{preview.items.map(item=><article className="notice-audience-message" key={item.source.accountId}><h3>{item.source.accountNumber} · {item.source.facility}</h3>{item.source.blockers.length?<><p className="notice-error">Notice held</p><ul>{item.source.blockers.map((blocker,index)=><li key={index}>{blocker}</li>)}</ul></>:null}{item.notice&&item.notice.status!=="DRAFT"&&<p className="notice-error">Existing notice is {item.notice.status}. Review it individually; this audience cannot replace it.</p>}{item.message&&<><dl><dt>Recipient</dt><dd>{item.message.recipient}</dd><dt>Subject</dt><dd>{item.message.subject}</dd><dt>As at</dt><dd>{item.source.asOf}</dd></dl><pre className="notice-preview">{item.message.text}</pre></>}</article>)}
+      {held?<p className="notice-error">Resolve or deselect held accounts and preview again. The group will be saved together or no drafts will change.</p>:<><label className="notice-confirm"><input type="checkbox" checked={confirmed} disabled={busy} onChange={event=>setConfirmed(event.target.checked)}/>I reviewed every selected account, recipient and message for draft preparation.</label><button disabled={busy||!confirmed} onClick={()=>act("prepare")}>Save selected notice drafts</button></>}
+    </section>}
+    {saved&&<section className="notice-panel"><h2>Drafts saved for review</h2><p role="status">{saved.notices.length} account drafts saved. No email was sent. Another authorised colleague must review each notice; sending requires separate confirmation.</p><ul>{saved.notices.map(item=><li key={item.accountId}><a href={`/collections/notices?account=${encodeURIComponent(item.accountId)}`}>Review {accounts.find(account=>account.id===item.accountId)?.accountNumber??"account notice"}</a></li>)}</ul></section>}
+    <p>Preparation does not approve or send email, add fees, collect money or change gate access. Changed balances, consent, pending payments, disputes or attempted notices hold preparation. There is no automatic send or retry.</p>
+  </div>
+}

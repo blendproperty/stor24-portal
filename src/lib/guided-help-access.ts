@@ -22,6 +22,7 @@ export const guideAccessRules: Record<string, Rule> = {
   identity: rule("identity.review", ["", "", "", ""]),
   mri: rule("mri.view", ["", "mri.manage", "", "mri.manage"], true),
   "collection-notices": rule("collections.view", ["", "collections.manage", "collections.manage", "collections.manage,billing.documents.send"]),
+  "collection-notice-audience": rule("collections.manage", ["", "", ""]),
   "mri-mapping": rule("mri.view", ["mri.manage", "mri.manage", "mri.manage", ""], true),
   "mri-sandbox": rule("mri.view", ["mri.manage", "mri.manage", ""], true),
   "mri-batches": rule("mri.view", ["mri.manage", "mri.manage", "mri.manage", ""], true),
