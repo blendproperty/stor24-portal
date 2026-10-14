@@ -38,7 +38,7 @@ export async function activeWalkIn(token: string) {
 }
 export async function walkInView(token: string) {
   const visit = await activeWalkIn(token);
-  return { facilitySlug: visit.facility.publicSlug, facilityName: visit.facility.name, expiresAt: visit.expiresAt.toISOString(), reference: visit.reservation?.publicReference ?? null };
+  return { id: visit.id, facilitySlug: visit.facility.publicSlug, facilityName: visit.facility.name, expiresAt: visit.expiresAt.toISOString(), reference: visit.reservation?.publicReference ?? null };
 }
 export async function endWalkIn(token: string) {
   const hash = walkInTokenHash(token);

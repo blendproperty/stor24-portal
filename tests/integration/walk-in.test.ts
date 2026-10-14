@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { db } from "../../src/lib/db";
-import { startWalkIn, redeemWalkIn, activeWalkIn, endWalkIn } from "../../src/lib/walk-in-service";
+import { startWalkIn, redeemWalkIn, activeWalkIn, walkInView, endWalkIn } from "../../src/lib/walk-in-service";
 import { createPublicReservation } from "../../src/lib/public-booking-service";
 import { POST as publicWalkIn } from "../../src/app/api/public/v1/walk-in/route";
 test("isolated PostgreSQL tablet visit and booking boundaries", async t => {
@@ -62,6 +62,15 @@ test("isolated PostgreSQL tablet visit and booking boundaries", async t => {
       await assert.rejects(redeemWalkIn(v.visitCode, "code"), /WALK_IN_UNAVAILABLE/);
       await assert.rejects(redeemWalkIn(launch), /WALK_IN_UNAVAILABLE/);
       await assert.rejects(redeemWalkIn("ZZZZZZZZ", "code"), /WALK_IN_UNAVAILABLE/);
+    });
+    await t.test("tablet screens can distinguish visits with identical store and expiry", async () => {
+      const first = await prepare(), second = await prepare();
+      const firstSession = await redeemWalkIn(first.v.visitCode, "code"), secondSession = await redeemWalkIn(second.launch);
+      const expiry = new Date(Date.now() + 3600000);
+      await db.walkInVisit.updateMany({ where: { id: { in: [first.v.id, second.v.id] } }, data: { expiresAt: expiry } });
+      const a = await walkInView(firstSession.token), b = await walkInView(secondSession.token);
+      assert.equal(a.facilitySlug, b.facilitySlug); assert.equal(a.expiresAt, b.expiresAt);
+      assert.equal(a.id, first.v.id); assert.equal(b.id, second.v.id); assert.notEqual(a.id, b.id);
     });
     await t.test("one visit creates one walk-in booking, rollback preserves units, clearing retains the booking", async () => {
       const { v, launch } = await prepare(), { token } = await redeemWalkIn(launch);
