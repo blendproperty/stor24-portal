@@ -70,6 +70,7 @@ jobs:
       - run: npx tsx --test tests/integration/facial-photos.test.ts
       - run: npx tsx --test tests/integration/identity-documents.test.ts
       - run: npx tsx --test tests/integration/recurring-charge-report.test.ts
+      - run: npx tsx --test tests/integration/billing-plan-history-evidence.test.ts
       - run: npx tsx --test tests/integration/monthly-billing.test.ts
       - run: npx tsx --test tests/integration/initial-rent.test.ts
       - run: npx tsx --test tests/integration/rent-reviews.test.ts

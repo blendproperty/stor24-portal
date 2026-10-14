@@ -25,7 +25,7 @@ Scope approved in this conversation: **existing tenants, fixed monthly amount**;
 
 ## Provider contracts still required
 
-Netcash's public [eCommerce contract](https://api.netcash.co.za/inbound-payments/pay-now/pay-now-ecommerce/) documents tokenisation and finite cycle fields, separate initial and recurring amounts, schedule anchoring and live-only card-subscription tests. Tokenisation does not work in Pay Now TEST MODE. The [UpdateSubscriptions contract](https://api.netcash.co.za/inbound-payments/pay-now/subscription-update-service/) uses a different date encoding (CCYYMMDD) and updates finite cycles/amount/frequency/active state.
+Netcash's public [eCommerce contract](https://api.netcash.co.za/inbound-payments/pay-now/pay-now-ecommerce/) documents tokenisation and finite cycle fields, separate initial and recurring amounts, schedule anchoring and earlier card-subscription test restrictions. Nicole’s 13 October account-specific confirmation and Netcash’s April2026 update confirm developer-account subscription testing; actual enrollment/cycle validation remains required. Tokenisation does not work in Pay Now TEST MODE. The [UpdateSubscriptions contract](https://api.netcash.co.za/inbound-payments/pay-now/subscription-update-service/) uses a different date encoding (CCYYMMDD) and updates finite cycles/amount/frequency/active state.
 
 The published TransactionStatus/Check example proves a transaction's reference, amount and accepted result. It does not itself establish verified card ownership/token, subscription state, recurring period identity or ongoing cycle duration. Do not infer subscription confirmation from an unsigned Notify/Accept token or one successful initial payment.
 
@@ -72,3 +72,7 @@ Brett requested built-in sandbox testing and confirmed use of the stored test ac
 ### Native recurring-charge increment
 
 Current approved-plan projections, scoped filters, included tax/discount lines, explicit review exceptions and online facility totals are implemented. CSV is a backup, not the collection transport. Separate Netcash review retains store/month and uses the existing guarded direct standard-debit-order API. No production submission flags are enabled. Runbook: `docs/RECURRING_CHARGES_REPORT.md`. Historical effective plan versions, broader recognised financial reports and real provider/live collection acceptance remain gates.
+
+### 14 October overnight increment
+
+Retained monthly plan approvals/changes with immutable source-bound snapshots and observed legacy baselines. No historical effective periods or recognized income are invented. Netcash payment operations now distinguishes all documented provider methods, keeps tests visible, refreshes server-verified classification, and fixes pre-tenancy booking scope through exact reservation/account/customer attribution. Four prior test successes were independently reverified: one card and three Instant EFT; no payment was deleted/reposted. Card subscription developer testing is now confirmed by Nicole and the April2026 provider update, superseding blanket live-only assumptions. Full-payment coverage and remaining provider/onboarding/UAT gates are in `docs/NETCASH_FULL_PAYMENT_SCOPE_2026-10-14.md`.
