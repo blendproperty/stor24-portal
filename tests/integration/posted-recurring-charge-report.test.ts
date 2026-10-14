@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';import test from 'node:test';import {randomUUID,createHash} from 'node:crypto';
 import {db} from '../../src/lib/db';import {postedRecurringChargeReport} from '../../src/lib/posted-recurring-charge-service';import {reportParametersSchema} from '../../src/lib/reporting';
+import {reportInsights} from '../../src/lib/report-insights';
 test('isolated original posted billing report preserves historical amounts, scope and financial records',async t=>{
  assert.equal(process.env.MERCHANDISE_DB_TEST,'isolated-ci');assert.equal(new URL(process.env.DATABASE_URL!).hostname,'localhost');
- const org=await db.organisation.create({data:{name:'Posted billing CI',slug:randomUUID()}}),facilities=await Promise.all(['Owned','Other'].map(name=>db.facility.create({data:{organisationId:org.id,name,code:randomUUID()}})));
+ const org=await db.organisation.create({data:{name:'Posted billing CI',slug:randomUUID()}}),facilities=await Promise.all([0,1].map(index=>db.facility.create({data:{organisationId:org.id,name:'Shared reporting name',code:`SYN-${index}-${randomUUID()}`}})));
  const scope={organisationId:org.id,userId:'synthetic-reader',facilityIds:[facilities[0].id],unrestrictedFacilities:false},period='2026-09',fingerprint='a'.repeat(64),effectiveAt=new Date('2026-08-31T22:00:00Z');
  async function fixture(index:number){
   const customer=await db.customer.create({data:{organisationId:org.id,firstName:'Synthetic'}}),account=await db.account.create({data:{customerId:customer.id,accountNumber:randomUUID(),balance:48.5}}),tenancy=await db.tenancy.create({data:{accountId:account.id,customerId:customer.id,facilityId:facilities[index].id,status:'CLOSED',startDate:new Date('2025-01-01'),endDate:new Date('2026-10-01')}});
@@ -25,6 +26,11 @@ test('isolated original posted billing report preserves historical amounts, scop
  await t.test('current plan changes cannot reprice original posted history',async()=>{
   await db.configurationProfile.create({data:{organisationId:org.id,facilityId:facilities[0].id,domain:'MONTHLY_BILLING',name:a.account.id,status:'READY',config:{firstPeriod:'2026-10',proration:'FULL_MONTH',taxPercent:15,rentTaxable:true,insuranceEnabled:false,insuranceTaxable:false,charges:[{code:'LATER',name:'Later price plan',amount:999,taxable:true}],discount:null,approvalReference:'LATER-APPROVAL'}}});
   assert.equal((await postedRecurringChargeReport(scope,parameters)).find(row=>row.category==='RENT')?.amount,'115.00');
+ });
+ await t.test('identically named stores retain separate original amounts and authoritative store codes',async()=>{
+  const rows=await postedRecurringChargeReport({...scope,unrestrictedFacilities:true,facilityIds:[]},parameters);assert.equal(rows.length,4);assert.deepEqual(new Set(rows.map(row=>row.facilityId)),new Set(facilities.map(f=>f.id)));assert.deepEqual(new Set(rows.map(row=>row.facilityCode)),new Set(facilities.map(f=>f.code)));
+  const summary=reportInsights('posted-recurring-charges',rows);assert.equal(summary.metrics[0].value,207);assert.equal(summary.metrics[1].value,27);assert.deepEqual(summary.bars.map(bar=>bar.value),[103.5,103.5]);assert.deepEqual(new Set(summary.bars.map(bar=>bar.label)),new Set(facilities.map(f=>`${f.name} · ${f.code}`)));
+  const scoped=await postedRecurringChargeReport(scope,parameters);assert.ok(scoped.every(row=>row.facilityId===facilities[0].id&&row.facilityCode===facilities[0].code));assert.deepEqual(reportInsights('posted-recurring-charges',scoped).bars,[{label:facilities[0].name,value:103.5}]);
  });
  await t.test('date windows use SAST billing effective dates while explicit store requests enforce scope',async()=>{
   assert.deepEqual(await postedRecurringChargeReport(scope,{...parameters,from:'2026-09-02'}),[]);await assert.rejects(postedRecurringChargeReport(scope,{...parameters,facilityId:facilities[1].id}),/FORBIDDEN/);assert.deepEqual(await postedRecurringChargeReport({...scope,organisationId:'unrelated'},parameters),[]);

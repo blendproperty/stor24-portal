@@ -19,3 +19,7 @@ At the read-only runtime check on13 October, `NETCASH_DEBIT_TEST_SUBMISSION_ENAB
 Provider contract: https://api.netcash.co.za/inbound-payments/debit-orders/ and https://api.netcash.co.za/value-added-services/compact-debit/ . Direct batch API is preferred to manual file transfer once its release gates are fulfilled.
 
 Validation and exact promotion status are in PROJECT_CONTEXT.md. Browser fixtures and fake provider transports do not establish real acceptance or payment.
+
+## Store identity in financial summaries
+
+Current-plan and original-posted line records retain the permitted store id and business code. Summaries group by store identity rather than display name; identical names display their distinct store codes. Missing or conflicting attribution and unsafe monetary totals require source review. The preview shows a review message and clears old totals when source validation fails. No billing calculation, ledger balance, collection instruction, receipt or income-recognition rule is changed by this correction. Its protected promotion and database/runtime evidence remain separately recorded in PROJECT_CONTEXT.md.

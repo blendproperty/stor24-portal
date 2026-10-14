@@ -12,7 +12,7 @@ export async function recurringChargeReport(scope: RequestScope, parameters: Rep
     const accounts = await tx.account.findMany({ where: { customer: { organisationId: scope.organisationId }, tenancy: {
       facility: { AND: [facilityWhere(scope), ...(parameters.facilityId ? [{id:parameters.facilityId}] : [])] }, status: { in: ["ACTIVE", "NOTICE_GIVEN"] } } },
       orderBy: { id: "asc" }, take: 501, include: { customer: { select: { firstName: true, lastName: true, companyName: true } }, tenancy: { include: {
-        facility: { select: { name: true } }, occupancies: { where: { status: { notIn: ["PENDING", "CANCELLED"] } }, include: { unit: { select: { number: true, facilityId: true } } }, orderBy: { id: "asc" }, take: 101 }, insuranceEnrollment: true } } } });
+        facility: { select: { name: true, code:true } }, occupancies: { where: { status: { notIn: ["PENDING", "CANCELLED"] } }, include: { unit: { select: { number: true, facilityId: true } } }, orderBy: { id: "asc" }, take: 101 }, insuranceEnrollment: true } } } });
     if (accounts.length > 500) throw Error("RECURRING_REPORT_LIMIT");
     const rows: ReportRow[] = [];
     for (const account of accounts) {
@@ -22,7 +22,7 @@ export async function recurringChargeReport(scope: RequestScope, parameters: Rep
       const invoice = await tx.document.findUnique({ where: { idempotencyKey: `monthly-invoice:${account.id}:${period}` }, select: { tenancyId: true, externalId: true } });
       if (invoice && invoice.tenancyId !== tenancy.id) throw Error("RECURRING_SOURCE_REVIEW");
       const rates = await rentRatesForBilling(tx, scope.organisationId, tenancy.facilityId, tenancy.occupancies, period);
-      rows.push(...recurringChargeRows({ facility: tenancy.facility.name, account: account.accountNumber,
+      rows.push(...recurringChargeRows({ facility: tenancy.facility.name, facilityId:tenancy.facilityId, facilityCode:tenancy.facility.code, account: account.accountNumber,
         customer: account.customer.companyName || [account.customer.firstName, account.customer.lastName].filter(Boolean).join(" "),
         units: tenancy.occupancies.filter(o => o.startDate <= new Date(`${parameters.to}T23:59:59+02:00`) && (!o.endDate || o.endDate > new Date(`${period}-01T00:00:00+02:00`))).map(o => o.unit.number).join(" | "),
         paymentMethod: tenancy.paymentMethod, currency: account.currency, plan: profile?.config, planReady: profile?.status === "READY", planUpdatedAt: profile?.updatedAt.toISOString() ?? null,
