@@ -30,5 +30,6 @@ export async function GET(request: Request) {
     if (!decision.allowed) return Response.json({ error: { code: "DLP_EXPORT_BLOCKED", message: "Data protection blocked this export. Contact your administrator with the request reference.", requestId: decision.requestId } }, { status: 422, headers });
     return Response.json({ data: rows, meta: { currentSnapshot: isSnapshot, source: "stor24-production-database" } }, { headers });
   } catch (error) {
+    if(error instanceof Error&&error.message.startsWith("POSTED_REPORT_"))return Response.json({error:{code:error.message,message:"Choose a valid date range of at most sixty months and a smaller store scope, or review duplicate/invalid posting evidence."}},{status:422,headers:dlpPrivateHeaders});
     if (error instanceof Error && /^RECURRING_/.test(error.message)) return Response.json({ error: { code: error.message, message: error.message === "RECURRING_PERIOD_INVALID" ? "Choose one complete month from this month through the next twelve months. This is a current-plan projection." : "The recurring-charge source needs review or a smaller facility scope." } }, { status: 422, headers: dlpPrivateHeaders }); return authErrorResponse(error); }
 }

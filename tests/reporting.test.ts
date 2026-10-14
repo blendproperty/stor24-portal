@@ -7,7 +7,8 @@ test("report catalogue is filtered by role", () => {
   const sales = availableReports(["reports.sales"]).map((report) => report.key);
   assert.deepEqual(sales, ["lead-conversion"]);
   const owner = availableReports(["*"]);
-  assert.equal(owner.length, 11);
+  assert.equal(owner.length, 12);
+  assert.ok(owner.some(report=>report.key==="posted-recurring-charges"));
 });
 
 test("report exports use scoped production data and never synthetic rows", () => {

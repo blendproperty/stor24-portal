@@ -60,6 +60,7 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
+    if(error instanceof Error&&error.message.startsWith("POSTED_REPORT_"))return Response.json({error:{code:error.message,message:"Choose a valid date range of at most sixty months and a smaller store scope, or review duplicate/invalid posting evidence."}},{status:422,headers:dlpPrivateHeaders});
     if (error instanceof Error && /^RECURRING_/.test(error.message)) return Response.json({ error: { code: error.message, message: error.message === "RECURRING_PERIOD_INVALID" ? "Choose one complete month from this month through the next twelve months. This is a current-plan projection." : "The recurring-charge source needs review or a smaller facility scope." } }, { status: 422, headers: dlpPrivateHeaders });
     if (error instanceof Error && error.message === "COLLECTION_DATE") return Response.json({ error: { code: "VALIDATION_ERROR", message: "Choose an ageing date on or before today in South Africa." } }, { status: 422 });
     if (error instanceof Error && error.message === "COLLECTION_LIMIT") return Response.json({ error: { code: "REPORT_LIMIT", message: "This ageing report exceeds the account limit. Select a smaller facility scope." } }, { status: 422 });

@@ -66,6 +66,7 @@ jobs:
       - run: node scripts/test-daily-close-history.mjs
       - run: node scripts/test-report-export-recovery.mjs
       - run: node scripts/test-recurring-charges.mjs
+      - run: node scripts/test-posted-recurring-charges.mjs
       - run: node scripts/test-audited-workspace-download.mjs
       - run: node scripts/test-reports-and-unit-map.mjs
       - run: npx tsx scripts/test-visual-report-builder.mjs

@@ -80,6 +80,7 @@ export function ReportPreview({
                 <strong>
                   {m.money ? "R " : ""}
                   {m.value.toLocaleString("en-ZA", {
+                    minimumFractionDigits: m.money ? 2 : 0,
                     maximumFractionDigits: 2,
                   })}
                 </strong>
@@ -105,6 +106,7 @@ export function ReportPreview({
                   </div>
                   <b>
                     {b.value.toLocaleString("en-ZA", {
+                      minimumFractionDigits: ["recurring-charges", "posted-recurring-charges"].includes(new URLSearchParams(query).get("reportKey") ?? "") ? 2 : 0,
                       maximumFractionDigits: 2,
                     })}
                   </b>
