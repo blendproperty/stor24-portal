@@ -1,3 +1,4 @@
+import {retainBillingPlanVersion,readBillingPlanVersions} from "./billing-plan-history";
 import { createHash } from "node:crypto";
 import { db } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
@@ -37,10 +38,15 @@ export async function saveMonthlyBillingPlan(scope: RequestScope, accountId: str
   return db.$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${accountId} FOR UPDATE`;
     const { tenancy, profile } = await context(tx, scope, accountId);
+    const history=await retainBillingPlanVersion(tx,{organisationId:scope.organisationId,facilityId:tenancy.facilityId,accountId,actorId:scope.userId,plan,previousPlan:profile?.config,previousReady:profile?.status==="READY",previousUpdatedAt:profile?.updatedAt??null});
+    if(!history.changed&&profile?.status==="READY")return profile.config as unknown as BillingPlan;
     const result = await tx.configurationProfile.upsert({ where: { organisationId_facilityId_domain_name: { organisationId: scope.organisationId, facilityId: tenancy.facilityId, domain: DOMAIN, name: accountId } }, create: { organisationId: scope.organisationId, facilityId: tenancy.facilityId, domain: DOMAIN, name: accountId, status: "READY", config: plan }, update: { config: plan, status: "READY" } });
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: tenancy.facilityId, actorId: scope.userId, action: "billing.plan_approved", entityType: "Account", entityId: accountId, before: profile?.config ?? Prisma.JsonNull, after: plan } });
     return result.config as unknown as BillingPlan;
-  });
+  },{isolationLevel:"Serializable",timeout:20000});
+}
+export async function monthlyBillingHistory(scope:RequestScope,accountId:string,before?:number){
+ return db.$transaction(async tx=>{const {tenancy}=await context(tx,scope,accountId);return readBillingPlanVersions(tx,scope.organisationId,tenancy.facilityId,accountId,before)},{isolationLevel:"RepeatableRead",timeout:20000});
 }
 async function preview(client: Client, scope: RequestScope, accountId: string, period: string) {
   const dates = periodDates(period);

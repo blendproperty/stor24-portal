@@ -1,0 +1,7 @@
+# Retained billing-plan history
+
+14 October2026. Monthly billing now records immutable source-bound plan snapshots with a monotonically numbered hash chain, recording time, actor and approval reference. Identical repeated saves do not add duplicate versions. The first change to an existing legacy plan retains the prior configuration as OBSERVED_LEGACY with original actor unknown; its last update timestamp is provenance, not a fabricated approval or historical effective period. No versions are backfilled into the past.
+
+History and active-plan change/audit commit atomically under the account lock and serializable transaction. Failed audit, invalid source, broken chain or divergent active terms fail closed. Generic configuration excludes/protects both active monthly-plan and retained-version domains. Dedicated billing-view scope reads pages of20 versions with a next cursor, strict snapshot/hash/source validation and private headers. Account switches clear history and are disabled during a history read. Approved terms can be inspected in Monthly billing.
+
+This establishes forward change retention. It does not enable historical amount reconstruction from current rent/insurance/customer data, assign historical finance recognition, infer effective plan periods or rewrite existing invoice/ledger data. Original invoice and posted charge evidence remain separate. Customer/staff/finance acceptance and historical effective-period semantics remain gates; exact validation/promotion stages are in PROJECT_CONTEXT.md.

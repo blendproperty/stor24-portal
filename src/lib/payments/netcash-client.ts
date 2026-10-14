@@ -316,14 +316,14 @@ export function createPayNowCheckout(connection: { config: unknown }, params: {
  * scoped by the (effectively unguessable) RequestTrace value alone.
  */
 export async function checkPayNowTransactionStatus(requestTrace: string, request: typeof fetch = fetch) {
-  const res = await request(`https://ws.netcash.co.za/PayNow/TransactionStatus/Check?RequestTrace=${encodeURIComponent(requestTrace)}`);
+  const res = await request(`https://ws.netcash.co.za/PayNow/TransactionStatus/Check?RequestTrace=${encodeURIComponent(requestTrace)}`,{cache:"no-store",redirect:"error",signal:AbortSignal.timeout(20000)});
   const text = await res.text();
-  if (!res.ok) throw new Error(`NETCASH_TRANSACTION_STATUS_HTTP_${res.status}: ${text.slice(0, 500)}`);
+  if (!res.ok) throw new Error(`NETCASH_TRANSACTION_STATUS_HTTP_${res.status}`);
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
   } catch {
-    throw new Error(`NETCASH_TRANSACTION_STATUS_NON_JSON: ${text.slice(0, 500)}`);
+    throw new Error("NETCASH_TRANSACTION_STATUS_NON_JSON");
   }
   const body = parsed as { RequestTrace?: string; Amount?: string; TransactionAccepted?: boolean; Reference?: string; Reason?: string };
   return {

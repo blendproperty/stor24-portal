@@ -3,7 +3,7 @@ import { authErrorResponse } from "@/lib/auth-guards";
 import { requirePermissionScope } from "@/lib/scope";
 import { sameOrigin } from "@/lib/request-security";
 import { billingPeriodSchema } from "@/lib/monthly-billing-policy";
-import { getMonthlyBillingPlan, monthlyBillingAccounts, monthlyBillingInvoices, postMonthlyBilling, previewMonthlyBilling, saveMonthlyBillingPlan } from "@/lib/monthly-billing-service";
+import { monthlyBillingHistory, getMonthlyBillingPlan, monthlyBillingAccounts, monthlyBillingInvoices, postMonthlyBilling, previewMonthlyBilling, saveMonthlyBillingPlan } from "@/lib/monthly-billing-service";
 
 const requestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("preview"), accountId: z.string().cuid(), period: billingPeriodSchema }).strict(),
@@ -12,6 +12,9 @@ const requestSchema = z.discriminatedUnion("action", [
 ]);
 function failure(error: unknown) {
   const messages: Record<string, string> = {
+    BILLING_HISTORY_INTEGRITY: "Billing-plan history failed integrity checks. Ask finance to review the account; no terms have changed.",
+    BILLING_HISTORY_SOURCE_CHANGED: "The active plan differs from its retained history. Finance must review it before another approval.",
+    BILLING_HISTORY_SOURCE_INVALID: "The previous terms cannot be retained as a valid plan. Finance must review the source before replacing it.",
     BILLING_RECONCILIATION_REQUIRED: "The saved balance and transaction history need finance review before billing. Check opening balances, corrections and future-dated entries; nothing has been posted.",
     BILLING_PLAN_REQUIRED: "Save approved billing terms for this account before previewing.",
     BILLING_BEFORE_APPROVED_START: "This month is earlier than the approved first unbilled month. Check the opening balance and billing history with finance.",
@@ -34,9 +37,11 @@ function failure(error: unknown) {
 export async function GET(request: Request) {
   try {
     const scope = await requirePermissionScope("billing.view");
-    const accountId = new URL(request.url).searchParams.get("accountId");
+    const params=new URL(request.url).searchParams;
+    const accountId = params.get("accountId");
     if (accountId) {
       z.string().cuid().parse(accountId);
+      if(params.get("history")==="true") {const before=params.get("before");const cursor=before?z.coerce.number().int().min(1).max(10000000).parse(before):undefined;return Response.json({data:await monthlyBillingHistory(scope,accountId,cursor)},{headers:{"cache-control":"private, no-store","x-content-type-options":"nosniff"}})}
       const [plan, invoices] = await Promise.all([getMonthlyBillingPlan(scope, accountId), monthlyBillingInvoices(scope, accountId)]);
       return Response.json({ data: { plan, invoices } });
     }

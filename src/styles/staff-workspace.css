@@ -730,3 +730,6 @@
 
 .report-netcash-review { margin-top: 1rem; padding: 1rem; border: 1px solid var(--border); border-radius: 12px; }
 .report-netcash-review .button { display: inline-flex; width: auto; max-width: 100%; white-space: normal; }
+
+.billing-plan-history { overflow-wrap:anywhere; }
+.billing-plan-history li { margin-block:0.8rem; }

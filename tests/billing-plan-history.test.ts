@@ -1,0 +1,5 @@
+import assert from "node:assert/strict";import test from "node:test";
+import {billingPlanHash,verifyBillingPlanVersion} from "../src/lib/billing-plan-history";
+import {readNetcashEvidence,netcashMethodLabels} from "../src/lib/payments/netcash-payment-evidence";
+test("plan hash is canonical across JSON object order and changes with agreement values",()=>{assert.equal(billingPlanHash({a:1,b:{y:2,x:1}}),billingPlanHash({b:{x:1,y:2},a:1}));assert.notEqual(billingPlanHash({amount:10}),billingPlanHash({amount:11}))});
+test("history/evidence reject untrusted or incomplete snapshots rather than inventing approvals/payment method",()=>{assert.throws(()=>verifyBillingPlanVersion({id:"bad",name:"bad",status:"RECORDED",config:{actorId:"forged"}},"org","store","account"),/INTEGRITY/);assert.equal(readNetcashEvidence({methodCode:"1",accepted:true},{id:"payment",providerRef:"ref",amount:{toFixed:()=>"10.00"},environment:"sandbox"}),null);assert.equal(netcashMethodLabels["1"],"Credit card");assert.equal(netcashMethodLabels["4"],"Instant EFT");assert.equal(netcashMethodLabels["11"],"paymyway")});
