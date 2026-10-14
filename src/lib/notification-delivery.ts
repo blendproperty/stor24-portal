@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { db } from "@/lib/db";
 import { privacyHash } from "@/lib/request-security";
+import { historyEvidence } from "@/lib/customer-history-message-policy";
 
 type Attempt = { ok: true; providerReference?: string } | { ok: false; code: string; retryable: boolean };
 
@@ -15,6 +16,7 @@ export async function sendNotificationOnce(input: {
 }): Promise<boolean> {
   const payloadHash = createHash("sha256").update(JSON.stringify(input.payload)).digest("hex");
   const recipientHash = privacyHash(input.recipient);
+  const retainedText = historyEvidence(input.payload);
   let claimed;
   try {
     claimed = await db.communicationLog.create({ data: {
@@ -22,7 +24,7 @@ export async function sendNotificationOnce(input: {
       templateId: input.templateId, channel: input.channel, direction: "OUTBOUND", messageType: input.messageType,
       recipientHash, idempotencyKey: input.idempotencyKey, provider: input.provider,
       status: "PENDING", attempts: 1, nextRetryAt: null,
-      metadata: { payloadHash, deliveryOutcome: "IN_PROGRESS" },
+      metadata: { payloadHash, deliveryOutcome: "IN_PROGRESS", ...(retainedText ? { historyEvidence: retainedText } : {}) },
     } });
   } catch (error) {
     if (!(error && typeof error === "object" && "code" in error && error.code === "P2002")) return false;
@@ -48,7 +50,7 @@ export async function sendNotificationOnce(input: {
       sentAt: result.ok ? new Date() : null, failedAt: result.ok ? null : new Date(), nextRetryAt: null,
       failureCode: result.ok ? null : uncertain ? "DELIVERY_REVIEW_REQUIRED" : result.code,
       failureMessage: result.ok ? null : uncertain ? "Delivery could not be confirmed. Review the provider record before retrying." : "The provider rejected this notification. Review before retrying.",
-      metadata: { payloadHash, deliveryOutcome: result.ok ? "ACCEPTED" : uncertain ? "UNCERTAIN" : "REJECTED" },
+      metadata: { payloadHash, deliveryOutcome: result.ok ? "ACCEPTED" : uncertain ? "UNCERTAIN" : "REJECTED", ...(retainedText ? { historyEvidence: retainedText } : {}) },
     } });
   } catch { return false; } // The pending claim remains durable if finalisation fails.
   return result.ok;

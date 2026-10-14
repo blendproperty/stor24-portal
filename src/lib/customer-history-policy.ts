@@ -61,5 +61,6 @@ export const historyReadSchema = z.object({ data: z.object({
   writableFacilities: z.array(z.object({ id: z.string(), name: z.string() })),
   visibility: z.object({ communications: z.boolean(), collections: z.boolean() }),
   legacyNotes: z.string().nullable(),
+  canExport: z.boolean().optional(),
 }) });
 export type CustomerHistoryRead = z.infer<typeof historyReadSchema>["data"];

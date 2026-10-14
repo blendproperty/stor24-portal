@@ -2948,3 +2948,80 @@ a.module-card:focus-visible {
   .customer-note-body { grid-column: auto; }
   .customer-history .button { max-width: 100%; }
 }
+
+/* Customer workspace: a compact dossier with one visible section at a time. */
+.customer-workspace { gap: 18px; }
+.customer-workspace .summary-strip { display:flex; gap:0; border:1px solid var(--border); border-radius:12px; background:white; overflow:hidden; }
+.customer-workspace .summary-cell { flex:1; padding:12px 18px; display:flex; align-items:center; gap:10px; }
+.customer-workspace .summary-cell span { font-size:11px; }
+.customer-workspace .summary-cell strong { font-size:19px; order:-1; }
+.customer-workspace-layout { grid-template-columns: minmax(235px,280px) minmax(0,1fr); gap:18px; }
+.customer-workspace .customers-list { max-height:calc(100vh - 230px); position:sticky; top:84px; }
+.customer-workspace .customers-list .toolbar-search { padding:14px; position:sticky; top:0; z-index:1; background:white; }
+.customer-workspace .account-list-row { padding:15px; gap:10px; }
+.customer-workspace .account-list-row small { margin-top:5px; font-size:11px; }
+.customer-record-ref { font-size:10px; color:var(--muted); background:#f1f5f6; padding:4px 6px; border-radius:5px; }
+.customer-workspace .customer-detail { padding:0; overflow:hidden; min-width:0; }
+.customer-profile-heading { display:flex; justify-content:space-between; gap:20px; align-items:center; padding:24px; }
+.customer-profile-identity { display:flex; align-items:center; gap:14px; min-width:0; }
+.customer-profile-identity > div { min-width:0; }
+.customer-profile-heading h2 { margin:5px 0; font-size:24px; }
+.customer-profile-heading .panel-subtitle { overflow-wrap:anywhere; font-size:12px; }
+.customer-avatar { display:grid; place-items:center; width:52px; height:52px; flex:0 0 52px; border-radius:14px; background:#153c33; color:white; font-weight:750; font-size:18px; }
+.customer-profile-actions { display:flex; gap:8px; }
+.customer-picker-toggle { display:none; }
+.customer-profile-tabs { display:flex; gap:20px; padding:0 24px; border-bottom:1px solid var(--border); background:#fafcfc; overflow-x:auto; }
+.customer-profile-tabs button { border:0; background:none; padding:15px 0; font:inherit; color:var(--muted); font-size:12px; font-weight:750; white-space:nowrap; border-bottom:3px solid transparent; cursor:pointer; }
+.customer-profile-tabs button[aria-current="page"] { color:var(--ink); border-bottom-color:var(--orange); }
+.customer-profile-tab { padding:24px; }
+.customer-profile-tab[hidden], .customer-note-form[hidden] { display:none; }
+.customer-profile-tab .customer-history { margin:0; padding:0; border:0; }
+.customer-history-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:7px; }
+.customer-history-actions .button { padding:9px 12px; min-height:36px; font-size:11px; }
+.customer-history-heading { align-items:center; }
+.customer-history-heading h3 { font-size:18px; }
+.customer-history-heading p { color:var(--muted); font-size:11px; margin-bottom:0; }
+.customer-history-filters { padding:14px; background:#f6f8f9; border:1px solid #e1e7e9; border-radius:10px; margin:18px 0; }
+.customer-history label { font-size:11px; }
+.customer-history input, .customer-history select { padding:9px 10px; min-height:38px; font-size:12px; }
+.customer-note-form { background:white; border:1px solid #dce5e4; border-top:3px solid #ef5707; box-shadow:0 4px 18px #153c3309; }
+.customer-note-form-title { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+.customer-note-form-title h4 { margin:0; font-size:15px; }
+.customer-history-caption { font-size:11px; color:var(--muted); line-height:1.5; margin:16px 0; }
+.customer-timeline { margin:0; }
+.customer-timeline li { border:1px solid #e2e8ea; padding:16px; margin:0 0 10px; border-radius:10px; display:flex; gap:13px; background:white; }
+.customer-timeline-icon { display:grid; place-items:center; width:34px; height:34px; flex:0 0 34px; border-radius:9px; color:#286652; background:#edf6f1; }
+.customer-timeline-content { flex:1; min-width:0; }
+.customer-event-heading { display:flex; align-items:start; justify-content:space-between; gap:14px; }
+.customer-timeline h4 { margin:0 0 7px; font-size:13px; font-weight:750; }
+.customer-event-download { display:flex; gap:5px; align-items:center; border:0; background:transparent; color:#52666c; font:inherit; font-size:10px; cursor:pointer; padding:2px; }
+.customer-timeline-meta { font-size:10px; gap:5px 12px; }
+.customer-timeline-body { line-height:1.55; font-size:13px; margin-top:12px; }
+.customer-timeline-delivery { font-size:10px; margin:10px 0 0; color:#61777e; gap:6px 12px; }
+.customer-timeline-delivery strong { padding:3px 7px; border-radius:5px; background:#eff5f3; color:#286652; font-weight:650; }
+.customer-workspace .customer-detail .empty-cell { padding:24px 14px; height:auto; min-height:0; }
+.customer-profile-tab .customer-record-grid { margin-top:0; }
+@media(max-width:1100px) {
+  .customer-workspace-layout { grid-template-columns:220px minmax(0,1fr); }
+  .customer-profile-heading { padding:18px; }
+  .customer-profile-tabs { gap:16px; padding:0 18px; }
+  .customer-profile-tab { padding:18px; }
+  .customer-history-heading { align-items:start; flex-direction:column; }
+  .customer-history-actions { justify-content:flex-start; }
+}
+@media(max-width:760px) {
+  .customer-workspace-layout { grid-template-columns:1fr; }
+  .customer-workspace .customers-list { display:none; position:static; max-height:330px; }
+  .customer-workspace .customers-list.customer-picker-open { display:block; }
+  .customer-picker-toggle { display:inline-flex; }
+  .customer-profile-heading { flex-direction:column; align-items:stretch; gap:14px; }
+  .customer-profile-actions { justify-content:space-between; }
+  .customer-profile-tabs { gap:20px; }
+  .customer-workspace .summary-cell { flex-direction:column; align-items:start; gap:4px; padding:10px; }
+  .customer-workspace .summary-cell span { font-size:9px; }
+  .customer-profile-tab { padding:15px; }
+  .customer-timeline li { padding:12px; gap:9px; }
+  .customer-event-download span { display:none; }
+}
+
+.customer-workspace .page-header .form-actions { flex-wrap:wrap; }
