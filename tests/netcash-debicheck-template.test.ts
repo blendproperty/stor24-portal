@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {parseDebiCheckTemplate,readDebiCheckTemplate} from '../src/lib/payments/netcash-debicheck-soap';
+const namespace='http://schemas.datacontract.org/2004/07/NC.DG.TMS.C.WCF.NIWS',id='NCDCT000000001';
+const fields={AdjustmentAmount:'0.0000',AdjustmentCategory:'N',AdjustmentRuleIndicator:'Y',AdjustmentType:'AMNT',AuthenticationType:'BATCH',CollectionFrequency:'MNTH',CollectionFrequencyDayCode:'MNTH_01',DebitEntryClassCode:'0036',DebitValueType:'USAGE BASED',DebtorAuthCode:'Batch (TT2)',DebtorAuthenticationRequired:'0227',InstallmentOccurrence:'RCUR',RMS:'False',TemplateName:'Synthetic template',TrackingDayCode:'01 Day tracking',TrackingIndicator:'Y'};
+export function templateXml(){return`<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><DebiCheckRetrieveMandateTemplateDetailResponse xmlns="http://tempuri.org/"><DebiCheckRetrieveMandateTemplateDetailResult xmlns:a="${namespace}"><a:ErrorCode>000</a:ErrorCode><a:TemplateId>${id}</a:TemplateId>${Object.entries(fields).map(([name,value])=>`<a:${name}>${value}</a:${name}>`).join('')}<a:InitiationDayOptions xmlns:b="http://schemas.microsoft.com/2003/10/Serialization/Arrays"><b:string>MNTH_01</b:string><b:string>MNTH_31</b:string></a:InitiationDayOptions></DebiCheckRetrieveMandateTemplateDetailResult></DebiCheckRetrieveMandateTemplateDetailResponse></s:Body></s:Envelope>`;}
+test('monthly template retains exact terms and day choices without treating TT2 or RMS as TT1 authority',()=>{
+ const value=parseDebiCheckTemplate(templateXml(),id);assert.deepEqual(value.detail,fields);assert.deepEqual(value.monthlyDayOptions,['MNTH_01','MNTH_31']);assert.equal(value.authenticationSubmissionEnabled,false);assert.equal(value.collectionEnabled,false);
+});
+test('template SOAP reader uses the exact WSDL method, debit key and requested template',async()=>{
+ let calls=0;const result=await readDebiCheckTemplate('11111111-1111-4111-8111-111111111111',id,async(url,options)=>{calls++;assert.equal(url,'https://ws.netcash.co.za/NIWS/NIWS_NIF.svc');assert.equal((options!.headers as Record<string,string>).SOAPAction,'"http://tempuri.org/INIWS_NIF/DebiCheckRetrieveMandateTemplateDetail"');assert.match(String(options!.body),/<DebiCheckMandateTemplateId>NCDCT000000001<\/DebiCheckMandateTemplateId>/);assert.equal(options!.redirect,'error');return new Response(templateXml());});assert.equal(calls,1);assert.equal(result.templateId,id);
+});
+test('wrong template, duplicate fields, namespaces, wrappers and malformed XML cannot pass source verification',()=>{
+ for(const xml of[templateXml().replace(id,'NCDCT000000002'),templateXml().replace('<a:TemplateId>','<a:TemplateId>'+id+'</a:TemplateId><a:TemplateId>'),templateXml().replace(namespace,'https://foreign.invalid'),templateXml().replace('</s:Envelope>',''),templateXml().replace('<s:Body>','<s:Body><unknown/>'),templateXml().replace('<b:string>MNTH_31','<b:string>MNTH_01'),templateXml().replace('MNTH_31','WEEK_01'),templateXml().replace('<s:Envelope','<!DOCTYPE private><s:Envelope')])assert.throws(()=>parseDebiCheckTemplate(xml,id),/RESPONSE_REVIEW/);
+ assert.throws(()=>parseDebiCheckTemplate(templateXml().replace('<a:CollectionFrequency>MNTH','<a:CollectionFrequency>WEEK'),id),/MONTHLY_REVIEW/);
+});
