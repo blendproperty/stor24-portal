@@ -22,7 +22,7 @@ test("isolated PostgreSQL tablet visit and booking boundaries", async t => {
   try {
     await t.test("short-code guesses are rate limited by the forwarded tablet address", async () => {
       const oldKey = process.env.PUBLIC_BOOKING_API_KEY;
-      process.env.PUBLIC_BOOKING_API_KEY = "synthetic-walk-in-api-key-at-least-32-characters";
+      process.env.PUBLIC_BOOKING_API_KEY = randomUUID() + randomUUID();
       const request = (ip: string, authorized = true) => new Request("https://portal.example.invalid/api/public/v1/walk-in", { method: "POST", headers: { "content-type": "application/json", "x-stor24-client-ip": ip, "x-stor24-public-key": authorized ? process.env.PUBLIC_BOOKING_API_KEY! : "wrong" }, body: JSON.stringify({ action: "redeem-code", token: "ZZZZZZZZ" }) });
       try {
         assert.equal((await publicWalkIn(request(key, false))).status, 401);
