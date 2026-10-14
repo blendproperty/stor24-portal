@@ -17,6 +17,7 @@ test("payment request API requires both payment and ledger scope, strict consent
   assert.equal((await post({action:"create",preview:{accountId:id},confirmed:false})).status,422);assert.equal(state.calls,1);
   state.auth=false;assert.equal((await post(input)).status,401);state.auth=true;state.manage=false;assert.equal((await post(input)).status,403);state.manage=true;state.ledger=false;assert.equal((await post(input)).status,403);state.ledger=true;state.origin=false;assert.equal((await post(input)).status,403);state.origin=true;state.limit=true;assert.equal((await post(input)).status,429);state.limit=false;
   r=await compiled.exports.GET(new Request("https://portal.example.invalid/api/v1/payments/netcash/requests?accountId="+id));assert.equal(r.status,200);assert.equal(state.calls,2);
+  assert.equal((await compiled.exports.GET(new Request("https://portal.example.invalid/api/v1/payments/netcash/requests?accountId="+id+"&accountId="+id))).status,422);assert.equal(state.calls,2);
   assert.equal((await post({action:"create",preview:{accountId:id,oversize:"x".repeat(9000)},confirmed:true})).status,422);assert.equal(state.calls,2);
  }finally{delete runtime.paymentRequestRouteFixture}
 });

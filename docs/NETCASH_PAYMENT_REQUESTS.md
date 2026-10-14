@@ -10,6 +10,8 @@ The provider XML is validated against the published invoice structure and origin
 
 Source changes and completed payment intents remove local payment instructions. This is not proof that an already copied provider link expired. Fixed-reference single-use behavior, actual link validity/expiry, method data, return routing and callbacks require controlled developer-account UAT before activation. Provider request acceptance is not a paid receipt, financial posting, settlement or recognized income. Test outcomes remain separate from balances and financial reports.
 
+Refreshing history hides payment instructions while the request runs. A failed refresh keeps them hidden until a successful read confirms the current source. Both staff and tenant browser regressions cover this recovery, source holds and mobile layouts. XML attributes use forward scanning rather than an ambiguous repeated regular expression; malformed responses remain subject to bounded validation and staff review.
+
 `NETCASH_PAYMENT_REQUEST_SANDBOX_ENABLED` defaults off; the stored connection must explicitly be test. History remains readable when creation is disabled. Production company onboarding, live activation, bank reconciliation and remaining full-payment/finance/provider acceptance gates are tracked in PROJECT_CONTEXT.md. No actual CreateInvoice, customer payment, email or financial posting was performed by the automated validation.
 
 Primary contracts: https://api.netcash.co.za/inbound-payments/pay-now/billing/ ; https://www.netcash.co.za/netcash/xsd/invoices.xsd ; https://ws.netcash.co.za/PayNow/PayNow.svc?singleWsdl .

@@ -18,7 +18,9 @@ function failure(error:unknown){
  return authErrorResponse(error);
 }
 export async function GET(request:Request){try{
- const{payment,ledger}=await scopes(false);const input=z.object({accountId:z.string().cuid()}).strict().parse(Object.fromEntries(new URL(request.url).searchParams));await requireAccountLedger(ledger,input.accountId);
+ const{payment,ledger}=await scopes(false);const params=new URL(request.url).searchParams;
+ if(params.getAll("accountId").length!==1)return Response.json({error:{message:"Choose one account."}},{status:422,headers});
+ const input=z.object({accountId:z.string().cuid()}).strict().parse(Object.fromEntries(params));await requireAccountLedger(ledger,input.accountId);
  if(await rateLimit(`payment-request-read:${payment.organisationId}:${payment.userId}`,30,60000))return Response.json({error:{message:"Wait a minute before refreshing again."}},{status:429,headers});
  return Response.json({data:await listAccountPaymentRequests(payment,input.accountId)},{headers});
 }catch(error){return failure(error)}}
