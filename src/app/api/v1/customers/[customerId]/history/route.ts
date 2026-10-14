@@ -16,7 +16,9 @@ export async function GET(request: Request, context: Context) {
     const parsed = historyQuerySchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
     if (!parsed.success) return Response.json({ error: { message: "Check the history filters." } }, { status: 422 });
     const [communications, collections, write] = await Promise.all([optionalScope("communications.view"), optionalScope("collections.view"), optionalScope("operations.manage")]);
-    return Response.json({ data: await customerHistory(scope, customerId, parsed.data, { communications, collections, write }) }, { headers: { "Cache-Control": "private, no-store" } });
+    const exported = await optionalScope("customer_history.export");
+    const canExport = !!exported && (scope.unrestrictedFacilities || exported.unrestrictedFacilities || scope.facilityIds.some(id => exported.facilityIds.includes(id)));
+    return Response.json({ data: { ...await customerHistory(scope, customerId, parsed.data, { communications, collections, write }), canExport } }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     if (error instanceof Error && error.message === "HISTORY_CURSOR_INVALID") return Response.json({ error: { message: "Reload customer history to continue." } }, { status: 422 });
     return apiError(error);
