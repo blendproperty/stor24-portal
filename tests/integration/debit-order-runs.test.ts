@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test, { mock } from "node:test";
 import { createHash, randomUUID } from "node:crypto";
 import { db } from "../../src/lib/db";
-import { cancelDebitRun, debitWorkspace, getDebitPlan, prepareDebitRun, previewDebitRun, refreshDebitRun, saveDebitPlan, submitDebitRun } from "../../src/lib/debit-order-service";
+import { cancelDebitRun, debitRunReview, debitWorkspace, getDebitPlan, prepareDebitRun, previewDebitRun, refreshDebitRun, saveDebitPlan, submitDebitRun } from "../../src/lib/debit-order-service";
 import { debitConnectionFingerprint } from "../../src/lib/payments/netcash-debit-batch";
 import { encryptIntegrationSecret } from "../../src/lib/integrations/integration-secret-vault";
 import { refreshHostedMandate } from "../../src/lib/public-hosted-mandate";
@@ -54,6 +54,14 @@ test("isolated PostgreSQL debit order runs", async t => {
       assert.ok((await prepare(f)).id);
       assert.equal(await db.payment.count({ where: { accountId: f.account.id } }), 0);
       assert.equal(await db.ledgerEntry.count({ where: { accountId: f.account.id } }), 1);
+    });
+    await t.test("saved test-readiness diagnostics are scoped, reflect configured gates and leave financial/run state unchanged",async()=>{
+      const f=await fixture(),run=await prepare(f),before=await db.debitOrderRun.findUniqueOrThrow({where:{id:run.id}}),account=await db.account.findUniqueOrThrow({where:{id:f.account.id}}),ledger=await db.ledgerEntry.findMany({where:{accountId:f.account.id}});
+      delete process.env.NETCASH_DEBIT_TEST_SUBMISSION_ENABLED;delete process.env.NETCASH_DEBIT_TEST_ACCOUNT_IDS;delete process.env.NETCASH_DEBIT_TEST_ACTION_DATES;
+      const held=await debitRunReview(f.scope,run.id);assert.equal(held.testReadiness.configurationAllowsTestRequest,false);assert.equal(held.testReadiness.accountsMissingAllowlist,1);assert.ok(!JSON.stringify(held.testReadiness).includes(f.account.id));enable(f);
+      const configured=await debitRunReview(f.scope,run.id);assert.equal(configured.testReadiness.configurationAllowsTestRequest,true);assert.equal(configured.testReadiness.liveSubmissionSupported,false);assert.equal(configured.testReadiness.financialReceipt,false);
+      await assert.rejects(debitRunReview({...f.scope,facilityIds:[]},run.id),/NOT_FOUND/);await assert.rejects(debitRunReview({...f.scope,organisationId:'other'},run.id),/NOT_FOUND/);
+      assert.deepEqual(await db.debitOrderRun.findUniqueOrThrow({where:{id:run.id}}),before);assert.deepEqual(await db.account.findUniqueOrThrow({where:{id:f.account.id}}),account);assert.deepEqual(await db.ledgerEntry.findMany({where:{accountId:f.account.id}}),ledger);assert.equal(await db.payment.count({where:{accountId:f.account.id}}),0);assert.equal(await db.communicationLog.count({where:{organisationId:f.org.id}}),0);
     });
     await t.test("other stores/organisations cannot read, prepare, cancel or submit", async () => {
       const f = await fixture(); const run = await prepare(f);
