@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {randomUUID} from "node:crypto";
 import {db} from "../../src/lib/db";
-import {previewCollectionNotice,prepareCollectionNotice,reviewCollectionNotice,sendCollectionNotice} from "../../src/lib/collection-notice-service";
+import {previewCollectionNotice,prepareCollectionNotice,reviewCollectionNotice,sendCollectionNotice,previewCollectionNoticeBatch,prepareCollectionNoticeBatch} from "../../src/lib/collection-notice-service";
 test("isolated collection notices: holds, independent review, source changes and one provider attempt",async t=>{
   assert.equal(process.env.MERCHANDISE_DB_TEST,"isolated-ci");assert.equal(new URL(process.env.DATABASE_URL!).hostname,"localhost");process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY="collection-notice-ci-only-encryption-key-at-least-32";process.env.AUTH_SECRET="collection-notice-ci-only-auth-secret-at-least-32";process.env.APP_URL="https://portal.example.invalid";
   const fixture=async(existing?:{org:{id:string};facility:{id:string}})=>{const key=randomUUID(),org=existing?.org??await db.organisation.create({data:{name:"Notice CI",slug:key}}),facility=existing?.facility??await db.facility.create({data:{organisationId:org.id,code:key,name:"CI store"}});
@@ -14,6 +14,31 @@ test("isolated collection notices: holds, independent review, source changes and
   const approved=async(f:Awaited<ReturnType<typeof fixture>>)=>{const draft=await prepared(f);return reviewCollectionNotice(f.b,{id:draft.id,revision:draft.revision,action:"approve",reference:"CI independent review"})};
   const nativeFetch=globalThis.fetch;globalThis.fetch=async()=>{throw Error("Real provider network is forbidden")};
   try{
+    await t.test("audience preview and atomic draft preparation preserve per-account review and financial baselines",async()=>{
+      const first=await fixture(),second=await fixture(first),ids=[first.account.id,second.account.id],accounts=await db.account.findMany({where:{id:{in:ids}},orderBy:{id:'asc'}}),ledger=await db.ledgerEntry.findMany({where:{accountId:{in:ids}},orderBy:{id:'asc'}});
+      const preview=await previewCollectionNoticeBatch(first.a,ids);assert.equal(preview.items.length,2);assert.equal(preview.prepared,false);assert.equal(preview.emailSent,false);assert.equal(await db.configurationProfile.count({where:{organisationId:first.org.id,domain:'COLLECTION_EMAIL_NOTICE'}}),0);
+      const command={items:preview.items.map(item=>({accountId:item.source.accountId,fingerprint:item.source.fingerprint})),confirm:true},prepared=await prepareCollectionNoticeBatch(first.a,command);assert.equal(prepared.notices.length,2);assert.equal(prepared.emailSent,false);assert.ok(prepared.notices.every(notice=>notice.status==='DRAFT'&&!notice.canApprove));
+      const again=await prepareCollectionNoticeBatch(first.a,command);assert.deepEqual(again.notices.map(notice=>[notice.id,notice.revision]),prepared.notices.map(notice=>[notice.id,notice.revision]));assert.equal(await db.auditEvent.count({where:{organisationId:first.org.id,action:'collection.notice.prepared'}}),2);
+      assert.deepEqual(await db.account.findMany({where:{id:{in:ids}},orderBy:{id:'asc'}}),accounts);assert.deepEqual(await db.ledgerEntry.findMany({where:{accountId:{in:ids}},orderBy:{id:'asc'}}),ledger);assert.equal(await db.payment.count({where:{accountId:{in:ids}}}),0);assert.equal(await db.communicationLog.count({where:{organisationId:first.org.id}}),0);
+      const reviewed=await reviewCollectionNotice(first.b,{id:prepared.notices[0].id,revision:prepared.notices[0].revision,action:'approve',reference:'CI individually reviewed'});await assert.rejects(prepareCollectionNoticeBatch(first.a,command),/IMMUTABLE/);assert.equal((await previewCollectionNotice(first.a,reviewed.accountId)).notice?.status,'APPROVED');assert.equal((await previewCollectionNotice(first.a,prepared.notices[1].accountId)).notice?.status,'DRAFT');
+    });
+    await t.test("a late changed or held recipient rolls back every earlier draft and preparation audit",async()=>{
+      const first=await fixture(),second=await fixture(first),ids=[first.account.id,second.account.id].sort(),preview=await previewCollectionNoticeBatch(first.a,ids),last=ids.at(-1)===first.account.id?first:second;
+      await db.customer.update({where:{id:last.customer.id},data:{communicationConsent:{email:false}}});
+      const command={items:preview.items.map(item=>({accountId:item.source.accountId,fingerprint:item.source.fingerprint})),confirm:true};await assert.rejects(prepareCollectionNoticeBatch(first.a,command),/CHANGED/);
+      const held=await previewCollectionNoticeBatch(first.a,ids);assert.ok(held.items.some(item=>item.source.blockers.length&&item.message===null));await assert.rejects(prepareCollectionNoticeBatch(first.a,{items:held.items.map(item=>({accountId:item.source.accountId,fingerprint:item.source.fingerprint})),confirm:true}),/HOLD/);
+      assert.equal(await db.configurationProfile.count({where:{organisationId:first.org.id,domain:'COLLECTION_EMAIL_NOTICE'}}),0);assert.equal(await db.auditEvent.count({where:{organisationId:first.org.id,action:'collection.notice.prepared'}}),0);assert.equal(await db.communicationLog.count({where:{organisationId:first.org.id}}),0);
+    });
+    await t.test("audiences enforce whole-set scope, confirmation, limits and duplicate rejection",async()=>{
+      const first=await fixture(),foreign=await fixture(),preview=await previewCollectionNoticeBatch(first.a,[first.account.id]);await assert.rejects(previewCollectionNoticeBatch(first.a,[first.account.id,foreign.account.id]),/NOT_FOUND/);
+      const command={items:preview.items.map(item=>({accountId:item.source.accountId,fingerprint:item.source.fingerprint})),confirm:true};await assert.rejects(prepareCollectionNoticeBatch(first.a,{...command,items:[...command.items,{accountId:foreign.account.id,fingerprint:'0'.repeat(64)}]}),/NOT_FOUND/);
+      for(const input of [{...command,confirm:false},{...command,items:[...command.items,...command.items]},{...command,items:Array.from({length:21},(_,i)=>({accountId:'account-'+i,fingerprint:'0'.repeat(64)}))}])await assert.rejects(prepareCollectionNoticeBatch(first.a,input));
+      assert.equal(await db.configurationProfile.count({where:{organisationId:first.org.id,domain:'COLLECTION_EMAIL_NOTICE'}}),0);
+    });
+    await t.test("overlapping audience preparation retains one draft and one audit per account",async()=>{
+      const first=await fixture(),second=await fixture(first),preview=await previewCollectionNoticeBatch(first.a,[first.account.id,second.account.id]),command={items:preview.items.map(item=>({accountId:item.source.accountId,fingerprint:item.source.fingerprint})),confirm:true};
+      const results=await Promise.allSettled([prepareCollectionNoticeBatch(first.a,command),prepareCollectionNoticeBatch(first.a,command)]);assert.ok(results.some(result=>result.status==='fulfilled'));assert.equal(await db.configurationProfile.count({where:{organisationId:first.org.id,domain:'COLLECTION_EMAIL_NOTICE'}}),2);assert.equal(await db.auditEvent.count({where:{organisationId:first.org.id,action:'collection.notice.prepared'}}),2);assert.equal(await db.communicationLog.count({where:{organisationId:first.org.id}}),0);
+    });
     await t.test("two accounts in the same store and day retain independent drafts and review without sending",async()=>{
       const first=await fixture(),second=await fixture(first),accounts=await db.account.findMany({where:{id:{in:[first.account.id,second.account.id]}},orderBy:{id:'asc'}}),ledger=await db.ledgerEntry.findMany({where:{accountId:{in:[first.account.id,second.account.id]}},orderBy:{id:'asc'}}),payments=await db.payment.count({where:{accountId:{in:[first.account.id,second.account.id]}}}),communications=await db.communicationLog.count({where:{organisationId:first.org.id}});
       const a=await prepared(first),b=await prepared(second);assert.equal(a.asOf,b.asOf);assert.notEqual(a.id,b.id);assert.equal(a.accountId,first.account.id);assert.equal(b.accountId,second.account.id);
