@@ -39,7 +39,7 @@ export async function prepareCollectionNotice(scope:RequestScope,accountId:strin
     if(old){const previous=await load(tx,scope,id);if(previous.saved.sourceFingerprint===source.fingerprint&&previous.saved.payloadHash===noticeHash(payload))return view(previous,scope);if(old.status!=="DRAFT")throw Error("COLLECTION_NOTICE_IMMUTABLE");}
     const previous=old?storedSchema.parse(old.config):null;
     const saved={version:1,revision:randomUUID(),accountId,asOf:source.asOf,sourceFingerprint:source.fingerprint,payloadHash:noticeHash(payload),payloadEncrypted:encryptIntegrationSecret(JSON.stringify(payload)),contributors:[...new Set([...(previous?.contributors??[]),scope.userId])],approvedBy:null,approvalReference:null,approvedAt:null};
-    const row=old?await tx.configurationProfile.update({where:{id},data:{config:saved,status:"DRAFT"}}):await tx.configurationProfile.create({data:{id,organisationId:scope.organisationId,facilityId:source.facilityId,domain,name:`Account reminder ${source.asOf}`,config:saved,status:"DRAFT"}});
+    const row=old?await tx.configurationProfile.update({where:{id},data:{config:saved,status:"DRAFT"}}):await tx.configurationProfile.create({data:{id,organisationId:scope.organisationId,facilityId:source.facilityId,domain,name:id,config:saved,status:"DRAFT"}});
     await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:source.facilityId,actorId:scope.userId,action:"collection.notice.prepared",entityType:"ConfigurationProfile",entityId:row.id,after:{revision:saved.revision,sourceFingerprint:source.fingerprint,payloadHash:saved.payloadHash,templateVersion:COLLECTION_NOTICE_VERSION,status:"DRAFT"}}});
     return view(await load(tx,scope,id),scope);
   },{isolationLevel:"Serializable"});
