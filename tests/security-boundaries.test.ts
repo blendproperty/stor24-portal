@@ -571,6 +571,7 @@ test("unit PATCH rolls back number map and rate when audit fails", async () => {
 test("customer DELETE rolls back when audit fails and protects tenancy history", async () => {
   const state = fixture(); state.grant("operations.manage");
   const rows = state.tables.customer;
+  rows.forEach(row => { row.staffNotes = []; });
   state.db.customer.delete = async ({ where }: Row) => rows.splice(rows.findIndex(row => row.id === where.id), 1)[0];
   let fail = true; let audits = 0;
   state.db.auditEvent.create = async () => { if (fail) throw new Error("SYNTHETIC_AUDIT_FAILURE"); audits++; return {}; };
@@ -581,6 +582,7 @@ test("customer DELETE rolls back when audit fails and protects tenancy history",
   fail = false; const own = () => rows.find(row => row.id === "customer-a")!;
   own().tenancies = [{ id: "history" }]; assert.equal((await remove()).status, 409); own().tenancies = [];
   own().reservations = [{ facilityId: "a" }]; assert.equal((await remove()).status, 409); own().reservations = [];
+  own().staffNotes = [{ id: "retained-note" }]; assert.equal((await remove()).status, 409); own().staffNotes = [];
   assert.equal((await remove("customer-b")).status, 403);
   assert.equal((await remove()).status, 204); assert.equal(rows.some(row => row.id === "customer-a"), false); assert.equal(audits, 1);
 });
