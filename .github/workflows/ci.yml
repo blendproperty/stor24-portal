@@ -25,6 +25,7 @@ jobs:
       - run: npm run test:guides
       - run: node scripts/test-monthly-billing.mjs
       - run: node scripts/test-plan-history-netcash-evidence.mjs
+      - run: node scripts/test-tenant-card-subscriptions.mjs
       - run: node scripts/test-debit-orders.mjs
       - run: node scripts/test-adjustments.mjs
       - run: node scripts/test-account-payment-retry.mjs
@@ -137,6 +138,7 @@ jobs:
             output/package-update-recovery/
             output/password-form-recovery/
             output/plan-history-evidence/
+            output/tenant-card-subscriptions/
             output/monthly-billing/
             output/debit-orders/
             output/adjustments/

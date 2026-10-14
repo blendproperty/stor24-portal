@@ -1,0 +1,1 @@
+export const netcashMethodLabels: Record<string, string> = { "1": "Credit card", "2": "Bank EFT", "3": "Retail / SCode", "4": "Instant EFT", "5": "MasterPass", "6": "Visa Click to Pay", "7": "Masterpass QR", "8": "Mobicred", "9": "Payflex", "10": "Flash1Voucher", "11": "paymyway" };

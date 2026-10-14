@@ -5,10 +5,11 @@ import { billingPlanSchema, calculateMonthlyBill } from "@/lib/monthly-billing-p
 import { rentRatesForBilling } from "@/lib/rent-review-service";
 import { isTestPayment } from "./payment-evidence";
 import { CARD_AUTOPAY_TERMS_VERSION, cardAutopayPeriods, cardAutopayScheduleSchema, fixedCardAutopayAmount, cardAutopayFingerprint, cardAutopayRequestText } from "./card-autopay-policy";
+import { CARD_SUBSCRIPTION_DOMAIN, CARD_SUBSCRIPTION_OPEN_STATUSES, CARD_REQUEST_HISTORY_DOMAIN, cardSourceHash } from "./card-autopay-enrollment-policy";
 export type CardAutopayCustomer = { organisationId: string; email: string; customerIds: string[] };
 type Client = Prisma.TransactionClient;
 const DOMAIN = "CARD_AUTOPAY_REQUEST";
-async function prepare(client: Client, session: CardAutopayCustomer, accountId: string, value: unknown, now: Date) {
+export async function prepareCardAutopay(client: Client, session: CardAutopayCustomer, accountId: string, value: unknown, now: Date, allowUnpostedTests = false) {
   const schedule = cardAutopayScheduleSchema.parse(value);
   if (schedule.cycles > 12) throw new Error("CARD_AUTOPAY_DURATION_REVIEW");
   const periods = cardAutopayPeriods(schedule, now);
@@ -32,8 +33,9 @@ async function prepare(client: Client, session: CardAutopayCustomer, accountId: 
   if (!profile) throw new Error("CARD_AUTOPAY_APPROVED_BILLING_REQUIRED");
   const plan = billingPlanSchema.parse(profile.config);
   const payments = await client.payment.findMany({ where: { accountId } });
-  if (payments.some(isTestPayment)) throw new Error("TEST_PAYMENT_RECONCILIATION_REQUIRED");
+  if (!allowUnpostedTests && payments.some(isTestPayment)) throw new Error("TEST_PAYMENT_RECONCILIATION_REQUIRED");
   const entries = await client.ledgerEntry.findMany({ where: { accountId }, orderBy: { id: "asc" } });
+  if (entries.some(entry => payments.filter(isTestPayment).some(payment => entry.externalRef === payment.idempotencyKey || (entry.metadata as { paymentId?: string } | null)?.paymentId === payment.id))) throw new Error("TEST_PAYMENT_RECONCILIATION_REQUIRED");
   // Do not assume an invoice, balance or payment date proves a period is unpaid.
   // Ambiguous forward charges or a credit balance require independent financial review.
   if (Number(account.balance) < 0 || entries.some(e => ["CHARGE", "CREDIT", "REVERSAL", "WRITE_OFF"].includes(e.type) && e.effectiveAt >= new Date(schedule.startDate + "T00:00:00+02:00"))) throw new Error("CARD_AUTOPAY_PREPAID_REVIEW");
@@ -49,12 +51,13 @@ async function prepare(client: Client, session: CardAutopayCustomer, accountId: 
   const source = { organisationId: session.organisationId, accountId, customerId: account.customerId, tenancyId: tenancy.id, facilityId: tenancy.facilityId, accountUpdatedAt: account.updatedAt.toISOString(), tenancyUpdatedAt: tenancy.updatedAt.toISOString(), documents: tenancy.documents, publicLease, profile: { config: profile.config, updatedAt: profile.updatedAt.toISOString() }, entries, payments, bills, schedule, termsVersion: CARD_AUTOPAY_TERMS_VERSION, requestText: text };
   return { accountId, accountNumber: account.accountNumber, facilityId: tenancy.facilityId, tenancyId: tenancy.id, customerId: account.customerId, monthlyAmount, currency: "ZAR", schedule, fingerprint: cardAutopayFingerprint(source), termsVersion: CARD_AUTOPAY_TERMS_VERSION, requestText: text, providerEnrollmentAvailable: false as const };
 }
-export function previewCardAutopayRequest(session: CardAutopayCustomer, accountId: string, value: unknown, now = new Date()) { return prepare(db, session, accountId, value, now); }
+export function previewCardAutopayRequest(session: CardAutopayCustomer, accountId: string, value: unknown, now = new Date(), allowUnpostedTests = false) { return prepareCardAutopay(db, session, accountId, value, now, allowUnpostedTests); }
 export async function withdrawCardAutopayRequest(session: CardAutopayCustomer, accountId: string, requestId: string) {
   return db.$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${accountId} FOR UPDATE`;
     const account = await tx.account.findFirst({ where: { id: accountId, customer: tenantCustomerScope(session), tenancy: { facility: { organisationId: session.organisationId } } }, select: { tenancy: { select: { facilityId: true } } } });
     if (!account?.tenancy) throw new Error("TENANT_NOT_FOUND");
+    if (await tx.configurationProfile.count({ where: { organisationId: session.organisationId, domain: CARD_SUBSCRIPTION_DOMAIN, status: { in: CARD_SUBSCRIPTION_OPEN_STATUSES }, config: { path: ["accountId"], equals: accountId } } })) throw Error("CARD_AUTOPAY_PROVIDER_CANCELLATION_REQUIRED");
     const record = await tx.configurationProfile.findFirst({ where: { id: requestId, organisationId: session.organisationId, facilityId: account.tenancy.facilityId, domain: DOMAIN, name: accountId } });
     if (!record) throw new Error("TENANT_NOT_FOUND");
     if (record.status === "WITHDRAWN") return { id: record.id, status: "WITHDRAWN", providerEnrollmentAvailable: false };
@@ -64,17 +67,26 @@ export async function withdrawCardAutopayRequest(session: CardAutopayCustomer, a
     return { id: record.id, status: "WITHDRAWN", providerEnrollmentAvailable: false };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
-export async function saveCardAutopayRequest(session: CardAutopayCustomer, accountId: string, value: unknown, fingerprint: string, accepted: boolean, now = new Date()) {
+export async function saveCardAutopayRequest(session: CardAutopayCustomer, accountId: string, value: unknown, fingerprint: string, accepted: boolean, now = new Date(), allowUnpostedTests = false) {
   if (accepted !== true) throw new Error("CARD_AUTOPAY_REQUEST_NOT_ACCEPTED");
   return db.$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${accountId} FOR UPDATE`;
-    const preview = await prepare(tx, session, accountId, value, now);
+    const preview = await prepareCardAutopay(tx, session, accountId, value, now, allowUnpostedTests);
     if (preview.fingerprint !== fingerprint) throw new Error("CARD_AUTOPAY_PREVIEW_CHANGED");
     const key = { organisationId: session.organisationId, facilityId: preview.facilityId, domain: DOMAIN, name: accountId };
     const existing = await tx.configurationProfile.findUnique({ where: { organisationId_facilityId_domain_name: key } });
     if (existing) {
       const previous = existing.config as { fingerprint?: string };
       if (existing.status === "REQUESTED" && previous.fingerprint === fingerprint) return { id: existing.id, status: "REQUESTED", providerEnrollmentAvailable: false };
+      if (existing.status === "WITHDRAWN") {
+        if (await tx.configurationProfile.count({ where: { organisationId: session.organisationId, domain: CARD_SUBSCRIPTION_DOMAIN, status: { in: CARD_SUBSCRIPTION_OPEN_STATUSES }, config: { path: ["accountId"], equals: accountId } } })) throw Error("CARD_AUTOPAY_PROVIDER_CANCELLATION_REQUIRED");
+        const snapshot = { originalId: existing.id, status: existing.status, originalCreatedAt: existing.createdAt.toISOString(), originalUpdatedAt: existing.updatedAt.toISOString(), terms: existing.config };
+        const sourceHash = cardSourceHash(snapshot);
+        await tx.configurationProfile.create({ data: { ...key, domain: CARD_REQUEST_HISTORY_DOMAIN, name: `${accountId}:${sourceHash}`, status: "RETAINED", config: { ...snapshot, sourceHash } } });
+        const renewed = await tx.configurationProfile.update({ where: { id: existing.id }, data: { status: "REQUESTED", config: { ...preview, requestedAt: now.toISOString() } } });
+        await tx.auditEvent.create({ data: { organisationId: session.organisationId, facilityId: preview.facilityId, action: "card_autopay.request_renewed", entityType: "Account", entityId: accountId, after: { requestId: renewed.id, previousSourceHash: sourceHash, fingerprint, providerEnrollmentAvailable: false } } });
+        return { id: renewed.id, status: "REQUESTED", providerEnrollmentAvailable: false };
+      }
       // A different request is not permission to overwrite previously recorded terms.
       throw new Error("CARD_AUTOPAY_REQUEST_EXISTS");
     }
