@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { reportInsights } from "@/lib/report-insights";
+import type { ReportInsight } from "@/lib/report-insights";
 import type { ReportRow } from "@/lib/report-data-service";
 export function ReportPreview({
   query,
@@ -9,7 +10,7 @@ export function ReportPreview({
   query: string;
   title: string;
 }) {
-  const [state, setState] = useState<{ rows: ReportRow[]; at: string } | null>(
+  const [state, setState] = useState<{ rows: ReportRow[]; at: string; insight:ReportInsight } | null>(
       null,
     ),
     [error, setError] = useState(""),
@@ -33,8 +34,11 @@ export function ReportPreview({
           throw new Error(payload.error?.message ?? "Report unavailable.");
         if (!Array.isArray(payload.data))
           throw new Error("Invalid report response.");
+        let insight:ReportInsight;
+        try { insight=reportInsights(new URLSearchParams(query).get("reportKey")??"",payload.data); }
+        catch { throw new Error("Store attribution or amounts need review before totals can be shown. Refresh the report and check its source records."); }
         if (current)
-          setState({ rows: payload.data, at: new Date().toISOString() });
+          setState({ rows: payload.data, at: new Date().toISOString(), insight });
       } catch (e) {
         if (current)
           setError(e instanceof Error ? e.message : "Report unavailable.");
@@ -49,7 +53,7 @@ export function ReportPreview({
     };
   }, [query]);
   const key = new URLSearchParams(query).get("reportKey") ?? "",
-    insight = reportInsights(key, state?.rows ?? []),
+    insight = state?.insight ?? reportInsights(key, []),
     max = insight.chartTitle.includes("(%)")
       ? 100
       : Math.max(1, ...insight.bars.map((b) => Math.abs(b.value))),
