@@ -11,6 +11,11 @@ function guide(id: string, title: string, category: string, route: string, scree
 }
 
 export const extendedGuides: WorkflowGuide[] = [
+  guide("netcash-debicheck-templates", "Review DebiCheck templates", "Money and accounts", "/billing/netcash/debicheck", "DebiCheck template review", "Retain monthly provider template terms for independent review before a bank request is prepared.", [
+    ["Read the developer template", "Choose your permitted store and enter its Netcash template ID. Read and retain template performs one read-only provider lookup using that store's configured developer connection. It does not submit a bank request or debit.", ".netcash-debicheck-templates"],
+    ["Ask a different colleague to review", "An authorised colleague reviews the retained terms and confirms their review. The server rechecks the provider template, merchant configuration and fifteen-minute review age. Changed sources require a new observation. Review does not enable authentication or collections.", ".netcash-debicheck-templates"],
+    ["Keep the acceptance gates visible", "Refresh retained history after failures. Customer consent, verified payer contract, durable authentication, collection preparation and provider/finance acceptance remain separate steps. Test observations are not money received.", ".netcash-debicheck-templates"],
+  ]),
   guide("netcash-payment-requests", "Review account payment requests", "Money and accounts", "/billing/netcash/requests", "Netcash payment requests", "Review an existing balance and retain the provider's returned payment options without a new account charge.", [
     ["Choose the account and reviewed amount", "Select an account from stores covered by both your payment and ledger permissions. Review the existing reconciled ZAR balance. A fixed partial amount may be chosen; zero, excess, inconsistent, future or overlapping collection sources require review before a provider request is prepared.", ".netcash-payment-requests"],
     ["Confirm one provider request", "Read the reviewed account and amount, then confirm creation of one sandbox request. This creates a pending test intent, not a new charge or subscription. Email, SMS and push are disabled. Source changes and expired reviews require a fresh preview; repeated confirmation cannot replay the original provider attempt.", ".netcash-payment-requests"],

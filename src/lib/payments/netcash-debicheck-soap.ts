@@ -3,6 +3,7 @@
  * Only the current-status operation below performs a request, and it is read-only.
  */
 import {boundedBody} from "./netcash-mandate";
+import {debiCheckSoapResult,debiCheckScalar as scalar,debiCheckDayOptions} from "./netcash-debicheck-response";
 
 export const DEBICHECK_ENDPOINT="https://ws.netcash.co.za/NIWS/NIWS_NIF.svc";
 const invalid=()=>{throw Error("DEBICHECK_RESPONSE_REVIEW")};
@@ -23,29 +24,9 @@ export function debiCheckAuthenticationFields(key:string,p:DebiCheckAuthenticati
  return[['ServiceKey',serviceKey(key)],['AccountReference',p.accountReference],['DebiCheckMandateTemplateId',p.templateId],['IsIdNumber',p.isIdNumber],['DebtorIdentification',text(p.debtorIdentification,50)],['AccountName',text(p.accountName,100)],['BankAccountName',text(p.bankAccountName,100)],['BranchCode',p.branchCode],['BankAccountNumber',p.bankAccountNumber],['BankAccountType',p.bankAccountType],['MobileNumber',p.mobileNumber],['EmailAddress',p.emailAddress],['CollectionAmount',money(p.collectionAmount)],['FirstCollectionDiffers',p.firstCollectionDiffers],['FirstCollectionAmount',money(p.firstCollectionAmount)],['FirstCollectionDate',date(p.firstCollectionDate)],['collectionDayCode',`MNTH_${String(p.monthlyCollectionDay).padStart(2,'0')}`],['DebtorIdentificationCode',p.debtorIdentificationCode]];
 }
 export function buildDebiCheckAuthenticationEnvelope(key:string,p:DebiCheckAuthenticationTerms){return envelope('DebiCheckAuthenticate',debiCheckAuthenticationFields(key,p));}
-function decode(value:string){
- if(/&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[a-f\d]+;)/i.test(value))return invalid();
- const result=value.replace(/&(amp|lt|gt|quot|apos);|&#(\d+);|&#x([a-f\d]+);/gi,(_,name:string,decimal:string,hex:string)=>{
-  if(name)return({amp:'&',lt:'<',gt:'>',quot:'"',apos:"'"})[name.toLowerCase()]!;
-  const code=decimal?Number(decimal):parseInt(hex,16);if(!Number.isInteger(code)||code<1||code>0x10ffff||(code>=0xd800&&code<=0xdfff))return invalid();return String.fromCodePoint(code);
- });
- if(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(result))return invalid();return result.trim();
-}
-function scalar(xml:string,name:string,nullable=false){
- const tags=[...xml.matchAll(new RegExp(`<(?:[\\w-]+:)?${name}\\b([^>]*?)(?:/>|>([^<]*)<\\/(?:[\\w-]+:)?${name}>)`,'g'))];
- if(tags.length!==1)return invalid();const[,attributes,value]=tags[0];
- const nil=/(?:\bnil|\bisNull)\s*=\s*["']true["']/i.test(attributes);
- if(nil){if(!nullable||(value??'').trim())return invalid();return null;}
- if(value===undefined)return invalid();if(value.length>300)return invalid();return decode(value);
-}
-function result(xml:string){
- if(Buffer.byteLength(xml,'utf8')>64000||/<!|<(?:[\w-]+:)?Fault\b/i.test(xml))return invalid();
- const values=[...xml.matchAll(/<(?:[\w-]+:)?DebiCheckAuthenticationCurrentStatusResult\b[^>]*>([\s\S]*?)<\/(?:[\w-]+:)?DebiCheckAuthenticationCurrentStatusResult>/g)];
- if(values.length!==1)return invalid();return values[0][1];
-}
 export function parseDebiCheckCurrentStatus(xml:string,expectedReference:string){
  if(!/^NC\d{12}$/.test(expectedReference))throw Error('DEBICHECK_CONTRACT_INVALID');
- const value=result(xml),code=scalar(value,'ErrorCode');
+ const value=debiCheckSoapResult(xml,'DebiCheckAuthenticationCurrentStatus'),code=scalar(value,'ErrorCode');
  if(code!=='000'){if(['100','200','202'].includes(code??''))throw Error(`DEBICHECK_STATUS_REJECTED_${code}`);return invalid();}
  const reference=scalar(value,'ContractReference');if(reference!==expectedReference)return invalid();
  const status=scalar(value,'Status'),cancelledAt=scalar(value,'DateCancelled',true),updatedAt=scalar(value,'UpdateDate'),cancellationReason=scalar(value,'CancellationReason',true);
@@ -59,4 +40,22 @@ export async function readDebiCheckCurrentStatus(key:string,contractReference:st
  let xml:string;
  try{const response=await request(DEBICHECK_ENDPOINT,{method:'POST',redirect:'error',cache:'no-store',signal:AbortSignal.timeout(20000),headers:{'content-type':'text/xml; charset=utf-8',SOAPAction:'"http://tempuri.org/INIWS_NIF/DebiCheckAuthenticationCurrentStatus"'},body:envelope('DebiCheckAuthenticationCurrentStatus',[['ServiceKey',key],['ContractReference',contractReference]])});if(!response.ok)throw Error();xml=(await boundedBody(response,64000)).toString();}catch{throw Error('DEBICHECK_STATUS_UNAVAILABLE');}
  return parseDebiCheckCurrentStatus(xml,contractReference);
+}
+export function parseDebiCheckTemplate(xml:string,expectedTemplateId:string){
+ if(!/^NCDCT\d{9}$/.test(expectedTemplateId))throw Error('DEBICHECK_TEMPLATE_INVALID');
+ const value=debiCheckSoapResult(xml,'DebiCheckRetrieveMandateTemplateDetail'),code=scalar(value,'ErrorCode');
+ if(code!=='000'){if(['100','200','202'].includes(code??''))throw Error(`DEBICHECK_TEMPLATE_REJECTED_${code}`);return invalid();}
+ if(scalar(value,'TemplateId')!==expectedTemplateId)return invalid();
+ const fields=['AdjustmentAmount','AdjustmentCategory','AdjustmentRuleIndicator','AdjustmentType','AuthenticationType','CollectionFrequency','CollectionFrequencyDayCode','DebitEntryClassCode','DebitValueType','DebtorAuthCode','DebtorAuthenticationRequired','InstallmentOccurrence','RMS','TemplateName','TrackingDayCode','TrackingIndicator'] as const;
+ const detail=Object.fromEntries(fields.map(name=>[name,scalar(value,name,true)])) as Record<typeof fields[number],string|null>;
+ // Preserve provider terms for explicit review; this monthly lane does not
+ // reinterpret a batch/RMS template as TT1 or enable a bank request.
+ if(detail.CollectionFrequency!=='MNTH'||detail.InstallmentOccurrence!=='RCUR')throw Error('DEBICHECK_TEMPLATE_MONTHLY_REVIEW');
+ return{templateId:expectedTemplateId,detail,monthlyDayOptions:debiCheckDayOptions(value),authenticationSubmissionEnabled:false as const,collectionEnabled:false as const};
+}
+export async function readDebiCheckTemplate(key:string,templateId:string,request:typeof fetch=fetch){
+ serviceKey(key);if(!/^NCDCT\d{9}$/.test(templateId))throw Error('DEBICHECK_TEMPLATE_INVALID');
+ let xml:string;
+ try{const response=await request(DEBICHECK_ENDPOINT,{method:'POST',redirect:'error',cache:'no-store',signal:AbortSignal.timeout(20000),headers:{'content-type':'text/xml; charset=utf-8',SOAPAction:'"http://tempuri.org/INIWS_NIF/DebiCheckRetrieveMandateTemplateDetail"'},body:envelope('DebiCheckRetrieveMandateTemplateDetail',[['ServiceKey',key],['DebiCheckMandateTemplateId',templateId]])});if(!response.ok)throw Error();xml=(await boundedBody(response,64000)).toString();}catch{throw Error('DEBICHECK_TEMPLATE_UNAVAILABLE');}
+ return parseDebiCheckTemplate(xml,templateId);
 }
