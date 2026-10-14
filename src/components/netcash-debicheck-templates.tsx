@@ -1,10 +1,14 @@
 "use client";
 import {useEffect,useState} from 'react';
 type RecordRow={id:string;status:string;templateId:string;detail:Record<string,string|null>;monthlyDayOptions:string[];checkedAt:string;ownRequest:boolean;sourceCurrent:boolean};
+function history(value:unknown):RecordRow[]{
+ if(!Array.isArray(value)||value.some(row=>!row||typeof row!=='object'||typeof row.id!=='string'||!['PENDING_REVIEW','REVIEWED'].includes(row.status)||typeof row.templateId!=='string'||!/^NCDCT\d{9}$/.test(row.templateId)||typeof row.checkedAt!=='string'||!Number.isFinite(Date.parse(row.checkedAt))||typeof row.ownRequest!=='boolean'||typeof row.sourceCurrent!=='boolean'||!Array.isArray(row.monthlyDayOptions)||row.monthlyDayOptions.some((v:unknown)=>typeof v!=='string')||!row.detail||typeof row.detail!=='object'||Array.isArray(row.detail)||Object.values(row.detail).some(v=>v!==null&&typeof v!=='string')))throw Error('Template history needs a fresh valid response. Refresh before continuing.');
+ return value;
+}
 export function NetcashDebiCheckTemplates({facilities,manageFacilities}:{facilities:{id:string;name:string}[];manageFacilities:string[]|null}){
  const[facilityId,setFacilityId]=useState(facilities[0]?.id??''),[templateId,setTemplateId]=useState(''),[rows,setRows]=useState<RecordRow[]>([]),[error,setError]=useState(''),[busy,setBusy]=useState(false),[confirmed,setConfirmed]=useState<string|null>(null);
  const canManage=manageFacilities===null||manageFacilities.includes(facilityId);
- async function read(id:string){const response=await fetch('/api/v1/payments/netcash/debicheck/templates?facilityId='+encodeURIComponent(id),{cache:'no-store'}),value=await response.json();if(!response.ok)throw Error(value.error?.message??'Template history is unavailable.');return value.data.records as RecordRow[];}
+ async function read(id:string){const response=await fetch('/api/v1/payments/netcash/debicheck/templates?facilityId='+encodeURIComponent(id),{cache:'no-store',signal:AbortSignal.timeout(20000)}),value=await response.json();if(!response.ok)throw Error(value.error?.message??'Template history is unavailable.');return history(value?.data?.records);}
  useEffect(()=>{let active=true;if(facilityId)read(facilityId).then(data=>{if(active)setRows(data)}).catch(e=>{if(active)setError(e instanceof Error?e.message:'Template history is unavailable.')});return()=>{active=false}},[facilityId]);
  async function refresh(){setBusy(true);setError('');setConfirmed(null);try{setRows(await read(facilityId))}catch(e){setRows([]);setError(e instanceof Error?e.message:'Template history needs review.')}finally{setBusy(false)}}
  async function perform(body:object){setBusy(true);setError('');setConfirmed(null);try{const response=await fetch('/api/v1/payments/netcash/debicheck/templates',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}),value=await response.json();if(!response.ok)throw Error(value.error?.message??'Template review failed.');setRows(await read(facilityId));}catch(e){setRows([]);setError(e instanceof Error?e.message:'Template review needs recovery. Refresh before continuing.')}finally{setBusy(false)}}

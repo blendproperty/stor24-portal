@@ -51,6 +51,7 @@ jobs:
         env:
           AUTH_SECRET: synthetic-payment-request-ci-auth-secret-at-least-32
           INTEGRATION_CONFIG_ENCRYPTION_KEY: synthetic-payment-request-ci-vault-key-at-least-32
+      - run: npx tsx --test tests/integration/netcash-debicheck-template.test.ts
       - run: npx tsx --test tests/integration/visual-reporting.test.ts
       - run: npx tsx --test tests/integration/daily-close.test.ts
       - run: npx tsx --test tests/integration/configuration-atomicity.test.ts
