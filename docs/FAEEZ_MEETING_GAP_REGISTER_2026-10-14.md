@@ -82,9 +82,8 @@ Paths below are relative to the CRM repository except explicitly marked public o
 
 - **Implementation:** audit/register/documentation only. No software gap was implemented.
 - **Testing:** focused 61-pass/one-skip run and read-only owner UI checks above; historical CI/database/release evidence is separately identified.
-- **Commit and push:** this register and both canonical context updates are prepared on repository-specific `codex/faeez-meeting-gap-audit-20261014` review branches. Exact push/head/context presence is verified before final handoff.
+- **Commit and push:** initial CRM audit/context commit `16524e9` and public audit/context commit `08b9f51` were pushed on repository-specific `codex/faeez-meeting-gap-audit-20261014` review branches. Both remote branches contain PROJECT_CONTEXT.md and the numbered register. Final review-branch head/content readback is verified before handoff.
 - **Merge:** no audit-documentation merge is claimed; draft review promotion is separate.
 - **Deployment and configuration:** none for the audit; no provider, financial, permission, device or operational policy change.
 - **Live production verification:** read-only screen/capability checks only. Existing historical Counter code redemption and other releases retain their own dates/proof boundaries.
 - **Open gates:** named staff/finance acceptance; real customer/provider/inbox/handset/device/access/key-handover UAT; current data/stock/tax/accounting/recognition reconciliation; legal/privacy/arrears/disposal approval; training, support coverage and launch approval. No external project tracker was requested or changed.
-
