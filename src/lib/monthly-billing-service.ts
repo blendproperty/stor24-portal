@@ -90,7 +90,7 @@ export async function postMonthlyBilling(scope: RequestScope, accountId: string,
     const invoiceNumber = `INV-${period.replace("-", "")}-${bill.accountNumber}`;
     const posted = [];
     for (const [index, line] of bill.lines.entries()) {
-      posted.push(await tx.ledgerEntry.create({ data: { accountId, type: line.type, amount: line.amount, taxAmount: line.taxAmount, description: line.description, effectiveAt: periodDates(period).effectiveAt, externalRef: index === 0 ? `RENT-${period}` : `BILL-${period}-${line.key}`, createdById: actorId, metadata: { billingPeriod: period, invoiceNumber, approvalReference: bill.approvalReference, fingerprint: bill.fingerprint } } }));
+      posted.push(await tx.ledgerEntry.create({ data: { accountId, type: line.type, amount: line.amount, taxAmount: line.taxAmount, description: line.description, effectiveAt: periodDates(period).effectiveAt, externalRef: index === 0 ? `RENT-${period}` : `BILL-${period}-${line.key}`, createdById: actorId, metadata: { billingPeriod: period, invoiceNumber, approvalReference: bill.approvalReference, fingerprint: bill.fingerprint, chargeKey: line.key } } }));
     }
     const account = await tx.account.update({ where: { id: accountId }, data: { balance: { increment: bill.total } } });
     const html = renderInvoiceHtml({ invoiceNumber, issueDate: periodDates(period).effectiveAt, facilityName: bill.facilityName, company, customerName: bill.customerName, accountNumber: bill.accountNumber, currentBalance: account.balance.toString(), lines: posted.map(line => ({ id: line.id, description: line.description, effectiveAt: line.effectiveAt, amount: Number(line.amount) * (line.type === "CREDIT" ? -1 : 1), taxAmount: Number(line.taxAmount) * (line.type === "CREDIT" ? -1 : 1) })) });
