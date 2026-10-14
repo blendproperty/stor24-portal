@@ -31,6 +31,12 @@ test('isolated DebiCheck observations and independent reviews cannot alter money
  await t.test('store and organisation isolation rejects reads/reviews before provider lookup',async()=>{
   const row=await observe(),count=calls;await assert.rejects(listDebiCheckTemplates({...scope,facilityIds:[other.id]},store.id),/FORBIDDEN/);await assert.rejects(reviewDebiCheckTemplate({...reviewer,facilityIds:[other.id]},{id:row.id,confirmed:true},request),/FORBIDDEN/);await assert.rejects(reviewDebiCheckTemplate({...reviewer,organisationId:'unrelated-org'},{id:row.id,confirmed:true},request),/NOT_FOUND/);assert.equal(calls,count);
  });
+ await t.test('a fresh observation retains prior history and copied evidence cannot be attached to another record',async()=>{
+  const first=await observe(),second=await observe();assert.notEqual(first.id,second.id);
+  const a=await db.configurationProfile.findUniqueOrThrow({where:{id:first.id}}),b=await db.configurationProfile.findUniqueOrThrow({where:{id:second.id}});assert.notEqual(a.name,b.name);
+  const history=await listDebiCheckTemplates(scope,store.id);assert.ok(history.records.some(row=>row.id===first.id));assert.ok(history.records.some(row=>row.id===second.id));
+  await db.configurationProfile.update({where:{id:second.id},data:{config:a.config!}});await assert.rejects(reviewDebiCheckTemplate(reviewer,{id:second.id,confirmed:true},request),/INTEGRITY_REVIEW/);await db.configurationProfile.update({where:{id:second.id},data:{config:b.config!}});
+ });
  await t.test('changed provider terms and expired confirmation cannot save review',async()=>{
   const row=await observe();changed=true;await assert.rejects(reviewDebiCheckTemplate(reviewer,{id:row.id,confirmed:true},request),/SOURCE_CHANGED/);changed=false;
   await assert.rejects(reviewDebiCheckTemplate(reviewer,{id:row.id,confirmed:true},request,new Date(Date.now()+901000)),/REVIEW_EXPIRED/);assert.equal((await db.configurationProfile.findUniqueOrThrow({where:{id:row.id}})).status,'PENDING_REVIEW');
