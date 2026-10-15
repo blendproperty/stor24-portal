@@ -7,6 +7,9 @@ import {newIdentityAccess} from "../../src/lib/identity-document-security";
 import {decryptIntegrationSecret} from "../../src/lib/integrations/integration-secret-vault";
 import {proposeReservationPrice,decideReservationPrice,previewCustomerReservationPrice,acceptCustomerReservationPrice,reservationPriceWorkspace,appliedCustomerReservationPrice} from "../../src/lib/reservation-price-service";
 import {preparePublicReservationLease,completePublicReservationLease} from "../../src/lib/public-lease-workflow";
+import {visualReportSource} from "../../src/lib/visual-report-data";
+import {defaultVisualQuery} from "../../src/lib/visual-report-engine";
+import {southAfricaDateKey} from "../../src/lib/south-africa-time";
 import {LEASE_CLAUSE_KEYS} from "../../src/lib/lease-agreement-content";
 
 test("isolated governed price amendments preserve original quotes, consent, source locks and financial baselines",async t=>{
@@ -73,6 +76,22 @@ test("isolated governed price amendments preserve original quotes, consent, sour
       const original=await db.reservationPriceAmendment.findUniqueOrThrow({where:{id:proposal.id}});assert.equal(JSON.parse(decryptIntegrationSecret(original.originalEncrypted)).quotedRate,"1000.00");
       await assert.rejects(db.reservationPriceAmendment.update({where:{id:proposal.id},data:{status:"WITHDRAWN"}}));
       const regenerated=await preparePublicReservationLease(f.booking.publicReference!,"EFT");assert.ok(regenerated.ok);const newLease=await db.publicReservationLease.findUniqueOrThrow({where:{reservationId:f.booking.id}});assert.equal(newLease.status,"READY");assert.equal(newLease.paymentMethod,"EFT");assert.notEqual(newLease.sha256,oldLease.sha256);assert.equal(newLease.signedAt,null);
+    });
+    await t.test("native cohort source retains the first original across two real accepted quotes and holds broken consent evidence",async()=>{
+      const f=await fixture(),yesterday=southAfricaDateKey(new Date(Date.now()-86400000)),today=southAfricaDateKey(new Date());
+      const lead=await db.lead.create({data:{facilityId:f.facility.id,customerId:f.customer.id,source:"PUBLIC_QUOTE_FORM",createdAt:new Date(`${yesterday}T10:00:00+02:00`)}});
+      await db.reservation.update({where:{id:f.booking.id},data:{leadId:lead.id}});
+      const baseline=await financial(f),query={...defaultVisualQuery("marketing-payment-cohorts",yesterday,today),facilityId:f.facility.id};
+      const first=await proposeReservationPrice(f.scope,propose(f));await approve(f,first.id);await acceptCustomerReservationPrice(await fresh(f,first.id));
+      await new Promise(resolve=>setTimeout(resolve,2));
+      const second=await proposeReservationPrice(f.scope,{...propose(f),monthlyRate:"850.00"});await approve(f,second.id);await acceptCustomerReservationPrice(await fresh(f,second.id));
+      const row=(await visualReportSource(f.scope,query)).find(r=>r.enquiry===lead.id)!;
+      assert.equal(row.originalMonthlyQuote,"1000.00");assert.equal(row.latestAcceptedQuote,"850.00");assert.equal(row.acceptedPriceChanges,2);assert.equal(row.review,null);
+      const earlier=(await visualReportSource(f.scope,{...query,to:yesterday})).find(r=>r.enquiry===lead.id)!;assert.equal(earlier.originalMonthlyQuote,"1000.00");assert.equal(earlier.acceptedPriceChanges,0);assert.equal(earlier.latestAcceptedQuote,null);
+      await db.auditEvent.updateMany({where:{entityId:second.id,action:"reservation.price_customer_accepted"},data:{action:"synthetic.missing_acceptance"}});
+      const held=(await visualReportSource(f.scope,query)).find(r=>r.enquiry===lead.id)!;assert.equal(held.originalMonthlyQuote,null);assert.equal(held.latestAcceptedQuote,null);assert.equal(held.paymentOutcome,"REVIEW_REQUIRED");
+      await assert.rejects(visualReportSource(f.scope,{...query,groupBy:["currency"],metrics:[{field:"latestAcceptedQuote",operation:"sum"}]}),/REPORT_COHORT_REVIEW/);
+      assert.deepEqual(await financial(f),baseline);
     });
     await t.test("changed original evidence and existing signed or payment records hold amendments",async()=>{
       const f=await fixture(),proposal=await proposeReservationPrice(f.scope,propose(f));

@@ -120,6 +120,7 @@ export async function acceptCustomerReservationPrice(input:ReservationPriceAccep
     if(booking.publicLease)await tx.publicReservationLease.update({where:{id:booking.publicLease.id},data:{status:"REQUOTE_REQUIRED",expiresAt:new Date(),signingToken:randomBytes(32).toString("base64url")}});
     await tx.reservation.update({where:{id:booking.id},data:{quotedRate:proposed.monthlyRate,initialRentSnapshot:json(proposed.initialRentSnapshot)}});
     const acceptedAt=new Date();
+    if(item.expiresAt<=acceptedAt||!booking.holdExpiresAt||booking.holdExpiresAt<=acceptedAt)throw Error("PRICE_EXPIRED");
     const changed=await tx.reservationPriceAmendment.updateMany({where:{id:item.id,status:"APPROVED",revision:item.revision},data:{status:"APPLIED",revision:{increment:1},acceptedCustomerId:booking.customerId,acceptedAt,acceptanceFingerprint:item.quoteFingerprint}});if(changed.count!==1)throw Error("CONFLICT");
     await audit(tx,item.organisationId,item.facilityId,null,item.id,"customer_accepted",{reservationId:booking.id,customerId:booking.customerId,quoteFingerprint:item.quoteFingerprint,verifiedAt:customer.emailVerifiedAt!.toISOString(),acceptedAt:acceptedAt.toISOString(),newAgreementRequired:true,financialPosting:false});
     return {id:item.id,applied:true,idempotent:false};
