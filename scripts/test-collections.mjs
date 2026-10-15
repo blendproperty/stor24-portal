@@ -26,7 +26,7 @@ try{
   if(body.action==="follow-up"){row.ownerId=body.ownerId;row.nextFollowUp=body.nextFollowUp;}
   else if(body.action==="dispute"){row.disputed=body.disputed;row.hold=body.disputed?"Dispute hold":null;}
   else if(body.action==="promise")row.promises=[{id:"cmpromisefixture00001",amount:body.amount,dueDate:body.dueDate,status:"OPEN",createdAt:new Date().toISOString(),progress:{label:"Awaiting receipt",received:0,onTime:0,covered:false}}];
-  else if(body.action==="terms")row.terms=body.terms;else throw new Error("Unexpected action "+body.action);
+  else if(body.action==="terms")row.terms=body.terms;else if(body.action==="escalation-review"){assert.equal(body.target,"NOTICE");assert.equal(body.channel,"WHATSAPP");assert.equal(body.reviewOn,data.today);}else throw new Error("Unexpected action "+body.action);
   row.activities.unshift({id:`action${calls.length}`,action:body.action,note:body.note,actorId:data.userId,createdAt:new Date().toISOString()});return route.fulfill({json:{id:`action${calls.length}`}});
  });
  await page.goto(`http://127.0.0.1:${server.address().port}`);
@@ -57,8 +57,17 @@ try{
  await page.getByLabel("Show",{exact:true}).selectOption("all");
  await page.getByLabel("As of (South Africa)").fill("2026-09-20");await page.getByRole("button",{name:"Review CI-101",exact:true}).click();await expect(page.getByLabel("Case note / evidence reference")).toBeDisabled();
  await page.getByLabel("As of (South Africa)").fill(data.today);await page.getByRole("button",{name:"Review CI-101",exact:true}).click();
+ await page.getByText("Request internal escalation review",{exact:true}).click();
+ await page.getByLabel("Case note / evidence reference").fill("CI proposed channel needs policy review");
+ await page.getByLabel("Proposed notice channel").selectOption("WHATSAPP");
+ await expect(page.getByRole("button",{name:"Record held review request"})).toBeDisabled();
+ await page.getByLabel("Internal review requested by").fill(data.today);
+ await page.getByLabel("Policy evidence to review (optional)").fill("Proposed policy reference, not approved");
+ await page.getByRole("button",{name:"Record held review request"}).click();
+ await expect(page.getByText("CI proposed channel needs policy review",{exact:true})).toBeVisible();
+ await page.getByText("Request internal escalation review",{exact:true}).click();
  await mkdir("output/collections",{recursive:true});
- for(const width of [1440,390]){await page.setViewportSize({width,height:1000});await page.screenshot({path:`output/collections/${width}.png`,fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`overflow at ${width}`);}
- assert.equal(errors.length,0);assert.deepEqual(calls.map(c=>c.action),["terms","follow-up","dispute","dispute","promise"]);
- console.log("Collections browser checks passed: scoped filters, queue selection without contact, evidenced follow-up, dispute hold, promise gating, historical read-only mode and 1440/390px bounds.");
+ for(const width of [1440,1024,390,320]){await page.setViewportSize({width,height:1000});await page.screenshot({path:`output/collections/${width}.png`,fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`overflow at ${width}`);}
+ assert.equal(errors.length,0);assert.deepEqual(calls.map(c=>c.action),["terms","follow-up","dispute","dispute","promise","escalation-review"]);
+ console.log("Collections browser checks passed: scoped filters, queue selection without contact, evidenced follow-up, dispute hold, promise gating, held internal escalation preparation, historical read-only mode and 1440/1024/390/320px bounds.");
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

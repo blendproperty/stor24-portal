@@ -52,7 +52,7 @@ test("isolated PostgreSQL shared customer notebook and scoped history", async t 
       assert.equal(history.legacyNotes, "Original undated summary");
       assert.ok(history.entries[0].at);
       await addCustomerNote(coverScope, customer.id, { ...note(), category: "CALL", body: "Cover completed the customer call." });
-      assert.equal((await customerHistory(scope, customer.id, query, grants(scope))).entries.length, 2);
+      assert.equal((await customerHistory(scope, customer.id, query, grants(scope))).entries.length, 3);
     });
     await t.test("customer/store/organisation boundaries and separate source permissions", async () => {
       await assert.rejects(addCustomerNote(scope, customer.id, { ...note(), facilityId: b.id }), /FORBIDDEN/);
@@ -72,11 +72,11 @@ test("isolated PostgreSQL shared customer notebook and scoped history", async t 
       assert.equal(history.entries.filter(e => e.kind === "COMMUNICATION").length, 2);
       assert.equal(history.entries.find(e => e.title.includes("BOOKING"))?.deliveredAt, null);
       const limited = await customerHistory(scope, customer.id, query, { communications: null, collections: null, write: null });
-      assert.ok(limited.entries.every(e => e.kind === "NOTE"));
-      assert.deepEqual(limited.visibility, { communications: false, collections: false });
+      assert.ok(limited.entries.every(e => ["NOTE", "TENANCY"].includes(e.kind)));
+      assert.deepEqual(limited.visibility, { communications: false, collections: false, accounts: false });
       assert.equal(limited.writableFacilities.length, 0);
       const split = await customerHistory(scope, customer.id, query, { communications: bScope, collections: bScope, write: bScope });
-      assert.ok(split.entries.every(e => e.kind === "NOTE"));
+      assert.ok(split.entries.every(e => ["NOTE", "TENANCY"].includes(e.kind)));
       assert.equal(split.writableFacilities.length, 0);
       await assert.rejects(customerHistory({ ...scope, organisationId: other.id, unrestrictedFacilities: true }, customer.id, query, grants(scope)), /FORBIDDEN/);
       await assert.rejects(customerHistory({ ...scope, facilityIds: [] }, customer.id, query, grants(scope)), /FORBIDDEN/);
@@ -91,8 +91,8 @@ test("isolated PostgreSQL shared customer notebook and scoped history", async t 
       await db.customerNote.create({ data: { organisationId: org.id, customerId: customer.id, facilityId: a.id, authorId: staff.id, authorName: "New staff", category: "GENERAL", body: "New after snapshot", requestKey: randomUUID(), createdAt: new Date(Date.now() + 1000) } });
       let cursor = first.nextCursor, pages = 1;
       while (cursor) { assert.ok(pages++ < 10); const page = await customerHistory(scope, customer.id, { ...query, cursor }, grants(scope)); found.push(...page.entries); cursor = page.nextCursor; }
-      assert.equal(found.length, 115);
-      assert.equal(new Set(found.map(e => e.kind + e.id)).size, 115);
+      assert.equal(found.length, 116);
+      assert.equal(new Set(found.map(e => e.kind + e.id)).size, 116);
       assert.deepEqual(found, [...found].sort(compareHistoryEntries));
       const fullExport=await buildCustomerHistoryExport(scope,customer.id,query,grants(scope));
       assert.ok(fullExport.rows.filter(row=>row.kind!=="LEGACY_SUMMARY").length>=115);
@@ -168,6 +168,76 @@ test("isolated PostgreSQL shared customer notebook and scoped history", async t 
       await db.role.update({where:{id:role.id},data:{permissions}});
       assert.equal((await download()).status,403);
       await db.roleAssignment.deleteMany({where:{userId:staff.id}});
+    });
+    await t.test("dated retained-text filters include full local days and apply to all export pages", async () => {
+      const start = new Date("2026-10-13T22:00:00Z"), end = new Date("2026-10-14T22:00:00Z");
+      await db.communicationLog.createMany({ data: [
+        ...Array.from({ length: 56 }, (_, i) => ({ queuedAt: new Date(start.getTime() + i * 1000), channel: "WHATSAPP", status: "SUCCEEDED" as const, messageType: "NOTICE", metadata: { historyEvidence: { version: 1, text: "Retained weekend instructions", redacted: true } } })),
+        { queuedAt: new Date(start.getTime() - 1), channel: "WHATSAPP", status: "SUCCEEDED" as const, messageType: "NOTICE", metadata: { historyEvidence: { version: 1, text: "Retained weekend instructions" } } },
+        { queuedAt: end, channel: "WHATSAPP", status: "SUCCEEDED" as const, messageType: "NOTICE", metadata: { historyEvidence: { version: 1, text: "Retained weekend instructions" } } },
+        { queuedAt: start, channel: "SMS", status: "SUCCEEDED" as const, messageType: "NOTICE", metadata: { historyEvidence: { version: 1, text: "Retained weekend instructions" } } },
+        { queuedAt: start, channel: "WHATSAPP", status: "FAILED" as const, messageType: "NOTICE", metadata: { historyEvidence: { version: 1, text: "Retained weekend instructions" } } },
+        { queuedAt: start, channel: "WHATSAPP", status: "SUCCEEDED" as const, messageType: "LOGIN_OTP", metadata: { historyEvidence: { version: 1, text: "Retained weekend instructions" } } },
+      ].map(row => ({ ...row, organisationId: org.id, facilityId: a.id, customerId: customer.id, recipientHash: "fixture", idempotencyKey: randomUUID() })) });
+      const filtered = { kind: "ALL" as const, search: "WEEKEND", from: "2026-10-14", to: "2026-10-14", channel: "WHATSAPP" as const, status: "SUCCEEDED" as const };
+      const first = await customerHistory(scope, customer.id, filtered, grants(scope));
+      assert.equal(first.entries.length, 50); assert.ok(first.nextCursor); assert.equal(first.legacyNotes, null);
+      const second = await customerHistory(scope, customer.id, { ...filtered, cursor: first.nextCursor! }, grants(scope));
+      assert.equal(second.entries.length, 6); assert.equal(second.nextCursor, null);
+      assert.ok([...first.entries, ...second.entries].every(row => row.kind === "COMMUNICATION" && row.channel === "WHATSAPP" && row.status === "SUCCEEDED"));
+      const exported = await buildCustomerHistoryExport(scope, customer.id, filtered, grants(scope));
+      assert.equal(exported.rows.length, 56); assert.ok(exported.rows.every(row => row.kind !== "LEGACY_SUMMARY"));
+      await assert.rejects(customerHistory(scope, customer.id, { ...filtered, from: "2026-10-15" }, grants(scope)), /HISTORY_DATE_INVALID/);
+      const author = await customerHistory(scope, customer.id, { kind: "NOTE", search: "Faeez fixture" }, grants(scope));
+      assert.equal(author.entries.length, 1);
+    });
+    await t.test("source chronology projects booking tenancy document signature ledger and appointment fields within store and financial scope", async () => {
+      const type = await db.unitType.create({ data: { facilityId: a.id, name: "History fixture", features: [] } });
+      const unit = await db.unit.create({ data: { facilityId: a.id, unitTypeId: type.id, number: "H1", monthlyRate: 100 } });
+      const reservation = await db.reservation.create({ data: { facilityId: a.id, customerId: customer.id, unitId: unit.id, quotedRate: 100, publicReference: `history-${key}`, verificationCodeHash: "NEVER-RETURN" } });
+      const tenancy = await db.tenancy.findUniqueOrThrow({ where: { accountId: account.id } });
+      const document = await db.document.create({ data: { tenancyId: tenancy.id, type: "LEASE", storageKey: "NEVER-RETURN", signingToken: `private-${key}`, content: "NEVER-RETURN" } });
+      await db.publicReservationLease.create({ data: { reservationId: reservation.id, version: "fixture", paymentMethod: "CARD", content: "NEVER-RETURN", clauses: {}, sha256: "fixture", signingToken: `lease-${key}`, expiresAt: new Date(Date.now() + 86400000), signedAt: new Date(), status: "SIGNED" } });
+      const foreignActor = await db.user.create({ data: { organisationId: other.id, name: "FOREIGN-STAFF-DO-NOT-RETURN", email: `${randomUUID()}@example.invalid` } });
+      const ledger = await db.ledgerEntry.create({ data: { accountId: account.id, createdById: foreignActor.id, type: "CHARGE", amount: 100, description: "Synthetic charge", effectiveAt: new Date(), metadata: { secret: "NEVER-RETURN" } } });
+      await db.auditEvent.create({ data: { organisationId: org.id, facilityId: a.id, actorId: foreignActor.id, entityType: "Task", entityId: "fixture-task", action: "staff_followup.handover", after: { customerId: customer.id, title: "Weekend customer appointment", description: "Cover to confirm arrival", requestHash: "NEVER-RETURN" } } });
+      await db.auditEvent.createMany({ data: [
+        { organisationId: org.id, facilityId: a.id, actorId: foreignActor.id, entityType: "Tenancy", entityId: tenancy.id, action: "tenancy.key_handover_confirmed", after: { secret: "NEVER-RETURN" } },
+        { organisationId: org.id, facilityId: b.id, entityType: "Tenancy", entityId: tenancy.id, action: "tenancy.moved_out" },
+        { organisationId: org.id, facilityId: a.id, entityType: "Tenancy", entityId: "missing-source", action: "tenancy.moved_out" },
+      ] });
+      const without = await customerHistory(scope, customer.id, query, grants(scope));
+      assert.ok(!without.entries.some(row => row.kind === "ACCOUNT"));
+      for (const kind of ["BOOKING", "TENANCY", "DOCUMENT", "AGREEMENT", "ACCOUNT", "APPOINTMENT", "MILESTONE"] as const) {
+        const history = await customerHistory(scope, customer.id, { kind, search: "" }, { ...grants(scope), financial: scope });
+        assert.ok(history.entries.some(row => row.kind === kind), kind);
+        assert.ok(!JSON.stringify(history).includes("NEVER-RETURN"));
+        assert.ok(!JSON.stringify(history).includes("FOREIGN-STAFF-DO-NOT-RETURN"));
+      }
+      const denied = await customerHistory(scope, customer.id, { kind: "ACCOUNT", search: "" }, { ...grants(scope), financial: { ...scope, facilityIds: [b.id] } });
+      assert.equal(denied.entries.length, 0);
+      const appointment = await customerHistory(scope, customer.id, { kind: "APPOINTMENT", search: "weekend" }, grants(scope));
+      assert.equal(appointment.entries.length, 1);
+      assert.equal((await customerHistory(scope, customer.id, { kind: "APPOINTMENT", search: "absent" }, grants(scope))).entries.length, 0);
+      const milestones = await customerHistory(scope, customer.id, { kind: "MILESTONE", search: "keys" }, grants(scope));
+      assert.equal(milestones.entries.length, 1); assert.equal(milestones.entries[0].title, "Keys handed over");
+      const single = await buildCustomerHistoryExport(scope, customer.id, query, grants(scope), { id: document.id, kind: "DOCUMENT" });
+      assert.equal(single.rows.length, 1); assert.ok(!JSON.stringify(single).includes("NEVER-RETURN"));
+      const role = await db.role.create({ data: { organisationId: org.id, name: "History financial fixture", permissions: ["operations.view", "customer_history.export", "ledger.view"] } });
+      await db.roleAssignment.create({ data: { userId: staff.id, roleId: role.id, facilityId: a.id } });
+      const bundle = await build({ entryPoints: ["src/app/api/v1/customers/[customerId]/history/export/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "history-financial-session", setup(builder) {
+        builder.onResolve({ filter: /^@\/lib\/(db|session)$/ }, args => ({ path: args.path, namespace: "fixture" }));
+        builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
+      } }] });
+      const loaded = { exports: {} as { POST: (r: Request, c: unknown) => Promise<Response> } };
+      new Function("require", "module", "exports", "__db", "__session", bundle.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: staff.id, sessionVersion: staff.sessionVersion });
+      const download = () => loaded.exports.POST(new Request("https://example.invalid/api/v1/customers/one/history/export", { method: "POST", headers: { origin: "https://example.invalid", "content-type": "application/json" }, body: JSON.stringify({ format: "XLSX", kind: "ACCOUNT" }) }), { params: Promise.resolve({ customerId: customer.id }) });
+      assert.equal((await download()).status, 200);
+      const originalAudit = db.auditEvent.create.bind(db.auditEvent);
+      db.auditEvent.create = (async args => { if (args.data.action === "dlp.export.allowed") await db.role.update({ where: { id: role.id }, data: { permissions: ["operations.view", "customer_history.export"] } }); return originalAudit(args); }) as typeof db.auditEvent.create;
+      try { assert.equal((await download()).status, 403); } finally { db.auditEvent.create = originalAudit; }
+      await db.roleAssignment.deleteMany({ where: { userId: staff.id, roleId: role.id } });
+      await db.ledgerEntry.delete({ where: { id: ledger.id } });
     });
     await t.test("new unlinked customers stay creator-only; approved reset deletion retains its existing behaviour", async () => {
       const unlinked = await db.customer.create({ data: { organisationId: org.id, firstName: "Unlinked" } });

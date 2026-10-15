@@ -1,0 +1,105 @@
+{
+  "verifiedAt": "2026-10-15T09:34:40.333Z",
+  "environment": "isolated-ci",
+  "customers": 180,
+  "activeTenancies": 150,
+  "units": 210,
+  "initialNotes": 540,
+  "initialCommunications": 180,
+  "staff": 25,
+  "scope": "Real HTTP fixture invoking actual route handlers, permission/transaction services and PostgreSQL. Session boundary is an isolated in-memory fixture, not Next hosting, real staff login, physical-device UAT or production peak capacity.",
+  "thresholds": {
+    "readP95Ms": 5000,
+    "writeP95Ms": 8000,
+    "maximumMs": 15000
+  },
+  "phases": [
+    {
+      "concurrent": 5,
+      "expectedRequests": 30,
+      "elapsedMs": 1227.2384999999995,
+      "unexpectedErrors": 0
+    },
+    {
+      "concurrent": 15,
+      "expectedRequests": 90,
+      "elapsedMs": 6591.287400000001,
+      "unexpectedErrors": 0
+    },
+    {
+      "concurrent": 25,
+      "expectedRequests": 150,
+      "elapsedMs": 8843.1198,
+      "unexpectedErrors": 0
+    }
+  ],
+  "staffHandbookProtectedDownload": true,
+  "connections": 10,
+  "operations": {
+    "search": {
+      "requests": 45,
+      "p50Ms": 478.6754000000001,
+      "p95Ms": 594.756400000002,
+      "maxMs": 600.1935999999987,
+      "unexpectedErrors": 0
+    },
+    "history": {
+      "requests": 45,
+      "p50Ms": 2682.8227000000006,
+      "p95Ms": 2842.9596999999994,
+      "maxMs": 2848.6664999999994,
+      "unexpectedErrors": 0
+    },
+    "note": {
+      "requests": 45,
+      "p50Ms": 793.1621999999988,
+      "p95Ms": 1264.936600000001,
+      "maxMs": 1297.8978000000025,
+      "unexpectedErrors": 0
+    },
+    "noteRetry": {
+      "requests": 45,
+      "p50Ms": 825.9702000000034,
+      "p95Ms": 968.8688000000002,
+      "maxMs": 1063.7780999999995,
+      "unexpectedErrors": 0
+    },
+    "report": {
+      "requests": 45,
+      "p50Ms": 1139.3437000000013,
+      "p95Ms": 2249.3441999999995,
+      "maxMs": 2629.4745000000003,
+      "unexpectedErrors": 0
+    },
+    "booking": {
+      "requests": 45,
+      "p50Ms": 1018.6726999999992,
+      "p95Ms": 2335.505500000003,
+      "maxMs": 2403.8607999999986,
+      "unexpectedErrors": 0
+    }
+  },
+  "expectedNegativeChecks": {
+    "unauthenticated": 401,
+    "foreignCustomer": 403,
+    "foreignNoteStore": 403,
+    "invalidBooking": 422,
+    "bookedUnitConflict": 409,
+    "subsequentRecovery": 200,
+    "safeNoteRetries": 45
+  },
+  "offlineSourceBaseline": {
+    "authorisedSnapshot": true,
+    "expiryHours": 12,
+    "foreignStoreDenied": true,
+    "queuedLeadSafeRetry": true,
+    "staleBookedUnitConflict": true,
+    "reselectedUnitSafeRetry": true,
+    "sourceRevisionChangesOnReconnect": true,
+    "actualDeviceInstallOrOfflineBrowserUat": false,
+    "providerMessagesSent": 0
+  },
+  "result": "PASS",
+  "testFile": "tests/integration/faeez-representative-workload.test.ts",
+  "testFileSha256": "2a5a27f4f3bd666940eee1d72f572c88f9731824d84398b7946e0c9e1d2594d7"
+}

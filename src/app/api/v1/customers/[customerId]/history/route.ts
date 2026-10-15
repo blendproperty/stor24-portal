@@ -15,12 +15,13 @@ export async function GET(request: Request, context: Context) {
     const { customerId } = await context.params;
     const parsed = historyQuerySchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
     if (!parsed.success) return Response.json({ error: { message: "Check the history filters." } }, { status: 422 });
-    const [communications, collections, write] = await Promise.all([optionalScope("communications.view"), optionalScope("collections.view"), optionalScope("operations.manage")]);
+    const [communications, collections, write, financial] = await Promise.all([optionalScope("communications.view"), optionalScope("collections.view"), optionalScope("operations.manage"), optionalScope("ledger.view")]);
     const exported = await optionalScope("customer_history.export");
     const canExport = !!exported && (scope.unrestrictedFacilities || exported.unrestrictedFacilities || scope.facilityIds.some(id => exported.facilityIds.includes(id)));
-    return Response.json({ data: { ...await customerHistory(scope, customerId, parsed.data, { communications, collections, write }), canExport } }, { headers: { "Cache-Control": "private, no-store" } });
+    return Response.json({ data: { ...await customerHistory(scope, customerId, parsed.data, { communications, collections, write, financial }), canExport } }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
-    if (error instanceof Error && error.message === "HISTORY_CURSOR_INVALID") return Response.json({ error: { message: "Reload customer history to continue." } }, { status: 422 });
+    if (error instanceof Error && error.message === "HISTORY_SOURCE_LIMIT") return Response.json({ error: { message: "This customer has too many linked tenancies for a combined history. Select a specific history type." } }, { status: 422 });
+    if (error instanceof Error && ["HISTORY_CURSOR_INVALID", "HISTORY_DATE_INVALID"].includes(error.message)) return Response.json({ error: { message: "Reload customer history to continue." } }, { status: 422 });
     return apiError(error);
   }
 }
