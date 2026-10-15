@@ -48,7 +48,7 @@ test("isolated receipt correction producers retain cash, approval, undo and sour
       const proof=await graph(f);assert.equal(proof.positions.reduce((n,p)=>n+Math.round(Number(p.remaining)*100),0),20000);assert.equal(proof.positions.find(p=>p.entryId===f.original.id)?.remaining,"124.75");
       assert.equal((await db.account.findUniqueOrThrow({where:{id:f.source.id}})).balance.toFixed(2),"-124.75");assert.equal((await db.account.findUniqueOrThrow({where:{id:f.target.id}})).balance.toFixed(2),"374.75");
       const docs=await db.document.findMany({where:{id:{in:[row.sourceDocumentId!,row.targetDocumentId!]}}});assert.equal(docs.length,2);
-      for(const doc of docs){assert.ok(!doc.content?.includes("PRIVATE-SYNTHETIC-CUSTOMER"));assert.ok(!doc.content?.includes(doc.id===row.sourceDocumentId?f.target.accountNumber:f.source.accountNumber));}
+      for(const doc of docs){assert.ok(!/[\u00c2\u00c3]/.test(doc.content??""));assert.ok(!doc.content?.includes("PRIVATE-SYNTHETIC-CUSTOMER"));assert.ok(!doc.content?.includes(doc.id===row.sourceDocumentId?f.target.accountNumber:f.source.accountNumber));}
       const count=await db.ledgerEntry.count({where:{accountId:{in:[f.source.id,f.target.id]}}});
       await settleVerifiedBookingPayment(f.payment.id,{reference:f.payment.providerRef!,amount:200,accepted:true,requestTrace:"synthetic-replay"});assert.equal(await db.ledgerEntry.count({where:{accountId:{in:[f.source.id,f.target.id]}}}),count);
     });
