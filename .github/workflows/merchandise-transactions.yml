@@ -106,6 +106,7 @@ jobs:
       - run: npx tsx --test tests/integration/customer-history.test.ts
       - run: npx tsx --test tests/integration/collection-notices.test.ts
       - run: npx tsx --test tests/integration/settlements.test.ts
+      - run: npx tsx --test tests/integration/unidentified-receipts.test.ts
       - run: npx tsx --test tests/integration/mri.test.ts
       - run: npx tsx --test tests/integration/mri-mapping.test.ts
       - run: npx tsx --test tests/integration/mri-sandbox.test.ts
