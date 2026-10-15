@@ -1,0 +1,11 @@
+# Receipt allocation corrections
+
+Implementation status: source foundation only. There is no released correction API or staff workflow yet. See PROJECT_CONTEXT.md for actual test and release evidence.
+
+The required workflow corrects the allocation of an already verified receipt between two existing tenancy accounts in the same organisation and store. Full and partial amounts must be supported. A different authorised colleague approves the exact retained request before paired ledger entries are posted atomically. The original external Payment and provider receipt remain unchanged and appear once in payment reporting; a transfer is not new revenue, another cash receipt or a refund. Receipt corrections carry no tax adjustment or provider request.
+
+Each request retains its root Payment, source receipt position, target account, exact amount, source evidence, reason, fingerprint, requester and independent reviewer. Both account/ledger balances, all retained receipt positions, actual prior refunds and unresolved collections/payment/adjustment activity must be rechecked under deterministic account locks. Missing or inconsistent evidence holds the request. Idempotent retries, competing approval, stale source and audit/document failure must be tested against actual producers in isolated PostgreSQL.
+
+Posting requires an outgoing reversal against the source receipt position and an equal incoming allocation credit, linked to the same root receipt and retained request. Both account balances change by equal opposite amounts. Collections, promises, statements, histories and native finance reports must recognise only verified paired allocations and must neither lose cash nor count the provider receipt twice. Moving an allocation again or returning it to the original account requires a retained correction chain; deleting or rewriting previous receipt evidence is not an undo mechanism.
+
+Existing adjustments, actual refund/payout records and provider callback replay must remain compatible. A real NSF or partial external cash return is a different event that requires provider/finance proof; this workflow must not invent a payout, bank settlement, clearing mapping or provider reversal. No production financial operation is part of agent verification.
