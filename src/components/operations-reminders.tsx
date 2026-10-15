@@ -4,6 +4,8 @@ import { facilityWhere, requirePermissionScope, type RequestScope } from "@/lib/
 import { collectionsWorkspace } from "@/lib/collections-service";
 import { collectionCallCount, reorderItemCount } from "@/lib/operations-reminder-policy";
 import { southAfricaDateKey } from "@/lib/south-africa-time";
+import { staffPaymentReviewCount } from "@/lib/staff-payment-review-service";
+import { staffOperationalUnreadCount } from "@/lib/staff-operational-events";
 
 // Authorise and scope each queue separately: navigation permissions alone do not
 // establish permission to read another facility's aggregate counts.
@@ -27,6 +29,8 @@ export async function OperationsReminders() {
     queue("inventory.view", { label: "Reorder", description: "Active products at or below their available-stock threshold", href: "/operations/merchandise" }, async scope => reorderItemCount(await db.product.findMany({ where: { organisationId: scope.organisationId, active: true, facility: facilityWhere(scope) }, select: { quantityOnHand: true, quantityReserved: true, reorderPoint: true } }))),
     queue("ledger.view", { label: "Move-out", description: "Notice-given tenancies scheduled today or overdue", href: "/operations/accounts" }, scope => db.tenancy.count({ where: { facility: facilityWhere(scope), status: "NOTICE_GIVEN", endDate: { lt: tomorrow } } })),
     queue("operations.view", { label: "Service required", description: "Open and in-progress maintenance requests", href: "/operations#operations-maintenance" }, scope => db.maintenanceRequest.count({ where: { organisationId: scope.organisationId, facility: facilityWhere(scope), status: { notIn: ["COMPLETED", "CANCELLED"] } } })),
+    queue("payments.view", { label: "Payments awaiting review", description: "Pending payments and unresolved receipt evidence; excludes test records", href: "/operations/payment-review" }, staffPaymentReviewCount),
+    queue("operations.view", { label: "Unread booking & move-in events", description: "Recorded store events not yet read by your account", href: "/operations/events" }, staffOperationalUnreadCount),
   ]);
   const visible = items.filter((item): item is Reminder => item !== null);
   return <OperationsRemindersPanel items={visible} updatedAt={now}/>;
