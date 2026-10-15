@@ -9,6 +9,7 @@ import { cardAutopayPeriods,fixedCardAutopayAmount } from './card-autopay-policy
 import { CARD_SUBSCRIPTION_DOMAIN,CARD_SUBSCRIPTION_OPEN_STATUSES,cardSourceHash } from './card-autopay-enrollment-policy';
 import { reviewedDebiCheckTemplate } from './netcash-debicheck-template-service';
 import { DEBICHECK_REQUEST_DOMAIN,DEBICHECK_REQUEST_TERMS,debiCheckPayerSchema,debiCheckRequestSignature,debiCheckSetupRequestText,encryptDebiCheckTerms,privateDebiCheckTerms,projectDebiCheckRequest,readDebiCheckRequest,sealDebiCheckRequest } from './netcash-debicheck-request-policy';
+import {DEBICHECK_ATTEMPT_DOMAIN} from './netcash-debicheck-attempt-policy';
 
 type Client=Prisma.TransactionClient;
 type Tenant={organisationId:string;email:string;customerIds:string[]};
@@ -107,6 +108,9 @@ export async function withdrawDebiCheckRequest(session:Tenant,accountId:string,i
   const definition=readDebiCheckRequest(row.config,{id:row.id,organisationId:session.organisationId,facilityId:identity.facilityId,accountId});
   if(definition.customerId!==identity.customerId)throw Error('TENANT_NOT_FOUND');
   if(row.status==='WITHDRAWN')return projectDebiCheckRequest(definition,row.status);
+  // Claim and withdrawal take the same account lock. Once an attempt is retained,
+  // local withdrawal cannot cancel or permit a replay of an uncertain bank call.
+  if(await tx.configurationProfile.findFirst({where:{organisationId:session.organisationId,facilityId:identity.facilityId,domain:DEBICHECK_ATTEMPT_DOMAIN,name:row.id},select:{id:true}}))throw Error('DEBICHECK_PROVIDER_CANCELLATION_REVIEW');
   if(!['REQUESTED','REVIEWED'].includes(row.status))throw Error('DEBICHECK_PROVIDER_CANCELLATION_REVIEW');
   await tx.configurationProfile.update({where:{id},data:{status:'WITHDRAWN'}});
   await tx.auditEvent.create({data:{organisationId:session.organisationId,facilityId:identity.facilityId,action:'netcash.debicheck_request_withdrawn',entityType:'ConfigurationProfile',entityId:id,after:{accountId,customerId:identity.customerId,authenticationSubmitted:false,collectionEnabled:false}}});
