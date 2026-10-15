@@ -10,6 +10,7 @@ import {visualReportSource} from "../../src/lib/visual-report-data";
 import {decryptReportArtifact,encryptReportArtifact,visualReportScope} from "../../src/lib/visual-report-security";
 import {transfer} from "../../src/lib/leasing-service";
 import {evaluateVisualReport} from "../../src/lib/visual-report-engine";
+import {previewRentReview,approveRentReview} from "../../src/lib/rent-review-service";
 
 test("isolated PostgreSQL reporting persistence, claims, expiry and history scope",async t=>{
   assert.equal(process.env.MERCHANDISE_DB_TEST,"isolated-ci");
@@ -100,6 +101,29 @@ test("isolated PostgreSQL reporting persistence, claims, expiry and history scop
         await db.tenancy.deleteMany({where:{customerId:customer.id}});
         await db.account.deleteMany({where:{customerId:customer.id}});
         await db.customer.delete({where:{id:customer.id}});
+      }
+    });
+    await t.test("native approved rent history uses the actual approval producer, retains immutable rates and holds broken sources",async()=>{
+      const customer=await db.customer.create({data:{organisationId:org.id,firstName:"Synthetic rent approval"}}),type=await db.unitType.create({data:{facilityId:facility.id,name:"Synthetic rate history"}});
+      const unit=await db.unit.create({data:{facilityId:facility.id,unitTypeId:type.id,number:"RENT-HISTORY-CI",floor:"Ground Floor",monthlyRate:100,status:"OCCUPIED"}});
+      const account=await db.account.create({data:{customerId:customer.id,accountNumber:randomUUID(),balance:0,currency:"ZAR"}}),tenancy=await db.tenancy.create({data:{customerId:customer.id,accountId:account.id,facilityId:facility.id,status:"ACTIVE",startDate:new Date("2026-01-01")}});
+      const occupancy=await db.occupancy.create({data:{tenancyId:tenancy.id,unitId:unit.id,status:"ACTIVE",startDate:new Date("2026-01-01"),monthlyRate:100}});
+      let auditId:string|undefined;
+      try{
+        const now=new Date(),effectivePeriod=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()+2,1)).toISOString().slice(0,7),input={facilityId:facility.id,minimumMonths:0,basis:"TIME_IN_UNIT",type:"AMOUNT",value:12.34,effectivePeriod};
+        const preview=await previewRentReview(org.id,input);await approveRentReview(org.id,user.id,input,preview.fingerprint,"Synthetic rate history approval");
+        const audit=await db.auditEvent.findFirstOrThrow({where:{organisationId:org.id,action:"rent.group_increase.approved",entityId:facility.id},orderBy:{occurredAt:"desc"}});auditId=audit.id;
+        await db.auditEvent.update({where:{id:audit.id},data:{occurredAt:new Date("2026-10-04T22:30:00Z")}});await db.unit.update({where:{id:unit.id},data:{number:"CURRENT-RENAMED-RENT-UNIT"}});
+        const scope={organisationId:org.id,userId:user.id,unrestrictedFacilities:false,facilityIds:[facility.id]},query=defaultVisualQuery("approved-rent-history-native","2026-10-01","2026-10-31");
+        const baseline={account:await db.account.findUniqueOrThrow({where:{id:account.id}}),occupancy:await db.occupancy.findUniqueOrThrow({where:{id:occupancy.id}}),audit:await db.auditEvent.findUniqueOrThrow({where:{id:audit.id}}),schedule:await db.configurationProfile.findMany({where:{organisationId:org.id,domain:"OCCUPANCY_RENT_SCHEDULE",name:occupancy.id}})};
+        const rows=await visualReportSource(scope,query);assert.equal(rows.length,1);assert.equal(rows[0].verified,true);assert.equal(rows[0].previousRate,"100.00");assert.equal(rows[0].newRate,"112.34");assert.equal(rows[0].changeAmount,"12.34");assert.equal(rows[0].unit,"CURRENT-RENAMED-RENT-UNIT");assert.equal(rows[0].date,"2026-10-05");assert.equal(rows[0].effective,effectivePeriod+"-01");
+        const effectiveQuery={...query,dateField:"effective",from:effectivePeriod+"-01",to:effectivePeriod+"-01"};assert.equal(evaluateVisualReport(effectiveQuery,await visualReportSource(scope,effectiveQuery)).matchedRows,1);assert.equal(evaluateVisualReport({...effectiveQuery,dateField:"date"},rows).matchedRows,0);
+        assert.deepEqual(await visualReportSource({...scope,facilityIds:[other.id]},query),[]);assert.deepEqual(await visualReportSource({...scope,organisationId:"separate-organisation",unrestrictedFacilities:true,facilityIds:[]},query),[]);await assert.rejects(visualReportSource(scope,{...query,facilityId:other.id}),/FORBIDDEN/);await assert.rejects(visualReportSource(scope,{...query,historyImportId:randomUUID()}),/REPORT_RATE_HISTORY_SOURCE/);
+        assert.deepEqual({account:await db.account.findUniqueOrThrow({where:{id:account.id}}),occupancy:await db.occupancy.findUniqueOrThrow({where:{id:occupancy.id}}),audit:await db.auditEvent.findUniqueOrThrow({where:{id:audit.id}}),schedule:await db.configurationProfile.findMany({where:{organisationId:org.id,domain:"OCCUPANCY_RENT_SCHEDULE",name:occupancy.id}})},baseline);assert.equal(await db.payment.count({where:{accountId:account.id}}),0);assert.equal(await db.ledgerEntry.count({where:{accountId:account.id}}),0);
+        await db.auditEvent.update({where:{id:audit.id},data:{after:{...audit.after as object,changes:[{occupancyId:"missing-original-occupancy",before:100,after:112.34}]}}});const held=await visualReportSource(scope,query);assert.equal(held[0].reviewCode,"RATE_APPROVAL_REFERENCE_REVIEW");assert.equal(held[0].newRate,null);assert.equal(held[0].currency,null);await assert.rejects(visualReportSource(scope,{...query,groupBy:["currency"],metrics:[{field:"newRate",operation:"sum"}]}),/REPORT_RATE_REVIEW_REQUIRED/);
+        await db.auditEvent.update({where:{id:audit.id},data:{after:{}}});assert.equal((await visualReportSource(scope,query))[0].reviewCode,"RATE_APPROVAL_PAYLOAD_REVIEW");await assert.rejects(visualReportSource(scope,effectiveQuery),/REPORT_RATE_DATE_REVIEW/);
+      }finally{
+        if(auditId)await db.auditEvent.delete({where:{id:auditId}});await db.configurationProfile.deleteMany({where:{organisationId:org.id,domain:"OCCUPANCY_RENT_SCHEDULE",name:occupancy.id}});await db.occupancy.delete({where:{id:occupancy.id}});await db.tenancy.delete({where:{id:tenancy.id}});await db.account.delete({where:{id:account.id}});await db.customer.delete({where:{id:customer.id}});await db.unit.delete({where:{id:unit.id}});await db.unitType.delete({where:{id:type.id}});
       }
     });
     await t.test("encrypted historical rows remain separate and cannot cross a facility scope",async()=>{

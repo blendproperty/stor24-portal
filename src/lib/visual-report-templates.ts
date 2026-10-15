@@ -6,6 +6,7 @@ const equal=(field:string,value:string):VisualReportQuery["filters"][number]=>({
 const template=(key:string,name:string,group:string,dataset:string,options:Partial<VisualReportTemplate>={}):VisualReportTemplate=>({key,name,group,dataset,...options});
 const ledger=(key:string,name:string,type?:string)=>template(key,name,"Finance","ledger",{dateField:"date",...(type?{filters:[equal("type",type)]}:{})});
 export const visualReportTemplates:VisualReportTemplate[]=[
+  template("approved-rent-history-native","Recorded approved rent changes","Units","approved-rent-history-native",{dateField:"date",columns:["facility","approval","account","unit","date","effective","previousRate","newRate","changeAmount","currency","verified","review"]}),
   template("transfers-native","Recorded STOR24 transfer pairs","Units","transfers-native",{dateField:"date",columns:["facility","transfer","account","fromUnit","toUnit","date","effective","verified","review"]}),
   template("unpaid-native", "Unpaid charges under approved STOR24 terms", "Finance", "unpaid-native", {columns:["facility","account","customer","charge","due","amount","currency","review","hold"]}),
   template("native-sign-ins", "STOR24 sign-in event counts", "Management", "audit", {dateField:"date",filters:[{field:"action",operator:"contains",value:"user.login."}],groupBy:["actor","action"],metrics:[{field:"*",operation:"count"}]}),

@@ -10,6 +10,7 @@ import { z } from "zod";
 import { collectionsWorkspace } from "./collections-service";
 import { nativeUnpaidRows } from "./native-unpaid-report";
 import { nativeTransferRows, transferReferenceIds } from "./native-transfer-report";
+import { nativeRentHistoryRows, rentHistoryReferenceIds } from "./native-rent-history-report";
 
 const iso=(date:Date|null|undefined)=>date?.toISOString()??null;
 const name=(c:{companyName:string|null;firstName:string|null;lastName:string|null}|null)=>c?(c.companyName||[c.firstName,c.lastName].filter(Boolean).join(" ")):null;
@@ -27,6 +28,14 @@ async function rawVisualReportSource(scope:RequestScope, query:VisualReportQuery
   const interval=query.intervalMode?{startDate:query.intervalMode==="whole-period"?{lte:period.gte}:{lt:period.lt},OR:[{endDate:null},{endDate:query.intervalMode==="whole-period"?{gte:period.lt}:{gt:period.gte}}]}:{};
   const bounded=<T>(rows:T[])=>{if(rows.length>REPORT_SOURCE_LIMIT)throw new ReportError("REPORT_LIMIT");return rows;};
   switch(query.dataset) {
+    case "approved-rent-history-native": return db.$transaction(async tx=>{
+      // Read the bounded retained approval set before date filtering so a reused
+      // batch cannot disappear merely because its other event is outside a period.
+      const events=bounded(await tx.auditEvent.findMany({where:{...direct,action:"rent.group_increase.approved",entityType:"Facility"},take,orderBy:{id:"asc"},select:{id:true,entityId:true,facilityId:true,facility:{select:facilitySelect},occurredAt:true,after:true}}));
+      const ids=rentHistoryReferenceIds(events);
+      const occupancies=ids.length?await tx.occupancy.findMany({where:{id:{in:ids},tenancy:{facility,customer:{organisationId:scope.organisationId},account:{customer:{organisationId:scope.organisationId}}}},select:{id:true,tenancyId:true,unitId:true,unit:{select:{number:true,facilityId:true}},tenancy:{select:{facilityId:true,account:{select:{accountNumber:true,currency:true}}}}}}):[];
+      return nativeRentHistoryRows(events,occupancies,{effectiveDateFilter:query.dateField==="effective",totalingMoney:query.metrics.some(m=>["previousRate","newRate","changeAmount"].includes(m.field))});
+    },{isolationLevel:"RepeatableRead",timeout:30000});
     case "transfers-native": return db.$transaction(async tx=>{
       const events=bounded(await tx.auditEvent.findMany({where:{...direct,action:"tenancy.transferred",entityType:"Tenancy",...range("occurredAt","date"),...range("occurredAt","recordedAt")},take,orderBy:{id:"asc"},select:{id:true,entityId:true,facilityId:true,facility:{select:facilitySelect},occurredAt:true,before:true,after:true}}));
       const ids=transferReferenceIds(events);
@@ -83,6 +92,7 @@ async function rawVisualReportSource(scope:RequestScope, query:VisualReportQuery
 }
 
 export async function visualReportSource(scope:RequestScope, query:VisualReportQuery):Promise<VisualReportRow[]> {
+  if(query.dataset==="approved-rent-history-native"&&query.historyImportId)throw new ReportError("REPORT_RATE_HISTORY_SOURCE");
   if(query.historyImportId) {
     const imported=await db.reportHistoryImport.findFirst({where:{id:query.historyImportId,organisationId:scope.organisationId,dataset:query.dataset,...(query.facilityId?{facilityId:query.facilityId}:scope.unrestrictedFacilities?{}:{facilityId:{in:scope.facilityIds}})}});
     if(!imported)throw new ReportError("REPORT_NOT_FOUND");
@@ -91,7 +101,7 @@ export async function visualReportSource(scope:RequestScope, query:VisualReportQ
   }
   if(visualReportDatasets.find(d=>d.key===query.dataset)?.importOnly)throw new ReportError("REPORT_HISTORY_REQUIRED");
   const rows=await rawVisualReportSource(scope,query);
-  if(query.dataset==="unpaid-native")return rows;
+  if(["unpaid-native","approved-rent-history-native"].includes(query.dataset))return rows;
   const org=await db.organisation.findUniqueOrThrow({where:{id:scope.organisationId},select:{currency:true}});
   return rows.map(row=>({...row,currency:row.currency??org.currency}));
 }
