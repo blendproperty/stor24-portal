@@ -7,7 +7,7 @@ export const securityPermissionGroups = [
   { label: "Accounting integration", permissions: [
     ["mri.view", "Review MRI accounting preparation"], ["mri.manage", "Manage encrypted MRI connection settings"],
   ] },
-  { label: "Unidentified payment investigation", permissions: [["receipt_review.view", "View unidentified payment investigations"], ["receipt_review.capture", "Retain unidentified evidence without financial posting"], ["receipt_review.propose", "Suggest accounts or withdraw matching investigations"], ["receipt_review.approve", "Independently review matching suggestions without financial posting"]] },
+  { label: "Unidentified payment investigation", permissions: [["receipt_review.view", "View unidentified payment investigations"], ["receipt_review.capture", "Retain unidentified evidence without financial posting"], ["receipt_review.propose", "Suggest accounts or withdraw matching investigations"], ["receipt_review.approve", "Independently review matching suggestions without financial posting"], ["receipt_review.bank_sources", "Manage and independently review incoming bank-source identities"], ["receipt_review.post", "Post independently reviewed imported receipts"]] },
   { label: "Settlement reviews", permissions: [
     ["settlements.view", "View merchant settlement statements"], ["settlements.import", "Import settlement and bank evidence"], ["settlements.manage", "Match and reopen settlement reviews"], ["settlements.approve", "Independently review settlements"], ["settlements.export", "Export settlement reviews"],
   ] },

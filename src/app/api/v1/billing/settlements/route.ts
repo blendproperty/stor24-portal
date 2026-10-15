@@ -4,7 +4,7 @@ import { requirePermissionScope } from "@/lib/scope";
 import { sameOrigin, rateLimit } from "@/lib/request-security";
 import { boundedBody } from "@/lib/payments/netcash-mandate";
 import { settlementActionSchema } from "@/lib/settlement-policy";
-import { settlementAction, settlementCsv, settlementDetail, settlementWorkspace } from "@/lib/settlement-service";
+import { settlementAction, settlementCsv, settlementDetail, settlementWorkspace,settlementBankSourceOptions } from "@/lib/settlement-service";
 const messages: Record<string, string> = {
   SETTLEMENT_UNSUPPORTED: "This transaction code needs a finance-approved mapping before review. Keep the exception open; do not relabel the original source.",
   SETTLEMENT_ORG_PERMISSION: "This workspace needs organisation-wide finance permission because a merchant statement can span stores.",
@@ -12,6 +12,7 @@ const messages: Record<string, string> = {
   SETTLEMENT_CONFIG: "Review the merchant, environment and Account service key in Netcash configuration.",
   SETTLEMENT_DATE: "Choose a valid past statement date. Bank records and balance observations cannot be future dated.",
   SETTLEMENT_FORMAT: "Use a full daily Netcash tab-separated statement or the specified bank CSV format, with at most 500 transactions.",
+  SETTLEMENT_CURRENCY: "A supplied currency column must state ZAR from the original source. Do not convert or guess another currency for this workflow.",
   SETTLEMENT_AMOUNT: "Check the amount and exact four-decimal matching. Available funds cannot exceed current funds.",
   SETTLEMENT_DIRECTION: "A recognised transaction has an unexpected direction. Obtain the original full statement and investigate.",
   SETTLEMENT_BALANCE: "Opening balance plus all signed movements does not equal closing balance.",
@@ -40,6 +41,7 @@ export async function GET(request: Request) {
   try {
     const params = new URL(request.url).searchParams, exporting = params.get("export") === "csv";
     const scope = await requirePermissionScope(exporting ? "settlements.export" : "settlements.view");
+    if(params.get('mode')==='bank-sources'){const cursor=params.get('cursor');return Response.json(await settlementBankSourceOptions(scope,cursor?z.uuid().parse(cursor):undefined),{headers:{'cache-control':'no-store'}});}
     const id = params.has("id") ? z.string().cuid().parse(params.get("id")) : null;
     if (exporting) {
       if (!id) return Response.json({ error: "Choose a statement." }, { status: 400 });
