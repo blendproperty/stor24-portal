@@ -1,3 +1,4 @@
+import { marketingPaymentCohortSource } from "./marketing-payment-cohort-source";
 import { db } from "@/lib/db";
 import { requireFacility, facilityWhere, type RequestScope } from "@/lib/scope";
 import { unitIsOperational } from "@/lib/floor-availability";
@@ -28,6 +29,7 @@ async function rawVisualReportSource(scope:RequestScope, query:VisualReportQuery
   const interval=query.intervalMode?{startDate:query.intervalMode==="whole-period"?{lte:period.gte}:{lt:period.lt},OR:[{endDate:null},{endDate:query.intervalMode==="whole-period"?{gte:period.lt}:{gt:period.gte}}]}:{};
   const bounded=<T>(rows:T[])=>{if(rows.length>REPORT_SOURCE_LIMIT)throw new ReportError("REPORT_LIMIT");return rows;};
   switch(query.dataset) {
+    case "marketing-payment-cohorts": return marketingPaymentCohortSource(scope,query);
     case "approved-rent-history-native": return db.$transaction(async tx=>{
       // Read the bounded retained approval set before date filtering so a reused
       // batch cannot disappear merely because its other event is outside a period.
@@ -93,6 +95,7 @@ async function rawVisualReportSource(scope:RequestScope, query:VisualReportQuery
 }
 
 export async function visualReportSource(scope:RequestScope, query:VisualReportQuery):Promise<VisualReportRow[]> {
+  if(query.dataset==="marketing-payment-cohorts"&&query.historyImportId)throw new ReportError("REPORT_COHORT_SOURCE");
   if(query.dataset==="approved-rent-history-native"&&query.historyImportId)throw new ReportError("REPORT_RATE_HISTORY_SOURCE");
   if(query.historyImportId) {
     const imported=await db.reportHistoryImport.findFirst({where:{id:query.historyImportId,organisationId:scope.organisationId,dataset:query.dataset,...(query.facilityId?{facilityId:query.facilityId}:scope.unrestrictedFacilities?{}:{facilityId:{in:scope.facilityIds}})}});
@@ -102,7 +105,7 @@ export async function visualReportSource(scope:RequestScope, query:VisualReportQ
   }
   if(visualReportDatasets.find(d=>d.key===query.dataset)?.importOnly)throw new ReportError("REPORT_HISTORY_REQUIRED");
   const rows=await rawVisualReportSource(scope,query);
-  if(["unpaid-native","approved-rent-history-native"].includes(query.dataset))return rows;
+  if(["unpaid-native","approved-rent-history-native","marketing-payment-cohorts"].includes(query.dataset))return rows;
   const org=await db.organisation.findUniqueOrThrow({where:{id:scope.organisationId},select:{currency:true}});
   return rows.map(row=>({...row,currency:row.currency??org.currency}));
 }

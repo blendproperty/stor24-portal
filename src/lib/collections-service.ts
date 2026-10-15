@@ -74,6 +74,39 @@ export async function collectionsWorkspace(scope: RequestScope, asOf: string) {
 }
 export type CollectionsWorkspaceData = Awaited<ReturnType<typeof collectionsWorkspace>>;
 
+/** Minimal read-only report projection using the staff queue's receipt and due-date rules.
+ * The caller supplies its already intersected report scope and transaction. */
+export async function collectionCohortOutcomes(tx: Client, scope: RequestScope, ids: string[], asOf: string) {
+  dateKey.parse(asOf);
+  if (asOf > southAfricaDateKey(new Date())) throw new Error("COLLECTION_DATE");
+  if (ids.length > 2000) throw new Error("COLLECTION_LIMIT");
+  if (ids.length) {
+    const account = { id: { in: ids }, ...where(scope) };
+    const [entries, payments] = await Promise.all([
+      tx.ledgerEntry.count({where:{account}}), tx.payment.count({where:{account}}),
+    ]);
+    if (entries > 5000 || payments > 5000) throw new Error("COLLECTION_LIMIT");
+  }
+  const accounts = ids.length ? await tx.account.findMany({ where: { id: { in: ids }, ...where(scope) }, include, take: 2001 }) : [];
+  if (accounts.length > 2000) throw new Error("COLLECTION_LIMIT");
+  const paymentIds = accounts.flatMap(account => account.payments.map(payment => payment.id));
+  if (paymentIds.length && await tx.auditEvent.count({where:{organisationId:scope.organisationId,entityType:"Payment",entityId:{in:paymentIds},action:{in:["payment.posted","booking.payment_recorded"]}}}) > 5000) throw new Error("COLLECTION_LIMIT");
+  const evidence = await receiptEvidence(tx, scope, accounts);
+  return accounts.map(account => {
+    const result = evaluate(account, asOf, evidence);
+    const values = result.ageing.issue ? [] : effectiveEntries(result.entries, asOf);
+    const verified = new Set(result.verifiedReceiptIds);
+    const receipts = values.filter(v => v.entry.type === "PAYMENT" && verified.has(v.entry.id));
+    const received = receipts.reduce((sum, v) => sum + v.amount, 0);
+    const refunded = values.filter(v => v.entry.type === "REFUND" && verified.has((v.entry.metadata as {sourceEntryId?: string} | null)?.sourceEntryId ?? "")).reduce((sum, v) => sum + v.amount, 0);
+    return { accountId: account.id, facilityId: account.tenancy!.facilityId, customerId: account.customerId,
+      issue: result.ageing.issue, overdueCents: result.ageing.issue ? null : result.ageing.overdue,
+      netReceiptCents: result.ageing.issue ? null : received - refunded,
+      receiptCount: result.ageing.issue ? null : receipts.filter(v => v.amount > 0).length,
+      hold: result.hold };
+  });
+}
+
 /** Reuses the same due-date, receipt and hold rules as the staff queue. */
 export async function collectionEmailSource(tx: Client, scope: RequestScope, accountId: string, asOf: string) {
   const account = await accountFor(tx, scope, accountId), evaluated = evaluate(account, asOf, await receiptEvidence(tx, scope, [account]));
