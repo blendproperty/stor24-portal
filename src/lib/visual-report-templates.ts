@@ -6,6 +6,8 @@ const equal=(field:string,value:string):VisualReportQuery["filters"][number]=>({
 const template=(key:string,name:string,group:string,dataset:string,options:Partial<VisualReportTemplate>={}):VisualReportTemplate=>({key,name,group,dataset,...options});
 const ledger=(key:string,name:string,type?:string)=>template(key,name,"Finance","ledger",{dateField:"date",...(type?{filters:[equal("type",type)]}:{})});
 export const visualReportTemplates:VisualReportTemplate[]=[
+  template("marketing-payment-cohorts","Enquiry sources, booking quotes and payment outcomes","Marketing","marketing-payment-cohorts",{dateField:"date",columns:["facility","source","acquisitionSource","campaign","city","province","bookingCount","convertedCount","originalMonthlyQuote","netReceipts","overdue","currency","paymentOutcome","review","acquisitionReview"]}),
+  template("marketing-payment-source-counts","Enquiry conversion and payment outcome counts","Marketing","marketing-payment-cohorts",{dateField:"date",groupBy:["source","paymentOutcome"],metrics:[{field:"*",operation:"count"}]}),
   template("approved-rent-history-native","Recorded approved rent changes","Units","approved-rent-history-native",{dateField:"date",columns:["facility","approval","account","unit","date","effective","previousRate","newRate","changeAmount","currency","verified","review"]}),
   template("transfers-native","Recorded STOR24 transfer pairs","Units","transfers-native",{dateField:"date",columns:["facility","transfer","account","fromUnit","toUnit","date","effective","verified","review"]}),
   template("unpaid-native", "Unpaid charges under approved STOR24 terms", "Finance", "unpaid-native", {columns:["facility","account","customer","charge","due","amount","currency","review","hold"]}),

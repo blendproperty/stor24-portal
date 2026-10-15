@@ -55,6 +55,7 @@ jobs:
       - run: npx tsx --test tests/integration/netcash-debicheck-requests.test.ts
       - run: npx tsx --test tests/integration/posted-recurring-charge-report.test.ts
       - run: npx tsx --test tests/integration/visual-reporting.test.ts
+      - run: npx tsx --test tests/integration/marketing-payment-cohorts.test.ts
       - run: npx tsx --test tests/integration/transfer-source-concurrency.test.ts
       - run: npx tsx --test tests/integration/daily-close.test.ts
       - run: npx tsx --test tests/integration/configuration-atomicity.test.ts
@@ -108,6 +109,7 @@ jobs:
         run: npx tsx --test tests/integration/faeez-representative-workload.test.ts
       - run: npx tsx --test tests/integration/collection-notices.test.ts
       - run: npx tsx --test tests/integration/settlements.test.ts
+      - run: npx tsx --test tests/integration/unidentified-receipts.test.ts
       - run: npx tsx --test tests/integration/mri.test.ts
       - run: npx tsx --test tests/integration/mri-mapping.test.ts
       - run: npx tsx --test tests/integration/mri-sandbox.test.ts
