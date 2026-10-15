@@ -1165,6 +1165,7 @@ model User {
   ledgerEntries       LedgerEntry[]
   assignedTasks       Task[]               @relation("TaskAssignee")
   createdTasks        Task[]               @relation("TaskCreator")
+  coveringTasks       Task[]               @relation("TaskCover")
   auditEvents         AuditEvent[]
   unitNotes           UnitNote[]
   maintenanceRequests MaintenanceRequest[]
@@ -1291,6 +1292,12 @@ model Task {
   assignee       User?        @relation("TaskAssignee", fields: [assigneeId], references: [id])
   createdById    String?
   createdBy      User?        @relation("TaskCreator", fields: [createdById], references: [id])
+  purpose        String       @default("GENERAL")
+  requestKey     String?      @unique
+  requestHash    String?
+  coverId        String?
+  cover          User?        @relation("TaskCover", fields: [coverId], references: [id], onDelete: SetNull)
+  coverAcknowledgedAt DateTime?
   title          String
   description    String?
   status         TaskStatus   @default(OPEN)
@@ -1303,6 +1310,7 @@ model Task {
 
   @@index([organisationId, status, dueAt])
   @@index([assigneeId, status, dueAt])
+  @@index([organisationId, facilityId, purpose, status, dueAt])
 }
 
 model IntegrationConnection {
