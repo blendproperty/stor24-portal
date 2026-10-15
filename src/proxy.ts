@@ -20,6 +20,7 @@ export function isPublicPathname(pathname: string) {
   if (pathname === "/api/v1/operations/alert-monitor-config") return true;
   if (pathname === "/api/v1/leads/sla-worker") return true;
   if (pathname === "/api/v1/reports/worker") return true;
+  if (pathname === "/api/internal/staff-event-emails") return true;
   // Only the dedicated enquiry handler accepts the scoped WhatChimp intake key.
   if (pathname === "/api/integrations/whatchimp/enquiry") return true;
   // Tenant APIs enforce separate tenant sessions; never accept the staff cookie as tenant authentication.

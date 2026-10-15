@@ -112,6 +112,24 @@ Open **Operations → Expected arrivals**. Choose the SAST date range and store,
 
 Booking → signed agreement → verified payment → physical key handover → active access are distinct stages. Planning an arrival never hands over keys or activates a gate. External manager notifications and delivery to a real recipient require their separately agreed channel and acceptance.
 
+## 05A · Review staff event emails
+
+Open **Booking & move-in events**, then **Staff event emails** with your own permitted account. These separate permissions do not add financial approval and have not been granted to Faeez automatically.
+
+**Choose the scope:** select the actual store, named existing staff recipients (maximum five), recorded event types and source dates. Booking created, agreement signed, move-in started and key handover recorded are different evidence. None alone proves payment or physical access.
+
+**Set explicit dates:** source dates include complete South African days (up to 32). Delivery dates and times are also SAST. Delivery expiry must reach midnight following the final source day; a past window cannot be approved.
+
+**Preview first:** read the actual source examples and recipient list. Editing a field clears the preview. **Retain for independent review** saves a policy and sends nothing. An older page of source records may still need evaluation.
+
+**Independent review:** a different authorised person checks store, recipients, event types and timing, then records their review reference. Current role, recipient address, sender and source checks apply again. Approval does not activate email sending.
+
+**Reviewed outbox:** **Evaluate next source page — no send** prepares notices without sending. Repeated or overlapping policies cannot create another notice for the same store event and recipient. Older policies and notices are available through paging.
+
+**Delivery remains separately approved:** sending is off by default. The exact policy, recipients and timing need approved activation. The worker rechecks current authority and source immediately before its single provider attempt. **ACCEPTED** means provider acceptance, not the staff member's inbox.
+
+**Investigate uncertainty:** **SENDING** or **REVIEW REQUIRED** must be investigated against provider evidence. The system never automatically reclaims or resends these notices. **Cancel future attempts** stops future work; it does not recall an attempted email. Preserve the original notice and its audit evidence.
+
 ## 06 · Payments, receipt review and agreed prices
 
 Open **Operations → Payments awaiting review** when your role permits it. Pending or unresolved evidence remains in the queue until the source is resolved; older pages are included. Test records are excluded. **Unavailable** means a source could not be read, not that there are zero pending payments.
