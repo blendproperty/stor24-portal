@@ -27,6 +27,7 @@ export async function prepareCardAutopay(client: Client, session: CardAutopayCus
   if (!account || !tenancy || tenancy.customerId !== account.customerId || tenancy.facilityId === null) throw new Error("TENANT_NOT_FOUND");
   if (tenancy.status !== "ACTIVE" || tenancy.endDate || tenancy.noticeDate || account.currency !== "ZAR") throw new Error("CARD_AUTOPAY_ACCOUNT_INELIGIBLE");
   if (tenancy.paymentMethod === "DEBIT_ORDER" || tenancy.mandateSession?.mandate?.status === "SIGNED" || tenancy.reservation?.publicLease?.mandate?.status === "SIGNED" || await client.debitOrderInstruction.count({ where: { accountId } })) throw new Error("CARD_AUTOPAY_OTHER_COLLECTION_REVIEW");
+  if (await client.configurationProfile.count({ where: { organisationId: session.organisationId, domain: "NETCASH_DEBICHECK_REQUEST", config: { path: ["accountId"], equals: accountId }, status: { not: "WITHDRAWN" } } })) throw new Error("CARD_AUTOPAY_OTHER_COLLECTION_REVIEW");
   const publicLease = tenancy.reservation?.publicLease;
   if (!tenancy.documents.length && !(publicLease?.status === "SIGNED" && publicLease.signedAt)) throw new Error("CARD_AUTOPAY_SIGNED_LEASE_REQUIRED");
   const profile = await client.configurationProfile.findFirst({ where: { organisationId: session.organisationId, facilityId: tenancy.facilityId, domain: "MONTHLY_BILLING", name: accountId, status: "READY" } });

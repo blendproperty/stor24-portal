@@ -1,7 +1,7 @@
 import {createHmac,randomUUID,timingSafeEqual} from 'node:crypto';
 import {z} from 'zod';
 import {db} from '@/lib/db';
-import {requireFacility,type RequestScope} from '@/lib/scope';
+import {requireFacility,type RequestScope,type FacilityScope} from '@/lib/scope';
 import {getNetcashConnection} from './netcash-client';
 import {merchantIdentity} from './netcash-statement';
 import {cardSourceHash} from './card-autopay-enrollment-policy';
@@ -11,12 +11,12 @@ export const DEBICHECK_TEMPLATE_DOMAIN='NETCASH_DEBICHECK_TEMPLATE';
 const observationSchema=z.object({version:z.literal(1),recordId:z.string().regex(/^debicheck-template:[a-f\d-]{36}$/),organisationId:z.string(),facilityId:z.string(),connectionId:z.string(),connectionUpdatedAt:z.iso.datetime(),merchantHash:z.string().regex(/^[a-f\d]{64}$/),environment:z.literal('sandbox'),requestedBy:z.string(),checkedAt:z.iso.datetime(),templateId:z.string().regex(/^NCDCT\d{9}$/),sourceHash:z.string().regex(/^[a-f\d]{64}$/),signature:z.string().regex(/^[a-f\d]{64}$/),snapshot:z.object({templateId:z.string(),detail:z.record(z.string(),z.string().nullable()),monthlyDayOptions:z.array(z.string()).min(1).max(62),authenticationSubmissionEnabled:z.literal(false),collectionEnabled:z.literal(false)}).strict()}).strict();
 type Observation=z.infer<typeof observationSchema>;
 function signature(value:object){const key=process.env.AUTH_SECRET;if(!key||key.length<32)throw Error('DEBICHECK_SIGNING_REQUIRED');return createHmac('sha256',key).update('netcash-debicheck-template:v1:'+cardSourceHash(value)).digest('hex');}
-function readObservation(value:unknown,scope:RequestScope,recordId:string){
+function readObservation(value:unknown,scope:FacilityScope,recordId:string){
  const observation=observationSchema.parse(value),{signature:stored,...plain}=observation;
  if(observation.recordId!==recordId||observation.organisationId!==scope.organisationId||observation.snapshot.templateId!==observation.templateId||cardSourceHash(observation.snapshot)!==observation.sourceHash||!timingSafeEqual(Buffer.from(stored,'hex'),Buffer.from(signature(plain),'hex')))throw Error('DEBICHECK_TEMPLATE_INTEGRITY_REVIEW');
  return observation;
 }
-async function connection(scope:RequestScope,facilityId:string){
+async function connection(scope:FacilityScope,facilityId:string){
  await requireFacility(scope,facilityId);
  const value=await getNetcashConnection(scope.organisationId,facilityId,true),stored=await db.integrationConnection.findUniqueOrThrow({where:{id:value.id}});
  if((stored.config as {environment?:unknown}).environment!=='test'||value.config.environment!=='sandbox'||!value.config.debitOrderServiceKey||!value.config.merchantAccount||!['CONNECTED','HEALTHY'].includes(value.status))throw Error('DEBICHECK_TEST_CONFIGURATION_REQUIRED');
@@ -60,4 +60,18 @@ export async function listDebiCheckTemplates(scope:RequestScope,facilityId:strin
  let c:Awaited<ReturnType<typeof connection>>|null=null;
  try{c=await connection(scope,facilityId)}catch(error){if(!(error instanceof Error)||!['DEBICHECK_TEST_CONFIGURATION_REQUIRED','NETCASH_NOT_CONFIGURED'].includes(error.message))throw error;}
  return{hasMore:rows.length>20,records:rows.slice(0,20).map(row=>{const observation=readObservation(row.config,scope,row.id);if(observation.facilityId!==facilityId||row.id!==row.name)throw Error('DEBICHECK_TEMPLATE_INTEGRITY_REVIEW');return{id:row.id,status:row.status,...observation.snapshot,checkedAt:observation.checkedAt,ownRequest:observation.requestedBy===scope.userId,sourceCurrent:c!==null&&connectionMatches(observation,c)}})};
+}
+/** Internal preparation dependency. A reviewed template is evidence for review,
+ * never permission to submit TT1 or to collect. Recheck its original identity,
+ * independent review audit and current merchant connection before using it. */
+export async function reviewedDebiCheckTemplate(scope:FacilityScope,facilityId:string,id:string,now=new Date()){
+ await requireFacility(scope,facilityId);
+ const row=await db.configurationProfile.findFirst({where:{id,organisationId:scope.organisationId,facilityId,domain:DEBICHECK_TEMPLATE_DOMAIN,status:'REVIEWED'}});
+ if(!row)throw Error('DEBICHECK_REVIEWED_TEMPLATE_REQUIRED');
+ const observation=readObservation(row.config,scope,row.id);
+ if(row.id!==row.name||observation.facilityId!==facilityId||new Date(observation.checkedAt)>now||now.getTime()-new Date(observation.checkedAt).getTime()>900000)throw Error('DEBICHECK_TEMPLATE_REVIEW_EXPIRED');
+ const review=await db.auditEvent.findFirst({where:{organisationId:scope.organisationId,facilityId,entityType:'ConfigurationProfile',entityId:row.id,action:'netcash.debicheck_template_reviewed'},orderBy:{occurredAt:'desc'}});
+ if(!review?.actorId||review.actorId===observation.requestedBy||(review.after as {sourceHash?:unknown}|null)?.sourceHash!==observation.sourceHash)throw Error('DEBICHECK_INDEPENDENT_REVIEW_REQUIRED');
+ const c=await connection(scope,facilityId);if(!connectionMatches(observation,c))throw Error('DEBICHECK_CONFIGURATION_CHANGED');
+ return{observationId:row.id,templateId:observation.templateId,sourceHash:observation.sourceHash,connectionId:c.id,connectionUpdatedAt:c.updatedAt.toISOString(),merchantHash:observation.merchantHash,monthlyDayOptions:observation.snapshot.monthlyDayOptions,authenticationSubmissionEnabled:false as const,collectionEnabled:false as const};
 }

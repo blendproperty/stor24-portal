@@ -29,6 +29,7 @@ jobs:
       - run: node scripts/test-netcash-payment-requests.mjs
       - run: node scripts/test-tenant-payment-requests.mjs
       - run: node scripts/test-netcash-debicheck-templates.mjs
+      - run: node scripts/test-netcash-debicheck-requests.mjs
       - run: node scripts/test-debit-orders.mjs
       - run: node scripts/test-adjustments.mjs
       - run: node scripts/test-account-payment-retry.mjs
@@ -149,6 +150,7 @@ jobs:
             output/password-form-recovery/
             output/plan-history-evidence/
             output/tenant-card-subscriptions/
+            output/netcash-debicheck-requests/
             output/monthly-billing/
             output/debit-orders/
             output/adjustments/
