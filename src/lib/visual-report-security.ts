@@ -6,7 +6,7 @@ import type { RequestScope } from "./scope";
 
 type Assignment = Parameters<typeof currentRoleAccess>[0][number];
 export function visualReportScope(assignments:Assignment[],dataset:ReportDataset,userId:string,organisationId:string,facilityId?:string,exporting=false):RequestScope {
-  const permissions=[dataset.permission,...(dataset.extraPermission?[dataset.extraPermission]:[]),...(exporting?["reports.export"]:[])];
+  const permissions=[dataset.permission,...(dataset.additionalPermissions??[]),...(dataset.extraPermission?[dataset.extraPermission]:[]),...(exporting?["reports.export"]:[])];
   let allowed:string[]|null=null;
   for(const permission of permissions) {
     const access=currentRoleAccess(assignments,permission,facilityId);
