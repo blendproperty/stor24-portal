@@ -29,8 +29,17 @@ export async function POST(request: Request) {
     const scope = await requirePermissionScope("collections.manage");
     const input = commandSchema.parse(JSON.parse((await boundedBody(new Response(request.body), 16000)).toString()));
     if (await rateLimit(`collection-notice-bulk:${scope.organisationId}:${scope.userId}`, 10, 60000)) return Response.json({ error: "Wait a minute before preparing another audience." }, { status: 429, headers });
-    const result = input.action === "preview" ? await previewCollectionNoticeBatch(scope, input.accounts) : input.action === "prepare" ? await prepareCollectionNoticeBatch(scope, { items: input.items, confirm: input.confirm }) : await approveCollectionNoticeBatch(scope,{items:input.items,reference:input.reference,confirm:input.confirm});
-    return Response.json(result, { headers });
+    if(input.action==="preview"){
+      const result=await previewCollectionNoticeBatch(scope,input.accounts);
+      const items=await Promise.all(result.items.map(async item=>{
+        let canSend=false;
+        try{await requirePermissionScope("billing.documents.send",item.source.facilityId);canSend=true}catch{/* Sending is a separate per-store grant. */}
+        return{...item,canSend};
+      }));
+      return Response.json({...result,items},{headers});
+    }
+    const result=input.action === "prepare" ? await prepareCollectionNoticeBatch(scope, { items: input.items, confirm: input.confirm }) : await approveCollectionNoticeBatch(scope,{items:input.items,reference:input.reference,confirm:input.confirm});
+    return Response.json(result,{headers});
   } catch (error) {
     const code = error instanceof Error ? error.message : "";
     const conflict = ["COLLECTION_NOTICE_CHANGED", "COLLECTION_NOTICE_HOLD", "COLLECTION_NOTICE_IMMUTABLE", "COLLECTION_NOTICE_INTEGRITY", "COLLECTION_NOTICE_SELF_APPROVAL"].includes(code) || !!(error && typeof error === "object" && "code" in error && ["P2002", "P2034"].includes(String(error.code)));

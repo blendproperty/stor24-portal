@@ -2,6 +2,8 @@
 
 ## Status and scope
 
+15 October 2026 support clarification: Byrone Sawyer's14 October08:25 UTC reply to the existing STOR24 readiness thread directs signing/confirmation testing to the synchronous eMandate service and a configured postback URL. The [current provider contract](https://api.netcash.co.za/inbound-payments/emandate/emandate-synchronous/) places this dedicated URL in the Debit Order NetConnector profile. Stor24 already calls AddMandate and has the dedicated `/api/webhooks/netcash/mandate` browser-return handler; it matches the stored reference/correlation, discards unsigned success/bank fields and returns the signer to the hosted journey. Independent report/PDF checks remain authoritative. Source presence and the application's postbackConfigured policy flag do not prove the merchant profile's actual URL or real browser/OTP/signature return. This reply supplies no collection payer/date approval and does not close signing, PDF, provider or production UAT. No bank details or private merchant references are recorded here.
+
 Implemented for controlled individual-customer test-account UAT, disabled by default.
 This is a signed **standard EFT eMandate**, not DebiCheck bank authentication.
 No debit submission, masterfile activation, ledger posting, tenancy activation or
