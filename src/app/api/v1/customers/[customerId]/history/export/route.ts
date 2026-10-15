@@ -11,8 +11,8 @@ export async function POST(request:Request,context:{params:Promise<{customerId:s
     if(!sameOrigin(request))throw new Error("FORBIDDEN");
     const exported=await requirePermissionScope("customer_history.export");
     const scope=intersectHistoryScope(await requirePermissionScope("operations.view"),exported);
-    let raw:unknown;try{raw=await request.json();}catch{return Response.json({error:{message:"Choose PDF or CSV and valid history filters."}},{status:422});}
-    const parsed=schema.safeParse(raw);if(!parsed.success)return Response.json({error:{message:"Choose PDF or CSV and valid history filters."}},{status:422});
+    let raw:unknown;try{raw=await request.json();}catch{return Response.json({error:{message:"Choose PDF, CSV or Excel and valid history filters."}},{status:422});}
+    const parsed=schema.safeParse(raw);if(!parsed.success)return Response.json({error:{message:"Choose PDF, CSV or Excel and valid history filters."}},{status:422});
     const {customerId}=await context.params;
     const [communications,collections]=await Promise.all([source("communications.view"),source("collections.view")]);
     // Recheck current export authority before any bytes are constructed/released.
