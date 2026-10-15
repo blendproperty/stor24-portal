@@ -27,6 +27,7 @@ export const receiptCorrectionWorkspaceSchema = z.object({
   accounts: z.array(receiptAccountSchema).max(200), accountsLimited: z.boolean(),
   receipts: z.array(z.object({ entryId: id, description: text, recordedAt: z.iso.datetime(), remaining: money, paymentReference: z.string().max(200) })).max(200),
   requests: z.array(receiptCorrectionRowSchema).max(50), nextCursor: z.string().min(1).max(500).nullable().optional(),
+  nextReceiptCursor: z.string().min(1).max(500).nullable().optional(),
 });
 export const receiptCorrectionPreviewSchema = z.object({
   fingerprint: z.string().regex(/^[a-f0-9]{64}$/), operation: z.enum(["MOVE", "UNDO"]),
