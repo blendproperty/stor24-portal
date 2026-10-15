@@ -1,0 +1,38 @@
+[
+  {
+    "file": "STOR24_Facilities_Manager_Manual.docx",
+    "zip": "valid",
+    "images": 7,
+    "characters": 19990,
+    "layout": "Not rendered: required LibreOffice executable unavailable"
+  },
+  {
+    "file": "STOR24_Faeez_Operating_Manual.docx",
+    "zip": "valid",
+    "images": 13,
+    "characters": 63265,
+    "layout": "Not rendered: required LibreOffice executable unavailable"
+  },
+  {
+    "file": "STOR24_Facilities_Manager_Manual.pdf",
+    "pages": 14,
+    "words": 3090,
+    "outline_entries": 19,
+    "text_checks": "pass",
+    "render_review": "Recorded separately after visual inspection"
+  },
+  {
+    "file": "STOR24_Faeez_Operating_Manual.pdf",
+    "pages": 36,
+    "words": 9773,
+    "outline_entries": 39,
+    "text_checks": "pass",
+    "render_review": "Recorded separately after visual inspection"
+  },
+  {
+    "role_profile": "27 baseline; 26 recommended core; 29 with proposed receipt investigation",
+    "finance_approval_separation": "pass",
+    "manager_assignment_gate": "retained",
+    "production_mutations": 0
+  }
+]
