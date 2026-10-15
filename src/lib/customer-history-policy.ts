@@ -24,6 +24,7 @@ export const historyQuerySchema = z.object({
   search: z.string().trim().max(200).default(""),
   cursor: z.string().max(1000).optional(),
 });
+export const historyExportSchema = historyQuerySchema.omit({cursor:true}).extend({format:z.enum(["PDF","CSV"]),entryId:z.string().min(1).max(100).optional(),entryKind:z.enum(["NOTE","COLLECTION","COMMUNICATION"]).optional()}).strict().refine(q=>!!q.entryId===!!q.entryKind);
 export type HistoryQuery = z.infer<typeof historyQuerySchema>;
 export const historyCursorSchema = z.object({
   at: z.iso.datetime(),

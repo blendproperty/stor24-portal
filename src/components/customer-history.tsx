@@ -63,7 +63,7 @@ export function CustomerHistory({ customerId }: { customerId: string }) {
     const controller=new AbortController();downloadRequest.current=controller;setDownloading(true);setDownloadError("");
     const timer=setTimeout(()=>controller.abort(),60_000);
     try {
-      const response=await fetch(`/api/v1/customers/${encodeURIComponent(customerId)}/history/export`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({format,...(item?{kind:"ALL",search:"",entryId:item.id,entryKind:item.kind}:appliedFilters.current)}),signal:controller.signal});
+      const response=await fetch(`/api/v1/customers/${encodeURIComponent(customerId)}/history/export`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({format,...(item?{kind:"ALL",search:"",entryId:item.id,entryKind:item.kind}:{kind:appliedFilters.current.kind,search:appliedFilters.current.search,...(appliedFilters.current.category?{category:appliedFilters.current.category}:{})})}),signal:controller.signal});
       if(downloadRequest.current!==controller)return;
       if(!response.ok){let message="Download failed. Try again.";try{message=(await response.json()).error?.message??message;}catch{}throw new Error(message);}
       const expected=format==="PDF"?"application/pdf":"text/csv";

@@ -4,6 +4,8 @@ import {createServer} from 'node:http';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import {PDFDocument} from 'pdf-lib';
+const policyBundle=await build({entryPoints:['src/lib/customer-history-policy.ts'],bundle:true,write:false,format:'esm',platform:'node'});
+const {historyExportSchema}=await import('data:text/javascript;base64,'+Buffer.from(policyBundle.outputFiles[0].text).toString('base64'));
 const fixturePdf=await PDFDocument.create();fixturePdf.addPage().drawText('Synthetic customer contact history');const fixturePdfBytes=await fixturePdf.save();
 const bundle=await build({stdin:{contents:`import React from 'react';import{createRoot}from'react-dom/client';import{CustomerOperationsWorkspace}from'./src/components/customer-operations-workspace';createRoot(document.getElementById('root')).render(<CustomerOperationsWorkspace/>);`,resolveDir:process.cwd(),loader:'jsx'},bundle:true,write:false,format:'esm',jsx:'automatic',plugins:[{name:'next-link',setup(b){b.onResolve({filter:/^next\/link$/},a=>({path:a.path,namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:"import React from 'react';export default function Link(p){return React.createElement('a',p)}",loader:'jsx',resolveDir:process.cwd()}));}}]});
 const css=(await Promise.all(['src/app/globals.css','src/styles/stor24-brand.css','src/styles/staff-workspace.css'].map(p=>readFile(p,'utf8')))).join('\n').replace('@import "tailwindcss";','')+"\nbody{font-family:Arial,sans-serif;margin:0;background:#eff4f7;}#root{padding:28px;max-width:1440px;margin:auto;}";
@@ -19,6 +21,7 @@ try{
   await page.route('**/api/v1/customers/*/history**',async route=>{
     if(route.request().url().includes('/export')){
       const body=route.request().postDataJSON();requests.push(body);
+      if(!historyExportSchema.safeParse(body).success)return route.fulfill({status:422,json:{error:{message:"Choose PDF or CSV and valid history filters."}}});
       if(mode==='403')return route.fulfill({status:403,json:{error:{message:'Download access is unavailable.'}}});
       if(mode==='malformed')return route.fulfill({contentType:'text/html',body:'not a file'});
       if(mode==='hold')return;
@@ -42,8 +45,12 @@ try{
     const pending=page.waitForEvent('download');
     await page.getByRole('button',{name:format==='PDF'?'Download history':'CSV',exact:true}).click();
     const downloaded=await pending;assert.ok(downloaded.suggestedFilename().endsWith('.'+format.toLowerCase()));await downloaded.saveAs(`output/customer-dossier/${width}.${format.toLowerCase()}`);
-    assert.equal(requests.at(-1).format,format);assert.equal(requests.at(-1).kind,'ALL');
+    assert.equal(requests.at(-1).format,format);assert.equal(requests.at(-1).kind,'ALL');assert.equal(requests.at(-1).category,undefined);assert.ok(historyExportSchema.safeParse(requests.at(-1)).success);
   }
+  await page.getByRole('combobox',{name:'Note category',exact:true}).selectOption('HANDOVER');
+  await page.getByRole('button',{name:'Apply filters',exact:true}).click();
+  const filteredDownload=page.waitForEvent('download');await page.getByRole('button',{name:'CSV',exact:true}).click();await filteredDownload;
+  assert.equal(requests.at(-1).category,'HANDOVER');assert.ok(historyExportSchema.safeParse(requests.at(-1)).success);
   const pending=page.waitForEvent('download');await page.getByRole('button',{name:'Download WHATSAPP · RESERVATION CONFIRMED',exact:true}).click();await pending;assert.equal(requests.at(-1).entryId,'message-1');assert.equal(requests.at(-1).entryKind,'COMMUNICATION');
   for(const failure of ['403','malformed']){mode=failure;await page.getByRole('button',{name:'Download history',exact:true}).click();await expect(page.getByRole('alert')).toBeVisible();}
   mode='success';await page.getByRole('button',{name:'Add note',exact:true}).click();await page.getByLabel('Staff note',{exact:true}).fill('Draft retained between sections');
