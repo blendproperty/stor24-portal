@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {withFinanceSerializationFailure} from './finance-serialization-fixture';
 import test from "node:test";
 import { randomUUID } from "node:crypto";
 import { db } from "../../src/lib/db";
@@ -162,6 +163,25 @@ test("isolated PostgreSQL controlled adjustments", async t => {
       const f = await fixture(), r = await request(f); await decideAdjustment(f.reviewer, r.id, "reject", "CI missing evidence");
       const next = await request(f); await assert.rejects(decideAdjustment({ ...f.reviewer, userId: "missing-user" }, next.id, "approve", "CI invalid actor"));
       assert.equal((await db.financialAdjustment.findUniqueOrThrow({ where: { id: next.id } })).status, "PENDING_APPROVAL"); assert.equal(await balance(f.account.id), "115");
+    });
+    await t.test("explicit PostgreSQL rollback reruns request and posting with one retained adjustment, document and audit",async()=>{
+      const f=await fixture(),created=await withFinanceSerializationFailure(f.org.id,'adjustment.requested',1,()=>request(f));
+      assert.ok(created.attempts>=2&&created.attempts<=3);assert.equal(await db.financialAdjustment.count({where:{accountId:f.account.id}}),1);
+      const approved=await withFinanceSerializationFailure(f.org.id,'adjustment.posted',1,()=>decideAdjustment(f.reviewer,created.value.id,'approve','CI fresh proof after rollback'));
+      assert.ok(approved.attempts>=2&&approved.attempts<=3);assert.equal(await balance(f.account.id),'57.5');
+      assert.equal(await db.ledgerEntry.count({where:{externalRef:'adjustment:'+created.value.id}}),1);
+      assert.equal(await db.document.count({where:{idempotencyKey:'adjustment-document:'+created.value.id}}),1);
+      for(const action of ['requested','approved','posted'])assert.equal(await db.auditEvent.count({where:{entityId:created.value.id,action:'adjustment.'+action}}),1);
+    });
+    await t.test("external refund recording retries only a rolled-back database post and retains one payout record",async()=>{
+      const f=await fixture(200),r=await request(f,{...f.input,kind:'REFUND',amount:'20',sourceEntryId:f.receipt!.id});
+      await decideAdjustment(f.reviewer,r.id,'approve','CI independent refund review');
+      const recorded=await withFinanceSerializationFailure(f.org.id,'adjustment.posted',1,()=>recordRefundPayout(f.reviewer,r.id,'CI recorded external payout',southAfricaDateKey(new Date())));
+      assert.ok(recorded.attempts>=2&&recorded.attempts<=3);assert.equal(await balance(f.account.id),'-65');
+      assert.equal(await db.ledgerEntry.count({where:{externalRef:'adjustment:'+r.id,type:'REFUND'}}),1);
+      assert.equal(await db.document.count({where:{idempotencyKey:'adjustment-document:'+r.id}}),1);
+      assert.equal(await db.auditEvent.count({where:{entityId:r.id,action:'adjustment.posted'}}),1);
+      assert.equal((await db.payment.findUniqueOrThrow({where:{id:f.payment!.id}})).status,'PARTIALLY_REFUNDED');
     });
   } finally { await db.$disconnect(); }
 });

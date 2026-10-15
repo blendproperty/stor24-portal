@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import {withFinanceSerializationFailure} from './finance-serialization-fixture';
+import {Prisma} from '../../src/generated/prisma/client';
 import test from "node:test";
 import { randomUUID } from "node:crypto";
 import { db } from "../../src/lib/db";
@@ -133,6 +135,22 @@ test("isolated PostgreSQL aged collections", async t => {
       const csv = collectionCsv(data, { mode: "all", facility: "", owner: "", search: "" }); assert.ok(csv.includes("'=CI formula")); assert.ok(csv.includes("Approved due dates"));
       const empty = collectionCsv(data, { mode: "all", facility: "another-store", owner: "", search: "" }); assert.equal(empty.split("\r\n").length, 1);
       await assert.rejects(collectionsWorkspace(f.scope, "2099-01-01"), /DATE/);
+    });
+    await t.test("explicit PostgreSQL rollback retains one follow-up and repeats the original request idempotently",async()=>{
+      const f=await fixture(),input:CollectionAction={...await base(f),action:'follow-up',ownerId:f.user.id,nextFollowUp:today,outcome:'NO_ANSWER'};
+      const before=JSON.stringify(await db.account.findUnique({where:{id:f.account.id},include:{ledgerEntries:true,payments:true}}));
+      const result=await withFinanceSerializationFailure(f.org.id,'collections.follow-up',1,()=>updateCollection(f.scope,input));
+      assert.ok(result.attempts>=2&&result.attempts<=3);assert.equal((await updateCollection(f.scope,input)).id,result.value.id);
+      assert.equal((await row(f)).activities.length,1);assert.equal(await db.auditEvent.count({where:{organisationId:f.org.id,action:'collections.follow-up'}}),1);
+      assert.equal(JSON.stringify(await db.account.findUnique({where:{id:f.account.id},include:{ledgerEntries:true,payments:true}})),before);
+    });
+    await t.test("persistent explicit rollbacks stop at three attempts with no saved action or revision",async()=>{
+      const f=await fixture();await terms(f);const before=await row(f),input:CollectionAction={...await base(f),action:'dispute',disputed:true};
+      const result=await withFinanceSerializationFailure(f.org.id,'collections.dispute',3,async()=>{
+        await assert.rejects(updateCollection(f.scope,input),error=>error instanceof Prisma.PrismaClientKnownRequestError&&error.code==='P2034');
+      });
+      assert.equal(result.attempts,3);const after=await row(f);assert.equal(after.revision,before.revision);assert.equal(after.activities.length,before.activities.length);
+      assert.equal(await db.auditEvent.count({where:{organisationId:f.org.id,action:'collections.dispute'}}),0);
     });
   } finally { await db.$disconnect(); }
 });

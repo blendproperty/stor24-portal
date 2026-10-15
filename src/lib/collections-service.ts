@@ -1,3 +1,4 @@
+import {retryRolledBackFinanceTransaction} from '@/lib/finance/retry-rolled-back-transaction';
 import {receiptAllocationGraph} from "./receipt-reallocation-source";
 import { createHash } from "node:crypto";
 import { z } from "zod";
@@ -150,8 +151,9 @@ export async function collectionEmailSource(tx: Client, scope: RequestScope, acc
 }
 
 export async function updateCollection(scope: RequestScope, raw: CollectionAction) {
-  const input = collectionActionSchema.parse(raw), today = southAfricaDateKey(new Date());
-  return db.$transaction(async tx => {
+  const input = collectionActionSchema.parse(raw);
+  return retryRolledBackFinanceTransaction(() => db.$transaction(async tx => {
+    const today = southAfricaDateKey(new Date());
     // Scope is checked before the lock; every writer for this case serialises on its account.
     await accountFor(tx, scope, input.accountId);
     await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${input.accountId} FOR UPDATE`;
@@ -204,5 +206,5 @@ export async function updateCollection(scope: RequestScope, raw: CollectionActio
       note: review ? `Internal review requested for ${review.reviewOn}. ${input.note}\n${review.blockers.join(" ")}${review.proposedPolicyReference ? ` Proposed policy evidence (unverified): ${review.proposedPolicyReference}.` : ""} No message, fee or access action was executed.` : input.note, payload: json(input) } });
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: account.tenancy!.facilityId, actorId: scope.userId, entityType: "CollectionCase", entityId: c.id, action: `collections.${input.action}`, after: json({ activityId: activity.id, revision: input.revision + 1, ...(review ? { review } : {}) }) } });
     return { id: activity.id, repeated: false };
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000 });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000 }));
 }

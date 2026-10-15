@@ -5,6 +5,7 @@ import {AsyncLocalStorage} from "node:async_hooks";
 import {createRequire} from "node:module";
 import {resolve} from "node:path";
 import {createServer} from "node:http";
+import {readFile} from "node:fs/promises";
 import {build} from "esbuild";
 import {db} from "../../src/lib/db";
 import {previewReceiptReallocation,requestReceiptReallocation,decideReceiptReallocation} from "../../src/lib/receipt-reallocation-service";
@@ -54,16 +55,36 @@ test("isolated receipt correction producers retain cash, approval, undo and sour
       }
       type Session={userId:string;sessionVersion:number};
       const sessions=new AsyncLocalStorage<Session|null>();
+      const routeFailures:{code:string;startTimeout:boolean;expired:boolean}[]=[];
+      const observeRouteFailure=(error:unknown)=>{
+        const code=error&&typeof error==="object"&&"code" in error?String(error.code):"NONE",message=error instanceof Error?error.message:"";
+        if(routeFailures.length<100)routeFailures.push({code,startTimeout:message.includes("Unable to start a transaction in the given time"),expired:message.includes("Transaction already closed")});
+      };
       const tokens=new Map<string,Session>([f.requester,f.reviewer,viewer].map(user=>[randomUUID(),{userId:user.id,sessionVersion:user.sessionVersion}]));
       const [requesterToken,reviewerToken,foreignToken]=[...tokens.keys()];
       const bundle=await build({entryPoints:["src/app/api/v1/adjustments/receipt-reallocations/route.ts"],bundle:true,write:false,platform:"node",format:"cjs",packages:"external",plugins:[{name:"synthetic-receipt-session-only",setup(b){
+        // Observe existing catch classification without changing its response,
+        // timeout, transaction, permission, or financial behaviour.
+        b.onLoad({filter:/adjustments[\\/]receipt-reallocations[\\/]route\.ts$/},async a=>{
+          const contents=await readFile(a.path,"utf8"),marker="function failure(error: unknown) {";assert.equal(contents.split(marker).length,2);
+          return{loader:"ts",contents:contents.replace(marker,marker+" __observeRouteFailure(error);")};
+        });
         b.onResolve({filter:/generated\/prisma\/client$/},()=>({path:resolve("src/generated/prisma/client.ts"),external:true}));
         b.onResolve({filter:/(?:^|\/)(db|session)$/},a=>({path:a.path,namespace:"fixture"}));
         b.onLoad({filter:/.*/,namespace:"fixture"},a=>({contents:a.path.endsWith("/db")?"export const db=__db;":"export const getSession=async()=>__sessions.getStore();"}));
       }}]});
       type Handler=(request:Request)=>Promise<Response>;
       const loaded={exports:{} as {GET:Handler;POST:Handler}};
-      new Function("require","module","exports","__db","__sessions",bundle.outputFiles[0].text)(createRequire(import.meta.url),loaded,loaded.exports,db,sessions);
+      const transactionFailures:{code:string;startTimeout:boolean;expired:boolean;elapsedMs:number}[]=[];
+      const observedDb=new Proxy(db,{get(target,key,receiver){
+        if(key!=="$transaction")return Reflect.get(target,key,receiver);
+        return async(...args:unknown[])=>{const began=performance.now();try{return await Reflect.apply(target.$transaction,target,args);}catch(error){
+          const code=error&&typeof error==="object"&&"code" in error?String(error.code):"UNKNOWN",message=error instanceof Error?error.message:"";
+          if(transactionFailures.length<50)transactionFailures.push({code,startTimeout:message.includes("Unable to start a transaction in the given time"),expired:message.includes("Transaction already closed"),elapsedMs:Math.round(performance.now()-began)});
+          throw error;
+        }};
+      }});
+      new Function("require","module","exports","__db","__sessions","__observeRouteFailure",bundle.outputFiles[0].text)(createRequire(import.meta.url),loaded,loaded.exports,observedDb,sessions,observeRouteFailure);
       const server=createServer(async(incoming,outgoing)=>{
         try{
           const chunks=[];for await(const chunk of incoming)chunks.push(Buffer.from(chunk));
@@ -94,6 +115,8 @@ test("isolated receipt correction producers retain cash, approval, undo and sour
         const responses=await Promise.all(contenders.map(async candidate=>{
           const response=await call(requesterToken,"",{action:"request",...candidate,confirmed:true});return {status:response.status,payload:await response.json()};
         }));
+        const statusCounts=new Map<number,number>();for(const response of responses)statusCounts.set(response.status,(statusCounts.get(response.status)??0)+1);
+        if(responses.some(r=>r.status!==200&&r.status!==409))console.error(JSON.stringify({fixture:"receipt-http-contention",statusCounts:Object.fromEntries(statusCounts),transactionFailures,routeFailures}));
         assert.ok(responses.every(r=>r.status===200||r.status===409),"contention produces a retained request or explicit review hold, never an unknown server result");
         assert.equal(responses.filter(r=>r.status===200).length,1);
         assert.ok(performance.now()-began<30000,"25 competing fixture requests complete within the staff request timeout");

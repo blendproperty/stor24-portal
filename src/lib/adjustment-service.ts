@@ -1,3 +1,4 @@
+import {retryRolledBackFinanceTransaction} from '@/lib/finance/retry-rolled-back-transaction';
 import {receiptAllocationGraph} from "./receipt-reallocation-source";
 import { createHash } from "node:crypto";
 import { Prisma } from "@/generated/prisma/client";
@@ -102,7 +103,7 @@ export async function adjustmentAccount(scope: RequestScope, accountId: string) 
 export const previewAdjustment = (scope: RequestScope, raw: unknown) => review(db, scope, raw);
 export async function requestAdjustment(scope: RequestScope, raw: unknown, fingerprint: string, requestKey: string) {
   const input = adjustmentInputSchema.parse(raw);
-  return db.$transaction(async tx => {
+  return retryRolledBackFinanceTransaction(() => db.$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${input.accountId} FOR UPDATE`;
     const existing = await tx.financialAdjustment.findUnique({ where: { organisationId_requestKey: { organisationId: scope.organisationId, requestKey } } });
     if (existing) {
@@ -115,7 +116,7 @@ export async function requestAdjustment(scope: RequestScope, raw: unknown, finge
     const record = await tx.financialAdjustment.create({ data: { ...scoped(scope), organisationId: scope.organisationId, facilityId: reviewed.facilityId, accountId: input.accountId, requestKey, kind: input.kind, amount: reviewed.amount, taxAmount: reviewed.taxAmount, sourceEntryId: input.sourceEntryId, paymentId: reviewed.paymentId, reason: input.reason, evidenceReference: input.evidenceReference, snapshot: json(reviewed), fingerprint, requestedById: scope.userId } });
     await audit(tx, scope, record, "requested", { fingerprint, amount: reviewed.amount });
     return record;
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
 }
 async function audit(tx: Client, scope: RequestScope, request: { id: string; facilityId: string }, action: string, after: unknown) {
   await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: request.facilityId, actorId: scope.userId, action: `adjustment.${action}`, entityType: "FinancialAdjustment", entityId: request.id, after: json(after) } });
@@ -148,7 +149,7 @@ async function post(tx: Client, scope: RequestScope, request: Adjustment, review
 }
 export async function decideAdjustment(scope: RequestScope, id: string, action: "approve" | "reject" | "cancel", reference: string, unpaidConfirmed = false) {
   reference = evidenceText.parse(reference);
-  return db.$transaction(async tx => {
+  return retryRolledBackFinanceTransaction(() => db.$transaction(async tx => {
     const request = await locked(tx, scope, id);
     if (!openStates.includes(request.status)) throw new Error("ADJUSTMENT_STATE");
     if (action !== "cancel" && request.requestedById === scope.userId) throw new Error("ADJUSTMENT_SELF_APPROVAL");
@@ -164,11 +165,11 @@ export async function decideAdjustment(scope: RequestScope, id: string, action: 
     const approved = await tx.financialAdjustment.update({ where: { id }, data: { status: "APPROVED", reviewedById: scope.userId, reviewedAt: new Date(), reviewReference: reference } });
     await audit(tx, scope, request, "approved", { reference, fingerprint: reviewed.fingerprint });
     return request.kind === "REFUND" ? approved : post(tx, scope, approved, reviewed);
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000 });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000 }));
 }
 export async function recordRefundPayout(scope: RequestScope, id: string, reference: string, date: string) {
   reference = evidenceText.parse(reference).toUpperCase();
-  return db.$transaction(async tx => {
+  return retryRolledBackFinanceTransaction(() => db.$transaction(async tx => {
     const request = await locked(tx, scope, id);
     if (request.kind !== "REFUND" || request.status !== "APPROVED" || !request.reviewedAt) throw new Error("ADJUSTMENT_STATE");
     if (scope.userId === request.requestedById) throw new Error("ADJUSTMENT_SELF_APPROVAL");
@@ -177,7 +178,7 @@ export async function recordRefundPayout(scope: RequestScope, id: string, refere
     const reviewed = await review(tx, scope, (request.snapshot as { input: unknown }).input, id);
     if (reviewed.fingerprint !== request.fingerprint) throw new Error("ADJUSTMENT_CHANGED");
     return post(tx, scope, request, reviewed, { reference, date });
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000 });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000 }));
 }
 export async function adjustmentDocument(scope: RequestScope, id: string) {
   const request = await db.financialAdjustment.findFirst({ where: { id, ...scoped(scope), status: "POSTED" } });
