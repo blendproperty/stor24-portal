@@ -37,6 +37,7 @@ jobs:
       - run: node scripts/test-customer-read-recovery.mjs
       - run: node scripts/test-customer-save-recovery.mjs
       - run: node scripts/test-customer-history.mjs
+      - run: node scripts/test-communication-log-search.mjs
       - run: node scripts/test-staff-handbook-download.mjs
       - run: node scripts/test-receipt-reallocation-workspace.mjs
       - run: node scripts/test-customer-dossier.mjs
@@ -144,6 +145,7 @@ jobs:
             output/customer-read-recovery/
             output/customer-save-recovery/
             output/customer-history/
+            output/communication-search/
             output/staff-handbook-download/
             output/receipt-staff-ui/
             output/customer-dossier/

@@ -17,6 +17,8 @@ Keep the acceptance pages at the back. Record actual results one item at a time;
 
 **Faeez / store operator:** work only in the stores shown in your own account. Find customers, maintain authorised details, add dated notes, prepare bookings and review the source workflows available to your role.
 
+Faeez's Midpoint role now includes booking-price viewing and proposals. Sign in again after the access update; independent price approval remains separate.
+
 **Covering colleague:** use your own account. Read the customer's full history and current instructions, then acknowledge only work assigned to you. A handover note does not itself assign responsibility.
 
 **Manager / administrator:** confirm the real covering colleague and the exact store access needed. The incoming covering manager starts on 1 November; account identification, onboarding and their own acceptance remain pending. Do not share another person's login.
@@ -65,6 +67,22 @@ Excel includes filters, frozen headings and wrapped message text. If a result is
 Available retained or verified provider text is included. Missing historical email, deleted provider text, external chats and attachments remain identified as missing. Authentication codes and private access links are excluded. An event-summary PDF is not the original signed agreement: use **Documents** for the original signed PDF.
 
 ![Date and communication filters in the current component; synthetic example, not customer data.](assets/staff-handbook/history-download-filters.png)
+
+## 03A · Find messages before opening a customer
+
+Open **Communications**, then **Message delivery history**, when you need to find a customer from an older message. This lookup pages through recorded history instead of stopping at the newest 100 attempts.
+
+1. Enter the customer's name, company, email, phone or reference. Choose a permitted store, channel or recorded send status where useful.
+2. Choose From/To dates in SAST and select **Apply filters**. Dates include the complete selected days and use the logged event time.
+3. Select **Load older messages** to continue the same applied search. Editing a filter does not change results until Apply filters. Counts cover the loaded results, not every message in the system.
+4. Select **Customer history** on the correct record. In History & notes, apply the required filters and download PDF, CSV or Excel as described on the previous page.
+5. Select **Refresh messages** to restart with current delivery outcomes and include newly logged messages. If history is unavailable, refresh or report the error; a failed read does not mean there were no messages.
+
+This screen shows delivery evidence. Available message text and downloads are in the customer's history. Sent means provider acceptance; delivered/read needs recorded confirmation. Missing old external chats or attachments cannot be reconstructed from delivery logs.
+
+Retry can send a real message. Investigate the failure, consent and duplication risk first; never retry as a training demonstration. Provider connection tests also send real messages and remain owner-only.
+
+![Global message lookup with synthetic training data only.](assets/staff-handbook/communication-search.png)
 
 ## 04 · Agreed follow-ups and named cover
 
