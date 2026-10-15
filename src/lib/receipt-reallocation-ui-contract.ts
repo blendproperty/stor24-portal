@@ -11,6 +11,7 @@ const documentHref = z.string().max(500).refine(value => /^\/api\/v1\/[a-zA-Z0-9
 export const receiptCorrectionRowSchema = z.object({
   id, revision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER), status: z.enum(["PENDING_APPROVAL", "POSTED", "REJECTED", "CANCELLED"]),
   operation: z.enum(["MOVE", "UNDO"]), reversesId: id.nullable(), sourceAccountId: id, targetAccountId: id, sourceEntryId: id,
+  facilityId: id, sourceAccountNumber: z.string().min(1).max(100), targetAccountNumber: z.string().min(1).max(100),
   targetLedgerEntryId: id.nullable(), amount: money, reason: text, evidenceReference: z.string().max(200), requestedById: id,
   requestedByName: z.string().max(200), createdAt: z.iso.datetime(), reviewReference: z.string().max(200).nullable(), postedAt: z.iso.datetime().nullable(),
   sourceDocumentHref: documentHref.nullable().optional(), targetDocumentHref: documentHref.nullable().optional(),
