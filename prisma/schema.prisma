@@ -1988,3 +1988,48 @@ model CustomerNote {
   @@index([organisationId, customerId, createdAt, id])
   @@index([customerId, facilityId, createdAt, id])
 }
+
+
+// Separate review evidence only; these models never create financial receipts.
+model UnidentifiedReceiptIntake {
+  id String @id @default(cuid())
+  organisationId String
+  facilityId String
+  sourceType String
+  sourceId String?
+  sourceIdentity String
+  sourceFingerprint String
+  evidenceEncrypted String
+  sourceEnvironment String
+  receiptDate String
+  amount Decimal @db.Decimal(14,2)
+  currency String @default("ZAR")
+  status String @default("OPEN")
+  revision Int @default(0)
+  requestKey String
+  requestHash String
+  capturedById String
+  proposals UnidentifiedReceiptMatchProposal[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([organisationId, sourceIdentity])
+  @@unique([organisationId, requestKey])
+  @@index([organisationId, facilityId, createdAt, id], map: "UnidentifiedReceiptIntake_org_store_created_id_idx")
+}
+
+model UnidentifiedReceiptMatchProposal {
+  id String @id @default(cuid())
+  intakeId String
+  intake UnidentifiedReceiptIntake @relation(fields: [intakeId], references: [id], onDelete: Restrict)
+  accountId String
+  accountFingerprint String
+  sourceFingerprint String
+  detailsEncrypted String
+  proposedById String
+  status String @default("PROPOSED")
+  reviewedById String?
+  reviewedAt DateTime?
+  reviewReference String?
+  createdAt DateTime @default(now())
+  @@index([intakeId, createdAt])
+}

@@ -9,6 +9,7 @@ export const metadata = { title: "Billing & payments" };
 export const dynamic = "force-dynamic";
 
 const modules = [
+  [Receipt, "Unidentified payment review", "Retain original evidence, suggest an account and obtain independent matching review without posting money.", "/billing/unidentified-receipts", "Review unidentified evidence"],
   [RefreshCcw, "Rent reviews & tenant duration", "Report days in a unit and recorded price changes; preview an approved group rent increase.", "/billing/rent-reviews", "Review tenant rents"],
   [FileText, "MRI accounting", "Prepare connection details and review monthly ledger movements for finance mapping.", "/billing/mri", "Prepare MRI integration"],
   [WalletCards, "Settlement reconciliation", "Review full merchant statements, receipt matches, bank payouts and retained funds.", "/billing/settlements", "Reconcile settlements"],
