@@ -79,7 +79,7 @@ test("isolated actual communication lookup, scope, dates, keyset and current-rol
       const json = await result.json(); assert.equal(communicationLogReadSchema.safeParse(json).success, true);
       for (const forbidden of ["PRIVATE-PAYLOAD", "PRIVATE-RECIPIENT-HASH", "PRIVATE-PROVIDER-REFERENCE", "PRIVATE-MESSAGE-BODY", "providerRef", "recipientHash", "metadata"]) assert.ok(!JSON.stringify(json).includes(forbidden));
       assert.equal((await get("facilityId=" + b.id)).status, 403); assert.equal((await get("customerId=" + foreignCustomer.id)).status, 403);
-      for (const query of ["from=2026-10-15&to=2026-10-14", "channel=EMAIL&channel=SMS", "export=CSV", "cursor=bad"]) assert.equal((await get(query)).status, 422);
+      for (const query of ["from=2026-10-15&to=2026-10-14", "channel=EMAIL&channel=SMS", "export=CSV", "cursor=bad", "__proto__=x", "constructor=x", "toString=x"]) assert.equal((await get(query)).status, 422);
       await db.role.update({ where: { id: role.id }, data: { permissions: [] } }); assert.equal((await get()).status, 403);
       await db.role.update({ where: { id: role.id }, data: { permissions: ["operations.view"] } });
       outage = true; const failed = await get(); assert.equal(failed.status, 500); const failureBody = await failed.text(); assert.ok(!failureBody.includes('"rows":[]')); assert.ok(!failureBody.includes("SIMULATED_READ_OUTAGE")); assert.ok(failureBody.includes("INTERNAL_ERROR")); outage = false;

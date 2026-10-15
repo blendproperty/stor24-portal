@@ -9,7 +9,7 @@ test("communication filters explicitly include complete SAST days", () => {
   const range = communicationDateRange(filters);
   assert.equal(range.gte?.toISOString(), "2026-10-13T22:00:00.000Z");
   assert.equal(range.lt?.toISOString(), "2026-10-14T22:00:00.000Z");
-  for (const query of ["from=2026-10-15&to=2026-10-14", "from=2026-02-30", "channel=PHONE", "status=READ", "search=a&search=b", "export=CSV", "includeBody=true"]) assert.throws(() => readCommunicationQuery(new URLSearchParams(query)), /COMMUNICATION_FILTER_INVALID/);
+  for (const query of ["from=2026-10-15&to=2026-10-14", "from=2026-02-30", "channel=PHONE", "status=READ", "search=a&search=b", "export=CSV", "includeBody=true", "__proto__=x", "constructor=x", "toString=x"]) assert.throws(() => readCommunicationQuery(new URLSearchParams(query)), /COMMUNICATION_FILTER_INVALID/);
   assert.throws(() => readCommunicationQuery(new URLSearchParams({ search: "x".repeat(201) })), /COMMUNICATION_FILTER_INVALID/);
 });
 test("communication paging binds both applied filters and the current actor/store scope", () => {

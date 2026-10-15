@@ -16,11 +16,11 @@ export function communicationDateRange(filters: CommunicationFilters) {
 }
 export function readCommunicationQuery(params: URLSearchParams) {
   if (params.toString().length > 4000) throw Error("COMMUNICATION_FILTER_INVALID");
-  const entries: Record<string, string> = {};
-  for (const [key, value] of params) { if (key in entries) throw Error("COMMUNICATION_FILTER_INVALID"); entries[key] = value; }
-  const cursor = entries.cursor ?? ""; delete entries.cursor;
+  const entries = new Map<string, string>();
+  for (const [key, value] of params) { if (entries.has(key)) throw Error("COMMUNICATION_FILTER_INVALID"); entries.set(key, value); }
+  const cursor = entries.get("cursor") ?? ""; entries.delete("cursor");
   if (cursor.length > 1800) throw Error("COMMUNICATION_CURSOR_INVALID");
-  const filters = communicationFiltersSchema.safeParse(entries);
+  const filters = communicationFiltersSchema.safeParse(Object.fromEntries(entries));
   if (!filters.success) throw Error("COMMUNICATION_FILTER_INVALID");
   return { filters: filters.data, cursor };
 }
