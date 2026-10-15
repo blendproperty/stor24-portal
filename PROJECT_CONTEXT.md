@@ -1,3 +1,8 @@
+## Numbered register reconciliation - 15 October 2026
+
+- **Documentation implementation/validation:** original23 numbering retained; register4/5 now distinguish actual c8e deployment/genuine owner files from human UAT,12/17/22 reflect515 all-nine/normal689 merge with deployment still pending,14 explicitly records deployed182 unused component and active capture IMPLEMENTATION OPEN. Android own-account result remains distinct. Reviewed changed rows against production proof/merge responses above; no application test repeat warranted for prose-only reconciliation.
+- **Commit/push/merge/deployment:** publication on the owned compatibility evidence branch is for union into REA's next release canonical/register, not a separate main promotion. No new live software or staff acceptance claim. Full incoming canonical, existing provider/data/finance/security/device/training blockers remain preserved.
+
 ## Receipt customer-history compatibility validation - 15 October 2026
 
 - **Implementation:** test-only addition94e21ee on owned codex/receipt-history-compatibility-20261015, based on owner receipt source plus normal released main689 integrationc511a40. Actual MOVE and partial UNDO producers verify exact source/target customer ledger IDs, cross-customer isolation, withheld ledger viewing, foreign-store denial, immutable original payment/ledger and one external payment. No service/model/API/UI/history projection change or ahead-of-schema query.
