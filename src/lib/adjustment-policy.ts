@@ -40,6 +40,8 @@ export function refundLimits(config: unknown) {
   return { minimum, maximum };
 }
 export const adjustmentMessages: Record<string, string> = {
+  ADJUSTMENT_ALLOCATION_PENDING: "A receipt allocation is awaiting independent review on this account. Resolve it before preparing an adjustment.",
+  ADJUSTMENT_ALLOCATION_SOURCE: "This is an internal allocation credit. Return the required allocation to its original receipt account before an external refund or full receipt reversal.",
   ADJUSTMENT_UNPAID_CONFIRMATION: "Confirm that no external payout occurred before cancelling this approved refund.",
   ADJUSTMENT_NOT_FOUND: "This account or request is outside your permitted stores.",
   ADJUSTMENT_OPEN_REQUEST: "An adjustment is already awaiting action on this account. Resolve it first.",

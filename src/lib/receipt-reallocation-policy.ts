@@ -1,8 +1,8 @@
 import {z} from "zod";
 
 const amount=z.string().regex(/^(?:0|[1-9]\d{0,11})(?:\.\d{1,2})?$/);
-export const receiptReallocationInput=z.object({sourceAccountId:z.cuid(),sourceEntryId:z.cuid(),targetAccountId:z.cuid(),amount,reason:z.string().trim().min(10).max(500),evidenceReference:z.string().trim().min(5).max(200),requestKey:z.uuid()}).strict();
-export type ReceiptReallocationInput=z.infer<typeof receiptReallocationInput>;
+export const receiptReallocationInput=z.object({operation:z.enum(["MOVE","UNDO"]).default("MOVE"),reversesId:z.cuid().nullable().default(null),sourceAccountId:z.cuid(),sourceEntryId:z.cuid(),targetAccountId:z.cuid(),amount,reason:z.string().trim().min(10).max(500),evidenceReference:z.string().trim().min(5).max(200),requestKey:z.uuid()}).strict().refine(v=>(v.operation==="UNDO")===Boolean(v.reversesId),"An undo must identify the original allocation.");
+export type ReceiptReallocationInput=z.input<typeof receiptReallocationInput>;
 export function receiptCents(text:string,signed=false){
   if(!(signed?/^-?(?:0|[1-9]\d{0,11})(?:\.\d{1,2})?$/:/^(?:0|[1-9]\d{0,11})(?:\.\d{1,2})?$/).test(text))throw Error("REALLOCATION_AMOUNT");
   const negative=text.startsWith("-"),[whole,fraction=""]=text.replace(/^-/ ,"").split(".");
@@ -11,11 +11,12 @@ export function receiptCents(text:string,signed=false){
 }
 export type ReallocationAccount={id:string;organisationId:string;facilityId:string;currency:string;balance:string;ledgerBalance:string;hasTenancy:boolean;inFlight:boolean};
 export type ReceiptPosition={entryId:string;accountId:string;organisationId:string;facilityId:string;remaining:string};
+export type ReallocationUndo={id:string;operation:string;paymentId:string;sourceAccountId:string;targetAccountId:string;sourceLedgerEntryId:string;targetLedgerEntryId:string;remaining:string;verified:boolean};
 export type ReceiptRoot={paymentId:string;organisationId:string;facilityId:string;currency:string;provider:string|null;environment:string|null;status:string;amount:string;refunded:string;postedExactlyOnce:boolean;verified:boolean};
 
 /** A reallocation changes only the account allocation of an already verified
  * receipt. The single external Payment is retained; no new cash is received. */
-export function planReceiptReallocation(input:ReceiptReallocationInput,source:ReallocationAccount,target:ReallocationAccount,root:ReceiptRoot,positions:ReceiptPosition[]){
+export function planReceiptReallocation(input:ReceiptReallocationInput,source:ReallocationAccount,target:ReallocationAccount,root:ReceiptRoot,positions:ReceiptPosition[],undo?:ReallocationUndo){
   const request=receiptReallocationInput.parse(input),value=receiptCents(request.amount);
   if(value<=0)throw Error("REALLOCATION_AMOUNT");
   if(source.id!==request.sourceAccountId||target.id!==request.targetAccountId||source.id===target.id||source.organisationId!==target.organisationId||source.facilityId!==target.facilityId||root.organisationId!==source.organisationId||root.facilityId!==source.facilityId)throw Error("REALLOCATION_SCOPE");
@@ -35,9 +36,11 @@ export function planReceiptReallocation(input:ReceiptReallocationInput,source:Re
   if(total!==received-refunded)throw Error("REALLOCATION_RECONCILIATION");
   const position=positions.find(p=>p.entryId===request.sourceEntryId&&p.accountId===source.id);
   if(!position||value>receiptCents(position.remaining))throw Error("REALLOCATION_EXCEEDS_RECEIPT");
+  if(request.operation==="UNDO"&&(!undo||!undo.verified||undo.operation!=="MOVE"||undo.id!==request.reversesId||undo.paymentId!==root.paymentId||undo.sourceAccountId!==target.id||undo.targetAccountId!==source.id||undo.targetLedgerEntryId!==position.entryId||value>receiptCents(undo.remaining)))throw Error("REALLOCATION_UNDO_REVIEW");
+  const incoming=request.operation==="UNDO"?{type:"REVERSAL" as const,reversalOfId:undo!.sourceLedgerEntryId}:{type:"PAYMENT" as const,rootPaymentId:root.paymentId};
   const sourceAfter=receiptCents(source.balance,true)+value,targetAfter=receiptCents(target.balance,true)-value;
-  if(!Number.isSafeInteger(sourceAfter)||!Number.isSafeInteger(targetAfter)||sourceAfter+targetAfter!==receiptCents(source.balance,true)+receiptCents(target.balance,true))throw Error("REALLOCATION_AMOUNT");
-  return {rootPaymentId:root.paymentId,amountCents:value,taxCents:0,sourceBalanceAfterCents:sourceAfter,targetBalanceAfterCents:targetAfter,sourceReceiptRemainingCents:receiptCents(position.remaining)-value,totalReceiptRemainingCents:total,outgoing:{type:"REVERSAL" as const,reversalOfId:position.entryId},incoming:{type:"PAYMENT" as const,rootPaymentId:root.paymentId},externalPaymentCreated:false as const,providerRequest:false as const};
+  if(!Number.isSafeInteger(sourceAfter)||!Number.isSafeInteger(targetAfter)||Math.abs(sourceAfter)>99999999999999||Math.abs(targetAfter)>99999999999999||sourceAfter+targetAfter!==receiptCents(source.balance,true)+receiptCents(target.balance,true))throw Error("REALLOCATION_AMOUNT");
+  return {operation:request.operation,reversesId:request.reversesId,rootPaymentId:root.paymentId,amountCents:value,taxCents:0,sourceBalanceAfterCents:sourceAfter,targetBalanceAfterCents:targetAfter,sourceReceiptRemainingCents:receiptCents(position.remaining)-value,totalReceiptRemainingCents:total,outgoing:{type:"REVERSAL" as const,reversalOfId:position.entryId},incoming,externalPaymentCreated:false as const,providerRequest:false as const};
 }
 export function requireReallocationReviewer(requestedBy:string,reviewedBy:string){if(requestedBy===reviewedBy)throw Error("REALLOCATION_INDEPENDENT_REVIEW");}
 

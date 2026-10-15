@@ -35,5 +35,17 @@ test("unverified, sandbox, reversed, refunded and duplicate receipt evidence is 
 test("whole cents, explicit targets and independent approval cannot be bypassed",()=>{
   for(const amount of ["0.00","1.001","1e2","-1.00","NaN","9999999999999.00"])assert.throws(()=>planReceiptReallocation({...input,amount},source,target,root,[position]));
   assert.equal(receiptCents("0.01"),1);assert.equal(receiptCents("999999999999.99"),99999999999999);assert.equal(receiptCents("-1.25",true),-125);
+  assert.throws(()=>planReceiptReallocation(input,{...source,balance:"999999999999.99",ledgerBalance:"999999999999.99"},target,root,[position]),/AMOUNT/);
   assert.throws(()=>requireReallocationReviewer("same","same"),/INDEPENDENT/);requireReallocationReviewer("proposer","reviewer");
+});
+test("partial undo restores the original receipt through retained reverse-of-reversal evidence",()=>{
+  const creditId="cmovedreceipt00000000000001",parent={id:"cpriorallocation00000000001",operation:"MOVE",paymentId:root.paymentId,sourceAccountId:source.id,targetAccountId:target.id,sourceLedgerEntryId:"cprioroutgoing0000000000001",targetLedgerEntryId:creditId,remaining:"75.00",verified:true};
+  const movedSource={...target,balance:"375.00",ledgerBalance:"375.00"},restoredTarget={...source,balance:"-125.00",ledgerBalance:"-125.00"};
+  const positions=[{...position,remaining:"125.00"},{...position,entryId:creditId,accountId:target.id,remaining:"75.00"}];
+  const undo={...input,operation:"UNDO" as const,reversesId:parent.id,sourceAccountId:target.id,sourceEntryId:creditId,targetAccountId:source.id,amount:"25.00"};
+  const planned=planReceiptReallocation(undo,movedSource,restoredTarget,root,positions,parent);
+  assert.deepEqual(planned.incoming,{type:"REVERSAL",reversalOfId:parent.sourceLedgerEntryId});assert.equal(planned.sourceBalanceAfterCents,40000);assert.equal(planned.targetBalanceAfterCents,-15000);assert.equal(planned.sourceReceiptRemainingCents,5000);assert.equal(planned.externalPaymentCreated,false);
+  for(const changed of [{verified:false},{operation:"UNDO"},{sourceAccountId:"other"},{paymentId:"other"},{remaining:"24.99"}])assert.throws(()=>planReceiptReallocation(undo,movedSource,restoredTarget,root,positions,{...parent,...changed}),/UNDO_REVIEW/);
+  assert.throws(()=>planReceiptReallocation(undo,movedSource,restoredTarget,root,positions),/UNDO_REVIEW/);
+  assert.throws(()=>planReceiptReallocation({...undo,reversesId:null},movedSource,restoredTarget,root,positions,parent));
 });

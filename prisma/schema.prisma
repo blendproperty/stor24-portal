@@ -932,6 +932,10 @@ model CollectionPromise {
 }
 
 model ReceiptReallocation {
+  operation String @default("MOVE")
+  reversesId String?
+  reverses ReceiptReallocation? @relation("ReceiptReallocationUndo",fields:[reversesId],references:[id],onDelete:Restrict)
+  undoRequests ReceiptReallocation[] @relation("ReceiptReallocationUndo")
   id String @id @default(cuid())
   organisationId String
   facilityId String
@@ -974,6 +978,7 @@ model ReceiptReallocation {
   @@index([targetAccountId,status])
   @@index([sourceEntryId,status])
   @@index([paymentId,status])
+  @@index([reversesId,status])
 }
 
 model FinancialAdjustment {
