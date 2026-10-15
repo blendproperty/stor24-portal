@@ -111,6 +111,8 @@ jobs:
       - run: npx tsx --test tests/integration/collection-notices.test.ts
       - run: npx tsx --test tests/integration/settlements.test.ts
       - run: npx tsx --test tests/integration/unidentified-receipts.test.ts
+      - run: npx tsx --test tests/integration/receipt-reallocation.test.ts
+      - run: npx tsx --test tests/integration/receipt-reallocation-workflow.test.ts
       - run: npx tsx --test tests/integration/reservation-price-amendments.test.ts
       - run: npx tsx --test tests/integration/mri.test.ts
       - run: npx tsx --test tests/integration/mri-mapping.test.ts
