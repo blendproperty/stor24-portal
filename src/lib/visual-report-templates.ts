@@ -6,6 +6,7 @@ const equal=(field:string,value:string):VisualReportQuery["filters"][number]=>({
 const template=(key:string,name:string,group:string,dataset:string,options:Partial<VisualReportTemplate>={}):VisualReportTemplate=>({key,name,group,dataset,...options});
 const ledger=(key:string,name:string,type?:string)=>template(key,name,"Finance","ledger",{dateField:"date",...(type?{filters:[equal("type",type)]}:{})});
 export const visualReportTemplates:VisualReportTemplate[]=[
+  template("transfers-native","Recorded STOR24 transfer pairs","Units","transfers-native",{dateField:"date",columns:["facility","transfer","account","fromUnit","toUnit","date","effective","verified","review"]}),
   template("unpaid-native", "Unpaid charges under approved STOR24 terms", "Finance", "unpaid-native", {columns:["facility","account","customer","charge","due","amount","currency","review","hold"]}),
   template("native-sign-ins", "STOR24 sign-in event counts", "Management", "audit", {dateField:"date",filters:[{field:"action",operator:"contains",value:"user.login."}],groupBy:["actor","action"],metrics:[{field:"*",operation:"count"}]}),
   template("directory","Tenant directory","Tenants","tenants",{columns:["facility","account","customer","email","phone","units","status"]}),
@@ -72,7 +73,7 @@ export const visualReportTemplates:VisualReportTemplate[]=[
   ...[
     ["internet-access","Internet access roll","Tenants","No tenant internet-access entitlement source is recorded."],
     ["unpaid-charges","Unpaid charges / all unpaid charges","Finance","Requires approved charge-level payment/credit allocations; a current account balance does not identify unpaid charges."],
-    ["transfer-pairs","Move-outs & transfers","Units","Requires an explicit transfer event/link and agreed effective-date definition; matching dates alone cannot establish a transfer."],
+    ["transfer-pairs","Move-outs & transfers","Units","Optional legacy history is separate from Recorded STOR24 transfer pairs. Native pairs use explicit transfer audits; dates alone never establish a transfer. Cross-store operations and historical completeness remain separate."],
     ["complimentary","Complimentary units","Units","Requires an approved complimentary/discount classification; zero rent alone is insufficient."],
     ["general-journal","General journal entries","Finance","MRI journal contract, chart-of-accounts mappings and reconciliation are not approved. Ledger transaction detail is available separately."],
     ["income-analysis","Financial summary / income analysis","Finance","Requires approved revenue recognition, allocations, reversals and financial statement definitions."],

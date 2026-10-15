@@ -8,6 +8,8 @@ import {saveVisualReport,scheduleVisualReport} from "../../src/lib/visual-report
 import {runScheduledReports} from "../../src/lib/visual-report-worker";
 import {visualReportSource} from "../../src/lib/visual-report-data";
 import {decryptReportArtifact,encryptReportArtifact,visualReportScope} from "../../src/lib/visual-report-security";
+import {transfer} from "../../src/lib/leasing-service";
+import {evaluateVisualReport} from "../../src/lib/visual-report-engine";
 
 test("isolated PostgreSQL reporting persistence, claims, expiry and history scope",async t=>{
   assert.equal(process.env.MERCHANDISE_DB_TEST,"isolated-ci");
@@ -52,6 +54,27 @@ test("isolated PostgreSQL reporting persistence, claims, expiry and history scop
         const scope={organisationId:org.id,userId:user.id,unrestrictedFacilities:true,facilityIds:[]};
         const rows=await visualReportSource(scope,defaultVisualQuery(dataset.key,"2026-10-01",dataset.key==="unpaid-native"?"2026-10-01":"2026-10-31"));
         if(dataset.key==="audit"){assert.equal(rows.length,5);assert.ok(rows.every(row=>row.actor==="Synthetic employee"&&row.facility==="Reporting fixture store"));}else assert.deepEqual(rows,[],dataset.key);
+      }
+    });
+    await t.test("native transfer pairs use the actual producer and retain original links, scope, date basis and read-only baselines",async()=>{
+      const customer=await db.customer.create({data:{organisationId:org.id,firstName:"Synthetic transfer"}}),type=await db.unitType.create({data:{facilityId:facility.id,name:"Synthetic transfer units"}});
+      const units=await Promise.all([0,1].map(i=>db.unit.create({data:{facilityId:facility.id,unitTypeId:type.id,number:`TRANSFER-${i}`,floor:"Ground Floor",monthlyRate:100,status:i===0?"OCCUPIED":"AVAILABLE"}})));
+      let tenancyId:string|undefined;
+      try{
+        const account=await db.account.create({data:{customerId:customer.id,accountNumber:randomUUID(),balance:0}}),tenancy=await db.tenancy.create({data:{customerId:customer.id,accountId:account.id,facilityId:facility.id,status:"ACTIVE",startDate:new Date("2026-01-01")}});tenancyId=tenancy.id;
+        const from=await db.occupancy.create({data:{tenancyId:tenancy.id,unitId:units[0].id,status:"ACTIVE",startDate:new Date("2026-01-01"),monthlyRate:100}}),scope={organisationId:org.id,userId:user.id,unrestrictedFacilities:false,facilityIds:[facility.id]},effectiveAt=new Date("2026-10-01T22:30:00Z");
+        const destination=await transfer(scope,{tenancyId:tenancy.id,toUnitId:units[1].id,effectiveAt});
+        const audit=await db.auditEvent.findFirstOrThrow({where:{entityId:tenancy.id,action:"tenancy.transferred"}});await db.auditEvent.update({where:{id:audit.id},data:{occurredAt:new Date("2026-10-04T08:00:00Z")}});
+        await db.unit.update({where:{id:units[0].id},data:{number:"RENAMED-CURRENT-UNIT"}});
+        const baselineAccount=await db.account.findUniqueOrThrow({where:{id:account.id}}),baselineOccupancies=await db.occupancy.findMany({where:{tenancyId:tenancy.id},orderBy:{id:'asc'}}),baselineAudit=await db.auditEvent.findUniqueOrThrow({where:{id:audit.id}});
+        const query=defaultVisualQuery("transfers-native","2026-10-01","2026-10-31"),rows=await visualReportSource(scope,query);assert.equal(rows.length,1);const row=rows[0];assert.equal(row.verified,true);assert.equal(row.fromUnitId,units[0].id);assert.equal(row.fromUnit,"RENAMED-CURRENT-UNIT");assert.equal(row.toUnitId,units[1].id);assert.equal(row.fromOccupancy,from.id);assert.equal(row.toOccupancy,destination.id);assert.equal(row.transfer,audit.id);assert.equal(row.account,account.accountNumber);
+        assert.deepEqual(await visualReportSource({...scope,facilityIds:[other.id]},query),[]);assert.deepEqual(await visualReportSource({...scope,organisationId:'foreign-org',unrestrictedFacilities:true,facilityIds:[]},query),[]);await assert.rejects(visualReportSource(scope,{...query,facilityId:other.id}),/FORBIDDEN/);
+        const effectiveQuery={...query,from:"2026-10-02",to:"2026-10-02",dateField:"effective"};assert.equal(evaluateVisualReport(effectiveQuery,await visualReportSource(scope,effectiveQuery)).matchedRows,1);const recordedQuery={...effectiveQuery,dateField:'date'};assert.equal((await visualReportSource(scope,recordedQuery)).length,0);
+        assert.deepEqual(await db.account.findUniqueOrThrow({where:{id:account.id}}),baselineAccount);assert.deepEqual(await db.occupancy.findMany({where:{tenancyId:tenancy.id},orderBy:{id:'asc'}}),baselineOccupancies);assert.deepEqual(await db.auditEvent.findUniqueOrThrow({where:{id:audit.id}}),baselineAudit);assert.equal(await db.payment.count({where:{accountId:account.id}}),0);assert.equal(await db.ledgerEntry.count({where:{accountId:account.id}}),0);assert.equal(await db.communicationLog.count({where:{organisationId:org.id}}),0);
+        await db.auditEvent.update({where:{id:audit.id},data:{after:{unitId:units[1].id,occupancyId:destination.id}}});const held=await visualReportSource(scope,query);assert.equal(held[0].verified,false);assert.equal(held[0].review,'TRANSFER_PAYLOAD_REVIEW');await assert.rejects(visualReportSource(scope,effectiveQuery),/REPORT_TRANSFER_DATE_REVIEW/);
+      }finally{
+        if(tenancyId){await db.auditEvent.deleteMany({where:{entityId:tenancyId,action:'tenancy.transferred'}});await db.occupancy.deleteMany({where:{tenancyId}});await db.tenancy.delete({where:{id:tenancyId}})}
+        await db.account.deleteMany({where:{customerId:customer.id}});await db.customer.delete({where:{id:customer.id}});await db.unit.deleteMany({where:{unitTypeId:type.id}});await db.unitType.delete({where:{id:type.id}});
       }
     });
     await t.test("native unpaid charges retain approved allocations, receipt quarantine and selected facility isolation",async()=>{

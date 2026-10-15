@@ -9,6 +9,7 @@ import { decryptReportArtifact } from "@/lib/visual-report-security";
 import { z } from "zod";
 import { collectionsWorkspace } from "./collections-service";
 import { nativeUnpaidRows } from "./native-unpaid-report";
+import { nativeTransferRows, transferReferenceIds } from "./native-transfer-report";
 
 const iso=(date:Date|null|undefined)=>date?.toISOString()??null;
 const name=(c:{companyName:string|null;firstName:string|null;lastName:string|null}|null)=>c?(c.companyName||[c.firstName,c.lastName].filter(Boolean).join(" ")):null;
@@ -26,6 +27,12 @@ async function rawVisualReportSource(scope:RequestScope, query:VisualReportQuery
   const interval=query.intervalMode?{startDate:query.intervalMode==="whole-period"?{lte:period.gte}:{lt:period.lt},OR:[{endDate:null},{endDate:query.intervalMode==="whole-period"?{gte:period.lt}:{gt:period.gte}}]}:{};
   const bounded=<T>(rows:T[])=>{if(rows.length>REPORT_SOURCE_LIMIT)throw new ReportError("REPORT_LIMIT");return rows;};
   switch(query.dataset) {
+    case "transfers-native": return db.$transaction(async tx=>{
+      const events=bounded(await tx.auditEvent.findMany({where:{...direct,action:"tenancy.transferred",entityType:"Tenancy",...range("occurredAt","date"),...range("occurredAt","recordedAt")},take,orderBy:{id:"asc"},select:{id:true,entityId:true,facilityId:true,facility:{select:facilitySelect},occurredAt:true,before:true,after:true}}));
+      const ids=transferReferenceIds(events);
+      const occupancies=ids.length?await tx.occupancy.findMany({where:{id:{in:ids},tenancy:{facility,customer:{organisationId:scope.organisationId},account:{customer:{organisationId:scope.organisationId}}}},select:{id:true,tenancyId:true,unitId:true,startDate:true,endDate:true,unit:{select:{number:true,facilityId:true}},tenancy:{select:{facilityId:true,account:{select:{accountNumber:true}}}}}}):[];
+      return nativeTransferRows(events,occupancies,["effective","effectiveAt"].includes(query.dateField??""));
+    },{isolationLevel:"RepeatableRead",timeout:30000});
     case "unpaid-native": {
       const narrowed = query.facilityId ? { ...scope, unrestrictedFacilities: false, facilityIds: [query.facilityId] } : scope;
       let workspace;

@@ -1,6 +1,8 @@
 import { authErrorResponse } from "./auth-guards";
 import { dlpPrivateHeaders } from "./dlp-policy";
 const errors:Record<string,[number,string]>={
+  REPORT_TRANSFER_REVIEW_REQUIRED:[422,"Transfer audit or occupancy identities are duplicated. Review the original records before producing this report."],
+  REPORT_TRANSFER_DATE_REVIEW:[422,"A retained transfer has no valid effective date. Run by Recorded date (SAST) to inspect its review row before filtering by effective date."],
   REPORT_ASOF_FUTURE:[422,"Unpaid charges require an end date no later than today in South Africa."],
   REPORT_FINANCE_REVIEW_REQUIRED:[422,"Some scoped accounts need receipt, allocation or ledger reconciliation. Preview the review rows before totaling unpaid charges."],
   REPORT_HISTORY_REQUIRED:[422,"Select an approved history extract for this report, or import its source CSV in SiteLink history."],
