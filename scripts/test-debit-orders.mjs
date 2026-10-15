@@ -15,6 +15,9 @@ const server = createServer(async (req,res) => {
 });
 await new Promise(resolve => server.listen(0,"127.0.0.1",resolve));
 const browser = await chromium.launch(process.env.PLAYWRIGHT_CHANNEL ? { channel:process.env.PLAYWRIGHT_CHANNEL } : {});
+const model=await build({stdin:{contents:'export{debitTestReadiness}from"./src/lib/debit-test-readiness";',resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm'});
+const {debitTestReadiness}=await import(`data:text/javascript;base64,${Buffer.from(model.outputFiles[0].text).toString('base64')}`);
+let reviewFails=false,malformedReadiness=false;
 const calls = [], errors = [];
 const workspace = { facilities:[{ id:"cmfacilityfixture000001", name:"Training store with a deliberately long facility name" }], accounts:[{ id:"cmaccountfixture000001", accountNumber:"CI-101", tenancy:{ facilityId:"cmfacilityfixture000001" } }], runs:[], submissionEnabled:false };
 const preview = { fingerprint:"a".repeat(64), total:1150, rows:[{ accountId:"cmaccountfixture000001", accountNumber:"CI-101", amount:1150, reference:"ST24-example-mandate" }, { accountId:"cmaccountfixture000002", accountNumber:"CI-102", amount:0, blocker:"DEBIT_SIGNED_MANDATE_REQUIRED" }] };
@@ -22,7 +25,14 @@ try {
   const page = await browser.newPage({ viewport:{ width:1440,height:1000 } }); page.on("pageerror",e=>errors.push(e.message));
   await page.route("**/api/v1/billing/debit-orders**",async route => {
     const req = route.request();
-    if (req.method() === "GET") return route.fulfill({ json:req.url().includes("accountId=") ? { plan:null,mandate:null } : req.url().includes("runId=") ? preview : workspace });
+    if (req.method() === "GET") {
+      if(req.url().includes("runId=")){
+        if(reviewFails)return route.fulfill({status:503,json:{error:"Synthetic review unavailable"}});
+        const run=workspace.runs[0],testReadiness=debitTestReadiness({...run,environment:'sandbox',instructions:[{accountId:'cmaccountfixture000001'}]},{});
+        return route.fulfill({json:{...preview,testReadiness:malformedReadiness?{...testReadiness,checks:null}:testReadiness}});
+      }
+      return route.fulfill({json:req.url().includes("accountId=")?{plan:null,mandate:null}:workspace});
+    }
     const body = req.postDataJSON(); calls.push(body);
     if (body.action === "preview") return route.fulfill({ json:preview });
     if (body.action === "prepare") { workspace.runs = [{ id:"cmrunfixture000001", batchName:"ST24-209902-1234567890123456", period:"2099-02", actionDate:"2099-02-14",status:"PREPARED",total:"1150",failureCode:null,_count:{instructions:1} }]; return route.fulfill({ json:{ id:"cmrunfixture000001" } }); }
@@ -45,13 +55,17 @@ try {
   await page.getByRole("button",{name:"Save prepared run"}).click();
   await expect(page.getByRole("button",{name:"Submit test batch"})).toBeDisabled();
   await page.getByRole("button",{name:"View saved accounts and exclusions"}).click();
-  await expect(page.locator(".debit-run li")).toHaveCount(2);
+  await expect(page.locator(".debit-run > ul > li")).toHaveCount(2);
+  await expect(page.getByRole('heading',{name:'Configured test-batch gates'})).toBeVisible();await expect(page.getByText('Configured gates currently block a test upload.',{exact:true})).toBeVisible();await expect(page.getByText(/1 included accounts lack configured test-account allowlisting/)).toBeVisible();
+  reviewFails=true;await page.getByRole('button',{name:'View saved accounts and exclusions'}).click();await expect(page.getByRole('heading',{name:'Configured test-batch gates'})).toHaveCount(0);reviewFails=false;
+  malformedReadiness=true;await page.getByRole('button',{name:'View saved accounts and exclusions'}).click();await expect(page.getByText(/saved review is incomplete/)).toBeVisible();await expect(page.getByRole('heading',{name:'Configured test-batch gates'})).toHaveCount(0);malformedReadiness=false;
+  await page.getByRole('button',{name:'View saved accounts and exclusions'}).click();await expect(page.getByRole('heading',{name:'Configured test-batch gates'})).toBeVisible();
   await page.getByText("Account collection terms",{exact:true}).click();
   await page.getByLabel("Account",{exact:true}).selectOption("cmaccountfixture000001");
   await expect(page.getByText(/No hosted mandate is attached/)).toBeVisible();
   await expect(page.getByRole("button",{name:"Save collection terms"})).toBeDisabled();
   await mkdir("output/debit-orders",{recursive:true});
-  for (const width of [1440,390]) { await page.setViewportSize({width,height:1000}); assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`Overflow at ${width}`); await page.screenshot({path:`output/debit-orders/${width}.png`,fullPage:true}); }
+  for (const width of [1440,768,390,320]) { await page.setViewportSize({width,height:1000}); assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`Overflow at ${width}`); await page.screenshot({path:`output/debit-orders/${width}.png`,fullPage:true}); }
   await page.getByRole("button",{name:"Cancel unsent run"}).click();
   await expect(page.getByText(/Cancelled before upload/)).toBeVisible();
   assert.equal(calls.filter(c=>c.action==="prepare").length,1); assert.equal(calls.find(c=>c.action==="prepare").confirm,true);
