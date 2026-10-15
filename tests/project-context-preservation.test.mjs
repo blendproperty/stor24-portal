@@ -14,3 +14,9 @@ test("empty API content followed by appended release paragraphs cannot pass cano
 test("a surviving title cannot disguise substantial loss of the base history",()=>{
   assert.throws(()=>verifyProjectContext(canonical,canonical+canonical),/lost more than/);
 });
+
+test("complete size and identity cannot disguise unresolved normal or diff3 conflict markers",()=>{
+  for(const marker of ["<<<<<<< HEAD","=======",">>>>>>> incoming","||||||| merge base","  <<<<<<< HEAD"]){
+    assert.throws(()=>verifyProjectContext(marker+"\r\n"+canonical,canonical),/unresolved Git conflict markers/);
+  }
+});

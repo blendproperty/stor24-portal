@@ -8,6 +8,7 @@ const normalize=text=>text.replace(/^\uFEFF/,"").replaceAll("\r\n","\n");
  * Promotion still requires complete original/owned text and Git blob checks. */
 export function verifyProjectContext(current,baseline){
   const text=normalize(current),bytes=Buffer.byteLength(text),lines=text.split("\n").length;
+  if(/^[ \t]*(?:<{7}|={7}|>{7}|\|{7})(?:[ \t]|$)/m.test(text))throw Error("PROJECT_CONTEXT.md contains unresolved Git conflict markers. Resolve and verify the complete retained history before promotion.");
   if(bytes<100000||lines<100||!/^# STOR 24 CRM and Operations Platform\b/m.test(text))throw Error("PROJECT_CONTEXT.md appears truncated or is missing its canonical identity. Restore the complete Git history before promotion.");
   const baseBytes=baseline===undefined?null:Buffer.byteLength(normalize(baseline));
   if(baseBytes!==null&&baseBytes>=100000&&bytes<baseBytes*0.9)throw Error("PROJECT_CONTEXT.md lost more than 10% of its base text. Verify complete retained history before promotion.");

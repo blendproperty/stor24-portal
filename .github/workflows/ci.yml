@@ -39,6 +39,7 @@ jobs:
       - run: node scripts/test-customer-history.mjs
       - run: node scripts/test-communication-log-search.mjs
       - run: node scripts/test-staff-handbook-download.mjs
+      - run: node scripts/test-receipt-reallocation-workspace.mjs
       - run: node scripts/test-customer-dossier.mjs
       - run: node scripts/test-company-setup-recovery.mjs
       - run: node scripts/test-password-form-recovery.mjs
@@ -146,6 +147,7 @@ jobs:
             output/customer-history/
             output/communication-search/
             output/staff-handbook-download/
+            output/receipt-staff-ui/
             output/customer-dossier/
             output/operations-access-recovery/
             output/task-create-recovery/

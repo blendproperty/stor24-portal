@@ -1,3 +1,4 @@
+import {receiptAllocationGraph} from "./receipt-reallocation-source";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
@@ -21,18 +22,41 @@ async function owners(tx: Client, scope: RequestScope) {
   const users = await tx.user.findMany({ where: { organisationId: scope.organisationId, active: true }, select: { id: true, name: true, roleAssignments: { include: { role: true } } } });
   return users.map(u => ({ id: u.id, name: u.name, facilities: u.roleAssignments.filter(a => a.role.organisationId === scope.organisationId && hasPermission(a.role.permissions, "collections.manage")).map(a => a.facilityId) })).filter(u => u.facilities.length > 0);
 }
-async function receiptEvidence(tx: Client, scope: RequestScope, accounts: Account[]) {
+type ReceiptProof=Set<string>&{allocations:Map<string,{accountId:string;rootPaymentId:string;remainingCents:number;receivedAt:Date;recordedAt:Date}>;held:Set<string>;pending:Set<string>};
+async function receiptEvidence(tx: Client, scope: RequestScope, accounts: Account[]):Promise<ReceiptProof> {
   const ids = accounts.flatMap(a => a.payments.map(p => p.id));
-  if (!ids.length) return new Set<string>();
-  const evidence = await tx.auditEvent.findMany({ where: { organisationId: scope.organisationId, entityType: "Payment", entityId: { in: ids }, action: { in: ["payment.posted", "booking.payment_recorded"] } }, select: { entityId: true } });
-  return new Set(evidence.map(e => e.entityId));
+  const evidence = ids.length?await tx.auditEvent.findMany({ where: { organisationId: scope.organisationId, entityType: "Payment", entityId: { in: ids }, action: { in: ["payment.posted", "booking.payment_recorded"] } }, select: { entityId: true } }):[];
+  const proof:ReceiptProof=Object.assign(new Set(evidence.map(e=>e.entityId)),{allocations:new Map(),held:new Set<string>(),pending:new Set<string>()});
+  const accountIds=accounts.map(a=>a.id);
+  const rows=accountIds.length?await tx.receiptReallocation.findMany({where:{OR:[{sourceAccountId:{in:accountIds}},{targetAccountId:{in:accountIds}}],status:{in:["PENDING_APPROVAL","POSTED"]}},take:5001,orderBy:{id:"asc"},select:{sourceAccountId:true,targetAccountId:true,paymentId:true,status:true}}):[];
+  if(rows.length>5000)throw Error("COLLECTION_LIMIT");
+  for(const row of rows.filter(r=>r.status==="PENDING_APPROVAL")){proof.pending.add(row.sourceAccountId);proof.pending.add(row.targetAccountId);}
+  for(const root of new Set(rows.filter(r=>r.status==="POSTED").map(r=>r.paymentId))){
+    try{
+      const graph=await receiptAllocationGraph(tx,scope,root);
+      for(const p of graph.positions)proof.allocations.set(p.entryId,{accountId:p.accountId,rootPaymentId:root,remainingCents:moneyCents(p.remaining),receivedAt:graph.receivedAt,recordedAt:graph.recordedAt});
+    }catch(error){
+      const message=error instanceof Error?error.message:"";
+      if(message==="REALLOCATION_LIMIT")throw Error("COLLECTION_LIMIT");
+      if(!["REALLOCATION_RECEIPT_REVIEW","REALLOCATION_NOT_FOUND","REALLOCATION_SCOPE","REALLOCATION_RECONCILIATION","COLLECTION_REVIEW"].includes(message)&&!(error instanceof Error&&error.name==="ZodError"))throw error;
+      for(const row of rows.filter(r=>r.paymentId===root)){proof.held.add(row.sourceAccountId);proof.held.add(row.targetAccountId);}
+    }
+  }
+  return proof;
 }
-function evaluate(account: Account, asOf: string, provenPayments: Set<string>) {
+function evaluate(account: Account, asOf: string, provenPayments: ReceiptProof) {
   const entries = account.ledgerEntries.map(e => ({ ...e, amount: e.amount.toString() }));
-  const verifiedReceiptIds: string[] = []; let receiptIssue = false;
+  const verifiedReceiptIds: string[] = []; let receiptIssue = provenPayments.held.has(account.id);
   let currentValues: ReturnType<typeof effectiveEntries> = [];
   try { currentValues = effectiveEntries(entries, "9998-12-31"); } catch { receiptIssue = true; }
   for (const e of account.ledgerEntries.filter(e => e.type === "PAYMENT")) {
+    const allocation=provenPayments.allocations.get(e.id);
+    if(allocation){
+      const effective=currentValues.find(v=>v.entry.id===e.id)?.amount??-1;
+      const returned=currentValues.filter(v=>v.entry.type==="REFUND"&&(v.entry.metadata as {sourceEntryId?:string}|null)?.sourceEntryId===e.id).reduce((n,v)=>n+v.amount,0);
+      if(allocation.accountId!==account.id||effective<0||effective-returned!==allocation.remainingCents)receiptIssue=true;else verifiedReceiptIds.push(e.id);
+      continue;
+    }
     const matched = account.payments.filter(p => e.externalRef === p.idempotencyKey || (e.metadata as { paymentId?: string } | null)?.paymentId === p.id);
     const p = matched[0];
     const metadata = e.metadata as { verifiedStatus?: boolean; environment?: string } | null;
@@ -50,9 +74,9 @@ function evaluate(account: Account, asOf: string, provenPayments: Set<string>) {
   if (receiptIssue) ageing.issue = "Unmatched, test or unverified receipt history needs reconciliation.";
   // Never display plausible numeric buckets for quarantined history.
   if (ageing.issue) { ageing.buckets = [0, 0, 0, 0, 0]; ageing.overdue = 0; ageing.charges = []; ageing.oldestDays = 0; }
-  let hold = account.collectionCase?.disputed ? "Dispute hold" : account.adjustments.length ? "Adjustment awaiting completion" : account.debitInstructions.length ? "Debit instruction needs review before follow-up" : null;
+  let hold = account.collectionCase?.disputed ? "Dispute hold" : account.adjustments.length ? "Adjustment awaiting completion" : provenPayments.pending.has(account.id) ? "Receipt allocation awaiting independent review" : account.debitInstructions.length ? "Debit instruction needs review before follow-up" : null;
   if (!hold && account.payments.some(p => p.status === "PENDING" && !isTestPayment(p))) hold = "Payment awaiting confirmation";
-  const promises = (account.collectionCase?.promises ?? []).map(p => ({ id: p.id, amount: p.amount.toString(), dueDate: p.dueDate, status: p.status, createdAt: p.createdAt.toISOString(), progress: ageing.issue ? null : promiseProgress(entries, verifiedReceiptIds, { ...p, amount: p.amount.toString() }, asOf) }));
+  const promises = (account.collectionCase?.promises ?? []).map(p => ({ id: p.id, amount: p.amount.toString(), dueDate: p.dueDate, status: p.status, createdAt: p.createdAt.toISOString(), progress: ageing.issue ? null : promiseProgress(entries, verifiedReceiptIds.filter(id=>{const root=provenPayments.allocations.get(id);return !root||root.recordedAt>p.createdAt&&root.receivedAt>=p.createdAt;}), { ...p, amount: p.amount.toString() }, asOf) }));
   const openPromise = promises.find(p => p.status === "OPEN");
   if (!hold && openPromise && openPromise.dueDate >= southAfricaDateKey(new Date())) hold = `Agreed promise due ${openPromise.dueDate}`;
   if (!hold && openPromise?.progress?.covered) hold = "Promise receipts awaiting confirmation";
@@ -102,7 +126,7 @@ export async function collectionCohortOutcomes(tx: Client, scope: RequestScope, 
     return { accountId: account.id, facilityId: account.tenancy!.facilityId, customerId: account.customerId,
       issue: result.ageing.issue, overdueCents: result.ageing.issue ? null : result.ageing.overdue,
       netReceiptCents: result.ageing.issue ? null : received - refunded,
-      receiptCount: result.ageing.issue ? null : receipts.filter(v => v.amount > 0).length,
+      receiptCount: result.ageing.issue ? null : new Set(receipts.filter(v=>v.amount>0).map(v=>evidence.allocations.get(v.entry.id)?.rootPaymentId??v.entry.id)).size,
       hold: result.hold };
   });
 }

@@ -1,3 +1,4 @@
+import {receiptAllocationGraph} from "./receipt-reallocation-source";
 import { createHash } from "node:crypto";
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
@@ -36,6 +37,14 @@ async function review(tx: Client, scope: RequestScope, raw: unknown, ownId?: str
   if (cents(statement.closingBalance) !== cents(account.balance.toString()) || entries.some(e => e.effectiveAt > new Date())) throw new Error("ADJUSTMENT_RECONCILIATION");
   if (await tx.financialAdjustment.count({ where: { accountId: account.id, status: { in: openStates }, ...(ownId ? { id: { not: ownId } } : {}) } })) throw new Error("ADJUSTMENT_OPEN_REQUEST");
   if (await tx.debitOrderInstruction.count({ where: { accountId: account.id, run: { status: { not: "CANCELLED" } } } })) throw new Error("ADJUSTMENT_COLLECTION_PENDING");
+  if(await tx.receiptReallocation.count({where:{OR:[{sourceAccountId:account.id},{targetAccountId:account.id}],status:"PENDING_APPROVAL"}}))throw Error("ADJUSTMENT_ALLOCATION_PENDING");
+  const retainedAllocations=await tx.receiptReallocation.findMany({where:{OR:[{sourceAccountId:account.id},{targetAccountId:account.id}],status:"POSTED"},take:5001,select:{paymentId:true}});
+  if(retainedAllocations.length>5000)throw Error("ADJUSTMENT_RECONCILIATION");
+  const allocationRoots=[...new Set(retainedAllocations.map(a=>a.paymentId))].sort(),allocationLegs=new Set<string>(),allocatedPositions=new Map<string,number>(),allocationDigests:string[]=[];
+  for(const root of allocationRoots){
+    let graph;try{graph=await receiptAllocationGraph(tx,scope,root,[account.id],undefined,ownId);}catch{throw Error("ADJUSTMENT_RECONCILIATION");}
+    for(const id of graph.verifiedLedgerIds)allocationLegs.add(id);for(const p of graph.positions)if(p.accountId===account.id)allocatedPositions.set(p.entryId,cents(p.remaining));allocationDigests.push(graph.digest);
+  }
   const amount = cents(input.amount), balance = cents(account.balance.toString());
   const source = entries.find(e => e.id === input.sourceEntryId);
   const history = await tx.financialAdjustment.findMany({ where: { accountId: account.id, status: "POSTED" }, orderBy: { id: "asc" } });
@@ -47,8 +56,8 @@ async function review(tx: Client, scope: RequestScope, raw: unknown, ownId?: str
     const used = history.filter(h => h.sourceEntryId === source.id).reduce((sum, h) => sum + cents(h.amount.toString()), 0);
     const remaining = cents(source.amount.toString()) - used;
     // Legacy credits without a linked source cannot safely be allocated retrospectively.
-    if (entries.some(e => ["CREDIT", "WRITE_OFF", "REFUND", "REVERSAL"].includes(e.type) && !history.some(h => h.ledgerEntryId === e.id))) throw new Error("ADJUSTMENT_RECONCILIATION");
-    if (amount > remaining) throw new Error("ADJUSTMENT_EXCEEDS_SOURCE");
+    if (entries.some(e => ["CREDIT", "WRITE_OFF", "REFUND", "REVERSAL"].includes(e.type) && !history.some(h => h.ledgerEntryId === e.id) && !allocationLegs.has(e.id))) throw new Error("ADJUSTMENT_RECONCILIATION");
+    if (amount > Math.min(remaining,allocatedPositions.get(source.id)??remaining)) throw new Error("ADJUSTMENT_EXCEEDS_SOURCE");
     if (["CREDIT", "WRITE_OFF"].includes(input.kind)) {
       if (source.type !== "CHARGE") throw new Error("ADJUSTMENT_SOURCE");
       if (input.kind === "WRITE_OFF" && amount > balance) throw new Error("ADJUSTMENT_EXCEEDS_SOURCE");
@@ -58,6 +67,7 @@ async function review(tx: Client, scope: RequestScope, raw: unknown, ownId?: str
       } else tax = 0;
     } else {
       const payment = matchedPayment(account, source.id);
+      if(!payment&&allocatedPositions.has(source.id))throw Error("ADJUSTMENT_ALLOCATION_SOURCE");
       if (!payment || (payment.provider && payment.environment !== "live")) throw new Error("ADJUSTMENT_SOURCE");
       if (entries.filter(e => e.type === "PAYMENT" && (e.externalRef === payment.idempotencyKey || (e.metadata as { paymentId?: string } | null)?.paymentId === payment.id)).length !== 1) throw new Error("ADJUSTMENT_RECONCILIATION");
       const audited = await tx.auditEvent.findFirst({ where: { organisationId: scope.organisationId, entityType: "Payment", entityId: payment.id, action: { in: ["payment.posted", "booking.payment_recorded"] } } });
@@ -76,7 +86,7 @@ async function review(tx: Client, scope: RequestScope, raw: unknown, ownId?: str
     if (cents(input.taxAmount) !== 0) throw new Error("ADJUSTMENT_TAX");
   }
   const snapshot = { input, accountNumber: account.accountNumber, facilityId: tenancy.facilityId, facilityName: tenancy.facility.name, tenancyId: tenancy.id, balanceBefore: amountText(balance), balanceAfter: amountText(balance + adjustmentDelta(input.kind, amount)), amount: amountText(amount), taxAmount: amountText(tax), source: source ? { id: source.id, type: source.type, description: source.description, amount: source.amount.toString(), effectiveAt: source.effectiveAt.toISOString(), externalRef: source.externalRef } : null, paymentId };
-  return { ...snapshot, fingerprint: hash({ snapshot, entries, payments: account.payments, policy: policy?.config ?? null, history }) };
+  return { ...snapshot, allocationRoots, fingerprint: hash({ snapshot, entries, payments: account.payments, policy: policy?.config ?? null, history, ...(allocationDigests.length?{allocationDigests}:{}) }) };
 }
 export async function adjustmentWorkspace(scope: RequestScope) {
   const [accounts, requests] = await Promise.all([
@@ -133,6 +143,7 @@ async function post(tx: Client, scope: RequestScope, request: Adjustment, review
   const document = await tx.document.create({ data: { tenancyId: reviewed.tenancyId, type: "ADJUSTMENT", status: "GENERATED", content: html, sha256, storageKey: `inline:${sha256}`, externalId: `ADJ-${request.id}`, idempotencyKey: `adjustment-document:${request.id}` } });
   const result = await tx.financialAdjustment.update({ where: { id: request.id }, data: { status: "POSTED", ledgerEntryId: entry.id, documentId: document.id, postedById: scope.userId, postedAt: new Date(), payoutReference: payout?.reference, payoutDate: payout?.date } });
   await audit(tx, scope, request, "posted", { ledgerEntryId: entry.id, documentId: document.id, balanceBefore: reviewed.balanceBefore, balanceAfter: reviewed.balanceAfter, payout: payout ?? null });
+  for(const root of reviewed.allocationRoots)await receiptAllocationGraph(tx,scope,root,[request.accountId]);
   return result;
 }
 export async function decideAdjustment(scope: RequestScope, id: string, action: "approve" | "reject" | "cancel", reference: string, unpaidConfirmed = false) {

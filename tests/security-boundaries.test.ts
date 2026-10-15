@@ -32,7 +32,7 @@ function fixture() {
       { id: "new-other", organisationId: "org", leads: [], reservations: [], tenancies: [] },
     ],
     auditEvent: [{ id: "audit", organisationId: "org", actorId: "staff", entityType: "Customer", entityId: "new-own", action: "customer.created" }],
-    lead: [{ id: "lead-a", facilityId: "a" }], reservation: [], unit: [], integrationIdentityLink: [], accessDecision: [],
+    lead: [{ id: "lead-a", facilityId: "a" }], reservation: [], unit: [], integrationIdentityLink: [], accessDecision: [], receiptReallocation: [],
   };
   const writes: Row[] = [], queries: Row[] = [], sends: unknown[][] = [];
   const db: Row = {};
@@ -420,6 +420,9 @@ test("receivables export uses approved ageing and shows review states instead of
   const parameters = { reportKey: "receivables-ageing", from: "2020-04-01", to: "2020-04-02", format: "JSON", groupBy: "month" };
   const [row] = await api.buildReportRows(scope, parameters);
   assert.equal(row.days91Plus, "100.00"); assert.equal(row.asOfSast, "2020-04-02"); assert.equal(row.currentRecordedBalance, "100"); assert.equal(row.reviewReason, null);
+  const receiptQuery = state.queries.find(q => q.model === "receiptReallocation");
+  assert.deepEqual(receiptQuery?.where, { OR: [{ sourceAccountId: { in: [account.id] } }, { targetAccountId: { in: [account.id] } }], status: { in: ["PENDING_APPROVAL", "POSTED"] } });
+  assert.equal(receiptQuery?.take, 5001);
   account.balance = "0";
   account.ledgerEntries.push({ id: "later-credit", type: "CREDIT", amount: "100", description: "Later synthetic credit", effectiveAt: new Date("2020-03-01T00:00:00+02:00"), metadata: { sourceEntryId: "charge" } });
   const [historical] = await api.buildReportRows(scope, { ...parameters, to: "2020-02-02", from: "2020-02-01" });
@@ -432,6 +435,8 @@ test("receivables export uses approved ageing and shows review states instead of
   account.collectionCase.terms.approvalReference = "";
   const [unapproved] = await api.buildReportRows(scope, parameters);
   assert.match(unapproved.reviewReason, /terms/i); assert.equal(unapproved.days91Plus, null); assert.equal(unapproved.overdue, null);
+  state.db.receiptReallocation.findMany = async () => { throw Error("Synthetic receipt evidence unavailable"); };
+  await assert.rejects(api.buildReportRows(scope, parameters), /Synthetic receipt evidence unavailable/);
   assert.deepEqual(state.writes, []);
 });
 
