@@ -1,3 +1,4 @@
+import {recordEnquiryLocation} from "./enquiry-location";
 import { activeWalkIn } from "./walk-in-service";
 import { walkInUsable } from "./walk-in-policy";
 import {newPublicInitialRent,publicInitialRent,publicCheckoutTotal} from "./public-initial-rent";
@@ -285,6 +286,7 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
 
       const lead = await tx.lead.create({
         data: {
+          enquiryLocation: recordEnquiryLocation(input.enquiryLocation,"PUBLIC_SELF_REPORTED"),
           facilityId: facility.id,
           productLine: input.productLine ?? "STORAGE",
           businessDetails: input.businessDetails,
@@ -351,6 +353,7 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
             source,
             unitId: unit.id,
             leadId: lead.id,
+            ...(lead.enquiryLocation?{enquiryLocation:lead.enquiryLocation}:{}),
             communicationPreferences: consent,
             holdExpiresAt: holdExpiresAt.toISOString(),
           },
