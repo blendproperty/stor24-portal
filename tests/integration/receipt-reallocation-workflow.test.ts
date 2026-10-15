@@ -9,6 +9,7 @@ import {collectionsWorkspace,collectionCohortOutcomes} from "../../src/lib/colle
 import {previewAdjustment,requestAdjustment,decideAdjustment,recordRefundPayout} from "../../src/lib/adjustment-service";
 import {netCollectionTotal} from "../../src/lib/finance/collection-total";
 import {southAfricaDateKey} from "../../src/lib/south-africa-time";
+import {customerHistory} from "../../src/lib/customer-history-service";
 import type {ReceiptReallocationInput} from "../../src/lib/receipt-reallocation-policy";
 
 test("isolated receipt correction producers retain cash, approval, undo and source integrity",async t=>{
@@ -38,6 +39,29 @@ test("isolated receipt correction producers retain cash, approval, undo and sour
   async function request(f:Fixture,data:ReceiptReallocationInput){const p=await previewReceiptReallocation(f.scope,data);return requestReceiptReallocation(f.scope,data,p.fingerprint);}
   const approve=(f:Fixture,id:string,reference="Synthetic independent approval")=>decideReceiptReallocation(f.reviewScope,id,0,"approve",reference);
   try{
+    await t.test("customer histories retain scoped MOVE and UNDO entries without duplicating external payment evidence",async()=>{
+      const f=await fixture(),moved=await request(f,input(f));await approve(f,moved.id);
+      const move=await db.receiptReallocation.findUniqueOrThrow({where:{id:moved.id}});
+      const history=(customerId:string,financial:typeof f.scope|null=f.scope)=>customerHistory(f.scope,customerId,{kind:"ACCOUNT",search:""},{communications:null,collections:null,write:null,financial});
+      const source=await history(f.source.customerId),target=await history(f.target.customerId);
+      assert.deepEqual(new Set(source.entries.map(e=>e.id)),new Set([f.original.id,move.sourceLedgerEntryId!]));
+      assert.ok(target.entries.some(e=>e.id===move.targetLedgerEntryId));
+      assert.ok(!source.entries.some(e=>e.id===move.targetLedgerEntryId));
+      assert.ok(!target.entries.some(e=>e.id===f.original.id||e.id===move.sourceLedgerEntryId));
+      assert.equal((await history(f.source.customerId,null)).entries.length,0);
+      assert.equal((await history(f.target.customerId,{...f.scope,facilityIds:[]})).entries.length,0);
+      const undone=await request(f,{...input(f),operation:"UNDO",reversesId:move.id,sourceAccountId:f.target.id,sourceEntryId:move.targetLedgerEntryId!,targetAccountId:f.source.id,amount:"25.25"});await approve(f,undone.id);
+      const undo=await db.receiptReallocation.findUniqueOrThrow({where:{id:undone.id}});
+      const afterSource=await history(f.source.customerId),afterTarget=await history(f.target.customerId);
+      assert.deepEqual(new Set(afterSource.entries.map(e=>e.id)),new Set([f.original.id,move.sourceLedgerEntryId!,undo.targetLedgerEntryId!]));
+      assert.ok(afterTarget.entries.some(e=>e.id===undo.sourceLedgerEntryId));
+      assert.ok(!afterTarget.entries.some(e=>e.id===undo.targetLedgerEntryId));
+      assert.ok(afterSource.entries.every(e=>e.body?.includes("not independent bank settlement proof")));
+      assert.equal(await db.payment.count({where:{account:{customer:{organisationId:f.org.id}}}}),1);
+      assert.deepEqual(await db.payment.findUniqueOrThrow({where:{id:f.payment.id}}),f.payment);
+      assert.deepEqual(await db.ledgerEntry.findUniqueOrThrow({where:{id:f.original.id}}),f.original);
+      await assert.rejects(customerHistory({...f.scope,facilityIds:[]},f.source.customerId,{kind:"ACCOUNT",search:""},{communications:null,collections:null,write:null,financial:f.scope}),/FORBIDDEN/);
+    });
     await t.test("one partial move posts equal opposite entries and private account documents without a new external payment",async()=>{
       const f=await fixture(),before=await balances(f),data=input(f),r=await request(f,data);
       assert.deepEqual(await balances(f),before);await assert.rejects(decideReceiptReallocation(f.scope,r.id,0,"approve","Invalid self approval"),/INDEPENDENT/);
