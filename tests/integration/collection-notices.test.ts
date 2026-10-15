@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {randomUUID} from "node:crypto";
 import {db} from "../../src/lib/db";
-import {previewCollectionNotice,prepareCollectionNotice,reviewCollectionNotice,sendCollectionNotice,previewCollectionNoticeBatch,prepareCollectionNoticeBatch} from "../../src/lib/collection-notice-service";
+import {previewCollectionNotice,prepareCollectionNotice,reviewCollectionNotice,sendCollectionNotice,previewCollectionNoticeBatch,prepareCollectionNoticeBatch,approveCollectionNoticeBatch} from "../../src/lib/collection-notice-service";
 test("isolated collection notices: holds, independent review, source changes and one provider attempt",async t=>{
   assert.equal(process.env.MERCHANDISE_DB_TEST,"isolated-ci");assert.equal(new URL(process.env.DATABASE_URL!).hostname,"localhost");process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY="collection-notice-ci-only-encryption-key-at-least-32";process.env.AUTH_SECRET="collection-notice-ci-only-auth-secret-at-least-32";process.env.APP_URL="https://portal.example.invalid";
   const fixture=async(existing?:{org:{id:string};facility:{id:string}})=>{const key=randomUUID(),org=existing?.org??await db.organisation.create({data:{name:"Notice CI",slug:key}}),facility=existing?.facility??await db.facility.create({data:{organisationId:org.id,code:key,name:"CI store"}});
@@ -14,6 +14,40 @@ test("isolated collection notices: holds, independent review, source changes and
   const approved=async(f:Awaited<ReturnType<typeof fixture>>)=>{const draft=await prepared(f);return reviewCollectionNotice(f.b,{id:draft.id,revision:draft.revision,action:"approve",reference:"CI independent review"})};
   const nativeFetch=globalThis.fetch;globalThis.fetch=async()=>{throw Error("Real provider network is forbidden")};
   try{
+    await t.test("independent audience approval is atomic, revision-bound and changes no money or communications",async()=>{
+      const first=await fixture(),second=await fixture(first),ids=[first.account.id,second.account.id],beforeAccounts=await db.account.findMany({where:{id:{in:ids}},orderBy:{id:'asc'}}),beforeLedger=await db.ledgerEntry.findMany({where:{accountId:{in:ids}},orderBy:{id:'asc'}});
+      const preview=await previewCollectionNoticeBatch(first.a,ids),drafts=await prepareCollectionNoticeBatch(first.a,{items:preview.items.map(item=>({accountId:item.source.accountId,fingerprint:item.source.fingerprint})),confirm:true});
+      const command={items:drafts.notices.map(notice=>({accountId:notice.accountId,id:notice.id,revision:notice.revision})),reference:'CI independent audience review',confirm:true};
+      await assert.rejects(approveCollectionNoticeBatch(first.a,command),/SELF_APPROVAL/);
+      const result=await approveCollectionNoticeBatch(first.b,command);assert.equal(result.approved,true);assert.equal(result.emailSent,false);assert.ok(result.notices.every(notice=>notice.status==='APPROVED'&&notice.sourceCurrent&&!notice.canApprove));
+      assert.equal(await db.auditEvent.count({where:{organisationId:first.org.id,action:'collection.notice.approve',actorId:first.b.userId}}),2);
+      await assert.rejects(approveCollectionNoticeBatch(first.b,command),/CHANGED|IMMUTABLE/);assert.equal(await db.auditEvent.count({where:{organisationId:first.org.id,action:'collection.notice.approve'}}),2);
+      assert.deepEqual(await db.account.findMany({where:{id:{in:ids}},orderBy:{id:'asc'}}),beforeAccounts);assert.deepEqual(await db.ledgerEntry.findMany({where:{accountId:{in:ids}},orderBy:{id:'asc'}}),beforeLedger);assert.equal(await db.payment.count({where:{accountId:{in:ids}}}),0);assert.equal(await db.communicationLog.count({where:{organisationId:first.org.id}}),0);
+    });
+    await t.test("late consent, revision, identity, contributor and scope holds roll back all group approvals",async()=>{
+      for(const hold of ['consent','revision','identity','contributor','scope']){
+        const first=await fixture(),second=await fixture(first),ids=[first.account.id,second.account.id].sort(),last=ids.at(-1)===first.account.id?first:second;
+        const preview=await previewCollectionNoticeBatch(first.a,ids),drafts=await prepareCollectionNoticeBatch(first.a,{items:preview.items.map(item=>({accountId:item.source.accountId,fingerprint:item.source.fingerprint})),confirm:true});
+        const command={items:drafts.notices.map(notice=>({accountId:notice.accountId,id:notice.id,revision:notice.revision})),reference:'CI held review',confirm:true};
+        if(hold==='consent')await db.customer.update({where:{id:last.customer.id},data:{communicationConsent:{email:false}}});
+        if(hold==='revision')command.items.at(-1)!.revision=randomUUID();
+        if(hold==='identity'){const item=command.items.at(-1)!;item.accountId='unmatched-account';}
+        if(hold==='contributor'){const item=command.items.at(-1)!,row=await db.configurationProfile.findUniqueOrThrow({where:{id:item.id}});await db.configurationProfile.update({where:{id:item.id},data:{config:{...(row.config as object),contributors:[first.a.userId,first.b.userId]}}});}
+        const baseline=await db.configurationProfile.findMany({where:{organisationId:first.org.id,domain:'COLLECTION_EMAIL_NOTICE'},orderBy:{id:'asc'}});
+        await assert.rejects(approveCollectionNoticeBatch(hold==='scope'?{...first.b,facilityIds:[]}:first.b,command),/CHANGED|SELF_APPROVAL|NOT_FOUND/);
+        assert.deepEqual(await db.configurationProfile.findMany({where:{organisationId:first.org.id,domain:'COLLECTION_EMAIL_NOTICE'},orderBy:{id:'asc'}}),baseline);assert.equal(await db.auditEvent.count({where:{organisationId:first.org.id,action:'collection.notice.approve'}}),0);assert.equal(await db.communicationLog.count({where:{organisationId:first.org.id}}),0);
+      }
+    });
+    await t.test("overlapping group approval records one approval per notice without replay",async()=>{
+      const first=await fixture(),second=await fixture(first),preview=await previewCollectionNoticeBatch(first.a,[first.account.id,second.account.id]),drafts=await prepareCollectionNoticeBatch(first.a,{items:preview.items.map(item=>({accountId:item.source.accountId,fingerprint:item.source.fingerprint})),confirm:true}),command={items:drafts.notices.map(notice=>({accountId:notice.accountId,id:notice.id,revision:notice.revision})),reference:'CI overlapping review',confirm:true};
+      const results=await Promise.allSettled([approveCollectionNoticeBatch(first.b,command),approveCollectionNoticeBatch(first.b,command)]);assert.equal(results.filter(result=>result.status==='fulfilled').length,1);assert.equal(await db.auditEvent.count({where:{organisationId:first.org.id,action:'collection.notice.approve'}}),2);assert.equal(await db.communicationLog.count({where:{organisationId:first.org.id}}),0);
+    });
+    await t.test("group approval audit failure rolls back every approval revision",async()=>{
+      const first=await fixture(),second=await fixture(first),preview=await previewCollectionNoticeBatch(first.a,[first.account.id,second.account.id]),drafts=await prepareCollectionNoticeBatch(first.a,{items:preview.items.map(item=>({accountId:item.source.accountId,fingerprint:item.source.fingerprint})),confirm:true}),command={items:drafts.notices.map(notice=>({accountId:notice.accountId,id:notice.id,revision:notice.revision})),reference:'CI audit rollback',confirm:true};
+      const baseline=await db.configurationProfile.findMany({where:{organisationId:first.org.id,domain:'COLLECTION_EMAIL_NOTICE'},orderBy:{id:'asc'}});let installed=false;
+      const last=command.items.toSorted((a,b)=>a.accountId.localeCompare(b.accountId)).at(-1)!;assert.match(last.id,/^collection-email:[a-f0-9]{64}$/);
+      try{await db.$executeRawUnsafe(`ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_audience_approval_failure CHECK ("action" <> 'collection.notice.approve' OR "entityId" <> '${last.id}') NOT VALID`);installed=true;await assert.rejects(approveCollectionNoticeBatch(first.b,command));assert.deepEqual(await db.configurationProfile.findMany({where:{organisationId:first.org.id,domain:'COLLECTION_EMAIL_NOTICE'},orderBy:{id:'asc'}}),baseline);assert.equal(await db.auditEvent.count({where:{organisationId:first.org.id,action:'collection.notice.approve'}}),0);}finally{if(installed)await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_audience_approval_failure')}
+    });
     await t.test("audience preview and atomic draft preparation preserve per-account review and financial baselines",async()=>{
       const first=await fixture(),second=await fixture(first),ids=[first.account.id,second.account.id],accounts=await db.account.findMany({where:{id:{in:ids}},orderBy:{id:'asc'}}),ledger=await db.ledgerEntry.findMany({where:{accountId:{in:ids}},orderBy:{id:'asc'}});
       const preview=await previewCollectionNoticeBatch(first.a,ids);assert.equal(preview.items.length,2);assert.equal(preview.prepared,false);assert.equal(preview.emailSent,false);assert.equal(await db.configurationProfile.count({where:{organisationId:first.org.id,domain:'COLLECTION_EMAIL_NOTICE'}}),0);

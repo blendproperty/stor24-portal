@@ -4,12 +4,13 @@ import { sameOrigin, rateLimit } from "@/lib/request-security";
 import { boundedBody } from "@/lib/payments/netcash-mandate";
 import { collectionsWorkspace } from "@/lib/collections-service";
 import { southAfricaDateKey } from "@/lib/south-africa-time";
-import { previewCollectionNoticeBatch, prepareCollectionNoticeBatch } from "@/lib/collection-notice-service";
-import { noticeBatchAccountsSchema, noticeBatchPreparationSchema } from "@/lib/collection-notice-batch-policy";
+import { previewCollectionNoticeBatch, prepareCollectionNoticeBatch, approveCollectionNoticeBatch } from "@/lib/collection-notice-service";
+import { noticeBatchAccountsSchema, noticeBatchPreparationSchema, noticeBatchApprovalSchema } from "@/lib/collection-notice-batch-policy";
 const headers = { "cache-control": "private, no-store", "x-content-type-options": "nosniff" };
 const commandSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("preview"), accounts: noticeBatchAccountsSchema }).strict(),
   noticeBatchPreparationSchema.extend({ action: z.literal("prepare") }),
+  noticeBatchApprovalSchema.extend({ action: z.literal("approve") }),
 ]);
 export async function GET() {
   try {
@@ -28,13 +29,13 @@ export async function POST(request: Request) {
     const scope = await requirePermissionScope("collections.manage");
     const input = commandSchema.parse(JSON.parse((await boundedBody(new Response(request.body), 16000)).toString()));
     if (await rateLimit(`collection-notice-bulk:${scope.organisationId}:${scope.userId}`, 10, 60000)) return Response.json({ error: "Wait a minute before preparing another audience." }, { status: 429, headers });
-    const result = input.action === "preview" ? await previewCollectionNoticeBatch(scope, input.accounts) : await prepareCollectionNoticeBatch(scope, { items: input.items, confirm: input.confirm });
+    const result = input.action === "preview" ? await previewCollectionNoticeBatch(scope, input.accounts) : input.action === "prepare" ? await prepareCollectionNoticeBatch(scope, { items: input.items, confirm: input.confirm }) : await approveCollectionNoticeBatch(scope,{items:input.items,reference:input.reference,confirm:input.confirm});
     return Response.json(result, { headers });
   } catch (error) {
     const code = error instanceof Error ? error.message : "";
-    const conflict = ["COLLECTION_NOTICE_CHANGED", "COLLECTION_NOTICE_HOLD", "COLLECTION_NOTICE_IMMUTABLE", "COLLECTION_NOTICE_INTEGRITY"].includes(code) || !!(error && typeof error === "object" && "code" in error && ["P2002", "P2034"].includes(String(error.code)));
+    const conflict = ["COLLECTION_NOTICE_CHANGED", "COLLECTION_NOTICE_HOLD", "COLLECTION_NOTICE_IMMUTABLE", "COLLECTION_NOTICE_INTEGRITY", "COLLECTION_NOTICE_SELF_APPROVAL"].includes(code) || !!(error && typeof error === "object" && "code" in error && ["P2002", "P2034"].includes(String(error.code)));
     const invalid = error instanceof z.ZodError || error instanceof SyntaxError || ["MANDATE_RESPONSE_TOO_LARGE", "MANDATE_RESPONSE_INVALID"].includes(code);
     const status = code === "UNAUTHENTICATED" ? 401 : ["FORBIDDEN", "COLLECTION_NOT_FOUND", "COLLECTION_NOTICE_NOT_FOUND"].includes(code) ? 403 : invalid ? 400 : conflict ? 409 : 500;
-    return Response.json({ error: status === 401 ? "Sign in is required." : status === 403 ? "This audience is outside your collection-management scope." : status === 400 ? "Select 1 to 20 different accounts and confirm the reviewed messages." : conflict ? "An account, consent, message or notice changed or is held. No drafts were changed by this failed preparation. Preview the audience again." : "Unable to prepare this audience. Reload the saved notices before retrying." }, { status, headers });
+    return Response.json({ error: status === 401 ? "Sign in is required." : status === 403 ? "This audience is outside your collection-management scope." : status === 400 ? "Select 1 to 20 different accounts and confirm the reviewed messages." : code === "COLLECTION_NOTICE_SELF_APPROVAL" ? "A different authorised colleague must approve every draft. No notices were approved." : conflict ? "An account, consent, message or notice changed or is held. This failed group action changed no notices. Preview the audience again." : "Unable to update this audience. Reload the saved notices before retrying." }, { status, headers });
   }
 }
