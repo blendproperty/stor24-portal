@@ -4,6 +4,7 @@ import { randomUUID, createHash } from "node:crypto";
 import { build } from "esbuild";
 import { createRequire } from "node:module";
 import { PDFDocument } from "pdf-lib";
+import ExcelJS from "exceljs";
 import { db } from "../../src/lib/db";
 import { addCustomerNote, customerHistory } from "../../src/lib/customer-history-service";
 import { compareHistoryEntries, type HistoryEntry } from "../../src/lib/customer-history-policy";
@@ -128,11 +129,11 @@ test("isolated PostgreSQL shared customer notebook and scoped history", async t 
       const download=(body:unknown={format:"CSV"},id=customer.id,origin="https://example.invalid")=>loaded.exports.POST(new Request("https://example.invalid/api/v1/customers/one/history/export",{method:"POST",headers:{origin,"content-type":"application/json"},body:JSON.stringify(body)}),{params:Promise.resolve({customerId:id})});
       assert.equal((await download()).status,403);
       await db.role.update({where:{id:role.id},data:{permissions:[...permissions,"customer_history.export"]}});
-      assert.equal((await download(undefined,customer.id,"https://attacker.invalid")).status,403);
+      assert.equal((await download({format:"XLSX"},customer.id,"https://attacker.invalid")).status,403);
       const foreignCustomer=await db.customer.create({data:{organisationId:other.id,firstName:"Foreign"}});
       const otherStore=await db.customer.create({data:{organisationId:org.id,firstName:"Other store",leads:{create:{facilityId:b.id,source:"CI"}}}});
-      assert.equal((await download(undefined,foreignCustomer.id)).status,403);
-      assert.equal((await download(undefined,otherStore.id)).status,403);
+      assert.equal((await download({format:"XLSX"},foreignCustomer.id)).status,403);
+      assert.equal((await download({format:"XLSX"},otherStore.id)).status,403);
       const response=await download();assert.equal(response.status,200);
       assert.match(response.headers.get("cache-control")!,/no-store/);
       const bytes=new Uint8Array(await response.arrayBuffer());const csv=new TextDecoder().decode(bytes);
@@ -141,6 +142,16 @@ test("isolated PostgreSQL shared customer notebook and scoped history", async t 
       const audit=await db.auditEvent.findFirstOrThrow({where:{entityId:customer.id,action:"customer.history_downloaded"},orderBy:{occurredAt:"desc"}});
       assert.equal((audit.after as {sha256:string}).sha256,createHash("sha256").update(bytes).digest("hex"));
       const pdf=await download({format:"PDF",kind:"NOTE"});assert.equal(pdf.status,200);assert.ok((await PDFDocument.load(await pdf.arrayBuffer())).getPageCount()>1);
+      const excel=await download({format:"XLSX"});assert.equal(excel.status,200);
+      assert.match(excel.headers.get("content-type")!,/spreadsheetml.sheet/);assert.match(excel.headers.get("content-disposition")!,/\.xlsx/);assert.match(excel.headers.get("cache-control")!,/no-store/);
+      const excelBytes=await excel.arrayBuffer(),book=new ExcelJS.Workbook();await book.xlsx.load(excelBytes);
+      const cells=JSON.stringify(book.worksheets[0].getSheetValues());
+      for(let i=0;i<60;i++)assert.ok(cells.includes(`Historical note ${i}`));
+      assert.ok(!cells.includes("Other store private"));assert.ok(!cells.includes("DO-NOT-RETURN"));
+      const excelAudit=await db.auditEvent.findFirstOrThrow({where:{entityId:customer.id,action:"customer.history_downloaded"},orderBy:{occurredAt:"desc"}});
+      assert.equal((excelAudit.after as {format:string}).format,"XLSX");assert.equal((excelAudit.after as {sha256:string}).sha256,createHash("sha256").update(new Uint8Array(excelBytes)).digest("hex"));
+      const filteredExcel=await download({format:"XLSX",kind:"NOTE",category:"CALL",search:"completed"});assert.equal(filteredExcel.status,200);
+      const filteredBook=new ExcelJS.Workbook();await filteredBook.xlsx.load(await filteredExcel.arrayBuffer());assert.equal(filteredBook.worksheets[0].rowCount,6);assert.equal(filteredBook.worksheets[0].getCell("E6").value,"CALL");
       const selected=await db.customerNote.findFirstOrThrow({where:{customerId:customer.id,facilityId:a.id}});
       assert.equal((await download({format:"CSV",entryId:selected.id,entryKind:"NOTE"})).status,200);
       await db.communicationLog.createMany({data:Array.from({length:51},()=>({organisationId:org.id,customerId:customer.id,facilityId:a.id,channel:"SMS" as const,provider:"twilio",providerRef:"SM"+"d".repeat(32),recipientHash:"synthetic",idempotencyKey:randomUUID(),messageType:"ARCHIVED_NOTICE",metadata:{historyEvidence:{version:1,text:"Archived safe notice",subject:"Notice",redacted:true}}}))});
@@ -149,11 +160,11 @@ test("isolated PostgreSQL shared customer notebook and scoped history", async t 
       assert.equal((await download({format:"CSV",entryId:excluded.id,entryKind:"NOTE"})).status,404);
       const saveAudit=db.auditEvent.create.bind(db.auditEvent);
       db.auditEvent.create=(async args=>{if(args.data.action==="dlp.export.allowed")await db.role.update({where:{id:role.id},data:{permissions}});return saveAudit(args);}) as typeof db.auditEvent.create;
-      try{assert.equal((await download()).status,403);}finally{db.auditEvent.create=saveAudit;await db.role.update({where:{id:role.id},data:{permissions:[...permissions,"customer_history.export"]}});}
+      try{assert.equal((await download({format:"XLSX"})).status,403);}finally{db.auditEvent.create=saveAudit;await db.role.update({where:{id:role.id},data:{permissions:[...permissions,"customer_history.export"]}});}
       await db.$executeRawUnsafe(`ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_history_download_audit_failure CHECK (action <> 'customer.history_downloaded') NOT VALID`);
-      try{assert.equal((await download()).status,500);}finally{await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_history_download_audit_failure');}
+      try{assert.equal((await download({format:"XLSX"})).status,500);}finally{await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_history_download_audit_failure');}
       const credential=await db.customerNote.create({data:{organisationId:org.id,customerId:customer.id,facilityId:a.id,authorId:staff.id,authorName:"Synthetic",category:"GENERAL",body:"Bearer "+"synthetic".repeat(6),requestKey:randomUUID()}});
-      assert.equal((await download({format:"CSV",entryId:credential.id,entryKind:"NOTE"})).status,422);
+      assert.equal((await download({format:"XLSX",entryId:credential.id,entryKind:"NOTE"})).status,422);
       await db.role.update({where:{id:role.id},data:{permissions}});
       assert.equal((await download()).status,403);
       await db.roleAssignment.deleteMany({where:{userId:staff.id}});

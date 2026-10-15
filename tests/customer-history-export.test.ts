@@ -38,4 +38,7 @@ test("actual export HTTP route enforces CSRF, scoped delegation and source grant
   assert.equal((await loaded.exports.POST(request({format:"CSV",rows:[{customerName:"forged"}]}),c)).status,422);
   assert.equal(writeCalls,0);assert.equal((await loaded.exports.POST(request({format:"CSV",kind:"COMMUNICATION"}),c)).status,200);
   assert.equal(released[0].customerId,"one");assert.equal(released[0].access.collections,null);assert.equal(released[0].query.kind,"COMMUNICATION");assert.equal(writeCalls,1);
+  assert.equal((await loaded.exports.POST(request({format:"XLSX",kind:"NOTE",category:"HANDOVER"}),c)).status,200);
+  assert.equal(released[1].query.kind,"NOTE");
+  exportAllowed=false;assert.equal((await loaded.exports.POST(request({format:"XLSX"}),c)).status,403);assert.equal(writeCalls,2);
 });

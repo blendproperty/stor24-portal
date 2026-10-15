@@ -58,7 +58,7 @@ export function CustomerHistory({ customerId }: { customerId: string }) {
     return () => { clearTimeout(timer); reader.current?.abort(); reader.current = null; writer.current?.abort(); writer.current = null; downloadRequest.current?.abort(); downloadRequest.current = null; };
   }, [load]);
 
-  async function download(format: "PDF" | "CSV", item?: {id:string;kind:string}) {
+  async function download(format: "PDF" | "CSV" | "XLSX", item?: {id:string;kind:string}) {
     if (downloadRequest.current) return;
     const controller=new AbortController();downloadRequest.current=controller;setDownloading(true);setDownloadError("");
     const timer=setTimeout(()=>controller.abort(),60_000);
@@ -66,7 +66,7 @@ export function CustomerHistory({ customerId }: { customerId: string }) {
       const response=await fetch(`/api/v1/customers/${encodeURIComponent(customerId)}/history/export`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({format,...(item?{kind:"ALL",search:"",entryId:item.id,entryKind:item.kind}:{kind:appliedFilters.current.kind,search:appliedFilters.current.search,...(appliedFilters.current.category?{category:appliedFilters.current.category}:{})})}),signal:controller.signal});
       if(downloadRequest.current!==controller)return;
       if(!response.ok){let message="Download failed. Try again.";try{message=(await response.json()).error?.message??message;}catch{}throw new Error(message);}
-      const expected=format==="PDF"?"application/pdf":"text/csv";
+      const expected=format==="PDF"?"application/pdf":format==="XLSX"?"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":"text/csv";
       if(!response.headers.get("content-type")?.includes(expected))throw new Error("The download was not a valid file. Try again.");
       const blob=await response.blob();if(!blob.size)throw new Error("The download was empty. Try again.");
       if(downloadRequest.current!==controller||controller.signal.aborted)return;
@@ -102,7 +102,7 @@ export function CustomerHistory({ customerId }: { customerId: string }) {
     } finally { clearTimeout(timer); if (writer.current === controller) { writer.current = null; setSaving(false); } }
   }
   return <section className="customer-history" aria-labelledby="customer-history-title">
-    <div className="customer-history-heading"><div><h3 id="customer-history-title">Customer history &amp; staff notes</h3><p>Shared staff record · newest first · SAST</p></div><div className="customer-history-actions"><button type="button" className="button button-secondary history-refresh" aria-label="Refresh history" onClick={() => void load(filters)} disabled={readBusy}><RefreshCw size={15}/></button>{data?.canExport ? <><button type="button" className="button button-secondary" disabled={downloading || readBusy} onClick={()=>void download("CSV")}>CSV</button><button type="button" className="button button-secondary" disabled={downloading || readBusy} onClick={()=>void download("PDF")}><Download size={15}/>{downloading?"Preparing…":"Download history"}</button></> : null}{data?.writableFacilities.length ? <button type="button" className="button button-primary" disabled={saving || !!retry} onClick={()=>setComposerOpen(!composerOpen)}><Plus size={15}/>{composerOpen?"Close note":"Add note"}</button> : null}</div></div>
+    <div className="customer-history-heading"><div><h3 id="customer-history-title">Customer history &amp; staff notes</h3><p>Shared staff record · newest first · SAST</p></div><div className="customer-history-actions"><button type="button" className="button button-secondary history-refresh" aria-label="Refresh history" onClick={() => void load(filters)} disabled={readBusy}><RefreshCw size={15}/></button>{data?.canExport ? <><button type="button" className="button button-secondary" disabled={downloading || readBusy} onClick={()=>void download("CSV")}>CSV</button><button type="button" className="button button-secondary" disabled={downloading || readBusy} onClick={()=>void download("XLSX")}>Excel</button><button type="button" className="button button-secondary" disabled={downloading || readBusy} onClick={()=>void download("PDF")}><Download size={15}/>{downloading?"Preparing…":"Download history"}</button></> : null}{data?.writableFacilities.length ? <button type="button" className="button button-primary" disabled={saving || !!retry} onClick={()=>setComposerOpen(!composerOpen)}><Plus size={15}/>{composerOpen?"Close note":"Add note"}</button> : null}</div></div>
     <form className="customer-history-filters" onSubmit={event => { event.preventDefault(); void load(filters); }}>
       <label>History type<select value={filters.kind} onChange={event => setFilters({ ...filters, kind: event.target.value })}><option value="ALL">All history</option><option value="NOTE">Staff notes</option><option value="COLLECTION">Collections activity</option><option value="COMMUNICATION">Communications</option></select></label>
       <label>Note category<select aria-label="Note category" value={filters.category} onChange={event => setFilters({ ...filters, category: event.target.value })}><option value="">All categories</option>{Object.entries(noteCategories).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
