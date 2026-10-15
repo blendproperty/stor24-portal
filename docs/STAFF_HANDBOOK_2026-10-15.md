@@ -7,7 +7,7 @@ For Faeez, covering staff and the incoming store manager
 
 Find the customer. Read the history. Confirm the next action.
 
-This booklet covers the October customer history, downloads, appointments, arrivals, payment review and Counter workflows. Use the live system's current permission and readiness checks. Printed pages never override a hold or approval.
+This booklet covers customer history and downloads, follow-ups and arrivals, payment review, governed receipt corrections and booking quotes, enquiry origin and Counter workflows. Use the live system's current permission and readiness checks. Printed pages never override a hold or approval.
 
 Portal: https://portal.stor24.co.za
 
@@ -102,11 +102,41 @@ Use the source account/provider review link and compare the actual evidence. An 
 
 **Unidentified receipts:** the separate reviewed-intake workflow prepares evidence and a proposed customer match. A proposal is not a posted receipt, allocation, transfer or refund. Use the finance owner's review and separate execution controls. Missing bank data must stay missing.
 
-**Wrong-customer receipt:** retain the original reference and use the controlled reversal/correction workflow with the authorised independent approver. Do not delete the original evidence. Partial reversals or cross-account reallocations require their explicitly supported finance process.
+**Wrong-customer receipt:** retain the original payment and source reference. The existing full-reversal workflow and a correction between tenancy accounts each require their permitted finance review. Follow section 06A for the governed partial allocation and undo workflow.
 
-**Negotiated rent:** confirm the agreed rate before signing and check the agreement, initial invoice and rent. Existing online bookings preserve their original quote snapshot. Use an available governed amendment process; if it is not released or the booking is already signed/payment-started, stop and refer for the applicable finance/legal/customer acceptance. Never silently overwrite a saved quote or signed document.
+**Negotiated rent:** confirm the rate before signing. A saved online booking keeps its original quote evidence. Follow section 06B for an eligible unsigned booking; signed, payment-started or held records require the applicable finance/legal process.
 
-If an amount, source, duplicate receipt, reversal or currency needs review, leave the evidence visible and record the next responsible action. Staff history notes do not approve a correction.
+Staff notes, a pending request or an exported file never approve a financial change.
+
+## 06A · Correct a receipt allocation
+
+Open **Adjustments** and choose **Correct a receipt allocation**. The page is **Receipt allocation corrections**. Use your own account. A proposer and an independent approver have different responsibilities; a missing permission does not permit use of another person's account.
+
+1. Select the store and use **Find an account** to locate the source customer/account. Choose the **Source account**, the **Verified receipt position** and a **Destination account** in the same store. Check account references, not just similar customer names.
+2. Enter the positive **Amount in rand**, **Source evidence reference** and **Correction reason**. The amount must be available on the selected receipt position. This can be a partial allocation; it does not create a second external payment or refund.
+3. Choose **Preview account changes**. Check both account references, their before/after balances, the allocation amount and remaining source receipt. Resolve any missing or changed source before continuing.
+4. Confirm that you checked the exact receipt, accounts and amount, then choose **Submit for independent review**. Confirm the saved request in **Retained requests and decisions**. A pending request has not posted the correction.
+5. The different authorised approver expands **View source and decision history**. Review the original internal receipt reference, **At submission** balance evidence, reason and source reference. An internal receipt identifier is not bank-settlement proof. Missing validated submission evidence holds posting approval.
+6. The approver checks the current financial source, enters the independent review reference and confirms the evidence before **Independently approve and post**. **Reject request** records a rejection. The proposer can use **Cancel my request** with a reason/reference while it is pending.
+7. Confirm the recorded **POSTED** status and the source/destination correction documents. Original payment evidence remains intact. A corrected account allocation is separate from a cash refund, NSF return or other provider/bank action.
+
+**Undo:** expand a posted allocation and select **Prepare an undo request**. The system fixes the reversed accounts and the original allocation link. Enter the amount still eligible for undo and fresh reason/evidence, preview, then submit for independent review again. Partial undo retains its chain of records; it does not delete the original receipt or correction.
+
+**Uncertain result:** if a request's response is interrupted, keep its locked details and use **Retry exactly the same request**. If an approval/decision is uncertain, use **Refresh recorded state** and inspect its status before another decision. Do not submit a different correction or repeat a provider action to make a reminder disappear.
+
+## 06B · Amend an unsigned booking quote
+
+Open **Booking price review** using the permitted reservation workflow. This process retains the original online quote and requires independent review plus the customer's own acceptance. It does not replace an already signed agreement.
+
+1. Enter the **Booking reference** and select **Load booking review**. Read **Current booking quote** and any **Review required** blockers. Stop if the source is missing, signed, converted, payment-started, mandated, expired or otherwise held.
+2. Enter **New monthly quote in rand** and **Negotiation reason**, then **Retain price proposal**. Check the saved proposal and its expiry. Saving a proposal does not apply the price or contact the customer.
+3. A different authorised colleague enters the independent review reference, checks the exact booking/original quote and selects **Independently approve proposal** or **Reject proposal**. An authorised proposer can withdraw an eligible proposal. Staff approval alone does not change the customer's quote.
+4. Use the approved proposal's **Customer review page** through the agreed customer channel. The customer requests a fresh email verification code and uses **Verify and read quote** themselves. Do not request or enter their code on their behalf.
+5. The customer checks the previous/new monthly rent, initial rental charge, checkout total and unchanged goods. They explicitly confirm both the displayed amounts and the need for a new agreement, then choose **Accept updated booking quote**.
+6. After acceptance, the customer selects the offered once-off Card or EFT choice and **Continue to updated agreement**. They review and sign the updated agreement separately. Quote acceptance, agreement signing, verified payment, physical keys and access remain separate stages.
+7. Staff verify the accepted quote, regenerated agreement and initial invoice/rental periods against the agreed terms. The original quote and accepted history remain retained. Do not reuse an old unsigned signing link or overwrite a saved/signed document manually.
+
+If saving is uncertain, check the retained proposal before another action. Follow the page's exact safe retry instructions; stop for source or finance/legal review when required. Use only the proposal/view permissions actually assigned to your account. No new approval authority is supplied by this guide.
 
 ## 07 · Arrears notices and escalation boundaries
 
@@ -154,7 +184,7 @@ Offline capture is not offline ID verification, signing, payment, bank settlemen
 
 ## 10 · Reports, location and safe recovery
 
-**Enquiry origin:** where the form offers it, capture optional city/town, province/region, postcode and country as the customer supplied them. Keep leading-zero postcodes as text. Origin is unverified and separate from the billing address; missing history is Unknown. Do not infer it from IP or GPS.
+**Enquiry origin:** the active self-storage and micro-warehouse rental/viewing journeys and general micro enquiries offer optional city/town, province/region, postcode and country. Ask the customer and capture only what they supply; leave unknown fields blank. Confirm the saved enquiry origin on the staff record rather than assuming it changed the customer profile or billing address. Keep leading-zero postcodes as text. Origin is unverified and separate from the billing address; missing history is Unknown. Do not infer it from IP or GPS.
 
 **Reporting:** use the permitted report and correct store/date basis. Approved rent-change history shows retained approved changes, not reconstructed changes. Descriptive marketing/payment cohorts describe recorded source data; they do not establish that a location or price causes payment behaviour. Missing source, sample size and attribution limitations remain relevant.
 

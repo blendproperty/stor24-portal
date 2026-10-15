@@ -8,7 +8,7 @@ import { PDFDocument } from "pdf-lib";
 
 test("staff handbook is a real current PDF with all23 acceptance items and protected audited download", async () => {
   const bytes = await readFile("private/staff-training/stor24-staff-handbook-2026-10-15.pdf");
-  assert.equal((await PDFDocument.load(bytes)).getPageCount(), 13);
+  assert.equal((await PDFDocument.load(bytes)).getPageCount(), 15);
   const source = await readFile("docs/STAFF_HANDBOOK_2026-10-15.md", "utf8");
   for (let item = 1; item <= 23; item++) assert.ok(source.includes(`| ${item} |`));
   assert.ok(source.includes("Excel")); assert.ok(source.includes("1 November")); assert.ok(source.includes("12 hours"));
