@@ -3,6 +3,7 @@ import { hasPermission } from "./permissions";
 export type NavigationAccess = { owner: boolean; permissions: string[] };
 // Navigation hints only. Existing page/API and facility-scope checks remain authoritative.
 const rules: Record<string, string[]> = {
+  "/reservations/prices": ["reservation_prices.view"],
   "/tenants": ["operations.view"], "/users": ["@owner"],
   "/leads": ["leads.view"], "/reservations": ["reservations.manage"],
   "/marketing": ["leads.view"],
