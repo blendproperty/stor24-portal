@@ -29,6 +29,7 @@ try {
       const filters={...defaults,...query}; delete filters.cursor;
       const start=Number(query.cursor?.replace('page-','')??0), selected=filters.search?[rows[134]]:rows;
       const data={rows:selected.slice(start,start+25),facilities:[{id:id(600),name:'Synthetic Midpoint'}],filters,snapshotAt,nextCursor:selected.length>start+25?'page-'+(start+25):null};
+      if(mode==='failed-email-sms'){data.rows=['EMAIL','SMS'].map((channel,index)=>({...rows[index],channel,status:'FAILED',deliveredAt:null,readAt:null}));data.nextCursor=null;}
       if(mode==='wrong-filter')data.filters={...filters,search:'Different customer'};
       if(mode==='wrong-snapshot')data.snapshotAt='2026-10-15T09:00:01.000Z';
       return route.fulfill({json:{data}});
@@ -70,6 +71,13 @@ try {
     await page.getByRole('button',{name:'Clear filters',exact:true}).click();
     await expect(page.locator('tbody tr')).toHaveCount(25);
     assert.deepEqual(reads.at(-1),{});
+    mode='failed-email-sms'; await page.getByRole('button',{name:'Refresh messages',exact:true}).click();
+    await expect(page.locator('tbody tr')).toHaveCount(2);
+    await expect(page.locator('tbody').getByText('FAILED',{exact:true})).toHaveCount(2);
+    await expect(page.locator('tbody').getByText('SENT',{exact:true})).toHaveCount(0);
+    await expect(page.getByRole('button',{name:/Retry WhatsApp/})).toHaveCount(0);
+    await expect(page.locator('tbody td').filter({hasText:'Review delivery before another send'})).toHaveCount(2);
+    mode='success';await page.getByRole('button',{name:'Refresh messages',exact:true}).click();await expect(page.locator('tbody tr')).toHaveCount(25);
     mode='wrong-snapshot'; await page.getByRole('button',{name:'Load older messages',exact:true}).click();
     await expect(page.getByText('Message history unavailable',{exact:true})).toBeVisible();
     await expect(page.locator('tbody tr')).toHaveCount(0);

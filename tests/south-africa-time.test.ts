@@ -16,7 +16,7 @@ test("South African date keys cross UTC midnight correctly", () => {
 });
 
 test("operational timestamp screens use the shared South African formatter", () => {
-  for (const file of ["../src/app/audit/page.tsx", "../src/app/communications/page.tsx", "../src/app/integrations/page.tsx", "../src/app/offline-readiness/page.tsx", "../src/components/operations-workspace.tsx"]) {
+  for (const file of ["../src/app/audit/page.tsx", "../src/components/communication-log-workspace.tsx", "../src/app/integrations/page.tsx", "../src/app/offline-readiness/page.tsx", "../src/components/operations-workspace.tsx"]) {
     const source = readFileSync(new URL(file, import.meta.url), "utf8");
     assert.match(source, /formatSouthAfricaDate/);
     assert.doesNotMatch(source, /toLocaleString\("en-ZA"\)/);

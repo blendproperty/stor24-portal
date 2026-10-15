@@ -82,7 +82,7 @@ test("isolated actual communication lookup, scope, dates, keyset and current-rol
       for (const query of ["from=2026-10-15&to=2026-10-14", "channel=EMAIL&channel=SMS", "export=CSV", "cursor=bad"]) assert.equal((await get(query)).status, 422);
       await db.role.update({ where: { id: role.id }, data: { permissions: [] } }); assert.equal((await get()).status, 403);
       await db.role.update({ where: { id: role.id }, data: { permissions: ["operations.view"] } });
-      outage = true; const failed = await get(); assert.equal(failed.status, 500); assert.ok(!(await failed.text()).includes('"rows":[]')); outage = false;
+      outage = true; const failed = await get(); assert.equal(failed.status, 500); const failureBody = await failed.text(); assert.ok(!failureBody.includes('"rows":[]')); assert.ok(!failureBody.includes("SIMULATED_READ_OUTAGE")); assert.ok(failureBody.includes("INTERNAL_ERROR")); outage = false;
       assert.equal(await db.communicationLog.count({ where: { organisationId: org.id } }), before);
       assert.equal(await db.webhookOutbox.count({ where: { organisationId: org.id } }), 0); assert.equal(await db.payment.count({ where: { account: { customer: { organisationId: org.id } } } }), 0);
     });
