@@ -439,6 +439,7 @@ model Customer {
 }
 
 model Lead {
+  enquiryLocation Json?
   productLine String @default("STORAGE")
   businessDetails Json?
   id                String        @id @default(cuid())
