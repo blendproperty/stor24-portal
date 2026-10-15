@@ -3,6 +3,9 @@ import { chromium, expect } from '@playwright/test';
 import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import ExcelJS from 'exceljs';
+const workbook = new ExcelJS.Workbook(); workbook.addWorksheet('Customer history').addRow(['Synthetic history fixture']);
+const excelFixture = await workbook.xlsx.writeBuffer();
 const bundle = await build({ stdin: { contents: `import React from 'react';import {createRoot} from 'react-dom/client';import {CustomerHistory} from './src/components/customer-history';function App(){const [id,setId]=React.useState('synthetic');return <main style={{padding:20,maxWidth:1100,margin:'auto'}}><button onClick={()=>setId(id==='synthetic'?'other':'synthetic')}>Switch customer</button><CustomerHistory key={id} customerId={id}/></main>}createRoot(document.getElementById('root')).render(<App/>);`, resolveDir: process.cwd(), loader: 'jsx' }, bundle: true, write: false, format: 'esm', jsx: 'automatic' });
 const css = (await readFile('src/app/globals.css', 'utf8') + '\n' + await readFile('src/styles/stor24-brand.css', 'utf8')).replace('@import "tailwindcss";', '');
 const server = createServer((req, res) => { res.setHeader('Content-Type', req.url === '/app.js' ? 'text/javascript' : 'text/html'); res.end(req.url === '/app.js' ? bundle.outputFiles[0].text : `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div id="root"></div><script type="module" src="/app.js"></script></body></html>`); });
@@ -11,14 +14,15 @@ const browser = await chromium.launch();
 await mkdir('output/customer-history', { recursive: true });
 const entry = { id: 'one', kind: 'NOTE', at: '2026-10-14T09:30:00.000Z', title: 'Staff handover', body: 'Customer called.\nCovering staff to check the arrival.', category: 'HANDOVER', author: 'Synthetic Faeez', facility: 'Midpoint', channel: null, status: null, sentAt: null, deliveredAt: null, readAt: null };
 const comm = { ...entry, id: 'two', kind: 'COMMUNICATION', title: 'EMAIL · RESERVATION CONFIRMED', body: 'Outbound communication record', category: null, author: null, channel: 'EMAIL', status: 'PENDING', sentAt: null };
-const initial = { entries: [entry, comm], nextCursor: 'older-page', facilities: [{ id: 'store', name: 'Midpoint' }], writableFacilities: [{ id: 'store', name: 'Midpoint' }], visibility: { communications: true, collections: true }, legacyNotes: 'Earlier customer summary' };
+const initial = { entries: [entry, comm], nextCursor: 'older-page', facilities: [{ id: 'store', name: 'Midpoint' }], writableFacilities: [{ id: 'store', name: 'Midpoint' }], visibility: { communications: true, collections: true }, legacyNotes: 'Earlier customer summary', canExport: true };
 try {
-  for (const width of [1440, 390, 320]) {
+  for (const width of [1440, 1024, 390, 320]) {
     const page = await browser.newPage({ viewport: { width, height: 1000 } });
     const errors = []; page.on('pageerror', e => errors.push(e.message));
-    let mode = 'success', writes = [], olderKind, saved = false;
+    let mode = 'success', writes = [], downloads = [], reads = [], olderKind, saved = false;
     await page.route('**/api/v1/customers/*/history**', async route => {
       const req = route.request(), url = new URL(req.url());
+      if (url.pathname.endsWith('/export')) { downloads.push(req.postDataJSON()); return route.fulfill({ contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', body: Buffer.from(excelFixture) }); }
       if (req.method() === 'POST') {
         const input = req.postDataJSON(); writes.push(input);
         if (mode === 'uncertain') { saved = true; return route.abort(); }
@@ -26,6 +30,7 @@ try {
         if (mode === 'hold') return;
         return route.fulfill({ json: { data: { id: 'new-note', createdAt: entry.at } } });
       }
+      reads.push(Object.fromEntries(url.searchParams));
       if (mode === '401' || mode === '403' || mode === '500') return route.fulfill({ status: Number(mode), json: { error: {} } });
       if (mode === 'malformed') return route.fulfill({ json: { data: {} } });
       if (mode === 'read-hold') return;
@@ -39,6 +44,23 @@ try {
     await expect(page.locator('time').first()).toContainText('11:30 SAST');
     await expect(page.getByText('Recorded status: PENDING')).toBeVisible();
     await expect(page.getByText('Delivered', { exact: false })).toHaveCount(0);
+    await page.getByText('Date and communication filters', { exact: true }).click();
+    await page.getByLabel('From date (SAST)').fill('2026-10-14');
+    await page.getByLabel('To date (SAST)').fill('2026-10-14');
+    await page.getByLabel('Communication channel').selectOption('WHATSAPP');
+    await page.getByLabel('Recorded send status').selectOption('SUCCEEDED');
+    await page.getByLabel('Search history').fill('weekend');
+    await page.getByRole('button', { name: 'Apply filters' }).click();
+    await expect(page.getByText('Recorded status: PENDING')).toBeVisible();
+    assert.deepEqual(reads.at(-1), { kind: 'ALL', search: 'weekend', from: '2026-10-14', to: '2026-10-14', channel: 'WHATSAPP', status: 'SUCCEEDED' });
+    await page.getByLabel('Search history').fill('unsaved draft');
+    const downloaded = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Excel', exact: true }).click(); await downloaded;
+    assert.deepEqual(downloads.at(-1), { format: 'XLSX', ...reads.at(-1) }, 'downloads use applied filters, not draft edits');
+    for (const label of ['From date (SAST)', 'To date (SAST)', 'Search history']) await page.getByLabel(label).fill('');
+    await page.getByLabel('Communication channel').selectOption(''); await page.getByLabel('Recorded send status').selectOption('');
+    await page.getByRole('button', { name: 'Apply filters' }).click();
+    await expect(page.getByText('Recorded status: PENDING')).toBeVisible();
     await page.getByLabel('History type').selectOption('NOTE');
     await page.getByRole('button', { name: 'Load older history' }).click();
     await expect(page.getByText('Older customer call')).toBeVisible();

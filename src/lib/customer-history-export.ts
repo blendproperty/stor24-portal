@@ -19,7 +19,7 @@ export function intersectHistoryScope(read: RequestScope, exported: RequestScope
   return {...read,unrestrictedFacilities:false,facilityIds};
 }
 const stamp=(value:string|null)=>value?new Date(value).toLocaleString("en-ZA",{timeZone:"Africa/Johannesburg"})+" SAST":"";
-export async function buildCustomerHistoryExport(scope:RequestScope, customerId:string, query:HistoryQuery, access:{communications:RequestScope|null;collections:RequestScope|null}, selection?:{id:string;kind:string}) {
+export async function buildCustomerHistoryExport(scope:RequestScope, customerId:string, query:HistoryQuery, access:{communications:RequestScope|null;collections:RequestScope|null;financial?:RequestScope|null}, selection?:{id:string;kind:string}) {
   const customer=await requireLeasingCustomer(scope,customerId);
   const entries:HistoryExportRow[]=[];let cursor:string|undefined;let legacyNotes:string|null=null;let visibility={communications:false,collections:false};
   do {
@@ -33,11 +33,11 @@ export async function buildCustomerHistoryExport(scope:RequestScope, customerId:
     cursor=page.nextCursor??undefined;
   }while(cursor);
   if(selection&&!entries.length)throw new Error("NOT_FOUND");
-  if(!selection&&legacyNotes&&query.kind==="ALL"&&!query.category&&(!query.search||legacyNotes.toLowerCase().includes(query.search.toLowerCase())))entries.push({customerId,customerName:customer.companyName||[customer.firstName,customer.lastName].filter(Boolean).join(" ")||"Customer",recordId:"legacy-summary",kind:"LEGACY_SUMMARY",recordedAtUtc:"",recordedAtSast:"",store:"",author:"Original author not recorded",title:"Existing profile notes",category:"Undated summary",body:legacyNotes,subject:"",channel:"",status:"",sentAtSast:"",deliveredAtSast:"",readAtSast:"",evidenceLimit:"Original date and author were not recorded."});
+  if(!selection&&legacyNotes&&query.kind==="ALL"&&!query.category&&!query.from&&!query.to&&!query.channel&&!query.status&&(!query.search||legacyNotes.toLowerCase().includes(query.search.toLowerCase())))entries.push({customerId,customerName:customer.companyName||[customer.firstName,customer.lastName].filter(Boolean).join(" ")||"Customer",recordId:"legacy-summary",kind:"LEGACY_SUMMARY",recordedAtUtc:"",recordedAtSast:"",store:"",author:"Original author not recorded",title:"Existing profile notes",category:"Undated summary",body:legacyNotes,subject:"",channel:"",status:"",sentAtSast:"",deliveredAtSast:"",readAtSast:"",evidenceLimit:"Original date and author were not recorded."});
   if(entries.length>5000)throw new Error("HISTORY_EXPORT_LIMIT");
   return {customer,rows:entries,visibility};
 }
-export async function releaseCustomerHistoryExport(input:{scope:RequestScope;customerId:string;query:HistoryQuery;access:{communications:RequestScope|null;collections:RequestScope|null};format:"PDF"|"CSV"|"XLSX";selection?:{id:string;kind:string}}) {
+export async function releaseCustomerHistoryExport(input:{scope:RequestScope;customerId:string;query:HistoryQuery;access:{communications:RequestScope|null;collections:RequestScope|null;financial?:RequestScope|null};format:"PDF"|"CSV"|"XLSX";selection?:{id:string;kind:string}}) {
   const {customer,rows,visibility}=await buildCustomerHistoryExport(input.scope,input.customerId,input.query,input.access,input.selection);
   const messages=rows.filter(row=>row.kind==="COMMUNICATION");
   const proofs=messages.length?await db.communicationLog.findMany({where:{organisationId:input.scope.organisationId,customerId:input.customerId,id:{in:messages.map(row=>String(row.recordId))}},select:{id:true,provider:true,providerRef:true,recipientHash:true,channel:true,direction:true,messageType:true,metadata:true}}):[];
@@ -54,7 +54,7 @@ export async function releaseCustomerHistoryExport(input:{scope:RequestScope;cus
   const contains=(previous:RequestScope,current:RequestScope)=>previous.userId===current.userId&&previous.organisationId===current.organisationId&&(current.unrestrictedFacilities||(!previous.unrestrictedFacilities&&previous.facilityIds.every(id=>current.facilityIds.includes(id))));
   const fresh=intersectHistoryScope(await requirePermissionScope("operations.view"),await requirePermissionScope("customer_history.export"));
   if(!contains(input.scope,fresh))throw new Error("FORBIDDEN");
-  for(const [kind,permission,previous]of [["COMMUNICATION","communications.view",input.access.communications],["COLLECTION","collections.view",input.access.collections]] as const){
+  for(const [kind,permission,previous]of [["COMMUNICATION","communications.view",input.access.communications],["COLLECTION","collections.view",input.access.collections],["ACCOUNT","ledger.view",input.access.financial]] as const){
     if(previous&&rows.some(row=>row.kind===kind)){
       const used=intersectHistoryScope(input.scope,previous);
       if(!contains(used,await requirePermissionScope(permission)))throw new Error("FORBIDDEN");
@@ -62,6 +62,6 @@ export async function releaseCustomerHistoryExport(input:{scope:RequestScope;cus
   }
   // Inspect actual source text even for binary PDF/XLSX; keep credential/size/rate controls.
   const headers=await guardDlpTransfer({organisationId:input.scope.organisationId,actorId:input.scope.userId,resourceId:customer.id,channel:"DOWNLOAD",classification:"restricted",content:csv,byteLength:bytes.byteLength});
-  await db.auditEvent.create({data:{organisationId:input.scope.organisationId,actorId:input.scope.userId,entityType:"Customer",entityId:customer.id,action:"customer.history_downloaded",after:{format:input.format,recordCount:rows.length,byteCount:bytes.byteLength,sha256:createHash("sha256").update(bytes).digest("hex"),permission:"customer_history.export",filters:{kind:input.query.kind,category:input.query.category??null,searchApplied:!!input.query.search},singleRecord:!!input.selection}}});
+  await db.auditEvent.create({data:{organisationId:input.scope.organisationId,actorId:input.scope.userId,entityType:"Customer",entityId:customer.id,action:"customer.history_downloaded",after:{format:input.format,recordCount:rows.length,byteCount:bytes.byteLength,sha256:createHash("sha256").update(bytes).digest("hex"),permission:"customer_history.export",filters:{kind:input.query.kind,category:input.query.category??null,from:input.query.from??null,to:input.query.to??null,channel:input.query.channel??null,status:input.query.status??null,searchApplied:!!input.query.search},singleRecord:!!input.selection}}});
   return new Response(Buffer.from(bytes),{headers:{...headers,"content-type":input.format==="PDF"?"application/pdf":input.format==="XLSX"?"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":"text/csv; charset=utf-8","content-disposition":`attachment; filename="customer-history-${customer.id}.${input.format.toLowerCase()}"`}});
 }
