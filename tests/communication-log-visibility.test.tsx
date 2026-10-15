@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { build } from "esbuild";
 import { createRequire } from "node:module";
-import { renderToStaticMarkup } from "react-dom/server";
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 function matches(row: Row, where: Row = {}): boolean {
   return Object.entries(where).every(([key, value]) => {
@@ -17,19 +16,19 @@ function matches(row: Row, where: Row = {}): boolean {
   });
 }
 function log(id: string, facilityId: string | null, customerFacility: string, channel = "WHATSAPP") {
-  return { id, organisationId: "org", facilityId, customerId: id, channel, direction: "OUTBOUND", status: "FAILED", queuedAt: new Date("2026-09-24T10:00:00Z"), sentAt: null, deliveredAt: null, readAt: null, messageType: "RESERVATION_CONFIRMED", failureCode: "DELIVERY_REVIEW_REQUIRED", metadata: { deliveryOutcome: "UNCERTAIN" }, customer: { organisationId: "org", firstName: id, leads: [{ facilityId: customerFacility }], reservations: [], tenancies: [] }, facility: facilityId ? { name: facilityId } : null };
+  return { id, organisationId: "org", facilityId, customerId: id, channel, direction: "OUTBOUND", status: "FAILED", queuedAt: new Date("2026-09-24T10:00:00Z"), sentAt: null, deliveredAt: null, readAt: null, messageType: "RESERVATION_CONFIRMED", failureCode: "DELIVERY_REVIEW_REQUIRED", metadata: { deliveryOutcome: "UNCERTAIN" }, customer: { organisationId: "org", firstName: id, leads: [{ facilityId: customerFacility }], reservations: [], tenancies: [] }, facility: facilityId ? { organisationId: "org", name: facilityId } : null };
 }
 async function fixture() {
   const rows: Row[] = [log("own", "a", "a"), log("own-null", null, "a"), log("OTHER-FACILITY-CUSTOMER", null, "b"), log("other-store", "b", "b"), { ...log("FOREIGN-CUSTOMER", null, "a"), organisationId: "foreign" }];
   const state: Row = { rows, scope: { organisationId: "org", user: { id: "staff" }, allowedFacilityIds: ["a"] }, query: null };
   state.db = { communicationLog: { findMany: async (query: Row) => { state.query = query; return rows.filter(row => matches(row, query.where)); } } };
-  const output = await build({ stdin: { contents: 'export {default as Page} from "./src/app/communications/page";', loader: "ts", resolveDir: process.cwd() }, bundle: true, write: false, platform: "node", format: "cjs", packages: "external", jsx: "automatic", plugins: [{ name: "synthetic-log-view", setup(builder) {
+  const output = await build({ stdin: { contents: 'export {listCommunicationLogs} from "./src/lib/communication-log-service";', loader: "ts", resolveDir: process.cwd() }, bundle: true, write: false, platform: "node", format: "cjs", packages: "external", jsx: "automatic", plugins: [{ name: "synthetic-log-view", setup(builder) {
     builder.onResolve({ filter: /^@\/lib\/(db|session|auth-guards)$/ }, args => ({ path: args.path, namespace: "fixture" }));
     builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__state.db;" : args.path.endsWith("/session") ? "export const getSession=async()=>({role:'Facility manager'});" : "export const requireSession=async()=>({userId:'staff'}); export const requirePermission=async(permission)=>{if(permission!=='operations.view')throw Error('Unexpected permission');return __state.scope;};" }));
   } }] });
   const loaded = { exports: {} as Row };
   new Function("require", "module", "exports", "__state", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, state);
-  return { state, render: async () => renderToStaticMarkup(await loaded.exports.Page()) };
+  return { state, read: async () => loaded.exports.listCommunicationLogs({userId: state.scope.user.id, organisationId: state.scope.organisationId, facilityIds: state.scope.allowedFacilityIds ?? [], unrestrictedFacilities: state.scope.allowedFacilityIds === null}), render: async () => JSON.stringify(await loaded.exports.listCommunicationLogs({userId: state.scope.user.id, organisationId: state.scope.organisationId, facilityIds: state.scope.allowedFacilityIds ?? [], unrestrictedFacilities: state.scope.allowedFacilityIds === null})) };
 }
 
 test("communications listing restricts unassigned messages to related customers", async () => {
@@ -48,15 +47,15 @@ test("communications listing restricts unassigned messages to related customers"
   assert.ok(!(await f.render()).includes("FOREIGN-CUSTOMER"));
 });
 
-test("email/SMS failures are visible without acquiring WhatsApp resend controls", async () => {
+test("email/SMS failed source evidence remains visible even with an earlier sent timestamp", async () => {
   const f = await fixture();
   f.state.rows.splice(0, f.state.rows.length, { ...log("EMAIL-FAILURE", "a", "a", "EMAIL"), sentAt: new Date() }, log("SMS-FAILURE", "a", "a", "SMS"));
-  const html = await f.render();
-  assert.ok(html.includes("EMAIL-FAILURE")); assert.ok(html.includes("SMS-FAILURE"));
-  assert.ok(html.includes("Message delivery log")); assert.ok(html.includes("Channel"));
-  assert.ok(html.includes("Review delivery before retrying"));
-  assert.ok(!html.includes("Retry WhatsApp"));
-  assert.ok(!html.includes(">SENT<"));
+  const rows = await f.read();
+  assert.deepEqual(rows.map((row: Row) => row.channel), ["EMAIL", "SMS"]);
+  assert.ok(rows.every((row: Row) => row.status === "FAILED"));
+  assert.ok(rows[0].sentAt instanceof Date);
+  // The actual client browser regression separately checks failed pills and absence of retry controls.
+
 });
 
 test("unassigned message scope accepts each leasing relationship and rejects unrelated records", async () => {
