@@ -1,3 +1,4 @@
+import {niwsStringResponse,niwsMandateResponse} from "./fixtures/niws-mandate-response";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { addHostedMandate, buildAddMandateEnvelope, parseAddMandateResponse, requestMandateData, requestMandatePdf, retrieveMandatePdf, boundedBody, safeMandateUrl, safeMandatePdfUrl, verifyMandateReport, assessMandateReport, canRecheckMandate, type MandateTerms } from "../src/lib/payments/netcash-mandate";
@@ -24,8 +25,8 @@ test("invalid amounts, dates, contact details and commercial options fail before
   }
 });
 test("provider errors and unexpected URL hosts fail closed without echoing provider PII", () => {
-  assert.equal(parseAddMandateResponse('<r><b:ErrorCode>000</b:ErrorCode><b:MandateUrl>https://short.surf/test</b:MandateUrl></r>'), "https://short.surf/test");
-  assert.throws(() => parseAddMandateResponse('<r><ErrorCode>100</ErrorCode><Errors>secret</Errors></r>'), /^Error: MANDATE_PROVIDER_100$/);
+  assert.equal(parseAddMandateResponse(niwsMandateResponse("000","https://short.surf/test")), "https://short.surf/test");
+  assert.throws(() => parseAddMandateResponse(niwsMandateResponse("100",null,["synthetic diagnostic"])), /^Error: MANDATE_PROVIDER_100$/);
   for (const url of ["http://short.surf/test", "https://short.surf.evil.test/test", "https://user@short.surf/test", "https://localhost/test", "javascript:alert(1)"]) assert.throws(() => safeMandateUrl(url));
   assert.throws(() => parseAddMandateResponse('<!DOCTYPE x><r><ErrorCode>000</ErrorCode></r>'));
   assert.throws(() => parseAddMandateResponse('<r><ErrorCode>000</ErrorCode><ErrorCode>100</ErrorCode></r>'));
@@ -36,7 +37,7 @@ test("transport uses SOAP 1.1 action, no redirects, bounded timeout and one requ
     calls++; assert.equal(String(url), "https://ws.netcash.co.za/NIWS/NIWS_NIF.svc");
     assert.equal(options?.redirect, "error"); assert.ok(options?.signal);
     assert.equal((options?.headers as Record<string, string>).SOAPAction, '"http://tempuri.org/INIWS_NIF/AddMandate"');
-    return new Response('<r><ErrorCode>000</ErrorCode><MandateUrl>https://short.surf/test</MandateUrl></r>');
+    return new Response(niwsMandateResponse("000","https://short.surf/test"));
   });
   assert.equal(url, "https://short.surf/test"); assert.equal(calls, 1);
 });
@@ -97,9 +98,9 @@ test("rechecking only recovers existing links after report review, never ambiguo
   for (const m of [{status:"CREATING",hostedUrl:null,failureCode:null},{status:"REVIEW_REQUIRED",hostedUrl:null,failureCode:null},{status:"REVIEW_REQUIRED",hostedUrl:"https://short.surf/example",failureCode:"MANDATE_PROVIDER_OUTCOME_UNKNOWN"}]) assert.equal(canRecheckMandate(m),false);
 });
 test("report request rejects service errors instead of treating them as file tokens", async () => {
-  assert.equal(await requestMandateData("test", async () => new Response('<r><RequestMandateDataResult>12345.123456.123456789012345678</RequestMandateDataResult></r>')), "12345.123456.123456789012345678");
-  assert.equal(await requestMandateData("test", async () => new Response('<r><RequestMandateDataResult>20000000.2550236530.0483.2.2</RequestMandateDataResult></r>')), "20000000.2550236530.0483.2.2");
-  await assert.rejects(requestMandateData("test", async () => new Response('<r><RequestMandateDataResult>100</RequestMandateDataResult></r>')), /UNAVAILABLE/);
+  assert.equal(await requestMandateData("test", async () => new Response(niwsStringResponse("RequestMandateData",'12345.123456.123456789012345678'))), "12345.123456.123456789012345678");
+  assert.equal(await requestMandateData("test", async () => new Response(niwsStringResponse("RequestMandateData",'20000000.2550236530.0483.2.2'))), "20000000.2550236530.0483.2.2");
+  await assert.rejects(requestMandateData("test", async () => new Response(niwsStringResponse("RequestMandateData",'100'))), /UNAVAILABLE/);
 });
 test("mandate policy fails closed unless every approved commercial setting is supplied", () => {
   assert.equal(mandatePolicy({}), null);
@@ -115,10 +116,10 @@ test("PDF retrieval binds exact account reference and never downloads from an un
     const action = (options?.headers as Record<string, string> | undefined)?.SOAPAction ?? "";
     if (action.includes("BatchFileUpload")) {
       assert.match(String(options?.body), /RequestMandatePDF/); assert.doesNotMatch(String(options?.body), /SameDay|TwoDay|MandateToMasterfile/);
-      return new Response('<r><BatchFileUploadResult>20000000.1.2.3.4</BatchFileUploadResult></r>');
+      return new Response(niwsStringResponse("BatchFileUpload",'20000000.1.2.3.4'));
     }
-    if (action.includes("RequestFileUploadReport")) return new Response(`<r><RequestFileUploadReportResult>###BEGIN\t${terms.reference}\tSUCCESSFUL\t12:00\n###END\t12:00</RequestFileUploadReportResult></r>`);
-    if (action.includes("RetrieveMandatePDF")) return new Response(`<r><RetrieveMandatePDFResult>###BEGIN\t${terms.reference}\n${terms.reference}\thttps://short.surf/pdf-test\n###END</RetrieveMandatePDFResult></r>`);
+    if (action.includes("RequestFileUploadReport")) return new Response(niwsStringResponse("RequestFileUploadReport",`###BEGIN\t${terms.reference}\tSUCCESSFUL\t12:00\n###END\t12:00`));
+    if (action.includes("RetrieveMandatePDF")) return new Response(niwsStringResponse("RetrieveMandatePDF",`###BEGIN\t${terms.reference}\n${terms.reference}\thttps://short.surf/pdf-test\n###END`));
     downloads++; assert.equal(new URL(String(_url)).searchParams.get("PKey"), key);
     assert.equal(options?.redirect, "manual");
     return new Response(null, { status: 302, headers: { location: "https://evil.example/steal" } });
@@ -136,8 +137,8 @@ test("current PDF batch headings are uppercase while the authority row stays exa
   const request: typeof fetch=async(_url,options)=>{
     const action=(options?.headers as Record<string,string>)?.SOAPAction??"";
     const title=wrongTitle?"OTHER-AUTHORITY":terms.reference.toUpperCase();
-    if(action.includes("RequestFileUploadReport"))return new Response(`<RequestFileUploadReportResult>###BEGIN\t${title}\tSUCCESSFUL\t12:00\tR0.00\t20261012\n###END\t12:00</RequestFileUploadReportResult>`);
-    if(action.includes("RetrieveMandatePDF"))return new Response(`<RetrieveMandatePDFResult>###BEGIN\t${title}\n${wrongRow?terms.reference.toUpperCase():terms.reference}\thttps://short.surf/synthetic-pdf\n###END</RetrieveMandatePDFResult>`);
+    if(action.includes("RequestFileUploadReport"))return new Response(niwsStringResponse("RequestFileUploadReport",`###BEGIN\t${title}\tSUCCESSFUL\t12:00\tR0.00\t20261012\n###END\t12:00`));
+    if(action.includes("RetrieveMandatePDF"))return new Response(niwsStringResponse("RetrieveMandatePDF",`###BEGIN\t${title}\n${wrongRow?terms.reference.toUpperCase():terms.reference}\thttps://short.surf/synthetic-pdf\n###END`));
     downloads++;return new Response("%PDF-synthetic-fixture");
   };
   assert.ok(await retrieveMandatePdf("test-key","20000000.1.2.3.4",terms.reference,request));assert.equal(downloads,1);
@@ -153,8 +154,8 @@ test("the exact Netcash legacy document redirect is upgraded before downloading"
  const downloads:string[]=[];
  const request:typeof fetch=async(url,options)=>{
   const action=(options?.headers as Record<string,string>)?.SOAPAction??"";
-  if(action.includes("RequestFileUploadReport"))return new Response(`<RequestFileUploadReportResult>###BEGIN\t${terms.reference.toUpperCase()}\tSUCCESSFUL\t12:00\tR0.00\t20261012\n###END\t12:00</RequestFileUploadReportResult>`);
-  if(action.includes("RetrieveMandatePDF"))return new Response(`<RetrieveMandatePDFResult>###BEGIN\t${terms.reference.toUpperCase()}\n${terms.reference}\thttps://short.surf/synthetic\n###END</RetrieveMandatePDFResult>`);
+  if(action.includes("RequestFileUploadReport"))return new Response(niwsStringResponse("RequestFileUploadReport",`###BEGIN\t${terms.reference.toUpperCase()}\tSUCCESSFUL\t12:00\tR0.00\t20261012\n###END\t12:00`));
+  if(action.includes("RetrieveMandatePDF"))return new Response(niwsStringResponse("RetrieveMandatePDF",`###BEGIN\t${terms.reference.toUpperCase()}\n${terms.reference}\thttps://short.surf/synthetic\n###END`));
   downloads.push(new URL(String(url)).protocol);
   if(downloads.length===1)return new Response(null,{status:302,headers:{location:"http://mandates.netcash.co.za/synthetic"}});
   assert.equal(new URL(String(url)).hostname,"mandates.netcash.co.za");return new Response("%PDF-synthetic");
@@ -166,8 +167,8 @@ test("document authentication cookies survive only on the exact Netcash host",as
   let gets=0;
   const request:typeof fetch=async(url,options)=>{
    const action=(options?.headers as Record<string,string>)?.SOAPAction??"";
-   if(action.includes("RequestFileUploadReport"))return new Response(`<RequestFileUploadReportResult>###BEGIN\t${terms.reference}\tSUCCESSFUL\t12:00\n###END\t12:00</RequestFileUploadReportResult>`);
-   if(action.includes("RetrieveMandatePDF"))return new Response(`<RetrieveMandatePDFResult>###BEGIN\t${terms.reference}\n${terms.reference}\thttps://short.surf/synthetic\n###END</RetrieveMandatePDFResult>`);
+   if(action.includes("RequestFileUploadReport"))return new Response(niwsStringResponse("RequestFileUploadReport",`###BEGIN\t${terms.reference}\tSUCCESSFUL\t12:00\n###END\t12:00`));
+   if(action.includes("RetrieveMandatePDF"))return new Response(niwsStringResponse("RetrieveMandatePDF",`###BEGIN\t${terms.reference}\n${terms.reference}\thttps://short.surf/synthetic\n###END`));
    gets++;assert.equal(new URL(String(url)).protocol,"https:");const headers=options?.headers as Record<string,string>|undefined;
    if(gets===1)return new Response(null,{status:302,headers:{location:"http://mandates.netcash.co.za/synthetic?PKey=test-key"}});
    if(gets===2){assert.equal(headers?.cookie,undefined);return new Response(null,{status:302,headers:{location:outside?"https://short.surf/synthetic-result":"https://mandates.netcash.co.za/synthetic-result","set-cookie":"session=synthetic-only; Path=/; HttpOnly; Secure"}});}
@@ -182,8 +183,8 @@ test("signed confirmation follows only its specific same-host PDF download contr
   const gets:string[]=[];
   const request:typeof fetch=async(url,options)=>{
    const action=(options?.headers as Record<string,string>)?.SOAPAction??"";
-   if(action.includes("RequestFileUploadReport"))return new Response(`<RequestFileUploadReportResult>###BEGIN\t${terms.reference}\tSUCCESSFUL\t12:00\n###END\t12:00</RequestFileUploadReportResult>`);
-   if(action.includes("RetrieveMandatePDF"))return new Response(`<RetrieveMandatePDFResult>###BEGIN\t${terms.reference}\n${terms.reference}\thttps://mandates.netcash.co.za/Public/Default.aspx\n###END</RetrieveMandatePDFResult>`);
+   if(action.includes("RequestFileUploadReport"))return new Response(niwsStringResponse("RequestFileUploadReport",`###BEGIN\t${terms.reference}\tSUCCESSFUL\t12:00\n###END\t12:00`));
+   if(action.includes("RetrieveMandatePDF"))return new Response(niwsStringResponse("RetrieveMandatePDF",`###BEGIN\t${terms.reference}\n${terms.reference}\thttps://mandates.netcash.co.za/Public/Default.aspx\n###END`));
    gets.push(String(url));if(gets.length===1)return new Response(`<a id="eMandate_Confirmation_userControl_DownloadAnchor" onclick="openAndRefresh(&#39;${hostile?"https://evil.example":".."}/DownloadBlank.aspx?pdfLink=EMF-123.pdf&#39;);">Download</a>`,{headers:{"content-type":"text/html"}});
    assert.equal(new URL(String(url)).pathname,"/DownloadBlank.aspx");return new Response("%PDF-synthetic");
   };

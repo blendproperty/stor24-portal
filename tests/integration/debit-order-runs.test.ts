@@ -1,3 +1,4 @@
+import {niwsStringResponse} from "../fixtures/niws-mandate-response";
 import assert from "node:assert/strict";
 import test, { mock } from "node:test";
 import { createHash, randomUUID } from "node:crypto";
@@ -85,11 +86,16 @@ test("isolated PostgreSQL debit order runs", async t => {
     });
     await t.test("concurrent submit uploads once; accepted load report posts no payment or receipt", async () => {
       const f = await fixture(); const run = await prepare(f); enable(f); let calls = 0;
-      const request = async () => { calls++; return new Response("<BatchFileUploadResult>20000000.123.1.1</BatchFileUploadResult>"); };
+      const request = async () => { calls++; return new Response(niwsStringResponse("BatchFileUpload","20000000.123.1.1")); };
       const attempts = await Promise.allSettled([submitDebitRun(f.scope, run.id, run.batchName, request), submitDebitRun(f.scope, run.id, run.batchName, request)]);
       assert.equal(attempts.filter(r => r.status === "fulfilled").length, 1); assert.equal(calls, 1);
       const report = `###BEGIN\t${run.batchName}\tSUCCESSFUL\t01:00 PM\t1150.00\t20990214\n###END\t01:01 PM`;
-      await refreshDebitRun(f.scope, run.id, async () => new Response(`<RequestFileUploadReportResult>${report}</RequestFileUploadReportResult>`));
+      const instructions=await db.debitOrderInstruction.findMany({where:{runId:run.id},orderBy:{id:"asc"}});
+      await assert.rejects(refreshDebitRun(f.scope,run.id,async()=>new Response(`<RequestFileUploadReportResult>${report}</RequestFileUploadReportResult>`)),/^Error: DEBIT_PROVIDER_OUTCOME_UNKNOWN$/);
+      assert.equal((await db.debitOrderRun.findUniqueOrThrow({where:{id:run.id}})).status,"SUBMITTED");
+      assert.deepEqual(await db.debitOrderInstruction.findMany({where:{runId:run.id},orderBy:{id:"asc"}}),instructions);
+      await db.debitOrderRun.update({where:{id:run.id},data:{checkedAt:null}});
+      await refreshDebitRun(f.scope, run.id, async () => new Response(niwsStringResponse("RequestFileUploadReport",`${report}`)));
       assert.equal((await db.debitOrderRun.findUniqueOrThrow({ where: { id: run.id } })).status, "ACCEPTED");
       assert.equal(await db.payment.count({ where: { accountId: f.account.id } }), 0);
       assert.equal((await db.account.findUniqueOrThrow({ where: { id: f.account.id } })).balance.toString(), "1150");
@@ -103,6 +109,17 @@ test("isolated PostgreSQL debit order runs", async t => {
       await assert.rejects(submitDebitRun(f.scope, run.id, run.batchName, timeout), /ALREADY_SUBMITTED/); assert.equal(calls, 1);
       assert.equal((await db.debitOrderRun.findUniqueOrThrow({ where: { id: run.id } })).status, "REVIEW_REQUIRED");
       assert.equal((await previewDebitRun(f.scope, f.facility.id, period, actionDate)).rows[0].blocker, "DEBIT_ALREADY_RESERVED");
+    });
+    await t.test("malformed rejection and general service errors cannot free an uncertain upload or trigger another submission",async()=>{
+     for(const body of ['<BatchFileUploadResult>100</BatchFileUploadResult>',niwsStringResponse("BatchFileUpload","200")]){
+      const f=await fixture(),run=await prepare(f);enable(f);let calls=0;
+      const request=async()=>{calls++;return new Response(body)};
+      await assert.rejects(submitDebitRun(f.scope,run.id,run.batchName,request),/^Error: DEBIT_PROVIDER_OUTCOME_UNKNOWN$/);
+      assert.equal((await db.debitOrderRun.findUniqueOrThrow({where:{id:run.id}})).status,'REVIEW_REQUIRED');
+      assert.equal((await previewDebitRun(f.scope,f.facility.id,period,actionDate)).rows[0].blocker,'DEBIT_ALREADY_RESERVED');
+      await assert.rejects(submitDebitRun(f.scope,run.id,run.batchName,request),/ALREADY_SUBMITTED/);assert.equal(calls,1);
+      assert.equal(await db.payment.count({where:{accountId:f.account.id}}),0);
+     }
     });
     await t.test("changed merchant, unsigned mandate, amount mismatch and receipts are blocked", async () => {
       const f = await fixture();
@@ -130,7 +147,7 @@ test("isolated PostgreSQL debit order runs", async t => {
         const row = Array(41).fill("");
         Object.assign(row, { 0:"6",1:f.mandate.reference,3:"1150.00",11:"1",12:"2",13:"14",14:"20990101",15:"CI",16:"30",17:"1",21:"1",30:matches ? f.mandate.correlation : "unmatched",40:"0" });
         const report = `###BEGIN\t20990214\n${row.join("\t")}\n###END`;
-        const network = mock.method(globalThis, "fetch", async () => new Response(`<RetrieveMandateDataResult>${report}</RetrieveMandateDataResult>`));
+        const network = mock.method(globalThis, "fetch", async () => new Response(niwsStringResponse("RetrieveMandateData",`${report}`)));
         try { await refreshHostedMandate(f.lease.signingToken); } finally { network.mock.restore(); }
         const mandate = await db.publicDebitMandate.findUniqueOrThrow({ where: { id: f.mandate.id } });
         assert.equal(mandate.status, matches ? "SIGNED" : "REVIEW_REQUIRED");

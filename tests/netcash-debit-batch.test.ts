@@ -1,3 +1,4 @@
+import {niwsStringResponse} from "./fixtures/niws-mandate-response";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildCompactDebitFile, parseDebitLoadReport, uploadDebitBatch, validDebitDate } from "../src/lib/payments/netcash-debit-batch";
@@ -10,11 +11,14 @@ test("compact EFT format uses cents, counts rows, rejects duplicate and injected
   assert.equal(validDebitDate("2027-02-29"), false); assert.equal(validDebitDate("2028-02-29"), true); assert.equal(validDebitDate("invalid"), false);
 });
 test("SOAP upload handles real file tokens, safe rejection codes and ambiguous transport failures", async () => {
-  const request = (async (_url, init) => { assert.equal(init?.redirect, "error"); assert.match(String(init?.body), /<BatchFileUpload xmlns="http:\/\/tempuri.org\/">/); return new Response("<BatchFileUploadResult>20000000.123456.1.1</BatchFileUploadResult>"); }) as typeof fetch;
+  const request = (async (_url, init) => { assert.equal(init?.redirect, "error"); assert.match(String(init?.body), /<BatchFileUpload xmlns="http:\/\/tempuri.org\/">/); return new Response(niwsStringResponse("BatchFileUpload","20000000.123456.1.1")); }) as typeof fetch;
   assert.equal(await uploadDebitBatch(key, "CI fixture", request), "20000000.123456.1.1");
-  await assert.rejects(uploadDebitBatch(key, "CI", async () => new Response("<BatchFileUploadResult>100</BatchFileUploadResult>")), /UPLOAD_REJECTED_100/);
+  await assert.rejects(uploadDebitBatch(key, "CI", async () => new Response(niwsStringResponse("BatchFileUpload","100"))), /UPLOAD_REJECTED_100/);
   await assert.rejects(uploadDebitBatch(key, "CI", async () => new Response("<Fault>sensitive provider detail</Fault>")), /^Error: DEBIT_PROVIDER_OUTCOME_UNKNOWN$/);
-  await assert.rejects(uploadDebitBatch(key, "CI", async () => new Response("<BatchFileUploadResult>123.1.1</BatchFileUploadResult><BatchFileUploadResult>321.1.1</BatchFileUploadResult>")), /OUTCOME_UNKNOWN/);
+  await assert.rejects(uploadDebitBatch(key, "CI", async () => new Response(niwsStringResponse("BatchFileUpload","123.1.1").replace("</BatchFileUploadResponse>","<BatchFileUploadResult>321.1.1</BatchFileUploadResult></BatchFileUploadResponse>"))), /OUTCOME_UNKNOWN/);
+  for (const body of [niwsStringResponse("BatchFileUpload","200"),"<BatchFileUploadResult>100</BatchFileUploadResult>",niwsStringResponse("BatchFileUpload","100").replace("http://tempuri.org/","https://example.invalid"),niwsStringResponse("BatchFileUpload","123.1.1").slice(0,-5)]) {
+    let calls=0;await assert.rejects(uploadDebitBatch(key,"CI",async()=>{calls++;return new Response(body)}),/^Error: DEBIT_PROVIDER_OUTCOME_UNKNOWN$/);assert.equal(calls,1);
+  }
 });
 test("load report binds exact batch, value and date; partial results never count as payment", () => {
   const report = "###BEGIN\tST24-CI\tSUCCESSFUL\t01:00 PM\t1150.00\t20990214\n###END\t01:01 PM";

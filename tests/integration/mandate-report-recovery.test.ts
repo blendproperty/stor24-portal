@@ -1,3 +1,4 @@
+import {niwsStringResponse} from "../fixtures/niws-mandate-response";
 import test,{mock} from "node:test";
 import assert from "node:assert/strict";
 import {randomUUID,createHash} from "node:crypto";
@@ -26,16 +27,17 @@ test("isolated report recovery restores one existing authority without creation 
  const connection=await db.integrationConnection.create({data:{organisationId:org.id,category:"PAYMENTS",provider:"NETCASH",config}});
  const terms={reference:`CI${key.replaceAll("-","").slice(0,18)}`,agreementReference:reservation.publicReference!,agreementDate,amount:"950.00",commencementMonth:month,debitDay:1,noticeDays:30,holiday:"VeryNextOrdinaryBusinessDay",correlation:key};
  const mandate=await db.publicDebitMandate.create({data:{leaseId:lease.id,reference:terms.reference,correlation:key,terms,status:"REVIEW_REQUIRED",hostedUrl:"https://short.surf/synthetic",environment:"sandbox",connectionId:connection.id,connectionFingerprint:debitConnectionFingerprint({environment:"sandbox",merchantAccount:"51111111111",debitOrderServiceKey:serviceKey})}});
- let altered=false,empty=false,signed=false;const methods:string[]=[];
+ let altered=false,empty=false,signed=false,malformed=false;const methods:string[]=[];
  const network=mock.method(globalThis,"fetch",async(_url:unknown,options?:RequestInit)=>{
   const action=String((options?.headers as Record<string,string>)?.SOAPAction ?? "");methods.push(action);
-  if(action.includes("RequestFileUploadReport"))return new Response(`<RequestFileUploadReportResult>###BEGIN\t${terms.reference.toUpperCase()}\tSUCCESSFUL\t12:00\tR0.00\t${agreementDate}\n###END\t12:00</RequestFileUploadReportResult>`);
-  if(action.includes("RetrieveMandatePDF"))return new Response(`<RetrieveMandatePDFResult>###BEGIN\t${terms.reference.toUpperCase()}\n${terms.reference}\thttps://short.surf/synthetic-pdf\n###END</RetrieveMandatePDFResult>`);
+  if(action.includes("RequestFileUploadReport"))return new Response(niwsStringResponse("RequestFileUploadReport",`###BEGIN\t${terms.reference.toUpperCase()}\tSUCCESSFUL\t12:00\tR0.00\t${agreementDate}\n###END\t12:00`));
+  if(action.includes("RetrieveMandatePDF"))return new Response(niwsStringResponse("RetrieveMandatePDF",`###BEGIN\t${terms.reference.toUpperCase()}\n${terms.reference}\thttps://short.surf/synthetic-pdf\n###END`));
   if(String(_url).startsWith("https://short.surf/"))return new Response(protectedMandatePdf());
-  if(action.includes("RequestMandateData"))return new Response("<RequestMandateDataResult>20000000.123.1.1</RequestMandateDataResult>");
-  assert.ok(action.includes("RetrieveMandateData"));if(empty)return new Response(`<RetrieveMandateDataResult>###BEGIN\t${agreementDate}\n###END</RetrieveMandateDataResult>`);const r=Array<string>(44).fill("");Object.assign(r,{0:signed?"6":"2",1:terms.reference,3:altered?"999.00":"950.0000",11:"1",12:firstDate.replaceAll("-",""),13:"01",14:agreementDate,15:terms.agreementReference,16:"30",17:"2",21:"0",30:key,40:"0"});
+  if(action.includes("RequestMandateData"))return new Response(niwsStringResponse("RequestMandateData","20000000.123.1.1"));
+  assert.ok(action.includes("RetrieveMandateData"));if(empty)return new Response(niwsStringResponse("RetrieveMandateData",`###BEGIN\t${agreementDate}\n###END`));const r=Array<string>(44).fill("");Object.assign(r,{0:signed?"6":"2",1:terms.reference,3:altered?"999.00":"950.0000",11:"1",12:firstDate.replaceAll("-",""),13:"01",14:agreementDate,15:terms.agreementReference,16:"30",17:"2",21:"0",30:key,40:"0"});
   if(signed)Object.assign(r,{22:"Synthetic holder",23:"1",24:"632005",25:"0",26:"11111111111"});
-  return new Response(`<RetrieveMandateDataResult>###BEGIN\t${agreementDate}\n${r.join("\t")}\n###END</RetrieveMandateDataResult>`);
+  const report=`###BEGIN\t${agreementDate}\n${r.join("\t")}\n###END`;
+  return new Response(malformed?`<RetrieveMandateDataResult>${report}</RetrieveMandateDataResult>`:niwsStringResponse("RetrieveMandateData",report));
  });
  try{
   assert.equal((await refreshHostedMandate(key)).verificationPending,true);
@@ -49,7 +51,10 @@ test("isolated report recovery restores one existing authority without creation 
   const missing=await refreshHostedMandate(key);assert.equal(missing.status,"REVIEW_REQUIRED");assert.equal(missing.hostedUrl,null);empty=false;
   altered=true;await db.publicDebitMandate.update({where:{id:mandate.id},data:{status:"REVIEW_REQUIRED",failureCode:null,lastCheckedAt:null,reportToken:"20000000.123.1.1",reportRequestedAt:new Date()}});
   const blocked=await refreshHostedMandate(key);assert.equal(blocked.status,"REVIEW_REQUIRED");assert.equal(blocked.hostedUrl,null);assert.equal(blocked.failureCode,"MANDATE_REPORT_AMOUNT_MISMATCH");
-  altered=false;signed=true;await db.publicDebitMandate.update({where:{id:mandate.id},data:{status:"REVIEW_REQUIRED",failureCode:"MANDATE_REPORT_BANK_TYPE_MISMATCH",lastCheckedAt:null,reportToken:"20000000.123.1.1",reportRequestedAt:new Date()}});
+  altered=false;signed=true;malformed=true;await db.publicDebitMandate.update({where:{id:mandate.id},data:{status:"REVIEW_REQUIRED",failureCode:"MANDATE_REPORT_BANK_TYPE_MISMATCH",lastCheckedAt:null,reportToken:"20000000.123.1.1",reportRequestedAt:new Date()}});
+  await assert.rejects(refreshHostedMandate(key),/^Error: MANDATE_RESPONSE_INVALID$/);
+  const held=await db.publicDebitMandate.findUniqueOrThrow({where:{id:mandate.id}});assert.equal(held.status,"REVIEW_REQUIRED");assert.equal(held.verifiedAt,null);assert.equal(held.signedPdf,null);
+  malformed=false;await db.publicDebitMandate.update({where:{id:mandate.id},data:{lastCheckedAt:null}});
   const accepted=await refreshHostedMandate(key);assert.equal(accepted.status,"SIGNED");assert.ok(accepted.verifiedAt);assert.equal(accepted.hostedUrl,null);assert.equal(accepted.pdfAvailable,false);assert.equal(accepted.collectionEnabled,false);
   assert.equal(await db.publicDebitMandate.count({where:{leaseId:lease.id}}),1);
   await db.publicDebitMandate.update({where:{id:mandate.id},data:{lastCheckedAt:null,pdfToken:"20000000.123.1.1"}});
