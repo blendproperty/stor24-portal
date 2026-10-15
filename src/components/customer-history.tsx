@@ -5,8 +5,11 @@ import { historyReadSchema, noteCategories, type CustomerHistoryRead, type Custo
 import { Download, Mail, MessageSquare, Phone, Plus, RefreshCw, X } from "lucide-react";
 
 const stamp = (value: string) => new Intl.DateTimeFormat("en-ZA", { timeZone: "Africa/Johannesburg", dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) + " SAST";
-type Filters = { kind: string; category: string; search: string };
-const initialFilters: Filters = { kind: "ALL", category: "", search: "" };
+type Filters = { kind: string; category: string; search: string; from: string; to: string; channel: string; status: string };
+const initialFilters: Filters = { kind: "ALL", category: "", search: "", from: "", to: "", channel: "", status: "" };
+function filterParameters(filters: Filters) {
+  return Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== ""));
+}
 export function CustomerHistory({ customerId }: { customerId: string }) {
   const [data, setData] = useState<CustomerHistoryRead | null>(null);
   const [filters, setFilters] = useState(initialFilters);
@@ -33,8 +36,7 @@ export function CustomerHistory({ customerId }: { customerId: string }) {
     if (!cursor) { appliedFilters.current = chosen; setData(null); }
     const timer = setTimeout(() => controller.abort(), 20_000);
     try {
-      const query = new URLSearchParams({ kind: chosen.kind, search: chosen.search });
-      if (chosen.category) query.set("category", chosen.category);
+      const query = new URLSearchParams(filterParameters(chosen));
       if (cursor) query.set("cursor", cursor);
       const response = await fetch(`/api/v1/customers/${encodeURIComponent(customerId)}/history?${query}`, { cache: "no-store", signal: controller.signal });
       if (reader.current !== controller) return;
@@ -63,7 +65,7 @@ export function CustomerHistory({ customerId }: { customerId: string }) {
     const controller=new AbortController();downloadRequest.current=controller;setDownloading(true);setDownloadError("");
     const timer=setTimeout(()=>controller.abort(),60_000);
     try {
-      const response=await fetch(`/api/v1/customers/${encodeURIComponent(customerId)}/history/export`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({format,...(item?{kind:"ALL",search:"",entryId:item.id,entryKind:item.kind}:{kind:appliedFilters.current.kind,search:appliedFilters.current.search,...(appliedFilters.current.category?{category:appliedFilters.current.category}:{})})}),signal:controller.signal});
+      const response=await fetch(`/api/v1/customers/${encodeURIComponent(customerId)}/history/export`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({format,...(item?{kind:"ALL",search:"",entryId:item.id,entryKind:item.kind}:filterParameters(appliedFilters.current))}),signal:controller.signal});
       if(downloadRequest.current!==controller)return;
       if(!response.ok){let message="Download failed. Try again.";try{message=(await response.json()).error?.message??message;}catch{}throw new Error(message);}
       const expected=format==="PDF"?"application/pdf":format==="XLSX"?"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":"text/csv";
@@ -104,10 +106,16 @@ export function CustomerHistory({ customerId }: { customerId: string }) {
   return <section className="customer-history" aria-labelledby="customer-history-title">
     <div className="customer-history-heading"><div><h3 id="customer-history-title">Customer history &amp; staff notes</h3><p>Shared staff record · newest first · SAST</p></div><div className="customer-history-actions"><button type="button" className="button button-secondary history-refresh" aria-label="Refresh history" onClick={() => void load(filters)} disabled={readBusy}><RefreshCw size={15}/></button>{data?.canExport ? <><button type="button" className="button button-secondary" disabled={downloading || readBusy} onClick={()=>void download("CSV")}>CSV</button><button type="button" className="button button-secondary" disabled={downloading || readBusy} onClick={()=>void download("XLSX")}>Excel</button><button type="button" className="button button-secondary" disabled={downloading || readBusy} onClick={()=>void download("PDF")}><Download size={15}/>{downloading?"Preparing…":"Download history"}</button></> : null}{data?.writableFacilities.length ? <button type="button" className="button button-primary" disabled={saving || !!retry} onClick={()=>setComposerOpen(!composerOpen)}><Plus size={15}/>{composerOpen?"Close note":"Add note"}</button> : null}</div></div>
     <form className="customer-history-filters" onSubmit={event => { event.preventDefault(); void load(filters); }}>
-      <label>History type<select value={filters.kind} onChange={event => setFilters({ ...filters, kind: event.target.value })}><option value="ALL">All history</option><option value="NOTE">Staff notes</option><option value="COLLECTION">Collections activity</option><option value="COMMUNICATION">Communications</option></select></label>
+      <label>History type<select value={filters.kind} onChange={event => setFilters({ ...filters, kind: event.target.value })}><option value="ALL">All history</option><option value="NOTE">Staff notes</option><option value="COLLECTION">Collections activity</option><option value="COMMUNICATION">Communications</option>{Object.entries({BOOKING:"Bookings",TENANCY:"Tenancies",DOCUMENT:"Documents",AGREEMENT:"Signed booking agreements",ACCOUNT:"Account entries (permitted staff)",APPOINTMENT:"Appointments & handovers",MILESTONE:"Move-in / move-out milestones"}).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
       <label>Note category<select aria-label="Note category" value={filters.category} onChange={event => setFilters({ ...filters, category: event.target.value })}><option value="">All categories</option>{Object.entries(noteCategories).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-      <label>Search history<input type="search" maxLength={200} value={filters.search} onChange={event => setFilters({ ...filters, search: event.target.value })} placeholder="Note text, message type or channel"/></label>
+      <label>Search history<input type="search" maxLength={200} value={filters.search} onChange={event => setFilters({ ...filters, search: event.target.value })} placeholder="Notes, staff or retained message text"/></label>
       <button className="button button-secondary" disabled={readBusy}>Apply filters</button>
+      <details className="history-advanced-filters"><summary>Date and communication filters</summary><div className="customer-history-filters">
+        <label>From date (SAST)<input type="date" value={filters.from} max={filters.to || undefined} onChange={event => setFilters({ ...filters, from: event.target.value })}/></label>
+        <label>To date (SAST)<input type="date" value={filters.to} min={filters.from || undefined} onChange={event => setFilters({ ...filters, to: event.target.value })}/></label>
+        <label>Communication channel<select value={filters.channel} onChange={event => setFilters({ ...filters, channel: event.target.value })}><option value="">All channels</option><option value="EMAIL">Email</option><option value="SMS">SMS</option><option value="WHATSAPP">WhatsApp</option></select></label>
+        <label>Recorded send status<select value={filters.status} onChange={event => setFilters({ ...filters, status: event.target.value })}><option value="">All statuses</option>{["PENDING", "PROCESSING", "SUCCEEDED", "FAILED", "DEAD_LETTER"].map(status => <option key={status} value={status}>{status.toLowerCase().replaceAll("_", " ")}</option>)}</select></label>
+      </div><p>Dates use the recorded event time. Channel and status narrow results to communications. Search includes retained message text; external conversations may be missing.</p></details>
     </form>
     {notice ? <p role="status" className="notice">{notice}</p> : null}
     {writeError ? <p role="alert" className="form-error">{writeError}</p> : null}
@@ -130,6 +138,7 @@ export function CustomerHistory({ customerId }: { customerId: string }) {
     {readError ? <div role="alert" className="form-error"><p>{readError}</p><button type="button" className="button button-secondary" disabled={readBusy} onClick={() => void load(appliedFilters.current, data?.nextCursor ?? undefined)}>Retry history</button></div> : null}
     {data ? <>
       {!data.visibility.communications || !data.visibility.collections ? <p className="leads-caption">Some history is restricted: {!data.visibility.communications ? "communications access" : ""}{!data.visibility.communications && !data.visibility.collections ? " and " : ""}{!data.visibility.collections ? "collections access" : ""} is required.</p> : null}
+      {filters.kind === "ACCOUNT" && data.visibility.accounts === false ? <p className="leads-caption">Account history requires financial viewing access for this store. Download permission does not grant financial viewing or approval.</p> : null}
       <p className="customer-history-caption">Download all matching history, including older pages. Available SMS/WhatsApp message text is included; missing content is identified in the file.</p>
       <ol className="customer-timeline">{data.entries.map(item => <li key={item.kind + item.id}>
         <div className="customer-timeline-icon" aria-hidden="true">{item.channel==="EMAIL"?<Mail size={17}/>:item.category==="CALL"?<Phone size={17}/>:<MessageSquare size={17}/>}</div><div className="customer-timeline-content"><div className="customer-event-heading"><h4>{item.title.replaceAll("RESERVATION CONFIRMED","Reservation confirmed").replaceAll("EMAIL VERIFICATION","Email verification")}</h4>{data.canExport ? <button type="button" className="customer-event-download" aria-label={`Download ${item.title}`} disabled={downloading} onClick={()=>void download("PDF",item)}><Download size={15}/><span>Download</span></button> : null}</div>
