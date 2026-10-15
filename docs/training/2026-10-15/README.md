@@ -1,5 +1,7 @@
 # STOR24 role based operating manuals
 
+**Current manuals: [edition 2](edition-2/README.md), 15 October 2026.** The earlier artifacts below are superseded review drafts. Edition 2 issues the expanded 61-page Faeez PDF and 22-page facilities-manager PDF; no account name or role application is needed for this documentation delivery.
+
 15 October 2026. Training review editions, not staff acceptance or production role assignment.
 
 ## Deliverables
