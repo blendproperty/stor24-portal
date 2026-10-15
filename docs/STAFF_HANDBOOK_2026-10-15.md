@@ -17,6 +17,8 @@ Keep the acceptance pages at the back. Record actual results one item at a time;
 
 **Faeez / store operator:** work only in the stores shown in your own account. Find customers, maintain authorised details, add dated notes, prepare bookings and review the source workflows available to your role.
 
+Faeez's Midpoint role now includes booking-price viewing and proposals. Sign in again after the access update; independent price approval remains separate.
+
 **Covering colleague:** use your own account. Read the customer's full history and current instructions, then acknowledge only work assigned to you. A handover note does not itself assign responsibility.
 
 **Manager / administrator:** confirm the real covering colleague and the exact store access needed. The incoming covering manager starts on 1 November; account identification, onboarding and their own acceptance remain pending. Do not share another person's login.
