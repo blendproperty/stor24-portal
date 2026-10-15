@@ -72,6 +72,7 @@ jobs:
       - run: npx tsx --test tests/integration/whatsapp-delivery-claim.test.ts
       - run: npx tsx --test tests/integration/booking-message-claims.test.ts
       - run: npx tsx --test tests/integration/booking-contact-correction.test.ts
+      - run: npx tsx --test tests/integration/public-booking-origin.test.ts
       - run: npx tsx --test tests/integration/merchandise-transactions.test.ts
       - run: npx tsx --test tests/integration/uat-reset.test.ts
       - run: npx tsx --test tests/integration/move-in-training.test.ts
@@ -105,6 +106,8 @@ jobs:
           MARKETING_DB_TEST: isolated-ci
       - run: npx tsx --test tests/integration/collections.test.ts
       - run: npx tsx --test tests/integration/customer-history.test.ts
+      - name: Verify representative staff workload and limited offline source recovery
+        run: npx tsx --test tests/integration/faeez-representative-workload.test.ts
       - run: npx tsx --test tests/integration/collection-notices.test.ts
       - run: npx tsx --test tests/integration/settlements.test.ts
       - run: npx tsx --test tests/integration/unidentified-receipts.test.ts

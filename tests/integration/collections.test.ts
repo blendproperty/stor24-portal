@@ -27,6 +27,31 @@ test("isolated PostgreSQL aged collections", async t => {
   const base = async (f: Awaited<ReturnType<typeof fixture>>) => ({ accountId: f.account.id, revision: (await row(f)).revision, requestKey: randomUUID(), note: "CI evidence reference" });
   const terms = async (f: Awaited<ReturnType<typeof fixture>>) => updateCollection(f.scope, { ...await base(f), action: "terms", terms: { dueDays: 0, allocation: "OLDEST_DUE_FIRST", approvalReference: "CI approved agreement", overrides: [] }, confirm: true });
   try {
+    await t.test("escalation requests remain held evidence under a promise and never send, post fees or change access", async () => {
+      const f = await fixture(); await terms(f);
+      await updateCollection(f.scope, { ...await base(f), action: "promise", amount: "50", dueDate: today, confirm: true });
+      const before = JSON.stringify(await db.account.findUnique({ where: { id: f.account.id }, include: { ledgerEntries: true, payments: true, tenancy: { include: { occupancies: true } } } }));
+      for (const target of ["NOTICE", "FEE", "ACCESS"] as const) {
+        const command = { ...await base(f), action: "escalation-review" as const, target, channel: "WHATSAPP" as const, reviewOn: today, policyReference: "Proposed evidence, not approval" };
+        const result = await updateCollection(f.scope, command);
+        assert.equal((await updateCollection(f.scope, command)).id, result.id);
+        await assert.rejects(updateCollection(f.scope, { ...command, note: "Different retry payload" }), /COLLECTION_CHANGED/);
+        const audit = await db.auditEvent.findFirstOrThrow({ where: { organisationId: f.org.id, action: "collections.escalation-review" }, orderBy: { occurredAt: "desc" } });
+        const review = (audit.after as { review: { status: string; effect: string; blockers: string[]; sourceHash: string; customerMessageSent: boolean; financialEntriesCreated: number; accessCommandsCreated: number } }).review;
+        assert.equal(review.status, "HELD_POLICY"); assert.equal(review.effect, "INTERNAL_REVIEW_ONLY"); assert.ok(review.blockers.some(value => /promise/i.test(value)));
+        assert.match(review.sourceHash, /^[a-f0-9]{64}$/); assert.equal(review.customerMessageSent, false); assert.equal(review.financialEntriesCreated, 0); assert.equal(review.accessCommandsCreated, 0);
+      }
+      assert.equal(JSON.stringify(await db.account.findUnique({ where: { id: f.account.id }, include: { ledgerEntries: true, payments: true, tenancy: { include: { occupancies: true } } } })), before);
+      assert.equal(await db.communicationLog.count({ where: { organisationId: f.org.id } }), 0); assert.equal(await db.webhookOutbox.count({ where: { organisationId: f.org.id } }), 0);
+      assert.ok((await row(f)).hold); assert.equal((await row(f)).promises[0].status, "OPEN");
+      const command = { ...await base(f), action: "escalation-review" as const, target: "FEE" as const, channel: "EMAIL" as const, reviewOn: today, policyReference: "" };
+      const revision = (await row(f)).revision;
+      await db.$executeRawUnsafe(`ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_escalation_audit_failure CHECK (action <> 'collections.escalation-review') NOT VALID`);
+      try { await assert.rejects(updateCollection(f.scope, command)); } finally { await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_escalation_audit_failure'); }
+      assert.equal((await row(f)).revision, revision);
+      await assert.rejects(updateCollection({ ...f.scope, facilityIds: [] }, command), /COLLECTION_NOT_FOUND/);
+      await assert.rejects(updateCollection(f.scope, { ...command, reviewOn: "2020-01-01" }), /COLLECTION_DATE/);
+    });
     await t.test("missing terms excluded; approved terms produce 91+ age without financial writes", async () => {
       const f = await fixture(); assert.match((await row(f)).ageing.issue!, /terms/);
       const parameters = { reportKey: "receivables-ageing", from: today, to: today, format: "JSON" as const, groupBy: "month" as const };

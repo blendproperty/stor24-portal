@@ -100,6 +100,7 @@ export const collectionActionSchema = z.discriminatedUnion("action", [
   z.object({ ...base, action: z.literal("terms"), terms: termsSchema, confirm: z.literal(true) }).strict(),
   z.object({ ...base, action: z.literal("follow-up"), ownerId: z.string().cuid().nullable(), nextFollowUp: dateKey.nullable(), outcome: z.enum(["PLAN", "REACHED", "NO_ANSWER"]) }).strict(),
   z.object({ ...base, action: z.literal("dispute"), disputed: z.boolean() }).strict(),
+  z.object({ ...base, action: z.literal("escalation-review"), target: z.enum(["NOTICE", "FEE", "ACCESS"]), channel: z.enum(["EMAIL", "SMS", "WHATSAPP"]), reviewOn: dateKey, policyReference: z.string().trim().max(200) }).strict(),
   z.object({ ...base, action: z.literal("promise"), amount: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/).refine(v => Number(v) > 0), dueDate: dateKey, confirm: z.literal(true) }).strict(),
   z.object({ ...base, action: z.literal("close-promise"), promiseId: z.string().cuid(), status: z.enum(["KEPT", "CANCELLED"]) }).strict(),
 ]);

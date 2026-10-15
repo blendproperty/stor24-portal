@@ -7,6 +7,7 @@ import { DailyCloseForm } from "@/components/daily-close-form";
 import { DailyCloseHistory, type DailyCloseRecord } from "@/components/daily-close-history";
 import { MerchandiseOrderQueue } from "@/components/merchandise-order-queue";
 import { StatusPill } from "@/components/status-pill";
+import { StaffHandbookDownload } from "@/components/staff-handbook-download";
 import Link from "next/link";
 import { formatSouthAfricaDateTime } from "@/lib/south-africa-time";
 import { PackageEditorModal, ProductEditorModal, type MerchandisePackage, type MerchandiseProduct } from "@/components/merchandise-editor";
@@ -467,6 +468,7 @@ export function OperationsWorkspace({ view = "operations", reminders }: { view?:
     <PageHeader eyebrow="Facility workflows" title="Operations centre" description="Prioritise tasks, keep maintenance moving and close the day with confidence." action={<button className="button button-primary" onClick={() => setShowTask(true)}><Plus size={16}/> New task</button>} />
     {reminders}
     <Link className="button button-secondary" href="/operations/followups">Customer follow-ups &amp; covering-staff handovers</Link>
+    <StaffHandbookDownload />
     <div className="followup-actions"><Link className="button button-secondary" href="/operations/arrivals">Expected arrivals &amp; weekend cover</Link><Link className="button button-secondary" href="/operations/events">Booking &amp; move-in event inbox</Link></div>
     {maintenanceMessage && !showMaintenance ? <div role="alert"><p>{maintenanceMessage}</p>{maintenanceUncertain ? <button className="button button-primary" onClick={() => window.location.reload()}>Reload maintenance status</button> : null}</div> : null}
     {taskMessage ? <div role={taskNeedsCheck ? "alert" : "status"}><p>{taskMessage}</p>{taskNeedsCheck ? <button className="button button-primary" disabled={taskBusy} onClick={checkTaskStatus}>{taskBusy ? "Checking…" : "Check task status"}</button> : null}</div> : null}

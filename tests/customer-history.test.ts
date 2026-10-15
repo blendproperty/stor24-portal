@@ -3,7 +3,20 @@ import test from "node:test";
 import { build } from "esbuild";
 import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
-import { customerNoteSchema, historyQuerySchema, decodeHistoryCursor, encodeHistoryCursor } from "../src/lib/customer-history-policy";
+import { customerNoteSchema, historyQuerySchema, historyDateRange, historyExportSchema, decodeHistoryCursor, encodeHistoryCursor } from "../src/lib/customer-history-policy";
+
+test("history date bounds use inclusive South African days and export accepts the same source filters", () => {
+  const query = historyQuerySchema.parse({ kind: "COMMUNICATION", from: "2026-10-14", to: "2026-10-14", channel: "WHATSAPP", status: "SUCCEEDED" });
+  const range = historyDateRange(query);
+  assert.equal(range.gte?.toISOString(), "2026-10-13T22:00:00.000Z");
+  assert.equal(range.lt?.toISOString(), "2026-10-14T22:00:00.000Z");
+  assert.throws(() => historyDateRange({ from: "2026-10-15", to: "2026-10-14" }), /HISTORY_DATE_INVALID/);
+  assert.equal(historyQuerySchema.safeParse({ from: "2026-02-30" }).success, false);
+  assert.equal(historyQuerySchema.safeParse({ status: "DELIVERED" }).success, false);
+  assert.equal(historyQuerySchema.safeParse({ channel: "FAX" }).success, false);
+  for (const format of ["PDF", "CSV", "XLSX"]) assert.equal(historyExportSchema.safeParse({ ...query, format }).success, true);
+  for (const kind of ["BOOKING", "TENANCY", "DOCUMENT", "AGREEMENT", "ACCOUNT", "APPOINTMENT"]) assert.equal(historyExportSchema.safeParse({ format: "PDF", entryId: "source", entryKind: kind }).success, true);
+});
 
 test("customer notes validate category, body, immutable server fields and bounded filters", () => {
   const input = { facilityId: "store", requestKey: randomUUID(), category: "CALL", body: " A real call note " };
@@ -30,7 +43,7 @@ test("history HTTP endpoints preserve source permission gates, reject CSRF, and 
   const url = "https://example.invalid/api/v1/customers/customer/history", context = { params: Promise.resolve({ customerId: "customer" }) };
   const response = await loaded.exports.GET(new Request(url), context);
   assert.equal(response.status, 200); assert.equal(response.headers.get("cache-control"), "private, no-store");
-  assert.deepEqual(seen, { communications: null, collections: null, write: null });
+  assert.deepEqual(seen, { communications: null, collections: null, write: null, financial: null });
   const input = { facilityId: "store", requestKey: randomUUID(), category: "CALL", body: "Called customer" };
   const request = (body = input, origin = "https://example.invalid") => new Request(url, { method: "POST", headers: { origin, "Content-Type": "application/json" }, body: JSON.stringify(body) });
   assert.equal((await loaded.exports.POST(request(), context)).status, 403);

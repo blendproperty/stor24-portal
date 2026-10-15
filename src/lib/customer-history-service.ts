@@ -2,8 +2,9 @@ import { db } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
 import { requireLeasingCustomer } from "@/lib/leasing-service";
 import { facilityWhere, type RequestScope } from "@/lib/scope";
-import { compareHistoryEntries, customerNoteSchema, decodeHistoryCursor, encodeHistoryCursor, historyQuerySchema, noteCategories, type CustomerNoteInput, type HistoryEntry, type HistoryQuery } from "@/lib/customer-history-policy";
+import { compareHistoryEntries, customerNoteSchema, decodeHistoryCursor, encodeHistoryCursor, historyQuerySchema, historyDateRange, noteCategories, type CustomerNoteInput, type HistoryEntry, type HistoryQuery } from "@/lib/customer-history-policy";
 import { archivedHistoryText } from "@/lib/customer-history-message-policy";
+import { customerHistoryRecords } from "@/lib/customer-history-records";
 
 type Client = Prisma.TransactionClient;
 const PAGE_SIZE = 50;
@@ -50,7 +51,7 @@ function pageBoundary(kind: HistoryEntry["kind"], dateKey: string, cursor: Retur
   return { AND: [{ [dateKey]: { lte: snapshot } }, { OR: [{ [dateKey]: { lt: date } }, ...(equal ? [equal] : [])] }] };
 }
 
-export async function customerHistory(scope: RequestScope, customerId: string, input: HistoryQuery, access: { communications: RequestScope | null; collections: RequestScope | null; write: RequestScope | null }, selectedRecordId?: string) {
+export async function customerHistory(scope: RequestScope, customerId: string, input: HistoryQuery, access: { communications: RequestScope | null; collections: RequestScope | null; write: RequestScope | null; financial?: RequestScope | null }, selectedRecordId?: string) {
   // A secondary grant cannot widen the customer-page store scope.
   const intersect = (other: RequestScope | null): RequestScope | null => {
     if (!other || other.organisationId !== scope.organisationId || other.userId !== scope.userId) return null;
@@ -58,30 +59,32 @@ export async function customerHistory(scope: RequestScope, customerId: string, i
     const facilityIds = scope.facilityIds.filter(id => other.unrestrictedFacilities || other.facilityIds.includes(id));
     return facilityIds.length ? { ...other, unrestrictedFacilities: false, facilityIds } : null;
   };
-  access = { communications: intersect(access.communications), collections: intersect(access.collections), write: intersect(access.write) };
+  access = { communications: intersect(access.communications), collections: intersect(access.collections), write: intersect(access.write), financial: intersect(access.financial ?? null) };
   const query = historyQuerySchema.parse(input);
+  const range = historyDateRange(query);
   const cursor = decodeHistoryCursor(query.cursor);
   const snapshot = new Date(cursor?.snapshot ?? new Date().toISOString());
   const { customer, facilities } = await customerNoteFacilities(scope, customerId);
-  const source = (kind: HistoryEntry["kind"]) => query.kind === "ALL" || query.kind === kind;
+  const source = (kind: HistoryEntry["kind"]) => (query.kind === "ALL" || query.kind === kind) && (!(query.channel || query.status) || kind === "COMMUNICATION");
+  const boundary = (kind: HistoryEntry["kind"], dateKey: string) => ({ AND: [pageBoundary(kind, dateKey, cursor, snapshot), { [dateKey]: range }] });
   const entry = (value: Partial<HistoryEntry> & Pick<HistoryEntry, "id" | "kind" | "at" | "title">): HistoryEntry => ({
     body: null, category: null, author: null, facility: null, channel: null, status: null, sentAt: null, deliveredAt: null, readAt: null, ...value,
   });
   const [notes, activities, messages] = await Promise.all([
     source("NOTE") ? db.customerNote.findMany({
-      where: { organisationId: scope.organisationId, customerId, facility: facilityWhere(scope), ...(selectedRecordId ? { id:selectedRecordId } : {}), ...(query.category ? { category: query.category } : {}), ...(query.search ? { body: { contains: query.search, mode: "insensitive" } } : {}), ...pageBoundary("NOTE", "createdAt", cursor, snapshot) },
+      where: { organisationId: scope.organisationId, customerId, facility: facilityWhere(scope), ...(selectedRecordId ? { id:selectedRecordId } : {}), ...(query.category ? { category: query.category } : {}), ...(query.search ? { OR: [{ body: { contains: query.search, mode: "insensitive" as const } }, { authorName: { contains: query.search, mode: "insensitive" as const } }] } : {}), ...boundary("NOTE", "createdAt") },
       include: { facility: { select: { name: true } } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: PAGE_SIZE + 1,
     }) : [],
     source("COLLECTION") && !query.category && access.collections ? db.collectionActivity.findMany({
-      where: { case: { account: { customerId, customer: { organisationId: scope.organisationId }, tenancy: { facility: facilityWhere(access.collections) } } }, ...(selectedRecordId ? { id:selectedRecordId } : {}), ...(query.search ? { note: { contains: query.search, mode: "insensitive" } } : {}), ...pageBoundary("COLLECTION", "createdAt", cursor, snapshot) },
+      where: { case: { account: { customerId, customer: { organisationId: scope.organisationId }, tenancy: { facility: facilityWhere(access.collections) } } }, ...(selectedRecordId ? { id:selectedRecordId } : {}), ...(query.search ? { note: { contains: query.search, mode: "insensitive" } } : {}), ...boundary("COLLECTION", "createdAt") },
       include: { case: { select: { account: { select: { accountNumber: true, tenancy: { select: { facility: { select: { name: true } } } } } } } } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: PAGE_SIZE + 1,
     }) : [],
     source("COMMUNICATION") && !query.category && access.communications ? db.communicationLog.findMany({
-      where: { organisationId: scope.organisationId, customerId, ...(selectedRecordId ? { id:selectedRecordId } : {}), channel: { in: ["EMAIL", "SMS", "WHATSAPP"] },
+      where: { organisationId: scope.organisationId, customerId, ...(selectedRecordId ? { id:selectedRecordId } : {}), channel: query.channel ?? { in: ["EMAIL", "SMS", "WHATSAPP"] }, ...(query.status ? { status: query.status } : {}),
         AND: [
           ...(access.communications.unrestrictedFacilities ? [] : [{ OR: [{ facilityId: { in: access.communications.facilityIds } }, { facilityId: null }] }]),
-          ...(query.search ? [{ OR: [{ messageType: { contains: query.search, mode: "insensitive" as const } }, { channel: { contains: query.search, mode: "insensitive" as const } }] }] : []),
-          pageBoundary("COMMUNICATION", "queuedAt", cursor, snapshot),
+          ...(query.search ? [{ OR: [{ messageType: { contains: query.search, mode: "insensitive" as const } }, { channel: { contains: query.search, mode: "insensitive" as const } }, { AND: [{ NOT: { messageType: { contains: "VERIFICATION", mode: "insensitive" as const } } }, { NOT: { messageType: { contains: "OTP", mode: "insensitive" as const } } }, { NOT: { messageType: { contains: "PASSWORD", mode: "insensitive" as const } } }, { NOT: { messageType: { contains: "LOGIN", mode: "insensitive" as const } } }, { NOT: { messageType: { contains: "AUTHENTICATION", mode: "insensitive" as const } } }, { metadata: { path: ["historyEvidence", "version"], equals: 1 } }, { metadata: { path: ["historyEvidence", "text"], string_contains: query.search, mode: "insensitive" as const } }] }] }] : []),
+          boundary("COMMUNICATION", "queuedAt"),
         ],
       },
       select: { id: true, queuedAt: true, messageType: true, channel: true, direction: true, status: true, sentAt: true, deliveredAt: true, readAt: true, metadata: true, facility: { select: { name: true } } },
@@ -90,6 +93,7 @@ export async function customerHistory(scope: RequestScope, customerId: string, i
   ]);
   const actors = activities.length ? await db.user.findMany({ where: { organisationId: scope.organisationId, id: { in: [...new Set(activities.map(a => a.actorId))] } }, select: { id: true, name: true } }) : [];
   const entries = [
+    ...await customerHistoryRecords(scope, customerId, query, access.financial ?? null, boundary, selectedRecordId),
     ...notes.map(n => entry({ id: n.id, kind: "NOTE", at: n.createdAt.toISOString(), title: noteCategories[n.category as keyof typeof noteCategories] ?? n.category, body: n.body, category: n.category, author: n.authorName, facility: n.facility.name })),
     ...activities.map(a => entry({ id: a.id, kind: "COLLECTION", at: a.createdAt.toISOString(), title: `Collections · ${a.action.replaceAll("-", " ")} · ${a.case.account.accountNumber}`, body: a.note, author: actors.find(u => u.id === a.actorId)?.name ?? "Former staff member", facility: a.case.account.tenancy?.facility.name ?? null })),
     ...messages.map(m => entry({ id: m.id, kind: "COMMUNICATION", at: m.queuedAt.toISOString(), title: `${m.channel} · ${(m.messageType ?? "Recorded communication").replaceAll("_", " ")}`, channel: m.channel, status: m.status, body: (/VERIFICATION|OTP|PASSWORD|LOGIN|AUTHENTICATION/i.test(m.messageType ?? "") ? null : archivedHistoryText(m.metadata)) ?? (m.direction === "INBOUND" ? "Inbound communication record" : "Outbound communication record"), facility: m.facility?.name ?? "Store not recorded", sentAt: m.sentAt?.toISOString() ?? null, deliveredAt: m.deliveredAt?.toISOString() ?? null, readAt: m.readAt?.toISOString() ?? null })),
@@ -104,7 +108,7 @@ export async function customerHistory(scope: RequestScope, customerId: string, i
     entries: data,
     nextCursor: entries.length > PAGE_SIZE && last ? encodeHistoryCursor({ at: last.at, kind: last.kind, id: last.id, snapshot: snapshot.toISOString() }) : null,
     facilities, writableFacilities: writable,
-    visibility: { communications: !!access.communications, collections: !!access.collections },
-    legacyNotes: customer.notes,
+    visibility: { communications: !!access.communications, collections: !!access.collections, accounts: !!access.financial },
+    legacyNotes: query.from || query.to || query.channel || query.status ? null : customer.notes,
   };
 }
