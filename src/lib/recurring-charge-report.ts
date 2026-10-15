@@ -9,13 +9,13 @@ export function recurringPeriod(from: string, to: string, now = new Date()) {
   return period;
 }
 export type RecurringSource = {
-  facility: string; account: string; customer: string; units: string; paymentMethod: string | null;
+  facility: string; facilityId: string; facilityCode: string; account: string; customer: string; units: string; paymentMethod: string | null;
   currency: string; plan: unknown; planReady: boolean; planUpdatedAt: string | null;
   invoice: string | null; occupancies: BillingOccupancy[]; insurance: BillingInsurance | null;
 };
 /** Current approved-plan projection, never a receipt, arrears allocation or collection instruction. */
 export function recurringChargeRows(source: RecurringSource, period: string, snapshotTakenAt: string): ReportRow[] {
-  const base = { snapshotTakenAt, basis: "Current approved plan projection", facility: source.facility, account: source.account,
+  const base = { snapshotTakenAt, basis: "Current approved plan projection", facility: source.facility, facilityId:source.facilityId, facilityCode:source.facilityCode, account: source.account,
     customer: source.customer, units: source.units, paymentMethod: source.paymentMethod ?? "UNRECORDED", currency: source.currency,
     period, frequency: "MONTHLY", planUpdatedAt: source.planUpdatedAt, invoice: source.invoice };
   const blocked = (review: string, status = "REVIEW") => [{ ...base, status, category: null, charge: null, description: null, amount: null, includedTax: null, approvalReference: null, firstPeriod: null, proration: null, review }];

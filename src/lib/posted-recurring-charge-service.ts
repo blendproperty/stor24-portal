@@ -19,7 +19,7 @@ export async function postedRecurringChargeReport(scope:RequestScope,parameters:
  if(parameters.facilityId)await requireFacility(scope,parameters.facilityId);
  const periods=postedBillingPeriods(parameters.from,parameters.to),from=new Date(`${parameters.from}T00:00:00.000+02:00`),to=new Date(`${parameters.to}T23:59:59.999+02:00`),snapshotTakenAt=new Date().toISOString();
  return db.$transaction(async tx=>{
-  const events=await tx.auditEvent.findMany({where:{organisationId:scope.organisationId,action:'billing.month_posted',entityType:'Account',facility:{AND:[facilityWhere(scope),...(parameters.facilityId?[{id:parameters.facilityId}]:[])]},OR:[...periods.map(period=>({after:{path:['period'],equals:period}})),{occurredAt:{gte:from,lte:to}}]},include:{facility:{select:{id:true,name:true}}},orderBy:[{occurredAt:'asc'},{id:'asc'}],take:501});
+  const events=await tx.auditEvent.findMany({where:{organisationId:scope.organisationId,action:'billing.month_posted',entityType:'Account',facility:{AND:[facilityWhere(scope),...(parameters.facilityId?[{id:parameters.facilityId}]:[])]},OR:[...periods.map(period=>({after:{path:['period'],equals:period}})),{occurredAt:{gte:from,lte:to}}]},include:{facility:{select:{id:true,name:true,code:true}}},orderBy:[{occurredAt:'asc'},{id:'asc'}],take:501});
   if(events.length>500)throw Error('POSTED_REPORT_LIMIT');
   const rows:ReportRow[]=[],seen=new Set<string>();
   for(const event of events){
@@ -36,7 +36,7 @@ export async function postedRecurringChargeReport(scope:RequestScope,parameters:
    const result=postedRecurringRows({facility:event.facility!.name,facilityId:event.facility!.id,accountId:event.entityId,recordedAt:event.occurredAt.toISOString(),posting:event.after,document,entries},snapshotTakenAt);
    const key=`${event.entityId}:${parsed.success?parsed.data:event.id}`;
    if(seen.has(key))throw Error('POSTED_REPORT_DUPLICATE_SOURCE');seen.add(key);
-   rows.push(...result.map(row=>({...row,postingId:event.id,dateBasis:'Billing effective date; unavailable periods use recorded-date review exceptions'})));
+   rows.push(...result.map(row=>({...row,facilityCode:event.facility!.code,postingId:event.id,dateBasis:'Billing effective date; unavailable periods use recorded-date review exceptions'})));
    if(rows.length>5000)throw Error('POSTED_REPORT_LIMIT');
   }
   return rows;
