@@ -73,7 +73,7 @@ export const guideAccessRules: Record<string, Rule> = {
   // The employee/invitation register itself currently requires owner access.
   users: rule("users.view,@owner", ["", "", "", "users.manage,audit.view", ""]),
   settings: rule("configuration.view,configuration.manage,users.view,users.manage,integrations.view,integrations.manage", ["", "", "", "", ""]),
-  communications: rule("operations.view,communications.view", ["", "@owner", "", "operations.manage", "@owner"]),
+  communications: rule("operations.view,communications.view", ["", "@owner", "", "", "operations.manage", "@owner"]),
   integrations: rule("operations.view,integrations.view", ["", "", "operations.manage", "", "integrations.manage,@owner"]),
   hikvision: rule("integrations.view,integrations.manage", ["", "", "", ""], true),
   "netcash-settings": rule("integrations.view,integrations.manage", ["", "", "", ""], true),
