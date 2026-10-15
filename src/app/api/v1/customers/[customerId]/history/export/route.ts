@@ -1,11 +1,10 @@
-import { z } from "zod";
 import { apiError } from "@/lib/api";
 import { requirePermissionScope, type RequestScope } from "@/lib/scope";
 import { requirePermission } from "@/lib/auth-guards";
-import { historyQuerySchema } from "@/lib/customer-history-policy";
+import { historyExportSchema } from "@/lib/customer-history-policy";
 import { intersectHistoryScope, releaseCustomerHistoryExport } from "@/lib/customer-history-export";
 import { sameOrigin } from "@/lib/request-security";
-const schema=historyQuerySchema.omit({cursor:true}).extend({format:z.enum(["PDF","CSV"]),entryId:z.string().min(1).max(100).optional(),entryKind:z.enum(["NOTE","COLLECTION","COMMUNICATION"]).optional()}).strict().refine(q=>!!q.entryId===!!q.entryKind);
+const schema=historyExportSchema;
 async function source(permission:string):Promise<RequestScope|null>{try{return await requirePermissionScope(permission);}catch(e){if(e instanceof Error&&e.message==="FORBIDDEN")return null;throw e;}}
 export async function POST(request:Request,context:{params:Promise<{customerId:string}>}){
   try{
