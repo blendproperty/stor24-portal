@@ -58,6 +58,7 @@ test("isolated PostgreSQL reporting persistence, claims, expiry and history scop
     });
     await t.test("native transfer pairs use the actual producer and retain original links, scope, date basis and read-only baselines",async()=>{
       const customer=await db.customer.create({data:{organisationId:org.id,firstName:"Synthetic transfer"}}),type=await db.unitType.create({data:{facilityId:facility.id,name:"Synthetic transfer units"}});
+      const foreignOrg=await db.organisation.create({data:{name:"Separate transfer-report fixture",slug:randomUUID()}}),foreignUser=await db.user.create({data:{organisationId:foreignOrg.id,name:"Separate reporting user",email:randomUUID()+"@example.invalid"}});
       const units=await Promise.all([0,1].map(i=>db.unit.create({data:{facilityId:facility.id,unitTypeId:type.id,number:`TRANSFER-${i}`,floor:"Ground Floor",monthlyRate:100,status:i===0?"OCCUPIED":"AVAILABLE"}})));
       let tenancyId:string|undefined;
       try{
@@ -68,13 +69,14 @@ test("isolated PostgreSQL reporting persistence, claims, expiry and history scop
         await db.unit.update({where:{id:units[0].id},data:{number:"RENAMED-CURRENT-UNIT"}});
         const baselineAccount=await db.account.findUniqueOrThrow({where:{id:account.id}}),baselineOccupancies=await db.occupancy.findMany({where:{tenancyId:tenancy.id},orderBy:{id:'asc'}}),baselineAudit=await db.auditEvent.findUniqueOrThrow({where:{id:audit.id}});
         const query=defaultVisualQuery("transfers-native","2026-10-01","2026-10-31"),rows=await visualReportSource(scope,query);assert.equal(rows.length,1);const row=rows[0];assert.equal(row.verified,true);assert.equal(row.fromUnitId,units[0].id);assert.equal(row.fromUnit,"RENAMED-CURRENT-UNIT");assert.equal(row.toUnitId,units[1].id);assert.equal(row.fromOccupancy,from.id);assert.equal(row.toOccupancy,destination.id);assert.equal(row.transfer,audit.id);assert.equal(row.account,account.accountNumber);
-        assert.deepEqual(await visualReportSource({...scope,facilityIds:[other.id]},query),[]);assert.deepEqual(await visualReportSource({...scope,organisationId:'foreign-org',unrestrictedFacilities:true,facilityIds:[]},query),[]);await assert.rejects(visualReportSource(scope,{...query,facilityId:other.id}),/FORBIDDEN/);
+        assert.deepEqual(await visualReportSource({...scope,facilityIds:[other.id]},query),[]);assert.deepEqual(await visualReportSource({...scope,organisationId:foreignOrg.id,userId:foreignUser.id,unrestrictedFacilities:true,facilityIds:[]},query),[]);await assert.rejects(visualReportSource(scope,{...query,facilityId:other.id}),/FORBIDDEN/);
         const effectiveQuery={...query,from:"2026-10-02",to:"2026-10-02",dateField:"effective"};assert.equal(evaluateVisualReport(effectiveQuery,await visualReportSource(scope,effectiveQuery)).matchedRows,1);const recordedQuery={...effectiveQuery,dateField:'date'};assert.equal((await visualReportSource(scope,recordedQuery)).length,0);
         assert.deepEqual(await db.account.findUniqueOrThrow({where:{id:account.id}}),baselineAccount);assert.deepEqual(await db.occupancy.findMany({where:{tenancyId:tenancy.id},orderBy:{id:'asc'}}),baselineOccupancies);assert.deepEqual(await db.auditEvent.findUniqueOrThrow({where:{id:audit.id}}),baselineAudit);assert.equal(await db.payment.count({where:{accountId:account.id}}),0);assert.equal(await db.ledgerEntry.count({where:{accountId:account.id}}),0);assert.equal(await db.communicationLog.count({where:{organisationId:org.id}}),0);
         await db.auditEvent.update({where:{id:audit.id},data:{after:{unitId:units[1].id,occupancyId:destination.id}}});const held=await visualReportSource(scope,query);assert.equal(held[0].verified,false);assert.equal(held[0].review,'TRANSFER_PAYLOAD_REVIEW');await assert.rejects(visualReportSource(scope,effectiveQuery),/REPORT_TRANSFER_DATE_REVIEW/);
       }finally{
         if(tenancyId){await db.auditEvent.deleteMany({where:{entityId:tenancyId,action:'tenancy.transferred'}});await db.occupancy.deleteMany({where:{tenancyId}});await db.tenancy.delete({where:{id:tenancyId}})}
         await db.account.deleteMany({where:{customerId:customer.id}});await db.customer.delete({where:{id:customer.id}});await db.unit.deleteMany({where:{unitTypeId:type.id}});await db.unitType.delete({where:{id:type.id}});
+        await db.organisation.delete({where:{id:foreignOrg.id}});
       }
     });
     await t.test("native unpaid charges retain approved allocations, receipt quarantine and selected facility isolation",async()=>{
