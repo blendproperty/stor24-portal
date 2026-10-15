@@ -39,7 +39,7 @@ export function ReceiptReallocationWorkspace() {
   const sourceAccountId = source?.id ?? "";
 
   const invalidate = () => { setPreview(null); setConfirmed(false); setError(""); requestKey.current = null; };
-  const load = useCallback(async (cursor?: string) => {
+  const load = useCallback(async (cursor?: string, receiptCursor?: string) => {
     reader.current?.abort();
     const controller = new AbortController(); reader.current = controller;
     setReadBusy(true); setReadError("");
@@ -50,12 +50,27 @@ export function ReceiptReallocationWorkspace() {
       if (sourceAccountId) params.set("sourceAccountId", sourceAccountId);
       if (appliedSearch.current.trim()) params.set("search", appliedSearch.current.trim());
       if (cursor) params.set("cursor", cursor);
+      if (receiptCursor && sourceAccountId) params.set("receiptCursor", receiptCursor);
       const response = await fetch(`${RECEIPT_CORRECTION_ENDPOINT}?${params}`, { cache: "no-store", signal: controller.signal });
       if (!response.ok) throw Error(response.status === 401 ? "Sign in again to review receipt corrections." : response.status === 403 ? "Your account cannot view receipt corrections for this store." : "Receipt corrections could not be loaded. Refresh to try again.");
       const parsed = receiptCorrectionWorkspaceSchema.safeParse((await response.json()).data);
       if (!parsed.success) throw Error("The receipt correction records could not be verified. Refresh before continuing.");
       if (reader.current !== controller) return;
-      setData(previous => cursor && previous ? { ...parsed.data, requests: [...previous.requests, ...parsed.data.requests.filter(row => !previous.requests.some(existing => existing.id === row.id))] } : parsed.data);
+      setData(previous => {
+        if (receiptCursor && previous) return {
+          ...parsed.data,
+          receipts: [...previous.receipts.map(receipt => parsed.data.receipts.find(fresh => fresh.entryId === receipt.entryId) ?? receipt), ...parsed.data.receipts.filter(receipt => !previous.receipts.some(existing => existing.entryId === receipt.entryId))],
+          requests: [...parsed.data.requests, ...previous.requests.filter(row => !parsed.data.requests.some(fresh => fresh.id === row.id))],
+          nextCursor: previous.nextCursor,
+        };
+        if (cursor && previous) return {
+          ...parsed.data,
+          requests: [...previous.requests.map(row => parsed.data.requests.find(fresh => fresh.id === row.id) ?? row), ...parsed.data.requests.filter(row => !previous.requests.some(existing => existing.id === row.id))],
+          receipts: [...previous.receipts.map(receipt => parsed.data.receipts.find(fresh => fresh.entryId === receipt.entryId) ?? receipt), ...parsed.data.receipts.filter(receipt => !previous.receipts.some(existing => existing.entryId === receipt.entryId))],
+          nextReceiptCursor: previous.nextReceiptCursor,
+        };
+        return parsed.data;
+      });
       setGeneration(value => value + 1); setDecisionNeedsCheck(false);
     } catch (failure) {
       if (reader.current === controller) { setData(null); setPreview(null); setConfirmed(false); setReadError(failure instanceof Error && failure.name !== "AbortError" ? failure.message : "The receipt review timed out. Refresh to try again."); }
@@ -132,19 +147,20 @@ export function ReceiptReallocationWorkspace() {
     {message && <p role="status" className={styles.notice}>{message}</p>}
     {readBusy && <p role="status">Loading scoped receipt records…</p>}
     {uncertain && <div className={styles.notice}><p>The pending request is locked so its saved details cannot change.</p><button type="button" className="button button-secondary" disabled={readBusy || writeBusy || !data?.capabilities.canRequest} onClick={() => void submit(uncertain)}>Retry exactly the same request</button></div>}
-    {data?.accountsLimited && <p className={styles.notice}>Only the first200 matching accounts are shown. Narrow the store or account search to find another account.</p>}
+    {data?.accountsLimited && <p className={styles.notice}>More matching accounts exist. Narrow the store or account search to find another account.</p>}
     {data?.capabilities.canRequest ? <section className={styles.panel}>
       <div className={styles.sectionHeading}><h2>{undo ? "Prepare an allocation undo" : "Request a receipt allocation correction"}</h2>{undo && <button type="button" className="button button-secondary" disabled={locked} onClick={() => { setUndo(null); setSource(null); setTarget(null); setEntryId(""); invalidate(); }}>Back to a new allocation</button>}</div>
       <form onSubmit={event => { event.preventDefault(); void prepare(); }}><fieldset disabled={locked} className={styles.fieldset}>
         <div className={styles.grid}>
           <label>Source account<select aria-label="Source account" value={source?.id ?? ""} disabled={!!undo} required onChange={event => { setSource(data.accounts.find(account => account.id === event.target.value) ?? null); setTarget(null); setEntryId(""); invalidate(); }}><option value="">Choose the current receipt account</option>{accountChoices(source).map(account => <option key={account.id} value={account.id}>{account.accountNumber} · {account.customerName}</option>)}</select></label>
           <label>Destination account<select aria-label="Destination account" value={target?.id ?? ""} disabled={!source || !!undo} required onChange={event => { setTarget(data.accounts.find(account => account.id === event.target.value) ?? null); invalidate(); }}><option value="">Choose an account in the same store</option>{accountChoices(target).filter(account => account.id !== source?.id && account.facilityId === source?.facilityId).map(account => <option key={account.id} value={account.id}>{account.accountNumber} · {account.customerName}</option>)}</select></label>
-          <label className={styles.wide}>Verified receipt position<select aria-label="Verified receipt position" value={entryId} disabled={!source || !!undo} required onChange={event => { setEntryId(event.target.value); invalidate(); }}><option value="">Choose the retained receipt</option>{data.receipts.map(receipt => <option key={receipt.entryId} value={receipt.entryId}>{receipt.paymentReference} · {zar(receipt.remaining)} available · {formatSouthAfricaDateTime(receipt.recordedAt)} SAST</option>)}</select></label>
+          <label className={styles.wide}>Verified receipt position<select aria-label="Verified receipt position" value={entryId} disabled={!source || !!undo} required onChange={event => { setEntryId(event.target.value); invalidate(); }}><option value="">Choose the retained receipt</option>{undo && !data.receipts.some(receipt => receipt.entryId === entryId) && <option value={entryId}>Original allocation receipt · load more to review availability</option>}{data.receipts.map(receipt => <option key={receipt.entryId} value={receipt.entryId}>{receipt.paymentReference} · {zar(receipt.remaining)} available · {formatSouthAfricaDateTime(receipt.recordedAt)} SAST</option>)}</select></label>
           <label>Amount in rand<input value={amount} inputMode="decimal" pattern="(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,2})?" required maxLength={15} onChange={event => { setAmount(event.target.value); invalidate(); }} /></label>
           <label>Source evidence reference<input value={evidence} required minLength={5} maxLength={200} onChange={event => { setEvidence(event.target.value); invalidate(); }} /></label>
           <label className={styles.wide}>Correction reason<textarea value={reason} required minLength={10} maxLength={500} rows={3} onChange={event => { setReason(event.target.value); invalidate(); }} /></label>
         </div>
-        {source && !data.receipts.length && <p>No available verified receipts are shown for this account. Refresh or refer the source evidence for finance review.</p>}
+        {source && !data.receipts.length && <p>{data.nextReceiptCursor ? "No eligible verified receipts on this page. Load more receipts to check older entries." : "No available verified receipts are shown for this account. Refresh or refer the source evidence for finance review."}</p>}
+        {source && data.nextReceiptCursor && <button type="button" className="button button-secondary" onClick={() => { invalidate(); void load(undefined, data.nextReceiptCursor!); }}>Load more receipts</button>}
         <button className="button button-secondary" disabled={!source || !target || !entryId}>Preview account changes</button>
       </fieldset></form>
       {preview && <section className={styles.preview} aria-label="Correction preview"><h3>Check the exact account changes</h3><div className={styles.grid}>
@@ -155,7 +171,7 @@ export function ReceiptReallocationWorkspace() {
     {data && <section className={styles.panel}><h2>Retained requests and decisions</h2><p>Newest first · SAST. A posted correction reallocates existing cash; it does not prove a new bank settlement.</p>
       {!data.requests.length && <p>No correction requests match this view.</p>}
       <div className={styles.history}>{data.requests.map(row => <CorrectionCard key={`${row.id}:${row.revision}:${generation}`} row={row} data={data} locked={locked} onDecide={decide} onUndo={startUndo} />)}</div>
-      {data.nextCursor && <button type="button" className="button button-secondary" disabled={locked} onClick={() => void load(data.nextCursor!)}>Load older requests</button>}
+      {data.nextCursor && <button type="button" className="button button-secondary" disabled={locked} onClick={() => { invalidate(); void load(data.nextCursor!); }}>Load older requests</button>}
     </section>}
   </div>;
 }

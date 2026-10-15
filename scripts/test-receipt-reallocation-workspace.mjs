@@ -21,14 +21,25 @@ try {
     const page = await browser.newPage({ viewport: { width, height: 1000 } });
     const errors = []; page.on('pageerror', error => errors.push(error.message));
     let mode = 'success', records = [row(ownId, userId), row(reviewId, id(12)), row(postedId, id(12), 'POSTED')];
-    const commands = [], created = new Map();
+    const commands = [], reads = [], created = new Map();
+    const olderReceiptId=id(201); const olderRequest={...row(id(40),id(12),"REJECTED"),createdAt:"2026-10-14T09:00:00.000Z"};
     await page.route('**/api/v1/adjustments/receipt-reallocations**', async route => {
       const req = route.request(), url = new URL(req.url());
       if (req.method() === 'GET') {
+        reads.push(Object.fromEntries(url.searchParams));
         if (mode === '403') return route.fulfill({ status: 403, json: { error: {} } });
         if (mode === 'malformed') return route.fulfill({ json: { data: { accounts: [] } } });
         const selectedSource = url.searchParams.get('sourceAccountId');
-        return route.fulfill({ json: { data: { userId, capabilities: { canRequest: true, canApprove: true }, facilities: [{ id: facilityId, name: 'Synthetic Midpoint' }, { id: id(11), name: 'Other synthetic store' }], accounts, accountsLimited: false, receipts: selectedSource ? [{ entryId: selectedSource === targetId ? targetEntryId : entryId, description: 'Synthetic source receipt', recordedAt: '2026-10-15T08:00:00.000Z', remaining: '200.00', paymentReference: 'VERIFIED-SYNTHETIC-RECEIPT' }] : [], requests: mode === 'missing-preview' ? records.map(record => ({...record,retainedPreview:null})) : records, nextCursor: null } } });
+        const cursor=url.searchParams.get('receiptCursor');
+        if(cursor){assert.ok(selectedSource);assert.ok(cursor.startsWith('receipt-'+selectedSource+'-'));}
+        const makeReceipt=receiptId=>({entryId:receiptId,description:'Synthetic source receipt',recordedAt:'2026-10-15T08:00:00.000Z',remaining:'200.00',paymentReference:'VERIFIED-SYNTHETIC-RECEIPT'});
+        const first=makeReceipt(selectedSource===targetId?targetEntryId:entryId);
+        let receipts=[],nextReceiptCursor=selectedSource?'receipt-'+selectedSource+'-start':null;
+        if(cursor?.endsWith('-start')){receipts=[first,...Array.from({length:24},(_,n)=>makeReceipt(id(1000+n)))];nextReceiptCursor='receipt-'+selectedSource+'-empty';}
+        if(cursor?.endsWith('-empty'))nextReceiptCursor='receipt-'+selectedSource+'-older';
+        if(cursor?.endsWith('-older')){receipts=[first,makeReceipt(olderReceiptId)];nextReceiptCursor=null;}
+        const history=url.searchParams.has('cursor')?[olderRequest]:records;
+        return route.fulfill({ json: { data: { userId, capabilities: { canRequest: true, canApprove: true }, facilities: [{ id: facilityId, name: 'Synthetic Midpoint' }, { id: id(11), name: 'Other synthetic store' }], accounts, accountsLimited: false, receipts, nextReceiptCursor, requests: mode === 'missing-preview' ? history.map(record => ({...record,retainedPreview:null})) : history, nextCursor:url.searchParams.has('cursor')?null:'request-page-2' } } });
       }
       const input = req.postDataJSON(); commands.push(input);
       if (input.action === 'preview') {
@@ -68,6 +79,10 @@ try {
     mode = 'success'; await page.getByRole('button', { name: 'Refresh recorded state', exact: true }).click();
     await page.getByLabel('Source account', { exact: true }).selectOption(sourceId);
     await expect(page.getByLabel('Verified receipt position', { exact: true })).toBeEnabled();
+    await expect(page.getByText('No eligible verified receipts on this page.',{exact:false})).toBeVisible();
+    await expect(page.getByRole('button',{name:'Load more receipts',exact:true})).toBeEnabled();
+    await page.getByRole('button',{name:'Load more receipts',exact:true}).click();
+    await expect(page.getByLabel('Verified receipt position',{exact:true}).locator('option')).toHaveCount(26);
     await page.getByLabel('Destination account', { exact: true }).selectOption(targetId);
     await expect(page.getByLabel('Destination account', { exact: true }).locator('option')).toHaveCount(2);
     await page.getByLabel('Verified receipt position', { exact: true }).selectOption(entryId);
@@ -81,6 +96,26 @@ try {
     await expect(page.getByRole('alert')).toContainText('preview differs');
     mode = 'success'; await page.getByRole('button', { name: 'Preview account changes', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Submit for independent review', exact: true })).toBeDisabled();
+    await page.getByRole('button',{name:'Load older requests',exact:true}).click();
+    await expect(page.locator('article')).toHaveCount(4);
+    await expect(page.getByLabel('Verified receipt position',{exact:true})).toHaveValue(entryId);
+    await expect(page.getByLabel('Verified receipt position',{exact:true}).locator('option')).toHaveCount(26);
+    await page.getByRole('button',{name:'Preview account changes',exact:true}).click();
+    await page.getByRole('button',{name:'Load more receipts',exact:true}).click();
+    await expect.poll(()=>reads.at(-1)?.receiptCursor).toBe('receipt-'+sourceId+'-empty');
+    await expect(page.getByRole('button',{name:'Load more receipts',exact:true})).toBeEnabled();
+    await expect(page.getByLabel('Verified receipt position',{exact:true})).toHaveValue(entryId);
+    await expect(page.locator('article')).toHaveCount(4);
+    await expect(page.getByRole('region',{name:'Correction preview'})).toHaveCount(0);
+    await page.getByRole('button',{name:'Load more receipts',exact:true}).click();
+    await expect(page.getByLabel('Verified receipt position',{exact:true}).locator('option')).toHaveCount(27);
+    await expect(page.getByLabel('Verified receipt position',{exact:true})).toHaveValue(entryId);
+    await expect(page.locator('article')).toHaveCount(4);
+    await expect(page.getByRole('button',{name:'Load older requests',exact:true})).toHaveCount(0);
+    await page.getByLabel('Verified receipt position',{exact:true}).selectOption(olderReceiptId);
+    await page.getByRole('button',{name:'Preview account changes',exact:true}).click();
+    assert.equal(commands.findLast(command=>command.action==='preview').input.sourceEntryId,olderReceiptId);
+
     await page.getByLabel('Amount in rand', { exact: true }).fill('76.25');
     await expect(page.getByRole('region', { name: 'Correction preview' })).toHaveCount(0);
     await page.getByLabel('Amount in rand', { exact: true }).fill('75.25');
@@ -112,6 +147,12 @@ try {
     await expect(page.getByLabel('Source account', { exact: true })).toHaveValue(targetId);
     await expect(page.getByLabel('Destination account', { exact: true })).toHaveValue(sourceId);
     await expect(page.getByLabel('Source account', { exact: true })).toBeDisabled();
+    await expect.poll(()=>reads.at(-1)?.sourceAccountId).toBe(targetId);
+    assert.equal(reads.at(-1).receiptCursor,undefined,'source change resets receipt cursor');
+    await expect(page.getByLabel('Verified receipt position',{exact:true}).locator(`option[value="${olderReceiptId}"]`)).toHaveCount(0);
+    await page.getByRole('button',{name:'Load more receipts',exact:true}).click();
+    await expect(page.getByLabel('Verified receipt position',{exact:true}).locator(`option[value="${targetEntryId}"]`)).toHaveCount(1);
+
     await page.getByLabel('Amount in rand', { exact: true }).fill('25.25');
     await page.getByLabel('Source evidence reference', { exact: true }).fill('Synthetic undo evidence');
     await page.getByLabel('Correction reason', { exact: true }).fill('Undo the retained synthetic allocation');
@@ -133,5 +174,5 @@ try {
     await expect(page.getByRole('heading', { name: 'Retained requests and decisions', exact: true })).toBeVisible();
     assert.deepEqual(errors, []); await page.close();
   }
-  console.log('Receipt staff actual-component workflow passed1440/768/390/320: scoped choices, preview/source holds, edit invalidation, immutable uncertain retry, independent review, uncertain decision refresh, retained undo and direct control bounds.');
+  console.log('Receipt staff actual-component workflow passed1440/768/390/320: scoped choices, preview/source holds, edit invalidation, immutable uncertain retry, independent review, uncertain decision refresh, retained undo, independent receipt/history cursors, empty receipt pages, earlier selection and source reset, and direct control bounds.');
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
