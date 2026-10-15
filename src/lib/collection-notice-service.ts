@@ -9,7 +9,7 @@ import { encryptIntegrationSecret, decryptIntegrationSecret } from "@/lib/integr
 import { emailProvider, type EmailProvider } from "@/lib/email";
 import { privacyHash } from "@/lib/request-security";
 import { renderCollectionNotice, noticeHash, COLLECTION_NOTICE_VERSION, collectionEmailConfigured } from "@/lib/collection-notice-policy";
-import { noticeBatchAccountsSchema, noticeBatchPreparationSchema } from "@/lib/collection-notice-batch-policy";
+import { noticeBatchAccountsSchema, noticeBatchPreparationSchema, noticeBatchApprovalSchema } from "@/lib/collection-notice-batch-policy";
 const domain = "COLLECTION_EMAIL_NOTICE";
 const idFor = (org: string, account: string, date: string) => `collection-email:${noticeHash([org,account,date])}`;
 const storedSchema = z.object({ version:z.literal(1), revision:z.string().uuid(), accountId:z.string(), asOf:z.string(), sourceFingerprint:z.string().regex(/^[a-f0-9]{64}$/), payloadHash:z.string().regex(/^[a-f0-9]{64}$/), payloadEncrypted:z.string(), contributors:z.array(z.string()).min(1), approvedBy:z.string().nullable(), approvalReference:z.string().nullable(), approvedAt:z.string().datetime().nullable() }).strict();
@@ -67,18 +67,28 @@ export async function prepareCollectionNoticeBatch(scope:RequestScope,input:unkn
 const reviewSchema=z.object({id:z.string().min(1).max(120),revision:z.string().uuid(),action:z.enum(["approve","reopen","cancel"]),reference:z.string().trim().min(3).max(240)}).strict();
 export async function reviewCollectionNotice(scope:RequestScope,input:unknown){
   const command=reviewSchema.parse(input);
-  return db.$transaction(async tx=>{
-    const value=await load(tx,scope,command.id);if(value.saved.revision!==command.revision)throw Error("COLLECTION_NOTICE_CHANGED");const snapshot={...value.saved,revision:randomUUID()};let status=value.row.status;
+  return db.$transaction(tx=>reviewInTransaction(tx,scope,command),{isolationLevel:"Serializable"});
+}
+async function reviewInTransaction(tx:Prisma.TransactionClient,scope:RequestScope,command:z.infer<typeof reviewSchema>,expectedAccountId?:string){
+    const value=await load(tx,scope,command.id);if(expectedAccountId&&value.saved.accountId!==expectedAccountId)throw Error("COLLECTION_NOTICE_CHANGED");if(value.saved.revision!==command.revision)throw Error("COLLECTION_NOTICE_CHANGED");const snapshot={...value.saved,revision:randomUUID()};let status=value.row.status;
     if(command.action==="approve"){
       if(status!=="DRAFT")throw Error("COLLECTION_NOTICE_IMMUTABLE");if(value.saved.contributors.includes(scope.userId))throw Error("COLLECTION_NOTICE_SELF_APPROVAL");
-      if(value.current.blockers.length||value.current.fingerprint!==value.saved.sourceFingerprint||noticeHash(renderCollectionNotice(value.current))!==value.saved.payloadHash)throw Error("COLLECTION_NOTICE_CHANGED");
+      if(value.current.asOf!==value.saved.asOf||value.current.blockers.length||value.current.fingerprint!==value.saved.sourceFingerprint||noticeHash(renderCollectionNotice(value.current))!==value.saved.payloadHash)throw Error("COLLECTION_NOTICE_CHANGED");
       status="APPROVED";snapshot.approvedBy=scope.userId;snapshot.approvedAt=new Date().toISOString();snapshot.approvalReference=command.reference;
     }else{
       if(!["DRAFT","APPROVED"].includes(status))throw Error("COLLECTION_NOTICE_IMMUTABLE");status=command.action==="cancel"?"CANCELLED":"DRAFT";snapshot.approvedBy=snapshot.approvedAt=snapshot.approvalReference=null;
     }
     await tx.configurationProfile.update({where:{id:command.id},data:{status,config:snapshot}});
     await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:value.current.facilityId,actorId:scope.userId,action:`collection.notice.${command.action}`,entityType:"ConfigurationProfile",entityId:command.id,after:{revision:snapshot.revision,status,reference:command.reference,payloadHash:snapshot.payloadHash}}});return view(await load(tx,scope,command.id),scope);
-  },{isolationLevel:"Serializable"});
+}
+export async function approveCollectionNoticeBatch(scope:RequestScope,input:unknown){
+  const command=noticeBatchApprovalSchema.parse(input),asOf=southAfricaDateKey(new Date());
+  return db.$transaction(async tx=>{
+    const notices=[];
+    for(const item of command.items.toSorted((a,b)=>a.accountId.localeCompare(b.accountId)))notices.push(await reviewInTransaction(tx,scope,{id:item.id,revision:item.revision,action:"approve",reference:command.reference},item.accountId));
+    if(asOf!==southAfricaDateKey(new Date()))throw Error("COLLECTION_NOTICE_CHANGED");
+    return{asOf,notices,approved:true as const,emailSent:false as const};
+  },{isolationLevel:"Serializable",timeout:30000});
 }
 const sendSchema=z.object({id:z.string().min(1).max(120),revision:z.string().uuid(),confirm:z.literal(true)}).strict();
 export async function sendCollectionNotice(scope:RequestScope,input:unknown,injectedProvider?:EmailProvider){
