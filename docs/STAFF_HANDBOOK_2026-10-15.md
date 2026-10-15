@@ -118,7 +118,7 @@ Open **Booking & move-in events**, then **Staff event emails** with your own per
 
 **Choose the scope:** select the actual store, named existing staff recipients (maximum five), recorded event types and source dates. Booking created, agreement signed, move-in started and key handover recorded are different evidence. None alone proves payment or physical access.
 
-**Set explicit dates:** source dates include complete South African days (up to 32). Delivery dates and times are also SAST. Delivery expiry must extend past midnight following the final source day; a past window cannot be approved.
+**Set explicit dates:** source dates include complete South African days (up to 32). Delivery dates and times are also SAST. Delivery expiry must reach midnight following the final source day; a past window cannot be approved.
 
 **Preview first:** read the actual source examples and recipient list. Editing a field clears the preview. **Retain for independent review** saves a policy and sends nothing. An older page of source records may still need evaluation.
 
