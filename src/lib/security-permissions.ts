@@ -1,4 +1,5 @@
 export const securityPermissionGroups = [
+  { label: "Staff event email review", permissions: [["staff_event_emails.view", "View scoped staff email policies and outbox"], ["staff_event_emails.manage", "Prepare or cancel staff event email policies"], ["staff_event_emails.approve", "Independently review staff event email policies"]] },
   { label: "Governed booking quotes", permissions: [["reservation_prices.view", "Read original booking quotes and amendment evidence"], ["reservation_prices.propose", "Propose or withdraw unsigned booking price changes"], ["reservation_prices.approve", "Independently approve booking quote proposals"]] },
   { label: "Customers and leasing", permissions: [
     ["customer_history.export", "Download a customer's contact history (scoped delegation)"],
