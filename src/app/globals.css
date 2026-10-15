@@ -2982,6 +2982,10 @@ a.module-card:focus-visible {
 .customer-history-heading h3 { font-size:18px; }
 .customer-history-heading p { color:var(--muted); font-size:11px; margin-bottom:0; }
 .customer-history-filters { padding:14px; background:#f6f8f9; border:1px solid #e1e7e9; border-radius:10px; margin:18px 0; }
+.history-advanced-filters { grid-column:1 / -1; min-width:0; }
+.history-advanced-filters summary { cursor:pointer; font-weight:600; }
+.history-advanced-filters .customer-history-filters { padding:0; border:0; margin:12px 0; grid-template-columns:repeat(2,minmax(0,1fr)); }
+@media(max-width:600px) { .history-advanced-filters .customer-history-filters { grid-template-columns:1fr; } }
 .customer-history label { font-size:11px; }
 .customer-history input, .customer-history select { padding:9px 10px; min-height:38px; font-size:12px; }
 .customer-note-form { background:white; border:1px solid #dce5e4; border-top:3px solid #ef5707; box-shadow:0 4px 18px #153c3309; }
