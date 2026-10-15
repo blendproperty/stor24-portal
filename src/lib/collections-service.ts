@@ -122,6 +122,10 @@ export async function updateCollection(scope: RequestScope, raw: CollectionActio
       if (input.ownerId && !eligible.some(u => u.id === input.ownerId && (u.facilities.includes(null) || u.facilities.includes(account.tenancy!.facilityId)))) throw new Error("COLLECTION_OWNER");
       data.ownerId = input.ownerId; data.nextFollowUp = input.nextFollowUp;
     } else if (input.action === "dispute") { data.disputed = input.disputed; data.disputeReason = input.disputed ? input.note : null; }
+    else if (input.action === "escalation-review") {
+      if (input.reviewOn < today) throw new Error("COLLECTION_DATE");
+      // Internal review record only. Never clear a hold, change terms, schedule a customer send, post a fee or command access.
+    }
     else if (input.action === "promise") {
       if (evaluated.ageing.issue || evaluated.hold || moneyCents(input.amount) > evaluated.ageing.overdue || input.dueDate < today) throw new Error("COLLECTION_PROMISE");
       if (await tx.collectionPromise.count({ where: { caseId: c.id, status: "OPEN" } })) throw new Error("COLLECTION_PROMISE");
@@ -133,8 +137,15 @@ export async function updateCollection(scope: RequestScope, raw: CollectionActio
       await tx.collectionPromise.update({ where: { id: p.id }, data: { status: input.status, closedAt: new Date() } });
     }
     await tx.collectionCase.update({ where: { id: c.id }, data });
-    const activity = await tx.collectionActivity.create({ data: { caseId: c.id, requestKey: input.requestKey, actorId: scope.userId, action: input.action === "follow-up" ? input.outcome : input.action, note: input.note, payload: json(input) } });
-    await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: account.tenancy!.facilityId, actorId: scope.userId, entityType: "CollectionCase", entityId: c.id, action: `collections.${input.action}`, after: json({ activityId: activity.id, revision: input.revision + 1 }) } });
+    const review = input.action === "escalation-review" ? {
+      status: "HELD_POLICY", effect: "INTERNAL_REVIEW_ONLY", target: input.target, proposedChannel: input.target === "NOTICE" ? input.channel : null, reviewOn: input.reviewOn, proposedPolicyReference: input.policyReference || null,
+      blockers: ["An approved escalation policy and responsible approver are required.", ...(evaluated.ageing.issue ? [evaluated.ageing.issue] : []), ...(evaluated.hold ? [evaluated.hold] : []), ...(input.target === "NOTICE" ? ["Use the existing independently reviewed email workflow where approved. Additional channels require approved templates, consent and provider acceptance."] : input.target === "FEE" ? ["Finance fee authority and the supported adjustment workflow are required."] : ["Approved access/legal policy, an authorised access operator and physical validation are required."])],
+      sourceHash: createHash("sha256").update(JSON.stringify({ accountId: account.id, updatedAt: account.updatedAt, balance: account.balance.toString(), ledger: account.ledgerEntries.map(e => [e.id, e.type, e.amount.toString(), e.effectiveAt, e.reversalOfId]), caseRevision: input.revision, terms: c.terms, hold: evaluated.hold, issue: evaluated.ageing.issue })).digest("hex"),
+      customerMessageSent: false, financialEntriesCreated: 0, accessCommandsCreated: 0,
+    } : null;
+    const activity = await tx.collectionActivity.create({ data: { caseId: c.id, requestKey: input.requestKey, actorId: scope.userId, action: input.action === "follow-up" ? input.outcome : review ? `Escalation review · ${review.target.toLowerCase()}${review.proposedChannel ? ` / ${review.proposedChannel}` : ""} · held for policy` : input.action,
+      note: review ? `Internal review requested for ${review.reviewOn}. ${input.note}\n${review.blockers.join(" ")}${review.proposedPolicyReference ? ` Proposed policy evidence (unverified): ${review.proposedPolicyReference}.` : ""} No message, fee or access action was executed.` : input.note, payload: json(input) } });
+    await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: account.tenancy!.facilityId, actorId: scope.userId, entityType: "CollectionCase", entityId: c.id, action: `collections.${input.action}`, after: json({ activityId: activity.id, revision: input.revision + 1, ...(review ? { review } : {}) }) } });
     return { id: activity.id, repeated: false };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000 });
 }

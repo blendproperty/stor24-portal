@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ageAccount, csvCell, dateKey, effectiveEntries, promiseProgress, type AgeEntry } from "../src/lib/collections-policy";
+import { ageAccount, csvCell, dateKey, effectiveEntries, promiseProgress, collectionActionSchema, type AgeEntry } from "../src/lib/collections-policy";
+import { randomUUID } from "node:crypto";
+
+test("internal escalation preparation accepts policy review fields and rejects execution instructions", () => {
+  const request = { accountId: "cmaccountfixture000001", revision: 0, requestKey: randomUUID(), note: "Policy decision needed", action: "escalation-review", target: "NOTICE", channel: "WHATSAPP", reviewOn: "2026-10-16", policyReference: "Proposed reference" };
+  assert.equal(collectionActionSchema.safeParse(request).success, true);
+  for (const extra of [{ execute: true }, { approve: true }, { feeAmount: 100 }, { lockDoor: true }, { recipient: "other@example.invalid" }]) assert.equal(collectionActionSchema.safeParse({ ...request, ...extra }).success, false);
+  assert.equal(collectionActionSchema.safeParse({ ...request, channel: "FAX" }).success, false);
+  assert.equal(collectionActionSchema.safeParse({ ...request, target: "DISPOSE" }).success, false);
+});
 const terms = { dueDays: 0, allocation: "OLDEST_DUE_FIRST", approvalReference: "CI approved terms", overrides: [] };
 const entry = (id: string, type: string, amount: string, date: string, extra: Partial<AgeEntry> = {}): AgeEntry => ({ id, type, amount, description: id, effectiveAt: new Date(`${date}T00:00:00+02:00`), ...extra });
 test("ageing boundaries use SAST days with today still current", () => {
