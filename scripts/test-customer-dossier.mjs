@@ -4,6 +4,8 @@ import {createServer} from 'node:http';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import {PDFDocument} from 'pdf-lib';
+import ExcelJS from 'exceljs';
+const excel=new ExcelJS.Workbook();excel.addWorksheet('Customer history').addRow(['Synthetic history']);const fixtureExcelBytes=await excel.xlsx.writeBuffer();
 const policyBundle=await build({entryPoints:['src/lib/customer-history-policy.ts'],bundle:true,write:false,format:'esm',platform:'node'});
 const {historyExportSchema}=await import('data:text/javascript;base64,'+Buffer.from(policyBundle.outputFiles[0].text).toString('base64'));
 const fixturePdf=await PDFDocument.create();fixturePdf.addPage().drawText('Synthetic customer contact history');const fixturePdfBytes=await fixturePdf.save();
@@ -21,11 +23,11 @@ try{
   await page.route('**/api/v1/customers/*/history**',async route=>{
     if(route.request().url().includes('/export')){
       const body=route.request().postDataJSON();requests.push(body);
-      if(!historyExportSchema.safeParse(body).success)return route.fulfill({status:422,json:{error:{message:"Choose PDF or CSV and valid history filters."}}});
+      if(!historyExportSchema.safeParse(body).success)return route.fulfill({status:422,json:{error:{message:"Choose PDF, CSV or Excel and valid history filters."}}});
       if(mode==='403')return route.fulfill({status:403,json:{error:{message:'Download access is unavailable.'}}});
       if(mode==='malformed')return route.fulfill({contentType:'text/html',body:'not a file'});
       if(mode==='hold')return;
-      return route.fulfill({headers:{'content-type':body.format==='PDF'?'application/pdf':'text/csv; charset=utf-8'},body:body.format==='PDF'?Buffer.from(fixturePdfBytes):'customerName,body\r\nAlex Example,Complete stored history'});
+      return route.fulfill({headers:{'content-type':body.format==='PDF'?'application/pdf':body.format==='XLSX'?'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'text/csv; charset=utf-8'},body:body.format==='PDF'?Buffer.from(fixturePdfBytes):body.format==='XLSX'?Buffer.from(fixtureExcelBytes):'customerName,body\r\nAlex Example,Complete stored history'});
     }
     return route.fulfill({json:{data}});
   });
@@ -41,20 +43,20 @@ try{
   const initialHeight=await page.locator('.customer-detail').evaluate(e=>e.getBoundingClientRect().height);
   if(width>=1024)assert.ok(initialHeight<1300,'Desktop dossier must not be a long stack');
   await page.screenshot({path:`output/customer-dossier/${width}.png`,fullPage:true});
-  for(const format of ['PDF','CSV']){
+  for(const format of ['PDF','CSV','XLSX']){
     const pending=page.waitForEvent('download');
-    await page.getByRole('button',{name:format==='PDF'?'Download history':'CSV',exact:true}).click();
+    await page.getByRole('button',{name:format==='PDF'?'Download history':format==='XLSX'?'Excel':'CSV',exact:true}).click();
     const downloaded=await pending;assert.ok(downloaded.suggestedFilename().endsWith('.'+format.toLowerCase()));await downloaded.saveAs(`output/customer-dossier/${width}.${format.toLowerCase()}`);
     assert.equal(requests.at(-1).format,format);assert.equal(requests.at(-1).kind,'ALL');assert.equal(requests.at(-1).category,undefined);assert.ok(historyExportSchema.safeParse(requests.at(-1)).success);
   }
   await page.getByRole('combobox',{name:'Note category',exact:true}).selectOption('HANDOVER');
   await page.getByRole('button',{name:'Apply filters',exact:true}).click();
-  const filteredDownload=page.waitForEvent('download');await page.getByRole('button',{name:'CSV',exact:true}).click();await filteredDownload;
+  const filteredDownload=page.waitForEvent('download');await page.getByRole('button',{name:'Excel',exact:true}).click();await filteredDownload;
   assert.equal(requests.at(-1).category,'HANDOVER');assert.ok(historyExportSchema.safeParse(requests.at(-1)).success);
   const pending=page.waitForEvent('download');await page.getByRole('button',{name:'Download WHATSAPP · RESERVATION CONFIRMED',exact:true}).click();await pending;assert.equal(requests.at(-1).entryId,'message-1');assert.equal(requests.at(-1).entryKind,'COMMUNICATION');
-  for(const failure of ['403','malformed']){mode=failure;await page.getByRole('button',{name:'Download history',exact:true}).click();await expect(page.getByRole('alert')).toBeVisible();}
+  for(const failure of ['403','malformed']){mode=failure;for(const name of ['Download history','Excel']){await page.getByRole('button',{name,exact:true}).click();await expect(page.getByRole('alert')).toBeVisible();}}
   mode='success';await page.getByRole('button',{name:'Add note',exact:true}).click();await page.getByLabel('Staff note',{exact:true}).fill('Draft retained between sections');
   await page.getByRole('button',{name:'Contact details',exact:true}).click();await page.getByRole('button',{name:'History & notes',exact:true}).click();await expect(page.getByLabel('Staff note',{exact:true})).toHaveValue('Draft retained between sections');
-  assert.deepEqual(errors,[]);await page.close();console.log(`PASS ${width}px: compact customer tabs, draft retention, PDF/CSV download, single comm download and access/content failure recovery`);
+  assert.deepEqual(errors,[]);await page.close();console.log(`PASS ${width}px: compact customer tabs, draft retention, PDF/CSV/Excel download, single comm download and access/content failure recovery`);
  }
 }finally{await browser.close();await new Promise(r=>server.close(r));}
