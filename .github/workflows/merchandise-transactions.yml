@@ -54,6 +54,7 @@ jobs:
           INTEGRATION_CONFIG_ENCRYPTION_KEY: synthetic-payment-request-ci-vault-key-at-least-32
       - run: npx tsx --test tests/integration/netcash-debicheck-template.test.ts
       - run: npx tsx --test tests/integration/netcash-debicheck-requests.test.ts
+      - run: npx tsx --test tests/integration/netcash-debicheck-attempt-journal.test.ts
       - run: npx tsx --test tests/integration/posted-recurring-charge-report.test.ts
       - run: npx tsx --test tests/integration/visual-reporting.test.ts
       - run: npx tsx --test tests/integration/marketing-payment-cohorts.test.ts
