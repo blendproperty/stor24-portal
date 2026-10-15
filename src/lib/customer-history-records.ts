@@ -11,6 +11,7 @@ export async function customerHistoryRecords(scope: RequestScope, customerId: st
   const facility = { select: { name: true } } as const;
   const tenancy = { customerId, customer: { organisationId: scope.organisationId }, facility: facilityWhere(scope) };
   const search = query.search ? { contains: query.search, mode: "insensitive" as const } : undefined;
+  const author = (value: { name: string; organisationId: string } | null) => value?.organisationId === scope.organisationId ? value.name : null;
   const linked = source("MILESTONE") ? await db.tenancy.findMany({ where: tenancy, select: { id: true, facilityId: true }, take: 1001 }) : [];
   if (linked.length > 1000) throw new Error("HISTORY_SOURCE_LIMIT");
   const [bookings, tenancies, documents, agreements, ledger, appointments, milestones] = await Promise.all([
@@ -25,14 +26,14 @@ export async function customerHistoryRecords(scope: RequestScope, customerId: st
       ...(search ? { reservation: { customerId, customer: { organisationId: scope.organisationId }, facility: facilityWhere(scope), publicReference: search } } : {}), ...boundary("AGREEMENT", "signedAt") },
       select: { id: true, signedAt: true, status: true, reservation: { select: { publicReference: true, facility } } }, orderBy: [{ signedAt: "desc" }, { id: "desc" }], take: 51 }) : [],
     source("ACCOUNT") && financial ? db.ledgerEntry.findMany({ where: { account: { customerId, customer: { organisationId: scope.organisationId }, tenancy: { facility: facilityWhere(financial) } }, ...selected,
-      ...(search ? { description: search } : {}), ...boundary("ACCOUNT", "createdAt") }, select: { id: true, createdAt: true, effectiveAt: true, type: true, amount: true, description: true, reversalOfId: true, createdBy: { select: { name: true } }, account: { select: { accountNumber: true, tenancy: { select: { facility } } } } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 51 }) : [],
+      ...(search ? { description: search } : {}), ...boundary("ACCOUNT", "createdAt") }, select: { id: true, createdAt: true, effectiveAt: true, type: true, amount: true, description: true, reversalOfId: true, createdBy: { select: { name: true, organisationId: true } }, account: { select: { accountNumber: true, tenancy: { select: { facility } } } } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 51 }) : [],
     source("APPOINTMENT") ? db.auditEvent.findMany({ where: { organisationId: scope.organisationId, facility: facilityWhere(scope), entityType: "Task", action: { in: ["staff_followup.created", "staff_followup.handover", "staff_followup.acknowledge", "staff_followup.complete", "staff_followup.cancel"] },
       after: { path: ["customerId"], equals: customerId }, ...selected, ...(search ? { OR: [{ after: { path: ["title"], string_contains: query.search, mode: "insensitive" as const } }, { after: { path: ["description"], string_contains: query.search, mode: "insensitive" as const } }] } : {}), ...boundary("APPOINTMENT", "occurredAt") },
-      select: { id: true, occurredAt: true, action: true, after: true, actor: { select: { name: true } }, facility }, orderBy: [{ occurredAt: "desc" }, { id: "desc" }], take: 51 }) : [],
+      select: { id: true, occurredAt: true, action: true, after: true, actor: { select: { name: true, organisationId: true } }, facility }, orderBy: [{ occurredAt: "desc" }, { id: "desc" }], take: 51 }) : [],
     linked.length ? db.auditEvent.findMany({ where: { organisationId: scope.organisationId, entityType: "Tenancy", OR: linked.map(row => ({ entityId: row.id, facilityId: row.facilityId })),
       action: { in: Object.entries(milestoneTitles).filter(([action, title]) => !query.search || `${action} ${title}`.toLowerCase().includes(query.search.toLowerCase())).map(([action]) => action) },
       ...selected, ...boundary("MILESTONE", "occurredAt") },
-      select: { id: true, occurredAt: true, action: true, actor: { select: { name: true } }, facility }, orderBy: [{ occurredAt: "desc" }, { id: "desc" }], take: 51 }) : [],
+      select: { id: true, occurredAt: true, action: true, actor: { select: { name: true, organisationId: true } }, facility }, orderBy: [{ occurredAt: "desc" }, { id: "desc" }], take: 51 }) : [],
   ]);
   const entry = (value: Partial<HistoryEntry> & Pick<HistoryEntry, "id" | "kind" | "at" | "title">): HistoryEntry => ({ body: null, category: null, author: null, facility: null, channel: null, status: null, sentAt: null, deliveredAt: null, readAt: null, ...value });
   const day = (value: Date) => value.toLocaleDateString("en-ZA", { timeZone: "Africa/Johannesburg" });
@@ -41,13 +42,13 @@ export async function customerHistoryRecords(scope: RequestScope, customerId: st
     ...tenancies.map(row => entry({ id: row.id, kind: "TENANCY", at: row.createdAt.toISOString(), title: `Tenancy recorded · ${row.account.accountNumber}`, body: `Start ${day(row.startDate)}${row.endDate ? ` · End ${day(row.endDate)}` : ""}. Status shown is current; this event does not confirm keys or access.`, status: row.status, facility: row.facility.name })),
     ...documents.map(row => entry({ id: row.id, kind: "DOCUMENT", at: row.createdAt.toISOString(), title: `Document recorded · ${row.type.replaceAll("_", " ")}`, body: `${row.signedAt ? `Signed ${day(row.signedAt)}. ` : ""}Status shown is current. Original documents remain in the customer documents area.`, status: row.status, facility: row.tenancy.facility.name })),
     ...agreements.filter(row => row.signedAt).map(row => entry({ id: row.id, kind: "AGREEMENT", at: row.signedAt!.toISOString(), title: "Booking agreement signed", body: `${row.reservation.publicReference ?? "Booking"}. Signature is separate from payment verification and move-in readiness.`, status: row.status, facility: row.reservation.facility.name })),
-    ...ledger.map(row => entry({ id: row.id, kind: "ACCOUNT", at: row.createdAt.toISOString(), title: `Account entry · ${row.account.accountNumber} · ${row.type}`, body: `${row.description} · Recorded amount ZAR ${row.amount.toFixed(2)} · Effective ${day(row.effectiveAt)}${row.reversalOfId ? " · Reversal entry" : ""}. This is a ledger record, not independent bank settlement proof.`, author: row.createdBy?.name ?? null, facility: row.account.tenancy?.facility.name ?? null })),
-    ...milestones.map(row => entry({ id: row.id, kind: "MILESTONE", at: row.occurredAt.toISOString(), title: milestoneTitles[row.action], body: "Retained staff workflow event. Signing, payment verification, key handover and active access are separate stages.", author: row.actor?.name ?? null, facility: row.facility?.name ?? null })),
+    ...ledger.map(row => entry({ id: row.id, kind: "ACCOUNT", at: row.createdAt.toISOString(), title: `Account entry · ${row.account.accountNumber} · ${row.type}`, body: `${row.description} · Recorded amount ZAR ${row.amount.toFixed(2)} · Effective ${day(row.effectiveAt)}${row.reversalOfId ? " · Reversal entry" : ""}. This is a ledger record, not independent bank settlement proof.`, author: author(row.createdBy), facility: row.account.tenancy?.facility.name ?? null })),
+    ...milestones.map(row => entry({ id: row.id, kind: "MILESTONE", at: row.occurredAt.toISOString(), title: milestoneTitles[row.action], body: "Retained staff workflow event. Signing, payment verification, key handover and active access are separate stages.", author: author(row.actor), facility: row.facility?.name ?? null })),
     ...appointments.map(row => {
       const data = row.after && typeof row.after === "object" && !Array.isArray(row.after) ? row.after : {};
       const title = "title" in data && typeof data.title === "string" ? data.title.slice(0, 200) : "Customer follow-up";
       const description = "description" in data && typeof data.description === "string" ? data.description.slice(0, 5000) : "";
-      return entry({ id: row.id, kind: "APPOINTMENT", at: row.occurredAt.toISOString(), title: `${row.action.replace("staff_followup.", "Follow-up ")} · ${title}`, body: description || null, author: row.actor?.name ?? null, facility: row.facility?.name ?? null });
+      return entry({ id: row.id, kind: "APPOINTMENT", at: row.occurredAt.toISOString(), title: `${row.action.replace("staff_followup.", "Follow-up ")} · ${title}`, body: description || null, author: author(row.actor), facility: row.facility?.name ?? null });
     }),
   ];
 }
