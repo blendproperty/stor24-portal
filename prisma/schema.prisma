@@ -201,6 +201,8 @@ enum AccessDecisionState {
 }
 
 model Organisation {
+  staffOperationalAcknowledgements StaffOperationalAcknowledgement[]
+  arrivalHandovers ArrivalHandover[]
   customerNotes CustomerNote[]
   walkInVisits WalkInVisit[]
   marketingCampaigns MarketingCampaign[]
@@ -265,6 +267,8 @@ model UserInvitation {
 }
 
 model Facility {
+  staffOperationalAcknowledgements StaffOperationalAcknowledgement[]
+  arrivalHandovers ArrivalHandover[]
   customerNotes CustomerNote[]
   walkInVisits WalkInVisit[]
   reportHistoryImports ReportHistoryImport[]
@@ -460,6 +464,7 @@ model Lead {
 }
 
 model Reservation {
+  arrivalHandover ArrivalHandover?
   walkInVisit WalkInVisit?
   productLine String @default("STORAGE")
   businessDetails Json?
@@ -1149,6 +1154,9 @@ model Document {
 }
 
 model User {
+  staffOperationalAcknowledgements StaffOperationalAcknowledgement[]
+  ownedArrivalHandovers ArrivalHandover[] @relation("ArrivalOwner")
+  coveringArrivalHandovers ArrivalHandover[] @relation("ArrivalCover")
   customerNotes CustomerNote[]
   walkInVisits WalkInVisit[]
   id                  String               @id @default(cuid())
@@ -1311,6 +1319,42 @@ model Task {
   @@index([organisationId, status, dueAt])
   @@index([assigneeId, status, dueAt])
   @@index([organisationId, facilityId, purpose, status, dueAt])
+}
+
+model StaffOperationalAcknowledgement {
+  id String @id @default(cuid())
+  organisationId String
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  facilityId String
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceKey String
+  sourceHash String
+  acknowledgedAt DateTime @default(now())
+  @@unique([organisationId, userId, sourceKey], map: "StaffEventAck_org_user_source_key")
+  @@index([organisationId, facilityId, acknowledgedAt], map: "StaffEventAck_org_facility_time_idx")
+}
+
+model ArrivalHandover {
+  id String @id @default(cuid())
+  organisationId String
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  facilityId String
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  reservationId String @unique
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  ownerId String
+  owner User @relation("ArrivalOwner", fields: [ownerId], references: [id])
+  coverId String?
+  cover User? @relation("ArrivalCover", fields: [coverId], references: [id], onDelete: SetNull)
+  notes String
+  sourceHash String
+  revision Int @default(0)
+  coverAcknowledgedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([organisationId, facilityId, updatedAt])
 }
 
 model IntegrationConnection {
