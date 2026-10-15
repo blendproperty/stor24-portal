@@ -1,0 +1,32 @@
+.workspace { display: grid; gap: 1.15rem; min-width: 0; }
+.workspace * { box-sizing: border-box; }
+.notice { margin: 0; padding: 1rem; border: 1px solid #d6e4e1; border-radius: 10px; background: #eff6f4; color: #183c3b; line-height: 1.6; overflow-wrap: anywhere; }
+.error { margin: 0; padding: 1rem; border: 1px solid #e6b1a4; border-radius: 10px; background: #fff3ee; color: #842e1b; overflow-wrap: anywhere; }
+.filters { display: flex; gap: .8rem; flex-wrap: wrap; align-items: end; }
+.filters label { flex: 1 1 220px; }
+.workspace label { display: grid; gap: .45rem; min-width: 0; font-weight: 600; font-size: .9rem; }
+.workspace input:not([type=checkbox]), .workspace select, .workspace textarea { width: 100%; min-width: 0; max-width: 100%; font: inherit; padding: .75rem; border: 1px solid #cedcde; border-radius: 7px; background: white; color: #163238; }
+.workspace select { text-overflow: ellipsis; }
+.workspace button, .workspace a { max-width: 100%; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.panel { padding: 1.25rem; background: white; border: 1px solid #dbe4e6; border-radius: 12px; min-width: 0; }
+.panel h2 { margin: 0 0 .7rem; font-size: 1.15rem; }
+.panel p { line-height: 1.65; overflow-wrap: anywhere; }
+.fieldset { border: 0; padding: 0; margin: .8rem 0 0; min-width: 0; display: grid; gap: 1rem; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.wide { grid-column: 1 / -1; }
+.sectionHeading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .65rem; min-width: 0; }
+.sectionHeading h3 { margin: 0; font-size: 1rem; overflow-wrap: anywhere; }
+.preview { margin-top: 1.25rem; border-top: 2px solid #ee5b00; padding-top: 1rem; }
+.preview h3, .preview h4 { overflow-wrap: anywhere; }
+.confirm { display: flex !important; align-items: flex-start; gap: .6rem !important; line-height: 1.6; margin: .7rem 0; }
+.confirm input { width: 18px; height: 18px; flex: 0 0 18px; margin-top: .2rem; }
+.history { display: grid; gap: 1rem; }
+.card { border: 1px solid #dbe4e6; border-left: 3px solid #38766b; border-radius: 9px; padding: 1rem; min-width: 0; }
+.status { font-size: .72rem; font-weight: 700; padding: .35rem .6rem; background: #eaf1f1; border-radius: 5px; }
+.actions { display: flex; flex-wrap: wrap; gap: .65rem; }
+.decision { margin-top: .8rem; }
+.decision summary { cursor: pointer; font-size: .9rem; font-weight: 600; padding: .5rem 0; }
+.retained { padding: .85rem; margin: .8rem 0; background: #f4f7f8; border-radius: 7px; font-size: .88rem; }
+.retained h4 { margin: 0 0 .5rem; }
+.retained p { margin: .35rem 0; }
+@media (max-width: 640px) { .grid { grid-template-columns: minmax(0, 1fr); } .panel { padding: 1rem; } .filters { display: grid; grid-template-columns: minmax(0, 1fr); } .filters label { flex: initial; } .actions { display: grid; grid-template-columns: minmax(0, 1fr); } }
