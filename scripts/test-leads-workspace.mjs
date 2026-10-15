@@ -46,7 +46,9 @@ try{
   await expect(page.getByRole('heading',{name:'Activity history'})).toBeVisible();
   await expect(nav.getByRole('button',{name:/Lease agreement/})).toBeDisabled();
   await page.getByLabel('Sales stage',{exact:true}).selectOption('CONTACTED');await page.getByLabel('Assigned owner').selectOption('staff');await page.getByLabel('Next follow-up (South Africa time)').fill('2026-10-12T14:30');
+  await page.getByLabel('Enquiry city / town').fill('Pretoria');await page.getByLabel('Enquiry postal code').fill('0081');await page.screenshot({path:`output/leads-design/enquiry-origin-${width}.png`,fullPage:false});
   await page.getByRole('button',{name:'Save & continue to unit',exact:true}).click();
+  if(patch.enquiryLocation.city!=='Pretoria'||patch.enquiryLocation.postalCode!=='0081')throw Error('Optional enquiry origin was not retained in update request');
   await expect(page.getByRole('dialog')).toHaveCount(1);await expect(page.getByRole('heading',{name:'Choose and reserve storage space'})).toBeVisible();
   if(patch.stage!=='CONTACTED'||patch.nextActionAt!=='2026-10-12T12:30:00.000Z')throw Error('Stage or SAST payload mismatch');
   await page.getByRole('button',{name:'Choose an available unit',exact:true}).click();

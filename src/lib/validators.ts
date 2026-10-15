@@ -1,3 +1,4 @@
+import { enquiryLocationInputSchema } from "@/lib/enquiry-location";
 import { z } from "zod";
 import { marketProfileSchema } from './lead-market-profile';
 import { LEAD_SOURCES } from "@/lib/lead-sources";
@@ -9,6 +10,7 @@ const leadContact = z.object({
   phone: z.string().trim().min(7).max(30),
 });
 export const createLeadSchema = z.object({
+  enquiryLocation: enquiryLocationInputSchema.optional(),
   marketProfile: marketProfileSchema.optional(),
   submissionId: z.string().uuid().optional(),
   facilityId: z.string().trim().min(1), desiredUnitTypeId: z.string().trim().optional(),

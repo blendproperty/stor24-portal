@@ -1,3 +1,5 @@
+import { enquiryLocationInputSchema, recordEnquiryLocation, readEnquiryLocation } from "@/lib/enquiry-location";
+import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { facilityWhere, type RequestScope } from "@/lib/scope";
 import { leadAttributionSchema } from "@/lib/lead-attribution";
@@ -5,6 +7,7 @@ import { z } from "zod";
 import { marketProfileSchema } from './lead-market-profile';
 
 export const leadUpdateSchema = z.object({
+  enquiryLocation: enquiryLocationInputSchema.optional(),
   marketProfile: marketProfileSchema.optional(),
   updatedAt: z.iso.datetime(),
   stage: z.enum(["NEW", "CONTACTED", "QUALIFIED", "QUOTED", "VIEWING_BOOKED", "RESERVED", "WON", "LOST"]),
@@ -44,7 +47,7 @@ export async function leadsWorkspace(scope: RequestScope) {
   }));
   const marketProfiles=new Map(evidence.flatMap(event=>{const parsed=marketProfileSchema.safeParse((event.after as {marketProfile?:unknown}|null)?.marketProfile);return parsed.success?[[event.entityId,parsed.data] as const]:[];}));
   return { facilities, staff: staff.map(person => ({ id: person.id, name: person.name, facilityIds: person.roleAssignments.map(a => a.facilityId) })), count,
-    leads: leads.map(lead => ({ ...lead, attribution: attribution.get(lead.id) ?? null,marketProfile:marketProfiles.get(lead.id)??null,
+    leads: leads.map(lead => ({ ...lead, enquiryLocation: readEnquiryLocation(lead.enquiryLocation), attribution: attribution.get(lead.id) ?? null,marketProfile:marketProfiles.get(lead.id)??null,
       stage: lead.reservations.some(r => r.status === "CONVERTED" && r.convertedTenancyId && ["ACTIVE", "NOTICE_GIVEN"].includes(r.convertedTenancy?.status ?? "")) ? "WON" : lead.stage,
       reservations: lead.reservations.map(r => ({ ...r, handedOver: Boolean(r.status === "CONVERTED" && r.convertedTenancyId && handedOver.has(r.convertedTenancyId)), quotedRate: Number(r.quotedRate) })) })) };
 }
@@ -60,15 +63,23 @@ export async function updateLead(scope: RequestScope, id: string, input: LeadUpd
     if (lead.reservations.some(r => ["ACTIVE", "CONVERTED"].includes(r.status)) && input.stage !== (converted ? "WON" : lead.stage)) throw new Error("LEAD_BOOKING_STAGE");
     if (input.assignedToId && !await tx.user.findFirst({ where: { id: input.assignedToId, organisationId: scope.organisationId, active: true,
       roleAssignments: { some: { OR: [{ facilityId: null }, { facilityId: lead.facilityId }] } } } })) throw new Error("FORBIDDEN");
+    let location = lead.enquiryLocation;
+    if (input.enquiryLocation !== undefined) {
+      const previous = readEnquiryLocation(lead.enquiryLocation);
+      const recorded = recordEnquiryLocation(input.enquiryLocation, "STAFF_RECORDED");
+      const fields = ["city", "province", "postalCode", "country"] as const;
+      if (!fields.every(field => (previous?.[field] || "") === (recorded?.[field] || ""))) location = recorded ?? null;
+    }
     const changed = await tx.lead.updateMany({ where: { id, updatedAt: new Date(input.updatedAt) }, data: {
+      ...(input.enquiryLocation !== undefined ? { enquiryLocation: location ?? Prisma.DbNull } : {}),
       stage: input.stage, nextActionAt: input.nextActionAt ? new Date(input.nextActionAt) : null,
       notes: input.notes || null, assignedToId: input.assignedToId,
     } });
     if (changed.count !== 1) throw new Error("CONFLICT");
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: lead.facilityId, actorId: scope.userId,
       action: "lead.updated", entityType: "Lead", entityId: id,
-      before: { stage: lead.stage, nextActionAt: lead.nextActionAt?.toISOString() ?? null, assignedToId: lead.assignedToId, notes: lead.notes },
-      after: { stage: input.stage, nextActionAt: input.nextActionAt, assignedToId: input.assignedToId, notes: input.notes || null } } });
+      before: { enquiryLocation: lead.enquiryLocation, stage: lead.stage, nextActionAt: lead.nextActionAt?.toISOString() ?? null, assignedToId: lead.assignedToId, notes: lead.notes },
+      after: { enquiryLocation: location, stage: input.stage, nextActionAt: input.nextActionAt, assignedToId: input.assignedToId, notes: input.notes || null } } });
     if(input.marketProfile)await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:lead.facilityId,actorId:scope.userId,action:'lead.market_profile.captured',entityType:'Lead',entityId:id,after:{marketProfile:input.marketProfile}}});
     return { id };
   });
