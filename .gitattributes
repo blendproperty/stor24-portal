@@ -1,0 +1,2 @@
+# Keep the printable handbook byte-exact across Windows and Linux checkouts.
+private/staff-training/*.pdf binary
