@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';import test from 'node:test';import {build} from 'esbuild';import {createRequire} from 'node:module';
+test('DebiCheck tenant and staff request routes keep origin, authentication, bounded inputs and review permission',async()=>{
+ const state={auth:true,manage:true,origin:true,limit:false,calls:0};const runtime=globalThis as typeof globalThis&{debiRequestRoute?:typeof state};runtime.debiRequestRoute=state;
+ const mocks:Record<string,string>={
+  '@/lib/tenant-portal-auth':`export async function requireTenantSession(){if(!globalThis.debiRequestRoute.auth)throw Error('TENANT_NOT_FOUND');return{organisationId:'org',email:'tenant@example.invalid',customerIds:['customer'],tokenHash:'synthetic'}};export const tenantRateLimit=async()=>globalThis.debiRequestRoute.limit`,
+  '@/lib/tenant-portal-response':`export const tenantPrivateHeaders={'cache-control':'private, no-store'};export function tenantError(e){return Response.json({error:e.message},{status:e.message==='TENANT_NOT_FOUND'?404:500})}`,
+  '@/lib/scope':`export async function requirePermissionScope(permission){const s=globalThis.debiRequestRoute;if(!s.auth)throw Error('UNAUTHENTICATED');if(permission==='payments.manage'&&!s.manage)throw Error('FORBIDDEN');return{organisationId:'org',userId:'staff',facilityIds:['store'],unrestrictedFacilities:false}}`,
+  '@/lib/auth-guards':`export function authErrorResponse(e){return Response.json({error:{message:e.message}},{status:e.message==='UNAUTHENTICATED'?401:e.message==='FORBIDDEN'?403:500})}`,
+  '@/lib/request-security':`export const sameOrigin=()=>globalThis.debiRequestRoute.origin;export const rateLimit=async()=>globalThis.debiRequestRoute.limit`,
+  '@/lib/payments/netcash-debicheck-request-service':`const action=async()=>{globalThis.debiRequestRoute.calls++;return{status:'REQUESTED'}};export const listTenantDebiCheckRequests=action,previewDebiCheckRequest=action,saveDebiCheckRequest=action,withdrawDebiCheckRequest=action,listStaffDebiCheckRequests=action,reviewDebiCheckRequest=action`,
+ };
+ async function route(path:string){const compiled={exports:{} as {GET:(r:Request)=>Promise<Response>;POST:(r:Request)=>Promise<Response>}},result=await build({entryPoints:[path],bundle:true,write:false,platform:'node',format:'cjs',packages:'external',plugins:[{name:'fixture',setup(b){b.onResolve({filter:/^@\/lib\//},a=>mocks[a.path]?{path:a.path,namespace:'fixture'}:undefined);b.onLoad({filter:/.*/,namespace:'fixture'},a=>({contents:mocks[a.path],loader:'js'}))}}]});new Function('require','module','exports',result.outputFiles[0].text)(createRequire(import.meta.url),compiled,compiled.exports);return compiled.exports;}
+ const tenant=await route('src/app/api/tenant/debicheck-requests/route.ts'),staff=await route('src/app/api/v1/payments/netcash/debicheck/requests/route.ts'),id='debicheck-request:11111111-1111-4111-8111-111111111111',facilityId='cmfixturefacility000000001';
+ const post=(handler:typeof tenant,body:object)=>handler.POST(new Request('https://portal.example.invalid/request',{method:'POST',body:JSON.stringify(body)}));
+ try{
+  assert.equal((await post(tenant,{action:'save',accountId:'account',preview:{recordId:id},accepted:true})).status,200);assert.equal(state.calls,1);
+  for(const extra of [{environment:'live'},{serviceKey:'override'},{customerId:'forged'},{monthlyAmount:'1.00'},{collectionEnabled:true}])assert.equal((await post(tenant,{action:'save',accountId:'account',preview:{recordId:id},accepted:true,...extra})).status,422);
+  assert.equal((await post(tenant,{action:'save',accountId:'account',preview:{recordId:id},accepted:false})).status,422);assert.equal((await post(tenant,{action:'save',accountId:'account',preview:{oversize:'x'.repeat(17000)},accepted:true})).status,422);assert.equal(state.calls,1);
+  state.origin=false;assert.equal((await post(tenant,{action:'withdraw',accountId:'account',id})).status,404);assert.equal((await post(staff,{id,confirmed:true})).status,403);state.origin=true;
+  state.auth=false;assert.equal((await post(tenant,{action:'withdraw',accountId:'account',id})).status,404);assert.equal((await post(staff,{id,confirmed:true})).status,401);state.auth=true;state.manage=false;assert.equal((await post(staff,{id,confirmed:true})).status,403);state.manage=true;
+  state.limit=true;assert.equal((await post(tenant,{action:'withdraw',accountId:'account',id})).status,429);assert.equal((await post(staff,{id,confirmed:true})).status,429);state.limit=false;assert.equal(state.calls,1);
+  assert.equal((await post(staff,{id,confirmed:false})).status,422);assert.equal((await post(staff,{id,confirmed:true,actorId:'forged'})).status,422);assert.equal((await post(staff,{id,confirmed:true})).status,200);
+  assert.equal((await tenant.GET(new Request('https://portal.example.invalid/?accountId=a&accountId=b'))).status,422);assert.equal((await staff.GET(new Request('https://portal.example.invalid/?facilityId='+facilityId+'&environment=live'))).status,422);
+  const response=await tenant.GET(new Request('https://portal.example.invalid/?accountId=account'));assert.equal(response.status,200);assert.match(response.headers.get('cache-control')??'',/private, no-store/);assert.equal(state.calls,3);
+ }finally{delete runtime.debiRequestRoute}
+});
