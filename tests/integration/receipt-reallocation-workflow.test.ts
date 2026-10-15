@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {randomUUID} from "node:crypto";
+import {AsyncLocalStorage} from "node:async_hooks";
+import {createRequire} from "node:module";
+import {resolve} from "node:path";
+import {createServer} from "node:http";
+import {build} from "esbuild";
 import {db} from "../../src/lib/db";
 import {previewReceiptReallocation,requestReceiptReallocation,decideReceiptReallocation} from "../../src/lib/receipt-reallocation-service";
 import {receiptAllocationGraph} from "../../src/lib/receipt-reallocation-source";
@@ -10,6 +15,7 @@ import {previewAdjustment,requestAdjustment,decideAdjustment,recordRefundPayout}
 import {netCollectionTotal} from "../../src/lib/finance/collection-total";
 import {southAfricaDateKey} from "../../src/lib/south-africa-time";
 import {customerHistory} from "../../src/lib/customer-history-service";
+import {receiptCorrectionWorkspace,receiptCorrectionPreview,receiptCorrectionDocument} from "../../src/lib/receipt-reallocation-workspace";
 import type {ReceiptReallocationInput} from "../../src/lib/receipt-reallocation-policy";
 
 test("isolated receipt correction producers retain cash, approval, undo and source integrity",async t=>{
@@ -39,6 +45,113 @@ test("isolated receipt correction producers retain cash, approval, undo and sour
   async function request(f:Fixture,data:ReceiptReallocationInput){const p=await previewReceiptReallocation(f.scope,data);return requestReceiptReallocation(f.scope,data,p.fingerprint);}
   const approve=(f:Fixture,id:string,reference="Synthetic independent approval")=>decideReceiptReallocation(f.reviewScope,id,0,"approve",reference);
   try{
+    await t.test("actual HTTP handlers and database roles separate requester, independent approver and foreign-store receipt access",async()=>{
+      const f=await fixture(),foreign=await db.facility.create({data:{organisationId:f.org.id,name:"Synthetic private other store",code:randomUUID()}});
+      const viewer=await db.user.create({data:{organisationId:f.org.id,name:"Synthetic foreign reviewer",email:randomUUID()+"@example.invalid"}});
+      for(const [user,store,extra] of [[f.requester,f.facility,["adjustments.request"]],[f.reviewer,f.facility,["adjustments.approve"]],[viewer,foreign,["adjustments.approve"]]] as const){
+        const role=await db.role.create({data:{organisationId:f.org.id,name:"Synthetic receipt HTTP "+randomUUID(),permissions:["adjustments.view","billing.view",...extra]}});
+        await db.roleAssignment.create({data:{userId:user.id,roleId:role.id,facilityId:store.id}});
+      }
+      type Session={userId:string;sessionVersion:number};
+      const sessions=new AsyncLocalStorage<Session|null>();
+      const tokens=new Map<string,Session>([f.requester,f.reviewer,viewer].map(user=>[randomUUID(),{userId:user.id,sessionVersion:user.sessionVersion}]));
+      const [requesterToken,reviewerToken,foreignToken]=[...tokens.keys()];
+      const bundle=await build({entryPoints:["src/app/api/v1/adjustments/receipt-reallocations/route.ts"],bundle:true,write:false,platform:"node",format:"cjs",packages:"external",plugins:[{name:"synthetic-receipt-session-only",setup(b){
+        b.onResolve({filter:/generated\/prisma\/client$/},()=>({path:resolve("src/generated/prisma/client.ts"),external:true}));
+        b.onResolve({filter:/(?:^|\/)(db|session)$/},a=>({path:a.path,namespace:"fixture"}));
+        b.onLoad({filter:/.*/,namespace:"fixture"},a=>({contents:a.path.endsWith("/db")?"export const db=__db;":"export const getSession=async()=>__sessions.getStore();"}));
+      }}]});
+      type Handler=(request:Request)=>Promise<Response>;
+      const loaded={exports:{} as {GET:Handler;POST:Handler}};
+      new Function("require","module","exports","__db","__sessions",bundle.outputFiles[0].text)(createRequire(import.meta.url),loaded,loaded.exports,db,sessions);
+      const server=createServer(async(incoming,outgoing)=>{
+        try{
+          const chunks=[];for await(const chunk of incoming)chunks.push(Buffer.from(chunk));
+          const url=`http://127.0.0.1:${(server.address() as {port:number}).port}${incoming.url}`;
+          const request=new Request(url,{method:incoming.method,headers:incoming.headers as Record<string,string>,...(incoming.method==="POST"?{body:Buffer.concat(chunks)}:{})});
+          const token=String(incoming.headers.cookie??"").replace("fixture=","");
+          const response=await sessions.run(tokens.get(token)??null,()=>loaded.exports[incoming.method==="POST"?"POST":"GET"](request));
+          outgoing.writeHead(response.status,Object.fromEntries(response.headers));outgoing.end(Buffer.from(await response.arrayBuffer()));
+        }catch{outgoing.writeHead(500);outgoing.end("Synthetic HTTP harness error");}
+      });
+      await new Promise<void>(done=>server.listen(0,"127.0.0.1",done));
+      const origin=`http://127.0.0.1:${(server.address() as {port:number}).port}`,path="/api/v1/adjustments/receipt-reallocations";
+      const call=(token:string,suffix="",body?:unknown,requestOrigin=origin)=>fetch(origin+path+suffix,{method:body===undefined?"GET":"POST",headers:{cookie:`fixture=${token}`,origin:requestOrigin,"content-type":"application/json"},...(body===undefined?{}:{body:JSON.stringify(body)})});
+      try{
+        assert.equal((await call("")).status,401);
+        const initial=await call(requesterToken,`?sourceAccountId=${f.source.id}`);assert.equal(initial.status,200);
+        const workspace=(await initial.json()).data;assert.equal(workspace.capabilities.canRequest,true);assert.equal(workspace.capabilities.canApprove,false);
+        assert.equal(workspace.receipts[0].paymentReference,`STOR24 receipt ${f.payment.id}`);
+        const data=input(f),previewResponse=await call(requesterToken,"",{action:"preview",input:data});assert.equal(previewResponse.status,200);
+        const preview=(await previewResponse.json()).data;
+        assert.equal((await call(requesterToken,"",{action:"request",input:data,fingerprint:preview.fingerprint,confirmed:true},"https://evil.example.invalid")).status,403);
+        assert.equal((await call(reviewerToken,"",{action:"request",input:data,fingerprint:preview.fingerprint,confirmed:true})).status,403);
+        const contenders=await Promise.all(Array.from({length:25},async()=>{
+          const candidate={...data,requestKey:randomUUID()},response=await call(requesterToken,"",{action:"preview",input:candidate});
+          assert.equal(response.status,200);return {input:candidate,fingerprint:(await response.json()).data.fingerprint};
+        }));
+        const began=performance.now();
+        const responses=await Promise.all(contenders.map(async candidate=>{
+          const response=await call(requesterToken,"",{action:"request",...candidate,confirmed:true});return {status:response.status,payload:await response.json()};
+        }));
+        assert.ok(responses.every(r=>r.status===200||r.status===409),"contention produces a retained request or explicit review hold, never an unknown server result");
+        assert.equal(responses.filter(r=>r.status===200).length,1);
+        assert.ok(performance.now()-began<30000,"25 competing fixture requests complete within the staff request timeout");
+        assert.equal(await db.receiptReallocation.count({where:{organisationId:f.org.id}}),1);
+        const id=responses.find(r=>r.status===200)!.payload.data.id;
+        const decision={action:"decide",id,revision:0,decision:"approve",reference:"Synthetic independent HTTP review",confirmed:true};
+        assert.equal((await call(requesterToken,"",decision)).status,403);
+        assert.equal((await call(foreignToken,"",decision)).status,404);
+        assert.equal((await call(reviewerToken,"",decision)).status,200);
+        const repeated=await call(reviewerToken,"",decision);assert.equal(repeated.status,200);assert.equal((await repeated.json()).data.idempotent,true);
+        const doc=await call(requesterToken,`?document=${id}&side=source`);assert.equal(doc.status,200);
+        assert.equal(doc.headers.get("x-stor24-data-classification"),"restricted");
+        const html=await doc.text();assert.ok(html.includes(f.source.accountNumber));assert.ok(!html.includes(f.target.accountNumber));
+        assert.equal((await call(foreignToken,`?document=${id}&side=source`)).status,404);
+        assert.equal((await call(foreignToken,`?sourceAccountId=${f.source.id}`)).status,404);
+        await db.roleAssignment.deleteMany({where:{userId:f.requester.id}});
+        assert.equal((await call(requesterToken)).status,403,"current database grant revocation is effective without a new fixture session");
+        assert.deepEqual(await db.payment.findUniqueOrThrow({where:{id:f.payment.id}}),f.payment);
+        assert.deepEqual(await db.ledgerEntry.findUniqueOrThrow({where:{id:f.original.id}}),f.original);
+      }finally{await new Promise<void>(done=>server.close(()=>done()));await db.rateLimitBucket.deleteMany({where:{key:{startsWith:`dlp:${f.org.id}:`}}});}
+    });
+    await t.test("staff projection retains scoped receipt evidence, balances and private documents through MOVE and partial UNDO",async()=>{
+      const f=await fixture(),capabilities={canRequest:true,canApprove:false};
+      const first=await receiptCorrectionWorkspace(f.scope,{facilityId:f.facility.id,sourceAccountId:f.source.id},capabilities);
+      assert.equal(first.receipts.length,1);assert.equal(first.receipts[0].paymentReference,`STOR24 receipt ${f.payment.id}`);
+      assert.equal(first.receipts[0].remaining,"200.00");assert.ok(!JSON.stringify(first).includes(f.payment.providerRef!));
+      const p=await receiptCorrectionPreview(f.scope,input(f));assert.equal(p.sourceBalanceAfter,"-124.75");assert.equal(p.targetBalanceAfter,"374.75");
+      const moved=await request(f,input(f));
+      const pending=await receiptCorrectionWorkspace(f.reviewScope,{}, {canRequest:false,canApprove:true});
+      assert.equal(pending.requests[0].id,moved.id);assert.equal(pending.requests[0].retainedPreview?.sourceBalance,"-200");
+      assert.equal(pending.requests[0].retainedPreview?.paymentReference,`STOR24 receipt ${f.payment.id}`);
+      await approve(f,moved.id);
+      const row=await db.receiptReallocation.findUniqueOrThrow({where:{id:moved.id}});
+      const source=await receiptCorrectionDocument(f.scope,moved.id,"source"),target=await receiptCorrectionDocument(f.scope,moved.id,"target");
+      assert.ok(source.content.includes(f.source.accountNumber));assert.ok(!source.content.includes(f.target.accountNumber));
+      assert.ok(target.content.includes(f.target.accountNumber));assert.ok(!target.content.includes(f.source.accountNumber));
+      assert.equal(await db.auditEvent.count({where:{entityId:moved.id,action:"receipt_reallocation.document_requested"}}),2);
+      await assert.rejects(receiptCorrectionWorkspace({...f.scope,facilityIds:[]},{sourceAccountId:f.source.id},capabilities),/NOT_FOUND/);
+      await assert.rejects(receiptCorrectionDocument({...f.scope,facilityIds:[]},moved.id,"source"),/NOT_FOUND/);
+      const beforeDate=(await receiptCorrectionWorkspace(f.scope,{sourceAccountId:f.target.id},capabilities)).receipts[0].recordedAt;
+      assert.equal(beforeDate,f.original.createdAt.toISOString());
+      const undo=await request(f,{...input(f),operation:"UNDO",reversesId:moved.id,sourceAccountId:f.target.id,sourceEntryId:row.targetLedgerEntryId!,targetAccountId:f.source.id,amount:"25.25"});await approve(f,undo.id);
+      const after=await receiptCorrectionWorkspace(f.scope,{sourceAccountId:f.source.id},capabilities);
+      assert.equal(after.receipts[0].remaining,"150.00");assert.equal(after.requests.length,2);
+      assert.ok(after.requests.every(r=>r.sourceAccountNumber&&r.targetAccountNumber&&r.retainedPreview));
+      const next=await receiptCorrectionWorkspace(f.scope,{cursor:after.requests[0].id},capabilities);assert.deepEqual(next.requests.map(r=>r.id),[after.requests[1].id]);
+      await db.customer.update({where:{id:f.source.customerId},data:{lastName:"Original Customer"}});
+      const searched=await receiptCorrectionWorkspace(f.scope,{search:"Customer PRIVATE-SYNTHETIC-CUSTOMER-0"},capabilities);
+      assert.deepEqual(searched.accounts.map(a=>a.id),[f.source.id]);
+      await db.ledgerEntry.createMany({data:Array.from({length:26},()=>({accountId:f.source.id,type:"PAYMENT" as const,amount:0,description:"Synthetic unverified zero-value candidate",effectiveAt:new Date(),createdAt:new Date(f.original.createdAt.getTime()+1000)}))});
+      const firstPage=await receiptCorrectionWorkspace(f.scope,{sourceAccountId:f.source.id},capabilities);
+      assert.equal(firstPage.receipts.length,0);assert.ok(firstPage.nextReceiptCursor,"filtered empty pages retain a next cursor to older verified receipts");
+      const older=await receiptCorrectionWorkspace(f.scope,{sourceAccountId:f.source.id,receiptCursor:firstPage.nextReceiptCursor!},capabilities);
+      assert.equal(older.receipts[0].entryId,f.original.id);assert.equal(older.receipts[0].remaining,"150.00");assert.equal(older.nextReceiptCursor,null);
+      await assert.rejects(receiptCorrectionWorkspace(f.scope,{sourceAccountId:f.target.id,receiptCursor:firstPage.nextReceiptCursor!},capabilities),/NOT_FOUND/);
+      assert.deepEqual(await db.payment.findUniqueOrThrow({where:{id:f.payment.id}}),f.payment);
+      assert.deepEqual(await db.ledgerEntry.findUniqueOrThrow({where:{id:f.original.id}}),f.original);
+    });
     await t.test("customer histories retain scoped MOVE and UNDO entries without duplicating external payment evidence",async()=>{
       const f=await fixture(),moved=await request(f,input(f));await approve(f,moved.id);
       const move=await db.receiptReallocation.findUniqueOrThrow({where:{id:moved.id}});
