@@ -118,5 +118,22 @@ test("isolated reviewed staff email policies, source evidence and durable once-o
       await assert.rejects(readStaffEventEmails(reviewScope, { facilityId: facility.id, policyId: policy.id, outboxCursor: first.nextOutboxCursor }), /CURSOR_INVALID/);
       assert.equal(await db.communicationLog.count({ where: { organisationId: org.id } }), 0);
     });
+    await t.test("a full25-policy read remains bounded, pages older policies and retains the explicitly selected older record", async () => {
+      for (let index = 0; index < 25; index++) await newPolicy();
+      const first = await readStaffEventEmails(scope, { facilityId: facility.id, policyId: prepared.id });
+      assert.equal(first.policies.length, 25); assert.ok(first.nextCursor); assert.equal(first.selectedPolicy?.id, prepared.id);
+      const older = await readStaffEventEmails(scope, { facilityId: facility.id, policyId: prepared.id, cursor: first.nextCursor });
+      assert.ok(older.policies.length > 0); assert.equal(older.nextCursor, null);
+      assert.equal(new Set([...first.policies, ...older.policies].map(row => row.id)).size, first.policies.length + older.policies.length);
+    });
+    await t.test("credential rotation invalidates retained sender authority without a provider attempt", async () => {
+      const next = await approve(await newPolicy()), before = process.env.RESEND_API_KEY;
+      try {
+        process.env.RESEND_API_KEY = `synthetic-${randomUUID()}`;
+        await assert.rejects(evaluateStaffEventEmail(scope, { action: "evaluate", id: next.id, revision: next.revision }), /SENDER_CHANGED/);
+        assert.equal((await readStaffEventEmails(scope, { policyId: next.id })).selectedPolicy?.authorityCurrent, false);
+      } finally { if (before === undefined) delete process.env.RESEND_API_KEY; else process.env.RESEND_API_KEY = before; }
+      assert.equal((await readStaffEventEmails(scope, { policyId: next.id })).selectedPolicy?.authorityCurrent, true);
+    });
   } finally { delete process.env.STAFF_EVENT_EMAIL_ENABLED; delete process.env.STAFF_EVENT_EMAIL_APPROVED_FINGERPRINT; await db.$disconnect(); }
 });

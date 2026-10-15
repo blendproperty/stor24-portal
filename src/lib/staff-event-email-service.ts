@@ -22,7 +22,7 @@ export async function staffEmailAuthority(tx: StaffEmailClient, row: StaffEmailR
   if (!row.facilityId) throw Error("STAFF_EMAIL_INTEGRITY");
   const facility = await tx.facility.findFirst({ where: { id: row.facilityId, organisationId: row.organisationId }, select: { id: true, name: true } });
   if (!facility || facility.name !== state.facility) throw Error("STAFF_EMAIL_SOURCE_CHANGED");
-  if (staffEmailSender().fingerprint !== state.senderFingerprint) throw Error("STAFF_EMAIL_SENDER_CHANGED");
+  if ((await staffEmailSender()).fingerprint !== state.senderFingerprint) throw Error("STAFF_EMAIL_SENDER_CHANGED");
   await staffEmailActor(tx, state.createdById, row.organisationId, STAFF_EMAIL_MANAGE, row.facilityId);
   const recipients = await staffEmailRecipients(tx, row.organisationId, row.facilityId, state.input.recipientIds);
   if (staffEmailDigest(recipients) !== staffEmailDigest(state.recipients)) throw Error("STAFF_EMAIL_RECIPIENT_CHANGED");
@@ -45,7 +45,7 @@ async function previewIn(tx: StaffEmailClient, scope: RequestScope, input: Staff
   const recipients = await staffEmailRecipients(tx, scope.organisationId, input.facilityId, input.recipientIds);
   const selectedScope = { ...scope, unrestrictedFacilities: false, facilityIds: [input.facilityId] };
   const sources = await staffOperationalEmailPage(selectedScope, range(input), tx), events = sources.events.filter(event => input.kinds.includes(event.kind));
-  const sender = staffEmailSender(), id = staffEmailPolicyKey(requestKey), policyFingerprint = staffEmailMac([id, scope.organisationId, input.facilityId, input, facility.name, recipients, sender.fingerprint, STAFF_EMAIL_TEMPLATE_VERSION]);
+  const sender = await staffEmailSender(), id = staffEmailPolicyKey(requestKey), policyFingerprint = staffEmailMac([id, scope.organisationId, input.facilityId, input, facility.name, recipients, sender.fingerprint, STAFF_EMAIL_TEMPLATE_VERSION]);
   const examples = events.map(event => { const message = staffEmailRender(event, recipients[0]); return { sourceKey: event.sourceKey, sourceHash: event.sourceHash, at: event.at, subject: message.subject, text: message.text }; });
   const previewFingerprint = staffEmailMac([policyFingerprint, examples, !!sources.nextCursor]);
   return { actor, sender, preview: staffEmailPreview.parse({ requestKey, input, facility: facility.name, sender: sender.label, recipients, examples, moreSourcePages: !!sources.nextCursor, policyFingerprint, previewFingerprint }) };
