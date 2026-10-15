@@ -37,6 +37,7 @@ try {
     });
     await page.goto(`http://127.0.0.1:${server.address().port}/arrivals`);
     await expect(page.getByRole('heading', { name: 'Expected arrivals', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Arrival plan & cover', exact: true })).toBeVisible();
     await expect(page.getByText('Not ready for key handover now', { exact: true })).toBeVisible();
     await expect(page.getByText(/have no agreed arrival date/)).toBeVisible();
     await page.getByRole('button', { name: 'Assign or update cover' }).click();
