@@ -1,3 +1,4 @@
+import { recordEnquiryLocation } from "@/lib/enquiry-location";
 import { createHash } from "node:crypto";
 import { db } from "@/lib/db";
 import { requireFacility, type RequestScope } from "@/lib/scope";
@@ -23,10 +24,10 @@ export async function createManualLead(scope: RequestScope, input: CreateLeadInp
     const existing = "customerId" in input;
     const customer = existing ? await requireLeasingCustomer(scope, input.customerId, tx) : await tx.customer.create({data: {organisationId: scope.organisationId, firstName: input.firstName, lastName: input.lastName, email: input.email, phone: input.phone}});
     const notes = [input.source === "Other" ? `Other source: ${input.sourceDetail}` : null, input.notes].filter(Boolean).join("\n");
-    const lead = await tx.lead.create({data: {facilityId: input.facilityId, customerId: customer.id, desiredUnitTypeId: input.desiredUnitTypeId, source: input.source, notes: notes || null, expectedMoveIn: input.expectedMoveIn, assignedToId: scope.userId}});
+    const lead = await tx.lead.create({data: {enquiryLocation: recordEnquiryLocation(input.enquiryLocation, "STAFF_RECORDED"), facilityId: input.facilityId, customerId: customer.id, desiredUnitTypeId: input.desiredUnitTypeId, source: input.source, notes: notes || null, expectedMoveIn: input.expectedMoveIn, assignedToId: scope.userId}});
     if(input.marketProfile) await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:input.facilityId,actorId:scope.userId,action:'lead.market_profile.captured',entityType:'Lead',entityId:lead.id,after:{marketProfile:input.marketProfile}}});
     if (!existing) await tx.auditEvent.create({data: {organisationId: scope.organisationId, facilityId: input.facilityId, actorId: scope.userId, action: "customer.created", entityType: "Customer", entityId: customer.id}});
-    await tx.auditEvent.create({data: {organisationId: scope.organisationId, facilityId: input.facilityId, actorId: scope.userId, action: "lead.created", entityType: "Lead", entityId: lead.id, after: {stage: lead.stage, source: lead.source, sourceDetail: input.source === "Other" ? input.sourceDetail : null, customerId: customer.id, customerCreated: !existing, assignedToId: scope.userId}}});
+    await tx.auditEvent.create({data: {organisationId: scope.organisationId, facilityId: input.facilityId, actorId: scope.userId, action: "lead.created", entityType: "Lead", entityId: lead.id, after: {enquiryLocation: lead.enquiryLocation, stage: lead.stage, source: lead.source, sourceDetail: input.source === "Other" ? input.sourceDetail : null, customerId: customer.id, customerCreated: !existing, assignedToId: scope.userId}}});
     if(input.submissionId) await tx.auditEvent.create({data: {organisationId: scope.organisationId, facilityId: input.facilityId, actorId: scope.userId, action: "lead.capture.saved", entityType: "LeadCapture", entityId: input.submissionId, after: {leadId: lead.id, inputHash}}});
     return lead;
   });

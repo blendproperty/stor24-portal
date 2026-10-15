@@ -1,3 +1,4 @@
+import { recordEnquiryLocation } from "@/lib/enquiry-location";
 import { bookingPreferenceRecord } from "@/lib/privacy-preferences";
 import { db } from "@/lib/db";
 import type { PublicLeadInput } from "@/lib/public-lead-contract";
@@ -80,6 +81,7 @@ export async function createPublicLead(input: PublicLeadInput, ipHash: string) {
 
     const lead = await tx.lead.create({
       data: {
+        enquiryLocation: recordEnquiryLocation(input.enquiryLocation, "PUBLIC_SELF_REPORTED"),
         facilityId: facility.id,
         customerId: customer.id,
         productLine: input.productLine ?? "STORAGE",
@@ -99,7 +101,7 @@ export async function createPublicLead(input: PublicLeadInput, ipHash: string) {
         entityType: "Lead",
         entityId: lead.id,
         ipHash,
-        after: { marketProfile:{gender:"UNKNOWN",storageUse:input.storageType==="Business"?"BUSINESS":input.storageType==="Personal"?"PERSONAL":"UNKNOWN",discoverySource:"Unknown"}, ...(input.attribution ? { attribution: input.attribution } : {}), source: "PUBLIC_QUOTE_FORM", customerId: customer.id, communicationPreferences: preferenceEvidence },
+        after: { enquiryLocation: lead.enquiryLocation, marketProfile:{gender:"UNKNOWN",storageUse:input.storageType==="Business"?"BUSINESS":input.storageType==="Personal"?"PERSONAL":"UNKNOWN",discoverySource:"Unknown"}, ...(input.attribution ? { attribution: input.attribution } : {}), source: "PUBLIC_QUOTE_FORM", customerId: customer.id, communicationPreferences: preferenceEvidence },
       },
     });
 

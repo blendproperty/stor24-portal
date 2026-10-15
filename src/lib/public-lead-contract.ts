@@ -1,3 +1,4 @@
+import { enquiryLocationInputSchema } from "@/lib/enquiry-location";
 import { leadAttributionSchema } from "@/lib/lead-attribution";
 import { z } from "zod";
 
@@ -9,6 +10,7 @@ import { z } from "zod";
  * creates a Customer + Lead only, not a Reservation.
  */
 export const publicLeadSchema = z.object({
+  enquiryLocation: enquiryLocationInputSchema.optional(),
   productLine: z.enum(["STORAGE", "MICRO_WAREHOUSE"]).default("STORAGE"),
   businessDetails: z.object({ companyName: z.string().trim().max(150), registrationNumber: z.string().trim().max(80).optional(), taxNumber: z.string().trim().max(80).optional(), intendedUse: z.string().trim().max(500).optional() }).optional(),
   firstName: z.string().trim().min(1).max(100),
