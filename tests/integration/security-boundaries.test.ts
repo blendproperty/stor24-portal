@@ -43,7 +43,8 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
       assert.deepEqual(new Set((await listCommunicationLogs(scope)).map(row => row.id)), new Set(logs.slice(0, 2).map(row => row.id)));
       assert.equal((await listCommunicationLogs({ ...scope, facilityIds: [] })).length, 0);
       const unrestricted = await listCommunicationLogs({ ...scope, unrestrictedFacilities: true });
-      assert.equal(unrestricted.length, logs.length);
+      assert.equal(unrestricted.length, logs.length - 1);
+      assert.ok(!unrestricted.some(row => row.customerId === foreignCustomer.id));
       assert.ok(!unrestricted.some(row => row.id === foreignLog.id));
     });
     await t.test("manual messaging checks customer and facility relationships before any provider attempt", async () => {
