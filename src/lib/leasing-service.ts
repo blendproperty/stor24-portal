@@ -1026,6 +1026,7 @@ export async function transfer(
     });
     if (!next) throw new Error("CONFLICT");
     const current = tenancy.occupancies[0];
+    if (current.unitId === next.id || !Number.isFinite(input.effectiveAt.getTime()) || input.effectiveAt < current.startDate) throw new Error("CONFLICT");
     const claimed = await tx.unit.updateMany({
       where: {
         id: next.id,
@@ -1039,14 +1040,17 @@ export async function transfer(
       where: { id: tenancy.id },
       data: { status: "ACTIVE" },
     });
-    await tx.occupancy.update({
-      where: { id: current.id },
+    // The occupancy was read before the facility lock. A waiting transfer or
+    // move-out may have changed it; never consume the same source twice.
+    const moved = await tx.occupancy.updateMany({
+      where: { id: current.id, tenancyId: tenancy.id, unitId: current.unitId, status: "ACTIVE", endDate: null },
       data: {
         status: "MOVED_OUT",
         endDate: input.effectiveAt,
         accessState: "REVOKED",
       },
     });
+    if (moved.count !== 1) throw new Error("CONFLICT");
     await tx.unit.update({
       where: { id: current.unitId },
       data: { status: "AVAILABLE" },

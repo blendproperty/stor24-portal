@@ -55,6 +55,7 @@ jobs:
       - run: npx tsx --test tests/integration/netcash-debicheck-requests.test.ts
       - run: npx tsx --test tests/integration/posted-recurring-charge-report.test.ts
       - run: npx tsx --test tests/integration/visual-reporting.test.ts
+      - run: npx tsx --test tests/integration/transfer-source-concurrency.test.ts
       - run: npx tsx --test tests/integration/daily-close.test.ts
       - run: npx tsx --test tests/integration/configuration-atomicity.test.ts
       - run: npx tsx --test tests/integration/operations-alerts.test.ts
