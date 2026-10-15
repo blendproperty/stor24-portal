@@ -1,6 +1,21 @@
 @import "../styles/identity-review.css";
 @import "tailwindcss";
 
+.price-review-workspace .panel,.customer-price-review .panel{padding:20px;min-width:0}
+.price-review-workspace form,.customer-price-review form{display:grid;gap:12px}
+.price-review-workspace label,.customer-price-review label{display:grid;gap:6px;margin:12px 0;font-weight:650}
+.price-review-workspace input:not([type="checkbox"]),.price-review-workspace textarea,.customer-price-review input:not([type="checkbox"]),.customer-price-review select{width:100%;min-width:0;box-sizing:border-box;padding:11px 12px;border:1px solid #cbd5db;border-radius:8px;font:inherit;background:#fff;color:#152b31}
+.price-review-workspace label:has(input[type="checkbox"]),.customer-price-review label:has(input[type="checkbox"]){display:flex;align-items:flex-start;gap:9px;font-weight:500;line-height:1.5}
+.price-review-workspace input[type="checkbox"],.customer-price-review input[type="checkbox"]{flex:0 0 18px;width:18px;height:18px;margin-top:3px}
+.price-review-workspace .button,.customer-price-review .button{max-width:100%;white-space:normal;margin:4px 8px 4px 0;text-align:center}
+.price-review-workspace article,.customer-price-review .table-wrap{margin-top:16px;max-width:100%;overflow-wrap:anywhere}
+.customer-price-review .price-amount-comparison{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:20px 0}
+.customer-price-review .price-amount-comparison>div{padding:12px;border:1px solid #d8e0e4;border-radius:8px;min-width:0;background:#f7f9fa}
+.customer-price-review .price-amount-comparison dt{font-size:12px;line-height:1.4;color:#53636b}
+.customer-price-review .price-amount-comparison dd{font-size:20px;font-weight:750;margin:6px 0 0;overflow-wrap:anywhere}
+@media(max-width:350px){.customer-price-review .price-amount-comparison{grid-template-columns:1fr}}
+@media(max-width:520px){.price-review-workspace .button,.customer-price-review .button{width:100%;margin-right:0}.price-review-workspace .panel,.customer-price-review .panel{padding:16px}}
+
 :root {
   --ink: #172033;
   --muted: #667085;

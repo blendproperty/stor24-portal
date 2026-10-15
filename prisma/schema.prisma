@@ -464,6 +464,34 @@ model Lead {
   @@index([facilityId, stage, nextActionAt])
 }
 
+model ReservationPriceAmendment {
+  id String @id @default(cuid())
+  organisationId String
+  facilityId String
+  reservationId String
+  sourceFingerprint String
+  quoteFingerprint String
+  originalEncrypted String
+  proposedEncrypted String
+  requestKey String
+  requestHash String
+  proposedById String
+  status String @default("PROPOSED")
+  revision Int @default(0)
+  expiresAt DateTime
+  reviewedById String?
+  reviewedAt DateTime?
+  reviewReference String?
+  acceptedCustomerId String?
+  acceptedAt DateTime?
+  acceptanceFingerprint String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([organisationId,requestKey])
+  @@index([organisationId,facilityId,createdAt,id],map:"ReservationPriceAmendment_org_store_created_idx")
+  @@index([reservationId,status])
+}
+
 model Reservation {
   arrivalHandover ArrivalHandover?
   walkInVisit WalkInVisit?

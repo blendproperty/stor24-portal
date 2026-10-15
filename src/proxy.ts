@@ -7,6 +7,9 @@ const publicPagePrefixes = ["/login", "/forgot-password", "/reset-password/", "/
 const publicApiPrefixes = ["/api/health", "/api/auth/login", "/api/auth/mfa/verify", "/api/auth/setup", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/public/v1/", "/api/webhooks/blendsign", "/api/webhooks/netcash", "/api/webhooks/twilio/", "/api/v1/invitations/accept", "/api/v1/webhooks/inbound/", "/api/v1/billing/run-monthly"];
 
 export function isPublicPathname(pathname: string) {
+  // Exact customer quote routes require approved booking evidence and fresh OTP
+  // in their handler; no surrounding reservation/staff routes are exempted.
+  if (pathname === "/booking-price-review" || pathname === "/api/booking-price-review") return true;
   if (pathname === "/privacy" || pathname === "/paia") return true;
   // Static instructions contain no business data and must load after session expiry.
   if (pathname === "/offline-guided-help.js" || pathname === "/offline-guided-help.css") return true;
