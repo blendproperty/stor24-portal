@@ -10,11 +10,11 @@ const sourceSelect = { id: true, facilityId: true, customerId: true, unit: { sel
 export type StaffOperationalEvent = { id: string; kind: EventKind; sourceKey: string; sourceHash: string; at: string; customer: string; customerId: string; facilityId: string; facility: string; unit: string | null; href: string; acknowledgedAt: string | null };
 const customerName = (c: { companyName: string | null; firstName: string | null; lastName: string | null }) => c.companyName || [c.firstName, c.lastName].filter(Boolean).join(" ") || "Customer";
 
-async function sourceEvents(scope: RequestScope, input: { cursor?: string }, tx: Client = db, selectedKey?: string, limit = 51) {
+async function sourceEvents(scope: RequestScope, input: { cursor?: string; from?: Date; to?: Date }, tx: Client = db, selectedKey?: string, limit = 51) {
   const cursor = decodeEventCursor(input.cursor), snapshot = cursor?.snapshot ?? new Date().toISOString();
   const selected = selectedKey?.split(":");
   const boundary = (kind: EventKind, field: string) => ({ AND: [
-    { [field]: { lte: new Date(snapshot) } },
+    { [field]: { lte: new Date(snapshot), ...(input.from ? { gte: input.from } : {}), ...(input.to ? { lt: input.to } : {}) } },
     ...(selected ? [{ id: selected[1] }] : []),
     ...(cursor ? [{ OR: [{ [field]: { lt: new Date(cursor.at) } }, ...(kind < cursor.kind ? [{ [field]: new Date(cursor.at) }] : kind === cursor.kind ? [{ [field]: new Date(cursor.at), id: { lt: cursor.id } }] : [])] }] : []),
   ] });
@@ -43,6 +43,19 @@ async function sourceEvents(scope: RequestScope, input: { cursor?: string }, tx:
     ...audits.map(a => ({ id: a.id, kind: (a.action === "tenancy.key_handover_confirmed" ? "HANDED_OVER" : "MOVE_IN_STARTED") as EventKind, at: a.occurredAt.toISOString() })),
   ].sort((a, b) => b.at.localeCompare(a.at) || b.kind.localeCompare(a.kind) || b.id.localeCompare(a.id));
   return { events, candidates, snapshot, sourceExceeded: [bookings, leases, started, handed].some(rows => rows.length >= limit) };
+}
+
+/** Exact scoped source read for reviewed staff notifications; never acknowledges an event. */
+export async function staffOperationalEmailSource(scope: RequestScope, sourceKey: string, tx: Client = db) {
+  eventAcknowledgeSchema.pick({ sourceKey: true }).parse({ sourceKey });
+  return (await sourceEvents(scope, {}, tx, sourceKey)).events.find(event => event.sourceKey === sourceKey) ?? null;
+}
+
+/** Pages raw source positions so orphaned historical audits cannot hide later pages. */
+export async function staffOperationalEmailPage(scope: RequestScope, input: { from: Date; to: Date; cursor?: string }, tx: Client = db) {
+  const { events, candidates, snapshot } = await sourceEvents(scope, input, tx, undefined, 11);
+  const positions = candidates.slice(0, 10), keys = new Set(positions.map(row => `${row.kind}:${row.id}`)), last = positions.at(-1);
+  return { events: events.filter(event => keys.has(event.sourceKey)), nextCursor: candidates.length > 10 && last ? encodeEventCursor({ ...last, snapshot }) : null };
 }
 
 export async function staffOperationalInbox(scope: RequestScope, input: unknown) {
