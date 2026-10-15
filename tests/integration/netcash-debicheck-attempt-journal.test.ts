@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {randomUUID} from 'node:crypto';
+import {randomBytes,randomUUID} from 'node:crypto';
 import {db} from '../../src/lib/db';
 import {sealDebiCheckRequest,DEBICHECK_REQUEST_TERMS} from '../../src/lib/payments/netcash-debicheck-request-policy';
 import {encryptIntegrationSecret} from '../../src/lib/integrations/integration-secret-vault';
@@ -11,7 +11,7 @@ import {withdrawDebiCheckRequest} from '../../src/lib/payments/netcash-debicheck
 
 test('isolated PostgreSQL durable authentication journal retains exactly one attempt without provider or financial action',async t=>{
  assert.equal(process.env.MERCHANDISE_DB_TEST,'isolated-ci');assert.equal(new URL(process.env.DATABASE_URL!).hostname,'localhost');
- process.env.AUTH_SECRET='synthetic-attempt-signing-secret-32-characters';process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY='synthetic-attempt-vault-secret-32-characters';
+ process.env.AUTH_SECRET=randomBytes(32).toString('hex');process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY=randomBytes(32).toString('hex');
  const now=new Date('2026-10-15T12:00:00Z'),originalFetch=globalThis.fetch;
  globalThis.fetch=async()=>{throw Error('Provider/network request forbidden in journal tests')};
  const accepted:DebiCheckAuthenticationOutcome={outcome:'BANK_AUTHENTICATED',contractReference:'NC000000000001',providerCode:'000',requestSubmitted:true,bankAuthenticationObserved:true,collectionAuthorised:false,financialReceipt:false,retryAllowed:false};

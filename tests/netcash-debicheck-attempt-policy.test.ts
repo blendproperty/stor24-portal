@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {randomUUID} from 'node:crypto';
+import {randomBytes,randomUUID} from 'node:crypto';
 import {prepareDebiCheckAttempt,readDebiCheckAttempt,completeDebiCheckAttempt,debiCheckAttemptInitialResult,projectDebiCheckAttempt,prepareDebiCheckStatusObservation,readDebiCheckStatusObservation,type DebiCheckAttemptSource} from '../src/lib/payments/netcash-debicheck-attempt-policy';
 import type {DebiCheckAuthenticationOutcome} from '../src/lib/payments/netcash-debicheck-authentication';
-process.env.AUTH_SECRET='synthetic-attempt-signing-secret-32-characters';
-process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY='synthetic-attempt-vault-secret-32-characters';
+process.env.AUTH_SECRET=randomBytes(32).toString('hex');
+process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY=randomBytes(32).toString('hex');
 const now=new Date('2026-10-15T12:00:00Z');
 const source:DebiCheckAttemptSource={organisationId:'synthetic-org',facilityId:'synthetic-store',accountId:'synthetic-account',requestId:'debicheck-request:'+randomUUID(),requestSignature:'1'.repeat(64),sourceHash:'2'.repeat(64),merchantHash:'3'.repeat(64),connectionId:'synthetic-connection',connectionUpdatedAt:now.toISOString(),templateSourceHash:'4'.repeat(64),authenticationConsentHash:'5'.repeat(64),independentReviewAuditId:'synthetic-review'};
 const accepted:DebiCheckAuthenticationOutcome={outcome:'BANK_AUTHENTICATED',contractReference:'NC000000000001',providerCode:'000',requestSubmitted:true,bankAuthenticationObserved:true,collectionAuthorised:false,financialReceipt:false,retryAllowed:false};
