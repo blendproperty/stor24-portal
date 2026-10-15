@@ -1,6 +1,9 @@
 import { authErrorResponse } from "./auth-guards";
 import { dlpPrivateHeaders } from "./dlp-policy";
 const errors:Record<string,[number,string]>={
+  REPORT_RATE_HISTORY_SOURCE:[422,"Recorded approved rent changes require native approval audits. Use a separately labelled historical report for imported records."],
+  REPORT_RATE_REVIEW_REQUIRED:[422,"Some retained rent approvals need source, amount, currency or duplicate review. Inspect their review rows before totaling recorded rates."],
+  REPORT_RATE_DATE_REVIEW:[422,"A retained rent approval has no verified effective month. Run by Recorded approval date to inspect it before filtering by effective date."],
   REPORT_TRANSFER_REVIEW_REQUIRED:[422,"Transfer audit or occupancy identities are duplicated. Review the original records before producing this report."],
   REPORT_TRANSFER_DATE_REVIEW:[422,"A retained transfer has no valid effective date. Run by Recorded date (SAST) to inspect its review row before filtering by effective date."],
   REPORT_ASOF_FUTURE:[422,"Unpaid charges require an end date no later than today in South Africa."],
