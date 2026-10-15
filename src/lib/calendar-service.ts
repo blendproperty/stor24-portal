@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { facilityWhere, type RequestScope } from "@/lib/scope";
 import { southAfricaDateKey } from "@/lib/south-africa-time";
 
-export type CalendarItem = { id: string; at: Date; kind: "TASK" | "LEAD" | "VIEWING" | "MOVE_OUT"; title: string; detail: string; href: string };
+export type CalendarItem = { id: string; at: Date; kind: "TASK" | "LEAD" | "VIEWING" | "MOVE_OUT" | "MOVE_IN"; title: string; detail: string; href: string };
 
 function dateKeys(startKey: string, count: number) {
   const start = new Date(`${startKey}T00:00:00.000Z`);
@@ -15,11 +15,12 @@ export async function getOperationsCalendar(scope: RequestScope, now = new Date(
   const rangeEnd = new Date(`${dateKeys(keys[0], 8)[7]}T00:00:00+02:00`);
   const directFacilityScope = scope.unrestrictedFacilities ? {} : { OR: [{ facilityId: null }, { facilityId: { in: scope.facilityIds } }] };
 
-  const [tasks, leads, viewings, moveOuts] = await Promise.all([
+  const [tasks, leads, viewings, moveOuts, arrivals] = await Promise.all([
     db.task.findMany({ where: { organisationId: scope.organisationId, status: { notIn: ["COMPLETED", "CANCELLED"] }, dueAt: { gte: rangeStart, lt: rangeEnd }, ...directFacilityScope }, include: { facility: { select: { name: true } } }, orderBy: { dueAt: "asc" } }),
     db.lead.findMany({ where: { facility: facilityWhere(scope), stage: { notIn: ["WON", "LOST"] }, nextActionAt: { gte: rangeStart, lt: rangeEnd } }, include: { facility: { select: { name: true } }, customer: { select: { firstName: true, lastName: true, companyName: true } } }, orderBy: { nextActionAt: "asc" } }),
     db.reservation.findMany({ where: { facility: facilityWhere(scope), status: "ACTIVE", viewingAt: { gte: rangeStart, lt: rangeEnd } }, include: { facility: { select: { name: true } }, unit: { select: { number: true } }, customer: { select: { firstName: true, lastName: true, companyName: true } } }, orderBy: { viewingAt: "asc" } }),
     db.tenancy.findMany({ where: { facility: facilityWhere(scope), status: "NOTICE_GIVEN", endDate: { gte: rangeStart, lt: rangeEnd } }, include: { facility: { select: { name: true } }, customer: { select: { firstName: true, lastName: true, companyName: true } }, occupancies: { where: { status: { in: ["ACTIVE", "NOTICE_GIVEN"] } }, include: { unit: { select: { number: true } } }, take: 1 } }, orderBy: { endDate: "asc" } }),
+    db.reservation.findMany({ where: { facility: facilityWhere(scope), customer: { organisationId: scope.organisationId }, status: "ACTIVE", journey: "RENTAL", convertedTenancyId: null, intendedMoveIn: { gte: rangeStart, lt: rangeEnd } }, select: { id: true, intendedMoveIn: true, facility: { select: { name: true } }, unit: { select: { number: true } }, customer: { select: { firstName: true, lastName: true, companyName: true } } }, orderBy: { intendedMoveIn: "asc" } }),
   ]);
 
   const customerName = (customer: { firstName: string | null; lastName: string | null; companyName: string | null }) => customer.companyName || [customer.firstName, customer.lastName].filter(Boolean).join(" ") || "Customer";
@@ -28,6 +29,7 @@ export async function getOperationsCalendar(scope: RequestScope, now = new Date(
     ...leads.flatMap((item) => item.nextActionAt ? [{ id: item.id, at: item.nextActionAt, kind: "LEAD" as const, title: `Follow up · ${customerName(item.customer ?? { firstName: null, lastName: null, companyName: null })}`, detail: item.facility.name, href: `/leads?lead=${encodeURIComponent(item.id)}` }] : []),
     ...viewings.flatMap((item) => item.viewingAt ? [{ id: item.id, at: item.viewingAt, kind: "VIEWING" as const, title: `Viewing · Unit ${item.unit.number}`, detail: `${customerName(item.customer)} · ${item.facility.name}`, href: "/reservations" }] : []),
     ...moveOuts.flatMap((item) => item.endDate ? [{ id: item.id, at: item.endDate, kind: "MOVE_OUT" as const, title: `Move-out · Unit ${item.occupancies[0]?.unit.number ?? "—"}`, detail: `${customerName(item.customer)} · ${item.facility.name}`, href: "/operations/accounts" }] : []),
+    ...arrivals.flatMap(item => item.intendedMoveIn ? [{ id: item.id, at: item.intendedMoveIn, kind: "MOVE_IN" as const, title: `Expected arrival · Unit ${item.unit.number}`, detail: `${customerName(item.customer)} · ${item.facility.name} · readiness must be reviewed`, href: `/operations/arrivals?from=${southAfricaDateKey(item.intendedMoveIn)}&to=${southAfricaDateKey(item.intendedMoveIn)}` }] : []),
   ].sort((a, b) => a.at.getTime() - b.at.getTime());
 
   return keys.map((key) => ({ key, items: items.filter((item) => southAfricaDateKey(item.at) === key) }));

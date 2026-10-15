@@ -21,8 +21,8 @@ async function fixture() {
     state.db[model] = { count: read, findMany: read };
   }
   const result = await build({ entryPoints: ["src/components/operations-reminders.tsx"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", jsx: "automatic", plugins: [{ name: "reminder-fixture", setup(b) {
-    b.onResolve({ filter: /^@\/lib\/(db|scope|collections-service)$/ }, a => ({ path: a.path, namespace: "fixture" }));
-    b.onLoad({ filter: /.*/, namespace: "fixture" }, a => ({ contents: a.path.endsWith("/db") ? "export const db=__state.db;" : a.path.endsWith("/scope") ? "export const requirePermissionScope=async(p)=>{if(__state.denied.has(p))throw Error('FORBIDDEN');return __state.scope};export const facilityWhere=s=>({organisationId:s.organisationId,...(s.unrestrictedFacilities?{}:{id:{in:s.facilityIds}})});" : "export const collectionsWorkspace=async(scope,today)=>({today,rows:[{ageing:{issue:null,overdue:100},hold:null,nextFollowUp:today}]});" }));
+    b.onResolve({ filter: /^@\/lib\/(db|scope|collections-service|staff-payment-review-service|staff-operational-events)$/ }, a => ({ path: a.path, namespace: "fixture" }));
+    b.onLoad({ filter: /.*/, namespace: "fixture" }, a => ({ contents: a.path.endsWith("/db") ? "export const db=__state.db;" : a.path.endsWith("/scope") ? "export const requirePermissionScope=async(p)=>{if(__state.denied.has(p))throw Error('FORBIDDEN');return __state.scope};export const facilityWhere=s=>({organisationId:s.organisationId,...(s.unrestrictedFacilities?{}:{id:{in:s.facilityIds}})});" : a.path.endsWith("/staff-payment-review-service") ? "export const staffPaymentReviewCount=async scope=>{__state.reads.push({model:'payment',query:{where:scope}});if(__state.failed.has('payment'))throw Error('SOURCE_UNAVAILABLE');return 2};" : a.path.endsWith("/staff-operational-events") ? "export const staffOperationalUnreadCount=async scope=>{__state.reads.push({model:'event',query:{where:scope}});if(__state.failed.has('event'))throw Error('SOURCE_UNAVAILABLE');return 2};" : "export const collectionsWorkspace=async(scope,today)=>({today,rows:[{ageing:{issue:null,overdue:100},hold:null,nextFollowUp:today}]});" }));
   } }] });
   const loaded = { exports: {} as { OperationsReminders: () => Promise<React.ReactNode> } };
   new Function("require", "module", "exports", "__state", result.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, state);
@@ -37,13 +37,14 @@ test("reminder aggregates enforce permission-specific organisation and facility 
     if (model === "task") {
       assert.equal(query.where.organisationId, "org");
       assert.deepEqual(query.where.facilityId, { in: ["store-a"] });
-    } else assert.deepEqual(query.where.facility, { organisationId: "org", id: { in: ["store-a"] } });
+    } else if (model === "payment" || model === "event") assert.deepEqual(query.where, f.state.scope);
+    else assert.deepEqual(query.where.facility, { organisationId: "org", id: { in: ["store-a"] } });
   }
   f.state.reads.length = 0;
-  f.state.denied.add("inventory.view"); f.state.denied.add("collections.view");
+  f.state.denied.add("inventory.view"); f.state.denied.add("collections.view"); f.state.denied.add("payments.view");
   const html = await f.render();
-  assert.doesNotMatch(html, /Reorder|Call past dues/);
-  assert.ok(!f.state.reads.some(r => r.model === "product"));
+  assert.doesNotMatch(html, /Reorder|Call past dues|Payments awaiting review/);
+  assert.ok(!f.state.reads.some(r => r.model === "product" || r.model === "payment"));
 });
 
 test("a failed aggregate is unavailable instead of a reassuring zero; other queues survive", async () => {
@@ -55,7 +56,7 @@ test("a failed aggregate is unavailable instead of a reassuring zero; other queu
 
 test("all-denied panel renders no queue and performs no aggregate reads", async () => {
   const f = await fixture();
-  for (const p of ["operations.view", "inventory.view", "collections.view", "ledger.view"]) f.state.denied.add(p);
+  for (const p of ["operations.view", "inventory.view", "collections.view", "ledger.view", "payments.view"]) f.state.denied.add(p);
   assert.equal(await f.render(), ""); assert.equal(f.state.reads.length, 0);
 });
 
@@ -71,7 +72,7 @@ test("synthetic reminder panel fits desktop and narrow mobile widths", { skip: p
       await page.setViewportSize({ width, height: 900 });
       await page.setContent(`<style>${css}</style><main style="padding:16px;max-width:1000px;margin:auto">${html}</main>`);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-      assert.equal(await page.getByRole("link").count(), 5);
+      assert.equal(await page.getByRole("link").count(), 7);
       await page.screenshot({ path: `output/operations-reminders/reminders-${width}.png`, fullPage: true });
     }
   } finally { await browser.close(); }
