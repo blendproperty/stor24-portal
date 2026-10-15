@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
 import { facilityWhere, requireFacility, type RequestScope } from "./scope";
+import { debitTestReadiness } from "./debit-test-readiness";
 import { getNetcashConnection } from "./payments/netcash-client";
 import { buildCompactDebitFile, debitConnectionFingerprint, parseDebitLoadReport, retrieveDebitLoadReport, uploadDebitBatch, validDebitDate } from "./payments/netcash-debit-batch";
 import { NETCASH_SOFTWARE_VENDOR_KEY } from "./integrations/netcash-configuration";
@@ -163,7 +164,7 @@ async function scopedRun(client: Client, scope: RequestScope, id: string) {
 export async function debitRunReview(scope: RequestScope, id: string) {
   const run = await scopedRun(db, scope, id);
   const snapshot = run.snapshot as unknown as DebitPreview;
-  return { batchName: run.batchName, total: run.total, rows: snapshot.rows.map(({ accountId, accountNumber, amount, reference, blocker }) => ({ accountId, accountNumber, amount, reference, blocker })) };
+  return { batchName: run.batchName, total: run.total, rows: snapshot.rows.map(({ accountId, accountNumber, amount, reference, blocker }) => ({ accountId, accountNumber, amount, reference, blocker })), testReadiness:debitTestReadiness(run,{enabled:process.env.NETCASH_DEBIT_TEST_SUBMISSION_ENABLED,accountIds:process.env.NETCASH_DEBIT_TEST_ACCOUNT_IDS,actionDates:process.env.NETCASH_DEBIT_TEST_ACTION_DATES}) };
 }
 export async function cancelDebitRun(scope: RequestScope, id: string) {
   return db.$transaction(async tx => {
