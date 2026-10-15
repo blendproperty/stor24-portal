@@ -2,6 +2,7 @@
  * Contract: https://api.netcash.co.za/value-added-services/compact-debit/
  * Checked 2026-09-21. No bank data or provider authorisation is sent here.
  */
+import {niwsStringResult} from "./netcash-niws-response";
 import { createHash } from "node:crypto";
 import { boundedBody, MANDATE_ENDPOINT } from "./netcash-mandate";
 export const debitConnectionFingerprint = (config: { environment: string; merchantAccount?: string; debitOrderServiceKey?: string }) => createHash("sha256").update(JSON.stringify([config.environment, config.merchantAccount, config.debitOrderServiceKey])).digest("hex");
@@ -26,14 +27,14 @@ async function soap(method: "BatchFileUpload" | "RequestFileUploadReport", key: 
   const response = await request(MANDATE_ENDPOINT, { method: "POST", redirect: "error", cache: "no-store", signal: AbortSignal.timeout(20000), headers: { "content-type": "text/xml; charset=utf-8", SOAPAction: `"http://tempuri.org/INIWS_NIF/${method}"` }, body });
   if (!response.ok) throw new Error("DEBIT_PROVIDER_OUTCOME_UNKNOWN");
   const xml = (await boundedBody(response, 1_000_000)).toString();
-  if (/<!DOCTYPE|<!ENTITY|<(?:[\w-]+:)?Fault\b/i.test(xml)) throw new Error("DEBIT_PROVIDER_OUTCOME_UNKNOWN");
-  const matches = [...xml.matchAll(new RegExp(`<(?:[\\w-]+:)?${method}Result(?:\\s[^>]*)?>([^<]*)<\\/(?:[\\w-]+:)?${method}Result>`, "g"))];
-  if (matches.length !== 1) throw new Error("DEBIT_PROVIDER_OUTCOME_UNKNOWN");
-  return matches[0][1].replace(/&(lt|gt|quot|apos|amp);|&#(\d+);/g, (_, c: string, d: string) => d ? String.fromCodePoint(Number(d)) : ({ lt: "<", gt: ">", quot: '"', apos: "'", amp: "&" })[c]!).trim();
+  try { return niwsStringResult(xml, method); }
+  catch { throw new Error("DEBIT_PROVIDER_OUTCOME_UNKNOWN"); }
 }
 export async function uploadDebitBatch(key: string, file: string, request: typeof fetch = fetch) {
   const result = await soap("BatchFileUpload", key, "File", file, request);
-  if (["100", "101", "102", "200"].includes(result)) throw new Error(`DEBIT_UPLOAD_REJECTED_${result}`);
+  if (["100", "101", "102"].includes(result)) throw new Error(`DEBIT_UPLOAD_REJECTED_${result}`);
+  // 200 is a general service exception, not confirmation that nothing loaded.
+  // Keep the original attempt reserved for reconciliation; never auto-reissue.
   if (!/^\d+(?:\.\d+){2,}$/.test(result)) throw new Error("DEBIT_PROVIDER_OUTCOME_UNKNOWN");
   return result;
 }

@@ -2,6 +2,8 @@
  * This module creates/signals mandates ONLY. It never submits collections or
  * adds customers to the debit masterfile. Never trust the browser postback as proof.
  */
+import {mandateCreationResult,niwsStringResult} from "./netcash-niws-response";
+
 export const MANDATE_ENDPOINT = "https://ws.netcash.co.za/NIWS/NIWS_NIF.svc";
 export type MandateTerms = {
   reference: string; agreementReference: string; agreementDate: string;
@@ -12,12 +14,7 @@ export type MandateTerms = {
 };
 const escapeXml = (s: string) => s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[c]!);
 const decodeXml = (s: string) => s.replace(/&(lt|gt|quot|apos|amp);|&#(\d+);|&#x([\da-f]+);/gi, (_, c: string, decimal: string, hex: string) => c ? ({ lt: "<", gt: ">", quot: '"', apos: "'", amp: "&" })[c.toLowerCase()]! : String.fromCodePoint(decimal ? Number(decimal) : parseInt(hex, 16)));
-function tag(xml: string, name: string) {
-  if (xml.length > 4_000_000 || /<!DOCTYPE|<!ENTITY/i.test(xml)) throw new Error("MANDATE_RESPONSE_INVALID");
-  const matches = [...xml.matchAll(new RegExp(`<(?:[\\w-]+:)?${name}(?:\\s[^>]*)?>([^<]*)<\\/(?:[\\w-]+:)?${name}>`, "g"))];
-  if (matches.length !== 1) throw new Error("MANDATE_RESPONSE_INVALID");
-  return decodeXml(matches[0][1]).trim();
-}
+
 type Method = "AddMandate" | "RequestMandateData" | "RetrieveMandateData" | "BatchFileUpload" | "RequestFileUploadReport" | "RetrieveMandatePDF";
 export function mandateEnvelope(method: Method, fields: Array<[string, string | number | boolean]>) {
   return `<?xml version="1.0" encoding="utf-8"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><${method} xmlns="http://tempuri.org/">${fields.map(([k, v]) => `<${k}>${escapeXml(String(v))}</${k}>`).join("")}</${method}></s:Body></s:Envelope>`;
@@ -63,16 +60,17 @@ export function safeMandatePdfUrl(value: string) {
   return url.toString();
 }
 export function parseAddMandateResponse(xml: string) {
-  const code = tag(xml, "ErrorCode");
-  if (code !== "000") throw new Error(["100", "200", "203"].includes(code) ? `MANDATE_PROVIDER_${code}` : "MANDATE_RESPONSE_INVALID");
-  return safeMandateUrl(tag(xml, "MandateUrl"));
+  const result = mandateCreationResult(xml);
+  if (result.code !== "000") throw new Error(`MANDATE_PROVIDER_${result.code}`);
+  return safeMandateUrl(result.url!);
 }
+
 async function soap(method: Method, body: string, request: typeof fetch) {
   const response = await request(MANDATE_ENDPOINT, { method: "POST", redirect: "error", cache: "no-store", signal: AbortSignal.timeout(20_000), headers: { "content-type": "text/xml; charset=utf-8", SOAPAction: `"http://tempuri.org/INIWS_NIF/${method}"` }, body });
   if (!response.ok) throw new Error(`MANDATE_HTTP_${response.status}`);
   // Do not log XML: responses can contain account numbers and identity data.
   const xml = new TextDecoder().decode(await boundedBody(response, 4_000_000));
-  if (xml.length > 4_000_000 || /<(?:[\w-]+:)?Fault\b|<!DOCTYPE|<!ENTITY/i.test(xml)) throw new Error("MANDATE_RESPONSE_INVALID");
+  if (xml.length > 4_000_000) throw new Error("MANDATE_RESPONSE_INVALID");
   return xml;
 }
 export async function boundedBody(response: Response, maximum: number) {
@@ -91,13 +89,13 @@ export async function addHostedMandate(key: string, terms: MandateTerms, request
   return parseAddMandateResponse(await soap("AddMandate", buildAddMandateEnvelope(key, terms), request));
 }
 export async function requestMandateData(key: string, request: typeof fetch = fetch) {
-  const token = tag(await soap("RequestMandateData", mandateEnvelope("RequestMandateData", [["ServiceKey", key]]), request), "RequestMandateDataResult");
+  const token = niwsStringResult(await soap("RequestMandateData", mandateEnvelope("RequestMandateData", [["ServiceKey", key]]), request), "RequestMandateData");
   if (!/^\d+(?:\.\d+){2,}$/.test(token)) throw new Error("MANDATE_REPORT_UNAVAILABLE");
   return token;
 }
 export async function retrieveMandateData(key: string, token: string, request: typeof fetch = fetch) {
   if (!/^\d+(?:\.\d+){2,}$/.test(token)) throw new Error("MANDATE_REPORT_UNAVAILABLE");
-  return tag(await soap("RetrieveMandateData", mandateEnvelope("RetrieveMandateData", [["ServiceKey", key], ["FileToken", token]]), request), "RetrieveMandateDataResult");
+  return niwsStringResult(await soap("RetrieveMandateData", mandateEnvelope("RetrieveMandateData", [["ServiceKey", key], ["FileToken", token]]), request), "RetrieveMandateData");
 }
 export function assessMandateReport(report: string, expected: MandateTerms) {
   const lines = report.trim().split(/\r?\n/);
@@ -149,7 +147,7 @@ export function canRecheckMandate(m: { status: string; hostedUrl: string | null;
 export async function requestMandatePdf(key: string, reference: string, vendor: string, date: string, request: typeof fetch = fetch) {
   if (!/^[A-Za-z0-9-]{2,22}$/.test(reference) || !/^[\da-f-]{36}$/i.test(key) || !/^[\da-f-]{36}$/i.test(vendor) || !/^\d{8}$/.test(date)) throw new Error("MANDATE_TERMS_INVALID");
   const file = `H\t${key}\t1\tRequestMandatePDF\t${reference}\t${date}\t${vendor}\nK\t101\nT\t${reference}\nF\t1\t0\t9999`;
-  const token = tag(await soap("BatchFileUpload", mandateEnvelope("BatchFileUpload", [["ServiceKey", key], ["File", file]]), request), "BatchFileUploadResult");
+  const token = niwsStringResult(await soap("BatchFileUpload", mandateEnvelope("BatchFileUpload", [["ServiceKey", key], ["File", file]]), request), "BatchFileUpload");
   if (!/^\d+(?:\.\d+){2,}$/.test(token)) throw new Error("MANDATE_PDF_PENDING");
   return token;
 }
@@ -168,14 +166,14 @@ function confirmationPdfLink(html: string, current: URL) {
 export async function retrieveMandatePdf(key: string, token: string, reference: string, request: typeof fetch = fetch) {
   if (!/^\d+(?:\.\d+){2,}$/.test(token)) throw new Error("MANDATE_PDF_PENDING");
   const fields: Array<[string, string]> = [["ServiceKey", key], ["FileToken", token]];
-  const load = tag(await soap("RequestFileUploadReport", mandateEnvelope("RequestFileUploadReport", fields), request), "RequestFileUploadReportResult");
+  const load = niwsStringResult(await soap("RequestFileUploadReport", mandateEnvelope("RequestFileUploadReport", fields), request), "RequestFileUploadReport");
   const loadLines = load.trim().split(/\r?\n/);
   const header = loadLines[0].split("\t");
   // Netcash uppercases batch titles in current six-field upload reports and
   // manifest headings. Only those titles are case-insensitive; the account
   // reference in the document row below remains an exact binding.
   if (![4, 6].includes(header.length) || header[0] !== "###BEGIN" || header[1]?.toUpperCase() !== reference.toUpperCase() || header[2] !== "SUCCESSFUL" || load.includes("###ERROR") || !loadLines.at(-1)?.startsWith("###END\t")) throw new Error("MANDATE_PDF_PENDING");
-  const report = tag(await soap("RetrieveMandatePDF", mandateEnvelope("RetrieveMandatePDF", fields), request), "RetrieveMandatePDFResult");
+  const report = niwsStringResult(await soap("RetrieveMandatePDF", mandateEnvelope("RetrieveMandatePDF", fields), request), "RetrieveMandatePDF");
   const rows = report.trim().split(/\r?\n/);
   const manifestHeader = rows[0].split("\t");
   if (manifestHeader.length !== 2 || manifestHeader[0] !== "###BEGIN" || manifestHeader[1]?.toUpperCase() !== reference.toUpperCase() || rows.at(-1) !== "###END" || rows.length !== 3) throw new Error("MANDATE_PDF_PENDING");
