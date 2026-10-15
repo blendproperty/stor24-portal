@@ -5,6 +5,7 @@ import { requireLeasingCustomer } from "@/lib/leasing-service";
 import { requirePermissionScope, type RequestScope } from "@/lib/scope";
 import type { HistoryQuery, HistoryEntry } from "@/lib/customer-history-policy";
 import { customerHistoryPdf, type HistoryExportRow } from "@/lib/customer-history-document";
+import { customerHistoryExcel } from "@/lib/customer-history-excel";
 import { toCsv } from "@/lib/reporting";
 import { guardReportExport } from "@/lib/dlp-export-service";
 import { guardDlpTransfer } from "@/lib/dlp-transfer-service";
@@ -36,7 +37,7 @@ export async function buildCustomerHistoryExport(scope:RequestScope, customerId:
   if(entries.length>5000)throw new Error("HISTORY_EXPORT_LIMIT");
   return {customer,rows:entries,visibility};
 }
-export async function releaseCustomerHistoryExport(input:{scope:RequestScope;customerId:string;query:HistoryQuery;access:{communications:RequestScope|null;collections:RequestScope|null};format:"PDF"|"CSV";selection?:{id:string;kind:string}}) {
+export async function releaseCustomerHistoryExport(input:{scope:RequestScope;customerId:string;query:HistoryQuery;access:{communications:RequestScope|null;collections:RequestScope|null};format:"PDF"|"CSV"|"XLSX";selection?:{id:string;kind:string}}) {
   const {customer,rows,visibility}=await buildCustomerHistoryExport(input.scope,input.customerId,input.query,input.access,input.selection);
   const messages=rows.filter(row=>row.kind==="COMMUNICATION");
   const proofs=messages.length?await db.communicationLog.findMany({where:{organisationId:input.scope.organisationId,customerId:input.customerId,id:{in:messages.map(row=>String(row.recordId))}},select:{id:true,provider:true,providerRef:true,recipientHash:true,channel:true,direction:true,messageType:true,metadata:true}}):[];
@@ -49,7 +50,7 @@ export async function releaseCustomerHistoryExport(input:{scope:RequestScope;cus
   const name=customer.companyName||[customer.firstName,customer.lastName].filter(Boolean).join(" ")||"Customer";
   const summary=`Customer reference: ${customer.id} | ${rows.length} recorded entries | ${input.query.kind.toLowerCase()} | Communications: ${visibility.communications?"authorised":"restricted"} | Collections: ${visibility.collections?"authorised":"restricted"}`;
   const csv=toCsv(rows.length?rows:[{customerId:customer.id,customerName:name,recordId:"",kind:"NO_MATCHING_RECORDS",body:"No recorded history matches these filters."}]);
-  const bytes=input.format==="PDF"?await customerHistoryPdf(name,rows,summary,new Date()):new TextEncoder().encode("\ufeff"+csv);
+  const bytes=input.format==="PDF"?await customerHistoryPdf(name,rows,summary,new Date()):input.format==="XLSX"?await customerHistoryExcel(name,rows,summary,new Date()):new TextEncoder().encode("\ufeff"+csv);
   const contains=(previous:RequestScope,current:RequestScope)=>previous.userId===current.userId&&previous.organisationId===current.organisationId&&(current.unrestrictedFacilities||(!previous.unrestrictedFacilities&&previous.facilityIds.every(id=>current.facilityIds.includes(id))));
   const fresh=intersectHistoryScope(await requirePermissionScope("operations.view"),await requirePermissionScope("customer_history.export"));
   if(!contains(input.scope,fresh))throw new Error("FORBIDDEN");
@@ -59,8 +60,8 @@ export async function releaseCustomerHistoryExport(input:{scope:RequestScope;cus
       if(!contains(used,await requirePermissionScope(permission)))throw new Error("FORBIDDEN");
     }
   }
-  // Inspect actual source text even for binary PDF; keep credential/size/rate controls.
+  // Inspect actual source text even for binary PDF/XLSX; keep credential/size/rate controls.
   const headers=await guardDlpTransfer({organisationId:input.scope.organisationId,actorId:input.scope.userId,resourceId:customer.id,channel:"DOWNLOAD",classification:"restricted",content:csv,byteLength:bytes.byteLength});
   await db.auditEvent.create({data:{organisationId:input.scope.organisationId,actorId:input.scope.userId,entityType:"Customer",entityId:customer.id,action:"customer.history_downloaded",after:{format:input.format,recordCount:rows.length,byteCount:bytes.byteLength,sha256:createHash("sha256").update(bytes).digest("hex"),permission:"customer_history.export",filters:{kind:input.query.kind,category:input.query.category??null,searchApplied:!!input.query.search},singleRecord:!!input.selection}}});
-  return new Response(Buffer.from(bytes),{headers:{...headers,"content-type":input.format==="PDF"?"application/pdf":"text/csv; charset=utf-8","content-disposition":`attachment; filename="customer-history-${customer.id}.${input.format.toLowerCase()}"`}});
+  return new Response(Buffer.from(bytes),{headers:{...headers,"content-type":input.format==="PDF"?"application/pdf":input.format==="XLSX"?"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":"text/csv; charset=utf-8","content-disposition":`attachment; filename="customer-history-${customer.id}.${input.format.toLowerCase()}"`}});
 }
