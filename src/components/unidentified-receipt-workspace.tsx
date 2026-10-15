@@ -1,0 +1,86 @@
+"use client";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { formatSouthAfricaDateTime } from "@/lib/south-africa-time";
+import { receiptReviewBoundary } from "@/lib/unidentified-receipt-policy";
+import styles from "./unidentified-receipt-workspace.module.css";
+
+type Proposal = { id: string; status: string; proposedById: string; reviewedById: string | null; reviewedAt: string | null; reviewReference: string | null; accountLabel: string; reason: string };
+type Row = { id: string; facilityId: string; sourceType: string; sourceEnvironment: string; receiptDate: string; amount: string; currency: string; status: string; revision: number; capturedById: string; reference: string; note: string; issue: string | null; proposals: Proposal[]; proposalsTruncated: boolean };
+type Workspace = { userId: string; canImportSources: boolean; facilities: { id: string; name: string; canCapture: boolean; canPropose: boolean; canReview: boolean }[]; rows: Row[]; nextCursor: string | null };
+type ImportedSource = { sourceType: "BANK_IMPORT_ENTRY" | "NETCASH_STATEMENT_LINE"; sourceId: string; sourceFingerprint: string; label: string };
+const endpoint = "/api/v1/billing/unidentified-receipts";
+async function read(url: string, signal?: AbortSignal) {
+  const response = await fetch(url, { cache: "no-store", signal }); const body = await response.json();
+  if (!response.ok) throw new Error(body.error || "The review could not be loaded."); return body;
+}
+export function UnidentifiedReceiptWorkspace() {
+  const [data, setData] = useState<Workspace | null>(null), [facility, setFacility] = useState(""), [selectedId, setSelectedId] = useState("");
+  const [error, setError] = useState(""), [notice, setNotice] = useState(""), [busy, setBusy] = useState(false), [loading, setLoading] = useState(true), [needsReload, setNeedsReload] = useState(false);
+  const [requestKey, setRequestKey] = useState(() => crypto.randomUUID()), [sources, setSources] = useState<ImportedSource[]>([]), [sourceInfo, setSourceInfo] = useState(""), [sourceId, setSourceId] = useState("");
+  const [accounts, setAccounts] = useState<{ id: string; label: string }[]>([]), [query, setQuery] = useState(""), [accountId, setAccountId] = useState(""), [searchInfo, setSearchInfo] = useState("");
+  const readEpoch = useRef(0), accountEpoch = useRef(0);
+  const load = useCallback(async (cursor?: string, signal?: AbortSignal) => {
+    const epoch = ++readEpoch.current;
+    const params = new URLSearchParams(); if (facility) params.set("facilityId", facility); if (cursor) params.set("cursor", cursor);
+    try {
+      const next = await read(`${endpoint}?${params}`, signal) as Workspace;
+      if (!Array.isArray(next.rows) || !Array.isArray(next.facilities) || typeof next.userId !== "string") throw new Error("The saved review response needs investigation. Reload before continuing.");
+      if (epoch !== readEpoch.current || signal?.aborted) return false;
+      setData(previous => cursor && previous ? { ...next, rows: [...previous.rows, ...next.rows.filter(row => !previous.rows.some(saved => saved.id === row.id))] } : next);
+      setNeedsReload(false); setError(""); return true;
+    } catch (failure) { if (epoch === readEpoch.current && !signal?.aborted) { setError(failure instanceof Error ? failure.message : "The review could not be loaded."); setNeedsReload(true); } return false; }
+    finally { if (epoch === readEpoch.current && !signal?.aborted) setLoading(false); }
+  }, [facility]);
+  useEffect(() => { const request = new AbortController(); queueMicrotask(() => { if (!request.signal.aborted) void load(undefined, request.signal); }); return () => request.abort(); }, [load]);
+  const selected = data?.rows.find(row => row.id === selectedId), store = data?.facilities.find(item => item.id === selected?.facilityId);
+  async function mutate(body: Record<string, unknown>) {
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const response = await fetch(endpoint, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const result = await response.json(); if (!response.ok) throw new Error(result.error || "The review could not be saved.");
+      const refreshed = await load();
+      setNotice(refreshed ? "Review evidence saved. No money was posted." : "Saved, but the list could not refresh. Reload saved reviews before another action.");
+      return true;
+    } catch (failure) { setError(failure instanceof Error ? failure.message : "The save outcome could not be confirmed. Reload saved reviews before continuing."); setNeedsReload(true); return false; }
+    finally { setBusy(false); }
+  }
+  function choose(id: string) { accountEpoch.current++; setSelectedId(id); setAccounts([]); setAccountId(""); setQuery(""); setSearchInfo(""); setError(""); setNotice(""); }
+  async function findAccounts() {
+    if (!selected) return; const epoch = ++accountEpoch.current; setBusy(true); setError(""); setAccounts([]); setAccountId("");
+    try { const result = await read(`${endpoint}?mode=accounts&facilityId=${encodeURIComponent(selected.facilityId)}&query=${encodeURIComponent(query.trim())}`); if (epoch === accountEpoch.current) { setAccounts(result.rows); setSearchInfo(result.truncated ? "First 20 matches. Narrow the search to find the exact account." : `${result.rows.length} matching accounts in this store.`); } }
+    catch (failure) { if (epoch === accountEpoch.current) setError(failure instanceof Error ? failure.message : "Accounts could not be loaded."); }
+    finally { setBusy(false); }
+  }
+  async function loadSources() {
+    setBusy(true); setError(""); setSources([]); setSourceId("");
+    try { const result = await read(`${endpoint}?mode=sources`); setSources(result.rows); setSourceInfo(`${result.note}${result.truncated ? " Candidate coverage is truncated; use the original reconciliation for remaining sources." : ""}`); }
+    catch (failure) { setError(failure instanceof Error ? failure.message : "Imported sources could not be loaded."); }
+    finally { setBusy(false); }
+  }
+  const blocked = busy || loading || needsReload;
+  return <div className={`receipt-review-workspace ${styles.workspace}`}>
+    <section className="panel"><p>{receiptReviewBoundary}</p><p>Bank and Netcash imports retain their original references. Manually reported evidence is explicitly unverified. A source may be retained once; records and earlier suggestions stay available for investigation.</p></section>
+    <div className={styles.toolbar}><label>Review store<select aria-label="Review store" value={facility} disabled={busy} onChange={event => { setLoading(true); setFacility(event.target.value); setData(null); choose(""); setSources([]); setSourceId(""); }}><option value="">All accessible stores</option>{data?.facilities.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><button className="button button-secondary" disabled={busy || loading} onClick={() => {setLoading(true); void load();}}>Reload saved reviews</button></div>
+    {error && <p className="form-error" role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}{needsReload && data && <p role="status">Reload saved reviews before another action. Keep the original evidence and do not repeat an uncertain save.</p>}{loading && <p role="status">Loading saved reviews…</p>}
+    {data && <>
+      <section className="panel receipt-intake"><h2>Retain unidentified evidence</h2><p>Do not enter bank account or card numbers. Use the original evidence reference and an investigation note.</p>
+        <form className={styles.form} onSubmit={async event => { event.preventDefault(); const form = event.currentTarget, fields = new FormData(form), imported = sources.find(source => source.sourceId === sourceId); const source = imported ? { sourceType: imported.sourceType, sourceId: imported.sourceId, sourceFingerprint: imported.sourceFingerprint } : { sourceType: "MANUAL_REPORTED", evidenceReference: fields.get("evidenceReference"), receiptDate: fields.get("receiptDate"), amount: fields.get("amount"), currency: "ZAR", note: fields.get("note") }; if (await mutate({ action: "capture", facilityId: fields.get("facilityId"), requestKey, source })) { form.reset(); setSourceId(""); setRequestKey(crypto.randomUUID()); } }}>
+          <label>Evidence review store<select aria-label="Evidence review store" name="facilityId" required disabled={blocked} defaultValue=""><option value="">Choose a store</option>{data.facilities.filter(item => item.canCapture).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+          {data.canImportSources && <><button type="button" className="button button-secondary" disabled={blocked} onClick={() => void loadSources()}>Load imported credit candidates</button><label>Original imported source<select aria-label="Original imported source" value={sourceId} disabled={blocked} onChange={event => setSourceId(event.target.value)}><option value="">Manually reported evidence</option>{sources.map(source => <option key={source.sourceId} value={source.sourceId}>{source.label}</option>)}</select></label><p>{sourceInfo}</p></>}
+          {!sourceId && <><label>Original evidence reference<input name="evidenceReference" minLength={5} maxLength={200} required disabled={blocked}/></label><div className={styles.grid}><label>Reported receipt date<input name="receiptDate" type="date" required disabled={blocked}/></label><label>Reported amount (ZAR)<input name="amount" inputMode="decimal" pattern="[0-9]{1,8}(\.[0-9]{1,2})?" required disabled={blocked}/></label></div><label>Investigation note<textarea name="note" minLength={5} maxLength={1000} required disabled={blocked}/></label></>}
+          <button className="button button-primary" disabled={blocked || !data.facilities.some(item => item.canCapture)}>Retain evidence for review</button>
+        </form>
+      </section>
+      <section className="panel receipt-review-list"><h2>Retained evidence</h2><p>{data.rows.length} loaded records. Use the store filter and load more to review remaining records.</p><div className="table-wrap"><table className="data-table"><thead><tr><th>Original reference</th><th>Source / date</th><th>Amount</th><th>Matching review</th><th/></tr></thead><tbody>{data.rows.map(row => <tr key={row.id}><td>{row.reference}<span className="secondary-cell">{data.facilities.find(item => item.id === row.facilityId)?.name}</span></td><td>{row.sourceType === "MANUAL_REPORTED" ? "Reported, unverified" : row.sourceType === "BANK_IMPORT_ENTRY" ? "Bank import" : "Netcash statement"}<span className="secondary-cell">{row.sourceEnvironment} · {row.receiptDate}</span></td><td>{row.sourceType === "BANK_IMPORT_ENTRY" ? `${row.amount} · verify original currency` : `R${row.amount}`}</td><td>{row.status}{row.issue && <span className="secondary-cell">Source needs review</span>}</td><td><button className="button button-secondary" disabled={busy} onClick={() => choose(row.id)}>Open review {row.reference}</button></td></tr>)}{!data.rows.length && <tr><td colSpan={5}>No retained evidence in this selection.</td></tr>}</tbody></table></div>{data.nextCursor && <button className="button button-secondary" disabled={blocked} onClick={() => {setLoading(true); void load(data.nextCursor!);}}>Load more evidence</button>}</section>
+      {selected && <section key={`${selected.id}:${selected.revision}`} className="panel receipt-match-detail"><h2>Matching review: {selected.reference}</h2><p>{selected.sourceType === "BANK_IMPORT_ENTRY" ? `${selected.amount} · original currency requires review` : `R${selected.amount}`} · {selected.receiptDate} · {selected.status}</p><p>{selected.note}</p>{selected.issue && <p role="alert">{selected.issue}</p>}{!["live", "REPORTED_UNVERIFIED"].includes(selected.sourceEnvironment) && <p>Test evidence is retained separately and cannot be matched to customer accounts here.</p>}
+        {store?.canPropose && selected.status !== "WITHDRAWN" && !selected.issue && ["live", "REPORTED_UNVERIFIED"].includes(selected.sourceEnvironment) && <div className="receipt-match-proposal"><h3>Suggest an account</h3><p>This replaces any current suggestion and keeps the earlier history. Confirm the exact account and original evidence; no automatic matching is performed.</p><label>Find account in this store<input value={query} minLength={2} maxLength={80} disabled={blocked} onChange={event => { setQuery(event.target.value); setAccountId(""); setAccounts([]); }}/></label><button className="button button-secondary" disabled={blocked || query.trim().length < 2} onClick={() => void findAccounts()}>Find matching accounts</button><p role="status">{searchInfo}</p>
+          <form className={styles.form} onSubmit={event => { event.preventDefault(); const fields = new FormData(event.currentTarget); void mutate({ action: "propose", id: selected.id, facilityId: selected.facilityId, revision: selected.revision, accountId, reason: fields.get("reason"), confirmed: fields.get("confirmed") === "on" }); }}><label>Suggested account<select aria-label="Suggested account" value={accountId} required disabled={blocked} onChange={event => setAccountId(event.target.value)}><option value="">Choose the exact account</option>{accounts.map(account => <option key={account.id} value={account.id}>{account.label}</option>)}</select></label><label>Why does this evidence suggest this account?<textarea name="reason" minLength={10} maxLength={1000} required disabled={blocked}/></label><label className={styles.confirm}><input type="checkbox" name="confirmed" required disabled={blocked}/>I checked the original evidence and account. This is a matching suggestion only.</label><button className="button button-primary" disabled={blocked || !accountId}>Save matching suggestion</button></form>
+        </div>}
+        <div className="receipt-match-history"><h3>Retained matching history</h3>{selected.proposals.map(proposal => <article key={proposal.id}><h4>{proposal.accountLabel} · {proposal.status}</h4><p>{proposal.reason}</p>{proposal.reviewedAt && <p>Reviewed {formatSouthAfricaDateTime(proposal.reviewedAt)} · {proposal.reviewReference}</p>}
+          {proposal.status === "PROPOSED" && store?.canReview && !selected.issue && <form className={styles.form} onSubmit={event => { event.preventDefault(); const fields = new FormData(event.currentTarget); void mutate({ action: "review", id: selected.id, facilityId: selected.facilityId, revision: selected.revision, proposalId: proposal.id, decision: fields.get("decision"), reference: fields.get("reference"), confirmed: fields.get("confirmed") === "on" }); }}><label>Matching decision<select aria-label="Matching decision" name="decision" disabled={blocked}><option value="REVIEWED">Matching suggestion reviewed</option><option value="REJECTED">Reject matching suggestion</option></select></label><label>Independent review reference<input name="reference" minLength={5} maxLength={200} required disabled={blocked}/></label><label className={styles.confirm}><input name="confirmed" type="checkbox" required disabled={blocked}/>I independently checked the source and account. This does not verify or post a receipt.</label>{[selected.capturedById, proposal.proposedById].includes(data.userId) && <p>A different authorised colleague must review this suggestion.</p>}<button className="button button-primary" disabled={blocked || [selected.capturedById, proposal.proposedById].includes(data.userId)}>Record independent matching review</button></form>}
+        </article>)}{!selected.proposals.length && <p>No account suggestion has been retained.</p>}{selected.proposalsTruncated && <p>Latest 20 suggestions shown. Earlier retained history remains in the audit; this view does not claim complete history.</p>}</div>
+        {store?.canPropose && selected.status !== "WITHDRAWN" && <form className={`${styles.form} receipt-review-withdraw`} onSubmit={event => { event.preventDefault(); const fields = new FormData(event.currentTarget); void mutate({ action: "withdraw", id: selected.id, facilityId: selected.facilityId, revision: selected.revision, reference: fields.get("reference"), confirmed: fields.get("confirmed") === "on" }); }}><h3>Withdraw this investigation</h3><label>Withdrawal reason / reference<input name="reference" minLength={5} maxLength={200} required disabled={blocked}/></label><label className={styles.confirm}><input type="checkbox" name="confirmed" required disabled={blocked}/>Retain the history and withdraw this matching investigation. No financial records change.</label><button className="button button-secondary" disabled={blocked}>Withdraw investigation</button></form>}
+      </section>}
+    </>}
+  </div>;
+}

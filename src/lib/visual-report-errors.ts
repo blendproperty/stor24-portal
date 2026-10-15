@@ -1,12 +1,15 @@
 import { authErrorResponse } from "./auth-guards";
 import { dlpPrivateHeaders } from "./dlp-policy";
 const errors:Record<string,[number,string]>={
+  REPORT_COHORT_SOURCE:[422,"Enquiry/payment cohorts require original CRM and verified ledger evidence. Imported extracts cannot replace those links."],
+  REPORT_COHORT_REVIEW:[422,"Enquiry, booking, account or receipt links need review. Inspect review rows before totaling money."],
+  REPORT_COHORT_CURRENCY:[422,"This enquiry/payment cohort currently supports organisations using ZAR only."],
   REPORT_RATE_HISTORY_SOURCE:[422,"Recorded approved rent changes require native approval audits. Use a separately labelled historical report for imported records."],
   REPORT_RATE_REVIEW_REQUIRED:[422,"Some retained rent approvals need source, amount, currency or duplicate review. Inspect their review rows before totaling recorded rates."],
   REPORT_RATE_DATE_REVIEW:[422,"A retained rent approval has no verified effective month. Run by Recorded approval date to inspect it before filtering by effective date."],
   REPORT_TRANSFER_REVIEW_REQUIRED:[422,"Transfer audit or occupancy identities are duplicated. Review the original records before producing this report."],
   REPORT_TRANSFER_DATE_REVIEW:[422,"A retained transfer has no valid effective date. Run by Recorded date (SAST) to inspect its review row before filtering by effective date."],
-  REPORT_ASOF_FUTURE:[422,"Unpaid charges require an end date no later than today in South Africa."],
+  REPORT_ASOF_FUTURE:[422,"Payment and unpaid-charge outcomes require an end date no later than today in South Africa."],
   REPORT_FINANCE_REVIEW_REQUIRED:[422,"Some scoped accounts need receipt, allocation or ledger reconciliation. Preview the review rows before totaling unpaid charges."],
   REPORT_HISTORY_REQUIRED:[422,"Select an approved history extract for this report, or import its source CSV in SiteLink history."],
   REPORT_HISTORY_REQUIRED_FIELDS:[422,"Map and populate every required source field for this report. Missing required values cannot produce a valid report."],
