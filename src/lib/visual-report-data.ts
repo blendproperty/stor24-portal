@@ -31,7 +31,8 @@ async function rawVisualReportSource(scope:RequestScope, query:VisualReportQuery
     case "approved-rent-history-native": return db.$transaction(async tx=>{
       // Read the bounded retained approval set before date filtering so a reused
       // batch cannot disappear merely because its other event is outside a period.
-      const events=bounded(await tx.auditEvent.findMany({where:{...direct,action:"rent.group_increase.approved",entityType:"Facility"},take,orderBy:{id:"asc"},select:{id:true,entityId:true,facilityId:true,facility:{select:facilitySelect},occurredAt:true,after:true}}));
+      const recorded=bounded(await tx.auditEvent.findMany({where:{...direct,action:"rent.group_increase.approved",entityType:"Facility"},take,orderBy:{id:"asc"},select:{id:true,entityId:true,facilityId:true,facility:{select:{name:true,organisationId:true}},occurredAt:true,after:true}}));
+      const events=recorded.map(event=>({...event,facility:event.facility?.organisationId===scope.organisationId?{name:event.facility.name}:null}));
       const ids=rentHistoryReferenceIds(events);
       const occupancies=ids.length?await tx.occupancy.findMany({where:{id:{in:ids},tenancy:{facility,customer:{organisationId:scope.organisationId},account:{customer:{organisationId:scope.organisationId}}}},select:{id:true,tenancyId:true,unitId:true,unit:{select:{number:true,facilityId:true}},tenancy:{select:{facilityId:true,account:{select:{accountNumber:true,currency:true}}}}}}):[];
       return nativeRentHistoryRows(events,occupancies,{effectiveDateFilter:query.dateField==="effective",totalingMoney:query.metrics.some(m=>["previousRate","newRate","changeAmount"].includes(m.field))});
