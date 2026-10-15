@@ -67,6 +67,7 @@ test("isolated unidentified evidence and matching review preserve money, provena
       assert.equal(await financial(), baseline);
     });
     await t.test("actual imported source bindings reject changed, test, duplicate and unsupported authorisation evidence", async () => {
+      const baseline = await financial();
       const bank = await db.settlementBankImport.create({ data: { organisationId: org.id, bankKey: "synthetic-bank", alias: "Synthetic import", environment: "live", sourceReference: "Synthetic source", rawEncrypted: encryptIntegrationSecret("synthetic file"), sha256: "a".repeat(64), importedById: operator.id, entries: { create: { bankKey: "synthetic-bank", transactionId: randomUUID(), date: "2026-10-14", amount: "123.45", reference: "Synthetic original bank reference" } } }, include: { entries: true } });
       await assert.rejects(unidentifiedReceiptSources(scope), /PERMISSION/);
       const candidate = (await unidentifiedReceiptSources(orgScope)).rows.find(row => row.sourceId === bank.entries[0].id)!; assert.ok(candidate);
@@ -78,13 +79,23 @@ test("isolated unidentified evidence and matching review preserve money, provena
       const proposal = await db.unidentifiedReceiptMatchProposal.findFirstOrThrow({ where: { intakeId: saved.id } });
       await assert.rejects(actOnUnidentifiedReceipt(independent, review(saved.id, proposal.id, 1)), /SOURCE|CHANGED/);
       assert.ok((await unidentifiedReceiptWorkspace(scope)).rows.find(row => row.id === saved.id)?.issue);
-      const statement = await db.settlementStatement.create({ data: { organisationId: org.id, connectionId: "synthetic-only", merchantKey: "synthetic-merchant", merchantLabel: "Synthetic test merchant", environment: "test", date: "2026-10-14", source: "FIXTURE", sourceReference: "Synthetic statement", rawEncrypted: encryptIntegrationSecret("synthetic statement"), sha256: "c".repeat(64), opening: "0", closing: "10", importedById: operator.id, editedById: operator.id } });
+      const statement = await db.settlementStatement.create({ data: { organisationId: org.id, connectionId: "synthetic-only", merchantKey: "synthetic-merchant", merchantLabel: "Synthetic test merchant", environment: "sandbox", date: "2026-10-14", source: "FIXTURE", sourceReference: "Synthetic statement", rawEncrypted: encryptIntegrationSecret("synthetic statement"), sha256: "c".repeat(64), opening: "0", closing: "10", importedById: operator.id, editedById: operator.id } });
       const line = await db.settlementLine.create({ data: { statementId: statement.id, merchantKey: statement.merchantKey, transactionId: randomUUID(), date: statement.date, code: "PNA", description: "Synthetic authorisation", amount: "0", vat: "0", extras: [], kind: "RECEIPT" } });
       assert.ok(!(await unidentifiedReceiptSources(orgScope)).rows.some(row => row.sourceId === line.id));
       await db.settlementLine.update({ where: { id: line.id }, data: { code: "PNC", amount: "10", description: "Synthetic settled test line" } });
       const testCandidate = (await unidentifiedReceiptSources(orgScope)).rows.find(row => row.sourceId === line.id)!; assert.ok(testCandidate);
       const testIntake = await captureUnidentifiedReceipt(orgScope, { facilityId: facility.id, requestKey: randomUUID(), source: { sourceType: testCandidate.sourceType, sourceId: testCandidate.sourceId, sourceFingerprint: testCandidate.sourceFingerprint } });
       await assert.rejects(actOnUnidentifiedReceipt(scope, propose(testIntake.id, 0)), /TEST_SOURCE/);
+      await db.settlementStatement.update({ where: { id: statement.id }, data: { environment: "live" } });
+      const liveCandidate = (await unidentifiedReceiptSources(orgScope)).rows.find(row => row.sourceId === line.id)!; assert.ok(liveCandidate);
+      const liveIntake = await captureUnidentifiedReceipt(orgScope, { facilityId: facility.id, requestKey: randomUUID(), source: { sourceType: liveCandidate.sourceType, sourceId: liveCandidate.sourceId, sourceFingerprint: liveCandidate.sourceFingerprint } });
+      await actOnUnidentifiedReceipt(scope, propose(liveIntake.id, 0));
+      await db.settlementBankImport.update({ where: { id: bank.id }, data: { status: "ACTIVE", environment: "sandbox" } });
+      const sandboxBank = (await unidentifiedReceiptSources(orgScope)).rows.find(row => row.sourceId === bank.entries[0].id)!; assert.ok(sandboxBank);
+      const bankTestIntake = await captureUnidentifiedReceipt(orgScope, { facilityId: facility.id, requestKey: randomUUID(), source: { sourceType: sandboxBank.sourceType, sourceId: sandboxBank.sourceId, sourceFingerprint: sandboxBank.sourceFingerprint } });
+      await assert.rejects(actOnUnidentifiedReceipt(scope, propose(bankTestIntake.id, 0)), /TEST_SOURCE/);
+      assert.equal(await financial(), baseline);
+
     });
     await t.test("account changes and concurrent revisions hold review without changing financial rows", async () => {
       const saved = await captureUnidentifiedReceipt(scope, input());

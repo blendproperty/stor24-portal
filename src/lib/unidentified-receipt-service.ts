@@ -29,12 +29,12 @@ async function importedProof(tx: Client, scope: RequestScope, sourceType: "BANK_
     const row = await tx.settlementBankEntry.findFirst({ where: { id: sourceId, active: true, import: { organisationId: scope.organisationId, status: "ACTIVE" } }, include: { import: true } });
     if (!row || await tx.settlementLine.count({ where: { active: true, bankEntryId: row.id } })) throw new Error("RECEIPT_REVIEW_SOURCE");
     const amount = receiptAmount(row.amount.toString()); assertReceiptDate(row.date);
-    if (!["test", "live"].includes(row.import.environment)) throw new Error("RECEIPT_REVIEW_SOURCE");
+    if (!["sandbox", "live"].includes(row.import.environment)) throw new Error("RECEIPT_REVIEW_SOURCE");
     const evidence = { currencyBasis: "ORIGINAL_BANK_CURRENCY_UNVERIFIED", sourceType, sourceId, importId: row.importId, sha256: row.import.sha256, bankKey: row.bankKey, transactionId: row.transactionId, reference: row.reference, date: row.date, amount, alias: row.import.alias, environment: row.import.environment };
     return { sourceType, sourceId, sourceIdentity: hash([sourceType, row.import.environment, row.bankKey, row.transactionId]), sourceFingerprint: hash(evidence), sourceEnvironment: row.import.environment, receiptDate: row.date, amount, evidence };
   }
   const row = await tx.settlementLine.findFirst({ where: { id: sourceId, active: true, statement: { organisationId: scope.organisationId, status: { not: "VOID" } } }, include: { statement: true } });
-  if (!row || row.paymentId || row.adjustmentId || row.bankEntryId || row.resolutionHash || row.kind !== "RECEIPT" || lineKind(row.code, units(row.amount.toString())) !== "RECEIPT" || !["test", "live"].includes(row.statement.environment)) throw new Error("RECEIPT_REVIEW_SOURCE");
+  if (!row || row.paymentId || row.adjustmentId || row.bankEntryId || row.resolutionHash || row.kind !== "RECEIPT" || lineKind(row.code, units(row.amount.toString())) !== "RECEIPT" || !["sandbox", "live"].includes(row.statement.environment)) throw new Error("RECEIPT_REVIEW_SOURCE");
   const amount = receiptAmount(row.amount.toString()); assertReceiptDate(row.date);
   const evidence = { sourceType, sourceId, statementId: row.statementId, sha256: row.statement.sha256, revision: row.statement.revision, status: row.statement.status, merchantKey: row.merchantKey, transactionId: row.transactionId, code: row.code, description: row.description, date: row.date, amount, extras: row.extras, environment: row.statement.environment };
   return { sourceType, sourceId, sourceIdentity: hash([sourceType, row.statement.environment, row.merchantKey, row.transactionId]), sourceFingerprint: hash(evidence), sourceEnvironment: row.statement.environment, receiptDate: row.date, amount, evidence };
@@ -93,7 +93,7 @@ export async function actOnUnidentifiedReceipt(scope: RequestScope, raw: Exclude
       return { id: item.id };
     }
     await currentProof(tx, scope, item);
-    if (item.sourceEnvironment === "test") throw new Error("RECEIPT_REVIEW_TEST_SOURCE");
+    if (!["live", "REPORTED_UNVERIFIED"].includes(item.sourceEnvironment)) throw new Error("RECEIPT_REVIEW_TEST_SOURCE");
     if (input.action === "propose") {
       const account = await accountProof(tx, scope, item.facilityId, input.accountId);
       await tx.unidentifiedReceiptMatchProposal.updateMany({ where: { intakeId: item.id, status: { in: ["PROPOSED", "REVIEWED"] } }, data: { status: "SUPERSEDED" } });

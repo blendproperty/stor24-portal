@@ -41,7 +41,7 @@ await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
 const browser = await chromium.launch(); await mkdir("output/unidentified-receipts", { recursive: true });
 try {
   for (const width of [1440, 768, 390, 320]) {
-    user = "capturer"; rows = [manual(), { ...manual(), id: "bank", sourceType: "BANK_IMPORT_ENTRY", sourceEnvironment: "live", reference: "bank-original-001", note: "Original currency requires separate review" }, { ...manual(), id: "test", sourceEnvironment: "test", reference: "test-original-001" }]; writes = []; failedRead = true; failedSave = false; canManage = true; nextPage = true;
+    user = "capturer"; rows = [manual(), { ...manual(), id: "bank", sourceType: "BANK_IMPORT_ENTRY", sourceEnvironment: "live", reference: "bank-original-001", note: "Original currency requires separate review" }, { ...manual(), id: "test", sourceEnvironment: "sandbox", reference: "test-original-001" }]; writes = []; failedRead = true; failedSave = false; canManage = true; nextPage = true;
     const page = await browser.newPage({ viewport: { width, height: 1000 } }); const errors = []; page.on("pageerror", error => errors.push(error.message));
     await page.goto(`http://127.0.0.1:${server.address().port}`);
     await expect(page.getByRole("alert")).toContainText("Synthetic read outage"); await expect(page.getByText("No retained evidence in this selection.")).toHaveCount(0);
