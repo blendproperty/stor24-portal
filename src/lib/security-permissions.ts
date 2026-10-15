@@ -1,4 +1,5 @@
 export const securityPermissionGroups = [
+  { label: "Governed booking quotes", permissions: [["reservation_prices.view", "Read original booking quotes and amendment evidence"], ["reservation_prices.propose", "Propose or withdraw unsigned booking price changes"], ["reservation_prices.approve", "Independently approve booking quote proposals"]] },
   { label: "Customers and leasing", permissions: [
     ["customer_history.export", "Download a customer's contact history (scoped delegation)"],
     ["leads.*", "Manage leads"], ["reservations.*", "Manage reservations"], ["move_in.create", "Process move-ins"], ["operations.view", "View tenant operations"], ["operations.manage", "Edit customers and operational work"],

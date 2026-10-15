@@ -1,3 +1,4 @@
+import type {BookingPriceEvidence} from "./reservation-price-evidence";
 import { leadAttributionSchema } from "./lead-attribution";
 import { readEnquiryLocation } from "./enquiry-location";
 import { publicInitialRent } from "./public-initial-rent";
@@ -7,6 +8,7 @@ import type { VisualReportRow } from "./visual-report-contract";
 export type CohortBooking = {
   id: string; facilityId: string; customerId: string; status: string;
   quotedRate: unknown; intendedMoveIn: Date | null; initialRentSnapshot: unknown;
+  priceEvidence?: BookingPriceEvidence;
   convertedTenancyId: string | null;
   tenancy: {id: string; facilityId: string; customerId: string; accountId: string} | null;
 };
@@ -54,10 +56,13 @@ export function marketingPaymentCohortRows(leads: CohortLead[], evidence: Cohort
     let price: string | null = null, priceReview: string | null = null;
     if (booking) {
       if (!linked) priceReview = "Booking identity needs review";
+      else if (booking.priceEvidence?.issue) priceReview = booking.priceEvidence.issue;
       else if (booking.initialRentSnapshot == null) priceReview = "Original booking price snapshot is missing";
       else try {
         publicInitialRent(booking);
-        const rate = Number(booking.quotedRate), cents = Math.round(rate * 100);
+        const original=booking.priceEvidence?.original??booking;
+        publicInitialRent(original);
+        const rate = Number(original.quotedRate), cents = Math.round(rate * 100);
         if (rate <= 0 || !Number.isSafeInteger(cents) || Math.abs(rate * 100 - cents) > 0.000001) throw Error("INVALID_RATE");
         price = money(cents);
       } catch { priceReview = "Original booking price snapshot needs review"; }
@@ -70,6 +75,9 @@ export function marketingPaymentCohortRows(leads: CohortLead[], evidence: Cohort
       locationSource: location?.source ?? "Unknown", city: location?.city || "Unknown", province: location?.province || "Unknown", postalCode: location?.postalCode || "Unknown",
       stage: lead.stage, bookingCount: lead.bookings.length, convertedCount: converted.length,
       booking: linked ? booking.id : null, originalMonthlyQuote: review ? null : price, currency: price !== null || financial ? "ZAR" : null,
+      acceptedPriceChanges: review ? null : booking?.priceEvidence?.acceptedChanges ?? 0,
+      latestAcceptedQuote: review ? null : booking?.priceEvidence?.latestAcceptedQuote ?? null,
+      latestAcceptedAt: review ? null : booking?.priceEvidence?.latestAcceptedAt ?? null,
       netReceipts: financial ? money(financial.netReceiptCents) : null, overdue: financial ? money(financial.overdueCents) : null,
       paymentOutcome: review ? "REVIEW_REQUIRED" : !tenancy ? "NOT_CONVERTED" : financial?.overdueCents ? "OVERDUE" : financial?.receiptCount ? "VERIFIED_RECEIPTS_NO_OVERDUE" : "NO_VERIFIED_RECEIPTS",
       review, acquisitionReview: unique.size > 1 || attributions.some(a => !a.parsed.success) ? "Conflicting or invalid retained attribution" : acquisition?.campaignId && campaign === "Unknown" ? "Original campaign reference needs review" : null,

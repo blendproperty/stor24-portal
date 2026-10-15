@@ -25,6 +25,7 @@ import {
 import { requireOwner, requirePermission } from "@/lib/auth-guards";
 import { leasingResourcePermissions } from "@/lib/leasing-resource-permissions";
 import { sameOrigin } from "@/lib/request-security";
+import { assertReservationQuotePatch } from "@/lib/reservation-price-policy";
 
 const schemas = {
   facilities: facilitySchema,
@@ -344,7 +345,11 @@ export async function PATCH(
         const patch = data as { facilityId?: string; unitId?: string };
         if (patch.facilityId && patch.facilityId !== current.facilityId) throw new Error("FORBIDDEN");
         entity = await db.$transaction(async tx => {
-          const reservation = await tx.reservation.findUniqueOrThrow({ where: { id: current.id } });
+          const target = await tx.reservation.findUniqueOrThrow({ where: { id: current.id }, select: { unitId: true } });
+          await requireOperationalUnit(tx, current.facilityId, patch.unitId ?? target.unitId);
+          await tx.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id" = ${current.id} FOR UPDATE`;
+          const reservation = await tx.reservation.findUniqueOrThrow({ where: { id: current.id }, include: { publicLease: { select: { status: true } } } });
+          assertReservationQuotePatch(reservation, data);
           await requireOperationalUnit(tx, current.facilityId, patch.unitId ?? reservation.unitId);
           const saved = await tx.reservation.update({ where: { id: current.id }, data });
           await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "reservations.updated", entityType: "reservations", entityId: current.id } });
