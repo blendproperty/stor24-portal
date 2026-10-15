@@ -57,5 +57,6 @@ test("denied and dedicated-provider configuration paths never write", async () =
   assert.equal((await f.send({ kind: "integration", payload: { category: "ACCESS_CONTROL", provider: "HIKCENTRAL", config: {} } })).status, 400);
   assert.equal((await f.send({ kind: "unsupported" })).status, 400);
   assert.equal((await f.send({ kind: "profile", payload: { domain: "OPERATIONS_ALERTS", name: "Operations alert recipients", status: "ACTIVE", config: {} } })).status, 400);
+  for (const domain of ["NETCASH_DEBICHECK_TEMPLATE", "NETCASH_DEBICHECK_REQUEST"]) assert.equal((await f.send({ kind: "profile", payload: { domain, name: "Forged reviewed record", status: "REVIEWED", config: {} } })).status, 400);
   assert.equal(f.state.rows.length, 0); assert.equal(f.state.audits.length, 0);
 });
