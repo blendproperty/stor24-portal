@@ -12,6 +12,33 @@ import {previewAdjustment,requestAdjustment,decideAdjustment} from '../../src/li
 import {importedReceiptDocument} from '../../src/lib/receipt-import-service';
 import {receiptAllocationGraph} from '../../src/lib/receipt-reallocation-source';
 
+// Test-only closed evidence: never serialize errors, messages, SQL, identities or request data.
+type ImportObservationCase='same-key-post'|'netcash-card-return'|'move-undo';
+type ImportObservationStage='setup'|'intake'|'preview'|'post'|'verify'|'netcash-return'|'move'|'undo';
+function importFailureObservation(error:unknown,caseId:ImportObservationCase,stage:ImportObservationStage,started:number){
+ const classes=new Set(['Error','AssertionError','PrismaClientKnownRequestError','PrismaClientUnknownRequestError','PrismaClientInitializationError','PrismaClientValidationError','PrismaClientRustPanicError','DriverAdapterError','DatabaseError']);
+ const errorClasses:string[]=[],prismaCodes:string[]=[],sqlStates:string[]=[];
+ const record=(value:unknown):Record<string,unknown>|null=>value!==null&&(typeof value==='object'||typeof value==='function')?value as Record<string,unknown>:null;
+ const field=(value:unknown,key:string):unknown=>{try{return record(value)?.[key];}catch{return undefined;}};
+ const state=(value:unknown)=>{if(typeof value==='string'&&/^[0-9A-Z]{5}$/.test(value)&&!sqlStates.includes(value))sqlStates.push(value);};
+ const seen=new Set<unknown>();let current:unknown=error;
+ for(let depth=0;depth<3&&record(current)&&!seen.has(current);depth++){
+  seen.add(current);const name=field(field(current,'constructor'),'name'),safe=typeof name==='string'&&classes.has(name)?name:'UNCLASSIFIED';
+  if(!errorClasses.includes(safe))errorClasses.push(safe);
+  const code=field(current,'code');if(typeof code==='string'&&/^P[0-9]{4}$/.test(code)&&!prismaCodes.includes(code))prismaCodes.push(code);
+  const meta=field(current,'meta'),adapterCause=field(field(meta,'driverAdapterError'),'cause');
+  // Native SQLSTATE is admitted only from known database metadata, never from error text.
+  const metaCode=field(meta,'code');if(metaCode!==code)state(metaCode);
+  state(field(adapterCause,'originalCode'));
+  current=field(current,'cause');
+ }
+ if(errorClasses.length===0)errorClasses.push('UNCLASSIFIED');
+ return{fixture:'receipt-import-contention',case:caseId,stage,errorClasses,prismaCodes,sqlStates,elapsedMs:Math.max(0,Math.min(3600000,Date.now()-started))};
+}
+function observeImportFailure(error:unknown,caseId:ImportObservationCase,stage:ImportObservationStage,started:number){
+ try{console.error(JSON.stringify(importFailureObservation(error,caseId,stage,started)));}catch{/* Observation must never replace the original failure. */}
+}
+
 test('isolated native receipt imports preserve independent approvals, original cash and atomic once-only posting',async t=>{
  assert.equal(process.env.MERCHANDISE_DB_TEST,'isolated-ci');const url=new URL(process.env.DATABASE_URL!);assert.equal(url.hostname,'localhost');assert.match(url.pathname,/^\/(?:receipt_correction_[a-z0-9_]+|merchandise_ci)$/);
  const oldSigning=process.env.AUTH_SECRET,oldVault=process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY,originalFetch=globalThis.fetch;
@@ -101,8 +128,12 @@ test('isolated native receipt imports preserve independent approvals, original c
    const renewed=await previewImportedReceiptPosting(reviewer.scope,c.input);await assert.rejects(postImportedReceipt(reviewer.scope,{...renewed,amount:'100.26'},randomUUID()),/CHANGED/);assert.equal(await counts(),before);
   });
   await t.test('concurrent same-key post makes one original-date EFT receipt; saved retry and different-key replay cannot duplicate cash',async()=>{
-   const imported=await bankImport(),c=await reviewedSource('BANK_IMPORT_ENTRY',imported.saved.entries[0].id),preview=await previewImportedReceiptPosting(reviewer.scope,c.input),key=randomUUID();
+   const observationStarted=Date.now();let stage:ImportObservationStage='setup';
+   try{
+   const imported=await bankImport();stage='intake';const c=await reviewedSource('BANK_IMPORT_ENTRY',imported.saved.entries[0].id);stage='preview';const preview=await previewImportedReceiptPosting(reviewer.scope,c.input),key=randomUUID();
+   stage='post';
    const results=await Promise.all([postImportedReceipt(reviewer.scope,preview,key),postImportedReceipt(reviewer.scope,preview,key)]);
+   stage='verify';
    assert.equal(results[0].posting!.id,results[1].posting!.id);assert.equal(results.filter(r=>!r.idempotent).length,1);
    const row=await db.receiptImportPosting.findUniqueOrThrow({where:{intakeId:c.intake.id},include:{payment:true,ledgerEntry:true,document:true}});
    assert.equal(row.payment.provider,'BANK_IMPORT');assert.equal(row.payment.providerRef,null);assert.equal(row.payment.method,'EFT');assert.equal(row.payment.amount.toFixed(2),'100.25');assert.equal(row.ledgerEntry.effectiveAt.toISOString(),'2026-10-13T22:00:00.000Z');assert.equal((await db.account.findUniqueOrThrow({where:{id:c.account.id}})).balance.toFixed(2),'99.75');assert.ok(row.document.content?.includes('date only'));assert.equal(row.document.type,'RECEIPT');
@@ -111,30 +142,43 @@ test('isolated native receipt imports preserve independent approvals, original c
    await assert.rejects(actOnUnidentifiedReceipt(maker.scope,{action:'withdraw',id:c.intake.id,facilityId:facility.id,revision:3,reference:'Attempted withdrawal after posting',confirmed:true}),/CONFLICT/);
    await assert.rejects(settlementAction(maker.scope,{action:'void-bank',id:imported.saved.id,reference:'Attempted void of posted receipt source',confirm:true}),/SETTLEMENT_BANK/);
    assert.equal((await importedReceiptPostingEvidence(db,org.id,c.intake.id))!.paymentId,row.paymentId);
+   }catch(error){observeImportFailure(error,'same-key-post',stage,observationStarted);throw error;}
   });
   await t.test('original Netcash settled card row posts CARD and links the same receipt; auth rows never become cash',async()=>{
+   const observationStarted=Date.now();let stage:ImportObservationStage='setup';
+   try{
    const connection=await db.integrationConnection.create({data:{organisationId:org.id,provider:'NETCASH',category:'PAYMENTS',config:{environment:'live',merchantAccountEncrypted:encryptIntegrationSecret('5'+String(Math.floor(Math.random()*1e10)).padStart(10,'0')),accountServiceKeyEncrypted:encryptIntegrationSecret(randomUUID())}}});
    const raw=['20261012\tOBL\t0\tOpening\t0\t+\t0','20261012\tPNA\t1\tSynthetic card authorisation\t0\t+\t0','20261012\tPNC\t2\tSynthetic settled card receipt\t100.25\t+\t0','20261012\tCBL\t0\tClosing\t100.25\t+\t0'].join('\n'),input={connectionId:connection.id,date:'2026-10-12',raw,sourceReference:'Synthetic original full Netcash statement'},p=await previewStatement(maker.scope,input),saved=await settlementAction(maker.scope,{action:'import',...input,fingerprint:p.fingerprint,confirm:true});
    assert.ok('id'in saved&&typeof saved.id==='string');const lines=await db.settlementLine.findMany({where:{statementId:saved.id}}),line=lines.find(l=>l.code==='PNC')!;
    assert.ok(!(await unidentifiedReceiptSources(maker.scope)).rows.some(r=>r.sourceId===lines.find(l=>l.code==='PNA')!.id));
-   const c=await reviewedSource('NETCASH_STATEMENT_LINE',line.id),preview=await previewImportedReceiptPosting(reviewer.scope,c.input),posted=await postImportedReceipt(reviewer.scope,preview,randomUUID());
+   stage='intake';
+   const c=await reviewedSource('NETCASH_STATEMENT_LINE',line.id);stage='preview';const preview=await previewImportedReceiptPosting(reviewer.scope,c.input);stage='post';const posted=await postImportedReceipt(reviewer.scope,preview,randomUUID());
+   stage='verify';
    const payment=await db.payment.findUniqueOrThrow({where:{id:posted.posting!.paymentId}});assert.equal(payment.method,'CARD');assert.equal(payment.provider,'NETCASH_STATEMENT');assert.equal(payment.providerRef,null);
    const linked=await db.settlementLine.findUniqueOrThrow({where:{id:line.id}});assert.equal(linked.paymentId,payment.id);assert.ok(linked.resolutionHash);assert.equal((await settlementDetail(maker.scope,saved.id)).lines.find(l=>l.id===line.id)!.issue,null);
    await assert.rejects(settlementAction(maker.scope,{action:'void',id:saved.id,revision:1,reference:'Attempted void of posted card receipt',confirm:true}),/SETTLEMENT_RECEIPT/);
+   stage='netcash-return';
    const reversalInput={accountId:c.account.id,sourceEntryId:posted.posting!.ledgerEntryId,kind:'REVERSAL',amount:'100.25',taxAmount:'0',reason:'Synthetic independently confirmed original card return',evidenceReference:'Synthetic original returned card source'},rp=await previewAdjustment(maker.scope,reversalInput),rr=await requestAdjustment(maker.scope,reversalInput,rp.fingerprint,randomUUID());await decideAdjustment(reviewer.scope,rr.id,'approve','Synthetic independent returned card review');
    const returnedRaw=['20261013\tOBL\t0\tOpening\t0\t+\t0','20261013\tPND\t3\tSynthetic returned card receipt\t100.25\t-\t0','20261013\tCBL\t0\tClosing\t-100.25\t+\t0'].join('\n'),returnedInput={connectionId:connection.id,date:'2026-10-13',raw:returnedRaw,sourceReference:'Synthetic later complete return statement'},returnedPreview=await previewStatement(maker.scope,returnedInput),returned=await settlementAction(maker.scope,{action:'import',...returnedInput,fingerprint:returnedPreview.fingerprint,confirm:true});
    assert.ok('id'in returned&&typeof returned.id==='string');const returnDetail=await settlementDetail(maker.scope,returned.id);await settlementAction(maker.scope,{action:'resolve',id:returned.id,revision:returnDetail.revision,lineId:returnDetail.lines[0].id,targetId:rr.id,reference:'Synthetic exact approved original return match',merchantConfirmed:false,requestKey:randomUUID()});assert.equal((await settlementDetail(maker.scope,returned.id)).lines[0].issue,null);
 
+   }catch(error){observeImportFailure(error,'netcash-card-return',stage,observationStarted);throw error;}
   });
   await t.test('imported cash supports existing independently reviewed MOVE and partial UNDO without a second payment or lost original date',async()=>{
-   const bank=await bankImport(),c=await reviewedSource('BANK_IMPORT_ENTRY',bank.saved.entries[0].id),preview=await previewImportedReceiptPosting(reviewer.scope,c.input),posted=await postImportedReceipt(reviewer.scope,preview,randomUUID()),target=await account();
+   const observationStarted=Date.now();let stage:ImportObservationStage='setup';
+   try{
+   const bank=await bankImport();stage='intake';const c=await reviewedSource('BANK_IMPORT_ENTRY',bank.saved.entries[0].id);stage='preview';const preview=await previewImportedReceiptPosting(reviewer.scope,c.input);stage='post';const posted=await postImportedReceipt(reviewer.scope,preview,randomUUID());stage='setup';const target=await account();
    const receipt=posted.posting!,request={sourceAccountId:c.account.id,sourceEntryId:receipt.ledgerEntryId,targetAccountId:target.id,amount:'25.25',reason:'Synthetic documented allocation correction',evidenceReference:'Synthetic original customer allocation evidence',requestKey:randomUUID()};
+   stage='move';
    const prepared=await previewReceiptReallocation(maker.scope,request),retained=await requestReceiptReallocation(maker.scope,request,prepared.fingerprint);await decideReceiptReallocation(reviewer.scope,retained.id,0,'approve','Synthetic independent original receipt correction');
    const move=await db.receiptReallocation.findUniqueOrThrow({where:{id:retained.id}}),undo={...request,operation:'UNDO' as const,reversesId:move.id,sourceAccountId:target.id,sourceEntryId:move.targetLedgerEntryId!,targetAccountId:c.account.id,amount:'10.00',requestKey:randomUUID()};
+   stage='undo';
    const undoPreview=await previewReceiptReallocation(maker.scope,undo),undoRequest=await requestReceiptReallocation(maker.scope,undo,undoPreview.fingerprint);await decideReceiptReallocation(reviewer.scope,undoRequest.id,0,'approve','Synthetic independent partial undo');
+   stage='verify';
    assert.equal(await db.payment.count({where:{accountId:{in:[c.account.id,target.id]}}}),1);assert.equal((await db.account.findUniqueOrThrow({where:{id:c.account.id}})).balance.toFixed(2),'115.00');assert.equal((await db.account.findUniqueOrThrow({where:{id:target.id}})).balance.toFixed(2),'184.75');
    const graph=await db.$transaction(tx=>receiptAllocationGraph(tx,reviewer.scope,receipt.paymentId));assert.equal(graph.receivedAt.toISOString(),'2026-10-13T22:00:00.000Z');assert.equal((await importedReceiptPostingEvidence(db,org.id,c.intake.id))!.paymentId,receipt.paymentId);
    assert.match((await importedReceiptDocument(reviewer.scope,c.intake.id)).content,/Original receipt date: 2026-10-14/);
+   }catch(error){observeImportFailure(error,'move-undo',stage,observationStarted);throw error;}
   });
   await t.test('full controlled reversal preserves the original imported cash and receipt evidence and cannot be reposted',async()=>{
    const bank=await bankImport(),c=await reviewedSource('BANK_IMPORT_ENTRY',bank.saved.entries[0].id),preview=await previewImportedReceiptPosting(reviewer.scope,c.input),posted=await postImportedReceipt(reviewer.scope,preview,randomUUID()),receipt=posted.posting!;
