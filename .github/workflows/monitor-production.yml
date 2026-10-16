@@ -73,7 +73,7 @@ jobs:
         with:
           node-version: 22
       - name: Restore encrypted last-known recipients
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .operations-alert-config.enc
           key: operations-alert-recipients-v1-${{ github.run_id }}
