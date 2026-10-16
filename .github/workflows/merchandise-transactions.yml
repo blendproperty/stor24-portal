@@ -154,6 +154,9 @@ jobs:
 
   finance-coupled-diagnostic:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.finance_coupled_diagnostic }}
+    concurrency:
+      group: stor24-finance-coupled-diagnostic
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -161,6 +164,8 @@ jobs:
         with:
           path: lane
           persist-credentials: false
+      - name: Verify diagnostic safety preflight without subject execution
+        run: python3 lane/scripts/ci/test_finance_coupled_diagnostic.py
       - name: Require the reviewed immutable subject
         env:
           SUBJECT_SHA: ${{ inputs.subject_sha }}

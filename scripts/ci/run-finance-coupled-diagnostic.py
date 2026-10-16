@@ -8,7 +8,7 @@ def command(args,**kwargs):return subprocess.run(args,check=True,capture_output=
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 STAGES={'initial-authentication','initial-workspace','initial-preview','foreign-origin-denial','reviewer-request-denial','contention-previews','contention-requests','requester-approval-denial','foreign-approval-denial','independent-approval','approval-idempotent-retry','source-document','foreign-document-denial','foreign-workspace-denial','next-preview','raw-rollback-40001','raw-rollback-40P01','current-grant-revocation','original-financial-baselines'}
 def sanitized_summary(raw):
- result={'tapTotals':{},'httpObservers':[],'observedPrismaCodes':sorted(set(re.findall(r"\bP[0-9]{4}\b",raw))),'numericAssertionPairs':[],'rawContentPublished':False};pending=None
+ result={'tapTotals':{},'httpObservers':[],'observedPrismaCodes':sorted(set(re.findall(r"\bP[0-9]{4}\b",raw)))[:100],'numericAssertionPairs':[],'rawContentPublished':False};pending=None
  for line in raw.splitlines():
   total=re.search(r'^# (tests|suites|pass|fail|cancelled|skipped|todo|duration_ms) ([0-9]+(?:\.[0-9]+)?)$',line.strip())
   if total:result['tapTotals'][total[1]]=float(total[2])
@@ -62,37 +62,45 @@ def main():
   if value!=identity:raise RuntimeError('Cleanup ownership mismatch; resource preserved')
   subprocess.run(['docker', 'rm','-f',name] if kind=='container' else ['docker','network','rm',name],check=True,capture_output=True)
  try:
-  for image in ['postgres:16','node:22-bookworm-slim']:command(['docker','pull',image],timeout=180)
-  manifest['images']={name:command(['docker','image','inspect','--format','{{.Id}}',name]) for name in ['postgres:16','node:22-bookworm-slim']};retain()
+  manifest['phase']='pull-public-images';retain()
+  for image in ['postgres:16','node:22-bookworm']:command(['docker','pull',image],timeout=180)
+  manifest['images']={name:command(['docker','image','inspect','--format','{{.Id}}',name]) for name in ['postgres:16','node:22-bookworm']};retain()
+  manifest['phase']='create-owned-internal-network';retain()
   command(['docker','network','create','--internal','--label',label+'='+identity,network]);resources.append(('network',network))
   if command(['docker','network','inspect','--format','{{.Internal}}',network])!='true':raise RuntimeError('Private network required')
   manifest['networkInternalVerified']=True;manifest['testNetworkNamespace']='owned PostgreSQL only';retain()
+  manifest['phase']='start-owned-postgres';retain()
   command(['docker','run','-d','--name',postgres,'--network',network,'--label',label+'='+identity,'-e','POSTGRES_USER=ci','-e','POSTGRES_PASSWORD=synthetic-ci','-e','POSTGRES_DB=finance_diagnostic','postgres:16','-c','log_error_verbosity=verbose']);resources.append(('container',postgres))
   if command(['docker','port',postgres]):raise RuntimeError('Host port exposure refused')
   manifest['noHostPortsVerified']=True;retain()
+  manifest['phase']='postgres-startup-readiness';retain()
   for _ in range(60):
    if subprocess.run(['docker','exec',postgres,'pg_isready','-U','ci','-d','finance_diagnostic'],capture_output=True).returncode==0:break
    time.sleep(1)
   else:raise RuntimeError('Own synthetic PostgreSQL did not become ready')
   def node_container(name,extra,program):
    resources.append(('container',name))
-   return ['docker','run','--name',name,'--network','container:'+postgres,'--label',label+'='+identity,'--workdir','/workspace','--mount','type=bind,source='+str(subject)+',target=/workspace,readonly','--mount','type=bind,source='+str(test_output)+',target=/workspace/output','-e','DATABASE_URL=postgresql://ci:synthetic-ci@localhost:5432/finance_diagnostic','-e','MERCHANDISE_DB_TEST=isolated-ci','-e','TSX_DISABLE_CACHE=1']+extra+['node:22-bookworm-slim']+program
-  manifest['runtime']=json.loads(command(node_container(prefix+'-runtime',[],['node','-e',"console.log(JSON.stringify({node:process.version,arch:process.arch,parallelism:require('node:os').availableParallelism()}))"])));retain()
+   return ['docker','run','--name',name,'--network','container:'+postgres,'--label',label+'='+identity,'--workdir','/workspace','--mount','type=bind,source='+str(subject)+',target=/workspace,readonly','--mount','type=bind,source='+str(test_output)+',target=/workspace/output','-e','DATABASE_URL=postgresql://ci:synthetic-ci@localhost:5432/finance_diagnostic','-e','MERCHANDISE_DB_TEST=isolated-ci','-e','TSX_DISABLE_CACHE=1']+extra+['node:22-bookworm']+program
+  manifest['phase']='runtime-compatibility-preflight';retain()
+  manifest['runtime']=json.loads(command(node_container(prefix+'-runtime',[],['node','-e',"console.log(JSON.stringify({node:process.version,arch:process.arch,parallelism:require('node:os').availableParallelism(),opensslCli:require('node:child_process').execFileSync('openssl',['version']).toString().trim()}))"])));retain()
+  manifest['phase']='bootstrap-own-empty-database';retain()
   with (output/'_private-bootstrap.log').open('w',encoding='utf-8') as log:
    boot=subprocess.run(node_container(prefix+'-bootstrap',['-e','ALLOW_EMPTY_DATABASE_BOOTSTRAP=true'],['node','scripts/bootstrap-empty-database.mjs']),stdout=log,stderr=subprocess.STDOUT,timeout=180)
+  manifest['bootstrapExitCode']=boot.returncode;retain()
   if boot.returncode:raise RuntimeError('Owned empty-database bootstrap failed; workload not started')
-  manifest['emptyDatabaseBootstrappedOnce']=True;manifest['workloadStartedAt']=now();retain()
+  manifest['phase']='single-original-coupled-workload';manifest['emptyDatabaseBootstrappedOnce']=True;manifest['workloadStartedAt']=now();retain()
   with (output/'_private-coupled.tap.log').open('w',encoding='utf-8') as log:
    test=subprocess.run(node_container(prefix+'-workload',[],manifest['command']),stdout=log,stderr=subprocess.STDOUT,timeout=600)
   result=test.returncode;manifest['workloadExitCode']=result;manifest['workloadCompletedAt']=now();manifest['coupledLogSha256']=sha(output/'_private-coupled.tap.log');retain()
  except BaseException as error:
-  manifest['diagnosticFailureClass']=type(error).__name__;manifest['diagnosticFailureStage']='setup_or_workload';retain();raise
+  manifest['diagnosticFailureClass']=type(error).__name__;manifest['diagnosticFailureStage']=manifest.get('phase','preflight');retain();raise
  finally:
   try:
    for private_name in ['_private-bootstrap.log','_private-coupled.tap.log']:
     private=output/private_name
     if private.exists():
      manifest[private_name]={'bytes':private.stat().st_size,'sha256':sha(private),'published':False}
+     if private_name=='_private-bootstrap.log':manifest['bootstrapSafeCodes']=sanitized_summary(private.read_text(encoding='utf-8',errors='replace'))['observedPrismaCodes']
      if private_name=='_private-coupled.tap.log':(output/'diagnostic-summary.json').write_text(json.dumps(sanitized_summary(private.read_text(encoding='utf-8',errors='replace')),indent=2),encoding='utf-8')
      private.unlink()
    if ('container',postgres) in resources:
