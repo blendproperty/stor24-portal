@@ -89,3 +89,12 @@ Next single check: Brett, using his own already authorised account, opens that s
 Brett answered: "I can see Faeez's note with the correct details" to the request to open the same training customer in his own account and check the note once with unchanged author/category/date/time. Record the paired Faeez-write/Brett-read handover check as human-confirmed PASS. This does not onboard the incoming manager, exercise every staff role, establish note-correction history or prove any actual exported file.
 
 Next single acceptance checkpoint (original13, supporting4/5/6/15): Faeez downloads PDF, CSV and native Excel (.xlsx) from that same customer's history using his own account, opens each file, and checks the selected customer and Faeez note with its author, category and SAST date/time. Confirm all three formats separately if any fail. Do not send customer files or details into this chat; report only the result/error. Financial approval and provider activation remain separate. Status: actual three-format staff download/open/content check pending.
+
+
+### 16 October - tester scope clarified; three downloads CONFIRMED
+
+Brett clarified that Faeez identified the system gaps in the meeting; Faeez is not the mandatory tester. Brett can verify the system himself. Prior questions that unnecessarily required Faeez should not impose a closure gate. Keep genuinely role-specific checks separate from general functionality.
+
+Brett directly confirmed: "downloads all three are working". Record PDF, CSV and native Excel downloads as working based on Brett's report. Do not attribute these downloads to Faeez or infer that every requested file-content field was checked individually. Earlier note save/refresh and shared-note read confirmations remain recorded at their stated scope. The general customer history/notes/download workflow can be tested and accepted by Brett; named-role onboarding and incoming-manager access are separate.
+
+Subsequent checks should use the original numbered system-gap register, identify the feature and expected behaviour, and let Brett check it. Ask for a named staff tester only where the requirement specifically concerns that person's account or role. Financial approvals/provider execution remain separate.
