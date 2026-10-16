@@ -1,3 +1,5 @@
+import {refundProviderClaimTruth} from './netcash-refund-attempt-journal';
+import {projectRefundAttempt} from './netcash-refund-attempt-policy';
 import type {Prisma,ConfigurationProfile} from '@/generated/prisma/client';
 import {db} from '@/lib/db';
 import type {RequestScope} from '@/lib/scope';
@@ -7,6 +9,9 @@ import {currentNetcashRefundSource} from './netcash-refund-source';
 import {NETCASH_REFUND_DOMAIN,refundRecordId,refundRecordSchema,readRefundRecord,sealRefundRecord,transitionRefundRecord,projectRefundRecord,type NetcashRefundRecord} from './netcash-refund-policy';
 
 type Tx=Prisma.TransactionClient;
+// Internal current-source primitives reused by the separate SEND contract.
+// Exporting these adds no API or new permission grant.
+export {authority as refundAuthority,lockAccount as lockRefundAccount,retained as retainedRefund,reviewedAuthority as refundReviewedAuthority};
 const transaction={isolationLevel:'Serializable' as const,timeout:20000};
 const permissions={review:'payments.refund_review',reject:'payments.refund_review',withdraw:'payments.refund_prepare',reserve:'payments.refund_reserve','request-release':'payments.refund_reserve','approve-release':'payments.refund_release_review'}as const;
 function preparationEnabled(){if(process.env.NETCASH_REFUND_PREPARATION_ENABLED!=='true')throw Error('NETCASH_REFUND_PREPARATION_DISABLED');}
@@ -25,12 +30,17 @@ function retained(row:ConfigurationProfile,scope:RequestScope,facilityId:string)
  if(value.state!==row.status)throw Error('NETCASH_REFUND_INTEGRITY_REVIEW');
  return value;
 }
+async function projectCurrentRefund(tx:Tx,scope:RequestScope,value:NetcashRefundRecord){
+ const truth=await refundProviderClaimTruth(tx,scope,value.source.facilityId,value.id);
+ const account=await tx.account.findFirst({where:{id:value.source.accountId,customer:{organisationId:scope.organisationId}},select:{accountNumber:true}});if(!account)throw Error('NETCASH_REFUND_NOT_FOUND');
+ return{...projectRefundRecord(value),accountNumber:account.accountNumber,originalTransactionId:value.source.transactionId,originalTransactionDate:value.source.lineDate,paymentAmount:value.source.paymentAmount,providerAttempted:truth.claimRetained,manualPayoutHeld:truth.claimRetained||projectRefundRecord(value).manualPayoutHeld,attempt:truth.attempt?projectRefundAttempt(truth.attempt):null};
+}
 async function audit(tx:Tx,scope:RequestScope,value:NetcashRefundRecord,action:string){
  await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:value.source.facilityId,actorId:scope.userId,entityType:'ConfigurationProfile',entityId:value.id,action:'netcash.refund_'+action,after:{state:value.state,revision:value.revision,sourceHash:value.sourceHash,adjustmentId:value.source.adjustmentId,paymentId:value.source.paymentId,reference:action==='prepared'?value.preparationReference:action==='request-release'?value.releaseRequest!.reference:action==='approve-release'?value.releaseReview!.reference:action==='reserve'?value.reservation!.reference:value.review?.reference??null,providerAttempted:false,dispatchAvailable:false,financialPosting:false}}});
 }
 async function save(tx:Tx,scope:RequestScope,value:NetcashRefundRecord,action:string){
  const row=await tx.configurationProfile.update({where:{id:value.id},data:{status:value.state,config:sealRefundRecord(value)}});
- await audit(tx,scope,value,action);return projectRefundRecord(retained(row,scope,value.source.facilityId));
+ await audit(tx,scope,value,action);return projectCurrentRefund(tx,scope,retained(row,scope,value.source.facilityId));
 }
 async function reviewedAuthority(tx:Tx,scope:RequestScope,value:NetcashRefundRecord){
  if(!value.review)throw Error('NETCASH_REFUND_INDEPENDENT_REVIEW');
@@ -44,6 +54,7 @@ export async function previewNetcashRefund(scope:RequestScope,input:{facilityId:
   await authority(tx,scope,input.facilityId,'payments.refund_prepare');preparationEnabled();
   const source=await currentNetcashRefundSource(tx,scope,input);
   if(source.facilityId!==input.facilityId)throw Error('NETCASH_REFUND_NOT_FOUND');
+  if((await refundProviderClaimTruth(tx,scope,input.facilityId,refundRecordId(source))).claimRetained)throw Error('NETCASH_REFUND_PROVIDER_OUTCOME_REVIEW');
   return{source,previewHash:cardSourceHash(source),providerAttempted:false as const,dispatchAvailable:false as const,financialPosting:false as const,manualPayoutHeld:false as const};
  },{isolationLevel:'RepeatableRead',timeout:20000});
 }
@@ -56,10 +67,10 @@ export async function prepareNetcashRefund(scope:RequestScope,input:{facilityId:
   const source=await currentNetcashRefundSource(tx,scope,input),sourceHash=cardSourceHash(source);
   if(source.facilityId!==input.facilityId||sourceHash!==input.previewHash)throw Error('NETCASH_REFUND_SOURCE_CHANGED');
   const id=refundRecordId(source),existing=await tx.configurationProfile.findUnique({where:{id}});
-  if(existing){const value=retained(existing,scope,input.facilityId);if(value.preparedById!==scope.userId||value.sourceHash!==sourceHash||value.preparationReference!==input.reference.trim())throw Error('NETCASH_REFUND_ALREADY_RETAINED');return projectRefundRecord(value);}
+  if(existing){const value=retained(existing,scope,input.facilityId);if(value.preparedById!==scope.userId||value.sourceHash!==sourceHash||value.preparationReference!==input.reference.trim())throw Error('NETCASH_REFUND_ALREADY_RETAINED');return projectCurrentRefund(tx,scope,value);}
   if(await tx.configurationProfile.count({where:{organisationId:scope.organisationId,domain:NETCASH_REFUND_DOMAIN}})>=1000)throw Error('NETCASH_REFUND_HOLD_COVERAGE_REVIEW');
   const value=refundRecordSchema.parse({version:1,id,source,sourceHash,state:'PREPARED',revision:1,createdAt:new Date().toISOString(),preparedById:scope.userId,preparationReference:input.reference,review:null,reservation:null,releaseRequest:null,releaseReview:null,providerAttempted:false,dispatchAvailable:false,dispatchContract:'UNAVAILABLE_V1',financialPosting:false});
-  await tx.configurationProfile.create({data:{id,organisationId:scope.organisationId,facilityId:input.facilityId,domain:NETCASH_REFUND_DOMAIN,name:id,status:value.state,config:sealRefundRecord(value)}});await audit(tx,scope,value,'prepared');return projectRefundRecord(value);
+  await tx.configurationProfile.create({data:{id,organisationId:scope.organisationId,facilityId:input.facilityId,domain:NETCASH_REFUND_DOMAIN,name:id,status:value.state,config:sealRefundRecord(value)}});await audit(tx,scope,value,'prepared');return projectCurrentRefund(tx,scope,value);
  },transaction);
 }
 export async function actOnNetcashRefund(scope:RequestScope,input:{facilityId:string;id:string;revision:number;action:keyof typeof permissions;reference:string;confirmed:boolean}){
@@ -95,6 +106,7 @@ export async function actOnNetcashRefund(scope:RequestScope,input:{facilityId:st
 
    const adjustment=await tx.financialAdjustment.findFirst({where:{id:value.source.adjustmentId,organisationId:scope.organisationId,facilityId:input.facilityId,accountId:value.source.accountId,kind:'REFUND',status:'APPROVED',postedAt:null,ledgerEntryId:null,documentId:null,payoutReference:null,payoutDate:null}});
    if(!adjustment||await tx.auditEvent.count({where:{organisationId:scope.organisationId,entityType:'ConfigurationProfile',entityId:value.id,action:{startsWith:'netcash.refund_provider_'}}}))throw Error('NETCASH_REFUND_PROVIDER_OUTCOME_REVIEW');
+   if((await refundProviderClaimTruth(tx,scope,input.facilityId,value.id)).claimRetained)throw Error('NETCASH_REFUND_PROVIDER_OUTCOME_REVIEW');
   }
   return save(tx,scope,transitionRefundRecord(value,input.action,scope.userId,input.reference),input.action);
  },transaction);
@@ -104,7 +116,7 @@ export async function netcashRefundHistory(scope:RequestScope,facilityId:string,
   await authority(tx,scope,facilityId,'adjustments.view');const where={organisationId:scope.organisationId,facilityId,domain:NETCASH_REFUND_DOMAIN};
   if(cursor&&!await tx.configurationProfile.findFirst({where:{...where,id:cursor},select:{id:true}}))throw Error('NETCASH_REFUND_NOT_FOUND');
   const rows=await tx.configurationProfile.findMany({where,orderBy:[{createdAt:'desc'},{id:'desc'}],take:21,...(cursor?{cursor:{id:cursor},skip:1}:{})});
-  return{rows:rows.slice(0,20).map(row=>projectRefundRecord(retained(row,scope,facilityId))),nextCursor:rows.length>20?rows[19].id:null};
+  return{rows:await Promise.all(rows.slice(0,20).map(row=>projectCurrentRefund(tx,scope,retained(row,scope,facilityId)))),nextCursor:rows.length>20?rows[19].id:null};
  },{isolationLevel:'RepeatableRead',timeout:20000});
 }
 

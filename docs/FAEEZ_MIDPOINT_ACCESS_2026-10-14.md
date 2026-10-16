@@ -48,3 +48,55 @@ Withhold adjustments.approve, adjustments.record_refund, settlements.approve/man
 - **Deployment and configuration:** normal Deploy38556590216 succeeded. Runtime readback at 11:30UTC confirms healthy stor24-crm:8347a65a, image sha256:c7e4bb460f164a7e1e54b9f0ba1fa2d75b149cd9aee895b45db0fb1c337c4e70 and matching checkout. At 13:32:50 SAST the normal owner-only permissions API saved Faeez's 26 exact grants, retained his unique custom role and single STORE-1 Midpoint scope, and advanced sessionVersion1 to2. Existing password/MFA and accepted account retained; no invitation/reset email sent.
 - **Live production verification:** 13:35:47 SAST readback confirms all26 grants and Midpoint-only scope; live permission editor shows26 selected. Short-lived server-memory Faeez-role verification requests returned200 for leasing/accounts/collections/adjustments/operations/leads/marketing; cross-store reads, financial approval, settlement reads and staff permission changes returned403. Previous-version session returned401. Business record counts and other staff remained unchanged during final checks. This verifies authorisation, not password/MFA login or real financial transactions.
 - **Remaining gates:** Brett confirms Faeez has not tried signing in yet. Item18 remains CONFIGURED / TECHNICALLY VERIFIED / STAFF LOGIN AND UAT OPEN. Use normal https://portal.stor24.co.za/login with existing credentials; old sessions require a fresh sign-in. Independent financial approvals, refund payouts, settlements, billing/debit administration, collection policy, physical-access changes and personal-data exports remain withheld. Customer history/dated notes and all existing finance/provider/customer/device/legal/privacy/data/training/approval gates remain open. No external tracker is in scope.
+
+
+## 16 October 2026 - current access and next own-account acceptance
+
+The dated 14 October evidence above is historical. A new read-only check at 08:43 SAST on16October confirms29 permissions, sessionVersion7, one Store1-Midpoint assignment, no unrestricted assignment and no other active user sharing this custom role. The complete permission set matches Brett's approved permission-update audit. Only the previously approved booking-price view and propose access is present; price approval remains false. No permissions, password/MFA settings or sessions were changed or manufactured by this check. Evidence: output/faeez-acceptance-20261016/independent-readback.json.
+
+The pool fix is separately deployed and read-only verified at main78b837f7. This is technical deployment evidence, not Faeez's login or staff acceptance. On 16 October Brett reported: "Faeez can sign in and Midpoint opens". Own-account login and Midpoint entry are now HUMAN-CONFIRMED; the exact attempt time was not supplied. This does not confirm the remaining customer, download or staff workflows.
+
+Work one step at a time:
+
+1. **Now - original18, own sign-in:** Faeez uses his existing account at https://portal.stor24.co.za/login and opens Midpoint. Record tester/date/store and only the result or error. Never send a password or verification code. Status: PASS - Brett reports Faeez signed in with his own account and Midpoint opens (16 October; actual attempt time not supplied).
+2. **After sign-in - original4/5/13:** in Customers & tenants, select an existing approved training customer, confirm the same customer/store in Communications and history, then download PDF, CSV and Excel. Open each file and check the selected customer, filters, older matching records, dated authors/categories and retained message content. Missing external source content must stay labelled; a download cannot reconstruct absent messages or attachments. Status: not run by Faeez.
+3. **Then - original6/15:** on that approved training customer, save one clearly labelled staff-acceptance note with the appropriate category. Refresh and verify exactly one retained note, Faeez's author name and SAST server date. Add any correction as a new note. Have a second already authorised staff member read the same history in their own session; record the named actor and result. The incoming manager starts1November and is not treated as onboarded or tested. Status: not run by the staff pair.
+
+These steps do not create a payment, correction, refund, price approval, customer message or provider authentication. Financial approval and provider activation remain separate. Owner or synthetic-session evidence is not a substitute for Faeez's own sign-in; server/source PDF bytes are not an ordinary browser download. The verification browser tool remains unavailable, so genuine ordinary-download and staff/device acceptance gates stay open until observed or specifically reported by the actual tester.
+
+
+### Next acceptance checkpoint - customer history read
+
+After the confirmed login, Faeez opens a Midpoint customer known to have recorded notes or messages and checks the History tab. Confirm existing dated notes and communications belong to that selected customer/store. Report only whether the history is visible or the error; no customer details are required. This read is the next single check. New-note persistence, a second authorised staff read and actual PDF/CSV/Excel files remain separate pending checks. No new note, export, permission or financial action is inferred from the login report.
+
+
+### 16 October - customer history read HUMAN-CONFIRMED
+
+Brett answered the next staff check: "Dated history and communications are visible". Record this as human confirmation that Faeez, after his own-account Midpoint login, can see existing dated history and communications for the selected customer. Exact attempt time and record identity were not supplied or requested. This is the read portion of original4/5/13; it does not establish all older pages, external source completeness, actual PDF/CSV/Excel files or new-note persistence.
+
+Next single check (original6/15): on an existing approved training customer, Faeez saves one clearly labelled staff test note in the appropriate category, refreshes/reopens the customer, and confirms that the note appears once with his name, the category and the correct SAST date/time. This is a staff note only; record corrections as a new note. Do not change a payment, price, approval or provider setting. Second-authorised-staff read and actual PDF/CSV/Excel exports remain later checks. Status: PASS - Brett reports the note appears once with correct author, category and date/time after refresh/reopen; second-staff read remains pending.
+
+
+### 16 October - note save and refresh HUMAN-CONFIRMED
+
+Brett answered: "Note appears once with correct author, category and date/time". Record Faeez's original6/15 note save/refresh acceptance as PASS for the reported single approved-training-customer note. This confirms the reported persistence, single appearance, author, selected category and SAST date/time. It is human-reported; no customer identity, note contents or exact attempt time were requested. Permanent correction history, second-staff read and actual file exports are not inferred.
+
+Next single check: Brett, using his own already authorised account, opens that same training customer and confirms the same Faeez note is visible once with unchanged author/category/date/time. This is a read-only handover check; it does not onboard the incoming manager or grant access. Status: second-staff read pending.
+
+
+### 16 October - second authorised staff read HUMAN-CONFIRMED
+
+Brett answered: "I can see Faeez's note with the correct details" to the request to open the same training customer in his own account and check the note once with unchanged author/category/date/time. Record the paired Faeez-write/Brett-read handover check as human-confirmed PASS. This does not onboard the incoming manager, exercise every staff role, establish note-correction history or prove any actual exported file.
+
+Next single acceptance checkpoint (original13, supporting4/5/6/15): Faeez downloads PDF, CSV and native Excel (.xlsx) from that same customer's history using his own account, opens each file, and checks the selected customer and Faeez note with its author, category and SAST date/time. Confirm all three formats separately if any fail. Do not send customer files or details into this chat; report only the result/error. Financial approval and provider activation remain separate. Status: actual three-format staff download/open/content check pending.
+
+
+### 16 October - tester scope clarified; three downloads CONFIRMED
+
+Brett clarified that Faeez identified the system gaps in the meeting; Faeez is not the mandatory tester. Brett can verify the system himself. Prior questions that unnecessarily required Faeez should not impose a closure gate. Keep genuinely role-specific checks separate from general functionality.
+
+Brett directly confirmed: "downloads all three are working". Record PDF, CSV and native Excel downloads as working based on Brett's report. Do not attribute these downloads to Faeez or infer that every requested file-content field was checked individually. Earlier note save/refresh and shared-note read confirmations remain recorded at their stated scope. The general customer history/notes/download workflow can be tested and accepted by Brett; named-role onboarding and incoming-manager access are separate.
+
+Subsequent checks should use the original numbered system-gap register, identify the feature and expected behaviour, and let Brett check it. Ask for a named staff tester only where the requirement specifically concerns that person's account or role. Financial approvals/provider execution remain separate.
+
+Attribution clarification: preserve the prior history, note persistence and shared-note visibility results as USER-CONFIRMED functionality. The earlier questions embedded named actors; after Brett's correction, those answers must not independently certify a Faeez/Brett tester pair or Faeez-specific authorship. Named tester identity for those general checks is not separately established. No repeat general-functionality test is required solely to obtain a different tester. Keep the earlier explicitly reported account-login result at its reported scope, separate from this general acceptance correction.

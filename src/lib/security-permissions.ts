@@ -14,6 +14,7 @@ export const securityPermissionGroups = [
     ["settlements.view", "View merchant settlement statements"], ["settlements.import", "Import settlement and bank evidence"], ["settlements.manage", "Match and reopen settlement reviews"], ["settlements.approve", "Independently review settlements"], ["settlements.export", "Export settlement reviews"],
   ] },
   { label: "Adjustments and refunds", permissions: [
+    ["payments.refund_send", "Prepare and submit one independently reviewed native card-refund request"], ["payments.refund_send_review", "Independently review a purpose-specific native card-refund SEND request"],
     ["payments.refund_prepare", "Prepare native Netcash refund review"], ["payments.refund_review", "Independently review native refund preparation"], ["payments.refund_reserve", "Explicitly reserve or request release of a native refund hold"], ["payments.refund_release_review", "Independently release an unattempted native refund hold"],
     ["adjustments.view", "View adjustment requests and records"], ["adjustments.request", "Request or withdraw adjustments"], ["adjustments.approve", "Independently approve adjustments"], ["adjustments.record_refund", "Record externally completed refunds"],
   ] },

@@ -236,7 +236,7 @@ Guidance added 16 October. **Controlled bank-authentication test** is available 
 
 ## 06G · Prepare a card refund and control its hold
 
-Open **Adjustments > Review a Netcash card refund**. Choose your store and read retained history first. New preparation and reservations are disabled by default. Provider refund dispatch is unavailable: these controls do not send money or record a refund as paid.
+Open **Adjustments > Review a Netcash card refund**. Choose your store and read retained history first. New preparation and reservations are disabled by default. These preparation and reservation controls do not send a provider request or record a refund as paid. The separate request controls in section 06H need their own permission and independent review.
 
 **Choose the original.** Load finance-approved refunds, select the account/refund and its original card receipt from a reviewed merchant statement, then choose **Preview original refund**. Stor24 checks the original payment, exact PNC transaction, full statement and current financial approval. Missing or ambiguous evidence needs investigation; matching amounts alone are insufficient.
 
@@ -247,6 +247,22 @@ Open **Adjustments > Review a Netcash card refund**. Choose your store and read 
 **Release independently.** Use **Request hold release**, record the evidence and type **REQUEST LOCAL HOLD RELEASE**. A different authorised reviewer checks that this application retained no provider attempt, then types **RELEASE LOCAL HOLD** to approve release. History remains permanent. Release does not prove that nobody paid outside Stor24, and it records no payout. Any retained provider-attempt or unknown outcome evidence requires investigation and blocks this release workflow.
 
 **After uncertainty.** Refresh retained history before another action; do not repeat a submission because a response was lost. Only record a manually completed payout through the existing finance-approved refund workflow with its actual payout evidence. Real Netcash refund testing, merchant approval and processed/refused outcomes remain separate readiness gates. A guide or automated check is not staff acceptance.
+
+## 06H · Request a card refund once and check its outcome
+
+Open **Adjustments > Review a Netcash card refund** and read current history. Request creation is disabled by default. It needs separate provider approval for this original transaction, current staff permissions and a valid independently reviewed local reservation. Signing-only bank permission does not authorise a refund.
+
+**Check the original.** Confirm the store, account, original card transaction/date/receipt amount and approved refund amount. Missing or changed evidence, credentials or approval must remain held. Do not replace evidence merely to clear a warning.
+
+**Prepare and obtain a separate review.** Choose the request preparation action, enter an evidence reference and type **PREPARE REFUND REQUEST**. A different currently authorised SEND reviewer checks this request and types **APPROVE REFUND REQUEST**. The earlier local preparation review is insufficient.
+
+**Request once.** The authorised sender reviews the exact current history, enters the supporting reference, checks the confirmation and types **REQUEST NETCASH REFUND**. This can request a real refund. Stor24 retains an irreversible claim before contacting Netcash. No second request, retry or automatic payout entry is available after that claim.
+
+**Read the result.** An acknowledgement means merchant authorisation and payout confirmation are still outstanding. An existing-request response means ownership is unknown. Rejection, timeout, lost response or an unverified result keeps the claim and financial hold for investigation. Refresh history; never resend or record an assumed payout. Merchant approval and confirmed processing require their own evidence.
+
+**Close only before a claim.** The preparing sender may type **WITHDRAW UNCLAIMED REQUEST**; a different SEND reviewer may type **REJECT UNCLAIMED REQUEST**. These actions remain available when creation is disabled or the approval window expired. They close only the unclaimed preparation and leave the financial hold intact.
+
+**Start fresh deliberately.** After a recorded withdrawal or rejection, **PREPARE FRESH REFUND REQUEST** retains the closed history and requires current approval plus a new independent SEND review. Changed original evidence or credentials stays held. A claimed request can never be closed, renewed or reset. Releasing an eligible local hold is a separate section 06G action. Staff acceptance, provider confirmation and finance sign-off remain open until actually verified.
 
 ## 07 · Arrears notices and escalation boundaries
 
