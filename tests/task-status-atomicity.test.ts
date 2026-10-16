@@ -4,7 +4,7 @@ import { build } from "esbuild";
 import { createRequire } from "node:module";
 
 test("task status and audit roll back together and allow a verified retry", async () => {
-  const state = { task: { id: "task", organisationId: "org", facilityId: "facility", status: "OPEN", completedAt: null as Date | null }, audits: [] as unknown[], failAudit: true };
+  const state = { task: { purpose: "GENERAL", id: "task", organisationId: "org", facilityId: "facility", status: "OPEN", completedAt: null as Date | null }, audits: [] as unknown[], failAudit: true };
   const client = (s: typeof state) => ({ task: {
     findFirst: async () => s.task,
     update: async ({data}: {data: {status:string;completedAt:Date|null}}) => (s.task={...s.task,...data}),
@@ -18,5 +18,6 @@ test("task status and audit roll back together and allow a verified retry", asyn
   new Function('require','module','exports','__db',output.outputFiles[0].text)(createRequire(import.meta.url),loaded,loaded.exports,database);
   const send=()=>loaded.exports.PATCH(new Request('https://example.invalid/task',{method:'PATCH',body:JSON.stringify({status:'COMPLETED'})}),{params:Promise.resolve({id:'task'})});
   const before=structuredClone(state.task);assert.equal((await send()).status,500);assert.deepEqual(state.task,before);assert.equal(state.audits.length,0);
+  state.task.purpose='AGREED_FOLLOWUP';assert.equal((await send()).status,409);assert.deepEqual(state.task,{...before,purpose:'AGREED_FOLLOWUP'});assert.equal(state.audits.length,0);state.task.purpose='GENERAL';
   state.failAudit=false;assert.equal((await send()).status,200);assert.equal(state.task.status,'COMPLETED');assert.equal(state.audits.length,1);
 });

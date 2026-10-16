@@ -36,10 +36,13 @@ test("reminder aggregates enforce permission-specific organisation and facility 
     assert.equal("take" in query, false);
     if (model === "task") {
       assert.equal(query.where.organisationId, "org");
-      assert.deepEqual(query.where.facilityId, { in: ["store-a"] });
+      if (query.where.purpose === "AGREED_FOLLOWUP") assert.deepEqual(query.where.facility, { organisationId: "org", id: { in: ["store-a"] }, active: true });
+      else assert.deepEqual(query.where.facilityId, { in: ["store-a"] });
     } else if (model === "payment" || model === "event") assert.deepEqual(query.where, f.state.scope);
     else assert.deepEqual(query.where.facility, { organisationId: "org", id: { in: ["store-a"] } });
   }
+  assert.match(await f.render(), /operations\/followups\?view=due/);
+  assert.ok(f.state.reads.some(r => r.model === "task" && r.query.where.purpose === "AGREED_FOLLOWUP"));
   f.state.reads.length = 0;
   f.state.denied.add("inventory.view"); f.state.denied.add("collections.view"); f.state.denied.add("payments.view");
   const html = await f.render();
@@ -72,7 +75,7 @@ test("synthetic reminder panel fits desktop and narrow mobile widths", { skip: p
       await page.setViewportSize({ width, height: 900 });
       await page.setContent(`<style>${css}</style><main style="padding:16px;max-width:1000px;margin:auto">${html}</main>`);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-      assert.equal(await page.getByRole("link").count(), 7);
+      assert.equal(await page.getByRole("link").count(), 8);
       await page.screenshot({ path: `output/operations-reminders/reminders-${width}.png`, fullPage: true });
     }
   } finally { await browser.close(); }

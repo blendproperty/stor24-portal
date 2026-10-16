@@ -34,6 +34,7 @@ try {
       } else {
         assert.ok(staffFollowupChangeSchema.safeParse(body).success); changes.push(body);
         if (mode === 'conflict') return route.fulfill({ status: 409, json: { error: {} } });
+        if (body.action === 'UPDATE') tasks[0] = { ...tasks[0], title: body.title, description: body.description, dueAt: body.dueAt, assignee: [responsible, cover].find(s => s.id === body.assigneeId), cover: [responsible, cover].find(s => s.id === body.coverId) ?? null, updatedAt: '2026-10-14T06:05:00.000Z' };
         if (body.action === 'ACKNOWLEDGE') tasks[0] = { ...tasks[0], coverAcknowledgedAt: '2026-10-14T06:10:00.000Z', updatedAt: '2026-10-14T06:10:00.000Z' };
       }
       if (mode === 'uncertain') return route.abort();
@@ -55,6 +56,19 @@ try {
     assert.ok(await page.getByRole('link', { name: /Customer history/ }).getAttribute('href').then(s => s.includes(customer.id)));
     await page.screenshot({ path: `output/staff-followups/${width}.png`, fullPage: true });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${width}px overflow`);
+    await page.getByLabel('Appointment queue').selectOption('due');
+    await expect(page.getByRole('heading', { name: 'Due today & overdue', exact: true })).toBeVisible();
+    assert.equal(new URL(page.url()).searchParams.get('view'), 'due');
+    await page.getByRole('button', { name: 'Edit appointment', exact: true }).click();
+    const edit = page.getByRole('form', { name: 'Edit Agreed advance call' });
+    await expect(edit.getByLabel('Agreed date and time (SAST)')).toHaveValue('2026-10-14T09:00');
+    await edit.getByLabel('Agreed date and time (SAST)').fill('2026-10-14T10:30');
+    await edit.getByLabel('Agreed action and handover details').fill('Customer agreed to a later call. Payment promise unchanged.');
+    await edit.getByRole('button', { name: 'Save appointment changes' }).click();
+    await expect(edit).toHaveCount(0);
+    assert.equal(changes.at(-1).action, 'UPDATE');
+    assert.equal(changes.at(-1).dueAt, '2026-10-14T08:30:00.000Z');
+    assert.equal(changes.at(-1).expectedUpdatedAt, '2026-10-14T06:00:00.000Z');
     mode = 'conflict'; await page.getByRole('button', { name: 'Complete', exact: true }).click(); await expect(page.getByRole('alert')).toContainText('changed');
     mode = 'success'; canManage = false; await page.getByRole('button', { name: 'Reload follow-ups' }).click();
     await expect(page.getByRole('button', { name: 'Acknowledge cover' })).toBeVisible(); await expect(page.getByRole('button', { name: 'Complete', exact: true })).toHaveCount(0);

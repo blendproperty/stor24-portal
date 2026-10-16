@@ -5,7 +5,7 @@ import { currentRoleAccess } from "@/lib/current-role-access";
 import { customerNoteFacilities } from "@/lib/customer-history-service";
 import { leasingCustomerWhere } from "@/lib/leasing-service";
 import { facilityWhere, type RequestScope } from "@/lib/scope";
-import { staffFollowupSchema, staffFollowupChangeSchema } from "@/lib/staff-followup-policy";
+import { staffFollowupSchema, staffFollowupChangeSchema, staffFollowupViewSchema, followupDayEnd, type StaffFollowupView } from "@/lib/staff-followup-policy";
 
 type Client = Prisma.TransactionClient;
 const staffSelect = { id: true, name: true } as const;
@@ -17,9 +17,16 @@ async function eligibleStaff(tx: Client, organisationId: string, userId: string,
   return user;
 }
 
-export async function listStaffFollowups(scope: RequestScope, search = "", cursor?: string) {
+async function eligibleActor(tx: Client, scope: RequestScope, facilityId: string, manage: boolean) {
+  const actor = await eligibleStaff(tx, scope.organisationId, scope.userId, facilityId);
+  if (manage && !currentRoleAccess(actor.roleAssignments, "operations.manage", facilityId).allowed) throw new Error("FORBIDDEN");
+}
+
+export async function listStaffFollowups(scope: RequestScope, search = "", cursor?: string, view: StaffFollowupView = "all", now = new Date()) {
+  staffFollowupViewSchema.parse(view);
   const facilities = await db.facility.findMany({ where: { ...facilityWhere(scope), active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } });
   const where: Prisma.TaskWhereInput = { organisationId: scope.organisationId, facilityId: { in: facilities.map(f => f.id) }, purpose: "AGREED_FOLLOWUP", status: { notIn: ["COMPLETED", "CANCELLED"] } };
+  if (view !== "all") where.dueAt = view === "due" ? { lt: followupDayEnd(now) } : { gte: followupDayEnd(now) };
   if (cursor && !await db.task.count({ where: { AND: [where, { id: cursor }] } })) throw new Error("CONFLICT");
   const [tasks, customers, users] = await Promise.all([
     db.task.findMany({ where, include, orderBy: [{ dueAt: "asc" }, { id: "asc" }], ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}), take: 101 }),
@@ -34,6 +41,7 @@ export async function createStaffFollowup(scope: RequestScope, input: unknown) {
   return db.$transaction(async tx => {
     const { facilities } = await customerNoteFacilities(scope, data.customerId, tx);
     if (!facilities.some(f => f.id === data.facilityId)) throw new Error("FORBIDDEN");
+    await eligibleActor(tx, scope, data.facilityId, true);
     await eligibleStaff(tx, scope.organisationId, data.assigneeId, data.facilityId);
     if (data.coverId) await eligibleStaff(tx, scope.organisationId, data.coverId, data.facilityId);
     const requestKey = createHash("sha256").update(JSON.stringify([scope.organisationId, scope.userId, data.requestKey])).digest("hex");
@@ -52,6 +60,7 @@ export async function changeStaffFollowup(scope: RequestScope, id: string, input
   return db.$transaction(async tx => {
     const before = await tx.task.findFirst({ where: { id, organisationId: scope.organisationId, facility: facilityWhere(scope), purpose: "AGREED_FOLLOWUP" } });
     if (!before || !before.facilityId) throw new Error("FORBIDDEN");
+    await eligibleActor(tx, scope, before.facilityId, data.action !== "ACKNOWLEDGE");
     if (["COMPLETED", "CANCELLED"].includes(before.status)) throw new Error("CONFLICT");
     let changes: Prisma.TaskUncheckedUpdateManyInput;
     if (data.action === "ACKNOWLEDGE") {
@@ -59,9 +68,14 @@ export async function changeStaffFollowup(scope: RequestScope, id: string, input
       await eligibleStaff(tx, scope.organisationId, scope.userId, before.facilityId);
       if (before.coverAcknowledgedAt && before.updatedAt.toISOString() === data.expectedUpdatedAt) return before;
       changes = { coverAcknowledgedAt: new Date() };
+    } else if (data.action === "UPDATE") {
+      await eligibleStaff(tx, scope.organisationId, data.assigneeId, before.facilityId);
+      if (data.coverId) await eligibleStaff(tx, scope.organisationId, data.coverId, before.facilityId);
+      changes = { title: data.title, description: data.description, dueAt: new Date(data.dueAt), assigneeId: data.assigneeId, coverId: data.coverId,
+        ...(data.assigneeId !== before.assigneeId || data.coverId !== before.coverId ? { coverAcknowledgedAt: null } : {}) };
     } else if (data.action === "HANDOVER") {
       if (data.coverId) await eligibleStaff(tx, scope.organisationId, data.coverId, before.facilityId);
-      changes = { coverId: data.coverId, coverAcknowledgedAt: null };
+      changes = { coverId: data.coverId, ...(data.coverId !== before.coverId ? { coverAcknowledgedAt: null } : {}) };
     } else {
       changes = { status: data.action === "COMPLETE" ? "COMPLETED" : "CANCELLED", completedAt: data.action === "COMPLETE" ? new Date() : null };
     }

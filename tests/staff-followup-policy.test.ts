@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { staffFollowupSchema, staffFollowupChangeSchema, followupSastInput } from "../src/lib/staff-followup-policy";
+import { staffFollowupSchema, staffFollowupChangeSchema, followupSastInput, followupDayEnd, followupSastValue } from "../src/lib/staff-followup-policy";
 import { collectionCallCount } from "../src/lib/operations-reminder-policy";
 
 test("agreed call on 14th uses SAST while a promise due 15th still holds debt chasing", () => {
@@ -11,4 +11,11 @@ test("agreed call on 14th uses SAST while a promise due 15th still holds debt ch
   assert.equal(staffFollowupSchema.safeParse({ ...value, overridePromiseHold: true }).success, false);
   assert.equal(staffFollowupSchema.safeParse({ ...value, dueAt: "2026-10-14T09:00" }).success, false);
   assert.equal(staffFollowupChangeSchema.safeParse({ action: "ACKNOWLEDGE", expectedUpdatedAt: "2026-10-14T07:00:00.000Z", coverId: value.assigneeId }).success, false);
+});
+
+test("SAST appointments reject impossible dates and use local midnight for due queues", () => {
+  for (const value of ["2026-02-30T09:00", "2026-13-01T09:00", "2026-10-14T25:00", "2026-10-14T09:61", "invalid"]) assert.throws(() => followupSastInput(value), /valid date/);
+  assert.equal(followupSastValue(followupSastInput("2028-02-29T00:00")), "2028-02-29T00:00");
+  assert.equal(followupDayEnd(new Date("2026-10-14T21:59:59Z")).toISOString(), "2026-10-14T22:00:00.000Z");
+  assert.equal(followupDayEnd(new Date("2026-10-14T22:00:00Z")).toISOString(), "2026-10-15T22:00:00.000Z");
 });
