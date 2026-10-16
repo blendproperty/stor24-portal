@@ -8,7 +8,7 @@ export function units(value: string): bigint {
 }
 export function amount(value: bigint) { const n = value < 0 ? -value : value; return `${value < 0 ? "-" : ""}${n / BigInt(10000)}.${(n % BigInt(10000)).toString().padStart(4, "0")}`; }
 const date = (value: string) => dateKey.parse(/^\d{8}$/.test(value) ? `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6)}` : value);
-const receipts = new Set(["PNC", "PNP", "PNM", "PNE", "PIS", "PVC", "TDD", "SDD", "TDC", "SDC", "DCS", "PQR"]);
+const receipts = new Set(["PNC", "PNP", "PNM", "PNE", "PIS", "PVC", "TDD", "SDD", "TDC", "SDC", "DCS", "PQR", "PFC", "PMW", "PGC"]);
 const returns = new Set(["DRU", "DCD", "DCU", "PND", "PNR", "PNQ", "PNZ", "PVR", "PVD", "PIR", "PNX", "DRC"]);
 export function lineKind(code: string, signed: bigint) {
   if (receipts.has(code) && signed > 0) return "RECEIPT";
@@ -45,7 +45,7 @@ export function parseDailyStatement(raw: string, expectedDate: string) {
   return { date: expectedDate, opening: amount(opening), closing: amount(closing), movement: amount(movement), lines };
 }
 /** Normalised bank extract, not a guessed native-bank format. Bank IDs must identify original statement rows. */
-export function parseBankCsv(raw: string) {
+export function parseBankCsvSource(raw: string) {
   if (raw.length > 500000) throw new Error("SETTLEMENT_FORMAT");
   const rows: string[][] = []; let row: string[] = [], cell = "", quoted = false, afterQuote = false;
   const text = raw.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n");
@@ -58,14 +58,20 @@ export function parseBankCsv(raw: string) {
   }
   if (quoted) throw new Error("SETTLEMENT_FORMAT");
   if (cell || row.length || afterQuote) { row.push(cell); rows.push(row); }
-  if (rows.shift()?.join(",") !== "transaction_id,date,amount,reference" || !rows.length || rows.length > 500) throw new Error("SETTLEMENT_FORMAT");
+  const header=rows.shift()?.join(","),hasCurrency=header==="transaction_id,date,amount,reference,currency";
+  if ((!hasCurrency&&header!=="transaction_id,date,amount,reference") || !rows.length || rows.length > 500) throw new Error("SETTLEMENT_FORMAT");
   const ids = new Set<string>();
-  return rows.map(r => {
-    if (r.length !== 4 || r.some(v => /[\r\n\t\x00-\x1f]/.test(v)) || !/^[\w .:/-]{1,100}$/.test(r[0]) || !r[3].trim() || r[3].length > 200 || ids.has(r[0])) throw new Error("SETTLEMENT_FORMAT");
+  const entries=rows.map(r => {
+    if (r.length !== (hasCurrency?5:4) || r.some(v => /[\r\n\t\x00-\x1f]/.test(v)) || !/^[\w .:/-]{1,100}$/.test(r[0]) || !r[3].trim() || r[3].length > 200 || ids.has(r[0])) throw new Error("SETTLEMENT_FORMAT");
+    // This is the source's declaration, not a currency conversion or a verified
+    // bank receipt. Existing extracts without it remain currency-unverified.
+    if(hasCurrency&&r[4]!=="ZAR")throw new Error("SETTLEMENT_CURRENCY");
     ids.add(r[0]); const n = units(r[2]); if (!n) throw new Error("SETTLEMENT_AMOUNT");
     return { transactionId: r[0], date: date(r[1]), amount: amount(n), reference: r[3] };
   });
+  return{entries,currency:hasCurrency?"ZAR" as const:null};
 }
+export function parseBankCsv(raw:string){return parseBankCsvSource(raw).entries;}
 const id = z.string().cuid(), revision = z.number().int().nonnegative();
 export const importStatementSchema = z.object({ connectionId: id, date: dateKey, raw: z.string().max(500000), sourceReference: reference });
 export const settlementActionSchema = z.discriminatedUnion("action", [
@@ -73,7 +79,7 @@ export const settlementActionSchema = z.discriminatedUnion("action", [
   importStatementSchema.extend({ action: z.literal("import"), fingerprint: z.string().regex(/^[a-f0-9]{64}$/), confirm: z.literal(true) }).strict(),
   z.object({ action: z.literal("request"), connectionId: id, date: dateKey }).strict(),
   z.object({ action: z.literal("retrieve"), ticket: z.string().max(4000) }).strict(),
-  z.object({ action: z.literal("bank-import"), alias: z.string().trim().min(3).max(80), environment: z.enum(["live", "sandbox"]), raw: z.string().max(500000), sourceReference: reference, confirm: z.literal(true) }).strict(),
+  z.object({ action: z.literal("bank-import"), bankSourceId: z.uuid().optional(), alias: z.string().trim().min(3).max(80), environment: z.enum(["live", "sandbox"]), raw: z.string().max(500000), sourceReference: reference, confirm: z.literal(true) }).strict(),
   z.object({ action: z.literal("resolve"), id, revision, lineId: id, targetId: id.nullable(), reference, merchantConfirmed: z.boolean().default(false), requestKey: z.string().uuid() }).strict(),
   z.object({ action: z.enum(["approve", "reopen", "void"]), id, revision, reference, confirm: z.literal(true) }).strict(),
   z.object({ action: z.literal("balance"), connectionId: id, observedDate: dateKey, current: z.string(), available: z.string(), reference, confirm: z.literal(true) }).strict(),

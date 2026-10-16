@@ -136,7 +136,7 @@ Open **Operations → Payments awaiting review** when your role permits it. Pend
 
 Use the source account/provider review link and compare the actual evidence. An internal receipt match is not independent proof of bank settlement. Do not mark a pending authorisation as paid or create a substitute receipt merely to clear a reminder.
 
-**Unidentified receipts:** the separate reviewed-intake workflow prepares evidence and a proposed customer match. A proposal is not a posted receipt, allocation, transfer or refund. Use the finance owner's review and separate execution controls. Missing bank data must stay missing.
+**Unidentified receipts:** retain original evidence and obtain an independent customer matching review. Matching alone is not a posted receipt, allocation, transfer or refund. The separate imported-receipt controls in section 06C require original bank/merchant evidence and finance approval. Missing bank data must stay missing.
 
 **Wrong-customer receipt:** retain the original payment and source reference. The existing full-reversal workflow and a correction between tenancy accounts each require their permitted finance review. Follow section 06A for the governed partial allocation and undo workflow.
 
@@ -173,6 +173,20 @@ Open **Booking price review** using the permitted reservation workflow. This pro
 7. Staff verify the accepted quote, regenerated agreement and initial invoice/rental periods against the agreed terms. The original quote and accepted history remain retained. Do not reuse an old unsigned signing link or overwrite a saved/signed document manually.
 
 If saving is uncertain, check the retained proposal before another action. Follow the page's exact safe retry instructions; stop for source or finance/legal review when required. Use only the proposal/view permissions actually assigned to your account. No new approval authority is supplied by this guide.
+
+## 06C · Review and post imported receipts
+
+**Finance only.** Open Unidentified payment review, choose the correct store and retain the original supported imported credit. Manually reported information remains investigation evidence and cannot be posted here. Card authorisation and mandate status are not received cash.
+
+**Bank identity first.** In Incoming bank sources, retain the original institution BIC, incoming account number, label and evidence reference. Keep full bank numbers out of labels, notes and references. A different authorised colleague privately checks the account identity and original evidence before approval. This is manual finance review, not provider account verification or permission to debit an account.
+
+In Settlement reconciliation, select that approved source and import the original normalised bank extract with its source-declared ZAR column, stable original transaction IDs and correct signs. Four-column, unmapped, foreign-currency or changed evidence cannot fund a receipt. A Netcash receipt needs the complete balanced original statement and an eligible settled transaction.
+
+**Check the customer and duplicate history.** Suggest the exact same-store account and obtain independent matching review. The person posting must differ from the evidence capturer and proposer, hold current finance access and record the posting approval reference. Confirm all three checks: the complete original source/currency/date/amount; this customer's actual received payment; and no existing receipt records the cash, including other bank imports or Netcash. Different references alone do not prove different cash.
+
+Read the fresh preview: exact account number, amount, method and original receipt date. The date has day-only precision; the recording time is shown separately. Explicit posting saves one payment, ledger credit, private receipt and audit together. It does not charge a customer, contact Netcash or send a message. A changed account/source/approval or expired preview requires review again.
+
+**Uncertain result:** reload saved receipt history and keep the original request reference. Do not create a second receipt to clear an error. Open the retained receipt from the posted record. Posted cash and its original source remain retained; corrections require the separately approved full reversal or section 06A MOVE/partial UNDO process. A tutorial tick is not finance approval or real receipt verification.
 
 ## 07 · Arrears notices and escalation boundaries
 

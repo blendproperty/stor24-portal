@@ -81,6 +81,7 @@ jobs:
       - run: node scripts/test-task-create-recovery.mjs
       - run: node scripts/test-staff-followups.mjs
       - run: node scripts/test-unidentified-receipts.mjs
+      - run: node scripts/test-receipt-import-workspace.mjs
       - run: node scripts/test-reservation-prices.mjs
       - run: node scripts/test-staff-attention.mjs
       - run: node scripts/test-staff-payment-review.mjs

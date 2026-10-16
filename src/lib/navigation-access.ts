@@ -12,6 +12,7 @@ const rules: Record<string, string[]> = {
   "/billing": ["billing.view"], "/billing/monthly": ["billing.view"], "/billing/rent-reviews": ["@owner"],
   "/billing/netcash": ["payments.view"], "/billing/mri": ["mri.view"],
   "/billing/unidentified-receipts": ["receipt_review.view"],
+  "/billing/receipt-bank-sources": ["receipt_review.bank_sources"],
   "/billing/settlements": ["settlements.view"],
   "/billing/debit-orders": ["debit_orders.view"],
   "/collections": ["collections.view"], "/access": ["access.view"],

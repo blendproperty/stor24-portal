@@ -8,7 +8,10 @@ import { decryptIntegrationSecret, encryptIntegrationSecret } from "@/lib/integr
 import { isTestPayment } from "@/lib/payments/payment-evidence";
 import { buildAccountStatement } from "@/lib/finance/account-statement";
 import { southAfricaDateKey } from "@/lib/south-africa-time";
-import { amount, importStatementSchema, parseBankCsv, parseDailyStatement, settlementActionSchema, units } from "@/lib/settlement-policy";
+import { amount, importStatementSchema, parseBankCsvSource, parseDailyStatement, settlementActionSchema, units } from "@/lib/settlement-policy";
+import {approvedReceiptBankSource} from './receipt-bank-source-service';
+import {receiptImportAuthority} from './receipt-import-access';
+import {importedReceiptPostingEvidence} from './receipt-import-service';
 import { csvCell, dateKey } from "@/lib/collections-policy";
 type Client = Prisma.TransactionClient;
 const hash = (v: unknown) => createHash("sha256").update(typeof v === "string" ? v : JSON.stringify(v)).digest("hex");
@@ -42,7 +45,16 @@ type Statement = Awaited<ReturnType<typeof statement>>;
 type Line = Statement["lines"][number];
 async function paymentProof(tx: Client, scope: RequestScope, s: Statement, id: string, merchantConfirmed: boolean) {
   const p = await tx.payment.findFirst({ where: { id, account: { customer: { organisationId: scope.organisationId } } }, include: { account: { include: { ledgerEntries: { orderBy: { id: "asc" } }, payments: true } }, merchandiseOrder: { select: { id: true, isTest: true } } } });
-  if (!p || s.environment !== "live" || p.provider !== "NETCASH" || p.environment !== "live" || p.currency !== "ZAR" || isTestPayment(p) || p.merchandiseOrder?.isTest || !["SUCCEEDED", "PARTIALLY_REFUNDED", "REFUNDED", "REVERSED"].includes(p.status)) throw new Error("SETTLEMENT_RECEIPT");
+  if (!p || s.environment !== "live" || !["NETCASH","NETCASH_STATEMENT"].includes(p.provider??'') || p.environment !== "live" || p.currency !== "ZAR" || isTestPayment(p) || p.merchandiseOrder?.isTest || !["SUCCEEDED", "PARTIALLY_REFUNDED", "REFUNDED", "REVERSED"].includes(p.status)) throw new Error("SETTLEMENT_RECEIPT");
+  let nativePosting=null;
+  if(p.provider==='NETCASH_STATEMENT'){
+    const imported=await tx.receiptImportPosting.findUnique({where:{paymentId:p.id},include:{netcashLine:true}});
+    // Returns may arrive on a later statement from the same merchant. The
+    // original posting/line remains immutable and independently validated.
+    if(!imported?.netcashLine||imported.netcashLine.merchantKey!==s.merchantKey||imported.organisationId!==scope.organisationId)throw Error('SETTLEMENT_RECEIPT');
+    nativePosting=await importedReceiptPostingEvidence(tx,scope.organisationId,imported.intakeId);
+    if(!nativePosting)throw Error('SETTLEMENT_RECEIPT');
+  }
   if (p.providerMerchantKey ? p.providerMerchantKey !== s.merchantKey : !merchantConfirmed) throw new Error("SETTLEMENT_MERCHANT");
   const entries = p.account.ledgerEntries;
   if (entries.some(e => e.type === "PAYMENT" && p.account.payments.some(other => isTestPayment(other) && (e.externalRef === other.idempotencyKey || (e.metadata as { paymentId?: string } | null)?.paymentId === other.id)))) throw new Error("SETTLEMENT_RECEIPT");
@@ -60,7 +72,7 @@ async function paymentProof(tx: Client, scope: RequestScope, s: Statement, id: s
   if (!evidence && !(metadata?.verifiedStatus === true && metadata.environment === "live")) throw new Error("SETTLEMENT_RECEIPT");
   const balance = buildAccountStatement(entries.map(e => ({ ...e, amount: e.amount.toString() })), new Date(0), new Date("9999-01-01")).closingBalance;
   if (units(balance) !== units(p.account.balance.toString())) throw new Error("SETTLEMENT_RECEIPT");
-  return { id: p.id, amount: p.amount.toString(), status: p.status, merchantKey: p.providerMerchantKey, legacyMerchantConfirmed: !p.providerMerchantKey && merchantConfirmed, accountNumber: p.account.accountNumber, ledgerEntryId: source.id, evidenceId: evidence?.id ?? null, accountHash: hash({ entries, balance: p.account.balance, payments: p.account.payments }) };
+  return { id: p.id, amount: p.amount.toString(), status: p.status, merchantKey: p.providerMerchantKey, legacyMerchantConfirmed: !p.providerMerchantKey && merchantConfirmed, accountNumber: p.account.accountNumber, ledgerEntryId: source.id, evidenceId: evidence?.id ?? null, accountHash: hash({ entries, balance: p.account.balance, payments: p.account.payments }),...(nativePosting?{receiptImportPostingId:nativePosting.id}: {}) };
 }
 async function proof(tx: Client, scope: RequestScope, s: Statement, l: Line, targetId: string | null, reference: string, merchantConfirmed: boolean) {
   if (l.kind === "RECEIPT") {
@@ -81,7 +93,7 @@ async function proof(tx: Client, scope: RequestScope, s: Statement, l: Line, tar
   }
   if (["PAYOUT", "BANK_RETURN"].includes(l.kind)) {
     const b = targetId ? await tx.settlementBankEntry.findFirst({ where: { id: targetId, active: true, import: { organisationId: scope.organisationId, status: "ACTIVE", environment: s.environment } }, include: { import: true } }) : null;
-    if (!b || units(b.amount.toString()) !== -units(l.amount.toString()) || b.date < l.date) throw new Error("SETTLEMENT_BANK");
+    if (!b || units(b.amount.toString()) !== -units(l.amount.toString()) || b.date < l.date||await tx.receiptImportPosting.count({where:{bankEntryId:b.id}})) throw new Error("SETTLEMENT_BANK");
     if (hash(decryptIntegrationSecret(b.import.rawEncrypted)) !== b.import.sha256) throw new Error("SETTLEMENT_INTEGRITY");
     return { type: "BANK", id: b.id, bankKey: b.bankKey, alias: b.import.alias, transactionId: b.transactionId, date: b.date, amount: b.amount.toString(), reference: b.reference, sourceReference: b.import.sourceReference, importedById: b.import.importedById, sourceHash: b.import.sha256 };
   }
@@ -106,15 +118,23 @@ export async function settlementWorkspace(scope: RequestScope) {
   const statements = await db.settlementStatement.findMany({ where: { organisationId: scope.organisationId }, orderBy: { createdAt: "desc" }, take: 50, select: { id: true, date: true, merchantLabel: true, environment: true, source: true, sourceReference: true, opening: true, closing: true, status: true, revision: true, importedById: true, approvedAt: true, _count: { select: { lines: true } } } });
   const bankImports = await db.settlementBankImport.findMany({ where: { organisationId: scope.organisationId }, orderBy: { createdAt: "desc" }, take: 30, select: { id: true, alias: true, environment: true, status: true, sourceReference: true, _count: { select: { entries: true } } } });
   const observations = await db.settlementBalanceObservation.findMany({ where: { organisationId: scope.organisationId }, orderBy: { createdAt: "desc" }, take: 20 });
-  return { merchants, statements, bankImports, observations: observations.map(o => ({ ...o, held: amount(units(o.current.toString()) - units(o.available.toString())) })), userId: scope.userId, today: today() };
+  const sources=await settlementBankSourceOptions(scope);
+  return { merchants, statements, bankImports,bankSources:sources.rows,bankSourcesNextCursor:sources.nextCursor,observations: observations.map(o => ({ ...o, held: amount(units(o.current.toString()) - units(o.available.toString())) })), userId: scope.userId, today: today() };
+}
+export async function settlementBankSourceOptions(scope:RequestScope,cursor?:string){
+ orgScope(scope);
+ const where={organisationId:scope.organisationId,status:'APPROVED'};
+ if(cursor&&!await db.receiptBankSourceProfile.findFirst({where:{...where,id:cursor},select:{id:true}}))throw Error('SETTLEMENT_NOT_FOUND');
+ const rows=await db.receiptBankSourceProfile.findMany({where,select:{id:true,label:true,bankCode:true,accountSuffix:true},orderBy:[{createdAt:'desc'},{id:'desc'}],take:101,...(cursor?{cursor:{id:cursor},skip:1}:{})});
+ return{rows:rows.slice(0,100),nextCursor:rows.length>100?rows[99].id:null};
 }
 export async function settlementDetail(scope: RequestScope, id: string) {
   return db.$transaction(async tx => {
     const s = await statement(tx, scope, id), lines = [];
     for (const l of s.lines) lines.push({ id: l.id, transactionId: l.transactionId, code: l.code, description: l.description, date: l.date, amount: l.amount.toString(), vat: l.vat.toString(), extras: l.extras, kind: l.kind, paymentId: l.paymentId, adjustmentId: l.adjustmentId, bankEntryId: l.bankEntryId, reference: l.reference, resolvedById: l.resolvedById, issue: s.status === "VOID" ? "Voided" : await checkLine(tx, scope, s, l), snapshot: l.resolutionSnapshot });
-    const payments = await tx.payment.findMany({ where: { provider: "NETCASH", environment: "live", account: { customer: { organisationId: scope.organisationId } }, status: { in: ["SUCCEEDED", "PARTIALLY_REFUNDED", "REFUNDED", "REVERSED"] } }, select: { id: true, amount: true, providerRef: true, providerMerchantKey: true, idempotencyKey: true, status: true, environment: true, account: { select: { accountNumber: true } } }, orderBy: { createdAt: "desc" }, take: 501 });
+    const payments = await tx.payment.findMany({ where: { provider: {in:["NETCASH","NETCASH_STATEMENT"]}, environment: "live", account: { customer: { organisationId: scope.organisationId } }, status: { in: ["SUCCEEDED", "PARTIALLY_REFUNDED", "REFUNDED", "REVERSED"] } }, select: { id: true, amount: true, providerRef: true, providerMerchantKey: true, idempotencyKey: true, status: true, environment: true, account: { select: { accountNumber: true } } }, orderBy: { createdAt: "desc" }, take: 501 });
     const adjustments = await tx.financialAdjustment.findMany({ where: { organisationId: scope.organisationId, status: "POSTED", kind: { in: ["REFUND", "REVERSAL"] } }, select: { id: true, kind: true, amount: true, paymentId: true }, orderBy: { postedAt: "desc" }, take: 501 });
-    const bank = await tx.settlementBankEntry.findMany({ where: { active: true, import: { organisationId: scope.organisationId, environment: s.environment, status: "ACTIVE" } }, include: { import: { select: { alias: true } } }, orderBy: { date: "desc" }, take: 501 });
+    const bank = await tx.settlementBankEntry.findMany({ where: { active: true, receiptImportPosting:null,import: { organisationId: scope.organisationId, environment: s.environment, status: "ACTIVE" } }, include: { import: { select: { alias: true } } }, orderBy: { date: "desc" }, take: 501 });
     // A bounded review must advertise missing candidate coverage rather than guess a match.
     return { id: s.id, date: s.date, status: s.status, revision: s.revision, environment: s.environment, merchantLabel: s.merchantLabel, opening: s.opening.toString(), closing: s.closing.toString(), source: s.source, sourceReference: s.sourceReference, importedById: s.importedById, editedById: s.editedById, approvedById: s.approvedById, approvalReference: s.approvalReference, lines, payments: payments.slice(0, 500).filter(p => !isTestPayment(p) && (!p.providerMerchantKey || p.providerMerchantKey === s.merchantKey)), adjustments: adjustments.slice(0, 500), bank: bank.slice(0, 500), candidatesTruncated: payments.length > 500 || adjustments.length > 500 || bank.length > 500 };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 30000 });
@@ -155,16 +175,22 @@ export async function settlementAction(scope: RequestScope, raw: unknown) {
   }
   return serial(scope, async tx => {
     if (v.action === "bank-import") {
-      const rows = parseBankCsv(v.raw); if (rows.some(r => r.date > today())) throw new Error("SETTLEMENT_DATE");
-      const bankKey = hash([scope.organisationId, v.environment, v.alias.trim().toLowerCase()]);
+      const parsed = parseBankCsvSource(v.raw),rows=parsed.entries; if (rows.some(r => r.date > today())) throw new Error("SETTLEMENT_DATE");
+      let source=null;
+      if(v.bankSourceId){
+        await receiptImportAuthority(tx,scope,['settlements.view','settlements.import']);
+        source=await approvedReceiptBankSource(tx,scope.organisationId,v.bankSourceId);
+        if(parsed.currency!=='ZAR')throw Error('SETTLEMENT_CURRENCY');
+      }
+      const bankKey = source?hash([scope.organisationId,v.environment,'bank-source',source.bankIdentityHash]):hash([scope.organisationId, v.environment, v.alias.trim().toLowerCase()]);
       const existing = await tx.settlementBankImport.findFirst({ where: { organisationId: scope.organisationId, bankKey, sha256: hash(v.raw), status: "ACTIVE" } });
       if (existing) return { id: existing.id };
-      const b = await tx.settlementBankImport.create({ data: { organisationId: scope.organisationId, bankKey, alias: v.alias, environment: v.environment, sourceReference: v.sourceReference, rawEncrypted: encryptIntegrationSecret(v.raw), sha256: hash(v.raw), importedById: scope.userId, entries: { create: rows.map(r => ({ ...r, bankKey })) } } });
-      await audit(tx, scope, b.id, "bank_imported", { count: rows.length, sourceHash: b.sha256 }); return { id: b.id };
+      const b = await tx.settlementBankImport.create({ data: { organisationId: scope.organisationId, bankKey, alias: v.alias, environment: v.environment, sourceReference: v.sourceReference, rawEncrypted: encryptIntegrationSecret(v.raw), sha256: hash(v.raw), importedById: scope.userId,...(source?{receiptBankSourceId:source.id,receiptBankIdentitySignature:source.identitySignature}:{}), entries: { create: rows.map(r => ({ ...r, bankKey })) } } });
+      await audit(tx, scope, b.id, "bank_imported", { count: rows.length, sourceHash: b.sha256,...(source?{bankSourceId:source.id,bankIdentitySignature:source.identitySignature,bankApprovalRevision:source.revision,bankApprovalAuditId:source.approvalAuditId,providerVerified:false}:{}) }); return { id: b.id };
     }
     if (v.action === "void-bank") {
       const b = await tx.settlementBankImport.findFirst({ where: { id: v.id, organisationId: scope.organisationId, status: "ACTIVE" }, include: { entries: true } });
-      if (!b || await tx.settlementLine.count({ where: { active: true, bankEntryId: { in: b.entries.map(e => e.id) } } })) throw new Error("SETTLEMENT_BANK");
+      if (!b || await tx.settlementLine.count({ where: { active: true, bankEntryId: { in: b.entries.map(e => e.id) } } })||await tx.receiptImportPosting.count({where:{bankEntryId:{in:b.entries.map(e=>e.id)}}})) throw new Error("SETTLEMENT_BANK");
       await tx.settlementBankImport.update({ where: { id: b.id }, data: { status: "VOID" } }); await tx.settlementBankEntry.updateMany({ where: { importId: b.id }, data: { active: false } });
       await audit(tx, scope, b.id, "bank_voided", { reference: v.reference }); return { id: b.id };
     }
@@ -177,6 +203,8 @@ export async function settlementAction(scope: RequestScope, raw: unknown) {
     const s = await statement(tx, scope, v.id);
     if (v.action === "resolve") {
       const l = s.lines.find(l => l.id === v.lineId); if (!l) throw new Error("SETTLEMENT_NOT_FOUND");
+      const importedPosting=await tx.receiptImportPosting.findUnique({where:{netcashLineId:l.id}});
+      if(importedPosting&&v.targetId!==importedPosting.paymentId)throw Error('SETTLEMENT_RECEIPT');
       const requestHash = hash(v), snapshot = l.resolutionSnapshot as { requestHash?: string } | null;
       if (l.requestKey === v.requestKey) { if (snapshot?.requestHash !== requestHash) throw new Error("SETTLEMENT_CHANGED"); return { id: s.id }; }
       if (s.status !== "DRAFT" || s.revision !== v.revision) throw new Error("SETTLEMENT_CHANGED");
@@ -197,6 +225,7 @@ export async function settlementAction(scope: RequestScope, raw: unknown) {
       await tx.settlementStatement.update({ where: { id: s.id }, data: { status: "REVIEWED", revision: { increment: 1 }, approvedById: scope.userId, approvedAt: new Date(), approvalReference: v.reference } });
     } else if (v.action === "void") {
       if (s.status !== "DRAFT") throw new Error("SETTLEMENT_CHANGED");
+      if(await tx.receiptImportPosting.count({where:{netcashLine:{statementId:s.id}}}))throw Error('SETTLEMENT_RECEIPT');
       await tx.settlementStatement.update({ where: { id: s.id }, data: { status: "VOID", revision: { increment: 1 }, editedById: scope.userId } }); await tx.settlementLine.updateMany({ where: { statementId: s.id }, data: { active: false } });
     } else {
       if (s.status !== "REVIEWED") throw new Error("SETTLEMENT_CHANGED");
@@ -204,6 +233,20 @@ export async function settlementAction(scope: RequestScope, raw: unknown) {
     }
     await audit(tx, scope, s.id, v.action, { reference: v.reference, previousApproval: s.approvalReference, previousApprover: s.approvedById, sourceHash: s.sha256 }); return { id: s.id };
   });
+}
+/** Internal same-transaction linking of a newly posted imported receipt. The
+ * immutable posting identifies the exact original provider row. No provider call. */
+export async function retainImportedSettlementMatch(tx:Client,scope:RequestScope,lineId:string,paymentId:string,reference:string,requestKey:string){
+ const line=await tx.settlementLine.findUniqueOrThrow({where:{id:lineId}}),s=await tx.settlementStatement.findFirst({where:{id:line.statementId,organisationId:scope.organisationId},include:{lines:{orderBy:{transactionId:'asc'}}}});
+ if(!s)throw Error('SETTLEMENT_NOT_FOUND');
+ if(s.status!=='DRAFT'||line.paymentId||line.resolutionHash)throw Error('SETTLEMENT_CHANGED');
+ // The original line and its posting become linked inside this same financial
+ // transaction before evidence is projected. Any later failure rolls both back.
+ await tx.settlementLine.update({where:{id:line.id},data:{paymentId}});
+ const projected=await proof(tx,scope,s,line,paymentId,reference,false);
+ await tx.settlementLine.update({where:{id:line.id},data:{paymentId,reference,resolvedById:scope.userId,requestKey,resolutionSnapshot:json({proof:projected,merchantConfirmed:false,receiptImportPosting:true}),resolutionHash:hash(projected)}});
+ await tx.settlementStatement.update({where:{id:s.id},data:{revision:{increment:1},editedById:scope.userId}});
+ await audit(tx,scope,s.id,'line_resolved',{lineId:line.id,reference,source:projected,receiptImportPosting:true});
 }
 export async function settlementCsv(scope: RequestScope, id: string) {
   const s = await settlementDetail(scope, id);
