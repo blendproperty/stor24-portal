@@ -68,3 +68,10 @@ These steps do not create a payment, correction, refund, price approval, custome
 ### Next acceptance checkpoint - customer history read
 
 After the confirmed login, Faeez opens a Midpoint customer known to have recorded notes or messages and checks the History tab. Confirm existing dated notes and communications belong to that selected customer/store. Report only whether the history is visible or the error; no customer details are required. This read is the next single check. New-note persistence, a second authorised staff read and actual PDF/CSV/Excel files remain separate pending checks. No new note, export, permission or financial action is inferred from the login report.
+
+
+### 16 October - customer history read HUMAN-CONFIRMED
+
+Brett answered the next staff check: "Dated history and communications are visible". Record this as human confirmation that Faeez, after his own-account Midpoint login, can see existing dated history and communications for the selected customer. Exact attempt time and record identity were not supplied or requested. This is the read portion of original4/5/13; it does not establish all older pages, external source completeness, actual PDF/CSV/Excel files or new-note persistence.
+
+Next single check (original6/15): on an existing approved training customer, Faeez saves one clearly labelled staff test note in the appropriate category, refreshes/reopens the customer, and confirms that the note appears once with his name, the category and the correct SAST date/time. This is a staff note only; record corrections as a new note. Do not change a payment, price, approval or provider setting. Second-authorised-staff read and actual PDF/CSV/Excel exports remain later checks. Status: new-note save/refresh not yet reported.
