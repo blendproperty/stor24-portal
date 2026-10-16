@@ -12,6 +12,6 @@ export async function GET(request: Request) {
     return Response.json({ data: await operationsTaskPage(scope, query) }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     if (error instanceof z.ZodError || error instanceof SyntaxError) return Response.json({ error: { message: "Check the task filters and reload the queue." } }, { status: 422, headers: { "Cache-Control": "private, no-store" } });
-    return apiError(error);
+    const response = apiError(error); response.headers.set("Cache-Control", "private, no-store"); return response;
   }
 }
