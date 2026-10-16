@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { canReadCollectionLetter, isCollectionLetter } from "@/lib/customer-history-body-access";
 import { db } from "@/lib/db";
 import { customerHistory } from "@/lib/customer-history-service";
 import { requireLeasingCustomer } from "@/lib/leasing-service";
@@ -37,14 +38,22 @@ export async function buildCustomerHistoryExport(scope:RequestScope, customerId:
   if(entries.length>5000)throw new Error("HISTORY_EXPORT_LIMIT");
   return {customer,rows:entries,visibility};
 }
+export async function hydrateCustomerHistoryMessages(input:{scope:RequestScope;customerId:string;phone:string|null;rows:HistoryExportRow[];access:{communications:RequestScope|null;collections:RequestScope|null;financial?:RequestScope|null}}) {
+  const {rows}=input;
+  const messages=rows.filter(row=>row.kind==="COMMUNICATION");
+  const proofs=messages.length?await db.communicationLog.findMany({where:{organisationId:input.scope.organisationId,customerId:input.customerId,id:{in:messages.map(row=>String(row.recordId))}},select:{id:true,facilityId:true,provider:true,providerRef:true,recipientHash:true,channel:true,direction:true,messageType:true,metadata:true}}):[];
+  const readableProofs=proofs.filter(proof=>!isCollectionLetter(proof.messageType)||canReadCollectionLetter(input.scope,input.access.communications,input.access.collections,proof.facilityId));
+  const collectionBodiesReleased=readableProofs.some(proof=>isCollectionLetter(proof.messageType));
+  for(const proof of proofs.filter(proof=>!readableProofs.some(allowed=>allowed.id===proof.id))){const row=rows.find(row=>row.recordId===proof.id);if(row){row.body="";row.subject="";row.evidenceLimit="Collection letter content requires collection-view access at this store.";}}
+  if(readableProofs.filter(needsProviderMessage).length>50)throw new Error("HISTORY_EXPORT_LIMIT");
+  for(let i=0;i<readableProofs.length;i+=8){
+    await Promise.all(readableProofs.slice(i,i+8).map(async proof=>{const value=await readHistoryMessage(proof,input.phone);const row=rows.find(row=>row.recordId===proof.id);if(row){row.body=value.body;row.subject="subject" in value?(value.subject??""):"";row.evidenceLimit=value.source;}}));
+  }
+  return {collectionBodiesReleased};
+}
 export async function releaseCustomerHistoryExport(input:{scope:RequestScope;customerId:string;query:HistoryQuery;access:{communications:RequestScope|null;collections:RequestScope|null;financial?:RequestScope|null};format:"PDF"|"CSV"|"XLSX";selection?:{id:string;kind:string}}) {
   const {customer,rows,visibility}=await buildCustomerHistoryExport(input.scope,input.customerId,input.query,input.access,input.selection);
-  const messages=rows.filter(row=>row.kind==="COMMUNICATION");
-  const proofs=messages.length?await db.communicationLog.findMany({where:{organisationId:input.scope.organisationId,customerId:input.customerId,id:{in:messages.map(row=>String(row.recordId))}},select:{id:true,provider:true,providerRef:true,recipientHash:true,channel:true,direction:true,messageType:true,metadata:true}}):[];
-  if(proofs.filter(needsProviderMessage).length>50)throw new Error("HISTORY_EXPORT_LIMIT");
-  for(let i=0;i<proofs.length;i+=8){
-    await Promise.all(proofs.slice(i,i+8).map(async proof=>{const value=await readHistoryMessage(proof,customer.phone);const row=rows.find(row=>row.recordId===proof.id);if(row){row.body=value.body;row.subject="subject" in value?(value.subject??""):"";row.evidenceLimit=value.source;}}));
-  }
+  const {collectionBodiesReleased}=await hydrateCustomerHistoryMessages({scope:input.scope,customerId:input.customerId,phone:customer.phone,rows,access:input.access});
   const decision=await guardReportExport({organisationId:input.scope.organisationId,actorId:input.scope.userId,reportKey:"customer-contact-history",rows,personalDataAllowed:true,personalColumnKeys:["customerName","customerId","body","author"],format:input.format});
   if(!decision.allowed)throw new Error("HISTORY_EXPORT_BLOCKED");
   const name=customer.companyName||[customer.firstName,customer.lastName].filter(Boolean).join(" ")||"Customer";
@@ -55,7 +64,7 @@ export async function releaseCustomerHistoryExport(input:{scope:RequestScope;cus
   const fresh=intersectHistoryScope(await requirePermissionScope("operations.view"),await requirePermissionScope("customer_history.export"));
   if(!contains(input.scope,fresh))throw new Error("FORBIDDEN");
   for(const [kind,permission,previous]of [["COMMUNICATION","communications.view",input.access.communications],["COLLECTION","collections.view",input.access.collections],["ACCOUNT","ledger.view",input.access.financial]] as const){
-    if(previous&&rows.some(row=>row.kind===kind)){
+    if(previous&&(rows.some(row=>row.kind===kind)||(kind==="COLLECTION"&&collectionBodiesReleased))){
       const used=intersectHistoryScope(input.scope,previous);
       if(!contains(used,await requirePermissionScope(permission)))throw new Error("FORBIDDEN");
     }
