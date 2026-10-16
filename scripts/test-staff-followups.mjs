@@ -63,6 +63,22 @@ try {
     await expect(page.getByRole('button', { name: 'Complete', exact: true })).toBeVisible();
     assert.equal(created.length, 1); assert.equal(created[0].dueAt, '2026-10-14T07:00:00.000Z');
     assert.ok(await page.getByRole('link', { name: /Customer history/ }).getAttribute('href').then(s => s.includes(customer.id)));
+    // The visible details/actions and separate cover form must have real breathing space.
+    const card = page.locator('.followup-card').first();
+    const geometry = await card.evaluate(node => {
+      const description = node.querySelector('.followup-description').getBoundingClientRect();
+      const responsibility = node.querySelector('.followup-description + p').getBoundingClientRect();
+      const actions = node.querySelector(':scope > .followup-actions');
+      const button = actions.querySelector('button').getBoundingClientRect();
+      const form = actions.querySelector('form');
+      const label = form.querySelector('label').getBoundingClientRect();
+      const actionButtons = [...actions.children].filter(child => child.tagName === 'BUTTON').map(child => child.getBoundingClientRect());
+      return { detailGap: responsibility.top-description.bottom, actionGap: button.top-responsibility.bottom,
+        coverGap: label.top-Math.max(...actionButtons.map(rect=>rect.bottom)), rowGap: parseFloat(getComputedStyle(actions).rowGap),
+        buttonHeights: actionButtons.map(rect=>rect.height) };
+    });
+    assert.ok(geometry.detailGap >= 13 && geometry.actionGap >= 28 && geometry.coverGap >= 23, `${width}px crowded appointment sections: ${JSON.stringify(geometry)}`);
+    assert.ok(geometry.rowGap >= 12 && geometry.buttonHeights.every(height=>height>=44), `${width}px crowded controls`);
     await page.screenshot({ path: `output/staff-followups/${width}.png`, fullPage: true });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${width}px overflow`);
     await page.getByLabel('Appointment queue').selectOption('due');
