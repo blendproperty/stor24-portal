@@ -1,6 +1,7 @@
 import {createHmac,randomUUID,timingSafeEqual} from 'node:crypto';
 import {z} from 'zod';
 import {db} from '@/lib/db';
+import type {Prisma} from '@/generated/prisma/client';
 import {requireFacility,type RequestScope,type FacilityScope} from '@/lib/scope';
 import {getNetcashConnection} from './netcash-client';
 import {merchantIdentity} from './netcash-statement';
@@ -16,9 +17,9 @@ function readObservation(value:unknown,scope:FacilityScope,recordId:string){
  if(observation.recordId!==recordId||observation.organisationId!==scope.organisationId||observation.snapshot.templateId!==observation.templateId||cardSourceHash(observation.snapshot)!==observation.sourceHash||!timingSafeEqual(Buffer.from(stored,'hex'),Buffer.from(signature(plain),'hex')))throw Error('DEBICHECK_TEMPLATE_INTEGRITY_REVIEW');
  return observation;
 }
-async function connection(scope:FacilityScope,facilityId:string){
- await requireFacility(scope,facilityId);
- const value=await getNetcashConnection(scope.organisationId,facilityId,true),stored=await db.integrationConnection.findUniqueOrThrow({where:{id:value.id}});
+async function connection(scope:FacilityScope,facilityId:string,client:Prisma.TransactionClient=db){
+ if(!scope.unrestrictedFacilities&&!scope.facilityIds.includes(facilityId)||!await client.facility.findFirst({where:{id:facilityId,organisationId:scope.organisationId}}))throw Error('FACILITY_FORBIDDEN');
+ const value=await getNetcashConnection(scope.organisationId,facilityId,true,client),stored=await client.integrationConnection.findUniqueOrThrow({where:{id:value.id}});
  if((stored.config as {environment?:unknown}).environment!=='test'||value.config.environment!=='sandbox'||!value.config.debitOrderServiceKey||!value.config.merchantAccount||!['CONNECTED','HEALTHY'].includes(value.status))throw Error('DEBICHECK_TEST_CONFIGURATION_REQUIRED');
  return value;
 }
@@ -64,14 +65,14 @@ export async function listDebiCheckTemplates(scope:RequestScope,facilityId:strin
 /** Internal preparation dependency. A reviewed template is evidence for review,
  * never permission to submit TT1 or to collect. Recheck its original identity,
  * independent review audit and current merchant connection before using it. */
-export async function reviewedDebiCheckTemplate(scope:FacilityScope,facilityId:string,id:string,now=new Date()){
- await requireFacility(scope,facilityId);
- const row=await db.configurationProfile.findFirst({where:{id,organisationId:scope.organisationId,facilityId,domain:DEBICHECK_TEMPLATE_DOMAIN,status:'REVIEWED'}});
+export async function reviewedDebiCheckTemplate(scope:FacilityScope,facilityId:string,id:string,now=new Date(),client:Prisma.TransactionClient=db){
+ if(!scope.unrestrictedFacilities&&!scope.facilityIds.includes(facilityId)||!await client.facility.findFirst({where:{id:facilityId,organisationId:scope.organisationId}}))throw Error('FACILITY_FORBIDDEN');
+ const row=await client.configurationProfile.findFirst({where:{id,organisationId:scope.organisationId,facilityId,domain:DEBICHECK_TEMPLATE_DOMAIN,status:'REVIEWED'}});
  if(!row)throw Error('DEBICHECK_REVIEWED_TEMPLATE_REQUIRED');
  const observation=readObservation(row.config,scope,row.id);
  if(row.id!==row.name||observation.facilityId!==facilityId||new Date(observation.checkedAt)>now||now.getTime()-new Date(observation.checkedAt).getTime()>900000)throw Error('DEBICHECK_TEMPLATE_REVIEW_EXPIRED');
- const review=await db.auditEvent.findFirst({where:{organisationId:scope.organisationId,facilityId,entityType:'ConfigurationProfile',entityId:row.id,action:'netcash.debicheck_template_reviewed'},orderBy:{occurredAt:'desc'}});
+ const review=await client.auditEvent.findFirst({where:{organisationId:scope.organisationId,facilityId,entityType:'ConfigurationProfile',entityId:row.id,action:'netcash.debicheck_template_reviewed'},orderBy:{occurredAt:'desc'}});
  if(!review?.actorId||review.actorId===observation.requestedBy||(review.after as {sourceHash?:unknown}|null)?.sourceHash!==observation.sourceHash)throw Error('DEBICHECK_INDEPENDENT_REVIEW_REQUIRED');
- const c=await connection(scope,facilityId);if(!connectionMatches(observation,c))throw Error('DEBICHECK_CONFIGURATION_CHANGED');
- return{observationId:row.id,templateId:observation.templateId,sourceHash:observation.sourceHash,connectionId:c.id,connectionUpdatedAt:c.updatedAt.toISOString(),merchantHash:observation.merchantHash,monthlyDayOptions:observation.snapshot.monthlyDayOptions,authenticationSubmissionEnabled:false as const,collectionEnabled:false as const};
+ const c=await connection(scope,facilityId,client);if(!connectionMatches(observation,c))throw Error('DEBICHECK_CONFIGURATION_CHANGED');
+ return{observationId:row.id,templateId:observation.templateId,sourceHash:observation.sourceHash,connectionId:c.id,connectionUpdatedAt:c.updatedAt.toISOString(),merchantHash:observation.merchantHash,monthlyDayOptions:observation.snapshot.monthlyDayOptions,snapshot:observation.snapshot,authenticationSubmissionEnabled:false as const,collectionEnabled:false as const};
 }
