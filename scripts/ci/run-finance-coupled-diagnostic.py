@@ -70,17 +70,17 @@ def main():
   if command(['docker','network','inspect','--format','{{.Internal}}',network])!='true':raise RuntimeError('Private network required')
   manifest['networkInternalVerified']=True;manifest['testNetworkNamespace']='owned PostgreSQL only';retain()
   manifest['phase']='start-owned-postgres';retain()
-  command(['docker','run','-d','--name',postgres,'--network',network,'--label',label+'='+identity,'-e','POSTGRES_USER=ci','-e','POSTGRES_PASSWORD=synthetic-ci','-e','POSTGRES_DB=finance_diagnostic','postgres:16','-c','log_error_verbosity=verbose']);resources.append(('container',postgres))
+  command(['docker','run','-d','--name',postgres,'--network',network,'--label',label+'='+identity,'-e','POSTGRES_USER=ci','-e','POSTGRES_PASSWORD=synthetic-ci','-e','POSTGRES_DB=merchandise_ci','postgres:16','-c','log_error_verbosity=verbose']);resources.append(('container',postgres))
   if command(['docker','port',postgres]):raise RuntimeError('Host port exposure refused')
   manifest['noHostPortsVerified']=True;retain()
   manifest['phase']='postgres-startup-readiness';retain()
   for _ in range(60):
-   if subprocess.run(['docker','exec',postgres,'pg_isready','-U','ci','-d','finance_diagnostic'],capture_output=True).returncode==0:break
+   if subprocess.run(['docker','exec',postgres,'pg_isready','-U','ci','-d','merchandise_ci'],capture_output=True).returncode==0:break
    time.sleep(1)
   else:raise RuntimeError('Own synthetic PostgreSQL did not become ready')
   def node_container(name,extra,program):
    resources.append(('container',name))
-   return ['docker','run','--name',name,'--network','container:'+postgres,'--label',label+'='+identity,'--workdir','/workspace','--mount','type=bind,source='+str(subject)+',target=/workspace,readonly','--mount','type=bind,source='+str(test_output)+',target=/workspace/output','-e','DATABASE_URL=postgresql://ci:synthetic-ci@localhost:5432/finance_diagnostic','-e','MERCHANDISE_DB_TEST=isolated-ci','-e','TSX_DISABLE_CACHE=1']+extra+['node:22-bookworm']+program
+   return ['docker','run','--name',name,'--network','container:'+postgres,'--label',label+'='+identity,'--workdir','/workspace','--mount','type=bind,source='+str(subject)+',target=/workspace,readonly','--mount','type=bind,source='+str(test_output)+',target=/workspace/output','-e','DATABASE_URL=postgresql://ci:synthetic-ci@localhost:5432/merchandise_ci','-e','MERCHANDISE_DB_TEST=isolated-ci','-e','TSX_DISABLE_CACHE=1']+extra+['node:22-bookworm']+program
   manifest['phase']='runtime-compatibility-preflight';retain()
   manifest['runtime']=json.loads(command(node_container(prefix+'-runtime',[],['node','-e',"console.log(JSON.stringify({node:process.version,arch:process.arch,parallelism:require('node:os').availableParallelism(),opensslCli:require('node:child_process').execFileSync('openssl',['version']).toString().trim()}))"])));retain()
   manifest['phase']='bootstrap-own-empty-database';retain()

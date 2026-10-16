@@ -35,3 +35,12 @@ The artifact allowlist is only manifest.json, diagnostic-summary.json and postgr
 ## Current validation limits
 
 Python syntax, safe sanitizer sentinel stripping with retained code/stage/count evidence, local refusal with zero subprocess calls, YAML shape/defaultfalse/allowlist and exact existing transaction preservation passed locally. No Docker call or financial subject test was executed. Actual image/bootstrap/container/mount/cleanup behavior and the diagnostic remain UNVERIFIED until the single separately reviewed hosted run. Actual530 workflow/canonical union is still pending. Keep all existing finance/provider/UAT gates open.
+
+
+## 16 October — first executed run and fixture correction
+
+The earlier source-preparation statements above describe the original checkpoint. One reviewed hosted run actually executed at frozen lane c50e8cd2 and subject f385f904: run38863352431, diagnostic job116850488333. Bootstrap completed0. The single workload ran06:50:02–06:50:12UTC, exited1 and reported44 tests/37pass/7fail. No HTTP observer or numeric assertion pairs were retained. SQLSTATE codes include42703/40001/23514/23505/P0001/40P01; none is mapped to a specific failed HTTP request. All four owned containers and the owned network were removed. The three original safe JSON artifacts remain unchanged; private raw log hashes and byte counts are retained, not private content. No automatic repeat or finance clearance.
+
+A bounded pinned-source audit found a lane fixture mismatch: three selected original suites require a database pathname matching receipt_correction_[a-z0-9_]+ or merchandise_ci, while the lane supplied finance_diagnostic. Their original parent guards therefore reject that URL before child execution, including the HTTP observer. The reduced totals do not establish that every original scenario ran; this does not classify all seven failures or the older financial failures.
+
+Correction changes only the three synthetic database-name arguments to merchandise_ci (PostgreSQL creation, readiness and client URL), retaining a new private empty container per run and every original test byte, assertion, concurrency, timeout and financial behavior. Added a static regression checks the actual runner arguments against the three pinned subject guard declarations. No Docker, database or financial subject is executed by that regression. Fresh immutable review and separately qualified single-run authorization remain required before any justified rerun. Financial PR521 remains held.

@@ -14,6 +14,20 @@ class Preflight(unittest.TestCase):
   with mock.patch.dict(os.environ,environment),mock.patch.object(lane.subprocess,'run',side_effect=AssertionError('Execution forbidden'))as calls,mock.patch.object(sys,'argv',[str(runner),'--subject','unused','--subject-sha',subject,'--lane-sha','1'*40]):
    with self.assertRaisesRegex(RuntimeError,expected):lane.main()
    calls.assert_not_called()
+ def test_fixture_database_matches_unchanged_subject_guards(self):
+  # These three original suites refuse an unrelated database name before their
+  # children run. Verify actual runner arguments, not a weakened subject guard.
+  import ast,re,subprocess
+  tree=ast.parse(runner.read_text(encoding='utf-8'))
+  literals=[node.value for node in ast.walk(tree) if isinstance(node,ast.Constant) and isinstance(node.value,str)]
+  configured=[value for value in literals if value.startswith('DATABASE_URL=')]
+  self.assertEqual(configured,['DATABASE_URL=postgresql://ci:synthetic-ci@localhost:5432/merchandise_ci'])
+  self.assertIn('POSTGRES_DB=merchandise_ci',literals)
+  self.assertIn('merchandise_ci',literals)
+  for name in ['receipt-reallocation-workflow','finance-raw-rollback','receipt-import-posting']:
+   source=subprocess.check_output(['git','show',lane.SUBJECT+':tests/integration/'+name+'.test.ts']).decode('utf-8')
+   self.assertIn('receipt_correction_[a-z0-9_]+|merchandise_ci',source)
+   self.assertRegex('/merchandise_ci',r'^/(?:receipt_correction_[a-z0-9_]+|merchandise_ci)$')
  def test_local_execution_stops_before_any_subprocess(self):self.refused({'GITHUB_ACTIONS':'false','RUNNER_OS':'Windows'},lane.SUBJECT,'Hosted Linux Actions only')
  def test_unreviewed_subject_stops_before_any_subprocess(self):self.refused({'GITHUB_ACTIONS':'true','RUNNER_OS':'Linux'},'f'*40,'Unreviewed subject/lane identity')
 if __name__=='__main__':unittest.main()
