@@ -1,0 +1,47 @@
+import {build} from 'esbuild';
+import {chromium,expect} from '@playwright/test';
+import {createServer} from 'node:http';
+import {readFile,mkdir} from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const bundle=await build({stdin:{contents:`import React from'react';import{createRoot}from'react-dom/client';import{NetcashRefundWorkspace}from'./src/components/netcash-refund-workspace';createRoot(document.getElementById('root')).render(<main style={{maxWidth:1000,margin:'auto',padding:16}}><NetcashRefundWorkspace userId="operator" preparationEnabled reservationEnabled facilities={[{id:'store-a',name:'Synthetic store',prepare:true,review:true,reserve:true,release:true},{id:'store-b',name:'Other store',prepare:true,review:true,reserve:true,release:true}]}/></main>);`,resolveDir:process.cwd(),loader:'jsx'},bundle:true,write:false,format:'esm',jsx:'automatic'});
+const css=(await readFile('src/app/globals.css','utf8')).replace('@import "tailwindcss";',''),server=createServer((request,response)=>{response.setHeader('content-type',request.url==='/app.js'?'text/javascript':request.url==='/style.css'?'text/css':'text/html');response.end(request.url==='/app.js'?bundle.outputFiles[0].text:request.url==='/style.css'?css:'<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"></head><body><div id="root"></div><script type="module" src="/app.js"></script></body></html>')});
+await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin=`http://127.0.0.1:${server.address().port}`,browser=await chromium.launch();
+const errors=[],writes=[];let external=0;
+try{
+ await mkdir('output/netcash-refunds',{recursive:true});
+ for(const width of [1440,768,390,320]){
+  const context=await browser.newContext({viewport:{width,height:1100},timezoneId:'America/New_York'}),page=await context.newPage();page.on('pageerror',error=>errors.push(error.message));
+  const evidence=actorId=>({actorId,at:'2026-10-16T04:00:01Z',reference:'Synthetic independent reference'}),base={id:'netcash-refund:'+'1'.repeat(64),facilityId:'store-a',accountId:'account',adjustmentId:'adjustment',paymentId:'payment',amount:'60.00',state:'PREPARED',revision:1,createdAt:'2026-10-16T04:00:00Z',preparedById:'other',review:null,reservation:null,releaseRequest:null,releaseReview:null,manualPayoutHeld:false,providerAttempted:false,dispatchAvailable:false,financialPosting:false,retryAvailable:false};let rows=[{...base}],failed=false,malformed=false;
+  await context.route('**/*',async route=>{
+   const req=route.request(),url=new URL(req.url());if(url.origin!==origin){external++;await route.abort();return}
+   if(!url.pathname.startsWith('/api/'))return route.continue();assert.equal(url.pathname,'/api/v1/adjustments/netcash-refunds');
+   if(req.method()==='GET'){
+    if(failed)return route.fulfill({status:503,json:{error:{message:'Retained history unavailable.'}}});
+    if(url.searchParams.get('mode')==='options')return route.fulfill({json:{data:{rows:[{adjustmentId:'adjustment',accountNumber:'SYNTHETIC-ACCOUNT-001',amount:'60.00',sourceLines:[{id:'line',date:'2026-01-01',transactionId:'1234',amount:'200.00'}],sourceCoverageIncomplete:false}],nextCursor:null,sourceVerified:false}}});
+    const shown=url.searchParams.get('facilityId')==='store-b'?[]:url.searchParams.has('cursor')?[{...base,id:'netcash-refund:'+'3'.repeat(64),state:'WITHDRAWN'}]:rows;
+    return route.fulfill({json:{data:{rows:malformed?[{...base,financialPosting:true}]:shown,nextCursor:!url.searchParams.has('cursor')&&shown.length?'synthetic-older':null}}});
+   }
+   assert.equal(req.method(),'POST');const body=req.postDataJSON();writes.push({width,action:body.action});assert.equal(body.facilityId,'store-a');assert.ok(!('serviceKey'in body)&&!('transactionId'in body)&&!('providerAttempted'in body));
+   if(body.action==='preview')return route.fulfill({json:{data:{source:{facilityId:'store-a',accountId:'account',adjustmentId:'adjustment',lineId:'line',refundAmount:'60.00',paymentAmount:'200.00',lineDate:'2026-01-01',transactionId:'1234'},previewHash:'4'.repeat(64),providerAttempted:false,dispatchAvailable:false,financialPosting:false,manualPayoutHeld:false}}});
+   let row=rows.find(value=>value.id===body.id)||{...base,id:'netcash-refund:'+'2'.repeat(64),preparedById:'operator'};
+   if(body.action==='review')row={...row,state:'REVIEWED',review:evidence('operator')};
+   if(body.action==='reserve'){assert.equal(body.confirmation,'RESERVE WITHOUT DISPATCH');row={...row,state:'RESERVED',reservation:evidence('operator'),manualPayoutHeld:true}}
+   if(body.action==='request-release'){assert.equal(body.confirmation,'REQUEST LOCAL HOLD RELEASE');row={...row,state:'RELEASE_REQUESTED',releaseRequest:evidence('operator')}}
+   if(body.action==='approve-release'){assert.equal(body.confirmation,'RELEASE LOCAL HOLD');row={...row,state:'RELEASED',releaseReview:evidence('operator'),manualPayoutHeld:false}}
+   if(body.action==='withdraw')row={...row,state:'WITHDRAWN'};
+   row={...row,revision:row.revision+1};rows=[row,...rows.filter(value=>value.id!==row.id)];await new Promise(resolve=>setTimeout(resolve,60));return route.fulfill({json:{data:row}});
+  });
+  await page.goto(origin);await expect(page.getByRole('heading',{name:'R60.00 — prepared',exact:true})).toBeVisible();await expect(page.getByText(new Date(base.createdAt).toLocaleString('en-ZA',{timeZone:'Africa/Johannesburg'})+' SAST.',{exact:false})).toBeVisible();
+  async function act(label,confirmation){await page.getByRole('button',{name:label,exact:true}).click();const form=page.getByRole('form',{name:'Confirm refund action'});await form.getByLabel('Review reference',{exact:true}).fill('Synthetic reviewed evidence');await form.getByRole('checkbox').check();const submit=form.getByRole('button',{name:'Confirm '+label.toLowerCase(),exact:true});if(confirmation){await expect(submit).toBeDisabled();await form.getByLabel('Typed confirmation',{exact:true}).fill(confirmation)}await submit.evaluate(button=>{button.click();button.click()});}
+  await act('Approve preparation');await expect(page.getByRole('heading',{name:'R60.00 — reviewed',exact:true})).toBeVisible();await act('Reserve without sending','RESERVE WITHOUT DISPATCH');await expect(page.getByRole('heading',{name:'R60.00 — reserved',exact:true})).toBeVisible();
+  await act('Request hold release','REQUEST LOCAL HOLD RELEASE');await expect(page.getByRole('heading',{name:'R60.00 — release requested',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Approve hold release',exact:true})).toHaveCount(0);rows=rows.map(row=>({...row,releaseRequest:evidence('different-requester')}));await page.getByRole('button',{name:'Refresh retained history',exact:true}).click();await act('Approve hold release','RELEASE LOCAL HOLD');await expect(page.getByRole('heading',{name:'R60.00 — released',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Load approved refunds',exact:true}).click();await page.getByRole('combobox',{name:'Approved refund',exact:true}).selectOption('adjustment');await page.getByRole('combobox',{name:'Original card receipt',exact:true}).selectOption('line');await page.getByRole('button',{name:'Preview original refund',exact:true}).click();await page.getByLabel('Preparation reference',{exact:true}).fill('Synthetic original source');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Save preparation',exact:true}).click();await expect(page.getByRole('heading',{name:'R60.00 — prepared',exact:true})).toBeVisible();assert.equal(writes.filter(value=>value.width===width&&value.action==='prepare').length,1);
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`Refund overflow ${width}`);await page.screenshot({path:`output/netcash-refunds/review-${width}.png`,fullPage:true});
+  await page.getByRole('button',{name:'Load more retained history',exact:true}).click();await expect(page.getByRole('heading',{name:'R60.00 — withdrawn',exact:true})).toBeVisible();
+  failed=true;await page.getByRole('button',{name:'Refresh retained history',exact:true}).click();await expect(page.getByRole('alert')).toBeFocused();await expect(page.getByRole('heading',{name:'R60.00 — prepared',exact:true})).toHaveCount(0);failed=false;
+  malformed=true;await page.getByRole('button',{name:'Refresh retained history',exact:true}).click();await expect(page.getByRole('alert')).toBeFocused();await expect(page.getByRole('button',{name:'Approve preparation',exact:true})).toHaveCount(0);malformed=false;
+  await page.getByRole('combobox',{name:'Store',exact:true}).selectOption('store-b');await expect(page.getByText('No retained refund preparation is shown.',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Request hold release',exact:true})).toHaveCount(0);
+  assert.equal(writes.filter(value=>value.width===width).length,6);await context.close();
+ }
+ assert.deepEqual(errors,[]);assert.equal(external,0);console.log(JSON.stringify({result:'PASS',widths:[1440,768,390,320],syntheticPosts:writes.length,providerCalls:external,financialWrites:0,coverage:['scoped history','guided original receipt','independent review','typed hold/release','no self release approval','duplicate click suppression','SAST presentation','paging','failed/malformed clearing and focus','store switch','no horizontal overflow']}));
+}finally{await browser.close();await new Promise(resolve=>server.close(resolve))}

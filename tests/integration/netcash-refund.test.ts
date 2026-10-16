@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID,randomBytes} from 'node:crypto';
 import {db} from '../../src/lib/db';
+import type {Prisma} from '../../src/generated/prisma/client';
 import {previewAdjustment,requestAdjustment,decideAdjustment,recordRefundPayout} from '../../src/lib/adjustment-service';
 import {previewStatement,settlementAction,settlementDetail} from '../../src/lib/settlement-service';
 import {encryptIntegrationSecret} from '../../src/lib/integrations/integration-secret-vault';
@@ -58,6 +59,46 @@ test('isolated native refund preparation, explicit hold and independently review
    const f=await fixture();await assert.rejects(previewNetcashRefund({...f.scope,facilityIds:[]},f.input),/FORBIDDEN/);
    await db.role.update({where:{id:f.role.id},data:{permissions:['adjustments.view']}});await assert.rejects(previewNetcashRefund(f.scope,f.input),/FORBIDDEN/);
    await db.role.update({where:{id:f.role.id},data:{permissions:['adjustments.view','payments.refund_prepare']}});await db.settlementStatement.update({where:{id:f.statement.id},data:{sha256:'0'.repeat(64)}});await assert.rejects(previewNetcashRefund(f.scope,f.input),/SOURCE_INTEGRITY/);assert.equal(await db.configurationProfile.count({where:{organisationId:f.org.id,domain:NETCASH_REFUND_DOMAIN}}),0);
+  });
+  await t.test('manual payout and cancellation before reservation prevent a later hold; competing actions have only one winner',async()=>{
+   process.env.NETCASH_REFUND_RESERVATION_ENABLED='true';
+   for(const manual of ['payout','cancel']){
+    const first=await prepared(),reviewed=await action(first,first.record,'review');
+    if(manual==='payout')await recordRefundPayout(first.reviewScope,first.adjustment.id,'SYNTHETIC-FIRST-'+first.account.id,southAfricaDateKey(new Date()));else await decideAdjustment(first.reviewScope,first.adjustment.id,'cancel','Synthetic unpaid original',true);
+    await assert.rejects(action(first,reviewed,'reserve'),/ADJUSTMENT_REVIEW/);assert.equal((await db.configurationProfile.findUniqueOrThrow({where:{id:reviewed.id}})).status,'REVIEWED');
+    const f=await prepared(),ready=await action(f,f.record,'review');
+    const results=await Promise.allSettled([action(f,ready,'reserve'),manual==='payout'?recordRefundPayout(f.reviewScope,f.adjustment.id,'SYNTHETIC-RACE-'+f.account.id,southAfricaDateKey(new Date())):decideAdjustment(f.reviewScope,f.adjustment.id,'cancel','Synthetic unpaid race',true)]);
+    assert.equal(results.filter(result=>result.status==='fulfilled').length,1);
+    const retained=await db.configurationProfile.findUniqueOrThrow({where:{id:ready.id}}),adjustment=await db.financialAdjustment.findUniqueOrThrow({where:{id:f.adjustment.id}}),account=await db.account.findUniqueOrThrow({where:{id:f.account.id}});
+    if(retained.status==='RESERVED'){assert.equal(adjustment.status,'APPROVED');assert.equal(account.balance.toString(),'-200')}else{assert.equal(retained.status,'REVIEWED');assert.equal(adjustment.status,manual==='payout'?'POSTED':'CANCELLED');assert.equal(account.balance.toString(),manual==='payout'?'-140':'-200')}
+   }
+   process.env.NETCASH_REFUND_RESERVATION_ENABLED='false';
+  });
+  await t.test('revoked independent reviewer cannot authorize reservation by another currently permitted actor',async()=>{
+   const f=await prepared(),reviewed=await action(f,f.record,'review'),user=await db.user.create({data:{organisationId:f.org.id,name:'Synthetic other reserver',email:randomUUID()+'@example.invalid'}});
+   await db.roleAssignment.create({data:{userId:user.id,facilityId:f.facility.id,roleId:f.role.id}});await db.roleAssignment.deleteMany({where:{userId:f.reviewScope.userId}});
+   process.env.NETCASH_REFUND_RESERVATION_ENABLED='true';await assert.rejects(action(f,reviewed,'reserve',{...f.scope,userId:user.id}),/FORBIDDEN/);assert.equal((await db.configurationProfile.findUniqueOrThrow({where:{id:reviewed.id}})).status,'REVIEWED');process.env.NETCASH_REFUND_RESERVATION_ENABLED='false';
+  });
+  await t.test('reservation audit rollback retains no hold; release audit rollback retains the existing hold',async()=>{
+   const f=await prepared(),reviewed=await action(f,f.record,'review');process.env.NETCASH_REFUND_RESERVATION_ENABLED='true';
+   async function rejecting(event:string){await db.$executeRawUnsafe(`CREATE FUNCTION ci_native_refund_audit_reject() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='${event}' THEN RAISE EXCEPTION 'Synthetic native refund audit failure'; END IF; RETURN NEW; END $$`);await db.$executeRawUnsafe(`CREATE TRIGGER ci_native_refund_audit_reject BEFORE INSERT ON "AuditEvent" FOR EACH ROW EXECUTE FUNCTION ci_native_refund_audit_reject()`)}
+   async function restore(){await db.$executeRawUnsafe(`DROP TRIGGER ci_native_refund_audit_reject ON "AuditEvent"`);await db.$executeRawUnsafe(`DROP FUNCTION ci_native_refund_audit_reject()`)}
+   await rejecting('netcash.refund_reserve');try{await assert.rejects(action(f,reviewed,'reserve'));assert.equal((await db.configurationProfile.findUniqueOrThrow({where:{id:reviewed.id}})).status,'REVIEWED')}finally{await restore()}
+   const held=await action(f,reviewed,'reserve'),requested=await action(f,held,'request-release',f.scope);await rejecting('netcash.refund_approve-release');
+   try{await assert.rejects(action(f,requested,'approve-release'));assert.equal((await db.configurationProfile.findUniqueOrThrow({where:{id:reviewed.id}})).status,'RELEASE_REQUESTED');await assert.rejects(recordRefundPayout(f.reviewScope,f.adjustment.id,'SYNTHETIC-STILL-HELD',southAfricaDateKey(new Date())),/REFUND_RESERVED/)}finally{await restore()}
+   assert.equal((await db.account.findUniqueOrThrow({where:{id:f.account.id}})).balance.toString(),'-200');process.env.NETCASH_REFUND_RESERVATION_ENABLED='false';
+  });
+  await t.test('malformed retained evidence fails closed without manual financial posting',async()=>{
+   const f=await prepared(),row=await db.configurationProfile.findUniqueOrThrow({where:{id:f.record.id}}),config=row.config as Prisma.JsonObject;
+   await db.configurationProfile.update({where:{id:row.id},data:{config:{...config,signature:'0'.repeat(64)}}});
+   await assert.rejects(recordRefundPayout(f.reviewScope,f.adjustment.id,'SYNTHETIC-BAD-EVIDENCE',southAfricaDateKey(new Date())),/INTEGRITY_REVIEW/);assert.equal((await db.account.findUniqueOrThrow({where:{id:f.account.id}})).balance.toString(),'-200');assert.equal(await db.ledgerEntry.count({where:{accountId:f.account.id}}),1);
+   await db.configurationProfile.update({where:{id:row.id},data:{config:row.config!}});
+   assert.equal((await recordRefundPayout(f.reviewScope,f.adjustment.id,'SYNTHETIC-RESTORED-'+f.account.id,southAfricaDateKey(new Date()))).status,'POSTED');
+  });
+  await t.test('any retained provider attempt evidence blocks local release and preserves the payout hold',async()=>{
+   const f=await prepared(),reviewed=await action(f,f.record,'review');process.env.NETCASH_REFUND_RESERVATION_ENABLED='true';const held=await action(f,reviewed,'reserve');process.env.NETCASH_REFUND_RESERVATION_ENABLED='false';
+   await db.auditEvent.create({data:{organisationId:f.org.id,facilityId:f.facility.id,actorId:f.reviewScope.userId,entityType:'ConfigurationProfile',entityId:held.id,action:'netcash.refund_provider_claimed',after:{syntheticOnly:true}}});
+   await assert.rejects(action(f,held,'request-release',f.scope),/PROVIDER_OUTCOME_REVIEW/);assert.equal((await db.configurationProfile.findUniqueOrThrow({where:{id:held.id}})).status,'RESERVED');await assert.rejects(decideAdjustment(f.reviewScope,f.adjustment.id,'cancel','Synthetic unknown outcome',true),/REFUND_RESERVED/);
   });
   assert.equal(outbound,0);
  }finally{globalThis.fetch=fetchBefore;for(const name of names){if(previous[name]===undefined)delete process.env[name];else process.env[name]=previous[name]}await db.$disconnect();}

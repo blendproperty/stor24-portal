@@ -35,6 +35,7 @@ jobs:
       - run: node scripts/test-netcash-debicheck-test-actions.mjs
       - run: node scripts/test-debit-orders.mjs
       - run: node scripts/test-adjustments.mjs
+      - run: node scripts/test-netcash-refunds.mjs
       - run: node scripts/test-account-payment-retry.mjs
       - run: node scripts/test-accounts-read-recovery.mjs
       - run: node scripts/test-customer-read-recovery.mjs
@@ -175,6 +176,7 @@ jobs:
             output/monthly-billing/
             output/debit-orders/
             output/adjustments/
+            output/netcash-refunds/
             output/collections/
             output/settlement/
             output/mri/1440.png
