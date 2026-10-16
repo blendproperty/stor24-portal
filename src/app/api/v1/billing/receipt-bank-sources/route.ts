@@ -1,3 +1,4 @@
+import {confirmedFinanceRollback} from '@/lib/finance/retry-rolled-back-transaction';
 import {z} from 'zod';
 import {requirePermissionScope} from '@/lib/scope';
 import {sameOrigin,rateLimit} from '@/lib/request-security';
@@ -12,7 +13,7 @@ function failure(error:unknown){
  if(['UNAUTHENTICATED','FORBIDDEN','FACILITY_FORBIDDEN'].includes(code))return Response.json({error:'This action requires current organisation-wide bank-source and settlement access.'},{status:code==='UNAUTHENTICATED'?401:403,headers:dlpPrivateHeaders});
  if(code==='RECEIPT_BANK_NOT_FOUND')return Response.json({error:'The source is unavailable in your organisation.'},{status:404,headers:dlpPrivateHeaders});
  if(code==='DLP_TRANSFER_BLOCKED')return Response.json({error:'The protected details could not be released.'},{status:403,headers:dlpPrivateHeaders});
- if(code.startsWith('RECEIPT_BANK_')||error&&typeof error==='object'&&'code'in error&&['P2002','P2034'].includes(String(error.code)))return Response.json({error:code==='RECEIPT_BANK_INDEPENDENT'?'Another authorised person must review this bank source.':'The source changed, already exists or needs review. Reload the saved state before continuing.'},{status:409,headers:dlpPrivateHeaders});
+ if(code.startsWith('RECEIPT_BANK_')||confirmedFinanceRollback(error)||error&&typeof error==='object'&&'code'in error&&['P2002','P2034'].includes(String(error.code)))return Response.json({error:code==='RECEIPT_BANK_INDEPENDENT'?'Another authorised person must review this bank source.':'The source changed, already exists or needs review. Reload the saved state before continuing.'},{status:409,headers:dlpPrivateHeaders});
  return Response.json({error:'Unable to complete the action. Check the saved state before trying again.'},{status:500,headers:dlpPrivateHeaders});
 }
 async function scope(){await requirePermissionScope('settlements.view');return requirePermissionScope('receipt_review.bank_sources');}

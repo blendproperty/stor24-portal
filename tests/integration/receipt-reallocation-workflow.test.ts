@@ -5,8 +5,12 @@ import {AsyncLocalStorage} from "node:async_hooks";
 import {createRequire} from "node:module";
 import {resolve} from "node:path";
 import {createServer} from "node:http";
+import {readFile} from "node:fs/promises";
 import {build} from "esbuild";
 import {db} from "../../src/lib/db";
+import type {Prisma} from "../../src/generated/prisma/client";
+import {withRawRollbackFixture} from './finance-raw-rollback-fixture';
+import {withFinanceSerializationFailure,rejectAfterFinanceRoleRevocation} from './finance-serialization-fixture';
 import {previewReceiptReallocation,requestReceiptReallocation,decideReceiptReallocation} from "../../src/lib/receipt-reallocation-service";
 import {receiptAllocationGraph} from "../../src/lib/receipt-reallocation-source";
 import {settleVerifiedBookingPayment} from "../../src/lib/payments/booking-payment-settlement";
@@ -21,10 +25,11 @@ import type {ReceiptReallocationInput} from "../../src/lib/receipt-reallocation-
 test("isolated receipt correction producers retain cash, approval, undo and source integrity",async t=>{
   const url=new URL(process.env.DATABASE_URL!);assert.equal(process.env.MERCHANDISE_DB_TEST,"isolated-ci");assert.ok(["localhost","127.0.0.1"].includes(url.hostname));assert.match(url.pathname,/^\/(?:receipt_correction_[a-z0-9_]+|merchandise_ci)$/);
   const organisations:string[]=[];
-  async function fixture(){
+  async function fixture(withRoles=true){
     const org=await db.organisation.create({data:{name:"Synthetic receipt workflow",slug:randomUUID()}});organisations.push(org.id);
     const facility=await db.facility.create({data:{organisationId:org.id,name:"Synthetic correction store",code:randomUUID()}});
     const requester=await db.user.create({data:{organisationId:org.id,name:"Synthetic requester",email:randomUUID()+"@example.invalid"}}),reviewer=await db.user.create({data:{organisationId:org.id,name:"Synthetic reviewer",email:randomUUID()+"@example.invalid"}});
+    if(withRoles){const role=await db.role.create({data:{organisationId:org.id,name:"Synthetic receipt authority",permissions:["adjustments.*","billing.view"]}});await db.roleAssignment.createMany({data:[requester,reviewer].map(user=>({userId:user.id,roleId:role.id,facilityId:facility.id}))});}
     const accounts=[];
     for(let n=0;n<3;n++){
       const customer=await db.customer.create({data:{organisationId:org.id,firstName:"PRIVATE-SYNTHETIC-CUSTOMER-"+n}});
@@ -46,7 +51,7 @@ test("isolated receipt correction producers retain cash, approval, undo and sour
   const approve=(f:Fixture,id:string,reference="Synthetic independent approval")=>decideReceiptReallocation(f.reviewScope,id,0,"approve",reference);
   try{
     await t.test("actual HTTP handlers and database roles separate requester, independent approver and foreign-store receipt access",async()=>{
-      const f=await fixture(),foreign=await db.facility.create({data:{organisationId:f.org.id,name:"Synthetic private other store",code:randomUUID()}});
+      const f=await fixture(false),foreign=await db.facility.create({data:{organisationId:f.org.id,name:"Synthetic private other store",code:randomUUID()}});
       const viewer=await db.user.create({data:{organisationId:f.org.id,name:"Synthetic foreign reviewer",email:randomUUID()+"@example.invalid"}});
       for(const [user,store,extra] of [[f.requester,f.facility,["adjustments.request"]],[f.reviewer,f.facility,["adjustments.approve"]],[viewer,foreign,["adjustments.approve"]]] as const){
         const role=await db.role.create({data:{organisationId:f.org.id,name:"Synthetic receipt HTTP "+randomUUID(),permissions:["adjustments.view","billing.view",...extra]}});
@@ -54,16 +59,42 @@ test("isolated receipt correction producers retain cash, approval, undo and sour
       }
       type Session={userId:string;sessionVersion:number};
       const sessions=new AsyncLocalStorage<Session|null>();
+      const routeFailures:{code:string;startTimeout:boolean;expired:boolean}[]=[];
+      const observeRouteFailure=(error:unknown)=>{
+        const code=error&&typeof error==="object"&&"code" in error?String(error.code):"NONE",message=error instanceof Error?error.message:"";
+        if(routeFailures.length<100)routeFailures.push({code,startTimeout:message.includes("Unable to start a transaction in the given time"),expired:message.includes("Transaction already closed")});
+      };
       const tokens=new Map<string,Session>([f.requester,f.reviewer,viewer].map(user=>[randomUUID(),{userId:user.id,sessionVersion:user.sessionVersion}]));
       const [requesterToken,reviewerToken,foreignToken]=[...tokens.keys()];
       const bundle=await build({entryPoints:["src/app/api/v1/adjustments/receipt-reallocations/route.ts"],bundle:true,write:false,platform:"node",format:"cjs",packages:"external",plugins:[{name:"synthetic-receipt-session-only",setup(b){
+        // Observe existing catch classification without changing its response,
+        // timeout, transaction, permission, or financial behaviour.
+        b.onLoad({filter:/adjustments[\\/]receipt-reallocations[\\/]route\.ts$/},async a=>{
+          const contents=await readFile(a.path,"utf8"),marker="function failure(error: unknown) {";assert.equal(contents.split(marker).length,2);
+          return{loader:"ts",contents:contents.replace(marker,marker+" __observeRouteFailure(error);")};
+        });
         b.onResolve({filter:/generated\/prisma\/client$/},()=>({path:resolve("src/generated/prisma/client.ts"),external:true}));
         b.onResolve({filter:/(?:^|\/)(db|session)$/},a=>({path:a.path,namespace:"fixture"}));
         b.onLoad({filter:/.*/,namespace:"fixture"},a=>({contents:a.path.endsWith("/db")?"export const db=__db;":"export const getSession=async()=>__sessions.getStore();"}));
       }}]});
       type Handler=(request:Request)=>Promise<Response>;
       const loaded={exports:{} as {GET:Handler;POST:Handler}};
-      new Function("require","module","exports","__db","__sessions",bundle.outputFiles[0].text)(createRequire(import.meta.url),loaded,loaded.exports,db,sessions);
+      const transactionFailures:{code:string;startTimeout:boolean;expired:boolean;elapsedMs:number}[]=[];
+      let forcedRawConflict:string|null=null;
+      const observedDb=new Proxy(db,{get(target,key,receiver){
+        if(key!=="$transaction")return Reflect.get(target,key,receiver);
+        return async(...args:unknown[])=>{const began=performance.now();
+          if(forcedRawConflict&&typeof args[0]==='function'){
+            const original=args[0] as (tx:Prisma.TransactionClient)=>Promise<unknown>,query=forcedRawConflict;
+            args[0]=async(tx:Parameters<typeof original>[0])=>{await tx.$queryRawUnsafe(query);return original(tx);};
+          }
+          try{return await Reflect.apply(target.$transaction,target,args);}catch(error){
+          const code=error&&typeof error==="object"&&"code" in error?String(error.code):"UNKNOWN",message=error instanceof Error?error.message:"";
+          if(transactionFailures.length<50)transactionFailures.push({code,startTimeout:message.includes("Unable to start a transaction in the given time"),expired:message.includes("Transaction already closed"),elapsedMs:Math.round(performance.now()-began)});
+          throw error;
+        }};
+      }});
+      new Function("require","module","exports","__db","__sessions","__observeRouteFailure",bundle.outputFiles[0].text)(createRequire(import.meta.url),loaded,loaded.exports,observedDb,sessions,observeRouteFailure);
       const server=createServer(async(incoming,outgoing)=>{
         try{
           const chunks=[];for await(const chunk of incoming)chunks.push(Buffer.from(chunk));
@@ -77,42 +108,76 @@ test("isolated receipt correction producers retain cash, approval, undo and sour
       await new Promise<void>(done=>server.listen(0,"127.0.0.1",done));
       const origin=`http://127.0.0.1:${(server.address() as {port:number}).port}`,path="/api/v1/adjustments/receipt-reallocations";
       const call=(token:string,suffix="",body?:unknown,requestOrigin=origin)=>fetch(origin+path+suffix,{method:body===undefined?"GET":"POST",headers:{cookie:`fixture=${token}`,origin:requestOrigin,"content-type":"application/json"},...(body===undefined?{}:{body:JSON.stringify(body)})});
+      let httpStage="initial-authentication";
+      const statusCounts=new Map<number,number>();
       try{
         assert.equal((await call("")).status,401);
+        httpStage="initial-workspace";
         const initial=await call(requesterToken,`?sourceAccountId=${f.source.id}`);assert.equal(initial.status,200);
         const workspace=(await initial.json()).data;assert.equal(workspace.capabilities.canRequest,true);assert.equal(workspace.capabilities.canApprove,false);
         assert.equal(workspace.receipts[0].paymentReference,`STOR24 receipt ${f.payment.id}`);
+        httpStage="initial-preview";
         const data=input(f),previewResponse=await call(requesterToken,"",{action:"preview",input:data});assert.equal(previewResponse.status,200);
         const preview=(await previewResponse.json()).data;
+        httpStage="foreign-origin-denial";
         assert.equal((await call(requesterToken,"",{action:"request",input:data,fingerprint:preview.fingerprint,confirmed:true},"https://evil.example.invalid")).status,403);
+        httpStage="reviewer-request-denial";
         assert.equal((await call(reviewerToken,"",{action:"request",input:data,fingerprint:preview.fingerprint,confirmed:true})).status,403);
+        httpStage="contention-previews";
         const contenders=await Promise.all(Array.from({length:25},async()=>{
           const candidate={...data,requestKey:randomUUID()},response=await call(requesterToken,"",{action:"preview",input:candidate});
           assert.equal(response.status,200);return {input:candidate,fingerprint:(await response.json()).data.fingerprint};
         }));
+        httpStage="contention-requests";
         const began=performance.now();
         const responses=await Promise.all(contenders.map(async candidate=>{
           const response=await call(requesterToken,"",{action:"request",...candidate,confirmed:true});return {status:response.status,payload:await response.json()};
         }));
+        for(const response of responses)statusCounts.set(response.status,(statusCounts.get(response.status)??0)+1);
         assert.ok(responses.every(r=>r.status===200||r.status===409),"contention produces a retained request or explicit review hold, never an unknown server result");
         assert.equal(responses.filter(r=>r.status===200).length,1);
         assert.ok(performance.now()-began<30000,"25 competing fixture requests complete within the staff request timeout");
         assert.equal(await db.receiptReallocation.count({where:{organisationId:f.org.id}}),1);
         const id=responses.find(r=>r.status===200)!.payload.data.id;
         const decision={action:"decide",id,revision:0,decision:"approve",reference:"Synthetic independent HTTP review",confirmed:true};
+        httpStage="requester-approval-denial";
         assert.equal((await call(requesterToken,"",decision)).status,403);
+        httpStage="foreign-approval-denial";
         assert.equal((await call(foreignToken,"",decision)).status,404);
+        httpStage="independent-approval";
         assert.equal((await call(reviewerToken,"",decision)).status,200);
+        httpStage="approval-idempotent-retry";
         const repeated=await call(reviewerToken,"",decision);assert.equal(repeated.status,200);assert.equal((await repeated.json()).data.idempotent,true);
+        httpStage="source-document";
         const doc=await call(requesterToken,`?document=${id}&side=source`);assert.equal(doc.status,200);
         assert.equal(doc.headers.get("x-stor24-data-classification"),"restricted");
         const html=await doc.text();assert.ok(html.includes(f.source.accountNumber));assert.ok(!html.includes(f.target.accountNumber));
+        httpStage="foreign-document-denial";
         assert.equal((await call(foreignToken,`?document=${id}&side=source`)).status,404);
+        httpStage="foreign-workspace-denial";
         assert.equal((await call(foreignToken,`?sourceAccountId=${f.source.id}`)).status,404);
+        httpStage="next-preview";
+        const next=input(f),nextPreview=await call(requesterToken,'',{action:'preview',input:next});assert.equal(nextPreview.status,200);const nextFingerprint=(await nextPreview.json()).data.fingerprint;
+        for(const state of ['40001','40P01']as const){
+          httpStage=`raw-rollback-${state}`;
+          const result=await withRawRollbackFixture(state,3,async query=>{forcedRawConflict=query;try{return await call(requesterToken,'',{action:'request',input:next,fingerprint:nextFingerprint,confirmed:true});}finally{forcedRawConflict=null;}});
+          assert.equal(result.value.status,409,'confirmed native raw rollback exhaustion is a review hold, not an unknown500');assert.equal(result.attempts,3);assert.equal(await db.receiptReallocation.count({where:{organisationId:f.org.id}}),1);
+        }
+        httpStage="current-grant-revocation";
         await db.roleAssignment.deleteMany({where:{userId:f.requester.id}});
         assert.equal((await call(requesterToken)).status,403,"current database grant revocation is effective without a new fixture session");
+        httpStage="original-financial-baselines";
         assert.deepEqual(await db.payment.findUniqueOrThrow({where:{id:f.payment.id}}),f.payment);
         assert.deepEqual(await db.ledgerEntry.findUniqueOrThrow({where:{id:f.original.id}}),f.original);
+      }catch(error){
+        // Print the existing bounded observations for failures in every phase,
+        // including approval/retry/document assertions after contention.
+        // Preserve the original error and all response assertions unchanged.
+        const safeCode=(code:string)=>/^(?:P\d{4}|NONE|UNKNOWN)$/.test(code)?code:"UNCLASSIFIED";
+        console.error(JSON.stringify({fixture:"receipt-http-contention",stage:httpStage,statusCounts:Object.fromEntries(statusCounts),
+          transactionFailures:transactionFailures.map(value=>({...value,code:safeCode(value.code)})),
+          routeFailures:routeFailures.map(value=>({...value,code:safeCode(value.code)}))}));
+        throw error;
       }finally{await new Promise<void>(done=>server.close(()=>done()));await db.rateLimitBucket.deleteMany({where:{key:{startsWith:`dlp:${f.org.id}:`}}});}
     });
     await t.test("staff projection retains scoped receipt evidence, balances and private documents through MOVE and partial UNDO",async()=>{
@@ -256,6 +321,19 @@ test("isolated receipt correction producers retain cash, approval, undo and sour
       await db.$executeRawUnsafe(`ALTER TABLE "AuditEvent" ADD CONSTRAINT "${name}" CHECK ("organisationId" <> '${f.org.id}' OR "action" <> 'receipt_reallocation.posted') NOT VALID`);
       try{await assert.rejects(approve(f,r.id));}finally{await db.$executeRawUnsafe(`ALTER TABLE "AuditEvent" DROP CONSTRAINT "${name}"`);}
       assert.deepEqual(await balances(f),before);assert.equal(await db.ledgerEntry.count({where:{account:{customer:{organisationId:f.org.id}}}}),entryCount);assert.equal(await db.document.count({where:{tenancy:{facilityId:f.facility.id}}}),0);assert.equal((await db.receiptReallocation.findUniqueOrThrow({where:{id:r.id}})).status,"PENDING_APPROVAL");assert.deepEqual(await db.payment.findUniqueOrThrow({where:{id:f.payment.id}}),f.payment);
+    });
+    await t.test('real role revocation after native rollback stops receipt requests and approvals without losing original cash',async()=>{
+      for(const action of ['request','approve']as const){
+        const f=await fixture(),data=input(f),pending=action==='approve'?await request(f,data):null,before=await balances(f);
+        const count=await db.ledgerEntry.count({where:{account:{customer:{organisationId:f.org.id}}}}),actor=action==='request'?f.scope:f.reviewScope;
+        const preview=action==='request'?await previewReceiptReallocation(f.scope,data):null;
+        const work=action==='request'?()=>requestReceiptReallocation(f.scope,data,preview!.fingerprint):()=>approve(f,pending!.id);
+        const result=await withFinanceSerializationFailure(f.org.id,'receipt_reallocation.'+(action==='request'?'requested':'posted'),1,()=>rejectAfterFinanceRoleRevocation(actor.userId,work,action==='approve'?1:2));
+        assert.equal(result.attempts,1);assert.equal(result.value.attempts,action==='approve'?1:2,'receipt approval revocation is rejected by the fresh preflight before opening another write transaction');assert.deepEqual(await balances(f),before);
+        assert.equal(await db.ledgerEntry.count({where:{account:{customer:{organisationId:f.org.id}}}}),count);assert.equal(await db.document.count({where:{tenancy:{facilityId:f.facility.id}}}),0);
+        assert.deepEqual(await db.payment.findUniqueOrThrow({where:{id:f.payment.id}}),f.payment);
+        assert.equal(await db.receiptReallocation.count({where:{organisationId:f.org.id}}),pending?1:0);if(pending)assert.equal((await db.receiptReallocation.findUniqueOrThrow({where:{id:pending.id}})).status,'PENDING_APPROVAL');
+      }
     });
   }finally{
     for(const organisationId of organisations){

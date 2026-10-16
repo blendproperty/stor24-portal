@@ -1,3 +1,4 @@
+import {confirmedFinanceRollback} from '@/lib/finance/retry-rolled-back-transaction';
 import {z} from 'zod';
 import {requirePermissionScope} from '@/lib/scope';
 import {sameOrigin} from '@/lib/request-security';
@@ -27,7 +28,7 @@ export async function POST(request:Request){
   const code=error instanceof Error?error.message:'';
   if(error instanceof z.ZodError||error instanceof SyntaxError)return Response.json({error:'Check the selected reviewed source and all three finance confirmations.'},{status:422,headers:dlpPrivateHeaders});
   if(['UNAUTHENTICATED','FORBIDDEN','FACILITY_FORBIDDEN'].includes(code))return Response.json({error:'Current receipt-posting, review, payment, ledger and billing access is required for this store.'},{status:code==='UNAUTHENTICATED'?401:403,headers:dlpPrivateHeaders});
-  if(/^RECEIPT_|^SETTLEMENT_/.test(code)||error&&typeof error==='object'&&'code'in error&&['P2002','P2034'].includes(String(error.code)))return Response.json({error:code==='RECEIPT_REVIEW_INDEPENDENT'?'The person posting must be independent of the evidence capturer and account proposer.':'The source, account or approval needs review. Reload the saved evidence and prepare a fresh preview before posting.'},{status:409,headers:dlpPrivateHeaders});
+  if(/^RECEIPT_|^SETTLEMENT_/.test(code)||confirmedFinanceRollback(error)||error&&typeof error==='object'&&'code'in error&&['P2002','P2034'].includes(String(error.code)))return Response.json({error:code==='RECEIPT_REVIEW_INDEPENDENT'?'The person posting must be independent of the evidence capturer and account proposer.':'The source, account or approval needs review. Reload the saved evidence and prepare a fresh preview before posting.'},{status:409,headers:dlpPrivateHeaders});
   return Response.json({error:'Posting outcome could not be confirmed. Reload saved evidence and receipt history before another action; keep the same request reference.'},{status:500,headers:dlpPrivateHeaders});
  }
 }

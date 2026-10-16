@@ -1,3 +1,4 @@
+import {confirmedFinanceRollback} from '@/lib/finance/retry-rolled-back-transaction';
 import { protectDlpResponse } from "@/lib/dlp-transfer-service";
 import { z } from "zod";
 import { requirePermissionScope } from "@/lib/scope";
@@ -34,7 +35,7 @@ function failure(e: unknown) {
   if (e instanceof z.ZodError || e instanceof SyntaxError) return Response.json({ error: "Check the dates, references, file and confirmation." }, { status: 400 });
   if (messages[code]) return Response.json({ error: messages[code] }, { status: 409 });
   if (code.startsWith("SETTLEMENT_PROVIDER")) return Response.json({ error: "Netcash could not supply this statement. Check the service key and past date; retry only the read request." }, { status: 502 });
-  if (e && typeof e === "object" && "code" in e && ["P2002", "P2034"].includes(String(e.code))) return Response.json({ error: "A source is already reserved or changed concurrently. Refresh before retrying." }, { status: 409 });
+  if (confirmedFinanceRollback(e) || e && typeof e === "object" && "code" in e && ["P2002", "P2034"].includes(String(e.code))) return Response.json({ error: "A source is already reserved or changed concurrently. Refresh before retrying." }, { status: 409 });
   return Response.json({ error: "Unable to process the reconciliation. Refresh before retrying." }, { status: 500 });
 }
 export async function GET(request: Request) {

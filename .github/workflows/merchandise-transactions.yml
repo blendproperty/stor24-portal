@@ -5,6 +5,16 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
+      finance_coupled_diagnostic:
+        description: Run the separately reviewed original financial diagnostic only
+        type: boolean
+        required: false
+        default: false
+      subject_sha:
+        description: Exact immutable financial diagnostic subject
+        type: string
+        required: false
+        default: f385f9044f471ed46542619a83c93341e41e49da
       run_next_workload:
         description: Run one isolated synthetic Next HTTP workload pilot
         type: boolean
@@ -129,6 +139,7 @@ jobs:
       - run: npx tsx --test tests/integration/receipt-import-posting.test.ts
       - run: npx tsx --test tests/integration/receipt-reallocation.test.ts
       - run: npx tsx --test tests/integration/receipt-reallocation-workflow.test.ts
+      - run: npx tsx --test tests/integration/finance-raw-rollback.test.ts
       - run: npx tsx --test tests/integration/reservation-price-amendments.test.ts
       - run: npx tsx --test tests/integration/mri.test.ts
       - run: npx tsx --test tests/integration/mri-mapping.test.ts
@@ -189,3 +200,52 @@ jobs:
             output/next-workload/*/http-result.json
             output/next-workload/*/database-result.json
             output/next-workload/*/build-*.log
+
+  finance-coupled-diagnostic:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.finance_coupled_diagnostic }}
+    concurrency:
+      group: stor24-finance-coupled-diagnostic
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: lane
+          persist-credentials: false
+      - name: Verify diagnostic safety preflight without subject execution
+        run: python3 lane/scripts/ci/test_finance_coupled_diagnostic.py
+      - name: Require the reviewed immutable subject
+        env:
+          SUBJECT_SHA: ${{ inputs.subject_sha }}
+        run: |
+          test "$SUBJECT_SHA" = f385f9044f471ed46542619a83c93341e41e49da
+      - uses: actions/checkout@v4
+        with:
+          ref: f385f9044f471ed46542619a83c93341e41e49da
+          path: subject
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install locked subject dependencies
+        working-directory: subject
+        run: npm ci
+      - name: Generate the subject database client
+        working-directory: subject
+        run: npm run db:generate
+      - name: Run exactly one original coupled workload in an owned internal network
+        env:
+          SUBJECT_SHA: f385f9044f471ed46542619a83c93341e41e49da
+          LANE_SHA: ${{ github.sha }}
+        run: python3 lane/scripts/ci/run-finance-coupled-diagnostic.py --subject "$GITHUB_WORKSPACE/subject" --subject-sha "$SUBJECT_SHA" --lane-sha "$LANE_SHA"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: financial-coupled-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            output/finance-coupled/*/manifest.json
+            output/finance-coupled/*/diagnostic-summary.json
+            output/finance-coupled/*/postgres-sqlstates.json

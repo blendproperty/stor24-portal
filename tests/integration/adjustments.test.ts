@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {withFinanceSerializationFailure,rejectAfterFinanceRoleRevocation} from './finance-serialization-fixture';
 import test from "node:test";
 import { randomUUID } from "node:crypto";
 import { db } from "../../src/lib/db";
@@ -16,6 +17,8 @@ test("isolated PostgreSQL controlled adjustments", async t => {
     const facility = await db.facility.create({ data: { organisationId: org.id, code: key, name: "CI store" } });
     const user = await db.user.create({ data: { organisationId: org.id, name: "Requester", email: `${key}@example.invalid` } });
     const approver = await db.user.create({ data: { organisationId: org.id, name: "Reviewer", email: `review-${key}@example.invalid` } });
+    const role=await db.role.create({data:{organisationId:org.id,name:"Synthetic adjustment authority",permissions:["adjustments.*"]}});
+    await db.roleAssignment.createMany({data:[user,approver].map(actor=>({userId:actor.id,roleId:role.id,facilityId:facility.id}))});
     const customer = await db.customer.create({ data: { organisationId: org.id, firstName: "CI" } });
     const account = await db.account.create({ data: { customerId: customer.id, accountNumber: `ADJ-CI-${key}`, balance: 115 - paid } });
     const tenancy = await db.tenancy.create({ data: { facilityId: facility.id, customerId: customer.id, accountId: account.id, status: "ACTIVE", startDate: new Date("2026-01-01") } });
@@ -162,6 +165,42 @@ test("isolated PostgreSQL controlled adjustments", async t => {
       const f = await fixture(), r = await request(f); await decideAdjustment(f.reviewer, r.id, "reject", "CI missing evidence");
       const next = await request(f); await assert.rejects(decideAdjustment({ ...f.reviewer, userId: "missing-user" }, next.id, "approve", "CI invalid actor"));
       assert.equal((await db.financialAdjustment.findUniqueOrThrow({ where: { id: next.id } })).status, "PENDING_APPROVAL"); assert.equal(await balance(f.account.id), "115");
+    });
+    await t.test("explicit PostgreSQL rollback reruns request and posting with one retained adjustment, document and audit",async()=>{
+      const f=await fixture(),created=await withFinanceSerializationFailure(f.org.id,'adjustment.requested',1,()=>request(f));
+      assert.ok(created.attempts>=2&&created.attempts<=3);assert.equal(await db.financialAdjustment.count({where:{accountId:f.account.id}}),1);
+      const approved=await withFinanceSerializationFailure(f.org.id,'adjustment.posted',1,()=>decideAdjustment(f.reviewer,created.value.id,'approve','CI fresh proof after rollback'));
+      assert.ok(approved.attempts>=2&&approved.attempts<=3);assert.equal(await balance(f.account.id),'57.5');
+      assert.equal(await db.ledgerEntry.count({where:{externalRef:'adjustment:'+created.value.id}}),1);
+      assert.equal(await db.document.count({where:{idempotencyKey:'adjustment-document:'+created.value.id}}),1);
+      for(const action of ['requested','approved','posted'])assert.equal(await db.auditEvent.count({where:{entityId:created.value.id,action:'adjustment.'+action}}),1);
+    });
+    await t.test("external refund recording retries only a rolled-back database post and retains one payout record",async()=>{
+      const f=await fixture(200),r=await request(f,{...f.input,kind:'REFUND',amount:'20',sourceEntryId:f.receipt!.id});
+      await decideAdjustment(f.reviewer,r.id,'approve','CI independent refund review');
+      const recorded=await withFinanceSerializationFailure(f.org.id,'adjustment.posted',1,()=>recordRefundPayout(f.reviewer,r.id,'CI recorded external payout',southAfricaDateKey(new Date())));
+      assert.ok(recorded.attempts>=2&&recorded.attempts<=3);assert.equal(await balance(f.account.id),'-65');
+      assert.equal(await db.ledgerEntry.count({where:{externalRef:'adjustment:'+r.id,type:'REFUND'}}),1);
+      assert.equal(await db.document.count({where:{idempotencyKey:'adjustment-document:'+r.id}}),1);
+      assert.equal(await db.auditEvent.count({where:{entityId:r.id,action:'adjustment.posted'}}),1);
+      assert.equal((await db.payment.findUniqueOrThrow({where:{id:f.payment!.id}})).status,'PARTIALLY_REFUNDED');
+    });
+    await t.test('real role revocation after a native rollback stops a new request, approval and external-payout recording before another write',async()=>{
+      for(const mode of ['request','approve','payout']as const){
+        const f=await fixture(mode==='payout'?200:0),input=mode==='payout'?{...f.input,kind:'REFUND',amount:'20',sourceEntryId:f.receipt!.id}:f.input;
+        const pending=mode==='request'?null:await request(f,input);
+        if(mode==='payout')await decideAdjustment(f.reviewer,pending!.id,'approve','Synthetic initial independent refund review');
+        const before=await db.account.findUniqueOrThrow({where:{id:f.account.id},include:{ledgerEntries:{orderBy:{id:'asc'}},payments:{orderBy:{id:'asc'}}}}),documents=await db.document.count({where:{tenancyId:f.tenancy.id}});
+        const action=mode==='request'?'adjustment.requested':'adjustment.posted',actor=mode==='request'?f.scope:f.reviewer;
+        const work=mode==='request'?()=>request(f,input):mode==='approve'?()=>decideAdjustment(f.reviewer,pending!.id,'approve','Synthetic fresh authority required'):()=>recordRefundPayout(f.reviewer,pending!.id,'Synthetic externally completed payout',southAfricaDateKey(new Date()));
+        const result=await withFinanceSerializationFailure(f.org.id,action,1,()=>rejectAfterFinanceRoleRevocation(actor.userId,work));
+        assert.equal(result.attempts,1);assert.equal(result.value.attempts,2);
+        assert.deepEqual(await db.account.findUniqueOrThrow({where:{id:f.account.id},include:{ledgerEntries:{orderBy:{id:'asc'}},payments:{orderBy:{id:'asc'}}}}),before);
+        assert.equal(await db.document.count({where:{tenancyId:f.tenancy.id}}),documents);
+        assert.equal(await db.auditEvent.count({where:{organisationId:f.org.id,action}}),0);
+        if(pending)assert.equal((await db.financialAdjustment.findUniqueOrThrow({where:{id:pending.id}})).status,mode==='payout'?'APPROVED':'PENDING_APPROVAL');
+        else assert.equal(await db.financialAdjustment.count({where:{accountId:f.account.id}}),0);
+      }
     });
   } finally { await db.$disconnect(); }
 });
