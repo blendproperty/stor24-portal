@@ -3091,28 +3091,28 @@ a.module-card:focus-visible {
 @media(max-width:600px){.operations-centre-workspace .operations-task-panel>.work-list{max-height:65vh;min-height:0}}
 
 /* Follow-ups: separate appointment details, actions and cover assignment. */
-.staff-followup-workspace > .panel > .followup-toolbar{gap:20px 28px;align-items:flex-start}
-.staff-followup-workspace > .panel > .followup-toolbar h2{margin:0;line-height:1.4}
-.staff-followup-workspace > .panel > .followup-toolbar p{margin:8px 0 0;max-width:74ch;font-size:14px;font-weight:400;line-height:1.65}
-.staff-followup-workspace > .panel > [role="status"]{margin:18px 0 0;padding:12px 16px;border-radius:8px;background:#f2f7f7;font-size:14px;font-weight:400;line-height:1.6}
-.staff-followup-workspace > .panel > [role="alert"]{margin:18px 0;line-height:1.6}
-.staff-followup-workspace .followup-layout > div > h3{margin:24px 0 16px;font-size:16px;line-height:1.5}
-.staff-followup-workspace .followup-card{display:grid;gap:14px;padding:24px;margin:0 0 18px}
-.staff-followup-workspace .followup-card > p{margin:0;font-weight:400;line-height:1.65}
-.staff-followup-workspace .followup-card > a{display:block;line-height:1.6}
-.staff-followup-workspace .followup-card > .followup-toolbar{align-items:center;gap:12px 20px;line-height:1.5}
-.staff-followup-workspace .followup-actions{gap:12px;align-items:center}
-.staff-followup-workspace .followup-card > .followup-actions{margin-top:4px;padding-top:18px;border-top:1px solid #dfe7ea}
-.staff-followup-workspace .followup-card > .followup-actions:empty{display:none}
-.staff-followup-workspace .followup-card > .followup-actions > form{gap:16px;margin-top:6px;padding-top:18px;border-top:1px solid #dfe7ea}
-.staff-followup-workspace form{gap:16px}
-.staff-followup-workspace label{gap:8px}
-.staff-followup-workspace .followup-composer > h3{margin:0 0 18px;line-height:1.5}
-.staff-followup-workspace .button{min-height:44px}
+.followup-appointments-workspace > .panel > .followup-toolbar{gap:20px 28px;align-items:flex-start}
+.followup-appointments-workspace > .panel > .followup-toolbar h2{margin:0;line-height:1.4}
+.followup-appointments-workspace > .panel > .followup-toolbar p{margin:8px 0 0;max-width:74ch;font-size:14px;font-weight:400;line-height:1.65}
+.followup-appointments-workspace > .panel > [role="status"]{margin:18px 0 0;padding:12px 16px;border-radius:8px;background:#f2f7f7;font-size:14px;font-weight:400;line-height:1.6}
+.followup-appointments-workspace > .panel > [role="alert"]{margin:18px 0;line-height:1.6}
+.followup-appointments-workspace .followup-layout > div > h3{margin:24px 0 16px;font-size:16px;line-height:1.5}
+.followup-appointments-workspace .followup-card{display:grid;gap:14px;padding:24px;margin:0 0 18px}
+.followup-appointments-workspace .followup-card > p{margin:0;font-weight:400;line-height:1.65}
+.followup-appointments-workspace .followup-card > a{display:block;line-height:1.6}
+.followup-appointments-workspace .followup-card > .followup-toolbar{align-items:center;gap:12px 20px;line-height:1.5}
+.followup-appointments-workspace .followup-actions{gap:12px;align-items:center}
+.followup-appointments-workspace .followup-card > .followup-actions{margin-top:4px;padding-top:18px;border-top:1px solid #dfe7ea}
+.followup-appointments-workspace .followup-card > .followup-actions:empty{display:none}
+.followup-appointments-workspace .followup-card > .followup-actions > form{gap:16px;margin-top:6px;padding-top:18px;border-top:1px solid #dfe7ea}
+.followup-appointments-workspace form{gap:16px}
+.followup-appointments-workspace label{gap:8px}
+.followup-appointments-workspace .followup-composer > h3{margin:0 0 18px;line-height:1.5}
+.followup-appointments-workspace .button{min-height:44px}
 @media(max-width:600px){
-  .staff-followup-workspace .followup-card{padding:18px;gap:14px}
-  .staff-followup-workspace > .panel > .followup-toolbar > .followup-actions{width:100%}
-  .staff-followup-workspace .followup-actions > .button{flex:1 1 140px}
-  .staff-followup-workspace .followup-card > .followup-actions > form{grid-template-columns:minmax(0,1fr)}
-  .staff-followup-workspace .followup-card > .followup-actions > form > .button{width:100%}
+  .followup-appointments-workspace .followup-card{padding:18px;gap:14px}
+  .followup-appointments-workspace > .panel > .followup-toolbar > .followup-actions{width:100%}
+  .followup-appointments-workspace .followup-actions > .button{flex:1 1 140px}
+  .followup-appointments-workspace .followup-card > .followup-actions > form{grid-template-columns:minmax(0,1fr)}
+  .followup-appointments-workspace .followup-card > .followup-actions > form > .button{width:100%}
 }

@@ -77,7 +77,7 @@ export function StaffFollowups() {
   }
 
   const disabled = loading || saving || uncertain || !!error;
-  return <div className="page-stack staff-followup-workspace">
+  return <div className="page-stack staff-followup-workspace followup-appointments-workspace">
     <PageHeader eyebrow="Operations centre" title="Follow-ups & handovers" description="Agreed appointments, named responsibility and cover acknowledgement. All dates and times are South African time." action={<Link href="/operations" className="button button-secondary">Operations centre</Link>}/>
     <section className="panel panel-spacious">
       <div className="followup-toolbar"><div><h2>Customer appointments</h2><p>A payment promise still holds debt-chasing calls. Record a separate appointment only when the customer agreed to it.</p></div><div className="followup-actions"><button className="button button-secondary" disabled={loading || saving} onClick={() => void load(search)}>{loading ? "Loading…" : "Reload follow-ups"}</button>{data?.canManage ? <button className="button button-primary" aria-expanded={composerOpen} onClick={() => setComposerOpen(!composerOpen)}>{composerOpen ? "Close appointment form" : "Schedule follow-up"}</button> : null}</div></div>
