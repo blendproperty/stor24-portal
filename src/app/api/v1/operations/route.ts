@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
+import { operationsTaskPage } from "@/lib/operations-task-service";
 import { currentRoleAccess } from "@/lib/current-role-access";
 import type { Prisma } from "@/generated/prisma/client";
 import { recordDailyClose } from "@/lib/daily-close-service";
@@ -10,7 +11,7 @@ export async function GET() {
   try {
     const { organisationId, allowedFacilityIds, user } = await requirePermission("operations.view");
     const facilityScope = allowedFacilityIds ? { in: allowedFacilityIds } : undefined;
-    const [tasks, notes, maintenance, products, storagePackages, dailyCloses, facilities] = await Promise.all([
+    const [tasks, notes, maintenance, products, storagePackages, dailyCloses, facilities, taskPage] = await Promise.all([
       db.task.findMany({ where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { facility: true, assignee: { select: { id: true, name: true } } }, orderBy: [{ status: "asc" }, { dueAt: "asc" }], take: 100 }),
       db.unitNote.findMany({ where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { unit: true, author: { select: { id: true, name: true } } }, orderBy: { createdAt: "desc" }, take: 30 }),
       db.maintenanceRequest.findMany({ where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { facility: true, unit: true, assignedTo: { select: { id: true, name: true } } }, orderBy: [{ status: "asc" }, { dueAt: "asc" }], take: 100 }),
@@ -30,9 +31,10 @@ export async function GET() {
         },
         orderBy: { name: "asc" },
       }),
+      operationsTaskPage({ organisationId, userId: user.id, facilityIds: allowedFacilityIds ?? [], unrestrictedFacilities: allowedFacilityIds === null }),
     ]);
     const dailyCloseFacilityIds = facilities.filter(facility => currentRoleAccess(user.roleAssignments, "daily_close.perform", facility.id).allowed).map(facility => facility.id);
-    return Response.json({ data: { tasks, notes, maintenance, products, storagePackages, dailyCloses, facilities, dailyCloseFacilityIds } });
+    return Response.json({ data: { tasks, notes, maintenance, products, storagePackages, dailyCloses, facilities, dailyCloseFacilityIds, taskPage } });
   } catch (error) { return authErrorResponse(error); }
 }
 
