@@ -6,7 +6,7 @@
 
 The coordinated release order requires the actual production-pool correction530 to be technically healthy, then independent review of this exact immutable lane and subject. No run is authorised by publishing these files. One qualified diagnostic may fail; investigate its evidence instead of repeating until green. This does not promote financial recovery521 or clear the historical HTTP500, 67/58pass9fail, workload/deadline or capacity gates.
 
-The original subject is pinned to f385f9044f471ed46542619a83c93341e41e49da; the receipt HTTP observer is87ff0b9beedade6869753eae0e24f2ac985546e6ab140574bea2875e1135eab7. Its production code is the held2065 financial recovery; f385 changes diagnostics only. The lane and subject use separate clean immutable checkouts. All selected test bytes are checked against the original Git objects. The financial source is deliberately not substituted with the pool pilot or refund work.
+The original subject is pinned to f385f9044f471ed46542619a83c93341e41e49da; the receipt HTTP observer is87ff0b9beedade6869753eae0e24f2ac985546e6ab140574bea2875e1135eab7. Its production code is the held2065 financial recovery; f385 changes diagnostics only. The actual checkout uses the literal reviewed subject hash; a dispatch input only confirms equality and cannot select another source. The lane and subject use separate clean immutable checkouts. All selected test bytes are checked against the original Git objects. The financial source is deliberately not substituted with the pool pilot or refund work.
 
 ## Original workload
 

@@ -173,7 +173,7 @@ jobs:
           test "$SUBJECT_SHA" = f385f9044f471ed46542619a83c93341e41e49da
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.subject_sha }}
+          ref: f385f9044f471ed46542619a83c93341e41e49da
           path: subject
           persist-credentials: false
       - uses: actions/setup-node@v4
@@ -187,7 +187,7 @@ jobs:
         run: npm run db:generate
       - name: Run exactly one original coupled workload in an owned internal network
         env:
-          SUBJECT_SHA: ${{ inputs.subject_sha }}
+          SUBJECT_SHA: f385f9044f471ed46542619a83c93341e41e49da
           LANE_SHA: ${{ github.sha }}
         run: python3 lane/scripts/ci/run-finance-coupled-diagnostic.py --subject "$GITHUB_WORKSPACE/subject" --subject-sha "$SUBJECT_SHA" --lane-sha "$LANE_SHA"
       - uses: actions/upload-artifact@v4
