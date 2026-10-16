@@ -8,12 +8,13 @@ import { PDFDocument } from "pdf-lib";
 
 test("staff handbook is a real current PDF with all23 acceptance items and protected audited download", async () => {
   const bytes = await readFile("private/staff-training/stor24-staff-handbook-2026-10-15.pdf");
-  assert.equal((await PDFDocument.load(bytes)).getPageCount(), 23);
+  assert.equal((await PDFDocument.load(bytes)).getPageCount(), 24);
   const source = await readFile("docs/STAFF_HANDBOOK_2026-10-15.md", "utf8");
   for (let item = 1; item <= 23; item++) assert.ok(source.includes(`| ${item} |`));
   assert.ok(source.includes("Excel")); assert.ok(source.includes("1 November")); assert.ok(source.includes("12 hours"));
   assert.ok(source.includes("financial")); assert.ok(source.includes("Missing historical email"));
   assert.ok(source.includes("06C")); assert.ok(source.includes("05A")); assert.ok(source.includes("Message delivery history")); assert.ok(source.includes("Load older messages"));
+  assert.ok(source.includes("06H")); assert.ok(source.includes("REQUEST NETCASH REFUND")); assert.ok(source.includes("WITHDRAW UNCLAIMED REQUEST")); assert.ok(source.includes("PREPARE FRESH REFUND REQUEST"));
   assert.ok(source.includes("06G")); assert.ok(source.includes("RESERVE WITHOUT DISPATCH")); assert.ok(source.includes("RELEASE LOCAL HOLD"));
   assert.ok(source.includes("06F")); assert.ok(source.includes("SUBMIT ONE BANK TEST")); assert.ok(source.includes("A retained attempt cannot be replayed"));
   assert.ok(source.includes("06E")); assert.ok(source.includes("Save bank-request permission")); assert.ok(source.includes("guarded submission step"));
