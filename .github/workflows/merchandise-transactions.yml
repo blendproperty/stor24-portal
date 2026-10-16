@@ -4,6 +4,15 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      run_next_workload:
+        description: Run one isolated synthetic Next HTTP workload pilot
+        type: boolean
+        default: false
+      workload_source_sha:
+        description: Exact reviewed 40-character source SHA (required for pilot)
+        type: string
+        default: ''
 permissions:
   contents: read
 jobs:
@@ -141,3 +150,41 @@ jobs:
           name: readiness-capacity-evidence
           path: output/readiness/
           if-no-files-found: error
+
+  next-workload-pilot:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_next_workload == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      REVIEWED_SOURCE_SHA: ${{ inputs.workload_source_sha }}
+      WORKFLOW_SOURCE_SHA: ${{ github.sha }}
+    steps:
+      - name: Require exact reviewed dispatch source
+        shell: bash
+        run: |
+          [[ "$REVIEWED_SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$REVIEWED_SOURCE_SHA" == "$WORKFLOW_SOURCE_SHA" ]]
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.workload_source_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: One isolated synthetic HTTP workload
+        env:
+          STOR24_NEXT_WORKLOAD_EXECUTION: approved-isolated
+        run: node scripts/test-next-representative-workload.mjs --run --source "$REVIEWED_SOURCE_SHA"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: isolated-next-workload-evidence
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            output/next-workload/*/manifest.json
+            output/next-workload/*/http-result.json
+            output/next-workload/*/database-result.json
+            output/next-workload/*/build-*.log
