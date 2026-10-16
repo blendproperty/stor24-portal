@@ -33,7 +33,7 @@ const rules: Record<string, string[]> = {
 };
 export function canVisit(path: string, access: NavigationAccess) {
   // Training has its own current-role/controller checks; personal Settings remain available.
-  if (path === "/operations/move-in/training") return true;
+  if (path === "/operations/move-in/training" || path === "/operations/accounts/training") return true;
   const route = Object.keys(rules).sort((a, b) => b.length - a.length)
     .find(key => path === key || path.startsWith(`${key}/`));
   return !route || access.owner || rules[route].some(permission => hasPermission(access.permissions, permission));

@@ -27,7 +27,7 @@ export function TrainingDebtorWorkspace({ initial }: { initial: TrainingDebtorSn
       setError(create ? "Creation could not be confirmed. Refresh training balances before trying again; the saved example will not be duplicated." : "Training balances could not be loaded. Check your sign-in and store access, then refresh.");
     } finally { clearTimeout(timer); setBusy(false); }
   }
-  return <div className="page-stack">
+  return <div className="page-stack training-debtor-workspace">
     <PageHeader eyebrow="Staff training" title="Training customer balances" description="Shared examples saved in the portal for staff to review with their own logins." action={<Link className="button button-secondary" href="/tenants">Customers &amp; tenants</Link>}/>
     <section className="panel panel-spacious"><h2>Training only</h2><p>These illustrative balances are separate from live Accounts, billing, receipts, collections and financial reports. No money was received, no real debt is created and no unit or access is assigned.</p>
       <div className="form-actions"><button type="button" className="button button-secondary" disabled={busy} onClick={() => void load(false)}>{busy ? "Loading…" : "Refresh training balances"}</button></div>

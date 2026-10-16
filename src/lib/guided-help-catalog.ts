@@ -11,6 +11,12 @@ function guide(id: string, title: string, category: string, route: string, scree
 }
 
 export const extendedGuides: WorkflowGuide[] = [
+  guide("training-debtor", "Review a shared training balance", "Facility operations", "/operations/accounts/training", "Training customer balances", "Review a saved test customer and illustrative outstanding amount with your own staff login.", [
+    ["Recognise the training record", "Training balances are stored separately from live Accounts, receipts, billing and collections. Only authorised staff for the selected store can view the shared example. The illustrative amount is not a customer debt, proof of money received or permission to hand over a unit.", ".training-debtor-workspace"],
+    ["Ask the owner to create the example", "The organisation owner selects the intended store and uses Create or open test customer. The portal saves one clearly labelled test profile and shared R600 balance per store. A retry opens the same example. Staff must not create a normal payment, charge, agreement or reservation to imitate this demonstration.", ".training-debtor-workspace"],
+    ["Review the saved amount with staff", "Read the R1,000 illustrative charge, R400 illustrative payment and R600 outstanding training balance. Refresh training balances to read the saved record again, or open its actual test customer profile. A colleague at the same store can view the same example with their own login; other stores remain outside their access.", ".training-debtor-workspace"],
+  ]),
+
   guide("collection-schedules", "Review every scheduled collection run", "Money and accounts", "/collections/schedules", "Scheduled collection letters", "Choose explicit South African timing and review the exact recipients and letters on every due day.", [
     ["Choose the store and schedule", "Choose a permitted store. Read the schedule's explicit dates, weekdays, SAST time, review window and selected accounts. Older schedules and runs remain available through paging. Automatic dispatch is off unless separately activated.", ".collection-schedules"],
     ["Prepare a due-day draft", "New schedule requires explicit timing and up to20 existing accounts. Prepare today's due run is allowed only within its configured South African day and window. Current source and consent holds are excluded. This action creates drafts only; no recipient is contacted and no approval is recorded.", ".collection-schedules"],

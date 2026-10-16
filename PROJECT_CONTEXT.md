@@ -1,3 +1,9 @@
+## Shared training debtor release integration - 16 October 2026
+
+- **Implementation:** normal merge with incoming documentation-only main ee638f82 preserves the completed follow-up evidence. Added the required three-step contextual training guide, current-role guide visibility and server-authorised training navigation exception. No production data or permissions changed.
+- **Testing:** initial protected source873f809f transaction/security/dependency checks passed; full unit suite933results/931passes/1failure/1existing skip found the missing contextual guide for the new page. This requirement is now implemented, not waived. Renewed focused help/access/navigation and full protected integrated-source checks are required. All original deployment/live-creation gates below remain pending.
+- **Commit/push/merge/deploy/live:** this integration checkpoint is published on the same feature branch for renewed protected review. No feature merge, deployment or live training record claimed yet.
+
 ## Shared test customer with portal training balance - 16 October 2026, source validated / release pending
 
 - **Request:** Brett clarified that Faeez must log into the actual portal and see a test customer's outstanding amount; the separate offline preview does not fulfil this request.
