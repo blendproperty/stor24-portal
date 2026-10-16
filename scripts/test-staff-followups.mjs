@@ -7,8 +7,8 @@ import assert from 'node:assert/strict';
 const policy = await build({ entryPoints: ['src/lib/staff-followup-policy.ts'], bundle: true, write: false, format: 'esm', platform: 'node' });
 const { staffFollowupSchema, staffFollowupChangeSchema } = await import('data:text/javascript;base64,' + Buffer.from(policy.outputFiles[0].text).toString('base64'));
 const bundle = await build({ stdin: { contents: `import React from 'react';import{createRoot}from'react-dom/client';import{StaffFollowups}from'./src/components/staff-followups';createRoot(document.getElementById('root')).render(<StaffFollowups/>);`, resolveDir: process.cwd(), loader: 'jsx' }, bundle: true, write: false, format: 'esm', jsx: 'automatic', plugins: [{ name: 'next-link', setup(b) { b.onResolve({ filter: /^next\/link$/ }, a => ({ path: a.path, namespace: 'fixture' })); b.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ contents: "import React from 'react';export default function Link(p){return React.createElement('a',p)}", loader: 'jsx', resolveDir: process.cwd() })); } }] });
-const css = (await Promise.all(['src/app/globals.css', 'src/styles/stor24-brand.css', 'src/styles/staff-workspace.css'].map(p => readFile(p, 'utf8')))).join('\n').replace('@import "tailwindcss";', '') + '\nbody{font-family:Arial,sans-serif;margin:0;background:#eff4f7}#root{padding:20px;max-width:1440px;margin:auto}';
-const server = createServer((req, res) => { res.setHeader('Content-Type', req.url === '/app.js' ? 'text/javascript' : 'text/html'); res.end(req.url === '/app.js' ? bundle.outputFiles[0].text : `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div id="root"></div><script type="module" src="/app.js"></script></body></html>`); });
+const css = (await Promise.all(['src/app/globals.css', 'src/styles/stor24-brand.css', 'src/styles/staff-workspace.css'].map(p => readFile(p, 'utf8')))).join('\n').replace('@import "tailwindcss";', '') + '\nbody{--font-satoshi:Arial;font-family:Arial,sans-serif;margin:0;background:#eff4f7}#root{padding:20px;max-width:1440px;margin:auto}';
+const server = createServer((req, res) => { res.setHeader('Content-Type', req.url === '/app.js' ? 'text/javascript' : 'text/html'); res.end(req.url === '/app.js' ? bundle.outputFiles[0].text : `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body class="app-shell"><div id="root" class="content"></div><script type="module" src="/app.js"></script></body></html>`); });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const browser = await chromium.launch(); await mkdir('output/staff-followups', { recursive: true });
 const ids = ['cm00000000000000000000001', 'cm00000000000000000000002', 'cm00000000000000000000003', 'cm00000000000000000000004'];
@@ -63,6 +63,22 @@ try {
     await expect(page.getByRole('button', { name: 'Complete', exact: true })).toBeVisible();
     assert.equal(created.length, 1); assert.equal(created[0].dueAt, '2026-10-14T07:00:00.000Z');
     assert.ok(await page.getByRole('link', { name: /Customer history/ }).getAttribute('href').then(s => s.includes(customer.id)));
+    // The visible details/actions and separate cover form must have real breathing space.
+    const card = page.locator('.followup-card').first();
+    const geometry = await card.evaluate(node => {
+      const description = node.querySelector('.followup-description').getBoundingClientRect();
+      const responsibility = node.querySelector('.followup-description + p').getBoundingClientRect();
+      const actions = node.querySelector(':scope > .followup-actions');
+      const button = actions.querySelector('button').getBoundingClientRect();
+      const form = actions.querySelector('form');
+      const label = form.querySelector('label').getBoundingClientRect();
+      const actionButtons = [...actions.children].filter(child => child.tagName === 'BUTTON').map(child => child.getBoundingClientRect());
+      return { detailGap: responsibility.top-description.bottom, actionGap: button.top-responsibility.bottom,
+        coverGap: label.top-Math.max(...actionButtons.map(rect=>rect.bottom)), rowGap: parseFloat(getComputedStyle(actions).rowGap),
+        buttonHeights: actionButtons.map(rect=>rect.height) };
+    });
+    assert.ok(geometry.detailGap >= 13 && geometry.actionGap >= 28 && geometry.coverGap >= 23, `${width}px crowded appointment sections: ${JSON.stringify(geometry)}`);
+    assert.ok(geometry.rowGap >= 12 && geometry.buttonHeights.every(height=>height>=44), `${width}px crowded controls`);
     await page.screenshot({ path: `output/staff-followups/${width}.png`, fullPage: true });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${width}px overflow`);
     await page.getByLabel('Appointment queue').selectOption('due');
