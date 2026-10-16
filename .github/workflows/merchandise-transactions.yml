@@ -10,6 +10,11 @@ on:
         type: boolean
         required: false
         default: false
+      finance_seven_file_concurrency:
+        description: Separately reviewed explicit seven-file condition (changes workload argv)
+        type: boolean
+        required: false
+        default: false
       subject_sha:
         description: Exact immutable financial diagnostic subject
         type: string
@@ -240,7 +245,14 @@ jobs:
         env:
           SUBJECT_SHA: f385f9044f471ed46542619a83c93341e41e49da
           LANE_SHA: ${{ github.sha }}
-        run: python3 lane/scripts/ci/run-finance-coupled-diagnostic.py --subject "$GITHUB_WORKSPACE/subject" --subject-sha "$SUBJECT_SHA" --lane-sha "$LANE_SHA"
+          FINANCE_FILE_CONCURRENCY_SEVEN: ${{ inputs.finance_seven_file_concurrency }}
+        run: |
+          case "$FINANCE_FILE_CONCURRENCY_SEVEN" in
+            true) condition=explicit-seven-files ;;
+            false) condition=original-default ;;
+            *) exit 2 ;;
+          esac
+          python3 lane/scripts/ci/run-finance-coupled-diagnostic.py --subject "$GITHUB_WORKSPACE/subject" --subject-sha "$SUBJECT_SHA" --lane-sha "$LANE_SHA" --condition "$condition"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

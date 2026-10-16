@@ -1,5 +1,19 @@
 # Isolated original financial coupled diagnostic
 
+## Current evidence and separate condition preparation
+
+The unchanged-default ea diagnostic38866919479 executed once07:24:51–07:25:06UTC, bootstrap/workload0,70/70PASS/no skips. Safe68mappedPASS references include the original receipt HTTP child and parent across all seven files;2unmapped result identities/0unresolvedFAILrecords. Four owned containers/network removed. This is THISRUNPASS WITHOUT REPRODUCTION. Earlier70/67/3 and older unknown500 remain unexplained;521 stays held, no automatic repeat.
+
+A new source-only explicit-seven-files condition is prepared, NOT EXECUTED. The manual boolean finance_seven_file_concurrency defaults false. False selects original-default with the exact original seven-file argv. True selects only the closed explicit-seven-files condition and inserts exactly one --test-concurrency=7 argument. Other values are rejected. No original subject, source/test/observer byte,25-request inner contention, assertion, timeout, retry, isolation, cleanup or safe artifact rule changes. Existing unrelated jobs remain exact.
+
+Primary Node22 CLI contract: https://raw.githubusercontent.com/nodejs/node/v22.x/doc/api/cli.md#--test-concurrency . Unless test isolation is none, the documented maximum-file default is availableParallelism minus1. Recorded hosted parallelism4 therefore conditionally implies default3; it does not prove a historical Windows value. Manifest records explicit requested maximum separately from runtime parallelism and marks actual simultaneous worker count unobserved/historical replication false. NODE_OPTIONS is recorded as configured boolean only, no environment dump; default inference is omitted if options are configured. An explicit maximum7 is a new condition, not an unchanged-baseline rerun.
+
+Bounded source audit found selected trigger bodies scoped by synthetic organisation/action and raw fixtures use unique owned functions/sequences; no demonstrated cross-organisation body contamination. Shared AuditEvent trigger DDL/catalog overlap and different scheduling/resource pressure remain hypotheses only. A separately reviewed one-off condition may reveal safe failure-case identities, but neither a pass nor failure alone proves the older cause or production capacity. No execution until immutable condition review/current protection and separate TEST qualification.
+
+Validation: ten safety/argument/sanitizer tests PASS locally and ten PASS from representative nonrepository hosted separate-checkout context. Exact original argv and one allowed flag delta/other-condition refusal tested; YAML parses/defaultfalse verified; unrelated transactions/Next jobs structurally exact. No financial subject/DB/Docker/provider execution by these tests. No production change, flags, grants, collection, refund or money.
+
+## Dated earlier checkpoints
+
 16 October 2026. SOURCE PREPARATION ONLY. No diagnostic dispatch, laptop Docker operation or financial subject execution has occurred for this lane.
 
 ## Execution gate

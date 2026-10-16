@@ -4,6 +4,17 @@ from unittest import mock
 runner=pathlib.Path(__file__).with_name('run-finance-coupled-diagnostic.py')
 spec=importlib.util.spec_from_file_location('finance_lane',runner);lane=importlib.util.module_from_spec(spec);spec.loader.exec_module(lane)
 class Preflight(unittest.TestCase):
+ def test_original_default_command_and_explicit_seven_condition_are_exact(self):
+  files=['tests/integration/'+name+'.test.ts' for name in ['receipt-reallocation-workflow','adjustments','collections','marketing-payment-cohorts','reservation-price-amendments','finance-raw-rollback','receipt-import-posting']]
+  baseline=['node','node_modules/tsx/dist/cli.mjs','--test']+files
+  self.assertEqual(lane.diagnostic_command('original-default'),baseline)
+  self.assertEqual(lane.diagnostic_command('explicit-seven-files'),baseline[:3]+['--test-concurrency=7']+files)
+  self.assertEqual(lane.diagnostic_command('explicit-seven-files').count('--test-concurrency=7'),1)
+ def test_unreviewed_condition_cannot_create_command_or_execute_subprocess(self):
+  with mock.patch.object(lane.subprocess,'run',side_effect=AssertionError('Execution forbidden')) as calls:
+   for value in ['',None,'7','--test-concurrency=8','explicit-eight-files','original-default;unsafe']:
+    with self.assertRaisesRegex(RuntimeError,'Unreviewed file-concurrency condition'):lane.diagnostic_command(value)
+   calls.assert_not_called()
  def test_private_data_stripped_and_safe_evidence_retained(self):
   observer={'fixture':'receipt-http-contention','stage':'independent-approval','statusCounts':{'200':1,'409':24,'PRIVATE-SEED':9},'transactionFailures':[{'code':'P2034','startTimeout':False,'expired':False,'elapsedMs':12,'rawSql':'PRIVATE-SQL'}],'routeFailures':[{'code':'P2010','startTimeout':False,'expired':False,'secret':'PRIVATE-TOKEN'}],'credentials':'PRIVATE-TOKEN'}
   raw='PRIVATE-SQL PRIVATE-TOKEN PRIVATE-SEED\n# tests 70\n# pass 61\n# fail 9\n  expected: 200\n  actual: 409\n# '+json.dumps(observer,separators=(',',':'))+'\n'

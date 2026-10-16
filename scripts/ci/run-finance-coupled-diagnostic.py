@@ -3,6 +3,10 @@ import argparse, datetime, hashlib, json, os, pathlib, re, subprocess, time
 SUBJECT='f385f9044f471ed46542619a83c93341e41e49da'
 OBSERVER='87ff0b9beedade6869753eae0e24f2ac985546e6ab140574bea2875e1135eab7'
 TESTS=['receipt-reallocation-workflow','adjustments','collections','marketing-payment-cohorts','reservation-price-amendments','finance-raw-rollback','receipt-import-posting']
+CONDITIONS=('original-default','explicit-seven-files')
+def diagnostic_command(condition):
+ if condition not in CONDITIONS:raise RuntimeError('Unreviewed file-concurrency condition')
+ return ['node','node_modules/tsx/dist/cli.mjs','--test']+(['--test-concurrency=7'] if condition=='explicit-seven-files' else [])+['tests/integration/'+name+'.test.ts' for name in TESTS]
 def now():return datetime.datetime.now(datetime.timezone.utc).isoformat()
 def command(args,**kwargs):return subprocess.run(args,check=True,capture_output=True,text=True,**kwargs).stdout.strip()
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -79,7 +83,7 @@ def verify_subject_database_guards(paths):
   if 'receipt_correction_[a-z0-9_]+|merchandise_ci' not in path.read_text(encoding='utf-8'):raise RuntimeError('Original database guard changed')
  if not re.fullmatch(r'/(?:receipt_correction_[a-z0-9_]+|merchandise_ci)','/merchandise_ci'):raise RuntimeError('Diagnostic database guard mismatch')
 def main():
- parser=argparse.ArgumentParser();parser.add_argument('--subject',required=True);parser.add_argument('--subject-sha',required=True);parser.add_argument('--lane-sha',required=True);args=parser.parse_args()
+ parser=argparse.ArgumentParser();parser.add_argument('--subject',required=True);parser.add_argument('--subject-sha',required=True);parser.add_argument('--lane-sha',required=True);parser.add_argument('--condition',choices=CONDITIONS,default='original-default');args=parser.parse_args()
  if os.environ.get('GITHUB_ACTIONS')!='true' or os.environ.get('RUNNER_OS')!='Linux':raise RuntimeError('Hosted Linux Actions only; local execution refused')
  if args.subject_sha!=SUBJECT or not re.fullmatch('[a-f0-9]{40}',args.lane_sha):raise RuntimeError('Unreviewed subject/lane identity')
  workspace=pathlib.Path(os.environ['GITHUB_WORKSPACE']).resolve();subject=pathlib.Path(args.subject).resolve();lane=pathlib.Path(__file__).resolve().parents[2]
@@ -96,7 +100,7 @@ def main():
  if not re.fullmatch('[0-9]+',run) or not re.fullmatch('[0-9]+',attempt):raise RuntimeError('Invalid owned run identity')
  identity=run+'-'+attempt;prefix='stor24-finance-diag-'+identity;label='stor24.finance.diagnostic.owner';network=prefix+'-net';postgres=prefix+'-pg'
  output=workspace/'output'/'finance-coupled'/identity;output.mkdir(parents=True,exist_ok=False);test_output=output/'fixture-output';test_output.mkdir();(subject/'output').mkdir(exist_ok=True)
- manifest={'startedAt':now(),'laneSha':args.lane_sha,'subjectSha':SUBJECT,'testHashes':{str(p.relative_to(subject)):sha(p) for p in paths},'observerHash':OBSERVER,'platform':'isolated hosted Linux; historical Windows environment differs','providerOrProductionSecretsProvided':False,'productionOrProviderAction':False,'assertionsOrInnerTimeoutsChanged':False,'command':['node','node_modules/tsx/dist/cli.mjs','--test']+[str(p.relative_to(subject)) for p in paths],'runs':[]}
+ manifest={'startedAt':now(),'laneSha':args.lane_sha,'subjectSha':SUBJECT,'testHashes':{str(p.relative_to(subject)):sha(p) for p in paths},'observerHash':OBSERVER,'platform':'isolated hosted Linux; historical Windows environment differs','providerOrProductionSecretsProvided':False,'productionOrProviderAction':False,'assertionsOrInnerTimeoutsChanged':False,'command':diagnostic_command(args.condition),'condition':args.condition,'maximumFileConcurrencyRequested':7 if args.condition=='explicit-seven-files' else None,'originalDefaultCommandPreserved':args.condition=='original-default','fileWorkerConcurrencyActuallyObserved':False,'historicalEnvironmentReplication':False,'runs':[]}
  def retain(): (output/'manifest.json').write_text(json.dumps(manifest,indent=2),encoding='utf-8')
  retain();resources=[];result=1
  def owned_remove(kind,name):
@@ -124,7 +128,7 @@ def main():
    resources.append(('container',name))
    return ['docker','run','--name',name,'--network','container:'+postgres,'--label',label+'='+identity,'--workdir','/workspace','--mount','type=bind,source='+str(subject)+',target=/workspace,readonly','--mount','type=bind,source='+str(test_output)+',target=/workspace/output','-e','DATABASE_URL=postgresql://ci:synthetic-ci@localhost:5432/merchandise_ci','-e','MERCHANDISE_DB_TEST=isolated-ci','-e','TSX_DISABLE_CACHE=1']+extra+['node:22-bookworm']+program
   manifest['phase']='runtime-compatibility-preflight';retain()
-  manifest['runtime']=json.loads(command(node_container(prefix+'-runtime',[],['node','-e',"console.log(JSON.stringify({node:process.version,arch:process.arch,parallelism:require('node:os').availableParallelism(),opensslCli:require('node:child_process').execFileSync('openssl',['version']).toString().trim()}))"])));retain()
+  manifest['runtime']=json.loads(command(node_container(prefix+'-runtime',[],['node','-e',"console.log(JSON.stringify({node:process.version,arch:process.arch,parallelism:require('node:os').availableParallelism(),nodeOptionsConfigured:!!process.env.NODE_OPTIONS,opensslCli:require('node:child_process').execFileSync('openssl',['version']).toString().trim()}))"])));manifest['defaultFileConcurrencyContractInference']=max(1,manifest['runtime']['parallelism']-1) if args.condition=='original-default' and not manifest['runtime']['nodeOptionsConfigured'] else None;retain()
   manifest['phase']='bootstrap-own-empty-database';retain()
   with (output/'_private-bootstrap.log').open('w',encoding='utf-8') as log:
    boot=subprocess.run(node_container(prefix+'-bootstrap',['-e','ALLOW_EMPTY_DATABASE_BOOTSTRAP=true'],['node','scripts/bootstrap-empty-database.mjs']),stdout=log,stderr=subprocess.STDOUT,timeout=180)
