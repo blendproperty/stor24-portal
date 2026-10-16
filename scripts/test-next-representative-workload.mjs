@@ -38,6 +38,8 @@ async function client() {
     return { status: response.status, payload, headers: response.headers };
   };
   const login = async index => {
+    // Synthetic-only credentials to same-container loopback; isolated project/DB guards above. Real HTTPS/browser acceptance is excluded.
+    // nosemgrep: typescript.react.security.react-insecure-request.react-insecure-request
     const response = await fetch(origin + '/api/auth/login', {
       method: 'POST', headers: { origin, 'content-type': 'application/json', 'x-forwarded-for': `127.0.0.${index + 2}` },
       body: JSON.stringify({ email: seed.users[index].email, password: process.env.WORKLOAD_STAFF_PASSWORD }), signal: AbortSignal.timeout(30000),
@@ -240,10 +242,6 @@ function host() {
       dc('app-start', ['up', '-d', '--no-deps', 'app']); await waitHealthy('app');
       dc('http-workload', ['exec', '-T', 'app', 'node', '/workload/test-next-representative-workload.mjs', '--client'], 180000);
       dc('database-verify', ['run', '--rm', '--no-deps', 'workload-seed', 'node', '--import', 'tsx', 'scripts/seed-next-workload.ts', '--verify'], 30000);
-      for (const name of ['http-result', 'database-result']) {
-        const raw = dc(`read-${name}`, ['exec', '-T', 'app', 'node', '-e', `process.stdout.write(require('node:fs').readFileSync('/workload-evidence/${name}.json','utf8'))`]);
-        const data = JSON.parse(raw); assert.equal(data.sourceSha, sha); writeFileSync(join(directory, `${name}.json`), JSON.stringify(data, null, 2));
-      }
       inspectContainers();
       manifest.result = 'PASS';
     } catch (error) {
@@ -251,6 +249,21 @@ function host() {
       process.exitCode = 1;
     } finally {
       if (servicesStarted) {
+        // Preserve safe measurement/count evidence even when HTTP or database assertions fail.
+        // Collection must not replace the original failure or prevent owned-container stop.
+        manifest.evidenceCollection = {};
+        for (const name of ['http-result', 'database-result']) {
+          try {
+            const raw = dc(`read-${name}`, ['exec', '-T', 'app', 'node', '-e', `process.stdout.write(require('node:fs').readFileSync('/workload-evidence/${name}.json','utf8'))`], 10000);
+            const data = JSON.parse(raw); assert.equal(data.sourceSha, sha);
+            assert.ok(Buffer.byteLength(raw) < 65536, 'BOUNDED_SAFE_EVIDENCE');
+            writeFileSync(join(directory, `${name}.json`), JSON.stringify(data, null, 2));
+            manifest.evidenceCollection[name] = 'RETAINED';
+          } catch { manifest.evidenceCollection[name] = 'UNAVAILABLE'; }
+        }
+        if (manifest.result === 'PASS' && Object.values(manifest.evidenceCollection).some(value => value !== 'RETAINED')) {
+          manifest.result = 'INCOMPLETE'; process.exitCode = 1;
+        }
         try {
           const owned = inspectContainers(false).filter(item => item.State.Running);
           if (owned.length) docker('stop-owned-services', ['stop', ...owned.map(item => item.Id)]);
