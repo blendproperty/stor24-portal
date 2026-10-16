@@ -68,6 +68,8 @@ jobs:
             "set -o pipefail && umask 077 && cd /opt/stor24-crm && \
              git fetch origin '$DEPLOY_REF' && \
              git checkout --detach FETCH_HEAD && \
+             source scripts/deployment-phase-evidence.sh && \
+             deployment_evidence_start '$DEPLOY_REF' && \
              if ! grep -q '^INTEGRATION_CONFIG_ENCRYPTION_KEY=' .env; then \
                umask 077; \
                integration_key=\$(openssl rand -hex 32); \
@@ -82,9 +84,15 @@ jobs:
              systemctl daemon-reload && systemctl enable --now stor24-dlp-backup.timer && \
              install -m 644 docs/stor24-operations-status.service docs/stor24-operations-status.timer /etc/systemd/system/ && \
              systemctl daemon-reload && systemctl enable --now stor24-operations-status.timer && \
+             deployment_phase pre-build && \
              IMAGE_TAG=\$(git rev-parse --short HEAD) docker compose --env-file .env -f compose.prod.yml build app migrate && \
+             deployment_phase post-build && \
+             deployment_phase pre-migrate && \
              IMAGE_TAG=\$(git rev-parse --short HEAD) docker compose --env-file .env -f compose.prod.yml run --rm migrate && \
+             deployment_phase post-migrate && \
+             deployment_phase pre-cutover && \
              IMAGE_TAG=\$(git rev-parse --short HEAD) docker compose --env-file .env -f compose.prod.yml up -d --no-deps app && \
+             deployment_phase post-cutover && \
              container=\$(docker compose --env-file .env -f compose.prod.yml ps -q app) && \
              for attempt in \$(seq 1 40); do \
                state=\$(docker inspect --format '{{.State.Health.Status}}' \"\$container\"); \
@@ -93,6 +101,7 @@ jobs:
                sleep 2; \
              done && \
              test \"\$(docker inspect --format '{{.State.Health.Status}}' \"\$container\")\" = healthy && \
+             deployment_phase healthy && \
              systemctl start stor24-operations-status.service && \
              install -m 644 docs/stor24-lead-sla.service docs/stor24-lead-sla.timer /etc/systemd/system/ && \
              systemctl daemon-reload && systemctl enable --now stor24-lead-sla.timer && \
