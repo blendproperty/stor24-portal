@@ -7,11 +7,39 @@ def now():return datetime.datetime.now(datetime.timezone.utc).isoformat()
 def command(args,**kwargs):return subprocess.run(args,check=True,capture_output=True,text=True,**kwargs).stdout.strip()
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 STAGES={'initial-authentication','initial-workspace','initial-preview','foreign-origin-denial','reviewer-request-denial','contention-previews','contention-requests','requester-approval-denial','foreign-approval-denial','independent-approval','approval-idempotent-retry','source-document','foreign-document-denial','foreign-workspace-denial','next-preview','raw-rollback-40001','raw-rollback-40P01','current-grant-revocation','original-financial-baselines'}
-def sanitized_summary(raw):
- result={'tapTotals':{},'httpObservers':[],'observedPrismaCodes':sorted(set(re.findall(r"\bP[0-9]{4}\b",raw)))[:100],'numericAssertionPairs':[],'rawContentPublished':False};pending=None
+def subject_case_references(paths):
+ # Only literal titles from these exact, previously Git/hash-verified sources
+ # become lookup keys. Published identifiers contain basename/line, not titles.
+ references={}
+ for path in paths:
+  if path.name not in {name+'.test.ts' for name in TESTS}:raise RuntimeError('Unselected diagnostic source')
+  for number,line in enumerate(path.read_text(encoding='utf-8').splitlines(),1):
+   match=re.search(r"\b(?:test|t\.test)\(\s*(['\"])(.*?)\1",line)
+   if match:
+    title=match[2]
+    reference={'testFile':path.name,'sourceLine':number}
+    references[title]=None if title in references else reference
+ return references
+def sanitized_summary(raw,case_references=None):
+ result={'tapTotals':{},'httpObservers':[],'observedPrismaCodes':sorted(set(re.findall(r"\bP[0-9]{4}\b",raw)))[:100],'numericAssertionPairs':[],'rawContentPublished':False,'caseResults':[],'unmappedCaseResultCount':0,'unresolvedFailureRecordCount':0};pending=None;current_case=None
  for line in raw.splitlines():
+  case=re.match(r'^\s*(not ok|ok) [0-9]+ - (.{1,2000})$',line)
+  if case:
+   current_case=None
+   reference=(case_references or {}).get(case[2])
+   if reference and len(result['caseResults'])<400:
+    current_case={**reference,'status':'FAIL' if case[1]=='not ok' else 'PASS'};result['caseResults'].append(current_case)
+   else:
+    result['unmappedCaseResultCount']+=1
+    if case[1]=='not ok':result['unresolvedFailureRecordCount']+=1
+  if current_case is not None:
+   kind=re.match(r"^\s*failureType: ['\"]?([A-Za-z]+)['\"]?\s*$",line)
+   if kind and kind[1] in {'testCodeFailure','subtestsFailed','cancelledByParent','hookFailed','testTimeoutFailure','uncaughtException','unhandledRejection'}:current_case['failureType']=kind[1]
+   code=re.match(r"^\s*code: ['\"]?([A-Z0-9_]+)['\"]?\s*$",line)
+   if code and (re.fullmatch(r'P[0-9]{4}',code[1]) or code[1] in {'ERR_ASSERTION','ERR_TEST_FAILURE','EACCES','ENOENT','EROFS','ERR_MODULE_NOT_FOUND','ERR_REQUIRE_ASYNC_MODULE','ERR_REQUIRE_ESM','ERR_UNKNOWN_FILE_EXTENSION'}):current_case['errorCode']=code[1]
   total=re.search(r'^# (tests|suites|pass|fail|cancelled|skipped|todo|duration_ms) ([0-9]+(?:\.[0-9]+)?)$',line.strip())
   if total:result['tapTotals'][total[1]]=float(total[2])
+  if current_case is not None and current_case.get('failureType')=='subtestsFailed':current_case['aggregateOnly']=True
   number=re.search(r'^\s*(expected|actual): ([0-9]{1,4})\s*$',line)
   if number:
    if number[1]=='expected':pending=int(number[2])
@@ -111,7 +139,7 @@ def main():
     if private.exists():
      manifest[private_name]={'bytes':private.stat().st_size,'sha256':sha(private),'published':False}
      if private_name=='_private-bootstrap.log':manifest['bootstrapSafeCodes']=sanitized_summary(private.read_text(encoding='utf-8',errors='replace'))['observedPrismaCodes']
-     if private_name=='_private-coupled.tap.log':(output/'diagnostic-summary.json').write_text(json.dumps(sanitized_summary(private.read_text(encoding='utf-8',errors='replace')),indent=2),encoding='utf-8')
+     if private_name=='_private-coupled.tap.log':(output/'diagnostic-summary.json').write_text(json.dumps(sanitized_summary(private.read_text(encoding='utf-8',errors='replace'),subject_case_references(paths)),indent=2),encoding='utf-8')
      private.unlink()
    if ('container',postgres) in resources:
     pg=subprocess.run(['docker','logs','--timestamps',postgres],capture_output=True,text=True)

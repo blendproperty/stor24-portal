@@ -14,6 +14,23 @@ class Preflight(unittest.TestCase):
   with mock.patch.dict(os.environ,environment),mock.patch.object(lane.subprocess,'run',side_effect=AssertionError('Execution forbidden'))as calls,mock.patch.object(sys,'argv',[str(runner),'--subject','unused','--subject-sha',subject,'--lane-sha','1'*40]):
    with self.assertRaisesRegex(RuntimeError,expected):lane.main()
    calls.assert_not_called()
+ def test_safe_case_identity_without_titles_messages_or_private_data(self):
+  refs={'Synthetic original case':{'testFile':'receipt-reallocation-workflow.test.ts','sourceLine':54}}
+  raw="    not ok 1 - Synthetic original case\n      failureType: 'testCodeFailure'\n      code: 'ERR_REQUIRE_ASYNC_MODULE'\n      error: 'PRIVATE SQL TOKEN SEED'\n    not ok 2 - PRIVATE-CUSTOMER\n      failureType: 'PRIVATE-FAILURE'\n      code: 'PRIVATE-CODE'\n"
+  result=lane.sanitized_summary(raw,refs);encoded=json.dumps(result)
+  self.assertEqual(result['caseResults'],[{'testFile':'receipt-reallocation-workflow.test.ts','sourceLine':54,'status':'FAIL','failureType':'testCodeFailure','errorCode':'ERR_REQUIRE_ASYNC_MODULE'}]);self.assertEqual(result['unmappedCaseResultCount'],1)
+  for private in ['Synthetic original case','PRIVATE','SQL','TOKEN','SEED']:self.assertNotIn(private,encoded)
+ def test_ambiguous_nested_and_multiline_cases_remain_safe(self):
+  import tempfile
+  with tempfile.TemporaryDirectory() as directory:
+   paths=[]
+   for name in ['receipt-reallocation-workflow','adjustments']:
+    path=pathlib.Path(directory)/(name+'.test.ts');path.write_text('test("Duplicate literal",()=>{});\ntest("'+name+' parent",()=>{});\n',encoding='utf-8');paths.append(path)
+   refs=lane.subject_case_references(paths);self.assertIsNone(refs['Duplicate literal'])
+   raw="    not ok 1 - Duplicate literal\n      failureType: 'testCodeFailure'\nnot ok 2 - receipt-reallocation-workflow parent\n  failureType: 'subtestsFailed'\n  code: 'ERR_TEST_FAILURE'\nnot ok 3 - Escaped\\nPRIVATE-TITLE\nnot ok 4 - Unknown multiline\nPRIVATE-CONTINUATION\n"
+   result=lane.sanitized_summary(raw,refs);encoded=json.dumps(result)
+   self.assertEqual(result['unresolvedFailureRecordCount'],3);self.assertEqual(len(result['caseResults']),1);self.assertTrue(result['caseResults'][0]['aggregateOnly']);self.assertEqual(result['caseResults'][0]['sourceLine'],2)
+   for text in ['Duplicate literal','PRIVATE','Unknown multiline','Escaped']:self.assertNotIn(text,encoded)
  def test_fixture_database_matches_unchanged_subject_guards(self):
   # Inspect real runner arguments and exercise the original-guard verifier with
   # synthetic files. No dependency on cwd, Git history, Docker or a DB.
