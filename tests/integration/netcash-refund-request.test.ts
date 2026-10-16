@@ -21,7 +21,7 @@ test('isolated native provider refund requests retain one irreversible account-l
  process.env.AUTH_SECRET=randomBytes(32).toString('hex');process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY=randomBytes(32).toString('hex');process.env.NETCASH_REFUND_PREPARATION_ENABLED='true';process.env.NETCASH_REFUND_RESERVATION_ENABLED='true';process.env.NETCASH_REFUND_REQUEST_ENABLED='true';
  const fetchBefore=globalThis.fetch;let outbound=0;globalThis.fetch=async()=>{outbound++;throw Error('No external request is permitted by refund preparation')};
  async function fixture(){
-  const key=randomUUID(),date=southAfricaDateKey(new Date()),org=await db.organisation.create({data:{name:'Synthetic refund CI',slug:key}}),facility=await db.facility.create({data:{organisationId:org.id,code:key,name:'Synthetic store'}});
+  const key=randomUUID(),date=southAfricaDateKey(new Date(Date.now()-86400000)),org=await db.organisation.create({data:{name:'Synthetic refund CI',slug:key}}),facility=await db.facility.create({data:{organisationId:org.id,code:key,name:'Synthetic store'}});
   const preparer=await db.user.create({data:{organisationId:org.id,name:'Synthetic preparer',email:key+'@example.invalid'}}),reviewer=await db.user.create({data:{organisationId:org.id,name:'Synthetic reviewer',email:'review-'+key+'@example.invalid'}});
   const role=await db.role.create({data:{organisationId:org.id,name:'Synthetic refund authority',permissions:['adjustments.view','payments.refund_prepare','payments.refund_review','payments.refund_reserve','payments.refund_release_review','payments.refund_send','payments.refund_send_review']}});
   await db.roleAssignment.createMany({data:[preparer,reviewer].map(user=>({userId:user.id,facilityId:facility.id,roleId:role.id}))});
