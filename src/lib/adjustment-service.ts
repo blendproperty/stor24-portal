@@ -187,3 +187,16 @@ export async function adjustmentDocument(scope: RequestScope, id: string) {
   if (!doc.content || createHash("sha256").update(doc.content).digest("hex") !== doc.sha256) throw new Error("ADJUSTMENT_RECONCILIATION");
   return doc.content;
 }
+
+/** Internal read-only refund dependency. Caller holds the account lock and
+ * rederives current finance authority; preview does not reserve or post money. */
+export async function approvedRefundAdjustmentSource(tx:Client,scope:RequestScope,id:string){
+ const request=await tx.financialAdjustment.findFirst({where:{id,...scoped(scope)}});
+ if(!request||request.kind!=='REFUND'||request.status!=='APPROVED'||!request.paymentId||!request.sourceEntryId||!request.reviewedById||request.reviewedById===request.requestedById||!request.reviewedAt||!request.reviewReference||request.postedAt||request.ledgerEntryId||request.documentId||request.payoutReference||request.payoutDate)throw Error('NETCASH_REFUND_ADJUSTMENT_REVIEW');
+ const reviewed=await review(tx,scope,(request.snapshot as {input:unknown}).input,id);
+ if(reviewed.fingerprint!==request.fingerprint||reviewed.paymentId!==request.paymentId||reviewed.facilityId!==request.facilityId||reviewed.source?.id!==request.sourceEntryId)throw Error('NETCASH_REFUND_SOURCE_CHANGED');
+ const approval=await tx.auditEvent.findFirst({where:{organisationId:scope.organisationId,facilityId:request.facilityId,entityType:'FinancialAdjustment',entityId:request.id,action:'adjustment.approved',actorId:request.reviewedById},orderBy:[{occurredAt:'desc'},{id:'desc'}]});
+ const evidence=approval?.after as {fingerprint?:unknown;reference?:unknown}|null;
+ if(!evidence||evidence.fingerprint!==request.fingerprint||evidence.reference!==request.reviewReference)throw Error('NETCASH_REFUND_ADJUSTMENT_REVIEW');
+ return{request,reviewed};
+}
