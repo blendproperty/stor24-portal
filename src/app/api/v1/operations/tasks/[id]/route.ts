@@ -9,6 +9,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const input = updateTaskSchema.parse(await request.json());
     const before = await db.task.findFirst({ where: { id, organisationId } });
     if (!before) return Response.json({ error: { code: "NOT_FOUND", message: "Task not found." } }, { status: 404 });
+    if (before.purpose === "AGREED_FOLLOWUP") return Response.json({ error: { code: "CONFLICT", message: "Open Follow-ups & handovers to update this appointment using its current version." } }, { status: 409 });
     if (before.facilityId) await requirePermission("operations.manage", before.facilityId);
     const task = await db.$transaction(async tx => {
       const updated = await tx.task.update({ where: { id }, data: { status: input.status, completedAt: input.status === "COMPLETED" ? new Date() : null } });

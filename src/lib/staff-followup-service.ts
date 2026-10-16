@@ -5,7 +5,7 @@ import { currentRoleAccess } from "@/lib/current-role-access";
 import { customerNoteFacilities } from "@/lib/customer-history-service";
 import { leasingCustomerWhere } from "@/lib/leasing-service";
 import { facilityWhere, type RequestScope } from "@/lib/scope";
-import { staffFollowupSchema, staffFollowupChangeSchema } from "@/lib/staff-followup-policy";
+import { staffFollowupSchema, staffFollowupChangeSchema, staffFollowupViewSchema, followupDayEnd, type StaffFollowupView } from "@/lib/staff-followup-policy";
 
 type Client = Prisma.TransactionClient;
 const staffSelect = { id: true, name: true } as const;
@@ -17,9 +17,11 @@ async function eligibleStaff(tx: Client, organisationId: string, userId: string,
   return user;
 }
 
-export async function listStaffFollowups(scope: RequestScope, search = "", cursor?: string) {
+export async function listStaffFollowups(scope: RequestScope, search = "", cursor?: string, view: StaffFollowupView = "all", now = new Date()) {
+  staffFollowupViewSchema.parse(view);
   const facilities = await db.facility.findMany({ where: { ...facilityWhere(scope), active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } });
   const where: Prisma.TaskWhereInput = { organisationId: scope.organisationId, facilityId: { in: facilities.map(f => f.id) }, purpose: "AGREED_FOLLOWUP", status: { notIn: ["COMPLETED", "CANCELLED"] } };
+  if (view !== "all") where.dueAt = view === "due" ? { lt: followupDayEnd(now) } : { gte: followupDayEnd(now) };
   if (cursor && !await db.task.count({ where: { AND: [where, { id: cursor }] } })) throw new Error("CONFLICT");
   const [tasks, customers, users] = await Promise.all([
     db.task.findMany({ where, include, orderBy: [{ dueAt: "asc" }, { id: "asc" }], ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}), take: 101 }),
@@ -59,6 +61,11 @@ export async function changeStaffFollowup(scope: RequestScope, id: string, input
       await eligibleStaff(tx, scope.organisationId, scope.userId, before.facilityId);
       if (before.coverAcknowledgedAt && before.updatedAt.toISOString() === data.expectedUpdatedAt) return before;
       changes = { coverAcknowledgedAt: new Date() };
+    } else if (data.action === "UPDATE") {
+      await eligibleStaff(tx, scope.organisationId, data.assigneeId, before.facilityId);
+      if (data.coverId) await eligibleStaff(tx, scope.organisationId, data.coverId, before.facilityId);
+      changes = { title: data.title, description: data.description, dueAt: new Date(data.dueAt), assigneeId: data.assigneeId, coverId: data.coverId,
+        ...(data.assigneeId !== before.assigneeId || data.coverId !== before.coverId ? { coverAcknowledgedAt: null } : {}) };
     } else if (data.action === "HANDOVER") {
       if (data.coverId) await eligibleStaff(tx, scope.organisationId, data.coverId, before.facilityId);
       changes = { coverId: data.coverId, coverAcknowledgedAt: null };
