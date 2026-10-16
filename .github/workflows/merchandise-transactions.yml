@@ -141,13 +141,13 @@ jobs:
         run: npx tsx scripts/test-synthetic-restore.ts
         env:
           POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: synthetic-restore-evidence
           path: output/recovery/synthetic-restore.json
           if-no-files-found: ignore
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: readiness-capacity-evidence
@@ -180,7 +180,7 @@ jobs:
         env:
           STOR24_NEXT_WORKLOAD_EXECUTION: approved-isolated
         run: node scripts/test-next-representative-workload.mjs --run --source "$REVIEWED_SOURCE_SHA"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: isolated-next-workload-evidence
