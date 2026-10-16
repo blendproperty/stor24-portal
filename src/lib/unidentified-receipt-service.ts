@@ -4,6 +4,7 @@ import { db } from "./db";
 import { facilityWhere, requireFacility, type RequestScope } from "./scope";
 import { encryptIntegrationSecret, decryptIntegrationSecret } from "./integrations/integration-secret-vault";
 import { lineKind, units } from "./settlement-policy";
+import {bankReceiptSource,netcashReceiptSource} from './receipt-import-source';
 import { assertIndependentReceiptReview, assertReceiptDate, receiptAmount, receiptIntakeSchema, receiptReviewActionSchema, reportedReceiptSchema, receiptReviewBoundary, type ReceiptIntakeInput, type ReceiptReviewAction } from "./unidentified-receipt-policy";
 
 type Client = Prisma.TransactionClient;
@@ -27,14 +28,16 @@ function manualProof(source: ReceiptIntakeInput["source"]) {
 async function importedProof(tx: Client, scope: RequestScope, sourceType: "BANK_IMPORT_ENTRY" | "NETCASH_STATEMENT_LINE", sourceId: string) {
   if (sourceType === "BANK_IMPORT_ENTRY") {
     const row = await tx.settlementBankEntry.findFirst({ where: { id: sourceId, active: true, import: { organisationId: scope.organisationId, status: "ACTIVE" } }, include: { import: true } });
-    if (!row || await tx.settlementLine.count({ where: { active: true, bankEntryId: row.id } })) throw new Error("RECEIPT_REVIEW_SOURCE");
+    if (!row || row.bankKey!==row.import.bankKey || await tx.settlementLine.count({ where: { active: true, bankEntryId: row.id } })||await tx.receiptImportPosting.count({where:{bankEntryId:row.id}})) throw new Error("RECEIPT_REVIEW_SOURCE");
+    const original=bankReceiptSource(decryptIntegrationSecret(row.import.rawEncrypted),row.import.sha256,{transactionId:row.transactionId,date:row.date,amount:row.amount.toString(),reference:row.reference});
     const amount = receiptAmount(row.amount.toString()); assertReceiptDate(row.date);
     if (!["sandbox", "live"].includes(row.import.environment)) throw new Error("RECEIPT_REVIEW_SOURCE");
-    const evidence = { currencyBasis: "ORIGINAL_BANK_CURRENCY_UNVERIFIED", sourceType, sourceId, importId: row.importId, sha256: row.import.sha256, bankKey: row.bankKey, transactionId: row.transactionId, reference: row.reference, date: row.date, amount, alias: row.import.alias, environment: row.import.environment };
+    const evidence = { currencyBasis: original.sourceCurrency?"NORMALISED_SOURCE_DECLARED_ZAR":"ORIGINAL_BANK_CURRENCY_UNVERIFIED",...(original.sourceCurrency?{sourceCurrency:original.sourceCurrency}:{}), sourceType, sourceId, importId: row.importId, sha256: row.import.sha256, bankKey: row.bankKey, transactionId: row.transactionId, reference: row.reference, date: row.date, amount, alias: row.import.alias, environment: row.import.environment };
     return { sourceType, sourceId, sourceIdentity: hash([sourceType, row.import.environment, row.bankKey, row.transactionId]), sourceFingerprint: hash(evidence), sourceEnvironment: row.import.environment, receiptDate: row.date, amount, evidence };
   }
   const row = await tx.settlementLine.findFirst({ where: { id: sourceId, active: true, statement: { organisationId: scope.organisationId, status: { not: "VOID" } } }, include: { statement: true } });
-  if (!row || row.paymentId || row.adjustmentId || row.bankEntryId || row.resolutionHash || row.kind !== "RECEIPT" || lineKind(row.code, units(row.amount.toString())) !== "RECEIPT" || !["sandbox", "live"].includes(row.statement.environment)) throw new Error("RECEIPT_REVIEW_SOURCE");
+  if (!row || row.merchantKey!==row.statement.merchantKey || row.paymentId || row.adjustmentId || row.bankEntryId || row.resolutionHash || row.kind !== "RECEIPT" || lineKind(row.code, units(row.amount.toString())) !== "RECEIPT" || !["sandbox", "live"].includes(row.statement.environment)) throw new Error("RECEIPT_REVIEW_SOURCE");
+  netcashReceiptSource(decryptIntegrationSecret(row.statement.rawEncrypted),row.statement.sha256,{date:row.statement.date,opening:row.statement.opening.toString(),closing:row.statement.closing.toString()},{...row,amount:row.amount.toString(),vat:row.vat.toString()});
   const amount = receiptAmount(row.amount.toString()); assertReceiptDate(row.date);
   const evidence = { sourceType, sourceId, statementId: row.statementId, sha256: row.statement.sha256, revision: row.statement.revision, status: row.statement.status, merchantKey: row.merchantKey, transactionId: row.transactionId, code: row.code, description: row.description, date: row.date, amount, extras: row.extras, environment: row.statement.environment };
   return { sourceType, sourceId, sourceIdentity: hash([sourceType, row.statement.environment, row.merchantKey, row.transactionId]), sourceFingerprint: hash(evidence), sourceEnvironment: row.statement.environment, receiptDate: row.date, amount, evidence };
@@ -45,7 +48,7 @@ async function intake(tx: Client, scope: RequestScope, id: string, facilityId: s
   if (!item) throw new Error("NOT_FOUND"); return item;
 }
 type Intake = Awaited<ReturnType<typeof intake>>;
-async function currentProof(tx: Client, scope: RequestScope, item: Intake) {
+export async function currentReceiptImportProof(tx: Client, scope: RequestScope, item: Intake) {
   const proof = item.sourceType === "MANUAL_REPORTED"
     ? manualProof(JSON.parse(decryptIntegrationSecret(item.evidenceEncrypted)))
     : item.sourceId && ["BANK_IMPORT_ENTRY", "NETCASH_STATEMENT_LINE"].includes(item.sourceType)
@@ -85,14 +88,14 @@ export async function actOnUnidentifiedReceipt(scope: RequestScope, raw: Exclude
   if (input.action === "capture") throw new Error("CONFLICT");
   return serial(scope, async tx => {
     const item = await intake(tx, scope, input.id, input.facilityId);
-    if (item.revision !== input.revision || item.status === "WITHDRAWN") throw new Error("CONFLICT");
+    if (item.revision !== input.revision || ["WITHDRAWN","POSTED"].includes(item.status)) throw new Error("CONFLICT");
     if (input.action === "withdraw") {
       await tx.unidentifiedReceiptMatchProposal.updateMany({ where: { intakeId: item.id, status: { in: ["PROPOSED", "REVIEWED"] } }, data: { status: "WITHDRAWN" } });
       await tx.unidentifiedReceiptIntake.update({ where: { id: item.id }, data: { status: "WITHDRAWN", revision: { increment: 1 } } });
       await audit(tx, scope, item.id, item.facilityId, "withdrawn", { reference: input.reference, revision: item.revision + 1, financialPosting: false });
       return { id: item.id };
     }
-    await currentProof(tx, scope, item);
+    await currentReceiptImportProof(tx, scope, item);
     if (!["live", "REPORTED_UNVERIFIED"].includes(item.sourceEnvironment)) throw new Error("RECEIPT_REVIEW_TEST_SOURCE");
     if (input.action === "propose") {
       const account = await accountProof(tx, scope, item.facilityId, input.accountId);
@@ -122,13 +125,18 @@ export async function unidentifiedReceiptWorkspace(scope: RequestScope, facility
   const items = await db.unidentifiedReceiptIntake.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 51, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}), include: { proposals: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 21 } } });
   const rows = await Promise.all(items.slice(0, 50).map(async item => {
     let evidence: Record<string, unknown> | null = null, issue: string | null = null;
-    try { evidence = JSON.parse(decryptIntegrationSecret(item.evidenceEncrypted)); await currentProof(db, scope, item); } catch { issue = "Original evidence is unavailable or changed. Investigate before proposing or reviewing a match."; }
+    let posting=null;
+    try { evidence = JSON.parse(decryptIntegrationSecret(item.evidenceEncrypted)); if(item.status!=='POSTED')await currentReceiptImportProof(db, scope, item); } catch { issue = "Original evidence is unavailable or changed. Investigate before proposing or reviewing a match."; }
+    if(item.status==='POSTED'){
+      try{const {importedReceiptPostingEvidence}=await import('./receipt-import-service');posting=await importedReceiptPostingEvidence(db,scope.organisationId,item.id);if(!posting)throw Error('missing');}catch{issue='The retained receipt posting evidence needs finance review. Do not post this source again.';}
+    }
     const proposals = item.proposals.slice(0, 20).map(proposal => {
       let details = { accountLabel: "Protected details need review", reason: "" };
       try { details = JSON.parse(decryptIntegrationSecret(proposal.detailsEncrypted)); } catch { issue = "Protected proposal evidence needs administrator review."; }
       return { id: proposal.id, status: proposal.status, proposedById: proposal.proposedById, reviewedById: proposal.reviewedById, reviewedAt: proposal.reviewedAt, reviewReference: proposal.reviewReference, createdAt: proposal.createdAt, ...details };
     });
-    return { id: item.id, facilityId: item.facilityId, sourceType: item.sourceType, sourceEnvironment: item.sourceEnvironment, currencyBasis: item.sourceType === "BANK_IMPORT_ENTRY" ? "ORIGINAL_BANK_CURRENCY_UNVERIFIED" : item.sourceType === "MANUAL_REPORTED" ? "REPORTED_ZAR_UNVERIFIED" : "NETCASH_ZAR_REVIEW", receiptDate: item.receiptDate, amount: item.amount.toFixed(2), currency: item.currency, status: item.status, revision: item.revision, capturedById: item.capturedById, createdAt: item.createdAt, reference: String(evidence?.evidenceReference ?? evidence?.reference ?? evidence?.transactionId ?? "Unavailable"), note: item.sourceType === "MANUAL_REPORTED" ? String(evidence?.note ?? "") : item.sourceType === "BANK_IMPORT_ENTRY" ? "Original bank import has no retained currency field. Confirm original statement currency separately; the ZAR account review context does not verify a receipt. Store assignment is for investigation only." : "Imported source; store assignment is for investigation only.", issue, proposals, proposalsTruncated: item.proposals.length > 20 };
+    const bankCurrency=evidence?.sourceCurrency==="ZAR"?"ZAR":null;
+    return { id: item.id, facilityId: item.facilityId, sourceType: item.sourceType, sourceEnvironment: item.sourceEnvironment, sourceCurrency: item.sourceType === "BANK_IMPORT_ENTRY" ? bankCurrency : item.sourceType === "NETCASH_STATEMENT_LINE" ? "ZAR" : null, currencyBasis: item.sourceType === "BANK_IMPORT_ENTRY" ? bankCurrency ? "NORMALISED_SOURCE_DECLARED_ZAR" : "ORIGINAL_BANK_CURRENCY_UNVERIFIED" : item.sourceType === "MANUAL_REPORTED" ? "REPORTED_ZAR_UNVERIFIED" : "NETCASH_ZAR_REVIEW", receiptDate: item.receiptDate, amount: item.amount.toFixed(2), currency: item.currency, status: item.status, revision: item.revision, capturedById: item.capturedById, createdAt: item.createdAt, reference: String(evidence?.evidenceReference ?? evidence?.reference ?? evidence?.transactionId ?? "Unavailable"), note: item.sourceType === "MANUAL_REPORTED" ? String(evidence?.note ?? "") : item.sourceType === "BANK_IMPORT_ENTRY" ? bankCurrency ? "The retained normalised extract declares ZAR. Independently check the original statement, bank ownership and payment nature before any financial posting. Store assignment is for investigation only." : "Original bank import has no retained currency field. Confirm original statement currency separately; the ZAR account review context does not verify a receipt. Store assignment is for investigation only." : "Imported source; store assignment is for investigation only.", issue, posting, proposals, proposalsTruncated: item.proposals.length > 20 };
   }));
   return { facilities, rows, nextCursor: items.length > 50 ? rows.at(-1)!.id : null, boundary: receiptReviewBoundary };
 }
@@ -140,12 +148,17 @@ export async function unidentifiedReceiptAccounts(scope: RequestScope, facilityI
 export async function unidentifiedReceiptSources(scope: RequestScope) {
   if (!scope.unrestrictedFacilities) throw new Error("RECEIPT_REVIEW_SOURCE_PERMISSION");
   const [bank, netcash] = await Promise.all([
-    db.settlementBankEntry.findMany({ where: { active: true, amount: { gt: 0 }, import: { organisationId: scope.organisationId, status: "ACTIVE" } }, select: { id: true }, orderBy: [{ date: "desc" }, { id: "desc" }], take: 101 }),
+    db.settlementBankEntry.findMany({ where: { active: true, amount: { gt: 0 }, receiptImportPosting:null,import: { organisationId: scope.organisationId, status: "ACTIVE" } }, select: { id: true }, orderBy: [{ date: "desc" }, { id: "desc" }], take: 101 }),
     db.settlementLine.findMany({ where: { active: true, kind: "RECEIPT", paymentId: null, adjustmentId: null, bankEntryId: null, resolutionHash: null, statement: { organisationId: scope.organisationId, status: { not: "VOID" } } }, select: { id: true }, orderBy: [{ date: "desc" }, { id: "desc" }], take: 101 }),
   ]);
   const rows = [];
   for (const [sourceType, items] of [["BANK_IMPORT_ENTRY", bank], ["NETCASH_STATEMENT_LINE", netcash]] as const) for (const item of items.slice(0, 100)) {
-    try { const proof = await importedProof(db, scope, sourceType, item.id); rows.push({ sourceType, sourceId: item.id, sourceFingerprint: proof.sourceFingerprint, label: `${sourceType === "BANK_IMPORT_ENTRY" ? "Bank" : "Netcash"} · ${proof.receiptDate} · ${sourceType === "BANK_IMPORT_ENTRY" ? `${proof.amount} (verify original currency)` : `R${proof.amount}`} · ${proof.sourceEnvironment} · ref ${proof.evidence.transactionId}` }); } catch { /* Unsupported sources stay in original reconciliation, never relabelled. */ }
+    try {
+      const proof = await importedProof(db, scope, sourceType, item.id);
+      const declaredCurrency='sourceCurrency' in proof.evidence&&proof.evidence.sourceCurrency==="ZAR";
+      const labelAmount=sourceType === "BANK_IMPORT_ENTRY" ? declaredCurrency ? `${proof.amount} ZAR (source declared; review original)` : `${proof.amount} (verify original currency)` : `R${proof.amount}`;
+      rows.push({sourceType,sourceId:item.id,sourceFingerprint:proof.sourceFingerprint,label:`${sourceType === "BANK_IMPORT_ENTRY" ? "Bank" : "Netcash"} · ${proof.receiptDate} · ${labelAmount} · ${proof.sourceEnvironment} · ref ${proof.evidence.transactionId}`});
+    } catch { /* Unsupported sources stay in original reconciliation, never relabelled. */ }
   }
   return { rows, truncated: bank.length > 100 || netcash.length > 100, note: "Bounded imported credit candidates only; not a complete bank reconciliation or proof of customer payment." };
 }

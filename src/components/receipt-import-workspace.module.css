@@ -1,0 +1,11 @@
+.workspace { display:grid; gap:20px; min-width:0; }
+.workspace section,.posting { padding:24px; min-width:0; overflow-wrap:anywhere; }
+.workspace h2,.posting h3,.posting h4 { margin-top:0; }
+.workspace label,.posting label { display:grid; gap:8px; font-weight:600; min-width:0; margin:14px 0; }
+.workspace input:not([type=checkbox]),.posting input:not([type=checkbox]) { display:block; width:100%; min-width:0; box-sizing:border-box; border:1px solid #c6d0ca; border-radius:8px; padding:12px; color:#10271f; background:white; }
+.workspace label:has(input[type=checkbox]),.posting label:has(input[type=checkbox]) { display:flex; align-items:start; gap:10px; font-weight:400; }
+.workspace input[type=checkbox],.posting input[type=checkbox] { flex:0 0 auto; margin-top:4px; }
+.workspace button,.posting button { white-space:normal; max-width:100%; }
+.posting { margin:18px 0; }
+.posting p { line-height:1.55; }
+@media(max-width:600px){.workspace section,.posting{padding:16px}.workspace button,.posting button{width:100%;margin-bottom:8px}}

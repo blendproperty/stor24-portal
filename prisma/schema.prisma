@@ -201,6 +201,8 @@ enum AccessDecisionState {
 }
 
 model Organisation {
+  receiptBankSources ReceiptBankSourceProfile[]
+  receiptImportPostings ReceiptImportPosting[]
   staffOperationalAcknowledgements StaffOperationalAcknowledgement[]
   arrivalHandovers ArrivalHandover[]
   customerNotes CustomerNote[]
@@ -267,6 +269,7 @@ model UserInvitation {
 }
 
 model Facility {
+  receiptImportPostings ReceiptImportPosting[]
   staffOperationalAcknowledgements StaffOperationalAcknowledgement[]
   arrivalHandovers ArrivalHandover[]
   customerNotes CustomerNote[]
@@ -835,6 +838,7 @@ model InsuranceEnrollment {
 }
 
 model Account {
+  receiptImportPostings ReceiptImportPosting[]
   outgoingReceiptReallocations ReceiptReallocation[] @relation("ReceiptReallocationSourceAccount")
   incomingReceiptReallocations ReceiptReallocation[] @relation("ReceiptReallocationTargetAccount")
   id            String        @id @default(cuid())
@@ -1062,6 +1066,7 @@ model DebitOrderInstruction {
 }
 
 model LedgerEntry {
+  receiptImportPosting ReceiptImportPosting?
   receiptReallocationSources ReceiptReallocation[] @relation("ReceiptReallocationOriginalEntry")
   receiptReallocationOutgoing ReceiptReallocation? @relation("ReceiptReallocationOutgoingEntry")
   receiptReallocationIncoming ReceiptReallocation? @relation("ReceiptReallocationIncomingEntry")
@@ -1085,6 +1090,7 @@ model LedgerEntry {
 }
 
 model Payment {
+  receiptImportPosting ReceiptImportPosting?
   receiptReallocations ReceiptReallocation[]
   id             String        @id @default(cuid())
   accountId      String
@@ -1141,6 +1147,7 @@ model SettlementStatement {
 }
 
 model SettlementLine {
+  receiptImportPosting ReceiptImportPosting?
   id String @id @default(cuid())
   statementId String
   statement SettlementStatement @relation(fields: [statementId], references: [id], onDelete: Restrict)
@@ -1166,6 +1173,9 @@ model SettlementLine {
 }
 
 model SettlementBankImport {
+  receiptBankSourceId String?
+  receiptBankSource ReceiptBankSourceProfile? @relation(fields: [receiptBankSourceId], references: [id], onDelete: Restrict)
+  receiptBankIdentitySignature String?
   id String @id @default(cuid())
   organisationId String
   bankKey String
@@ -1182,6 +1192,7 @@ model SettlementBankImport {
 }
 
 model SettlementBankEntry {
+  receiptImportPosting ReceiptImportPosting?
   id String @id @default(cuid())
   importId String
   import SettlementBankImport @relation(fields: [importId], references: [id], onDelete: Restrict)
@@ -1210,6 +1221,7 @@ model SettlementBalanceObservation {
 }
 
 model Document {
+  receiptImportPosting ReceiptImportPosting?
   receiptReallocationSource ReceiptReallocation? @relation("ReceiptReallocationSourceDocument")
   receiptReallocationTarget ReceiptReallocation? @relation("ReceiptReallocationTargetDocument")
   id              String    @id @default(cuid())
@@ -2120,8 +2132,10 @@ model CustomerNote {
 }
 
 
-// Separate review evidence only; these models never create financial receipts.
+// Retained investigation/matching evidence. Financial posting is a separate
+// explicit action with its own immutable ReceiptImportPosting record.
 model UnidentifiedReceiptIntake {
+  posting ReceiptImportPosting?
   id String @id @default(cuid())
   organisationId String
   facilityId String
@@ -2148,6 +2162,7 @@ model UnidentifiedReceiptIntake {
 }
 
 model UnidentifiedReceiptMatchProposal {
+  posting ReceiptImportPosting?
   id String @id @default(cuid())
   intakeId String
   intake UnidentifiedReceiptIntake @relation(fields: [intakeId], references: [id], onDelete: Restrict)
@@ -2162,4 +2177,74 @@ model UnidentifiedReceiptMatchProposal {
   reviewReference String?
   createdAt DateTime @default(now())
   @@index([intakeId, createdAt])
+}
+
+model ReceiptBankSourceProfile {
+  id String @id @default(uuid())
+  organisationId String
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  bankIdentityHash String
+  bankCode String
+  accountSuffix String
+  label String
+  currency String @default("ZAR")
+  identityEncrypted String
+  identitySignature String
+  status String @default("PENDING_REVIEW")
+  revision Int @default(0)
+  requestedById String
+  requestKey String
+  requestHash String
+  requestReference String
+  reviewedById String?
+  reviewedAt DateTime?
+  reviewReference String?
+  imports SettlementBankImport[]
+  postings ReceiptImportPosting[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([organisationId, bankIdentityHash])
+  @@unique([organisationId, requestKey])
+  @@index([organisationId, status, createdAt])
+}
+
+model ReceiptImportPosting {
+  id String @id @default(uuid())
+  organisationId String
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  facilityId String
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  intakeId String @unique
+  intake UnidentifiedReceiptIntake @relation(fields: [intakeId], references: [id], onDelete: Restrict)
+  proposalId String @unique
+  proposal UnidentifiedReceiptMatchProposal @relation(fields: [proposalId], references: [id], onDelete: Restrict)
+  accountId String
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  paymentId String @unique
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  ledgerEntryId String @unique
+  ledgerEntry LedgerEntry @relation(fields: [ledgerEntryId], references: [id], onDelete: Restrict)
+  documentId String @unique
+  document Document @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  bankSourceId String?
+  bankSource ReceiptBankSourceProfile? @relation(fields: [bankSourceId], references: [id], onDelete: Restrict)
+  sourceIdentity String
+  sourceFingerprint String
+  bankEntryId String? @unique
+  bankEntry SettlementBankEntry? @relation(fields: [bankEntryId], references: [id], onDelete: Restrict)
+  netcashLineId String? @unique
+  netcashLine SettlementLine? @relation(fields: [netcashLineId], references: [id], onDelete: Restrict)
+  amount Decimal @db.Decimal(14,2)
+  currency String @default("ZAR")
+  originalReceiptDate String
+  snapshot Json
+  snapshotHash String
+  requestKey String
+  requestHash String
+  postedById String
+  approvalReference String
+  postedAt DateTime @default(now())
+  @@unique([organisationId, sourceIdentity])
+  @@unique([organisationId, requestKey])
+  @@index([organisationId, facilityId, postedAt, id])
 }
