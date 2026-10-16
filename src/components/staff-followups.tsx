@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { z } from "zod";
+import { AppointmentTitleField } from "@/components/appointment-title-field";
 import { PageHeader } from "@/components/page-header";
 import { formatSouthAfricaDateTime } from "@/lib/south-africa-time";
 import { followupSastInput, followupSastValue, staffFollowupViewSchema, type StaffFollowupView } from "@/lib/staff-followup-policy";
@@ -99,7 +100,7 @@ export function StaffFollowups() {
               <form onSubmit={e => { e.preventDefault(); const form = new FormData(e.currentTarget); void mutate(`/api/v1/operations/followups/${task.id}`, "PATCH", { action: "HANDOVER", coverId: form.get("coverId") || null, expectedUpdatedAt: task.updatedAt }); }}><label>Cover for {task.title}<select name="coverId" defaultValue={task.cover?.id ?? ""} disabled={disabled}><option value="">No cover</option>{data.staff.filter(s => s.facilityIds.includes(task.facility.id)).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label><button disabled={disabled} className="button button-secondary">Update cover</button></form></> : null}
             </div>
             {data.canManage && editing === task.id ? <form aria-label={`Edit ${task.title}`} key={`${task.id}-${task.updatedAt}`} onSubmit={e => { e.preventDefault(); const fields = new FormData(e.currentTarget); const dueAt = appointmentDate(fields.get("dueAt")); if (!dueAt) return; void mutate(`/api/v1/operations/followups/${task.id}`, "PATCH", { action: "UPDATE", expectedUpdatedAt: task.updatedAt, title: fields.get("title"), description: fields.get("description"), dueAt, assigneeId: fields.get("assigneeId"), coverId: fields.get("coverId") || null }, () => setEditing(null)); }}>
-              <label>Appointment title<input name="title" defaultValue={task.title} minLength={2} maxLength={160} required disabled={disabled}/></label>
+              <AppointmentTitleField initialTitle={task.title} disabled={disabled}/>
               <label>Agreed action and handover details<textarea name="description" defaultValue={task.description ?? ""} minLength={2} maxLength={4000} required disabled={disabled}/></label>
               <label>Agreed date and time (SAST)<input name="dueAt" type="datetime-local" defaultValue={task.dueAt ? followupSastValue(task.dueAt) : ""} required disabled={disabled}/></label>
               <label>Responsible staff<select name="assigneeId" defaultValue={task.assignee?.id ?? ""} required disabled={disabled}><option value="">Choose responsible staff</option>{data.staff.filter(s => s.facilityIds.includes(task.facility.id)).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
@@ -117,7 +118,7 @@ export function StaffFollowups() {
             <label>Responsible staff<select aria-label="Responsible staff" name="assigneeId" key={`assignee-${facilityId}`} required disabled={disabled}><option value="">Choose responsible staff</option>{data.staff.filter(s => s.facilityIds.includes(facilityId)).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
             <label>Covering staff<select aria-label="Covering staff" name="coverId" key={`cover-${facilityId}`} disabled={disabled}><option value="">No cover assigned</option>{data.staff.filter(s => s.facilityIds.includes(facilityId)).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
             <label>Agreed date and time (SAST)<input name="dueAt" type="datetime-local" required disabled={disabled}/></label>
-            <label>Appointment title<input name="title" minLength={2} maxLength={160} required disabled={disabled}/></label>
+            <AppointmentTitleField disabled={disabled}/>
             <label>Agreed action and handover details<textarea name="description" minLength={2} maxLength={4000} rows={4} required disabled={disabled}/></label>
             <button className="button button-primary" disabled={disabled || !customerId}>{saving ? "Saving…" : "Save agreed appointment"}</button>
           </form>
