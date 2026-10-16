@@ -82,3 +82,10 @@ Next single check (original6/15): on an existing approved training customer, Fae
 Brett answered: "Note appears once with correct author, category and date/time". Record Faeez's original6/15 note save/refresh acceptance as PASS for the reported single approved-training-customer note. This confirms the reported persistence, single appearance, author, selected category and SAST date/time. It is human-reported; no customer identity, note contents or exact attempt time were requested. Permanent correction history, second-staff read and actual file exports are not inferred.
 
 Next single check: Brett, using his own already authorised account, opens that same training customer and confirms the same Faeez note is visible once with unchanged author/category/date/time. This is a read-only handover check; it does not onboard the incoming manager or grant access. Status: second-staff read pending.
+
+
+### 16 October - second authorised staff read HUMAN-CONFIRMED
+
+Brett answered: "I can see Faeez's note with the correct details" to the request to open the same training customer in his own account and check the note once with unchanged author/category/date/time. Record the paired Faeez-write/Brett-read handover check as human-confirmed PASS. This does not onboard the incoming manager, exercise every staff role, establish note-correction history or prove any actual exported file.
+
+Next single acceptance checkpoint (original13, supporting4/5/6/15): Faeez downloads PDF, CSV and native Excel (.xlsx) from that same customer's history using his own account, opens each file, and checks the selected customer and Faeez note with its author, category and SAST date/time. Confirm all three formats separately if any fail. Do not send customer files or details into this chat; report only the result/error. Financial approval and provider activation remain separate. Status: actual three-format staff download/open/content check pending.
