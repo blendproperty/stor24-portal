@@ -1,4 +1,4 @@
-import {createHmac,timingSafeEqual} from 'node:crypto';
+import {createHash,createHmac,timingSafeEqual} from 'node:crypto';
 import {z} from 'zod';
 import {cardSourceHash} from './card-autopay-enrollment-policy';
 import {decryptIntegrationSecret,encryptIntegrationSecret} from '../integrations/integration-secret-vault';
@@ -10,7 +10,7 @@ const reference=z.string().trim().min(3).max(200).regex(/^[^\x00-\x1f\x7f]+$/);
 /** Preserve the original string; do not round, truncate, or infer the numeric
  * refund identifier from a merchant reference, amount, callback or card token. */
 export function refundTransactionId(value:string){
- if(!/^[1-9]\d{0,9}$/.test(value)||BigInt(value)>2147483647n)throw Error('NETCASH_REFUND_TRANSACTION_REVIEW');
+ if(!/^[1-9]\d{0,9}$/.test(value)||BigInt(value)>BigInt('2147483647'))throw Error('NETCASH_REFUND_TRANSACTION_REVIEW');
  return value;
 }
 export const refundSourceSchema=z.object({
@@ -93,4 +93,17 @@ export function transitionRefundRecord(raw:NetcashRefundRecord,action:'review'|'
   next={...value,state:'RELEASED',releaseReview:evidence};
  }
  return refundRecordSchema.parse({...next,revision:value.revision+1});
+}
+
+// Settlement resolutionHash predates the canonical source hash. Its original
+// writer hashes this exact object order; PostgreSQL JSONB does not retain that
+// order. Reconstruct the strictly validated writer shape, never hash arbitrary
+// JSONB iteration order or replace the original expected hash.
+const originalReceiptProofSchema=z.object({type:z.literal('RECEIPT'),payment:z.object({id,amount:z.string().regex(/^(?:0|[1-9]\d{0,11})(?:\.\d{1,2})?$/),status:z.enum(['SUCCEEDED','PARTIALLY_REFUNDED']),merchantKey:hash,legacyMerchantConfirmed:z.literal(false),accountNumber:id,ledgerEntryId:id,evidenceId:id.nullable(),accountHash:hash}).strict()}).strict();
+export function requireOriginalRefundReceiptProof(raw:unknown,resolutionHash:string,expected:{paymentId:string;merchantKey:string;sourceEntryId:string;paymentAmount:string}){
+ try{
+  const proof=originalReceiptProofSchema.parse(raw),payment=proof.payment;
+  if(createHash('sha256').update(JSON.stringify(proof)).digest('hex')!==resolutionHash||payment.id!==expected.paymentId||payment.merchantKey!==expected.merchantKey||payment.ledgerEntryId!==expected.sourceEntryId||payment.amount!==expected.paymentAmount)throw Error();
+  return proof;
+ }catch{throw Error('NETCASH_REFUND_STATEMENT_REVIEW')}
 }

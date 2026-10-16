@@ -1,4 +1,3 @@
-import {createHash} from 'node:crypto';
 import type {Prisma} from '@/generated/prisma/client';
 import type {RequestScope} from '@/lib/scope';
 import {approvedRefundAdjustmentSource} from '@/lib/adjustment-service';
@@ -7,8 +6,7 @@ import {decryptIntegrationSecret} from '@/lib/integrations/integration-secret-va
 import {decryptNetcashConfig} from './netcash-client';
 import {merchantIdentity} from './netcash-statement';
 import {isTestPayment} from './payment-evidence';
-import {refundSourceSchema,refundTransactionId} from './netcash-refund-policy';
-const evidenceHash=(value:unknown)=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
+import {refundSourceSchema,refundTransactionId,requireOriginalRefundReceiptProof} from './netcash-refund-policy';
 /** Read only. Numeric identity comes solely from an exact checksum-verified PNC
  * row linked to the original payment in an independently reviewed statement.
  * Legacy merchant inference and amount-only matching are deliberately refused. */
@@ -22,8 +20,8 @@ export async function currentNetcashRefundSource(tx:Prisma.TransactionClient,sco
  if(await tx.settlementLine.count({where:{active:true,merchantKey:statement.merchantKey,transactionId:line.transactionId,statement:{organisationId:scope.organisationId,status:{not:'VOID'}}}})!==1)throw Error('NETCASH_REFUND_ORIGINAL_RECEIPT_REQUIRED');
  const original=await tx.payment.findFirst({where:{id:request.paymentId!,accountId:request.accountId,provider:'NETCASH',environment:'live',currency:'ZAR',status:{in:['SUCCEEDED','PARTIALLY_REFUNDED']}},include:{account:{select:{customerId:true}},merchandiseOrder:{select:{id:true}}}});
  if(!original||original.merchandiseOrder||isTestPayment(original)||!original.providerMerchantKey||original.providerMerchantKey!==statement.merchantKey||!original.amount.equals(line.amount))throw Error('NETCASH_REFUND_ORIGINAL_RECEIPT_REQUIRED');
- const snapshot=line.resolutionSnapshot as {proof?:{type?:unknown;payment?:{id?:unknown;amount?:unknown;merchantKey?:unknown;ledgerEntryId?:unknown;legacyMerchantConfirmed?:unknown}}}|null,proof=snapshot?.proof;
- if(!proof||evidenceHash(proof)!==line.resolutionHash||proof.type!=='RECEIPT'||proof.payment?.id!==original.id||proof.payment.merchantKey!==statement.merchantKey||proof.payment.ledgerEntryId!==request.sourceEntryId||proof.payment.legacyMerchantConfirmed!==false||proof.payment.amount!==original.amount.toString())throw Error('NETCASH_REFUND_STATEMENT_REVIEW');
+ const snapshot=line.resolutionSnapshot as {proof?:unknown}|null;
+ requireOriginalRefundReceiptProof(snapshot?.proof,line.resolutionHash,{paymentId:original.id,merchantKey:statement.merchantKey,sourceEntryId:request.sourceEntryId!,paymentAmount:original.amount.toString()});
  netcashReceiptSource(decryptIntegrationSecret(statement.rawEncrypted),statement.sha256,{date:statement.date,opening:statement.opening.toString(),closing:statement.closing.toString()},{transactionId:line.transactionId,date:line.date,code:line.code,description:line.description,amount:line.amount.toString(),vat:line.vat.toString(),extras:line.extras,kind:line.kind});
  const approval=await tx.auditEvent.findFirst({where:{organisationId:scope.organisationId,entityType:'SettlementStatement',entityId:statement.id,action:{in:['settlement.approve','settlement.reopen','settlement.void']}},orderBy:[{occurredAt:'desc'},{id:'desc'}]});
  const approved=approval?.after as {reference?:unknown;sourceHash?:unknown}|null;

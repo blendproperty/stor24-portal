@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {randomBytes} from 'node:crypto';
+import {createHash,randomBytes} from 'node:crypto';
 import {cardSourceHash} from '../src/lib/payments/card-autopay-enrollment-policy';
-import {refundTransactionId,refundSourceSchema,refundRecordId,refundRecordSchema,sealRefundRecord,readRefundRecord,refundHoldsManualPayout,projectRefundRecord,transitionRefundRecord,type NetcashRefundRecord} from '../src/lib/payments/netcash-refund-policy';
+import {refundTransactionId,refundSourceSchema,refundRecordId,refundRecordSchema,sealRefundRecord,readRefundRecord,refundHoldsManualPayout,projectRefundRecord,transitionRefundRecord,requireOriginalRefundReceiptProof,type NetcashRefundRecord} from '../src/lib/payments/netcash-refund-policy';
 
 test('refund preparation policy preserves a bounded original transaction and zero-dispatch held history',async t=>{
  const before={auth:process.env.AUTH_SECRET,vault:process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY};process.env.AUTH_SECRET=randomBytes(32).toString('hex');process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY=randomBytes(32).toString('hex');
@@ -36,6 +36,12 @@ test('refund preparation policy preserves a bounded original transaction and zer
    const requested=step(held,'request-release','synthetic-release-requester',3);assert.throws(()=>step(requested,'approve-release','synthetic-release-requester',4),/INDEPENDENT/);
    const released=step(requested,'approve-release','synthetic-release-reviewer',4);assert.equal(released.state,'RELEASED');assert.equal(released.revision,5);assert.equal(refundHoldsManualPayout(released),false);
    for(const terminal of [released,step(prepared,'withdraw',prepared.preparedById)])for(const action of ['review','reserve','request-release']as const)assert.throws(()=>step(terminal,action),/STATE/);
+  });
+  await t.test('original statement proof survives JSONB key ordering and still rejects changed source or hash',()=>{
+   const proof={type:'RECEIPT',payment:{id:'synthetic-payment',amount:'950',status:'SUCCEEDED',merchantKey:source.merchantKey,legacyMerchantConfirmed:false,accountNumber:'synthetic-account-number',ledgerEntryId:source.sourceEntryId,evidenceId:null,accountHash:'6'.repeat(64)}},resolutionHash=createHash('sha256').update(JSON.stringify(proof)).digest('hex'),expected={paymentId:proof.payment.id,merchantKey:source.merchantKey,sourceEntryId:source.sourceEntryId,paymentAmount:'950'};
+   const reordered={payment:Object.fromEntries(Object.entries(proof.payment).reverse()),type:proof.type};assert.deepEqual(requireOriginalRefundReceiptProof(reordered,resolutionHash,expected),proof);
+   for(const changed of [{...reordered,payment:{...reordered.payment,amount:'951'}},{...reordered,payment:{...reordered.payment,legacyMerchantConfirmed:true}},{...reordered,payment:{...reordered.payment,unrecognised:'forged'}}])assert.throws(()=>requireOriginalRefundReceiptProof(changed,resolutionHash,expected),/STATEMENT_REVIEW/);
+   assert.throws(()=>requireOriginalRefundReceiptProof(reordered,'0'.repeat(64),expected),/STATEMENT_REVIEW/);assert.throws(()=>requireOriginalRefundReceiptProof(reordered,resolutionHash,{...expected,paymentId:'foreign'}),/STATEMENT_REVIEW/);
   });
   await t.test('sealed records reject wrong store, tampered ciphertext, forged source and altered signature',()=>{
    const sealed=sealRefundRecord(prepared);assert.deepEqual(readRefundRecord(sealed,expected),prepared);

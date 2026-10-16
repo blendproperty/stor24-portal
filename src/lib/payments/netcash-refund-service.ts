@@ -107,3 +107,19 @@ export async function netcashRefundHistory(scope:RequestScope,facilityId:string,
   return{rows:rows.slice(0,20).map(row=>projectRefundRecord(retained(row,scope,facilityId))),nextCursor:rows.length>20?rows[19].id:null};
  },{isolationLevel:'RepeatableRead',timeout:20000});
 }
+
+/** Candidate rows are choices for a subsequent full preview, not source proof. */
+export async function netcashRefundOptions(scope:RequestScope,facilityId:string,cursor?:string){
+ return db.$transaction(async tx=>{
+  await authority(tx,scope,facilityId,'payments.refund_prepare');preparationEnabled();
+  const where={organisationId:scope.organisationId,facilityId,kind:'REFUND',status:'APPROVED'};
+  if(cursor&&!await tx.financialAdjustment.findFirst({where:{...where,id:cursor},select:{id:true}}))throw Error('NETCASH_REFUND_NOT_FOUND');
+  const rows=await tx.financialAdjustment.findMany({where,include:{account:{select:{accountNumber:true}}},orderBy:[{createdAt:'desc'},{id:'desc'}],take:21,...(cursor?{cursor:{id:cursor},skip:1}:{})});
+  const options=[];
+  for(const row of rows.slice(0,20)){
+   const lines=row.paymentId?await tx.settlementLine.findMany({where:{paymentId:row.paymentId,active:true,code:'PNC',kind:'RECEIPT',statement:{organisationId:scope.organisationId,status:'REVIEWED',environment:'live'}},select:{id:true,date:true,amount:true,transactionId:true},orderBy:{id:'asc'},take:6}):[];
+   options.push({adjustmentId:row.id,accountNumber:row.account.accountNumber,amount:row.amount.toFixed(2),sourceLines:lines.slice(0,5).map(line=>({...line,amount:line.amount.toFixed(2)})),sourceCoverageIncomplete:lines.length>5});
+  }
+  return{rows:options,nextCursor:rows.length>20?rows[19].id:null,sourceVerified:false as const};
+ },{isolationLevel:'RepeatableRead',timeout:20000});
+}
