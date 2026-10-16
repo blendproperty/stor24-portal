@@ -31,6 +31,13 @@ class Preflight(unittest.TestCase):
    result=lane.sanitized_summary(raw,refs);encoded=json.dumps(result)
    self.assertEqual(result['unresolvedFailureRecordCount'],3);self.assertEqual(len(result['caseResults']),1);self.assertTrue(result['caseResults'][0]['aggregateOnly']);self.assertEqual(result['caseResults'][0]['sourceLine'],2)
    for text in ['Duplicate literal','PRIVATE','Unknown multiline','Escaped']:self.assertNotIn(text,encoded)
+ def test_every_malformed_or_oversized_header_breaks_metadata_attribution(self):
+  refs={'Known case':{'testFile':'adjustments.test.ts','sourceLine':12}}
+  for header in ['not ok 2 - '+'PRIVATE-LONG-'*200,'not ok malformed PRIVATE-HEADER','not ok 2 -','ok bad PRIVATE-PASS']:
+   raw="ok 1 - Known case\n"+header+"\n  failureType: 'testCodeFailure'\n  code: 'ERR_ASSERTION'\n"
+   result=lane.sanitized_summary(raw,refs)
+   self.assertEqual(result['caseResults'],[{'testFile':'adjustments.test.ts','sourceLine':12,'status':'PASS'}]);self.assertEqual(result['unmappedCaseResultCount'],1);self.assertEqual(result['unresolvedFailureRecordCount'],int(header.startswith('not ok')))
+   self.assertNotIn('PRIVATE',json.dumps(result))
  def test_fixture_database_matches_unchanged_subject_guards(self):
   # Inspect real runner arguments and exercise the original-guard verifier with
   # synthetic files. No dependency on cwd, Git history, Docker or a DB.

@@ -23,15 +23,19 @@ def subject_case_references(paths):
 def sanitized_summary(raw,case_references=None):
  result={'tapTotals':{},'httpObservers':[],'observedPrismaCodes':sorted(set(re.findall(r"\bP[0-9]{4}\b",raw)))[:100],'numericAssertionPairs':[],'rawContentPublished':False,'caseResults':[],'unmappedCaseResultCount':0,'unresolvedFailureRecordCount':0};pending=None;current_case=None
  for line in raw.splitlines():
-  case=re.match(r'^\s*(not ok|ok) [0-9]+ - (.{1,2000})$',line)
-  if case:
+  header=re.match(r'^\s*(not ok|ok)\b',line)
+  if header:
+   # Every TAP-like result boundary clears the previous record, including
+   # malformed/oversized unknown titles. Never attach later failure metadata
+   # to a preceding known case merely because this header could not resolve.
    current_case=None
-   reference=(case_references or {}).get(case[2])
+   case=re.match(r'^\s*(not ok|ok) [0-9]+ - (.{1,2000})$',line) if len(line)<=2200 else None
+   reference=(case_references or {}).get(case[2]) if case else None
    if reference and len(result['caseResults'])<400:
-    current_case={**reference,'status':'FAIL' if case[1]=='not ok' else 'PASS'};result['caseResults'].append(current_case)
+    current_case={**reference,'status':'FAIL' if header[1]=='not ok' else 'PASS'};result['caseResults'].append(current_case)
    else:
     result['unmappedCaseResultCount']+=1
-    if case[1]=='not ok':result['unresolvedFailureRecordCount']+=1
+    if header[1]=='not ok':result['unresolvedFailureRecordCount']+=1
   if current_case is not None:
    kind=re.match(r"^\s*failureType: ['\"]?([A-Za-z]+)['\"]?\s*$",line)
    if kind and kind[1] in {'testCodeFailure','subtestsFailed','cancelledByParent','hookFailed','testTimeoutFailure','uncaughtException','unhandledRejection'}:current_case['failureType']=kind[1]
