@@ -1,5 +1,19 @@
 # Netcash native refund request: implementation checkpoint
 
+## Current source — native caller checkpoint, validation pending
+
+The draft now contains the native encrypted/HMAC journal, purpose-specific independent SEND preparation/review, account-locked irreversible claim+audit BEFORE one physical fetch, repeated current actor/reviewer/source/credential/operator approval guard, and private bounded original-response retention. New `payments.refund_send` / `payments.refund_send_review` descriptions create no production grants. `NETCASH_REFUND_REQUEST_ENABLED` defaults off and a separate strict source-bound provider approval is required; signing-only bank permission is not refund authority. No actual provider request or configuration mutation has occurred.
+
+Strict same-origin4KiB/rate-limited staff API and the existing refund page expose the separate request controls. V1 HMAC records/schema stay intact; current DTO/UI overlays claim/result truth, blocks old local release after claim, and prevents manual payout/cancel for valid claims or orphan/invalid evidence. The generic configuration workflow excludes the new private attempt domain. A committed claim is a POSSIBLE provider action even when the final guard prevents fetch or result bookkeeping fails. No replay, automatic retry, completed-payout inference or ledger posting.
+
+The original reviewed transaction day must be within the documented six-month request period. Calendar month ends clamp; the exact six-month boundary/future day is held for provider review rather than assuming undocumented time-zone grace. See the official provider pages below. No invented sandbox financial source: the existing source is live-only and actual test authority/format/merchant authorization/readback remain external gates.
+
+Current local validation:12 focused route/projection/transport/approval/attempt-policy results PASS, owned-file ESLint and browser-script syntax pass. Native isolated cases are authored for default off, independent/current scoped review,8parallel-to1physical mock request, claim/result-audit rollback, revoked reviewer and changed source/credential/window, normalized approval, final guard source/permission/flag changes, unknown state/disablement/orphan/V1 release/no cash. Four-width actual-component synthetic browser cases are authored. Native/browser/full-build/current protected-check execution remains PENDING. No local Docker/build or real provider use.
+
+Still required before promotion: successful native/browser/build/full current checks, independent source/permission/atomicity review, actual-main532 source/guide/PDF/canonical integration and healthy predecessor, guide/handbook updates, and bounded preclaim rejection/withdrawal/renewal handling preserving review history. Claims and unknown provider outcomes must never be renewed or reset. These are implementation/validation requirements, not relabelled as UAT. Provider/finance/operator/customer/device approval and real acceptance remain distinct.
+
+## Dated earlier implementation checkpoints
+
 16 October 2026. INCOMPLETE source preparation. No runtime caller, staff request controls, journal, real provider call or refund is claimed by this checkpoint.
 
 The released531 preparation/reservation contract does not send refunds. The remaining implementation must add an explicit new purpose-specific independent SEND review, current dedicated grants, an irreversible encrypted/HMAC attempt journal and account-locked provider-claim audit BEFORE one physical fetch. A claim, orphan audit or unknown outcome must keep manual payout/cancellation and the old zero-dispatch release blocked. Every old history/API/UI projection must report current claim/outcome truth, never an obsolete no-provider-send statement. No network belongs inside a retried financial transaction. No automatic replay, retry, reclaim, ledger posting or completed-refund inference.

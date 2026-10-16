@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {transportRefundRequest} from '../src/lib/payments/netcash-refund-transport';
-import {readRefundSendApproval,refundCredentialFingerprint} from '../src/lib/payments/netcash-refund-send-policy';
+import {readRefundSendApproval,refundCredentialFingerprint,requireRefundRequestDate} from '../src/lib/payments/netcash-refund-send-policy';
 import {cardSourceHash} from '../src/lib/payments/card-autopay-enrollment-policy';
 const key='00000000-0000-0000-0000-000000000001',input={transactionId:'2147483647',amount:'12.50',wireFormat:'DECIMAL_DOT' as const};
 const xml=(code:string)=>`<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><RequestCreditCardRefundResponse xmlns="http://tempuri.org/"><RequestCreditCardRefundResult>${code}</RequestCreditCardRefundResult></RequestCreditCardRefundResponse></s:Body></s:Envelope>`;
@@ -41,4 +41,13 @@ test('refund provider approval uses one normalized strictly bounded operator ass
   for(const change of [{expiresAt:'2026-10-17T09:00:00Z'},{expiresAt:'2026-10-16T08:00:30Z'},{approvedAt:'2026-10-16T08:01:00Z'},{environment:'sandbox'},{wireFormat:'TRY_BOTH'},{extra:'forged'},{purpose:'SIGNING_ONLY'}]){process.env.NETCASH_REFUND_REQUEST_APPROVAL=JSON.stringify({...value,...change});assert.throws(()=>readRefundSendApproval(now));}
   assert.notEqual(refundCredentialFingerprint('org','connection',key),refundCredentialFingerprint('org','connection',key.replace(/1$/,'2')));
  }finally{if(old===undefined)delete process.env.NETCASH_REFUND_REQUEST_APPROVAL;else process.env.NETCASH_REFUND_REQUEST_APPROVAL=old;if(secret===undefined)delete process.env.AUTH_SECRET;else process.env.AUTH_SECRET=secret;}
+});
+
+test('refund eligibility uses original transaction day with six-month/month-end/SAST boundary held for review',()=>{
+ requireRefundRequestDate('2026-01-31',new Date('2026-07-30T12:00:00Z'));
+ assert.throws(()=>requireRefundRequestDate('2026-01-31',new Date('2026-07-30T22:00:00Z')),/PROVIDER_DATE_REVIEW/);
+ requireRefundRequestDate('2025-08-31',new Date('2026-02-27T12:00:00Z'));
+ assert.throws(()=>requireRefundRequestDate('2025-08-31',new Date('2026-02-28T12:00:00Z')),/PROVIDER_DATE_REVIEW/);
+ assert.throws(()=>requireRefundRequestDate('2026-10-17',new Date('2026-10-16T12:00:00Z')),/PROVIDER_DATE_REVIEW/);
+ assert.throws(()=>requireRefundRequestDate('2026-02-30'));
 });

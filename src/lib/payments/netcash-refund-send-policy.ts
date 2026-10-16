@@ -2,6 +2,7 @@ import {createHmac} from 'node:crypto';
 import {z} from 'zod';
 import {cardSourceHash} from './card-autopay-enrollment-policy';
 import type {NetcashRefundSource} from './netcash-refund-policy';
+import {southAfricaDateKey} from '../south-africa-time';
 
 const hash=z.string().regex(/^[a-f\d]{64}$/),id=z.string().trim().min(1).max(160);
 /** Trusted deployment assertion of provider authorization; never supplied by
@@ -32,8 +33,20 @@ export function readRefundSendApproval(now=new Date()){
  return value;
 }
 export function requireRefundSendApproval(source:NetcashRefundSource,credentialFingerprint:string,now=new Date()){
+ requireRefundRequestDate(source.lineDate,now);
  const value=readRefundSendApproval(now);
  const expected={organisationId:source.organisationId,facilityId:source.facilityId,accountId:source.accountId,adjustmentId:source.adjustmentId,paymentId:source.paymentId,sourceHash:cardSourceHash(source),merchantKey:source.merchantKey,credentialFingerprint,transactionId:source.transactionId,amount:source.refundAmount};
  for(const key of Object.keys(expected) as (keyof typeof expected)[])if(value[key]!==expected[key])throw Error('NETCASH_REFUND_SEND_APPROVAL_SOURCE_CHANGED');
  return{approval:value,approvalHash:cardSourceHash(value)};
+}
+/** Provider help limits card requests to six months. Use the original reviewed
+ * statement's transaction day; do not replace it with import/posting time.
+ * Hold the exact six-month boundary for provider review rather than assuming
+ * an undocumented time-of-day/time-zone grace period. Clamp month ends. */
+export function requireRefundRequestDate(lineDate:string,now=new Date()){
+ const day=z.iso.date().parse(lineDate),today=southAfricaDateKey(now),original=new Date(day+'T12:00:00Z');
+ const month=original.getUTCMonth()+6,year=original.getUTCFullYear()+Math.floor(month/12),targetMonth=month%12;
+ const endDay=Math.min(original.getUTCDate(),new Date(Date.UTC(year,targetMonth+1,0)).getUTCDate());
+ const boundary=new Date(Date.UTC(year,targetMonth,endDay,12)).toISOString().slice(0,10);
+ if(day>today||today>=boundary)throw Error('NETCASH_REFUND_PROVIDER_DATE_REVIEW');
 }

@@ -7,9 +7,12 @@ export type RefundResponseCapture={httpStatus:number|null;bodyBase64:string;comp
 /** ONE physical fetch. Caller must already have committed an irreversible
  * account-locked claim and rechecked current review/source/credential/approval.
  * No request body, service key, raw headers or exception text is retained. */
-export async function transportRefundRequest(serviceKey:string,input:{transactionId:string;amount:string;wireFormat:RefundSendApproval['wireFormat']},request:typeof fetch=fetch):Promise<RefundResponseCapture>{
+export function assertRefundTransportInput(serviceKey:string,input:{transactionId:string;amount:string;wireFormat:RefundSendApproval['wireFormat']}){
  if(!/^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i.test(serviceKey)||! /^(?:0|[1-9]\d{0,5})\.\d{2}$/.test(input.amount)||Number(input.amount)<=0||!['DECIMAL_DOT','DECIMAL_COMMA'].includes(input.wireFormat))throw Error('NETCASH_REFUND_TRANSPORT_INPUT');
  refundTransactionId(input.transactionId);
+}
+export async function transportRefundRequest(serviceKey:string,input:{transactionId:string;amount:string;wireFormat:RefundSendApproval['wireFormat']},request:typeof fetch=fetch):Promise<RefundResponseCapture>{
+ assertRefundTransportInput(serviceKey,input);
  const chunks:Buffer[]=[];let capturedBytes=0,httpStatus:number|null=null,complete=false;
  try{
   const response=await request(PAYNOW_SOAP_ENDPOINT,{method:'POST',redirect:'error',cache:'no-store',signal:AbortSignal.timeout(20000),headers:{'content-type':'text/xml; charset=utf-8',SOAPAction:'"http://tempuri.org/IPayNow/RequestCreditCardRefund"'},body:payNowSoapEnvelope('RequestCreditCardRefund',[['M1',serviceKey],['TransactionId',input.transactionId],['amount',input.wireFormat==='DECIMAL_COMMA'?input.amount.replace('.',','):input.amount]])});

@@ -18,7 +18,7 @@ const schema=z.discriminatedUnion('action',[
 const permission={preview:'payments.refund_prepare',prepare:'payments.refund_prepare',review:'payments.refund_review',reject:'payments.refund_review',withdraw:'payments.refund_prepare',reserve:'payments.refund_reserve','request-release':'payments.refund_reserve','approve-release':'payments.refund_release_review'}as const;
 function failure(error:unknown){
  if(error instanceof z.ZodError||error instanceof SyntaxError||(error instanceof Error&&['MANDATE_RESPONSE_TOO_LARGE','MANDATE_RESPONSE_INVALID'].includes(error.message)))return Response.json({error:{message:'Check the store, original refund, source and explicit confirmation.'}},{status:422,headers});
- if(error instanceof Error&&/^(NETCASH_REFUND|ADJUSTMENT|RECEIPT_REVIEW|SETTLEMENT)_/.test(error.message))return Response.json({error:{code:error.message,message:'The original payment, finance approval or retained reservation needs review. Refresh its history. No provider refund or financial posting was performed.'}},{status:409,headers});
+ if(error instanceof Error&&/^(NETCASH_REFUND|ADJUSTMENT|RECEIPT_REVIEW|SETTLEMENT)_/.test(error.message))return Response.json({error:{code:error.message,message:'The original payment, finance approval, retained reservation or possible provider outcome needs review. Refresh its history before continuing.'}},{status:409,headers});
  if(error&&typeof error==='object'&&'code'in error&&['P2002','P2034'].includes(String(error.code)))return Response.json({error:{message:'Another action changed this source. Refresh its history before continuing.'}},{status:409,headers});
  const response=authErrorResponse(error);for(const[key,value]of Object.entries(headers))response.headers.set(key,value);return response;
 }
