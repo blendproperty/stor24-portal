@@ -1,0 +1,42 @@
+# Test-only override. Always combine with compose.staging.yml and a unique -p.
+services:
+  postgres:
+    restart: "no"
+  app:
+    restart: "no"
+    environment:
+      STOR24_NEXT_WORKLOAD_TEST: isolated-container
+      WORKLOAD_SOURCE_SHA: ${WORKLOAD_SOURCE_SHA:?Exact reviewed source required}
+      WORKLOAD_PROJECT: ${WORKLOAD_PROJECT:?Unique isolated project required}
+      WORKLOAD_STAFF_PASSWORD: ${WORKLOAD_STAFF_PASSWORD:?Synthetic password required}
+      INTEGRATION_CONFIG_ENCRYPTION_KEY: ${WORKLOAD_VAULT_KEY:?Synthetic vault key required}
+      COLLECTION_SCHEDULE_ENABLED: "false"
+      NETCASH_DEBICHECK_BANK_CONSENT_PREPARATION_ENABLED: "false"
+      NETCASH_DEBICHECK_REQUEST_PREPARATION_ENABLED: "false"
+      CARD_AUTOPAY_SANDBOX_ENROLLMENT_ENABLED: "false"
+      NETCASH_PAYMENT_REQUEST_SANDBOX_ENABLED: "false"
+      STAFF_EVENT_EMAIL_ENABLED: "false"
+    volumes:
+      - workload-evidence:/workload-evidence
+      - ./scripts/test-next-representative-workload.mjs:/workload/test-next-representative-workload.mjs:ro
+  workload-seed:
+    image: stor24-workload-builder:${IMAGE_TAG:?Exact isolated image required}
+    profiles: [tools]
+    environment:
+      DATABASE_URL: postgresql://stor24_stage:${STAGING_DB_PASSWORD}@postgres:5432/stor24_staging
+      STOR24_NEXT_WORKLOAD_TEST: isolated-container
+      WORKLOAD_SOURCE_SHA: ${WORKLOAD_SOURCE_SHA}
+      WORKLOAD_PROJECT: ${WORKLOAD_PROJECT}
+      WORKLOAD_STAFF_PASSWORD: ${WORKLOAD_STAFF_PASSWORD}
+    command: [node, --import, tsx, scripts/seed-next-workload.ts]
+    volumes:
+      - workload-evidence:/workload-evidence
+    cpus: 1.0
+    mem_limit: 1g
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    networks: [isolated]
+volumes:
+  workload-evidence:

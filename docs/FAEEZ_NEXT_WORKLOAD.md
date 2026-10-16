@@ -1,0 +1,25 @@
+# Original gap17: isolated Next-hosted workload
+
+This test adds the actual production Next.js server, proxy, signed-cookie verification and permission guards to the existing representative workload. It changes no product, session, permission, provider or deployment code. Keep `tests/integration/faeez-representative-workload.test.ts` and its original assertions unchanged.
+
+Before execution, publish the exact source checkpoint for review and obtain the coordinator/REA's explicit quiet CPU slot. The one-pass build is expected to take4–6minutes; the three measured phases must finish within2minutes. Builds have an8minute aggregate deadline; bootstrap/seeding and readiness have their own bounds. A failure or timeout is retained and is not automatically rerun. Check for an unfinished daemon build before releasing/reusing a slot after an interrupted Docker command.
+
+From a clean reviewed branch, set `STOR24_NEXT_WORKLOAD_EXECUTION=approved-isolated`, then run:
+
+```text
+node scripts/test-next-representative-workload.mjs --run --source <exact-reviewed-40-character-HEAD>
+```
+
+The opt-in is an execution guard, not a substitute for recorded review/slot agreement. The runner refuses a dirty tracked tree, a nonlocal Docker endpoint, existing project resources, published ports and nonisolated networking. It exports an exact Git archive under its own ignored `output/next-workload/<run>/source`; ignored production `.env` files and credentials are not copied. Docker commands receive only an allowlist of host executable/configuration paths. Fresh fixture passwords, signing/vault keys and image/project names are generated locally; private resolved configuration/container inspection is never retained in logs. No production/provider credential or browser cookie is used.
+
+`compose.workload.yml` overlays the existing private `compose.staging.yml`, with a fresh project/database/volume, production runner image and internal network. No shared test database/container is reset or restarted. All services remain on that private network with no host ports. The runner builds the existing Dockerfile's builder, migrator and runner targets with shared layers and the reviewed source label, bootstraps the empty database, seeds synthetic data, then invokes the client inside the app container. The app image and normal server/guards remain unchanged. Network isolation and absent provider credentials prevent external delivery; this is not provider or inbox acceptance.
+
+The seed contains180 measured customers,150 active tenancies and retained synthetic charges,210units,540notes,180synthetic retained communications,25 scoped staff accounts and a separate hidden-store customer. Passwords are hashed using the normal algorithm. Sessions come from the actual normal login API, remain in memory, and are never minted directly or saved to artifacts. Distinct forwarded-IP headers are explicitly synthetic client fixtures; five attempts are allowed and the sixth same-IP attempt must return429. This does not test truthful socket/proxy address handling, a real browser's cookie transport, actual staff credentials or MFA.
+
+Phases of5,15and25 concurrent staff retain the original270 business requests: search, history, note, identical-key retry, report and reservation. They add45 actual `/tenants` HTML requests, reported separately. Original read p95<5s, write p95<8s and maximum<15s thresholds remain. The test retains401/403/422/409/recovery controls and the original offline snapshot12-hour expiry, foreign-store denial, queued-lead safe retry, stale-unit rejection, reselected booking retry and changed revision. This validates server source recovery, not physical-device offline/browser behavior.
+
+Final database checks require585notes,46reservations,150original ledger entries, zero payments/outbox rows and at most10server-pool connections. The fixture's own separate pool is excluded from the application count. Sanitised HTTP/database result JSON and a phase manifest identify the exact source, timing, counts, statuses, images and isolation; no passwords, tokens, request bodies or headers are published. Build/failure logs stay private in the owned run directory.
+
+Only containers bearing the exact new project label are stopped. Volumes, logs and the private fixture configuration remain for diagnosis; there is no automatic destructive cleanup. A stop failure leaves the overall run incomplete. Before any later removal, verify the recorded project, resolved paths and volume labels. No failure is erased by resetting a database or weakening an assertion.
+
+A passing result supports this one isolated production-server workload only. It does not establish production peak capacity, customer delivery, real staff/device acceptance or remediation of the separately held financial SSI/HTTP500 issue. Gap23 and all provider/data/device/training/financial gates remain open.
