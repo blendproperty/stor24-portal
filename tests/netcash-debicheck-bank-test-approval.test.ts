@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
 import {cardSourceHash} from '../src/lib/payments/card-autopay-enrollment-policy';
-import {requireBankAuthenticationTestApproval,bankAuthenticationPayerFingerprint} from '../src/lib/payments/netcash-debicheck-bank-test-approval';
+import {requireBankAuthenticationTestApproval,readBankAuthenticationTestApproval,bankAuthenticationPayerFingerprint} from '../src/lib/payments/netcash-debicheck-bank-test-approval';
 import type {DebiCheckAuthenticationTerms,parseDebiCheckTemplate} from '../src/lib/payments/netcash-debicheck-soap';
 
 test('separate deployment test approval binds exact payer, subject, template, amount and time without inventing a provider approval',async t=>{
@@ -25,6 +25,13 @@ test('separate deployment test approval binds exact payer, subject, template, am
   await t.test('an exact configured source yields a hash reference and never returns private payer values',()=>{
    configure();const result=requireBankAuthenticationTestApproval(expected,template,now);assert.match(result.providerApprovalHash,/^[a-f0-9]{64}$/);assert.equal(result.providerApprovalId,'debicheck-test-approval:'+result.providerApprovalHash);
    for(const privateValue of [terms.bankAccountNumber,terms.debtorIdentification,terms.emailAddress,'bankAccountNumber','providerEvidenceReference'])assert.ok(!JSON.stringify(result).includes(privateValue));
+  });
+  await t.test('source and final guards share normalized documentary fields while preserving semantic and time changes',()=>{
+   configure();const canonical=requireBankAuthenticationTestApproval(expected,template,now).providerApprovalHash;
+   configure({...approval(),providerEvidenceReference:'  '+approval().providerEvidenceReference+'  ',approvalRecordedBy:'  '+approval().approvalRecordedBy+'  '});
+   assert.equal(cardSourceHash(readBankAuthenticationTestApproval(now)),canonical);assert.equal(requireBankAuthenticationTestApproval(expected,template,now).providerApprovalHash,canonical);
+   configure({...approval(),providerEvidenceReference:approval().providerEvidenceReference+' changed'});assert.notEqual(cardSourceHash(readBankAuthenticationTestApproval(now)),canonical);
+   assert.throws(()=>readBankAuthenticationTestApproval(new Date(now.getTime()+3000001)),/EXPIRED/);
   });
   await t.test('all subject bindings are required and a fingerprint cannot be transferred across stores or bank details',()=>{
    configure();for(const field of Object.keys(expected)){assert.throws(()=>requireBankAuthenticationTestApproval({...expected,[field]:'foreign'},template,now))}

@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {randomBytes,randomUUID} from 'node:crypto';
+import {prepareBankAuthenticationConsent,acceptBankAuthenticationConsent,bankAuthenticationConsentHash,DEBICHECK_BANK_CONSENT_DOMAIN} from '../../src/lib/payments/netcash-debicheck-bank-consent-policy';
+import {encryptBankConsent} from '../../src/lib/payments/netcash-debicheck-bank-consent-record';
 import {db} from '../../src/lib/db';
 import {sealDebiCheckRequest,DEBICHECK_REQUEST_TERMS} from '../../src/lib/payments/netcash-debicheck-request-policy';
 import {encryptIntegrationSecret} from '../../src/lib/integrations/integration-secret-vault';
@@ -23,28 +25,35 @@ test('isolated PostgreSQL durable authentication journal retains exactly one att
   const account=await db.account.create({data:{customerId:customer.id,accountNumber:key,currency:'ZAR',balance:100}});
   const tenancy=await db.tenancy.create({data:{accountId:account.id,facilityId:facility.id,customerId:customer.id,status:'ACTIVE',startDate:now,paymentMethod:'CARD'}});
   const reviewer=await db.user.create({data:{organisationId:organisation.id,name:'Synthetic reviewer',email:randomUUID()+'@example.invalid'}});
-  const role=await db.role.create({data:{organisationId:organisation.id,name:'Synthetic history reader '+key,permissions:['payments.view']}});
+  const role=await db.role.create({data:{organisationId:organisation.id,name:'Synthetic history reader '+key,permissions:['payments.view','payments.bank_auth_review']}});
   await db.roleAssignment.create({data:{userId:reviewer.id,roleId:role.id,facilityId:facility.id}});
   const request=sealDebiCheckRequest({version:1,recordId:'debicheck-request:'+randomUUID(),organisationId:organisation.id,facilityId:facility.id,accountId:account.id,customerId:customer.id,tenancyId:tenancy.id,sourceHash:'1'.repeat(64),templateObservationId:'synthetic-observation',templateSourceHash:'2'.repeat(64),templateId:'NCDCT000000001',connectionId:'synthetic-connection',connectionUpdatedAt:now.toISOString(),merchantHash:'3'.repeat(64),environment:'sandbox',startDate:'2026-11-01',monthlyAmount:'100.00',consentVersion:DEBICHECK_REQUEST_TERMS,consentText:'Synthetic setup only; no bank authority',consentAt:now.toISOString(),tenantIdentityHash:'4'.repeat(64),bankSuffix:'0000',encryptedTerms:encryptIntegrationSecret('synthetic private terms fixture')});
   await db.configurationProfile.create({data:{id:request.recordId,organisationId:organisation.id,facilityId:facility.id,domain:'NETCASH_DEBICHECK_REQUEST',name:account.id+':'+key,status:'REVIEWED',config:request}});
-  const consentHash='5'.repeat(64);
-  const consent=await db.auditEvent.create({data:{organisationId:organisation.id,facilityId:facility.id,entityType:'ConfigurationProfile',entityId:request.recordId,action:'netcash.debicheck_bank_authentication_consented',occurredAt:now,after:{consentVersion:'debicheck-bank-authentication-v1',customerId:customer.id,requestSignature:request.signature,sourceHash:request.sourceHash,merchantHash:request.merchantHash,consentHash}}});
-  const review=await db.auditEvent.create({data:{organisationId:organisation.id,facilityId:facility.id,actorId:reviewer.id,entityType:'ConfigurationProfile',entityId:request.recordId,action:'netcash.debicheck_bank_authentication_reviewed',occurredAt:now,after:{requestSignature:request.signature,authenticationConsentHash:consentHash,sourceHash:request.sourceHash,merchantHash:request.merchantHash}}});
+  const bankConsent=acceptBankAuthenticationConsent(prepareBankAuthenticationConsent({organisationId:organisation.id,facilityId:facility.id,accountId:account.id,customerId:customer.id,tenancyId:tenancy.id,requestId:request.recordId,requestSignature:request.signature,sourceHash:request.sourceHash,merchantHash:request.merchantHash,templateSourceHash:request.templateSourceHash,templateId:request.templateId,connectionId:request.connectionId,connectionUpdatedAt:request.connectionUpdatedAt,tenantIdentityHash:request.tenantIdentityHash,providerApprovalId:'synthetic-operator-evidence-not-provider-acceptance',providerApprovalHash:'6'.repeat(64),payerFingerprint:'7'.repeat(64),monthlyAmount:request.monthlyAmount,startDate:request.startDate,bankSuffix:request.bankSuffix},now),now),consentHash=bankAuthenticationConsentHash(bankConsent);
+  await db.configurationProfile.create({data:{id:bankConsent.recordId,organisationId:organisation.id,facilityId:facility.id,domain:DEBICHECK_BANK_CONSENT_DOMAIN,name:bankConsent.recordId,status:'REVIEWED',config:encryptBankConsent(bankConsent)}});
+  const consent=await db.auditEvent.create({data:{organisationId:organisation.id,facilityId:facility.id,entityType:'ConfigurationProfile',entityId:bankConsent.recordId,action:'netcash.debicheck_bank_consent_saved',occurredAt:now,after:{accountId:account.id,requestId:request.recordId,customerId:customer.id,consentHash,consentedAt:bankConsent.consentedAt}}});
+  const review=await db.auditEvent.create({data:{organisationId:organisation.id,facilityId:facility.id,actorId:reviewer.id,entityType:'ConfigurationProfile',entityId:bankConsent.recordId,action:'netcash.debicheck_bank_consent_reviewed',occurredAt:now,after:{accountId:account.id,requestId:request.recordId,consentHash}}});
   const source:DebiCheckAttemptSource={organisationId:organisation.id,facilityId:facility.id,accountId:account.id,requestId:request.recordId,requestSignature:request.signature,sourceHash:request.sourceHash,merchantHash:request.merchantHash,connectionId:request.connectionId,connectionUpdatedAt:request.connectionUpdatedAt,templateSourceHash:request.templateSourceHash,authenticationConsentHash:consentHash,independentReviewAuditId:review.id};
   const identity={id:'debicheck-attempt:'+request.recordId.replace('debicheck-request:',''),organisationId:organisation.id,facilityId:facility.id,accountId:account.id};
   const claim=()=>db.$transaction(tx=>retainDebiCheckAttemptClaim(tx,source,now),{isolationLevel:'Serializable',timeout:20000});
   const complete=(value:DebiCheckAuthenticationOutcome)=>db.$transaction(tx=>retainDebiCheckAttemptResult(tx,identity,value,new Date(now.getTime()+1000)),{isolationLevel:'Serializable'});
   const session={organisationId:organisation.id,email:customer.email!,customerIds:[customer.id]};
   const scope={userId:reviewer.id,organisationId:organisation.id,facilityIds:[facility.id],unrestrictedFacilities:false};
-  return{source,identity,claim,complete,consent,review,account,request,session,scope};
+  return{source,identity,claim,complete,consent,review,account,request,session,scope,bankConsent};
  }
  try{
   const financialBaseline={payments:await db.payment.count(),ledger:await db.ledgerEntry.count(),instructions:await db.debitOrderInstruction.count()};
   await t.test('setup consent or missing independent authentication review cannot create a dispatch claim',async()=>{
    const f=await fixture();await db.auditEvent.update({where:{id:f.consent.id},data:{action:'netcash.debicheck_request_consented'}});
    await assert.rejects(f.claim(),/BANK_AUTHENTICATION_CONSENT_REQUIRED/);assert.equal(await db.configurationProfile.count({where:{id:f.identity.id}}),0);
-   await db.auditEvent.update({where:{id:f.consent.id},data:{action:'netcash.debicheck_bank_authentication_consented'}});
+   await db.auditEvent.update({where:{id:f.consent.id},data:{action:'netcash.debicheck_bank_consent_saved'}});
    await db.auditEvent.delete({where:{id:f.review.id}});await assert.rejects(f.claim(),/BANK_AUTHENTICATION_REVIEW_REQUIRED/);
+  });
+  await t.test('native withdrawn or expired permission and revoked reviewer authority cannot create a claim',async()=>{
+   const withdrawn=await fixture();await db.configurationProfile.update({where:{id:withdrawn.bankConsent.recordId},data:{status:'WITHDRAWN'}});await assert.rejects(withdrawn.claim(),/BANK_AUTHENTICATION_CONSENT_REQUIRED/);
+   const expired=await fixture();await assert.rejects(db.$transaction(tx=>retainDebiCheckAttemptClaim(tx,expired.source,new Date(expired.bankConsent.expiresAt)),{isolationLevel:'Serializable'}),/BANK_AUTHENTICATION_CONSENT_REQUIRED/);
+   const revoked=await fixture();await db.roleAssignment.deleteMany({where:{userId:revoked.scope.userId}});await assert.rejects(revoked.claim(),/BANK_AUTHENTICATION_REVIEW_REQUIRED/);
+   for(const f of [withdrawn,expired,revoked])assert.equal(await db.configurationProfile.count({where:{id:f.identity.id}}),0);
   });
   await t.test('one committed claim survives crash/restart and repeated requests never yield a new attempt',async()=>{
    const f=await fixture(),first=await f.claim();assert.equal(first.newClaim,true);assert.equal(first.attempt.status,'CLAIMED');
