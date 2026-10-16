@@ -1,3 +1,4 @@
+import {assertNoNetcashRefundHold} from './payments/netcash-refund-interlock';
 import {receiptAllocationGraph} from "./receipt-reallocation-source";
 import { createHash } from "node:crypto";
 import { Prisma } from "@/generated/prisma/client";
@@ -154,6 +155,7 @@ export async function decideAdjustment(scope: RequestScope, id: string, action: 
     if (action !== "cancel" && request.requestedById === scope.userId) throw new Error("ADJUSTMENT_SELF_APPROVAL");
     if (action === "cancel" && request.requestedById !== scope.userId && request.reviewedById !== scope.userId) throw new Error("FORBIDDEN");
     if (action === "cancel" && request.status === "APPROVED" && !unpaidConfirmed) throw new Error("ADJUSTMENT_UNPAID_CONFIRMATION");
+    if(action==='cancel'&&request.kind==='REFUND'&&request.status==='APPROVED')await assertNoNetcashRefundHold(tx,scope.organisationId,request.accountId,request.paymentId);
     if (action !== "approve") {
       const result = await tx.financialAdjustment.update({ where: { id }, data: { status: action === "reject" ? "REJECTED" : "CANCELLED", reviewReference: reference, reviewedById: scope.userId, reviewedAt: new Date() } });
       await audit(tx, scope, request, action, { reference, previousStatus: request.status }); return result;
@@ -172,6 +174,7 @@ export async function recordRefundPayout(scope: RequestScope, id: string, refere
     const request = await locked(tx, scope, id);
     if (request.kind !== "REFUND" || request.status !== "APPROVED" || !request.reviewedAt) throw new Error("ADJUSTMENT_STATE");
     if (scope.userId === request.requestedById) throw new Error("ADJUSTMENT_SELF_APPROVAL");
+    await assertNoNetcashRefundHold(tx,scope.organisationId,request.accountId,request.paymentId);
     const parsed = new Date(`${date}T00:00:00+02:00`);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(parsed.getTime()) || southAfricaDateKey(parsed) !== date || date < southAfricaDateKey(request.reviewedAt) || date > southAfricaDateKey(new Date())) throw new Error("ADJUSTMENT_PAYOUT_DATE");
     const reviewed = await review(tx, scope, (request.snapshot as { input: unknown }).input, id);
