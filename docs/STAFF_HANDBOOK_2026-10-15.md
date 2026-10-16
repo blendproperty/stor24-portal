@@ -206,7 +206,7 @@ A note saying 'lock tomorrow' is not access authorisation. Record the review req
 
 ## 07A · Review each scheduled arrears run
 
-Open **Collections → Scheduled collection letters**. Brett's chosen mode is **staff review each run**. Automatic dispatch remains off until separately approved configuration; saving a schedule or approving a run does not itself send an email.
+Open **Collections**, then **Scheduled collection letters**. Brett's chosen mode is **staff review each run**. Automatic dispatch remains off until separately approved configuration; saving a schedule or approving a run does not itself send an email.
 
 1. Choose the exact store and existing accounts. Enter the schedule name, first and last South African days, weekdays, SAST due time and review/delivery window. These choices start blank. The window must end by midnight that day.
 2. Open the saved schedule and use **Prepare today's due run** within its configured window, or read the due draft prepared by the separately configured worker. Source, verified-email and consent holds exclude the affected account. Read held accounts as well as included letters.

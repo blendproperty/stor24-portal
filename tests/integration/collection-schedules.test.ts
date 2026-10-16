@@ -62,7 +62,8 @@ test("isolated native schedules require a fresh real independent review every ru
     await t.test("real reviewed current-day producer sends once, records history, and changes no money", async () => {
       const f = await fixture(), run = await approve(f); activate(f); let calls = 0;
       const provider = { send: async (message: { to: string; dlp?: { actorId?: string } }) => { calls++; assert.equal(message.to, f.accounts[0].customer.email); assert.equal(message.dlp?.actorId, f.b.userId); } };
-      assert.equal((await processCollectionSchedules(provider)).accepted, 1); await processCollectionSchedules(provider); assert.equal(calls, 1);
+      assert.equal((await processCollectionSchedules(provider)).accepted, 1); assert.equal((await processCollectionSchedules(provider)).accepted, 0); assert.equal(calls, 1);
+      const read = await readCollectionSchedules(f.b, { facilityId: f.facility.id, planId: f.plan.row.id }); assert.equal(read.runs[0].delivery[run.state.items[0].noticeId], "ACCEPTED");
       const log = await db.communicationLog.findUniqueOrThrow({ where: { idempotencyKey: run.state.items[0].noticeId } }); assert.equal(log.status, "SUCCEEDED"); assert.ok(JSON.stringify(log.metadata).includes("historyEvidence"));
       const audits = await db.auditEvent.findMany({ where: { organisationId: f.org.id, action: { in: ["collection.notice.send_claimed", "collection.notice.provider_accepted"] } } }); assert.ok(audits.every(a => a.actorId === null));
       assert.equal((await db.account.findUniqueOrThrow({ where: { id: f.accounts[0].account.id } })).balance.toString(), "100"); assert.equal(await db.payment.count({ where: { accountId: f.accounts[0].account.id } }), 0); assert.equal(await db.ledgerEntry.count({ where: { accountId: f.accounts[0].account.id } }), 1);
@@ -108,6 +109,42 @@ test("isolated native schedules require a fresh real independent review every ru
     await t.test("exact window expiry sends nothing and does not claim a notice", async () => {
       const f = await fixture(); await approve(f); activate(f); t.mock.timers.setTime(new Date("2026-10-15T11:00:00Z").getTime());
       assert.equal(southAfricaDateKey(new Date()), "2026-10-15"); let calls = 0; await processCollectionSchedules({ send: async () => { calls++; } }); assert.equal(calls, 0); assert.equal(await db.communicationLog.count({ where: { organisationId: f.org.id } }), 0); t.mock.timers.setTime(fixed.getTime());
+    });
+    await t.test("manual due evaluation records the actual contributor and prevents their own approval", async () => {
+      const f = await fixture();
+      const runId = await evaluateCollectionSchedule(f.b, f.plan.row.id, f.plan.state.revision), run = await collectionRunRecord(db, f.org.id, runId);
+      const audit = await db.auditEvent.findFirstOrThrow({ where: { organisationId: f.org.id, action: "collection.notice.prepared" } }); assert.equal(audit.actorId, f.b.userId);
+      const notice = await db.configurationProfile.findUniqueOrThrow({ where: { id: run.state.items[0].noticeId } }); assert.ok((notice.config as { contributors: string[] }).contributors.includes(f.b.userId));
+      await assert.rejects(commandCollectionSchedule(f.b, { action: "review-run", id: runId, revision: run.state.revision, fingerprint: run.state.fingerprint, decision: "APPROVE", reference: "Actual evaluator cannot approve", confirm: true }), /SELF_APPROVAL/);
+      assert.equal((await collectionRunRecord(db, f.org.id, runId)).state.status, "PENDING_REVIEW");
+    });
+    await t.test("overlapping plans retain one account-day draft and no hidden manual send path", async () => {
+      const f = await fixture(), first = await prepare(f);
+      const second = await commandCollectionSchedule(f.a, { ...f.command, requestKey: randomUUID() }), plan = await collectionPlanRecord(db, f.org.id, second.id);
+      const id = await evaluateCollectionSchedule(f.a, second.id, plan.state.revision), run = await collectionRunRecord(db, f.org.id, id);
+      assert.equal(first.state.items.length, 1); assert.equal(run.state.items.length, 0); assert.equal(run.state.held.length, 1);
+      assert.equal(await db.configurationProfile.count({ where: { organisationId: f.org.id, domain: "COLLECTION_EMAIL_NOTICE" } }), 1);
+    });
+    await t.test("a failed run-review audit rolls back every notice approval and run revision", async () => {
+      const f = await fixture(2), run = await prepare(f); let installed = false;
+      assert.match(f.org.id, /^[a-z0-9]+$/);
+      try {
+        await db.$executeRawUnsafe(`ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_scheduled_review_failure CHECK ("action" <> 'collection.schedule.run_reviewed' OR "organisationId" <> '${f.org.id}') NOT VALID`); installed = true;
+        await assert.rejects(commandCollectionSchedule(f.b, { action: "review-run", id: run.row.id, revision: run.state.revision, fingerprint: run.state.fingerprint, decision: "APPROVE", reference: "Synthetic failing audit", confirm: true }));
+        assert.equal(await db.configurationProfile.count({ where: { organisationId: f.org.id, domain: "COLLECTION_EMAIL_NOTICE", status: "APPROVED" } }), 0);
+        assert.equal((await collectionRunRecord(db, f.org.id, run.row.id)).state.revision, run.state.revision);
+      } finally { if (installed) await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_scheduled_review_failure'); }
+    });
+    await t.test("actual schedule and due-run producers support stable older pages with explicit selection", async () => {
+      const f = await fixture();
+      for (let i = 0; i < 26; i++) await commandCollectionSchedule(f.a, { ...f.command, requestKey: randomUUID(), input: { ...f.command.input, label: `Synthetic older plan ${i}` } });
+      const first = await readCollectionSchedules(f.a, { facilityId: f.facility.id }); assert.equal(first.plans.length, 25); assert.ok(first.nextCursor);
+      const older = await readCollectionSchedules(f.a, { facilityId: f.facility.id, cursor: first.nextCursor!, planId: f.plan.row.id }); assert.equal(older.plans.length, 2); assert.ok(!older.plans.some(p => first.plans.some(q => q.id === p.id))); assert.equal(older.selectedPlan?.id, f.plan.row.id);
+      const saved = await commandCollectionSchedule(f.a, { ...f.command, requestKey: randomUUID(), input: { ...f.command.input, to: "2026-11-15", weekdays: [0, 1, 2, 3, 4, 5, 6] } }), plan = await collectionPlanRecord(db, f.org.id, saved.id);
+      for (let i = 0; i < 27; i++) { t.mock.timers.setTime(fixed.getTime() + i * 86400000); await evaluateCollectionSchedule(f.a, saved.id, plan.state.revision); }
+      const runs = await readCollectionSchedules(f.a, { facilityId: f.facility.id, planId: saved.id }); assert.equal(runs.runs.length, 25); assert.ok(runs.nextRunCursor);
+      const olderRuns = await readCollectionSchedules(f.a, { facilityId: f.facility.id, planId: saved.id, runCursor: runs.nextRunCursor! }); assert.equal(olderRuns.runs.length, 2); assert.ok(!olderRuns.runs.some(r => runs.runs.some(q => q.id === r.id)));
+      assert.equal(await db.communicationLog.count({ where: { organisationId: f.org.id } }), 0); t.mock.timers.setTime(fixed.getTime());
     });
   } finally { globalThis.fetch = originalFetch; delete process.env.COLLECTION_SCHEDULE_ENABLED; delete process.env.COLLECTION_SCHEDULE_APPROVED_FINGERPRINT; t.mock.timers.reset(); await db.$disconnect(); }
 });

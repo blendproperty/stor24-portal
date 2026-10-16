@@ -26,7 +26,7 @@ async function load(tx:Prisma.TransactionClient,scope:RequestScope,id:string){
 }
 function view(value:Awaited<ReturnType<typeof load>>,scope:RequestScope){
   const{row,saved,payload,current}=value;const sourceCurrent=current.fingerprint===saved.sourceFingerprint&&current.asOf===saved.asOf&&!current.blockers.length&&noticeHash(renderCollectionNotice(current))===saved.payloadHash;
-  return{id:row.id,accountId:saved.accountId,status:row.status,revision:saved.revision,asOf:saved.asOf,recipient:payload.recipient,subject:payload.subject,text:payload.text,sourceCurrent,blockers:current.blockers,canApprove:row.status==="DRAFT"&&!saved.contributors.includes(scope.userId),approvedAt:saved.approvedAt,approvalReference:saved.approvalReference,sendConfigured:collectionEmailConfigured(),accepted:row.status==="ACCEPTED",deliveryVerified:false};
+  return{id:row.id,accountId:saved.accountId,status:row.status,revision:saved.revision,asOf:saved.asOf,recipient:payload.recipient,subject:payload.subject,text:payload.text,sourceCurrent,blockers:current.blockers,canApprove:row.status==="DRAFT"&&!saved.scheduledRunId&&!saved.contributors.includes(scope.userId),...(saved.scheduledRunId?{scheduledRunId:saved.scheduledRunId}:{}),approvedAt:saved.approvedAt,approvalReference:saved.approvalReference,sendConfigured:collectionEmailConfigured(),accepted:row.status==="ACCEPTED",deliveryVerified:false};
 }
 async function previewInTransaction(tx:Prisma.TransactionClient,scope:RequestScope,accountId:string,asOf:string){
   const source=await collectionEmailSource(tx,scope,accountId,asOf);const id=idFor(scope.organisationId,accountId,source.asOf);const exists=await tx.configurationProfile.findUnique({where:{id}});

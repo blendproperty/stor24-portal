@@ -39,7 +39,7 @@ export async function processCollectionSchedules(provider?: EmailProvider) {
   for (const item of run.state.items) {
     try {
       const result = await sendCollectionNotice(reviewer, { id: item.noticeId, revision: item.revision, confirm: true }, provider, { runId, check: tx => guard(tx, item) });
-      if (result.accepted) accepted++; else held++;
+      if (result.accepted) { if (!result.repeated) accepted++; } else held++;
     } catch { held++; /* No blind retry after conflicts, expired review or a durable sending claim. */ }
   }
   return { disabled: false, prepared: true, accepted, held };
