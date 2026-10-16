@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { historyEvidence } from "@/lib/customer-history-message-policy";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
@@ -12,7 +13,7 @@ import { renderCollectionNotice, noticeHash, COLLECTION_NOTICE_VERSION, collecti
 import { noticeBatchAccountsSchema, noticeBatchPreparationSchema, noticeBatchApprovalSchema } from "@/lib/collection-notice-batch-policy";
 const domain = "COLLECTION_EMAIL_NOTICE";
 const idFor = (org: string, account: string, date: string) => `collection-email:${noticeHash([org,account,date])}`;
-const storedSchema = z.object({ version:z.literal(1), revision:z.string().uuid(), accountId:z.string(), asOf:z.string(), sourceFingerprint:z.string().regex(/^[a-f0-9]{64}$/), payloadHash:z.string().regex(/^[a-f0-9]{64}$/), payloadEncrypted:z.string(), contributors:z.array(z.string()).min(1), approvedBy:z.string().nullable(), approvalReference:z.string().nullable(), approvedAt:z.string().datetime().nullable() }).strict();
+const storedSchema = z.object({ version:z.literal(1), revision:z.string().uuid(), accountId:z.string(), asOf:z.string(), sourceFingerprint:z.string().regex(/^[a-f0-9]{64}$/), payloadHash:z.string().regex(/^[a-f0-9]{64}$/), payloadEncrypted:z.string(), contributors:z.array(z.string()).min(1), approvedBy:z.string().nullable(), approvalReference:z.string().nullable(), approvedAt:z.string().datetime().nullable(), scheduledRunId:z.string().optional() }).strict();
 const payloadSchema = z.object({recipient:z.email(),subject:z.string(),text:z.string(),html:z.string(),templateVersion:z.literal(COLLECTION_NOTICE_VERSION)}).strict();
 async function load(tx:Prisma.TransactionClient,scope:RequestScope,id:string){
   const row=await tx.configurationProfile.findFirst({where:{id,organisationId:scope.organisationId,domain}});if(!row)throw Error("COLLECTION_NOTICE_NOT_FOUND");
@@ -25,7 +26,7 @@ async function load(tx:Prisma.TransactionClient,scope:RequestScope,id:string){
 }
 function view(value:Awaited<ReturnType<typeof load>>,scope:RequestScope){
   const{row,saved,payload,current}=value;const sourceCurrent=current.fingerprint===saved.sourceFingerprint&&current.asOf===saved.asOf&&!current.blockers.length&&noticeHash(renderCollectionNotice(current))===saved.payloadHash;
-  return{id:row.id,accountId:saved.accountId,status:row.status,revision:saved.revision,asOf:saved.asOf,recipient:payload.recipient,subject:payload.subject,text:payload.text,sourceCurrent,blockers:current.blockers,canApprove:row.status==="DRAFT"&&!saved.contributors.includes(scope.userId),approvedAt:saved.approvedAt,approvalReference:saved.approvalReference,sendConfigured:collectionEmailConfigured(),accepted:row.status==="ACCEPTED",deliveryVerified:false};
+  return{id:row.id,accountId:saved.accountId,status:row.status,revision:saved.revision,asOf:saved.asOf,recipient:payload.recipient,subject:payload.subject,text:payload.text,sourceCurrent,blockers:current.blockers,canApprove:row.status==="DRAFT"&&!saved.scheduledRunId&&!saved.contributors.includes(scope.userId),...(saved.scheduledRunId?{scheduledRunId:saved.scheduledRunId}:{}),approvedAt:saved.approvedAt,approvalReference:saved.approvalReference,sendConfigured:collectionEmailConfigured(),accepted:row.status==="ACCEPTED",deliveryVerified:false};
 }
 async function previewInTransaction(tx:Prisma.TransactionClient,scope:RequestScope,accountId:string,asOf:string){
   const source=await collectionEmailSource(tx,scope,accountId,asOf);const id=idFor(scope.organisationId,accountId,source.asOf);const exists=await tx.configurationProfile.findUnique({where:{id}});
@@ -38,14 +39,14 @@ export async function prepareCollectionNotice(scope:RequestScope,accountId:strin
   z.string().regex(/^[a-f0-9]{64}$/).parse(expectedFingerprint);
   return db.$transaction(tx=>prepareInTransaction(tx,scope,accountId,expectedFingerprint,southAfricaDateKey(new Date())),{isolationLevel:"Serializable"});
 }
-async function prepareInTransaction(tx:Prisma.TransactionClient,scope:RequestScope,accountId:string,expectedFingerprint:string,asOf:string,draftOnly=false){
+export async function prepareInTransaction(tx:Prisma.TransactionClient,scope:RequestScope,accountId:string,expectedFingerprint:string,asOf:string,draftOnly=false,systemRunId?:string,system=true,executorUserId?:string){
     const source=await collectionEmailSource(tx,scope,accountId,asOf);if(source.fingerprint!==expectedFingerprint)throw Error("COLLECTION_NOTICE_CHANGED");if(source.blockers.length)throw Error("COLLECTION_NOTICE_HOLD");
     const id=idFor(scope.organisationId,accountId,source.asOf),old=await tx.configurationProfile.findUnique({where:{id}}),payload=renderCollectionNotice(source);
-    if(old){if(draftOnly&&old.status!=="DRAFT")throw Error("COLLECTION_NOTICE_IMMUTABLE");const previous=await load(tx,scope,id);if(previous.saved.sourceFingerprint===source.fingerprint&&previous.saved.payloadHash===noticeHash(payload))return view(previous,scope);if(old.status!=="DRAFT")throw Error("COLLECTION_NOTICE_IMMUTABLE");}
+    if(old){if(draftOnly&&old.status!=="DRAFT")throw Error("COLLECTION_NOTICE_IMMUTABLE");const previous=await load(tx,scope,id);if(previous.saved.scheduledRunId&&previous.saved.scheduledRunId!==systemRunId)throw Error("COLLECTION_NOTICE_IMMUTABLE");if(previous.saved.sourceFingerprint===source.fingerprint&&previous.saved.payloadHash===noticeHash(payload)&&previous.saved.scheduledRunId===systemRunId)return view(previous,scope);if(old.status!=="DRAFT")throw Error("COLLECTION_NOTICE_IMMUTABLE");}
     const previous=old?storedSchema.parse(old.config):null;
-    const saved={version:1,revision:randomUUID(),accountId,asOf:source.asOf,sourceFingerprint:source.fingerprint,payloadHash:noticeHash(payload),payloadEncrypted:encryptIntegrationSecret(JSON.stringify(payload)),contributors:[...new Set([...(previous?.contributors??[]),scope.userId])],approvedBy:null,approvalReference:null,approvedAt:null};
+    const saved={version:1,revision:randomUUID(),accountId,asOf:source.asOf,sourceFingerprint:source.fingerprint,payloadHash:noticeHash(payload),payloadEncrypted:encryptIntegrationSecret(JSON.stringify(payload)),contributors:[...new Set([...(previous?.contributors??[]),scope.userId,...(executorUserId?[executorUserId]:[])])],approvedBy:null,approvalReference:null,approvedAt:null,...(systemRunId?{scheduledRunId:systemRunId}:{})};
     const row=old?await tx.configurationProfile.update({where:{id},data:{config:saved,status:"DRAFT"}}):await tx.configurationProfile.create({data:{id,organisationId:scope.organisationId,facilityId:source.facilityId,domain,name:id,config:saved,status:"DRAFT"}});
-    await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:source.facilityId,actorId:scope.userId,action:"collection.notice.prepared",entityType:"ConfigurationProfile",entityId:row.id,after:{revision:saved.revision,sourceFingerprint:source.fingerprint,payloadHash:saved.payloadHash,templateVersion:COLLECTION_NOTICE_VERSION,status:"DRAFT"}}});
+    await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:source.facilityId,actorId:systemRunId&&system?null:executorUserId??scope.userId,action:"collection.notice.prepared",entityType:"ConfigurationProfile",entityId:row.id,after:{revision:saved.revision,sourceFingerprint:source.fingerprint,payloadHash:saved.payloadHash,templateVersion:COLLECTION_NOTICE_VERSION,status:"DRAFT",...(systemRunId?{execution:system?"SCHEDULED_DRAFT":"STAFF_SCHEDULED_DRAFT",runId:systemRunId,policyCreatorId:scope.userId}:{})}}});
     return view(await load(tx,scope,id),scope);
 }
 export async function previewCollectionNoticeBatch(scope:RequestScope,input:unknown){
@@ -69,8 +70,8 @@ export async function reviewCollectionNotice(scope:RequestScope,input:unknown){
   const command=reviewSchema.parse(input);
   return db.$transaction(tx=>reviewInTransaction(tx,scope,command),{isolationLevel:"Serializable"});
 }
-async function reviewInTransaction(tx:Prisma.TransactionClient,scope:RequestScope,command:z.infer<typeof reviewSchema>,expectedAccountId?:string){
-    const value=await load(tx,scope,command.id);if(expectedAccountId&&value.saved.accountId!==expectedAccountId)throw Error("COLLECTION_NOTICE_CHANGED");if(value.saved.revision!==command.revision)throw Error("COLLECTION_NOTICE_CHANGED");const snapshot={...value.saved,revision:randomUUID()};let status=value.row.status;
+export async function reviewInTransaction(tx:Prisma.TransactionClient,scope:RequestScope,command:z.infer<typeof reviewSchema>,expectedAccountId?:string,scheduledRunId?:string){
+    const value=await load(tx,scope,command.id);if(value.saved.scheduledRunId&&value.saved.scheduledRunId!==scheduledRunId)throw Error("COLLECTION_NOTICE_IMMUTABLE");if(expectedAccountId&&value.saved.accountId!==expectedAccountId)throw Error("COLLECTION_NOTICE_CHANGED");if(value.saved.revision!==command.revision)throw Error("COLLECTION_NOTICE_CHANGED");const snapshot={...value.saved,revision:randomUUID()};let status=value.row.status;
     if(command.action==="approve"){
       if(status!=="DRAFT")throw Error("COLLECTION_NOTICE_IMMUTABLE");if(value.saved.contributors.includes(scope.userId))throw Error("COLLECTION_NOTICE_SELF_APPROVAL");
       if(value.current.asOf!==value.saved.asOf||value.current.blockers.length||value.current.fingerprint!==value.saved.sourceFingerprint||noticeHash(renderCollectionNotice(value.current))!==value.saved.payloadHash)throw Error("COLLECTION_NOTICE_CHANGED");
@@ -91,28 +92,30 @@ export async function approveCollectionNoticeBatch(scope:RequestScope,input:unkn
   },{isolationLevel:"Serializable",timeout:30000});
 }
 const sendSchema=z.object({id:z.string().min(1).max(120),revision:z.string().uuid(),confirm:z.literal(true)}).strict();
-export async function sendCollectionNotice(scope:RequestScope,input:unknown,injectedProvider?:EmailProvider){
+export async function sendCollectionNotice(scope:RequestScope,input:unknown,injectedProvider?:EmailProvider,scheduled?:{runId:string;check:(tx:Prisma.TransactionClient)=>Promise<void>}){
   const command=sendSchema.parse(input);
   const claimed=await db.$transaction(async tx=>{
     const initial=await load(tx,scope,command.id);
     await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${initial.saved.accountId} FOR UPDATE`;
     const value=await load(tx,scope,command.id);
+    if(value.saved.scheduledRunId&&value.saved.scheduledRunId!==scheduled?.runId)throw Error("COLLECTION_NOTICE_IMMUTABLE");
+    if(scheduled)await scheduled.check(tx);
     // A repeat after acceptance/pending/uncertainty never attempts the provider.
     if(["ACCEPTED","SENDING","REVIEW_REQUIRED"].includes(value.row.status))return{repeated:true as const,value};
     if(!injectedProvider&&!collectionEmailConfigured())throw Error("COLLECTION_NOTICE_CONFIG");
     if(value.saved.revision!==command.revision)throw Error("COLLECTION_NOTICE_CHANGED");if(value.row.status!=="APPROVED")throw Error("COLLECTION_NOTICE_IMMUTABLE");
     if(value.current.blockers.length||value.current.fingerprint!==value.saved.sourceFingerprint||noticeHash(renderCollectionNotice(value.current))!==value.saved.payloadHash)throw Error("COLLECTION_NOTICE_CHANGED");
-    await tx.communicationLog.create({data:{organisationId:scope.organisationId,facilityId:value.current.facilityId,customerId:value.current.customerId,channel:"EMAIL",direction:"OUTBOUND",messageType:"COLLECTION_REMINDER",recipientHash:privacyHash(value.payload.recipient),idempotencyKey:command.id,provider:process.env.EMAIL_PROVIDER??"twilio",status:"PENDING",attempts:1,nextRetryAt:null,metadata:{payloadHash:value.saved.payloadHash,sourceFingerprint:value.saved.sourceFingerprint,deliveryOutcome:"IN_PROGRESS"}}});
+    await tx.communicationLog.create({data:{organisationId:scope.organisationId,facilityId:value.current.facilityId,customerId:value.current.customerId,channel:"EMAIL",direction:"OUTBOUND",messageType:"COLLECTION_REMINDER",recipientHash:privacyHash(value.payload.recipient),idempotencyKey:command.id,provider:process.env.EMAIL_PROVIDER??"twilio",status:"PENDING",attempts:1,nextRetryAt:null,metadata:{payloadHash:value.saved.payloadHash,sourceFingerprint:value.saved.sourceFingerprint,deliveryOutcome:"IN_PROGRESS",historyEvidence:historyEvidence(value.payload)}}});
     await tx.configurationProfile.update({where:{id:command.id},data:{status:"SENDING"}});
-    await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:value.current.facilityId,actorId:scope.userId,action:"collection.notice.send_claimed",entityType:"ConfigurationProfile",entityId:command.id,after:{payloadHash:value.saved.payloadHash,status:"SENDING",confirmed:true,templateVersion:COLLECTION_NOTICE_VERSION}}});return{repeated:false as const,value};
+    await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:value.current.facilityId,actorId:scheduled?null:scope.userId,action:"collection.notice.send_claimed",entityType:"ConfigurationProfile",entityId:command.id,after:{payloadHash:value.saved.payloadHash,status:"SENDING",confirmed:true,templateVersion:COLLECTION_NOTICE_VERSION}}});return{repeated:false as const,value};
   },{isolationLevel:"Serializable"});
   if(claimed.repeated)return{...view(claimed.value,scope),repeated:true};
   let accepted=false;
-  try{const value=claimed.value;await(injectedProvider??emailProvider()).send({to:value.payload.recipient,subject:value.payload.subject,text:value.payload.text,html:value.payload.html,dlp:{organisationId:scope.organisationId,facilityId:value.current.facilityId,actorId:scope.userId,resourceId:command.id,approvedRecipient:value.payload.recipient}});accepted=true;
-    await db.$transaction(async tx=>{await tx.communicationLog.update({where:{idempotencyKey:command.id},data:{status:"SUCCEEDED",sentAt:new Date(),metadata:{payloadHash:value.saved.payloadHash,deliveryOutcome:"PROVIDER_ACCEPTED",inboxVerified:false}}});await tx.configurationProfile.update({where:{id:command.id},data:{status:"ACCEPTED"}});await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:value.current.facilityId,actorId:scope.userId,action:"collection.notice.provider_accepted",entityType:"ConfigurationProfile",entityId:command.id,after:{payloadHash:value.saved.payloadHash,inboxVerified:false}}});});
+  try{const value=claimed.value;if(scheduled)await db.$transaction(tx=>scheduled.check(tx),{isolationLevel:"Serializable"});await(injectedProvider??emailProvider()).send({to:value.payload.recipient,subject:value.payload.subject,text:value.payload.text,html:value.payload.html,dlp:{organisationId:scope.organisationId,facilityId:value.current.facilityId,actorId:scope.userId,resourceId:command.id,approvedRecipient:value.payload.recipient}});accepted=true;
+    await db.$transaction(async tx=>{await tx.communicationLog.update({where:{idempotencyKey:command.id},data:{status:"SUCCEEDED",sentAt:new Date(),metadata:{payloadHash:value.saved.payloadHash,deliveryOutcome:"PROVIDER_ACCEPTED",inboxVerified:false,historyEvidence:historyEvidence(value.payload)}}});await tx.configurationProfile.update({where:{id:command.id},data:{status:"ACCEPTED"}});await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:value.current.facilityId,actorId:scheduled?null:scope.userId,action:"collection.notice.provider_accepted",entityType:"ConfigurationProfile",entityId:command.id,after:{payloadHash:value.saved.payloadHash,inboxVerified:false}}});});
   }catch{
     // Even a known rejection is held: no blind replay after an ambiguous send.
-    try{await db.$transaction(async tx=>{await tx.communicationLog.update({where:{idempotencyKey:command.id},data:{status:"PENDING",failedAt:null,failureCode:"NOTICE_DELIVERY_REVIEW",nextRetryAt:null,metadata:{payloadHash:claimed.value.saved.payloadHash,deliveryOutcome:accepted?"ACCEPTED_PERSISTENCE_UNCERTAIN":"REQUIRES_REVIEW"}}});await tx.configurationProfile.update({where:{id:command.id},data:{status:"REVIEW_REQUIRED"}});await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:claimed.value.current.facilityId,actorId:scope.userId,action:"collection.notice.delivery_review",entityType:"ConfigurationProfile",entityId:command.id,after:{providerAcceptanceObserved:accepted,retryAllowed:false}}});});}catch{/* Existing SENDING claim remains a durable stop. */}
+    try{await db.$transaction(async tx=>{await tx.communicationLog.update({where:{idempotencyKey:command.id},data:{status:"PENDING",failedAt:null,failureCode:"NOTICE_DELIVERY_REVIEW",nextRetryAt:null,metadata:{payloadHash:claimed.value.saved.payloadHash,deliveryOutcome:accepted?"ACCEPTED_PERSISTENCE_UNCERTAIN":"REQUIRES_REVIEW",historyEvidence:historyEvidence(claimed.value.payload)}}});await tx.configurationProfile.update({where:{id:command.id},data:{status:"REVIEW_REQUIRED"}});await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:claimed.value.current.facilityId,actorId:scheduled?null:scope.userId,action:"collection.notice.delivery_review",entityType:"ConfigurationProfile",entityId:command.id,after:{providerAcceptanceObserved:accepted,retryAllowed:false}}});});}catch{/* Existing SENDING claim remains a durable stop. */}
   }
   return{...view(await load(db,scope,command.id),scope),repeated:false};
 }
