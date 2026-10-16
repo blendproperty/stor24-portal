@@ -12,7 +12,7 @@ async function fixture() {
   const state = { denied: new Set<string>(), failed: new Set<string>(), reads,
     scope: { userId: "staff", organisationId: "org", facilityIds: ["store-a"], unrestrictedFacilities: false },
     db: {} as Record<string, unknown> };
-  for (const model of ["task", "product", "tenancy", "maintenanceRequest"]) {
+  for (const model of ["task", "product", "tenancy", "maintenanceRequest", "reservation"]) {
     const read = async (query: Query) => {
       reads.push({ model, query });
       if (state.failed.has(model)) throw Error("SYNTHETIC_READ_FAILURE");
@@ -59,7 +59,7 @@ test("a failed aggregate is unavailable instead of a reassuring zero; other queu
 
 test("all-denied panel renders no queue and performs no aggregate reads", async () => {
   const f = await fixture();
-  for (const p of ["operations.view", "inventory.view", "collections.view", "ledger.view", "payments.view"]) f.state.denied.add(p);
+  for (const p of ["operations.view", "inventory.view", "collections.view", "ledger.view", "payments.view", "reservations.manage"]) f.state.denied.add(p);
   assert.equal(await f.render(), ""); assert.equal(f.state.reads.length, 0);
 });
 
@@ -75,8 +75,29 @@ test("synthetic reminder panel fits desktop and narrow mobile widths", { skip: p
       await page.setViewportSize({ width, height: 900 });
       await page.setContent(`<style>${css}</style><main style="padding:16px;max-width:1000px;margin:auto">${html}</main>`);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-      assert.equal(await page.getByRole("link").count(), 8);
+      assert.equal(await page.getByRole("region", { name: "Operations reminders" }).getByRole("link").count(), 8);
       await page.screenshot({ path: `output/operations-reminders/reminders-${width}.png`, fullPage: true });
     }
   } finally { await browser.close(); }
+});
+
+
+test("dashboard shortcuts use complete scoped source counts and explicit date ranges, never list-page lengths", async () => {
+  const f = await fixture(); const html = await f.render();
+  assert.ok(html.indexOf('aria-label="Operations workspaces"') < html.indexOf('aria-label="Operations reminders"'));
+  assert.match(html, /Move in: 3 items/); assert.match(html, /Customer follow-ups: 3 items/); assert.match(html, /Expected arrivals: 3 items/);
+  const arrivals = f.state.reads.find(r => r.model === "reservation" && r.query.where.intendedMoveIn)!;
+  assert.ok(arrivals); assert.equal("take" in arrivals.query, false);
+  assert.equal(arrivals.query.where.status, "ACTIVE"); assert.equal(arrivals.query.where.journey, "RENTAL"); assert.equal(arrivals.query.where.convertedTenancyId, null);
+  assert.deepEqual(arrivals.query.where.customer, { organisationId: "org" });
+  const dates = arrivals.query.where.intendedMoveIn as { gte: Date; lt: Date };
+  assert.equal(dates.lt.getTime() - dates.gte.getTime(), 7 * 86400000);
+  assert.match(dates.gte.toISOString(), /T22:00:00.000Z$/);
+  assert.match(html, /operations\/arrivals\?from=\d{4}-\d{2}-\d{2}&amp;to=\d{4}-\d{2}-\d{2}/);
+  const followups = f.state.reads.filter(r => r.model === "task" && r.query.where.purpose === "AGREED_FOLLOWUP");
+  assert.equal(followups.length, 2); assert.ok(followups.some(r => !("dueAt" in r.query.where)));
+  f.state.failed.add("reservation");
+  const failed = await f.render(); assert.match(failed, /Expected arrivals: count unavailable/); assert.doesNotMatch(failed, /Expected arrivals: 0 items/);
+  f.state.failed.clear(); f.state.denied.add("reservations.manage"); f.state.denied.add("operations.view");
+  f.state.reads.length = 0; const denied = await f.render(); assert.doesNotMatch(denied, /Move in:|Expected arrivals:|Customer follow-ups:/); assert.ok(!f.state.reads.some(r => r.model === "reservation"));
 });
