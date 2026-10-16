@@ -134,7 +134,7 @@ function host() {
   assert.equal(process.env.STOR24_NEXT_WORKLOAD_EXECUTION, 'approved-isolated', 'EXPLICIT_REVIEW_AND_CPU_SLOT_REQUIRED');
   const sha = process.argv[process.argv.indexOf('--source') + 1];
   assert.match(sha ?? '', /^[a-f0-9]{40}$/);
-  const commandEnv = Object.fromEntries(['PATH', 'Path', 'SYSTEMROOT', 'SystemRoot', 'WINDIR', 'TEMP', 'TMP', 'USERPROFILE', 'HOME', 'APPDATA', 'LOCALAPPDATA'].filter(k => process.env[k]).map(k => [k, process.env[k]]));
+  const commandEnv = Object.fromEntries(['PATH', 'Path', 'SYSTEMROOT', 'SystemRoot', 'WINDIR', 'TEMP', 'TMP', 'USERPROFILE', 'HOME', 'APPDATA', 'LOCALAPPDATA', 'ProgramFiles'].filter(k => process.env[k]).map(k => [k, process.env[k]]));
   const run = randomBytes(6).toString('hex'), project = `stor24-next-workload-${run}`;
   const directory = resolve('output', 'next-workload', run), clean = join(directory, 'source');
   assert.ok(directory.startsWith(resolve('output', 'next-workload') + (process.platform === 'win32' ? '\\' : '/')));
@@ -156,7 +156,14 @@ function host() {
       return output;
     } catch (error) {
       writeFileSync(join(directory, `${phase}.log`), privateOutput ? 'PRIVATE_OUTPUT_NOT_RETAINED\n' : `${error.stdout ?? ''}\n${error.stderr ?? ''}`);
-      manifest.phases.push({ phase, exitStatus: error.status ?? 'INTERRUPTED', elapsedMs: performance.now() - started });
+      const text = String(error.stderr ?? '');
+      const diagnosticClass = /unknown command: docker compose/i.test(text) ? 'COMPOSE_PLUGIN_UNAVAILABLE'
+        : /permission denied|access is denied|EACCES/i.test(text) ? 'PROCESS_PERMISSION_DENIED'
+        : /cannot connect|error during connect|is the docker daemon/i.test(text) ? 'DOCKER_ENGINE_UNAVAILABLE'
+        : /yaml:|interpolation|invalid compose/i.test(text) ? 'COMPOSE_CONFIGURATION_REVIEW'
+        : 'PROCESS_FAILURE_UNCLASSIFIED';
+      const errorCode = /^[A-Z_0-9]+$/.test(error.error?.code ?? '') ? error.error.code : null;
+      manifest.phases.push({ phase, exitStatus: error.status ?? 'INTERRUPTED', diagnosticClass, errorCode, elapsedMs: performance.now() - started });
       saveManifest();
       throw new Error(`ISOLATED_PHASE_FAILED_${phase}`);
     }
@@ -202,6 +209,7 @@ function host() {
       assert.match(dockerContext, /^[a-zA-Z0-9_-]+$/);
       const endpoint = JSON.parse(docker('docker-endpoint', ['context', 'inspect', '--format', '{{json .Endpoints.docker.Host}}', dockerContext], 20000));
       assert.ok(endpoint.startsWith('npipe://') || endpoint.startsWith('unix://'), 'LOCAL_DOCKER_ENGINE_REQUIRED');
+      docker('compose-plugin-version', ['compose', 'version'], 20000);
       command('source-archive', 'git', ['archive', '--format=tar', '--output', join(directory, 'source.tar'), sha], 30000, process.cwd());
       command('source-extract', 'tar', ['-xf', join(directory, 'source.tar'), '-C', clean], 30000);
       const envFile = join(directory, 'fixture.env'), imageTag = `workload-${sha.slice(0, 12)}-${run}`;
