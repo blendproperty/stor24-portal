@@ -188,6 +188,20 @@ Read the fresh preview: exact account number, amount, method and original receip
 
 **Uncertain result:** reload saved receipt history and keep the original request reference. Do not create a second receipt to clear an error. Open the retained receipt from the posted record. Posted cash and its original source remain retained; corrections require the separately approved full reversal or section 06A MOVE/partial UNDO process. A tutorial tick is not finance approval or real receipt verification.
 
+## 06D · Read retained DebiCheck authentication evidence
+
+**History guidance added 16 October.** Open **DebiCheck setup review**, then **Recorded DebiCheck authentication**. You need current payment-view access at the selected store. This history screen reads saved evidence; it does not contact Netcash, submit a bank request or change a customer account.
+
+1. Choose **History store** and, if needed, filter **Original outcome**. Check the exact account number, agreed monthly amount, start date and masked bank-account suffix.
+2. Read the original attempt and its recording times in SAST. A claimed attempt has no saved original outcome. An unknown outcome requires investigation; neither state permits repeating the request.
+3. Use **Older authentication attempts** for earlier records. **Refresh recorded history** returns to the latest matching page and reads saved evidence again.
+4. Select **Inspect retained status reads for** the intended account. The selected panel keeps the original outcome visible separately from any later retained observations. Use **Older retained status reads** for earlier observations.
+5. If reading fails or evidence changes, the old results clear. Refresh and investigate the original retained records with an authorised colleague. Do not substitute another account, create a new request or infer that a missing result means rejection.
+
+**Keep each result distinct.** Bank authentication observed in an original response or dated later read is not collected rent, a settled payment, a signed provider mandate, a financial receipt or permission for a new debit. A later observation does not overwrite an unknown original outcome. The original provider contract, where available, stays private.
+
+**No records is an honest empty state.** It does not prove a bank request was sent. Native bank-authentication consent, independently reviewed submission, approved real-time TT1 template/test payer and separate collection/provider acceptance remain required. Setup-request consent and setup review do not satisfy those steps. Signing-only test bank details must not be used for collections. Continue to use the existing approved card/EFT flows within their own limits.
+
 ## 07 · Arrears notices and escalation boundaries
 
 Open **Collections** and review the customer's source account, approved terms, ageing and current hold before preparing a notice. A future promise or dispute hold remains effective.
