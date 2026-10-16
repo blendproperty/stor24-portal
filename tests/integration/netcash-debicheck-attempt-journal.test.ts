@@ -5,7 +5,8 @@ import {db} from '../../src/lib/db';
 import {sealDebiCheckRequest,DEBICHECK_REQUEST_TERMS} from '../../src/lib/payments/netcash-debicheck-request-policy';
 import {encryptIntegrationSecret} from '../../src/lib/integrations/integration-secret-vault';
 import {retainDebiCheckAttemptClaim,retainDebiCheckAttemptResult,retainDebiCheckStatusObservation} from '../../src/lib/payments/netcash-debicheck-attempt-journal';
-import {readDebiCheckAttempt,projectDebiCheckAttempt,type DebiCheckAttemptSource} from '../../src/lib/payments/netcash-debicheck-attempt-policy';
+import {readDebiCheckAttempt,projectDebiCheckAttempt,prepareDebiCheckAttempt,type DebiCheckAttemptSource} from '../../src/lib/payments/netcash-debicheck-attempt-policy';
+import {readDebiCheckHistory} from '../../src/lib/payments/netcash-debicheck-history-service';
 import type {DebiCheckAuthenticationOutcome} from '../../src/lib/payments/netcash-debicheck-authentication';
 import {withdrawDebiCheckRequest} from '../../src/lib/payments/netcash-debicheck-request-service';
 
@@ -22,6 +23,8 @@ test('isolated PostgreSQL durable authentication journal retains exactly one att
   const account=await db.account.create({data:{customerId:customer.id,accountNumber:key,currency:'ZAR',balance:100}});
   const tenancy=await db.tenancy.create({data:{accountId:account.id,facilityId:facility.id,customerId:customer.id,status:'ACTIVE',startDate:now,paymentMethod:'CARD'}});
   const reviewer=await db.user.create({data:{organisationId:organisation.id,name:'Synthetic reviewer',email:randomUUID()+'@example.invalid'}});
+  const role=await db.role.create({data:{organisationId:organisation.id,name:'Synthetic history reader '+key,permissions:['payments.view']}});
+  await db.roleAssignment.create({data:{userId:reviewer.id,roleId:role.id,facilityId:facility.id}});
   const request=sealDebiCheckRequest({version:1,recordId:'debicheck-request:'+randomUUID(),organisationId:organisation.id,facilityId:facility.id,accountId:account.id,customerId:customer.id,tenancyId:tenancy.id,sourceHash:'1'.repeat(64),templateObservationId:'synthetic-observation',templateSourceHash:'2'.repeat(64),templateId:'NCDCT000000001',connectionId:'synthetic-connection',connectionUpdatedAt:now.toISOString(),merchantHash:'3'.repeat(64),environment:'sandbox',startDate:'2026-11-01',monthlyAmount:'100.00',consentVersion:DEBICHECK_REQUEST_TERMS,consentText:'Synthetic setup only; no bank authority',consentAt:now.toISOString(),tenantIdentityHash:'4'.repeat(64),bankSuffix:'0000',encryptedTerms:encryptIntegrationSecret('synthetic private terms fixture')});
   await db.configurationProfile.create({data:{id:request.recordId,organisationId:organisation.id,facilityId:facility.id,domain:'NETCASH_DEBICHECK_REQUEST',name:account.id+':'+key,status:'REVIEWED',config:request}});
   const consentHash='5'.repeat(64);
@@ -32,7 +35,8 @@ test('isolated PostgreSQL durable authentication journal retains exactly one att
   const claim=()=>db.$transaction(tx=>retainDebiCheckAttemptClaim(tx,source,now),{isolationLevel:'Serializable',timeout:20000});
   const complete=(value:DebiCheckAuthenticationOutcome)=>db.$transaction(tx=>retainDebiCheckAttemptResult(tx,identity,value,new Date(now.getTime()+1000)),{isolationLevel:'Serializable'});
   const session={organisationId:organisation.id,email:customer.email!,customerIds:[customer.id]};
-  return{source,identity,claim,complete,consent,review,account,request,session};
+  const scope={userId:reviewer.id,organisationId:organisation.id,facilityIds:[facility.id],unrestrictedFacilities:false};
+  return{source,identity,claim,complete,consent,review,account,request,session,scope};
  }
  try{
   const financialBaseline={payments:await db.payment.count(),ledger:await db.ledgerEntry.count(),instructions:await db.debitOrderInstruction.count()};
@@ -95,6 +99,52 @@ test('isolated PostgreSQL durable authentication journal retains exactly one att
    await f.claim();
    await assert.rejects(db.$transaction(async tx=>{await retainDebiCheckAttemptResult(tx,f.identity,accepted,new Date(now.getTime()+1000));throw Error('Synthetic lost result transaction');}),/Synthetic lost result/);
    const row=await db.configurationProfile.findUniqueOrThrow({where:{id:f.identity.id}});assert.equal(row.status,'CLAIMED');assert.equal(projectDebiCheckAttempt(readDebiCheckAttempt(row.config,f.identity)).retryAllowed,false);assert.equal((await f.claim()).newClaim,false);
+  });
+  await t.test('native history reads preserve original unknown outcome separately from a later observed bank status without exposing private references or writes',async()=>{
+   const f=await fixture();await f.claim();await f.complete({...accepted,outcome:'OUTCOME_UNKNOWN',bankAuthenticationObserved:false});
+   const status={contractReference:accepted.contractReference!,status:'Accepted',updatedAt:'20261015',cancelledAt:null,cancellationReason:null,bankAuthenticationObserved:true,collectionAuthorised:false as const,financialReceipt:false as const};
+   await db.$transaction(tx=>retainDebiCheckStatusObservation(tx,f.identity,f.source.merchantHash,status,new Date(now.getTime()+2000)));
+   const before=await db.configurationProfile.findMany({where:{organisationId:f.scope.organisationId},orderBy:{id:'asc'}}),audits=await db.auditEvent.count({where:{organisationId:f.scope.organisationId}});
+   const snapshot=await readDebiCheckHistory(f.scope,{facilityId:f.identity.facilityId,attemptId:f.identity.id});
+   assert.equal(snapshot.attempts.length,1);assert.equal(snapshot.selected?.status,'OUTCOME_UNKNOWN');assert.equal(snapshot.selected?.bankAuthenticationObserved,false);assert.equal(snapshot.observations[0].bankAuthenticationObserved,true);assert.equal(snapshot.providerQueried,false);
+   const json=JSON.stringify(snapshot);for(const privateValue of [accepted.contractReference!,'encryptedTerms','requestSignature','merchantHash','synthetic private terms fixture'])assert.ok(!json.includes(privateValue),privateValue);
+   assert.deepEqual(await db.configurationProfile.findMany({where:{organisationId:f.scope.organisationId},orderBy:{id:'asc'}}),before);assert.equal(await db.auditEvent.count({where:{organisationId:f.scope.organisationId}}),audits);
+  });
+  await t.test('history enforces current database roles, exact organisation and store even with a forged unrestricted incoming scope',async()=>{
+   const f=await fixture(),foreign=await fixture();await f.claim();
+   await assert.rejects(readDebiCheckHistory(foreign.scope,{facilityId:f.identity.facilityId}),/FORBIDDEN/);
+   await assert.rejects(readDebiCheckHistory({...f.scope,unrestrictedFacilities:true},{facilityId:foreign.identity.facilityId}),/FORBIDDEN/);
+   await assert.rejects(readDebiCheckHistory(f.scope,{facilityId:f.identity.facilityId,attemptId:foreign.identity.id}),/NOT_FOUND/);
+   await db.roleAssignment.deleteMany({where:{userId:f.scope.userId}});
+   await assert.rejects(readDebiCheckHistory(f.scope,{facilityId:f.identity.facilityId}),/FORBIDDEN/);
+  });
+  await t.test('stable native attempt and observation pages retain original sources and explicit older selections',async()=>{
+   const f=await fixture();await f.claim();await f.complete(accepted);
+   const {signature:discarded,...plain}=f.request;assert.ok(discarded);
+   for(let i=0;i<21;i++){
+    const account=await db.account.create({data:{customerId:f.request.customerId,accountNumber:'SYN-HISTORY-'+randomUUID(),currency:'ZAR',balance:100}});
+    const tenancy=await db.tenancy.create({data:{accountId:account.id,facilityId:f.identity.facilityId,customerId:f.request.customerId,status:'ACTIVE',startDate:now,paymentMethod:'CARD'}});
+    const request=sealDebiCheckRequest({...plain,recordId:'debicheck-request:'+randomUUID(),accountId:account.id,tenancyId:tenancy.id,sourceHash:randomBytes(32).toString('hex')});
+    await db.configurationProfile.create({data:{id:request.recordId,organisationId:f.scope.organisationId,facilityId:f.identity.facilityId,domain:'NETCASH_DEBICHECK_REQUEST',name:account.id,status:'REVIEWED',config:request}});
+    const attempt=prepareDebiCheckAttempt({...f.source,accountId:account.id,sourceHash:request.sourceHash,requestId:request.recordId,requestSignature:request.signature},now);
+    await db.configurationProfile.create({data:{id:attempt.recordId,organisationId:f.scope.organisationId,facilityId:f.identity.facilityId,domain:'NETCASH_DEBICHECK_ATTEMPT',name:request.recordId,status:'CLAIMED',config:attempt,createdAt:now}});
+   }
+   const first=await readDebiCheckHistory(f.scope,{facilityId:f.identity.facilityId}),older=await readDebiCheckHistory(f.scope,{facilityId:f.identity.facilityId,cursor:first.nextCursor!,attemptId:f.identity.id});
+   assert.equal(first.attempts.length,20);assert.equal(older.attempts.length,2);assert.ok(!older.attempts.some(row=>first.attempts.some(previous=>previous.id===row.id)));assert.equal(older.selected?.id,f.identity.id);
+   const filtered=await readDebiCheckHistory(f.scope,{facilityId:f.identity.facilityId,status:'BANK_AUTHENTICATED'});assert.equal(filtered.attempts.length,1);assert.equal(filtered.nextCursor,null);
+   for(let i=0;i<21;i++){
+    const updatedAt=new Date(Date.UTC(2026,9,15+i)).toISOString().slice(0,10).replaceAll('-','');
+    await db.$transaction(tx=>retainDebiCheckStatusObservation(tx,f.identity,f.source.merchantHash,{contractReference:accepted.contractReference!,status:'Accepted',updatedAt,cancelledAt:null,cancellationReason:null,bankAuthenticationObserved:true,collectionAuthorised:false,financialReceipt:false},new Date(now.getTime()+2000+i*1000)));
+   }
+   const selected=await readDebiCheckHistory(f.scope,{facilityId:f.identity.facilityId,attemptId:f.identity.id});assert.equal(selected.observations.length,20);assert.ok(selected.nextObservationCursor);
+   const previous=await readDebiCheckHistory(f.scope,{facilityId:f.identity.facilityId,attemptId:f.identity.id,observationCursor:selected.nextObservationCursor!});assert.equal(previous.observations.length,1);assert.ok(!previous.observations.some(row=>selected.observations.some(current=>current.id===row.id)));
+   await assert.rejects(readDebiCheckHistory(f.scope,{facilityId:f.identity.facilityId,cursor:'not-json'}),/HISTORY_QUERY/);
+  });
+  await t.test('tampered sealed source or mismatched retained row status stops history instead of projecting a success',async()=>{
+   const f=await fixture();await f.claim();await f.complete(accepted);
+   await db.configurationProfile.update({where:{id:f.identity.id},data:{status:'CLAIMED'}});await assert.rejects(readDebiCheckHistory(f.scope,{facilityId:f.identity.facilityId}),/INTEGRITY/);
+   const row=await db.configurationProfile.findUniqueOrThrow({where:{id:f.identity.id}});
+   await db.configurationProfile.update({where:{id:f.identity.id},data:{status:'BANK_AUTHENTICATED',config:{...(row.config as object),signature:'a'.repeat(64)}}});await assert.rejects(readDebiCheckHistory(f.scope,{facilityId:f.identity.facilityId}),/INTEGRITY/);
   });
   assert.deepEqual({payments:await db.payment.count(),ledger:await db.ledgerEntry.count(),instructions:await db.debitOrderInstruction.count()},financialBaseline);
  }finally{globalThis.fetch=originalFetch;await db.$disconnect();}
