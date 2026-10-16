@@ -40,6 +40,10 @@ export function refundLimits(config: unknown) {
   return { minimum, maximum };
 }
 export const adjustmentMessages: Record<string, string> = {
+  NETCASH_REFUND_RESERVED: "This payment has a retained Netcash refund reservation. Request and independently review its release before recording a manual payout or cancelling the refund.",
+  NETCASH_REFUND_INTEGRITY_REVIEW: "Retained Netcash refund evidence needs investigation. No manual payout or cancellation was recorded.",
+  NETCASH_REFUND_HOLD_COVERAGE_REVIEW: "Refund reservation coverage needs investigation. No manual payout or cancellation was recorded.",
+
   ADJUSTMENT_ALLOCATION_PENDING: "A receipt allocation is awaiting independent review on this account. Resolve it before preparing an adjustment.",
   ADJUSTMENT_ALLOCATION_SOURCE: "This is an internal allocation credit. Return the required allocation to its original receipt account before an external refund or full receipt reversal.",
   ADJUSTMENT_UNPAID_CONFIRMATION: "Confirm that no external payout occurred before cancelling this approved refund.",
