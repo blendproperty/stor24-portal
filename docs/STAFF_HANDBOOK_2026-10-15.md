@@ -232,6 +232,20 @@ Guidance added 16 October. **Controlled bank-authentication test** is available 
 
 **Keep production gates open.** These controls do not create test approval, grant permissions, activate a schedule, send a collection or record cash. Real provider/bank acceptance, independent finance/legal decisions, staff/customer/device UAT and training sign-off remain separate. Continue approved card/EFT flows within their own limits.
 
+## 06G · Prepare a card refund and control its hold
+
+Open **Adjustments > Review a Netcash card refund**. Choose your store and read retained history first. New preparation and reservations are disabled by default. Provider refund dispatch is unavailable: these controls do not send money or record a refund as paid.
+
+**Choose the original.** Load finance-approved refunds, select the account/refund and its original card receipt from a reviewed merchant statement, then choose **Preview original refund**. Stor24 checks the original payment, exact PNC transaction, full statement and current financial approval. Missing or ambiguous evidence needs investigation; matching amounts alone are insufficient.
+
+**Prepare and review.** Enter a supporting reference, confirm the original and save preparation. A different currently authorised reviewer uses **Approve preparation** with their own review reference. Preparation and review do not block an otherwise permitted manual payout. Rejected, withdrawn or released records cannot be reopened by repeating a request.
+
+**Reserve deliberately.** If separately enabled and permitted, **Reserve without sending** requires the exact typed confirmation **RESERVE WITHOUT DISPATCH**. This creates a local hold on manual payout and cancellation of the approved refund. It sends no provider request and posts no financial entry. Disabling preparation does not remove an existing hold.
+
+**Release independently.** Use **Request hold release**, record the evidence and type **REQUEST LOCAL HOLD RELEASE**. A different authorised reviewer checks that this application retained no provider attempt, then types **RELEASE LOCAL HOLD** to approve release. History remains permanent. Release does not prove that nobody paid outside Stor24, and it records no payout. Any retained provider-attempt or unknown outcome evidence requires investigation and blocks this release workflow.
+
+**After uncertainty.** Refresh retained history before another action; do not repeat a submission because a response was lost. Only record a manually completed payout through the existing finance-approved refund workflow with its actual payout evidence. Real Netcash refund testing, merchant approval and processed/refused outcomes remain separate readiness gates. A guide or automated check is not staff acceptance.
+
 ## 07 · Arrears notices and escalation boundaries
 
 Open **Collections** and review the customer's source account, approved terms, ageing and current hold before preparing a notice. A future promise or dispute hold remains effective.
