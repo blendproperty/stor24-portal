@@ -89,12 +89,12 @@ Retry can send a real message. Investigate the failure, consent and duplication 
 Open **Operations → Follow-ups and handovers**. This queue records a customer appointment separately from a collection promise-to-pay hold. In Operations reminders, choose **Agreed follow-ups** for **Due today & overdue**. **Appointment queue** also offers all open appointments or appointments from tomorrow.
 
 1. Find the customer and choose their store. Select the responsible staff member and, when agreed, an eligible named cover.
-2. Enter the agreed SAST date/time, a clear title and the action to take. Save once and confirm the appointment appears in the queue/calendar.
+2. Enter the agreed SAST date/time, choose an appointment title and record the action to take. Choose **Other** to enter a required custom title. Save once and confirm the appointment appears in the queue/calendar.
 3. Open Customer history before acting. If the customer agreed a call on the 14th while payment is due on the 15th, keep the call on the 14th; do not change or bypass the collection hold to create it.
 4. The named cover signs in with their own account and acknowledges the appointment. A change of cover clears the old acknowledgement.
 5. Record the contact outcome as a dated note, then complete or cancel the appointment as appropriate. These are separate actions.
 
-To reschedule or reassign, choose **Edit appointment**. Check the agreed SAST time, responsible staff, optional cover and details, then choose **Save appointment changes**. Customer and store remain fixed. Changing responsible staff or cover clears the old cover acknowledgement; unchanged assignments retain it.
+To reschedule or reassign, choose **Edit appointment**. Check the agreed SAST time, responsible staff, optional cover and details, then choose **Save appointment changes**. Customer and store remain fixed. Existing custom titles reopen under **Other** with their text preserved. Changing responsible staff or cover clears the old cover acknowledgement; unchanged assignments retain it.
 
 If a colleague changed the record, reload and review the current version. If a save is uncertain, check the current record before trying another action. Load more appointments when the open queue spans additional pages.
 

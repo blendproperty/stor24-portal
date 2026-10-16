@@ -48,8 +48,17 @@ try {
     await page.getByLabel('Responsible staff', { exact: true }).selectOption(responsible.id);
     await page.getByLabel('Covering staff', { exact: true }).selectOption(cover.id);
     await page.getByLabel('Agreed date and time (SAST)').fill('2026-10-14T09:00');
-    await page.getByLabel('Appointment title').fill('Agreed advance call');
     await page.getByLabel('Agreed action and handover details').fill('Customer agreed to call on 14th. Promise due 15th remains held.');
+    await page.getByLabel('Appointment title', { exact: true }).selectOption('Prospect follow-up');
+    await expect(page.locator('input[name="title"]')).toHaveValue('Prospect follow-up');
+    await expect(page.getByLabel('Other appointment title')).toHaveCount(0);
+    await page.getByLabel('Appointment title', { exact: true }).selectOption({ label: 'Other' });
+    await page.getByRole('button', { name: 'Save agreed appointment' }).click();
+    assert.equal(created.length, 0);
+    assert.equal(await page.getByLabel('Other appointment title').evaluate(input => input.validity.valueMissing), true);
+    await page.getByLabel('Other appointment title').fill('Agreed advance call');
+    await page.screenshot({ path: `output/staff-followups/title-options-${width}.png`, fullPage: true });
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${width}px title form overflow`);
     await page.getByRole('button', { name: 'Save agreed appointment' }).click();
     await expect(page.getByRole('button', { name: 'Complete', exact: true })).toBeVisible();
     assert.equal(created.length, 1); assert.equal(created[0].dueAt, '2026-10-14T07:00:00.000Z');
@@ -61,6 +70,7 @@ try {
     assert.equal(new URL(page.url()).searchParams.get('view'), 'due');
     await page.getByRole('button', { name: 'Edit appointment', exact: true }).click();
     const edit = page.getByRole('form', { name: 'Edit Agreed advance call' });
+    await expect(edit.getByLabel('Other appointment title')).toHaveValue('Agreed advance call');
     await expect(edit.getByLabel('Agreed date and time (SAST)')).toHaveValue('2026-10-14T09:00');
     await edit.getByLabel('Agreed date and time (SAST)').fill('2026-10-14T10:30');
     await edit.getByLabel('Agreed action and handover details').fill('Customer agreed to a later call. Payment promise unchanged.');
@@ -69,6 +79,18 @@ try {
     assert.equal(changes.at(-1).action, 'UPDATE');
     assert.equal(changes.at(-1).dueAt, '2026-10-14T08:30:00.000Z');
     assert.equal(changes.at(-1).expectedUpdatedAt, '2026-10-14T06:00:00.000Z');
+    assert.equal(changes.at(-1).title, 'Agreed advance call');
+    await page.getByRole('button', { name: 'Edit appointment', exact: true }).click();
+    const presetEdit = page.getByRole('form', { name: 'Edit Agreed advance call' });
+    await presetEdit.getByLabel('Appointment title', { exact: true }).selectOption('Move-in follow-up');
+    await expect(presetEdit.getByLabel('Other appointment title')).toHaveCount(0);
+    await presetEdit.getByRole('button', { name: 'Save appointment changes' }).click();
+    await expect(page.getByText('Move-in follow-up', { exact: true })).toBeVisible();
+    assert.equal(changes.at(-1).title, 'Move-in follow-up');
+    await page.getByRole('button', { name: 'Edit appointment', exact: true }).click();
+    const savedPreset = page.getByRole('form', { name: 'Edit Move-in follow-up' });
+    await expect(savedPreset.getByLabel('Appointment title', { exact: true })).toHaveValue('Move-in follow-up');
+    await page.getByRole('button', { name: 'Edit appointment', exact: true }).click();
     mode = 'conflict'; await page.getByRole('button', { name: 'Complete', exact: true }).click(); await expect(page.getByRole('alert')).toContainText('changed');
     mode = 'success'; canManage = false; await page.getByRole('button', { name: 'Reload follow-ups' }).click();
     await expect(page.getByRole('button', { name: 'Acknowledge cover' })).toBeVisible(); await expect(page.getByRole('button', { name: 'Complete', exact: true })).toHaveCount(0);
@@ -76,7 +98,7 @@ try {
     await expect(page.getByRole('button', { name: 'Acknowledge cover' })).toBeDisabled();
     mode = 'read-failure'; await page.getByRole('button', { name: 'Reload follow-ups' }).click(); await expect(page.getByRole('alert')).toBeVisible();
     mode = 'success'; await page.getByRole('button', { name: 'Reload follow-ups' }).click(); await expect(page.getByText(/Acknowledged/)).toBeVisible();
-    mode = 'denied'; await page.getByRole('button', { name: 'Reload follow-ups' }).click(); await expect(page.getByText('Agreed advance call', { exact: true })).toHaveCount(0);
+    mode = 'denied'; await page.getByRole('button', { name: 'Reload follow-ups' }).click(); await expect(page.getByText('Move-in follow-up', { exact: true })).toHaveCount(0);
     assert.deepEqual(errors, []); await page.close(); console.log(`PASS ${width}px actual follow-up creation, SAST, named cover, conflict, uncertain save/read recovery and access removal`);
   }
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
