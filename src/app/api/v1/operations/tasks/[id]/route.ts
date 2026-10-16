@@ -19,3 +19,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return Response.json({ data: task });
   } catch (error) { return authErrorResponse(error); }
 }
+
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const scope = await requirePermission("operations.view"), { id } = await params;
+    const unrestricted = scope.allowedFacilityIds === null;
+    const facilities = { organisationId: scope.organisationId, ...(unrestricted ? {} : { id: { in: scope.allowedFacilityIds ?? [] } }) };
+    const task = await db.task.findFirst({ where: { id, organisationId: scope.organisationId, ...(unrestricted ? { OR: [{ facilityId: null }, { facility: facilities }] } : { facility: facilities }) }, select: { id: true, status: true } });
+    if (!task) return Response.json({ error: { message: "Task is not available in your current store access." } }, { status: 404, headers: { "Cache-Control": "private, no-store" } });
+    return Response.json({ data: task }, { headers: { "Cache-Control": "private, no-store" } });
+  } catch (error) { const response = authErrorResponse(error); response.headers.set("Cache-Control", "private, no-store"); return response; }
+}

@@ -252,8 +252,25 @@ test("an old owner role in the session cannot retain owner authority", async () 
   await assert.rejects(guards.requireOwner(), /FORBIDDEN/);
 });
 
+// The additive paged queue uses a separate read-only repeatable snapshot. Keep
+// the real queue service/projection running without changing legacy query mocks.
+function enableOperationsTaskSnapshot(state: ReturnType<typeof fixture>) {
+  const prior = state.db.$transaction;
+  state.db.$transaction = async (fn: (client: Row) => unknown, options?: Row) => {
+    if (options?.isolationLevel !== "RepeatableRead") return prior(fn);
+    return fn({
+      facility: { findMany: async ({ where, select }: Row) => { assert.equal(where.organisationId,"org"); assert.deepEqual(select,{id:true,name:true}); return state.tables.facility.filter(row=>matches(row,where)).map(row=>({id:row.id,name:row.id})); } },
+      task: {
+        count: async () => 0,
+        findMany: async ({where,select,take}: Row) => { assert.equal(where.AND[0].organisationId,"org"); assert.deepEqual(select.assignee,{select:{id:true,name:true,organisationId:true}}); assert.equal(take,26); return []; },
+      },
+      user: { findMany: async ({where,select}: Row) => { assert.equal(where.organisationId,"org"); assert.equal(where.assignedTasks.some.organisationId,"org"); assert.deepEqual(select,{id:true,name:true}); return []; } },
+    });
+  };
+}
+
 test("operations response limits every staff relation to display identity", async () => {
-  const state = fixture(); state.grant("operations.view");
+  const state = fixture(); state.grant("operations.view"); enableOperationsTaskSnapshot(state);
   const privateStaff = { id: "reviewer", name: "Synthetic reviewer", email: "private@example.invalid", passwordHash: "synthetic-private-hash", sessionVersion: 9, passwordChangedAt: new Date() };
   const relations = [["task", "assignee", "tasks"], ["unitNote", "author", "notes"], ["maintenanceRequest", "assignedTo", "maintenance"], ["dailyClose", "closedBy", "dailyCloses"]];
   for (const [model, relation] of relations) state.db[model] = { findMany: async (args: Row) => {
@@ -279,7 +296,7 @@ test("operations response limits every staff relation to display identity", asyn
 
 test("daily-close form facilities follow current scoped permission and never a cached owner role", async () => {
   const state = fixture(); state.grant("operations.view", null); state.grant("daily_close.perform", "a");
-  state.session.role = "Organisation owner";
+  state.session.role = "Organisation owner"; enableOperationsTaskSnapshot(state);
   for (const model of ["task", "unitNote", "maintenanceRequest", "product", "storagePackage", "dailyClose"]) state.db[model] = { findMany: async () => [] };
   state.db.facility.findMany = async () => [{ id: "a", name: "A" }, { id: "b", name: "B" }];
   const api = await load("./src/app/api/v1/operations/route.ts", state);

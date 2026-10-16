@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { CheckCircle2, ClipboardList, PackageCheck, Plus, RefreshCw, Search, Wrench } from "lucide-react";
+import { OperationsTaskFilters } from "@/components/operations-task-filters";
+import { operationsTaskFiltersSchema, operationsTaskPageSchema, type OperationsTaskPage, type OperationsTaskFilters as TaskFilters } from "@/lib/operations-task-policy";
 import { PageHeader } from "@/components/page-header";
 import { DailyCloseForm } from "@/components/daily-close-form";
 import { DailyCloseHistory, type DailyCloseRecord } from "@/components/daily-close-history";
@@ -18,7 +20,7 @@ type Product = MerchandiseProduct;
 type StoragePackage = MerchandisePackage;
 type Close = DailyCloseRecord;
 type Facility = { id: string; name: string; units: { id: string; number: string; status: string }[] };
-type OperationsData = { tasks: Task[]; maintenance: Maintenance[]; products: Product[]; storagePackages: StoragePackage[]; dailyCloses: Close[]; notes: unknown[]; facilities: Facility[]; dailyCloseFacilityIds?: string[] };
+type OperationsData = { tasks: Task[]; maintenance: Maintenance[]; products: Product[]; storagePackages: StoragePackage[]; dailyCloses: Close[]; notes: unknown[]; facilities: Facility[]; dailyCloseFacilityIds?: string[]; taskPage?: OperationsTaskPage };
 
 export function OperationsWorkspace({ view = "operations", reminders }: { view?: "operations" | "merchandise"; reminders?: ReactNode }) {
   const [data, setData] = useState<OperationsData | null>(null);
@@ -28,6 +30,11 @@ export function OperationsWorkspace({ view = "operations", reminders }: { view?:
   const [readAccess, setReadAccess] = useState<"denied" | "signed-out" | null>(null);
   const readRequest = useRef<AbortController | null>(null);
   const taskRequest = useRef(false);
+  const taskReader = useRef<AbortController | null>(null);
+  const taskSnapshot = useRef<OperationsTaskPage | null>(null);
+  const pendingTaskId = useRef<string | null>(null);
+  const [taskLoading, setTaskLoading] = useState(false);
+  const [taskReadError, setTaskReadError] = useState("");
   const [taskBusy, setTaskBusy] = useState(false);
   const [taskNeedsCheck, setTaskNeedsCheck] = useState(false);
   const [taskMessage, setTaskMessage] = useState("");
@@ -59,6 +66,8 @@ export function OperationsWorkspace({ view = "operations", reminders }: { view?:
 
   const handleReadAccessFailure = useCallback((status: number) => {
     if (status !== 401 && status !== 403) return false;
+    taskReader.current?.abort(); taskReader.current = null; taskSnapshot.current = null;
+    setTaskLoading(false); setTaskReadError("");
     setData(null);
     setReadFailed(false);
     setReadAccess(status === 403 ? "denied" : "signed-out");
@@ -73,9 +82,10 @@ export function OperationsWorkspace({ view = "operations", reminders }: { view?:
     setMaintenanceFacilityId("");
     setPackageFacilityId("");
     return true;
-  }, []);
+  }, [setShowTask, setShowMaintenance, setMaintenanceFacilityId]);
 
   const load = useCallback(async () => {
+    taskReader.current?.abort(); taskReader.current = null; setTaskLoading(false); setTaskReadError("");
     readRequest.current?.abort();
     const controller = new AbortController();
     readRequest.current = controller;
@@ -89,6 +99,8 @@ export function OperationsWorkspace({ view = "operations", reminders }: { view?:
       const payload = await response.json();
       if (!response.ok || !payload.data || !["tasks", "maintenance", "products", "storagePackages", "dailyCloses", "notes", "facilities"].every(key => Array.isArray(payload.data[key]))) throw new Error("Operations data unavailable");
       if (readRequest.current !== controller) return;
+      if (payload.data.taskPage !== undefined) payload.data.taskPage = operationsTaskPageSchema.parse(payload.data.taskPage);
+      taskSnapshot.current = payload.data.taskPage ?? null;
       setData(payload.data);
       setError("");
       setReadFailed(false);
@@ -107,8 +119,32 @@ export function OperationsWorkspace({ view = "operations", reminders }: { view?:
   useEffect(() => {
     let cancelled = false;
     void Promise.resolve().then(() => { if (!cancelled) void load(); });
-    return () => { cancelled = true; readRequest.current?.abort(); readRequest.current = null; };
+    return () => { cancelled = true; readRequest.current?.abort(); readRequest.current = null; taskReader.current?.abort(); taskReader.current = null; };
   }, [load]);
+
+  async function loadTaskPage(filters: TaskFilters, cursor?: string) {
+    taskReader.current?.abort(); const controller = new AbortController(); taskReader.current = controller;
+    const previous = taskSnapshot.current; setTaskLoading(true); setTaskReadError("");
+    const timeout = setTimeout(() => controller.abort(), 20_000);
+    try {
+      const query = operationsTaskFiltersSchema.parse(filters), params = new URLSearchParams(query);
+      if (cursor) params.set("cursor", cursor);
+      const response = await fetch(`/api/v1/operations/tasks?${params}`, { cache: "no-store", signal: controller.signal });
+      if (taskReader.current !== controller) return false;
+      if (handleReadAccessFailure(response.status)) return false;
+      if (!response.ok) throw new Error(response.status === 409 ? "The task queue changed. Refresh it before loading more." : "Task results could not be loaded. Refresh the queue before acting.");
+      const page = operationsTaskPageSchema.parse((await response.json()).data);
+      if (taskReader.current !== controller) return false;
+      if (JSON.stringify(page.filters) !== JSON.stringify(query)) throw new Error("The task filters could not be verified. Refresh the queue before acting.");
+      if (cursor && (!previous || previous.total !== page.total || JSON.stringify(previous.filters) !== JSON.stringify(page.filters))) throw new Error("The task queue changed. Refresh it before loading more.");
+      const merged = cursor && previous ? { ...page, items: [...previous.items, ...page.items.filter(item => !previous.items.some(prior => prior.id === item.id))] } : page;
+      taskSnapshot.current = merged; setData(current => current ? { ...current, taskPage: merged } : current);
+      return true;
+    } catch (error) {
+      if (taskReader.current === controller) setTaskReadError(error instanceof Error && !error.message.startsWith("[") ? error.message : "Task results could not be verified. Refresh the queue before acting.");
+      return false;
+    } finally { clearTimeout(timeout); if (taskReader.current === controller) { taskReader.current = null; setTaskLoading(false); } }
+  }
 
   async function createTask(formData: FormData) {
     if (taskCreationRequest.current || taskCreationUncertain) return;
@@ -139,8 +175,8 @@ export function OperationsWorkspace({ view = "operations", reminders }: { view?:
   }
 
   async function completeTask(id: string) {
-    if (taskRequest.current || taskNeedsCheck) return;
-    taskRequest.current = true;
+    if (taskRequest.current || taskNeedsCheck || loading || readFailed || taskLoading || taskReadError) return;
+    taskRequest.current = true; pendingTaskId.current = id;
     setTaskBusy(true);
     setTaskMessage("");
     const controller = new AbortController();
@@ -149,8 +185,12 @@ export function OperationsWorkspace({ view = "operations", reminders }: { view?:
       const response = await fetch(`/api/v1/operations/tasks/${id}`, { method: "PATCH", signal: controller.signal, headers: { "content-type": "application/json" }, body: JSON.stringify({ status: "COMPLETED" }) });
       const payload = await response.json();
       if (!response.ok || payload.data?.id !== id || payload.data?.status !== "COMPLETED") throw new Error("Unconfirmed task completion");
-      setData(current => current ? { ...current, tasks: current.tasks.map(task => task.id === id ? { ...task, status: "COMPLETED" } : task) } : current);
+      if (taskSnapshot.current) taskSnapshot.current = { ...taskSnapshot.current, items: taskSnapshot.current.items.map(task => task.id === id ? { ...task, status: "COMPLETED" } : task) };
+      const confirmedPage = taskSnapshot.current;
+      setData(current => current ? { ...current, tasks: current.tasks.map(task => task.id === id ? { ...task, status: "COMPLETED" } : task), ...(confirmedPage ? { taskPage: confirmedPage } : {}) } : current);
+      pendingTaskId.current = null;
       setTaskMessage("Task completed.");
+      if (taskSnapshot.current) await loadTaskPage(taskSnapshot.current.filters);
     } catch {
       setTaskNeedsCheck(true);
       setTaskMessage("We could not confirm this task was completed. Check its current status before trying again.");
@@ -168,6 +208,15 @@ export function OperationsWorkspace({ view = "operations", reminders }: { view?:
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 20_000);
     try {
+      if (taskSnapshot.current && pendingTaskId.current) {
+        const id = pendingTaskId.current;
+        const response = await fetch(`/api/v1/operations/tasks/${encodeURIComponent(id)}`, { cache: "no-store", signal: controller.signal });
+        if (handleReadAccessFailure(response.status)) return;
+        const current = (await response.json()).data;
+        if (!response.ok || current?.id !== id || !["OPEN", "IN_PROGRESS", "WAITING", "COMPLETED", "CANCELLED"].includes(current.status)) throw new Error("Task status unavailable");
+        if (!await loadTaskPage(taskSnapshot.current.filters)) throw new Error("Task queue unavailable");
+        pendingTaskId.current = null; setTaskNeedsCheck(false); setTaskMessage("Task status refreshed. Review the current queue before any further action."); return;
+      }
       const response = await fetch("/api/v1/operations", { cache: "no-store", signal: controller.signal });
       if (handleReadAccessFailure(response.status)) return;
       const payload = await response.json();
@@ -430,7 +479,9 @@ export function OperationsWorkspace({ view = "operations", reminders }: { view?:
   </div>;
 
   const readRecovery = readFailed ? <div role="alert"><p>Displayed records may be out of date.</p><button className="button button-primary" disabled={loading} onClick={() => void load()}>{loading ? "Loading…" : "Retry loading"}</button></div> : null;
-  const openTasks = data?.tasks.filter((task) => !["COMPLETED", "CANCELLED"].includes(task.status)) ?? [];
+  const taskPage = data?.taskPage;
+  const openTasks = taskPage ? taskPage.items.filter(task => taskPage.filters.status !== "active" || !["COMPLETED", "CANCELLED"].includes(task.status)) : data?.tasks.filter(task => !["COMPLETED", "CANCELLED"].includes(task.status)) ?? [];
+  const taskActionsBlocked = taskBusy || taskNeedsCheck || loading || readFailed || taskLoading || !!taskReadError;
   const service = data?.maintenance.filter((item) => !["COMPLETED", "CANCELLED"].includes(item.status)) ?? [];
   const reorder = data?.products.filter((product) => product.quantityOnHand <= product.reorderPoint) ?? [];
   const productCategories = Array.from(new Set(data?.products.map((product) => product.category) ?? [])).sort();
@@ -464,37 +515,42 @@ export function OperationsWorkspace({ view = "operations", reminders }: { view?:
     {merchandiseModals}
   </div>;
 
-  return <div className="page-stack facility-operations-workspace">
-    <PageHeader eyebrow="Facility workflows" title="Operations centre" description="Prioritise tasks, keep maintenance moving and close the day with confidence." action={<button className="button button-primary" onClick={() => setShowTask(true)}><Plus size={16}/> New task</button>} />
+  return <div className="page-stack facility-operations-workspace operations-centre-workspace">
+    <PageHeader eyebrow="Facility workflows" title="Operations centre" description="Review what needs attention, filter your tasks and open the right store workflow." action={<div className="operations-page-actions"><StaffHandbookDownload/><button className="button button-primary" onClick={() => setShowTask(true)}><Plus size={16}/> New task</button></div>} />
     {reminders}
-    <Link className="button button-secondary" href="/operations/followups">Customer follow-ups &amp; covering-staff handovers</Link>
-    <StaffHandbookDownload />
-    <div className="followup-actions"><Link className="button button-secondary" href="/operations/arrivals">Expected arrivals &amp; weekend cover</Link><Link className="button button-secondary" href="/operations/events">Booking &amp; move-in event inbox</Link></div>
     {maintenanceMessage && !showMaintenance ? <div role="alert"><p>{maintenanceMessage}</p>{maintenanceUncertain ? <button className="button button-primary" onClick={() => window.location.reload()}>Reload maintenance status</button> : null}</div> : null}
     {taskMessage ? <div role={taskNeedsCheck ? "alert" : "status"}><p>{taskMessage}</p>{taskNeedsCheck ? <button className="button button-primary" disabled={taskBusy} onClick={checkTaskStatus}>{taskBusy ? "Checking…" : "Check task status"}</button> : null}</div> : null}
     {error ? <p className="form-error">{error}</p> : null}{readRecovery}
-    <section className="summary-strip">
-      {[["Open tasks", openTasks.length], ["Service required", service.length], ["Reorder items", reorder.length], ["Daily closes", data?.dailyCloses.length ?? 0]].map(([label, value]) => <div className="summary-cell" key={label}><span>{label}</span><strong>{value}</strong></div>)}
+    <section id="operations-tasks" className="panel panel-spacious operations-task-panel" aria-label="Operational task queue" aria-busy={taskLoading}>
+      <div className="panel-heading"><div><p className="eyebrow">Your work queue</p><h2>Assigned operational tasks</h2><p className="panel-subtitle">Choose a person, store, status or due date, then apply the filters.</p></div>{taskPage ? <button className="button button-secondary" disabled={taskBusy || loading} onClick={() => void loadTaskPage(taskPage.filters)}>Refresh tasks</button> : null}</div>
+      {taskPage ? <OperationsTaskFilters key={JSON.stringify(taskPage.filters)} page={taskPage} disabled={taskBusy || loading || readFailed} onApply={filters => void loadTaskPage(filters)}/> : <p className="panel-subtitle">Showing loaded records only. Reload the page to enable filtering across the full permitted queue.</p>}
+      {taskReadError ? <p role="alert">{taskReadError}</p> : null}
+      <p className="operations-task-result-count">{taskLoading ? "Updating task queue…" : taskReadError || readFailed ? "Task results need refreshing before you act." : taskPage ? `Showing ${openTasks.length} of ${taskPage.total} matching tasks · Updated ${formatSouthAfricaDateTime(taskPage.asOf)} SAST` : `${openTasks.length} open tasks on the loaded page`}</p>
+      <div className="work-list">{openTasks.length ? openTasks.map(task => <div className="work-row operations-task-row" key={task.id}>
+        <span className={`work-icon ${task.priority === "URGENT" ? "work-icon-danger" : task.priority === "HIGH" ? "work-icon-warning" : ""}`}><ClipboardList size={18}/></span>
+        <div className="work-copy"><strong>{task.title}</strong><small>{task.facility?.name ?? "Portfolio"} · {task.assignee?.name ?? "Unassigned"} · {task.dueAt ? `${formatSouthAfricaDateTime(task.dueAt)} SAST` : "No due date"}</small>{task.description && <details><summary>View request details</summary><p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{task.description}</p>{task.customerId && <Link href={`/tenants?customer=${encodeURIComponent(task.customerId)}`}>Open customer record →</Link>}</details>}</div>
+        <span className="operations-task-row-actions"><StatusPill tone={task.status === "COMPLETED" ? "positive" : "neutral"}>{task.status.replaceAll("_", " ")}</StatusPill>{!["COMPLETED", "CANCELLED"].includes(task.status) ? task.purpose === "AGREED_FOLLOWUP" ? <Link className="text-button" href="/operations/followups">Open appointment</Link> : <button className="text-button" disabled={taskActionsBlocked} onClick={() => completeTask(task.id)}>{taskBusy ? "Please wait…" : "Complete"}</button> : null}</span>
+      </div>) : !taskLoading && !taskReadError && !readFailed ? <div className="empty-state"><CheckCircle2 size={32}/><strong>{taskPage ? "No tasks match these filters" : "No open tasks"}</strong><p>{taskPage ? "Clear a filter or create a new task." : "Create a task to start the facility work queue."}</p></div> : null}</div>
+      {taskPage?.nextCursor ? <button className="button button-secondary" disabled={taskBusy || taskLoading || !!taskReadError || readFailed} onClick={() => void loadTaskPage(taskPage.filters, taskPage.nextCursor!)}>Load more tasks</button> : null}
     </section>
-    <section className="panel panel-spacious"><div className="panel-heading"><div><p className="eyebrow">Accounts</p><h2>Customer account workflows</h2><p className="panel-subtitle">Start the primary rental and billing workflows from one place.</p></div></div><div className="operations-account-grid">
-      <Link href="/operations/walk-in"><strong>Walk-in on tablet</strong><span>Hand over the website booking journey to a customer.</span></Link>
-      <Link href="/operations/move-in"><strong>Move in</strong><span>Select a vacant unit and create the tenancy account.</span></Link>
-      <Link href="/operations/accounts"><strong>Payments</strong><span>Post and review customer payments.</span></Link>
-      <Link href="/operations/accounts"><strong>Transfer</strong><span>Move an active tenant to another available unit.</span></Link>
-      <Link href="/operations/accounts"><strong>Move out</strong><span>Close an occupancy and release the unit.</span></Link>
-      <Link href="/operations/merchandise"><strong>Merchandise</strong><span>Open the dedicated products, stock and package workspace.</span></Link>
-    </div></section>
-    <section className="dashboard-grid">
-      <article id="operations-tasks" className="panel panel-spacious"><div className="panel-heading"><div><p className="eyebrow">Work queues</p><h2>Assigned operational tasks</h2></div><ClipboardList size={21}/></div>
-        <div className="work-list">{openTasks.length ? openTasks.map((task) => <div className="work-row" key={task.id}><span className={`work-icon ${task.priority === "URGENT" ? "work-icon-danger" : task.priority === "HIGH" ? "work-icon-warning" : ""}`}><ClipboardList size={18}/></span><div className="work-copy"><strong>{task.title}</strong><small>{task.facility?.name ?? "Portfolio"} · {task.assignee?.name ?? "Unassigned"} · {task.dueAt ? `${formatSouthAfricaDateTime(task.dueAt)} SAST` : "No due date"}</small>{task.description && <details><summary>View request details</summary><p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{task.description}</p>{task.customerId && <Link href={`/tenants?customer=${encodeURIComponent(task.customerId)}`}>Open customer record →</Link>}</details>}</div>{task.purpose === "AGREED_FOLLOWUP" ? <Link className="text-button" href="/operations/followups">Open appointment</Link> : <button className="text-button" disabled={taskBusy || taskNeedsCheck} onClick={() => completeTask(task.id)}>{taskBusy ? "Please wait…" : "Complete"}</button>}</div>) : <div className="empty-state"><CheckCircle2 size={32}/><strong>No open tasks</strong><p>Create a task to start the facility work queue.</p></div>}</div>
-      </article>
-      <article id="operations-maintenance" className="panel panel-spacious"><div className="panel-heading"><div><p className="eyebrow">Service required</p><h2>Maintenance queue</h2></div><button className="button button-secondary" disabled={busy || maintenanceUncertain} onClick={() => setShowMaintenance(true)}><Plus size={16}/> New request</button></div>
-        <div className="work-list">{service.length ? service.map((item) => <div className="work-row" key={item.id}><span className="work-icon work-icon-warning"><Wrench size={18}/></span><span className="work-copy"><strong>{item.title}</strong><small>{item.facility.name}{item.unit ? ` · Unit ${item.unit.number}` : ""}</small></span><StatusPill tone={item.priority === "URGENT" ? "danger" : "warning"}>{item.status}</StatusPill><span className="inline-actions">{item.status !== "IN_PROGRESS" ? <button className="text-button" disabled={busy || maintenanceUncertain} onClick={() => updateMaintenance(item.id, "IN_PROGRESS")}>Start</button> : null}<button className="text-button" disabled={busy || maintenanceUncertain} onClick={() => updateMaintenance(item.id, "COMPLETED")}>Complete</button><button className="text-button" disabled={busy || maintenanceUncertain} onClick={() => updateMaintenance(item.id, "CANCELLED")}>Cancel</button></span></div>) : <div className="empty-state"><Wrench size={32}/><strong>No service requests</strong><p>Unit and facility maintenance will appear here.</p></div>}</div>
-      </article>
+    <section className="panel panel-spacious operations-workflow-panel" aria-label="Operations workspaces"><div className="panel-heading"><div><p className="eyebrow">Quick access</p><h2>Customer and store workflows</h2><p className="panel-subtitle">Open a dedicated workspace when you are ready to act.</p></div></div>
+      <div className="operations-workflow-groups"><div><h3>Customer journeys</h3><div className="operations-account-grid">
+        <Link href="/operations/walk-in"><strong>Walk-in on tablet</strong><span>Hand over the booking journey to a customer.</span></Link>
+        <Link href="/operations/move-in"><strong>Move in</strong><span>Select a unit and create the tenancy account.</span></Link>
+        <Link href="/operations/accounts"><strong>Payments</strong><span>Review and record customer payments.</span></Link>
+        <Link href="/operations/accounts"><strong>Transfer</strong><span>Move an active tenant to another unit.</span></Link>
+        <Link href="/operations/accounts"><strong>Move out</strong><span>Close an occupancy and release the unit.</span></Link>
+      </div></div><div><h3>Store work and cover</h3><div className="operations-account-grid">
+        <Link href="/operations/followups"><strong>Customer follow-ups</strong><span>Appointments and covering-staff handovers.</span></Link>
+        <Link href="/operations/arrivals"><strong>Expected arrivals</strong><span>Review readiness and weekend cover.</span></Link>
+        <Link href="/operations/events"><strong>Booking and move-in events</strong><span>Open the store event inbox.</span></Link>
+        <Link href="/operations/merchandise"><strong>Merchandise</strong><span>Products, stock and storage packages.</span></Link>
+      </div></div></div>
     </section>
-    <section className="dashboard-grid">
-      <article className="panel daily-close-panel"><div className="hub-heading"><div><h2>End-of-day control</h2><p>Recorded close snapshots and cash variance.</p></div><RefreshCw size={20}/></div><DailyCloseForm facilities={(data?.facilities ?? []).filter(facility => data?.dailyCloseFacilityIds?.includes(facility.id))} unavailable={loading || readFailed} onRecorded={load}/><DailyCloseHistory records={data?.dailyCloses ?? []}/></article>
+    <section id="operations-maintenance" className="panel panel-spacious"><div className="panel-heading"><div><p className="eyebrow">Store upkeep</p><h2>Maintenance queue</h2><p className="panel-subtitle">Unit and facility requests, separate from the task queue.</p></div><button className="button button-secondary" disabled={busy || maintenanceUncertain} onClick={() => setShowMaintenance(true)}><Plus size={16}/> New request</button></div>
+      <div className="work-list">{service.length ? service.map(item => <div className="work-row" key={item.id}><span className="work-icon work-icon-warning"><Wrench size={18}/></span><span className="work-copy"><strong>{item.title}</strong><small>{item.facility.name}{item.unit ? ` · Unit ${item.unit.number}` : ""}</small></span><StatusPill tone={item.priority === "URGENT" ? "danger" : "warning"}>{item.status}</StatusPill><span className="inline-actions">{item.status !== "IN_PROGRESS" ? <button className="text-button" disabled={busy || maintenanceUncertain} onClick={() => updateMaintenance(item.id, "IN_PROGRESS")}>Start</button> : null}<button className="text-button" disabled={busy || maintenanceUncertain} onClick={() => updateMaintenance(item.id, "COMPLETED")}>Complete</button><button className="text-button" disabled={busy || maintenanceUncertain} onClick={() => updateMaintenance(item.id, "CANCELLED")}>Cancel</button></span></div>) : <div className="empty-state"><Wrench size={32}/><strong>No service requests</strong><p>Unit and facility maintenance will appear here.</p></div>}</div>
     </section>
+    <section className="panel daily-close-panel"><div className="hub-heading"><div><p className="eyebrow">Day-end records</p><h2>End-of-day control</h2><p>Recorded close snapshots and cash variance.</p></div><RefreshCw size={20}/></div><DailyCloseForm facilities={(data?.facilities ?? []).filter(facility => data?.dailyCloseFacilityIds?.includes(facility.id))} unavailable={loading || readFailed} onRecorded={load}/><DailyCloseHistory records={data?.dailyCloses ?? []}/></section>
     {showTask ? <div className="modal-backdrop"><div className="modal-card" role="dialog" aria-modal="true"><p className="eyebrow">Work queue</p><h2>Create operational task</h2><form onSubmit={(event) => { event.preventDefault(); void createTask(new FormData(event.currentTarget)); }} className="invite-form">{taskCreationMessage ? <div role="alert"><p>{taskCreationMessage}</p>{taskCreationUncertain ? <button type="button" className="button button-primary" onClick={() => window.location.reload()}>Reload task list</button> : null}</div> : null}<label>Facility<select name="facilityId" required><option value="">Choose facility</option>{data?.facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}</select></label><label>Title<input name="title" required minLength={2}/></label><label>Description<textarea name="description" rows={4}/></label><label>Priority<select name="priority" defaultValue="NORMAL"><option>LOW</option><option>NORMAL</option><option>HIGH</option><option>URGENT</option></select></label><label>Due date<input name="dueAt" type="datetime-local"/></label><div className="form-actions"><button type="button" className="button button-secondary" onClick={() => setShowTask(false)}>Cancel</button><button className="button button-primary" disabled={busy || taskCreationUncertain || !data?.facilities.length}>{busy ? "Saving…" : "Create task"}</button></div></form></div></div> : null}
     {showMaintenance ? <div className="modal-backdrop"><div className="modal-card" role="dialog" aria-modal="true"><p className="eyebrow">Unit availability</p><h2>Create maintenance request</h2><p className="panel-subtitle">Selecting a unit immediately removes it from bookable availability until all linked maintenance is complete.</p><form onSubmit={(event) => { event.preventDefault(); void createMaintenance(new FormData(event.currentTarget)); }} className="invite-form">{maintenanceMessage ? <div role="alert"><p>{maintenanceMessage}</p>{maintenanceUncertain ? <button type="button" className="button button-primary" onClick={() => window.location.reload()}>Reload maintenance status</button> : null}</div> : null}<label>Facility<select name="facilityId" required value={maintenanceFacilityId} onChange={(event) => setMaintenanceFacilityId(event.target.value)}><option value="">Choose facility</option>{data?.facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}</select></label><label>Unit (optional)<select name="unitId" defaultValue=""><option value="">Facility-level request</option>{data?.facilities.find((facility) => facility.id === maintenanceFacilityId)?.units.map((unit) => <option key={unit.id} value={unit.id}>Unit {unit.number}{unit.status === "SERVICE" ? " · already in service" : ""}</option>)}</select></label><label>Title<input name="title" required minLength={2}/></label><label>Description<textarea name="description" rows={4}/></label><label>Priority<select name="priority" defaultValue="NORMAL"><option>LOW</option><option>NORMAL</option><option>HIGH</option><option>URGENT</option></select></label><label>Due date<input name="dueAt" type="datetime-local"/></label><div className="form-actions"><button type="button" className="button button-secondary" onClick={() => { setShowMaintenance(false); setMaintenanceFacilityId(""); }}>Cancel</button><button className="button button-primary" disabled={busy || maintenanceUncertain || !maintenanceFacilityId}>{busy ? "Saving…" : "Create request"}</button></div></form></div></div> : null}
   </div>;

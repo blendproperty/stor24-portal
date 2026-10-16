@@ -58,6 +58,7 @@ jobs:
       - run: node scripts/test-purchase-read-recovery.mjs
       - run: node scripts/test-task-completion-recovery.mjs
       - run: node scripts/test-operations-read-recovery.mjs
+      - run: node scripts/test-operations-task-filters.mjs
       - run: node scripts/test-merchandise-queue-read.mjs
       - run: node scripts/test-reservations-read-recovery.mjs
       - run: node scripts/test-reservation-create-recovery.mjs
@@ -132,6 +133,7 @@ jobs:
             output/company-setup-recovery/
             output/task-completion-recovery/
             output/operations-read-recovery/
+            output/operations-task-filters/
             output/merchandise-queue-read/
             output/reservations-read-recovery/
             output/reservation-create-recovery/

@@ -86,6 +86,8 @@ Retry can send a real message. Investigate the failure, consent and duplication 
 
 ## 04 · Agreed follow-ups and named cover
 
+**Operations task queue:** choose Assigned person, Store, Status and Due date, optionally search task text, then **Apply filters**. Matching totals cover the full permitted queue; **Load more tasks** adds another page. **Clear filters** restores open work. **Refresh tasks** keeps the applied filters. Failed refreshes block completion until results are verified. Use **Open appointment** for agreed follow-ups.
+
 Open **Operations → Follow-ups and handovers**. This queue records a customer appointment separately from a collection promise-to-pay hold. In Operations reminders, choose **Agreed follow-ups** for **Due today & overdue**. **Appointment queue** also offers all open appointments or appointments from tomorrow.
 
 1. Find the customer and choose their store. Select the responsible staff member and, when agreed, an eligible named cover.
