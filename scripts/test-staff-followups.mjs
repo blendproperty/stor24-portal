@@ -48,6 +48,7 @@ try {
     await page.getByLabel('Responsible staff', { exact: true }).selectOption(responsible.id);
     await page.getByLabel('Covering staff', { exact: true }).selectOption(cover.id);
     await page.getByLabel('Agreed date and time (SAST)').fill('2026-10-14T09:00');
+    await page.getByLabel('Agreed action and handover details').fill('Customer agreed to call on 14th. Promise due 15th remains held.');
     await page.getByLabel('Appointment title', { exact: true }).selectOption('Prospect follow-up');
     await expect(page.locator('input[name="title"]')).toHaveValue('Prospect follow-up');
     await expect(page.getByLabel('Other appointment title')).toHaveCount(0);
@@ -58,7 +59,6 @@ try {
     await page.getByLabel('Other appointment title').fill('Agreed advance call');
     await page.screenshot({ path: `output/staff-followups/title-options-${width}.png`, fullPage: true });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${width}px title form overflow`);
-    await page.getByLabel('Agreed action and handover details').fill('Customer agreed to call on 14th. Promise due 15th remains held.');
     await page.getByRole('button', { name: 'Save agreed appointment' }).click();
     await expect(page.getByRole('button', { name: 'Complete', exact: true })).toBeVisible();
     assert.equal(created.length, 1); assert.equal(created[0].dueAt, '2026-10-14T07:00:00.000Z');

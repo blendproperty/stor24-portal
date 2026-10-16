@@ -13,7 +13,7 @@ export function AppointmentTitleField({ initialTitle = "", disabled = false }: {
   const [choice, setChoice] = useState(() => titles.includes(initialTitle) ? initialTitle : initialTitle ? other : "");
   const [custom, setCustom] = useState(() => titles.includes(initialTitle) ? "" : initialTitle);
   return <div className="page-stack">
-    <label>Appointment title<select value={choice} required disabled={disabled} onChange={event => setChoice(event.target.value)}>
+    <label>Appointment title<select aria-label="Appointment title" value={choice} required disabled={disabled} onChange={event => setChoice(event.target.value)}>
       <option value="">Choose appointment title</option>
       {titles.map(title => <option key={title} value={title}>{title}</option>)}
       <option value={other}>Other</option>
