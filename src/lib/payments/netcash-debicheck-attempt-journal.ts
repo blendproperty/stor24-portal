@@ -1,3 +1,4 @@
+import {requireNativeBankConsent} from './netcash-debicheck-bank-authority';
 import type {Prisma} from '@/generated/prisma/client';
 import {cardSourceHash} from './card-autopay-enrollment-policy';
 import {readDebiCheckRequest,DEBICHECK_REQUEST_DOMAIN} from './netcash-debicheck-request-policy';
@@ -6,11 +7,11 @@ import {DEBICHECK_ATTEMPT_DOMAIN,DEBICHECK_STATUS_OBSERVATION_DOMAIN,prepareDebi
 import type {parseDebiCheckCurrentStatus} from './netcash-debicheck-soap';
 
 type Client=Prisma.TransactionClient;
-/** Internal persistence primitive, NOT dispatch authority. No route, scheduler or
- * provider transport calls it. A future worker must first validate fresh bank-
+/** Internal persistence primitive, NOT dispatch authority. The guarded test caller must
+ * first validate fresh bank-
  * authentication consent (setup-v1 is insufficient), current independent staff
  * authority, exact TT1/RMS=false provider terms and approved test payer evidence,
- * plus current source/merchant. It must commit this claim BEFORE its one network
+ * plus current source/merchant. It commits this claim BEFORE its one network
  * attempt. A claimed/crashed/unknown attempt is never permission to send again.
  * Caller owns a Serializable transaction; no transaction/network retry here. */
 export async function retainDebiCheckAttemptClaim(client:Client,source:DebiCheckAttemptSource,now=new Date()){
@@ -29,16 +30,7 @@ export async function retainDebiCheckAttemptClaim(client:Client,source:DebiCheck
  if(!request)throw Error('DEBICHECK_REVIEWED_REQUEST_REQUIRED');
  const definition=readDebiCheckRequest(request.config,{...identity,id:source.requestId});
  if(definition.signature!==source.requestSignature||definition.sourceHash!==source.sourceHash||definition.merchantHash!==source.merchantHash||definition.templateSourceHash!==source.templateSourceHash||definition.connectionId!==source.connectionId||definition.connectionUpdatedAt!==source.connectionUpdatedAt)throw Error('DEBICHECK_ATTEMPT_SOURCE_CHANGED');
- // A future bank-authentication consent flow must retain its own evidence.
- // An ordinary setup-request consent or staff setup review cannot satisfy this.
- const consent=await client.auditEvent.findFirst({where:{organisationId:source.organisationId,facilityId:source.facilityId,entityType:'ConfigurationProfile',entityId:source.requestId,action:'netcash.debicheck_bank_authentication_consented',actorId:null},orderBy:{occurredAt:'desc'}});
- const consentValue=consent?.after as Record<string,unknown>|null;
- if(!consentValue||consentValue.consentVersion!=='debicheck-bank-authentication-v1'||consentValue.customerId!==definition.customerId||consentValue.requestSignature!==source.requestSignature||consentValue.sourceHash!==source.sourceHash||consentValue.merchantHash!==source.merchantHash||consentValue.consentHash!==source.authenticationConsentHash)throw Error('DEBICHECK_BANK_AUTHENTICATION_CONSENT_REQUIRED');
- const review=await client.auditEvent.findFirst({where:{id:source.independentReviewAuditId,organisationId:source.organisationId,facilityId:source.facilityId,entityType:'ConfigurationProfile',entityId:source.requestId,action:'netcash.debicheck_bank_authentication_reviewed',actorId:{not:null}}});
- const reviewValue=review?.after as Record<string,unknown>|null;
- if(!reviewValue||reviewValue.requestSignature!==source.requestSignature||reviewValue.authenticationConsentHash!==source.authenticationConsentHash||reviewValue.sourceHash!==source.sourceHash||reviewValue.merchantHash!==source.merchantHash)throw Error('DEBICHECK_BANK_AUTHENTICATION_REVIEW_REQUIRED');
- const reviewer=await client.user.findFirst({where:{id:review!.actorId!,organisationId:source.organisationId,active:true},select:{email:true}}),customer=await client.customer.findFirst({where:{id:definition.customerId,organisationId:source.organisationId},select:{email:true}});
- if(!reviewer||!customer?.email||reviewer.email.toLowerCase()===customer.email.toLowerCase()||consent!.occurredAt>review!.occurredAt||review!.occurredAt>now)throw Error('DEBICHECK_BANK_AUTHENTICATION_REVIEW_REQUIRED');
+ await requireNativeBankConsent(client,source,definition,now);
  await client.configurationProfile.create({data:{id:prepared.recordId,organisationId:source.organisationId,facilityId:source.facilityId,domain:DEBICHECK_ATTEMPT_DOMAIN,name:source.requestId,status:'CLAIMED',config:prepared}});
  await client.auditEvent.create({data:{organisationId:source.organisationId,facilityId:source.facilityId,action:'netcash.debicheck_authentication_claim_retained',entityType:'ConfigurationProfile',entityId:prepared.recordId,after:{requestId:source.requestId,sourceHash:source.sourceHash,authenticationConsentHash:source.authenticationConsentHash,claimedAt:prepared.claimedAt,collectionAuthorised:false,financialReceipt:false,retryAllowed:false}}});
  return{newClaim:true,attempt:projectDebiCheckAttempt(prepared)};
