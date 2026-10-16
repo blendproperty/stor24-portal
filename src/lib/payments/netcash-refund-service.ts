@@ -32,7 +32,8 @@ function retained(row:ConfigurationProfile,scope:RequestScope,facilityId:string)
 }
 async function projectCurrentRefund(tx:Tx,scope:RequestScope,value:NetcashRefundRecord){
  const truth=await refundProviderClaimTruth(tx,scope,value.source.facilityId,value.id);
- return{...projectRefundRecord(value),providerAttempted:truth.claimRetained,manualPayoutHeld:truth.claimRetained||projectRefundRecord(value).manualPayoutHeld,attempt:truth.attempt?projectRefundAttempt(truth.attempt):null};
+ const account=await tx.account.findFirst({where:{id:value.source.accountId,customer:{organisationId:scope.organisationId}},select:{accountNumber:true}});if(!account)throw Error('NETCASH_REFUND_NOT_FOUND');
+ return{...projectRefundRecord(value),accountNumber:account.accountNumber,originalTransactionId:value.source.transactionId,originalTransactionDate:value.source.lineDate,paymentAmount:value.source.paymentAmount,providerAttempted:truth.claimRetained,manualPayoutHeld:truth.claimRetained||projectRefundRecord(value).manualPayoutHeld,attempt:truth.attempt?projectRefundAttempt(truth.attempt):null};
 }
 async function audit(tx:Tx,scope:RequestScope,value:NetcashRefundRecord,action:string){
  await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:value.source.facilityId,actorId:scope.userId,entityType:'ConfigurationProfile',entityId:value.id,action:'netcash.refund_'+action,after:{state:value.state,revision:value.revision,sourceHash:value.sourceHash,adjustmentId:value.source.adjustmentId,paymentId:value.source.paymentId,reference:action==='prepared'?value.preparationReference:action==='request-release'?value.releaseRequest!.reference:action==='approve-release'?value.releaseReview!.reference:action==='reserve'?value.reservation!.reference:value.review?.reference??null,providerAttempted:false,dispatchAvailable:false,financialPosting:false}}});

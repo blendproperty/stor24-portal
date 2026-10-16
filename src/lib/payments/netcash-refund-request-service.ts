@@ -7,7 +7,7 @@ import {decryptNetcashConfig} from './netcash-client';
 import {currentNetcashRefundSource} from './netcash-refund-source';
 import {refundAuthority,lockRefundAccount,retainedRefund,refundReviewedAuthority} from './netcash-refund-service';
 import {loadRefundAttempt,persistRefundAttempt,refundProviderClaimTruth} from './netcash-refund-attempt-journal';
-import {NETCASH_REFUND_ATTEMPT_DOMAIN,refundAttemptId,refundAttemptSchema,projectRefundAttempt,type RefundAttempt} from './netcash-refund-attempt-policy';
+import {NETCASH_REFUND_ATTEMPT_DOMAIN,refundAttemptId,refundAttemptSchema,projectRefundAttempt,closeUnclaimedRefundAttempt,renewUnclaimedRefundAttempt,type RefundAttempt} from './netcash-refund-attempt-policy';
 import {requireRefundSendApproval,refundCredentialFingerprint} from './netcash-refund-send-policy';
 import {assertRefundTransportInput,transportRefundRequest,type RefundResponseCapture} from './netcash-refund-transport';
 
@@ -43,9 +43,37 @@ function sameSource(value:RefundAttempt,current:Awaited<ReturnType<typeof contex
 }
 async function purposeAudit(tx:Tx,scope:RequestScope,value:RefundAttempt,action:'prepared'|'reviewed'){
  const evidence=action==='reviewed'?value.review:value.created;if(!evidence)throw Error('NETCASH_REFUND_SEND_REVIEW_REQUIRED');
- const rows=await tx.auditEvent.findMany({where:{organisationId:scope.organisationId,facilityId:value.source.facilityId,entityType:'ConfigurationProfile',entityId:value.id,actorId:evidence.actorId,action:'netcash.refund_send_'+action},take:2});
- const proof=rows[0]?.after as {attemptId?:unknown;refundId?:unknown;sourceHash?:unknown;approvalHash?:unknown;reference?:unknown}|null;
- if(rows.length!==1||proof?.attemptId!==value.id||proof.refundId!==value.refundId||proof.sourceHash!==value.sourceHash||proof.approvalHash!==value.approvalHash||proof.reference!==evidence.reference)throw Error('NETCASH_REFUND_SEND_REVIEW_REQUIRED');
+ const eventAction=action==='prepared'&&value.cycle>1?'renewed':action;
+ const rows=await tx.auditEvent.findMany({where:{organisationId:scope.organisationId,facilityId:value.source.facilityId,entityType:'ConfigurationProfile',entityId:value.id,actorId:evidence.actorId,action:'netcash.refund_send_'+eventAction,after:{path:['cycle'],equals:value.cycle}},take:2});
+ const proof=rows[0]?.after as {attemptId?:unknown;refundId?:unknown;sourceHash?:unknown;approvalHash?:unknown;reference?:unknown;revision?:unknown;state?:unknown}|null;
+ const preparedRevision=value.state==='PREPARED'?value.revision:value.state==='REVIEWED'?value.revision-1:value.state==='CLAIMED'?value.revision-2:value.state==='RESULT_RETAINED'?value.revision-3:-1;
+ if(rows.length!==1||proof?.attemptId!==value.id||proof.refundId!==value.refundId||proof.sourceHash!==value.sourceHash||proof.approvalHash!==value.approvalHash||proof.reference!==evidence.reference||proof.revision!==(action==='reviewed'?preparedRevision+1:preparedRevision)||proof.state!==(action==='reviewed'?'REVIEWED':'PREPARED'))throw Error('NETCASH_REFUND_SEND_REVIEW_REQUIRED');
+}
+/** Cleanup remains available with creation disabled or provider approval
+ * expired. It changes no hold or financial record and can never close a claim. */
+export async function closeRefundSend(scope:RequestScope,input:Action,action:'reject-send'|'withdraw-send',clock=()=>new Date()){
+ if(input.confirmed!==true||!['reject-send','withdraw-send'].includes(action))throw Error('NETCASH_REFUND_CONFIRMATION_REQUIRED');
+ return db.$transaction(async tx=>{
+  await refundAuthority(tx,scope,input.facilityId,action==='withdraw-send'?'payments.refund_send':'payments.refund_send_review');
+  const row=await tx.configurationProfile.findUnique({where:{id:input.refundId}});if(!row)throw Error('NETCASH_REFUND_NOT_FOUND');
+  let refund=retainedRefund(row,scope,input.facilityId);await lockRefundAccount(tx,scope,input.facilityId,refund.source.accountId);
+  refund=retainedRefund(await tx.configurationProfile.findUniqueOrThrow({where:{id:input.refundId}}),scope,input.facilityId);
+  if(refund.revision!==input.reservationRevision)throw Error('NETCASH_REFUND_SOURCE_CHANGED');
+  const truth=await refundProviderClaimTruth(tx,scope,input.facilityId,input.refundId),value=truth.attempt;
+  if(!value||truth.claimRetained||value.revision!==input.attemptRevision)throw Error('NETCASH_REFUND_ATTEMPT_STATE');
+  return projectRefundAttempt(await persistRefundAttempt(tx,scope,value,closeUnclaimedRefundAttempt(value,action,scope.userId,input.reference,clock())));
+ },transaction);
+}
+export async function renewRefundSend(scope:RequestScope,input:Action,clock=()=>new Date()){
+ if(input.confirmed!==true)throw Error('NETCASH_REFUND_CONFIRMATION_REQUIRED');
+ return db.$transaction(async tx=>{
+  const now=clock(),current=await context(tx,scope,input,'payments.refund_send',now),truth=await refundProviderClaimTruth(tx,scope,input.facilityId,input.refundId),value=truth.attempt;
+  if(!value||truth.claimRetained||value.revision!==input.attemptRevision)throw Error('NETCASH_REFUND_ATTEMPT_STATE');
+  // Only a new operator window/review cycle can change. Original financial,
+  // reservation and credential bindings are never silently refreshed here.
+  if(value.sourceHash!==current.refund.sourceHash||value.reservationRevision!==current.refund.revision||value.credentialFingerprint!==current.credentialFingerprint)throw Error('NETCASH_REFUND_SEND_SOURCE_CHANGED');
+  return projectRefundAttempt(await persistRefundAttempt(tx,scope,value,renewUnclaimedRefundAttempt(value,current.approvalHash,scope.userId,input.reference,now)));
+ },transaction);
 }
 async function currentSendReview(tx:Tx,scope:RequestScope,value:RefundAttempt){
  if(!value.review||value.review.actorId===value.created.actorId)throw Error('NETCASH_REFUND_SEND_REVIEW_REQUIRED');
@@ -81,7 +109,7 @@ export async function sendRefundRequest(scope:RequestScope,input:Action,request:
   const now=clock(),current=await context(tx,scope,input,'payments.refund_send',now),value=await loadRefundAttempt(tx,scope,input.facilityId,input.refundId);
   if(!value||value.state!=='REVIEWED'||value.revision!==input.attemptRevision||value.created.actorId!==scope.userId)throw Error('NETCASH_REFUND_SEND_REVIEW_REQUIRED');
   sameSource(value,current);await currentSendReview(tx,scope,value);
-  return persistRefundAttempt(tx,scope,value,refundAttemptSchema.parse({...value,state:'CLAIMED',revision:value.revision+1,claim:{actorId:scope.userId,at:now.toISOString(),token:randomUUID()}}));
+  return persistRefundAttempt(tx,scope,value,refundAttemptSchema.parse({...value,state:'CLAIMED',revision:value.revision+1,claim:{actorId:scope.userId,at:now.toISOString(),reference:input.reference,token:randomUUID()}}));
  },transaction);
  // A crash or revoked/changed source here retains the committed claim forever.
  // Re-read current source, actor, reviewer, credential and purpose audit before

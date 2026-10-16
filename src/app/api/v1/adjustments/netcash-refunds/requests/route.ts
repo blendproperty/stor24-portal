@@ -3,7 +3,7 @@ import {requirePermissionScope} from '@/lib/scope';
 import {authErrorResponse} from '@/lib/auth-guards';
 import {sameOrigin,rateLimit} from '@/lib/request-security';
 import {boundedBody} from '@/lib/payments/netcash-mandate';
-import {prepareRefundSend,reviewRefundSend,sendRefundRequest,refundSendHistory} from '@/lib/payments/netcash-refund-request-service';
+import {prepareRefundSend,reviewRefundSend,sendRefundRequest,refundSendHistory,closeRefundSend,renewRefundSend} from '@/lib/payments/netcash-refund-request-service';
 export const maxDuration=120;
 const headers={'cache-control':'private, no-store','x-content-type-options':'nosniff'};
 const selection={facilityId:z.string().cuid(),refundId:z.string().regex(/^netcash-refund:[a-f\d]{64}$/),reservationRevision:z.number().int().positive()};
@@ -12,8 +12,11 @@ const schema=z.discriminatedUnion('action',[
  z.object({action:z.literal('prepare-send'),...action,confirmation:z.literal('PREPARE REFUND REQUEST')}).strict(),
  z.object({action:z.literal('review-send'),...action,attemptRevision:z.number().int().positive(),confirmation:z.literal('APPROVE REFUND REQUEST')}).strict(),
  z.object({action:z.literal('send'),...action,attemptRevision:z.number().int().positive(),confirmation:z.literal('REQUEST NETCASH REFUND')}).strict(),
+ z.object({action:z.literal('withdraw-send'),...action,attemptRevision:z.number().int().positive(),confirmation:z.literal('WITHDRAW UNCLAIMED REQUEST')}).strict(),
+ z.object({action:z.literal('reject-send'),...action,attemptRevision:z.number().int().positive(),confirmation:z.literal('REJECT UNCLAIMED REQUEST')}).strict(),
+ z.object({action:z.literal('renew-send'),...action,attemptRevision:z.number().int().positive(),confirmation:z.literal('PREPARE FRESH REFUND REQUEST')}).strict(),
 ]);
-const permissions={'prepare-send':'payments.refund_send','review-send':'payments.refund_send_review',send:'payments.refund_send'}as const;
+const permissions={'prepare-send':'payments.refund_send','review-send':'payments.refund_send_review',send:'payments.refund_send','withdraw-send':'payments.refund_send','reject-send':'payments.refund_send_review','renew-send':'payments.refund_send'}as const;
 function failure(error:unknown){
  if(error instanceof z.ZodError||error instanceof SyntaxError||error instanceof Error&&['MANDATE_RESPONSE_TOO_LARGE','MANDATE_RESPONSE_INVALID'].includes(error.message))return Response.json({error:{message:'Check the original reservation, separate SEND review and exact confirmation.'}},{status:422,headers});
  if(error instanceof Error&&/^(NETCASH_REFUND|ADJUSTMENT|RECEIPT_REVIEW|SETTLEMENT)_/.test(error.message))return Response.json({error:{code:error.message,message:'This refund request needs review. Refresh retained history before continuing. A committed claim or unknown provider outcome must never be retried.'}},{status:409,headers});
@@ -31,6 +34,6 @@ export async function POST(request:Request){try{
  if(!sameOrigin(request))throw Error('FORBIDDEN');await requirePermissionScope('adjustments.view');
  const input=schema.parse(JSON.parse((await boundedBody(new Response(request.body),4096)).toString())),scope=await requirePermissionScope(permissions[input.action]);
  if(await rateLimit(`netcash-refund-send-write:${scope.organisationId}:${scope.userId}`,4,60000))return Response.json({error:{message:'Wait a minute and review retained history before continuing.'}},{status:429,headers});
- const data=input.action==='prepare-send'?await prepareRefundSend(scope,input):input.action==='review-send'?await reviewRefundSend(scope,input):await sendRefundRequest(scope,input);
+ const data=input.action==='prepare-send'?await prepareRefundSend(scope,input):input.action==='review-send'?await reviewRefundSend(scope,input):input.action==='renew-send'?await renewRefundSend(scope,input):input.action==='reject-send'||input.action==='withdraw-send'?await closeRefundSend(scope,input,input.action):await sendRefundRequest(scope,input);
  return Response.json({data},{status:input.action==='send'?202:200,headers});
 }catch(error){return failure(error);}}
