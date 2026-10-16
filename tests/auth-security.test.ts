@@ -4,6 +4,11 @@ import { permissionGranted } from "../src/lib/permissions.ts";
 import { createResetToken, hashResetToken } from "../src/lib/password-reset.ts";
 import { isPublicPathname } from "../src/proxy.ts";
 
+test("staff event worker uses only its exact dedicated credential route; staff pages and descendants remain session protected", () => {
+  assert.equal(isPublicPathname("/api/internal/staff-event-emails"), true);
+  for (const path of ["/api/internal", "/api/internal/staff-event-emails/private", "/api/internal/staff-event-emails-extra", "/api/v1/operations/event-emails", "/operations/event-emails"]) assert.equal(isPublicPathname(path), false);
+});
+
 test('WhatChimp intake delegates only its exact path to scoped handler authentication', () => {
   assert.equal(isPublicPathname('/api/integrations/whatchimp/enquiry'), true);
   for (const path of ['/api/integrations/whatchimp', '/api/integrations/whatchimp/enquiry/private', '/api/integrations/whatchimp/enquiry-extra', '/api/v1/leads']) assert.equal(isPublicPathname(path), false);

@@ -12,6 +12,7 @@ const messages: Record<string, string> = {
   RECEIPT_REVIEW_AMOUNT: "Use a positive ZAR amount in whole cents. Do not round imported evidence.",
   RECEIPT_REVIEW_DATE: "Choose a valid receipt date no later than today in South African time.",
   RECEIPT_REVIEW_SOURCE: "This original source is unavailable, already matched or not a supported credit. Review the original reconciliation.",
+  RECEIPT_REVIEW_SOURCE_INTEGRITY: "The retained statement or selected row does not match its original evidence. Review the source file before continuing.",
   RECEIPT_REVIEW_SOURCE_PERMISSION: "Imported evidence needs organisation-wide receipt capture and settlement-view access.",
   RECEIPT_REVIEW_CHANGED: "The original evidence or target account changed. Refresh and investigate before a new matching review.",
   RECEIPT_REVIEW_DUPLICATE: "This evidence is already retained. Find the existing intake instead of recording it twice.",
@@ -46,7 +47,7 @@ export async function GET(request: Request) {
     const data = await unidentifiedReceiptWorkspace(scope, facilityId, params.has("cursor") ? id.parse(params.get("cursor")) : undefined);
     const auth = await requireSession();
     const allowed = (permission: string, store?: string) => currentRoleAccess(auth.user.roleAssignments, permission, store).allowed;
-    return Response.json({ ...data, userId: scope.userId, canImportSources: scope.unrestrictedFacilities && currentRoleAccess(auth.user.roleAssignments, "receipt_review.capture").allowedFacilityIds === null && currentRoleAccess(auth.user.roleAssignments, "settlements.view").allowedFacilityIds === null && allowed("receipt_review.capture") && allowed("settlements.view"), facilities: data.facilities.map(f => ({ ...f, canCapture: allowed("receipt_review.capture", f.id), canPropose: allowed("receipt_review.propose", f.id) && allowed("ledger.view", f.id), canReview: allowed("receipt_review.approve", f.id) && allowed("ledger.view", f.id) })) }, { headers: { "cache-control": "no-store" } });
+    return Response.json({ ...data, userId: scope.userId, canImportSources: scope.unrestrictedFacilities && currentRoleAccess(auth.user.roleAssignments, "receipt_review.capture").allowedFacilityIds === null && currentRoleAccess(auth.user.roleAssignments, "settlements.view").allowedFacilityIds === null && allowed("receipt_review.capture") && allowed("settlements.view"), facilities: data.facilities.map(f => ({ ...f, canCapture: allowed("receipt_review.capture", f.id), canPropose: allowed("receipt_review.propose", f.id) && allowed("ledger.view", f.id), canReview: allowed("receipt_review.approve", f.id) && allowed("ledger.view", f.id), canPost: ["receipt_review.post","receipt_review.approve","ledger.view","payments.manage","billing.view"].every(permission=>allowed(permission,f.id)) })) }, { headers: { "cache-control": "no-store" } });
   } catch (error) { return failure(error); }
 }
 export async function POST(request: Request) {

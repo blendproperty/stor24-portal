@@ -54,6 +54,7 @@ jobs:
           INTEGRATION_CONFIG_ENCRYPTION_KEY: synthetic-payment-request-ci-vault-key-at-least-32
       - run: npx tsx --test tests/integration/netcash-debicheck-template.test.ts
       - run: npx tsx --test tests/integration/netcash-debicheck-requests.test.ts
+      - run: npx tsx --test tests/integration/netcash-debicheck-attempt-journal.test.ts
       - run: npx tsx --test tests/integration/posted-recurring-charge-report.test.ts
       - run: npx tsx --test tests/integration/visual-reporting.test.ts
       - run: npx tsx --test tests/integration/marketing-payment-cohorts.test.ts
@@ -64,6 +65,7 @@ jobs:
       - run: npx tsx --test tests/integration/task-status-atomicity.test.ts
       - run: npx tsx --test tests/integration/staff-followups.test.ts
       - run: npx tsx --test tests/integration/staff-attention.test.ts
+      - run: npx tsx --test tests/integration/staff-event-emails.test.ts
       - run: npx tsx --test tests/integration/stock-movement-atomicity.test.ts
       - run: npx tsx --test tests/integration/stock-request-replay.test.ts
       - run: npx tsx --test tests/integration/reserved-stock-guard.test.ts
@@ -112,6 +114,7 @@ jobs:
       - run: npx tsx --test tests/integration/collection-notices.test.ts
       - run: npx tsx --test tests/integration/settlements.test.ts
       - run: npx tsx --test tests/integration/unidentified-receipts.test.ts
+      - run: npx tsx --test tests/integration/receipt-import-posting.test.ts
       - run: npx tsx --test tests/integration/receipt-reallocation.test.ts
       - run: npx tsx --test tests/integration/receipt-reallocation-workflow.test.ts
       - run: npx tsx --test tests/integration/reservation-price-amendments.test.ts

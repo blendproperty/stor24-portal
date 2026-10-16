@@ -1,4 +1,5 @@
 export const securityPermissionGroups = [
+  { label: "Staff event email review", permissions: [["staff_event_emails.view", "View scoped staff email policies and outbox"], ["staff_event_emails.manage", "Prepare or cancel staff event email policies"], ["staff_event_emails.approve", "Independently review staff event email policies"]] },
   { label: "Governed booking quotes", permissions: [["reservation_prices.view", "Read original booking quotes and amendment evidence"], ["reservation_prices.propose", "Propose or withdraw unsigned booking price changes"], ["reservation_prices.approve", "Independently approve booking quote proposals"]] },
   { label: "Customers and leasing", permissions: [
     ["customer_history.export", "Download a customer's contact history (scoped delegation)"],
@@ -7,7 +8,7 @@ export const securityPermissionGroups = [
   { label: "Accounting integration", permissions: [
     ["mri.view", "Review MRI accounting preparation"], ["mri.manage", "Manage encrypted MRI connection settings"],
   ] },
-  { label: "Unidentified payment investigation", permissions: [["receipt_review.view", "View unidentified payment investigations"], ["receipt_review.capture", "Retain unidentified evidence without financial posting"], ["receipt_review.propose", "Suggest accounts or withdraw matching investigations"], ["receipt_review.approve", "Independently review matching suggestions without financial posting"]] },
+  { label: "Unidentified payment investigation", permissions: [["receipt_review.view", "View unidentified payment investigations"], ["receipt_review.capture", "Retain unidentified evidence without financial posting"], ["receipt_review.propose", "Suggest accounts or withdraw matching investigations"], ["receipt_review.approve", "Independently review matching suggestions without financial posting"], ["receipt_review.bank_sources", "Manage and independently review incoming bank-source identities"], ["receipt_review.post", "Post independently reviewed imported receipts"]] },
   { label: "Settlement reviews", permissions: [
     ["settlements.view", "View merchant settlement statements"], ["settlements.import", "Import settlement and bank evidence"], ["settlements.manage", "Match and reopen settlement reviews"], ["settlements.approve", "Independently review settlements"], ["settlements.export", "Export settlement reviews"],
   ] },

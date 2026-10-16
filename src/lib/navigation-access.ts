@@ -3,6 +3,7 @@ import { hasPermission } from "./permissions";
 export type NavigationAccess = { owner: boolean; permissions: string[] };
 // Navigation hints only. Existing page/API and facility-scope checks remain authoritative.
 const rules: Record<string, string[]> = {
+  "/operations/event-emails": ["staff_event_emails.view"],
   "/reservations/prices": ["reservation_prices.view"],
   "/tenants": ["operations.view"], "/users": ["@owner"],
   "/leads": ["leads.view"], "/reservations": ["reservations.manage"],
@@ -11,6 +12,7 @@ const rules: Record<string, string[]> = {
   "/billing": ["billing.view"], "/billing/monthly": ["billing.view"], "/billing/rent-reviews": ["@owner"],
   "/billing/netcash": ["payments.view"], "/billing/mri": ["mri.view"],
   "/billing/unidentified-receipts": ["receipt_review.view"],
+  "/billing/receipt-bank-sources": ["receipt_review.bank_sources"],
   "/billing/settlements": ["settlements.view"],
   "/billing/debit-orders": ["debit_orders.view"],
   "/collections": ["collections.view"], "/access": ["access.view"],

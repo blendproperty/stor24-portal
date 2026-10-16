@@ -38,6 +38,7 @@ jobs:
       - run: node scripts/test-customer-save-recovery.mjs
       - run: node scripts/test-customer-history.mjs
       - run: node scripts/test-communication-log-search.mjs
+      - run: node scripts/test-staff-event-emails.mjs
       - run: node scripts/test-staff-handbook-download.mjs
       - run: node scripts/test-receipt-reallocation-workspace.mjs
       - run: node scripts/test-customer-dossier.mjs
@@ -80,6 +81,7 @@ jobs:
       - run: node scripts/test-task-create-recovery.mjs
       - run: node scripts/test-staff-followups.mjs
       - run: node scripts/test-unidentified-receipts.mjs
+      - run: node scripts/test-receipt-import-workspace.mjs
       - run: node scripts/test-reservation-prices.mjs
       - run: node scripts/test-staff-attention.mjs
       - run: node scripts/test-staff-payment-review.mjs
@@ -159,6 +161,7 @@ jobs:
             output/package-create-recovery/
             output/package-update-recovery/
             output/password-form-recovery/
+            output/staff-event-emails/
             output/plan-history-evidence/
             output/tenant-card-subscriptions/
             output/netcash-debicheck-requests/
