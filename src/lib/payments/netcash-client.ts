@@ -92,8 +92,8 @@ export function decryptNetcashConfig(value: unknown): NetcashConfig {
   };
 }
 
-export async function getNetcashConnection(organisationId: string, facilityId?: string | null, allowOrganisationDefault = false) {
-  let connection = await db.integrationConnection.findFirst({
+export async function getNetcashConnection(organisationId: string, facilityId?: string | null, allowOrganisationDefault = false, client: Pick<typeof db, "integrationConnection"> = db) {
+  let connection = await client.integrationConnection.findFirst({
     where: {
       organisationId,
       facilityId: facilityId ?? null,
@@ -104,7 +104,7 @@ export async function getNetcashConnection(organisationId: string, facilityId?: 
   // Explicit opt-in: prefer the store's connection; otherwise use only the same
   // organisation's default. Never substitute another store or organisation.
   if (!connection && facilityId && allowOrganisationDefault) {
-    connection = await db.integrationConnection.findFirst({
+    connection = await client.integrationConnection.findFirst({
       where: { organisationId, facilityId: null, category: "PAYMENTS", provider: "NETCASH" },
     });
   }

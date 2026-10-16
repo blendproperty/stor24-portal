@@ -1,5 +1,6 @@
 "use client";
 import {useEffect,useState} from 'react';
+import {TenantDebiCheckBankConsents} from './tenant-debicheck-bank-consents';
 
 type Row={id:string;accountId:string;status:string;monthlyAmount:string;startDate:string;bankSuffix:string;consentText:string;authenticationSubmitted:false;collectionEnabled:false;financialReceipt:false};
 const blank={debtorIdentification:'',debtorIdentificationCode:'I',accountName:'',bankAccountName:'',branchCode:'',bankAccountNumber:'',bankAccountType:'Current',mobileNumber:'',emailAddress:''};
@@ -39,5 +40,6 @@ export function TenantDebiCheckRequests({accountId}:{accountId:string}){
   </form>)}
   {preview&&<div><p>{preview.display.consentText}</p><p>Bank account ending {preview.display.bankSuffix}.</p><label><input type="checkbox" disabled={busy} checked={accepted} onChange={e=>setAccepted(e.target.checked)}/>I confirm this setup request and permission to provide these details.</label><button type="button" disabled={busy||!accepted} onClick={()=>void act(async()=>{const result=row(await post({action:'save',accountId,preview:preview.ticket,accepted:true}),accountId);if(result.id!==preview.display.id||result.status!=='REQUESTED')throw Error('Refresh the saved request before continuing.');setPreview(null);setAccepted(false);setSnapshot(await read());setNotice('Request saved for staff review. No bank request or collection was submitted.');})}>Save for staff review</button><button type="button" disabled={busy} onClick={()=>{setPreview(null);setAccepted(false);setPayer(blank)}}>Discard preview</button></div>}
   {snapshot?.requests.map(r=><article key={r.id}><h4>{r.status==='REQUESTED'?'Awaiting staff review':r.status==='REVIEWED'?'Staff reviewed — bank setup still pending':'Request withdrawn'}</h4><p>R{r.monthlyAmount} monthly from {r.startDate}; bank account ending {r.bankSuffix}.</p>{r.status!=='WITHDRAWN'&&<button type="button" disabled={busy} onClick={()=>void act(async()=>{const result=row(await post({action:'withdraw',accountId,id:r.id}),accountId);if(result.id!==r.id||result.status!=='WITHDRAWN')throw Error('Refresh the saved request.');setSnapshot(await read());setNotice('Pending setup request withdrawn.');})}>Withdraw setup request</button>}</article>)}
+ <TenantDebiCheckBankConsents key={accountId} accountId={accountId} requestId={snapshot?.requests.find(r=>r.status==='REVIEWED')?.id??''}/>
  </section>;
 }
