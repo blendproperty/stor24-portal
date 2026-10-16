@@ -1,5 +1,27 @@
 import {randomUUID} from 'node:crypto';
 import {db} from '../../src/lib/db';
+import assert from 'node:assert/strict';
+import {Prisma} from '../../src/generated/prisma/client';
+
+/** Observe a real completed pg rollback, then revoke the real database role
+ * before the production helper starts its next full attempt. No error is
+ * fabricated and no production retry/backoff is patched. */
+export async function rejectAfterFinanceRoleRevocation(userId:string,run:()=>Promise<unknown>,expectedTransactions:1|2=2){
+ const url=new URL(process.env.DATABASE_URL!);
+ if(process.env.MERCHANDISE_DB_TEST!=='isolated-ci'||url.hostname!=='localhost'||!/^\/(?:receipt_correction_[a-z0-9_]+|merchandise_ci)$/.test(url.pathname)||!/^[a-z0-9]+$/.test(userId))throw Error('Synthetic authority-revocation fixture refused');
+ const original=db.$transaction;let attempts=0,revoked=false;
+ db.$transaction=(async(...args:unknown[])=>{
+  attempts++;
+  try{return await Reflect.apply(original,db,args)}catch(error){
+   if(!revoked&&error instanceof Prisma.PrismaClientKnownRequestError&&error.code==='P2034'){
+    assert.ok((await db.roleAssignment.deleteMany({where:{userId}})).count>0);revoked=true;
+   }
+   throw error;
+  }
+ }) as typeof db.$transaction;
+ try{await assert.rejects(run,/FORBIDDEN/);assert.equal(revoked,true);assert.equal(attempts,expectedTransactions);return{attempts,revoked}}
+ finally{db.$transaction=original}
+}
 
 /** Sequence increments survive rollback, proving the actual PostgreSQL abort
  * and the number of full attempts. Trigger affects only this synthetic org. */

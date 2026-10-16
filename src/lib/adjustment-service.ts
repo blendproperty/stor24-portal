@@ -1,3 +1,4 @@
+import {requireCurrentFinanceAuthority} from '@/lib/finance/current-finance-authority';
 import {retryRolledBackFinanceTransaction} from '@/lib/finance/retry-rolled-back-transaction';
 import {receiptAllocationGraph} from "./receipt-reallocation-source";
 import { createHash } from "node:crypto";
@@ -105,6 +106,9 @@ export async function requestAdjustment(scope: RequestScope, raw: unknown, finge
   const input = adjustmentInputSchema.parse(raw);
   return retryRolledBackFinanceTransaction(() => db.$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${input.accountId} FOR UPDATE`;
+    const admitted=await tx.account.findFirst({where:{id:input.accountId,...accountsWhere(scope)},select:{tenancy:{select:{facilityId:true}}}});
+    if(!admitted?.tenancy)throw Error("ADJUSTMENT_NOT_FOUND");
+    await requireCurrentFinanceAuthority(tx,scope,["adjustments.request"],admitted.tenancy.facilityId);
     const existing = await tx.financialAdjustment.findUnique({ where: { organisationId_requestKey: { organisationId: scope.organisationId, requestKey } } });
     if (existing) {
       await context(tx, scope, existing.accountId);
@@ -151,6 +155,7 @@ export async function decideAdjustment(scope: RequestScope, id: string, action: 
   reference = evidenceText.parse(reference);
   return retryRolledBackFinanceTransaction(() => db.$transaction(async tx => {
     const request = await locked(tx, scope, id);
+    await requireCurrentFinanceAuthority(tx,scope,[action==="cancel"?"adjustments.request":"adjustments.approve"],request.facilityId);
     if (!openStates.includes(request.status)) throw new Error("ADJUSTMENT_STATE");
     if (action !== "cancel" && request.requestedById === scope.userId) throw new Error("ADJUSTMENT_SELF_APPROVAL");
     if (action === "cancel" && request.requestedById !== scope.userId && request.reviewedById !== scope.userId) throw new Error("FORBIDDEN");
@@ -171,6 +176,7 @@ export async function recordRefundPayout(scope: RequestScope, id: string, refere
   reference = evidenceText.parse(reference).toUpperCase();
   return retryRolledBackFinanceTransaction(() => db.$transaction(async tx => {
     const request = await locked(tx, scope, id);
+    await requireCurrentFinanceAuthority(tx,scope,["adjustments.record_refund"],request.facilityId);
     if (request.kind !== "REFUND" || request.status !== "APPROVED" || !request.reviewedAt) throw new Error("ADJUSTMENT_STATE");
     if (scope.userId === request.requestedById) throw new Error("ADJUSTMENT_SELF_APPROVAL");
     const parsed = new Date(`${date}T00:00:00+02:00`);

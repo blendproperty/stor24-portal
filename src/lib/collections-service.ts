@@ -1,3 +1,4 @@
+import {requireCurrentFinanceAuthority} from '@/lib/finance/current-finance-authority';
 import {retryRolledBackFinanceTransaction} from '@/lib/finance/retry-rolled-back-transaction';
 import {receiptAllocationGraph} from "./receipt-reallocation-source";
 import { createHash } from "node:crypto";
@@ -158,6 +159,7 @@ export async function updateCollection(scope: RequestScope, raw: CollectionActio
     await accountFor(tx, scope, input.accountId);
     await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${input.accountId} FOR UPDATE`;
     const account = await accountFor(tx, scope, input.accountId);
+    await requireCurrentFinanceAuthority(tx,scope,[input.action==="terms"?"collections.policy":"collections.manage"],account.tenancy!.facilityId);
     let c = account.collectionCase;
     const previous = c ? await tx.collectionActivity.findUnique({ where: { caseId_requestKey: { caseId: c.id, requestKey: input.requestKey } } }) : null;
     if (previous) {

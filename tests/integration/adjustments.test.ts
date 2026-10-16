@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {withFinanceSerializationFailure} from './finance-serialization-fixture';
+import {withFinanceSerializationFailure,rejectAfterFinanceRoleRevocation} from './finance-serialization-fixture';
 import test from "node:test";
 import { randomUUID } from "node:crypto";
 import { db } from "../../src/lib/db";
@@ -17,6 +17,8 @@ test("isolated PostgreSQL controlled adjustments", async t => {
     const facility = await db.facility.create({ data: { organisationId: org.id, code: key, name: "CI store" } });
     const user = await db.user.create({ data: { organisationId: org.id, name: "Requester", email: `${key}@example.invalid` } });
     const approver = await db.user.create({ data: { organisationId: org.id, name: "Reviewer", email: `review-${key}@example.invalid` } });
+    const role=await db.role.create({data:{organisationId:org.id,name:"Synthetic adjustment authority",permissions:["adjustments.*"]}});
+    await db.roleAssignment.createMany({data:[user,approver].map(actor=>({userId:actor.id,roleId:role.id,facilityId:facility.id}))});
     const customer = await db.customer.create({ data: { organisationId: org.id, firstName: "CI" } });
     const account = await db.account.create({ data: { customerId: customer.id, accountNumber: `ADJ-CI-${key}`, balance: 115 - paid } });
     const tenancy = await db.tenancy.create({ data: { facilityId: facility.id, customerId: customer.id, accountId: account.id, status: "ACTIVE", startDate: new Date("2026-01-01") } });
@@ -182,6 +184,23 @@ test("isolated PostgreSQL controlled adjustments", async t => {
       assert.equal(await db.document.count({where:{idempotencyKey:'adjustment-document:'+r.id}}),1);
       assert.equal(await db.auditEvent.count({where:{entityId:r.id,action:'adjustment.posted'}}),1);
       assert.equal((await db.payment.findUniqueOrThrow({where:{id:f.payment!.id}})).status,'PARTIALLY_REFUNDED');
+    });
+    await t.test('real role revocation after a native rollback stops a new request, approval and external-payout recording before another write',async()=>{
+      for(const mode of ['request','approve','payout']as const){
+        const f=await fixture(mode==='payout'?200:0),input=mode==='payout'?{...f.input,kind:'REFUND',amount:'20',sourceEntryId:f.receipt!.id}:f.input;
+        const pending=mode==='request'?null:await request(f,input);
+        if(mode==='payout')await decideAdjustment(f.reviewer,pending!.id,'approve','Synthetic initial independent refund review');
+        const before=await db.account.findUniqueOrThrow({where:{id:f.account.id},include:{ledgerEntries:{orderBy:{id:'asc'}},payments:{orderBy:{id:'asc'}}}}),documents=await db.document.count({where:{tenancyId:f.tenancy.id}});
+        const action=mode==='request'?'adjustment.requested':'adjustment.posted',actor=mode==='request'?f.scope:f.reviewer;
+        const work=mode==='request'?()=>request(f,input):mode==='approve'?()=>decideAdjustment(f.reviewer,pending!.id,'approve','Synthetic fresh authority required'):()=>recordRefundPayout(f.reviewer,pending!.id,'Synthetic externally completed payout',southAfricaDateKey(new Date()));
+        const result=await withFinanceSerializationFailure(f.org.id,action,1,()=>rejectAfterFinanceRoleRevocation(actor.userId,work));
+        assert.equal(result.attempts,1);assert.equal(result.value.attempts,2);
+        assert.deepEqual(await db.account.findUniqueOrThrow({where:{id:f.account.id},include:{ledgerEntries:{orderBy:{id:'asc'}},payments:{orderBy:{id:'asc'}}}}),before);
+        assert.equal(await db.document.count({where:{tenancyId:f.tenancy.id}}),documents);
+        assert.equal(await db.auditEvent.count({where:{organisationId:f.org.id,action}}),0);
+        if(pending)assert.equal((await db.financialAdjustment.findUniqueOrThrow({where:{id:pending.id}})).status,mode==='payout'?'APPROVED':'PENDING_APPROVAL');
+        else assert.equal(await db.financialAdjustment.count({where:{accountId:f.account.id}}),0);
+      }
     });
   } finally { await db.$disconnect(); }
 });

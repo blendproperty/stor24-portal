@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {withFinanceSerializationFailure} from './finance-serialization-fixture';
+import {withFinanceSerializationFailure,rejectAfterFinanceRoleRevocation} from './finance-serialization-fixture';
 import {Prisma} from '../../src/generated/prisma/client';
 import test from "node:test";
 import { randomUUID } from "node:crypto";
@@ -23,7 +23,7 @@ test("isolated PostgreSQL aged collections", async t => {
     await db.tenancy.create({ data: { customerId: customer.id, accountId: account.id, facilityId: facility.id, status: "ACTIVE", startDate: new Date("2026-01-01") } });
     await db.ledgerEntry.create({ data: { accountId: account.id, type: "CHARGE", amount: 100, description: "CI original rent", effectiveAt: new Date("2026-01-01") } });
     const scope = { organisationId: org.id, userId: user.id, facilityIds: [facility.id], unrestrictedFacilities: false };
-    return { org, facility, user, account, scope };
+    return { org, facility, user, role, account, scope };
   }
   const row = async (f: Awaited<ReturnType<typeof fixture>>) => (await collectionsWorkspace(f.scope, today)).rows[0];
   const base = async (f: Awaited<ReturnType<typeof fixture>>) => ({ accountId: f.account.id, revision: (await row(f)).revision, requestKey: randomUUID(), note: "CI evidence reference" });
@@ -75,8 +75,11 @@ test("isolated PostgreSQL aged collections", async t => {
       assert.equal((await collectionsWorkspace({ ...f.scope, facilityIds: [] }, today)).rows.length, 0);
       await assert.rejects(updateCollection(other.scope, { ...await base(f), action: "dispute", disputed: true }), /NOT_FOUND/);
       await assert.rejects(updateCollection(f.scope, { ...await base(f), action: "follow-up", ownerId: other.user.id, nextFollowUp: today, outcome: "PLAN" }), /OWNER/);
+      const cover=await db.user.create({data:{organisationId:f.org.id,name:"Synthetic active cover",email:randomUUID()+"@example.invalid"}});
+      await db.roleAssignment.create({data:{userId:cover.id,roleId:f.role.id,facilityId:f.facility.id}});
       await db.user.update({ where: { id: f.user.id }, data: { active: false } });
-      await assert.rejects(updateCollection(f.scope, { ...await base(f), action: "follow-up", ownerId: f.user.id, nextFollowUp: today, outcome: "PLAN" }), /OWNER/);
+      await assert.rejects(updateCollection(f.scope, { ...await base(f), action: "follow-up", ownerId: cover.id, nextFollowUp: today, outcome: "PLAN" }), /FORBIDDEN/);
+      await assert.rejects(updateCollection({...f.scope,userId:cover.id}, { ...await base(f), action: "follow-up", ownerId: f.user.id, nextFollowUp: today, outcome: "PLAN" }), /OWNER/);
     });
     await t.test("idempotency, stale edits and simultaneous writers preserve one action", async () => {
       const f = await fixture(); const input: CollectionAction = { ...await base(f), action: "follow-up", ownerId: f.user.id, nextFollowUp: today, outcome: "NO_ANSWER" };
@@ -151,6 +154,15 @@ test("isolated PostgreSQL aged collections", async t => {
       });
       assert.equal(result.attempts,3);const after=await row(f);assert.equal(after.revision,before.revision);assert.equal(after.activities.length,before.activities.length);
       assert.equal(await db.auditEvent.count({where:{organisationId:f.org.id,action:'collections.dispute'}}),0);
+    });
+    await t.test('real role revocation after rollback stops both policy and follow-up attempts with no saved revision or activity',async()=>{
+      for(const action of ['terms','follow-up']as const){
+        const f=await fixture();if(action==='follow-up')await terms(f);
+        const before=await row(f),input:CollectionAction=action==='terms'?{...await base(f),action:'terms',terms:{dueDays:0,allocation:'OLDEST_DUE_FIRST',approvalReference:'Synthetic approved policy',overrides:[]},confirm:true}:{...await base(f),action:'follow-up',ownerId:f.user.id,nextFollowUp:today,outcome:'NO_ANSWER'};
+        const result=await withFinanceSerializationFailure(f.org.id,'collections.'+action,1,()=>rejectAfterFinanceRoleRevocation(f.scope.userId,()=>updateCollection(f.scope,input)));
+        assert.equal(result.attempts,1);assert.equal(result.value.attempts,2);
+        const after=await row(f);assert.equal(after.revision,before.revision);assert.equal(after.activities.length,before.activities.length);assert.equal(await db.auditEvent.count({where:{organisationId:f.org.id,action:'collections.'+action}}),0);
+      }
     });
   } finally { await db.$disconnect(); }
 });

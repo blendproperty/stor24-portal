@@ -1,3 +1,4 @@
+import {requireCurrentFinanceAuthority} from './finance/current-finance-authority';
 import {createHash} from "node:crypto";
 import {Prisma} from "@/generated/prisma/client";
 import {db} from "./db";
@@ -46,6 +47,7 @@ async function requestReceiptReallocationOnce(scope:RequestScope,input:ReceiptRe
   const retry=async()=>{
     const row=await db.receiptReallocation.findUnique({where:{organisationId_requestKey:{organisationId:scope.organisationId,requestKey:data.requestKey}}});
     if(!row)return null;await accountScope(db,scope,[row.sourceAccountId,row.targetAccountId]);
+    await requireCurrentFinanceAuthority(db,scope,["adjustments.view","billing.view","adjustments.request"],row.facilityId);
     if(row.requestHash!==requestHash||row.requestedById!==scope.userId)throw Error("REALLOCATION_DUPLICATE");return {id:row.id,idempotent:true};
   };
   const existing=await retry();if(existing)return existing;
@@ -53,6 +55,7 @@ async function requestReceiptReallocationOnce(scope:RequestScope,input:ReceiptRe
     await lock(tx,discovery.graph.accountIds);
     await tx.$queryRaw`SELECT "id" FROM "Payment" WHERE "id"=${discovery.graph.root.paymentId} FOR UPDATE`;
     const c=await context(tx,scope,data);sameLocks(c.graph.accountIds,discovery.graph.accountIds);
+    await requireCurrentFinanceAuthority(tx,scope,["adjustments.view","billing.view","adjustments.request"],c.graph.root.facilityId);
     if(c.fingerprint!==fingerprint)throw Error("REALLOCATION_CHANGED");
     const row=await tx.receiptReallocation.create({data:{organisationId:scope.organisationId,facilityId:c.graph.root.facilityId,sourceAccountId:data.sourceAccountId,targetAccountId:data.targetAccountId,sourceEntryId:data.sourceEntryId,paymentId:c.graph.root.paymentId,operation:c.data.operation,reversesId:c.data.reversesId,requestKey:data.requestKey,requestHash,amount:receiptAmount(c.plan.amountCents),reason:c.data.reason,evidenceReference:c.data.evidenceReference,snapshot:json(c.snapshot),fingerprint,requestedById:scope.userId}});
     await audit(tx,scope,row,"requested",{fingerprint,amountCents:c.plan.amountCents,operation:c.data.operation});return {id:row.id,idempotent:false};
@@ -76,6 +79,7 @@ async function decideReceiptReallocationOnce(scope:RequestScope,id:string,revisi
   await accountScope(db,scope,[initial.sourceAccountId,initial.targetAccountId]);
   if(action==="cancel"){if(initial.requestedById!==scope.userId)throw Error("FORBIDDEN");}else requireReallocationReviewer(initial.requestedById,scope.userId);
   const final=action==="approve"?"POSTED":action==="reject"?"REJECTED":"CANCELLED";
+  await requireCurrentFinanceAuthority(db,scope,["adjustments.view","billing.view",action==="cancel"?"adjustments.request":"adjustments.approve"],initial.facilityId);
   if(initial.status!=="PENDING_APPROVAL"){
     if(initial.status===final&&initial.reviewedById===scope.userId&&initial.reviewReference===reference)return {id,status:initial.status,idempotent:true};throw Error("REALLOCATION_STATE");
   }
@@ -85,6 +89,7 @@ async function decideReceiptReallocationOnce(scope:RequestScope,id:string,revisi
     const locked=discovery?.graph.accountIds??[initial.sourceAccountId,initial.targetAccountId].sort();await lock(tx,locked);
     if(discovery)await tx.$queryRaw`SELECT "id" FROM "Payment" WHERE "id"=${discovery.graph.root.paymentId} FOR UPDATE`;
     const row=await tx.receiptReallocation.findFirst({where:{id,...scoped(scope)}});if(!row||row.status!=="PENDING_APPROVAL"||row.revision!==revision)throw Error("REALLOCATION_STATE");
+    await requireCurrentFinanceAuthority(tx,scope,["adjustments.view","billing.view",action==="cancel"?"adjustments.request":"adjustments.approve"],row.facilityId);
     if(action!=="approve"){
       await tx.receiptReallocation.update({where:{id},data:{status:final,revision:{increment:1},reviewedById:scope.userId,reviewedAt:new Date(),reviewReference:reference}});await audit(tx,scope,row,action,{reference,fingerprint:row.fingerprint});return {id,status:final,idempotent:false};
     }

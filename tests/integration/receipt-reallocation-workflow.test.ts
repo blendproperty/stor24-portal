@@ -10,6 +10,7 @@ import {build} from "esbuild";
 import {db} from "../../src/lib/db";
 import type {Prisma} from "../../src/generated/prisma/client";
 import {withRawRollbackFixture} from './finance-raw-rollback-fixture';
+import {withFinanceSerializationFailure,rejectAfterFinanceRoleRevocation} from './finance-serialization-fixture';
 import {previewReceiptReallocation,requestReceiptReallocation,decideReceiptReallocation} from "../../src/lib/receipt-reallocation-service";
 import {receiptAllocationGraph} from "../../src/lib/receipt-reallocation-source";
 import {settleVerifiedBookingPayment} from "../../src/lib/payments/booking-payment-settlement";
@@ -24,10 +25,11 @@ import type {ReceiptReallocationInput} from "../../src/lib/receipt-reallocation-
 test("isolated receipt correction producers retain cash, approval, undo and source integrity",async t=>{
   const url=new URL(process.env.DATABASE_URL!);assert.equal(process.env.MERCHANDISE_DB_TEST,"isolated-ci");assert.ok(["localhost","127.0.0.1"].includes(url.hostname));assert.match(url.pathname,/^\/(?:receipt_correction_[a-z0-9_]+|merchandise_ci)$/);
   const organisations:string[]=[];
-  async function fixture(){
+  async function fixture(withRoles=true){
     const org=await db.organisation.create({data:{name:"Synthetic receipt workflow",slug:randomUUID()}});organisations.push(org.id);
     const facility=await db.facility.create({data:{organisationId:org.id,name:"Synthetic correction store",code:randomUUID()}});
     const requester=await db.user.create({data:{organisationId:org.id,name:"Synthetic requester",email:randomUUID()+"@example.invalid"}}),reviewer=await db.user.create({data:{organisationId:org.id,name:"Synthetic reviewer",email:randomUUID()+"@example.invalid"}});
+    if(withRoles){const role=await db.role.create({data:{organisationId:org.id,name:"Synthetic receipt authority",permissions:["adjustments.*","billing.view"]}});await db.roleAssignment.createMany({data:[requester,reviewer].map(user=>({userId:user.id,roleId:role.id,facilityId:facility.id}))});}
     const accounts=[];
     for(let n=0;n<3;n++){
       const customer=await db.customer.create({data:{organisationId:org.id,firstName:"PRIVATE-SYNTHETIC-CUSTOMER-"+n}});
@@ -49,7 +51,7 @@ test("isolated receipt correction producers retain cash, approval, undo and sour
   const approve=(f:Fixture,id:string,reference="Synthetic independent approval")=>decideReceiptReallocation(f.reviewScope,id,0,"approve",reference);
   try{
     await t.test("actual HTTP handlers and database roles separate requester, independent approver and foreign-store receipt access",async()=>{
-      const f=await fixture(),foreign=await db.facility.create({data:{organisationId:f.org.id,name:"Synthetic private other store",code:randomUUID()}});
+      const f=await fixture(false),foreign=await db.facility.create({data:{organisationId:f.org.id,name:"Synthetic private other store",code:randomUUID()}});
       const viewer=await db.user.create({data:{organisationId:f.org.id,name:"Synthetic foreign reviewer",email:randomUUID()+"@example.invalid"}});
       for(const [user,store,extra] of [[f.requester,f.facility,["adjustments.request"]],[f.reviewer,f.facility,["adjustments.approve"]],[viewer,foreign,["adjustments.approve"]]] as const){
         const role=await db.role.create({data:{organisationId:f.org.id,name:"Synthetic receipt HTTP "+randomUUID(),permissions:["adjustments.view","billing.view",...extra]}});
@@ -292,6 +294,19 @@ test("isolated receipt correction producers retain cash, approval, undo and sour
       await db.$executeRawUnsafe(`ALTER TABLE "AuditEvent" ADD CONSTRAINT "${name}" CHECK ("organisationId" <> '${f.org.id}' OR "action" <> 'receipt_reallocation.posted') NOT VALID`);
       try{await assert.rejects(approve(f,r.id));}finally{await db.$executeRawUnsafe(`ALTER TABLE "AuditEvent" DROP CONSTRAINT "${name}"`);}
       assert.deepEqual(await balances(f),before);assert.equal(await db.ledgerEntry.count({where:{account:{customer:{organisationId:f.org.id}}}}),entryCount);assert.equal(await db.document.count({where:{tenancy:{facilityId:f.facility.id}}}),0);assert.equal((await db.receiptReallocation.findUniqueOrThrow({where:{id:r.id}})).status,"PENDING_APPROVAL");assert.deepEqual(await db.payment.findUniqueOrThrow({where:{id:f.payment.id}}),f.payment);
+    });
+    await t.test('real role revocation after native rollback stops receipt requests and approvals without losing original cash',async()=>{
+      for(const action of ['request','approve']as const){
+        const f=await fixture(),data=input(f),pending=action==='approve'?await request(f,data):null,before=await balances(f);
+        const count=await db.ledgerEntry.count({where:{account:{customer:{organisationId:f.org.id}}}}),actor=action==='request'?f.scope:f.reviewScope;
+        const preview=action==='request'?await previewReceiptReallocation(f.scope,data):null;
+        const work=action==='request'?()=>requestReceiptReallocation(f.scope,data,preview!.fingerprint):()=>approve(f,pending!.id);
+        const result=await withFinanceSerializationFailure(f.org.id,'receipt_reallocation.'+(action==='request'?'requested':'posted'),1,()=>rejectAfterFinanceRoleRevocation(actor.userId,work,action==='approve'?1:2));
+        assert.equal(result.attempts,1);assert.equal(result.value.attempts,action==='approve'?1:2,'receipt approval revocation is rejected by the fresh preflight before opening another write transaction');assert.deepEqual(await balances(f),before);
+        assert.equal(await db.ledgerEntry.count({where:{account:{customer:{organisationId:f.org.id}}}}),count);assert.equal(await db.document.count({where:{tenancy:{facilityId:f.facility.id}}}),0);
+        assert.deepEqual(await db.payment.findUniqueOrThrow({where:{id:f.payment.id}}),f.payment);
+        assert.equal(await db.receiptReallocation.count({where:{organisationId:f.org.id}}),pending?1:0);if(pending)assert.equal((await db.receiptReallocation.findUniqueOrThrow({where:{id:pending.id}})).status,'PENDING_APPROVAL');
+      }
     });
   }finally{
     for(const organisationId of organisations){
