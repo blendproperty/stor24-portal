@@ -35,7 +35,7 @@ export function NetcashRefundWorkspace({facilities,userId,preparationEnabled,res
  function choose(row:Row,action:Action){clearChoice();setSelected({row,action})}
  function available(row:Row):Action[]{
   if(!facility)return[];const actions:Action[]=[];
-  if(row.state==='PREPARED'&&preparationEnabled&&facility.review&&row.preparedById!==userId)actions.push('review','reject');
+  if(row.state==='PREPARED'&&facility.review&&row.preparedById!==userId){actions.push('reject');if(preparationEnabled)actions.push('review')}
   if(['PREPARED','REVIEWED'].includes(row.state)&&facility.prepare&&row.preparedById===userId)actions.push('withdraw');
   if(row.state==='REVIEWED'&&preparationEnabled&&reservationEnabled&&facility.reserve&&row.preparedById!==userId)actions.push('reserve');
   if(row.state==='RESERVED'&&facility.reserve)actions.push('request-release');

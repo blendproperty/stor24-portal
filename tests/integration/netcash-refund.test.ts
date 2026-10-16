@@ -60,6 +60,10 @@ test('isolated native refund preparation, explicit hold and independently review
    await db.role.update({where:{id:f.role.id},data:{permissions:['adjustments.view']}});await assert.rejects(previewNetcashRefund(f.scope,f.input),/FORBIDDEN/);
    await db.role.update({where:{id:f.role.id},data:{permissions:['adjustments.view','payments.refund_prepare']}});await db.settlementStatement.update({where:{id:f.statement.id},data:{sha256:'0'.repeat(64)}});await assert.rejects(previewNetcashRefund(f.scope,f.input),/SOURCE_INTEGRITY/);assert.equal(await db.configurationProfile.count({where:{organisationId:f.org.id,domain:NETCASH_REFUND_DOMAIN}}),0);
   });
+  await t.test('independent rejection remains available with preparation disabled and creates no manual payout hold',async()=>{
+   const f=await prepared();process.env.NETCASH_REFUND_PREPARATION_ENABLED='false';
+   try{await assert.rejects(action(f,f.record,'review'),/PREPARATION_DISABLED/);const rejected=await action(f,f.record,'reject');assert.equal(rejected.state,'REJECTED');assert.equal(rejected.manualPayoutHeld,false);assert.equal((await recordRefundPayout(f.reviewScope,f.adjustment.id,'SYNTHETIC-OFF-REJECT-'+f.account.id,southAfricaDateKey(new Date()))).status,'POSTED')}finally{process.env.NETCASH_REFUND_PREPARATION_ENABLED='true'}
+  });
   await t.test('manual payout and cancellation before reservation prevent a later hold; competing actions have only one winner',async()=>{
    process.env.NETCASH_REFUND_RESERVATION_ENABLED='true';
    for(const manual of ['payout','cancel']){
