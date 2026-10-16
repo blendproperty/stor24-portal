@@ -108,49 +108,76 @@ test("isolated receipt correction producers retain cash, approval, undo and sour
       await new Promise<void>(done=>server.listen(0,"127.0.0.1",done));
       const origin=`http://127.0.0.1:${(server.address() as {port:number}).port}`,path="/api/v1/adjustments/receipt-reallocations";
       const call=(token:string,suffix="",body?:unknown,requestOrigin=origin)=>fetch(origin+path+suffix,{method:body===undefined?"GET":"POST",headers:{cookie:`fixture=${token}`,origin:requestOrigin,"content-type":"application/json"},...(body===undefined?{}:{body:JSON.stringify(body)})});
+      let httpStage="initial-authentication";
+      const statusCounts=new Map<number,number>();
       try{
         assert.equal((await call("")).status,401);
+        httpStage="initial-workspace";
         const initial=await call(requesterToken,`?sourceAccountId=${f.source.id}`);assert.equal(initial.status,200);
         const workspace=(await initial.json()).data;assert.equal(workspace.capabilities.canRequest,true);assert.equal(workspace.capabilities.canApprove,false);
         assert.equal(workspace.receipts[0].paymentReference,`STOR24 receipt ${f.payment.id}`);
+        httpStage="initial-preview";
         const data=input(f),previewResponse=await call(requesterToken,"",{action:"preview",input:data});assert.equal(previewResponse.status,200);
         const preview=(await previewResponse.json()).data;
+        httpStage="foreign-origin-denial";
         assert.equal((await call(requesterToken,"",{action:"request",input:data,fingerprint:preview.fingerprint,confirmed:true},"https://evil.example.invalid")).status,403);
+        httpStage="reviewer-request-denial";
         assert.equal((await call(reviewerToken,"",{action:"request",input:data,fingerprint:preview.fingerprint,confirmed:true})).status,403);
+        httpStage="contention-previews";
         const contenders=await Promise.all(Array.from({length:25},async()=>{
           const candidate={...data,requestKey:randomUUID()},response=await call(requesterToken,"",{action:"preview",input:candidate});
           assert.equal(response.status,200);return {input:candidate,fingerprint:(await response.json()).data.fingerprint};
         }));
+        httpStage="contention-requests";
         const began=performance.now();
         const responses=await Promise.all(contenders.map(async candidate=>{
           const response=await call(requesterToken,"",{action:"request",...candidate,confirmed:true});return {status:response.status,payload:await response.json()};
         }));
-        const statusCounts=new Map<number,number>();for(const response of responses)statusCounts.set(response.status,(statusCounts.get(response.status)??0)+1);
-        if(responses.some(r=>r.status!==200&&r.status!==409))console.error(JSON.stringify({fixture:"receipt-http-contention",statusCounts:Object.fromEntries(statusCounts),transactionFailures,routeFailures}));
+        for(const response of responses)statusCounts.set(response.status,(statusCounts.get(response.status)??0)+1);
         assert.ok(responses.every(r=>r.status===200||r.status===409),"contention produces a retained request or explicit review hold, never an unknown server result");
         assert.equal(responses.filter(r=>r.status===200).length,1);
         assert.ok(performance.now()-began<30000,"25 competing fixture requests complete within the staff request timeout");
         assert.equal(await db.receiptReallocation.count({where:{organisationId:f.org.id}}),1);
         const id=responses.find(r=>r.status===200)!.payload.data.id;
         const decision={action:"decide",id,revision:0,decision:"approve",reference:"Synthetic independent HTTP review",confirmed:true};
+        httpStage="requester-approval-denial";
         assert.equal((await call(requesterToken,"",decision)).status,403);
+        httpStage="foreign-approval-denial";
         assert.equal((await call(foreignToken,"",decision)).status,404);
+        httpStage="independent-approval";
         assert.equal((await call(reviewerToken,"",decision)).status,200);
+        httpStage="approval-idempotent-retry";
         const repeated=await call(reviewerToken,"",decision);assert.equal(repeated.status,200);assert.equal((await repeated.json()).data.idempotent,true);
+        httpStage="source-document";
         const doc=await call(requesterToken,`?document=${id}&side=source`);assert.equal(doc.status,200);
         assert.equal(doc.headers.get("x-stor24-data-classification"),"restricted");
         const html=await doc.text();assert.ok(html.includes(f.source.accountNumber));assert.ok(!html.includes(f.target.accountNumber));
+        httpStage="foreign-document-denial";
         assert.equal((await call(foreignToken,`?document=${id}&side=source`)).status,404);
+        httpStage="foreign-workspace-denial";
         assert.equal((await call(foreignToken,`?sourceAccountId=${f.source.id}`)).status,404);
+        httpStage="next-preview";
         const next=input(f),nextPreview=await call(requesterToken,'',{action:'preview',input:next});assert.equal(nextPreview.status,200);const nextFingerprint=(await nextPreview.json()).data.fingerprint;
         for(const state of ['40001','40P01']as const){
+          httpStage=`raw-rollback-${state}`;
           const result=await withRawRollbackFixture(state,3,async query=>{forcedRawConflict=query;try{return await call(requesterToken,'',{action:'request',input:next,fingerprint:nextFingerprint,confirmed:true});}finally{forcedRawConflict=null;}});
           assert.equal(result.value.status,409,'confirmed native raw rollback exhaustion is a review hold, not an unknown500');assert.equal(result.attempts,3);assert.equal(await db.receiptReallocation.count({where:{organisationId:f.org.id}}),1);
         }
+        httpStage="current-grant-revocation";
         await db.roleAssignment.deleteMany({where:{userId:f.requester.id}});
         assert.equal((await call(requesterToken)).status,403,"current database grant revocation is effective without a new fixture session");
+        httpStage="original-financial-baselines";
         assert.deepEqual(await db.payment.findUniqueOrThrow({where:{id:f.payment.id}}),f.payment);
         assert.deepEqual(await db.ledgerEntry.findUniqueOrThrow({where:{id:f.original.id}}),f.original);
+      }catch(error){
+        // Print the existing bounded observations for failures in every phase,
+        // including approval/retry/document assertions after contention.
+        // Preserve the original error and all response assertions unchanged.
+        const safeCode=(code:string)=>/^(?:P\d{4}|NONE|UNKNOWN)$/.test(code)?code:"UNCLASSIFIED";
+        console.error(JSON.stringify({fixture:"receipt-http-contention",stage:httpStage,statusCounts:Object.fromEntries(statusCounts),
+          transactionFailures:transactionFailures.map(value=>({...value,code:safeCode(value.code)})),
+          routeFailures:routeFailures.map(value=>({...value,code:safeCode(value.code)}))}));
+        throw error;
       }finally{await new Promise<void>(done=>server.close(()=>done()));await db.rateLimitBucket.deleteMany({where:{key:{startsWith:`dlp:${f.org.id}:`}}});}
     });
     await t.test("staff projection retains scoped receipt evidence, balances and private documents through MOVE and partial UNDO",async()=>{
