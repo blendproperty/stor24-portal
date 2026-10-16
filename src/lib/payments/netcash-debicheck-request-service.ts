@@ -66,12 +66,16 @@ export async function previewDebiCheckRequest(session:Tenant,input:{accountId:st
 async function current(client:Client,definition:ReturnType<typeof readDebiCheckRequest>,identity:Owner,scope:FacilityScope,now:Date){
  const s=await source(client,identity,definition.accountId,definition.startDate,now);
  if(s.sourceHash!==definition.sourceHash||s.facilityId!==definition.facilityId||s.customerId!==definition.customerId||s.tenancyId!==definition.tenancyId||s.monthlyAmount!==definition.monthlyAmount||definition.consentText!==debiCheckSetupRequestText(s.monthlyAmount,definition.startDate)||definition.tenantIdentityHash!==debiCheckRequestSignature({organisationId:identity.organisationId,customerId:identity.customerId,email:identity.email.toLowerCase()}))throw Error('DEBICHECK_REQUEST_SOURCE_CHANGED');
- const template=await reviewedDebiCheckTemplate(scope,s.facilityId,definition.templateObservationId,now);
+ const template=await reviewedDebiCheckTemplate(scope,s.facilityId,definition.templateObservationId,now,client);
  if(template.templateId!==definition.templateId||template.sourceHash!==definition.templateSourceHash||template.connectionId!==definition.connectionId||template.connectionUpdatedAt!==definition.connectionUpdatedAt||template.merchantHash!==definition.merchantHash||!template.monthlyDayOptions.includes('MNTH_01'))throw Error('DEBICHECK_CONFIGURATION_CHANGED');
  privateDebiCheckTerms(definition);
  const c=await client.integrationConnection.findUniqueOrThrow({where:{id:template.connectionId}});
  if(c.updatedAt.toISOString()!==definition.connectionUpdatedAt)throw Error('DEBICHECK_CONFIGURATION_CHANGED');
+ return{template};
 }
+/** Current original setup evidence for the separate bank-consent workflow.
+ * This is a source read, not tenant authentication or permission to dispatch. */
+export {current as recheckDebiCheckSetupSource};
 export async function saveDebiCheckRequest(session:Tenant,input:{accountId:string;preview:unknown;accepted:boolean},now=new Date()){
  enabled();if(input.accepted!==true)throw Error('DEBICHECK_CONSENT_REQUIRED');
  return db.$transaction(async tx=>{

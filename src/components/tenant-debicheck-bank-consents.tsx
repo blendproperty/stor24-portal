@@ -1,0 +1,31 @@
+"use client";
+import {useEffect,useRef,useState} from 'react';
+import {bankConsentResponseSchema,type BankConsentResponse} from '@/lib/payments/netcash-debicheck-bank-consent-response';
+
+type Snapshot={available:boolean;records:BankConsentResponse[];nextCursor:string|null};
+export function TenantDebiCheckBankConsents({accountId,requestId}:{accountId:string;requestId:string}){
+ const[snapshot,setSnapshot]=useState<Snapshot|null>(null),[preview,setPreview]=useState<{display:BankConsentResponse;ticket:Record<string,unknown>}|null>(null),[accepted,setAccepted]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
+ const requestVersion=useRef(0),alert=useRef<HTMLParagraphElement>(null);
+ function row(value:unknown){const result=bankConsentResponseSchema.parse(value);if(result.accountId!==accountId)throw Error('Refresh this account’s permission history.');return result}
+ async function read(cursor?:string){
+  const params=new URLSearchParams({accountId,...(cursor?{cursor}:{})}),response=await fetch('/api/tenant/debicheck-bank-consents?'+params,{cache:'no-store',signal:AbortSignal.timeout(20000)}),body=await response.json(),data=body?.data;
+  if(!response.ok)throw Error(body.error??'Bank-request permissions are unavailable.');
+  if(!data||typeof data.available!=='boolean'||!Array.isArray(data.records)||!(data.nextCursor===null||typeof data.nextCursor==='string'))throw Error('Refresh the permission history.');
+  return{available:data.available,records:data.records.map(row),nextCursor:data.nextCursor}as Snapshot;
+ }
+ useEffect(()=>{let active=true;const version=++requestVersion.current;Promise.resolve().then(async()=>{if(!active||requestVersion.current!==version)return;setSnapshot(null);setPreview(null);setAccepted(false);setError('');const value=await read();if(active&&requestVersion.current===version)setSnapshot(value)}).catch(()=>{if(active&&requestVersion.current===version)setError('Bank-request permissions are temporarily unavailable.')});return()=>{active=false}},[accountId,requestId]); // eslint-disable-line react-hooks/exhaustive-deps
+ useEffect(()=>{if(error)alert.current?.focus()},[error]);
+ useEffect(()=>{if(!preview)return;const id=setTimeout(()=>{setPreview(null);setAccepted(false);setNotice('The preview expired. Review a fresh permission before saving.')},Math.max(0,Date.parse(preview.display.expiresAt)-Date.now()));return()=>clearTimeout(id)},[preview]);
+ async function act(work:()=>Promise<void>){requestVersion.current++;setBusy(true);setError('');setNotice('');try{await work()}catch(e){setSnapshot(null);setPreview(null);setAccepted(false);setError(e instanceof Error&&!e.message.startsWith('[')?e.message:'Refresh before continuing.')}finally{setBusy(false)}}
+ async function post(value:object){const response=await fetch('/api/tenant/debicheck-bank-consents',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(value),signal:AbortSignal.timeout(25000)}),body=await response.json();if(!response.ok)throw Error(body.error??'Ask staff to review this permission.');return body.data}
+ if(snapshot&&!snapshot.available&&!snapshot.records.length)return null;
+ const active=snapshot?.records.some(r=>r.requestId===requestId&&r.status!=='WITHDRAWN');
+ return<section aria-label="Permission for one bank-authentication request" style={{overflowWrap:'anywhere'}}><h4>Permission for one bank request</h4><p>This separate permission lets staff review one bank-authentication request. Saving it does not contact your bank or collect a payment.</p>
+ {error&&<p role="alert" tabIndex={-1} ref={alert}>{error}</p>}{notice&&<p role="status">{notice}</p>}
+ <button type="button" disabled={busy} onClick={()=>void act(async()=>{setPreview(null);setAccepted(false);setSnapshot(await read())})}>Refresh bank permissions</button>
+ {snapshot?.available&&!!requestId&&!active&&!preview&&<button type="button" disabled={busy} onClick={()=>void act(async()=>{const data=await post({action:'preview',accountId,requestId}),{preview:ticket,...display}=data,r=row(display);if(r.status!=='PREVIEW'||r.requestId!==requestId||!ticket||ticket.recordId!==r.id)throw Error('Review a fresh permission.');setPreview({display:r,ticket});setAccepted(false)})}>Review permission for one bank request</button>}
+ {preview&&<div><p>{preview.display.consentText}</p><p>Valid until {new Date(preview.display.expiresAt).toLocaleString('en-ZA')}.</p><label><input type="checkbox" checked={accepted} disabled={busy} onChange={e=>setAccepted(e.target.checked)}/>I give the permission shown above for one bank-authentication request.</label><button type="button" disabled={busy||!accepted} onClick={()=>void act(async()=>{const r=row(await post({action:'save',accountId,preview:preview.ticket,accepted:true}));if(r.id!==preview.display.id||!['CONSENTED','REVIEWED','WITHDRAWN'].includes(r.status))throw Error('Refresh the retained permission before continuing.');setPreview(null);setAccepted(false);setSnapshot(await read());setNotice('Permission saved for independent staff review. No bank request was sent.')})}>Save bank-request permission</button><button type="button" disabled={busy} onClick={()=>{setPreview(null);setAccepted(false)}}>Discard bank permission preview</button></div>}
+ {snapshot?.records.map(r=><article key={r.id}><h5>{r.status}{r.expired?' — expired':''}</h5><p>R{r.monthlyAmount} monthly from {r.startDate}; bank account ending {r.bankSuffix}.</p><p>{r.attemptRecorded?'An attempt is retained. Contact staff about its outcome; withdrawal here cannot cancel a provider request.':'This permission does not show a bank-authentication outcome or a received payment.'}</p>{r.status!=='WITHDRAWN'&&!r.attemptRecorded&&<button type="button" disabled={busy} onClick={()=>void act(async()=>{const result=row(await post({action:'withdraw',accountId,id:r.id}));if(result.id!==r.id||result.status!=='WITHDRAWN')throw Error('Refresh the saved permission.');setSnapshot(await read());setNotice('Permission withdrawn before a bank-request attempt.')})}>Withdraw bank permission</button>}</article>)}
+ {snapshot?.nextCursor&&<button type="button" disabled={busy} onClick={()=>void act(async()=>{setPreview(null);setAccepted(false);setSnapshot(await read(snapshot.nextCursor!))})}>Older bank permissions</button>}
+ </section>;
+}

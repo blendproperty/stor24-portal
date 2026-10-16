@@ -202,6 +202,20 @@ Read the fresh preview: exact account number, amount, method and original receip
 
 **No records is an honest empty state.** It does not prove a bank request was sent. Native bank-authentication consent, independently reviewed submission, approved real-time TT1 template/test payer and separate collection/provider acceptance remain required. Setup-request consent and setup review do not satisfy those steps. Signing-only test bank details must not be used for collections. Continue to use the existing approved card/EFT flows within their own limits.
 
+## 06E · Prepare separate permission for one bank request
+
+**Use the tenant’s own verified account.** After the original setup has been reviewed, **Permission for one bank request** can show the separate authorisation when approved test preparation is available. A setup request alone is not this permission. Signing-only test bank details cannot be reused for authentication or collections.
+
+**Read the exact terms before saving.** Check the monthly amount, start date and bank-account suffix. Tick the explicit bank-authentication permission only if you may authorise that account. A preview expires after ten minutes; saving or review cannot extend it. **Save bank-request permission** records the decision for staff review and sends nothing to the bank.
+
+**Independent staff review.** Open **DebiCheck setup review → Bank-request consent review**. Choose the permitted store and inspect the saved terms and expiry. An authorised colleague with a different email from the tenant checks the current source and records their confirmation. The system rechecks their current access, billing, merchant, exact template and separately approved test payer. This review does not dispatch a bank request or enable collections.
+
+**Withdraw before an attempt.** The tenant can withdraw an unattempted permission even while new preparation is disabled. Duplicate saves keep its retained status and cannot reopen withdrawn permission. Expired permission needs a fresh preview; withdraw the old permission before replacing it. **Older bank permissions** retains access to earlier pages.
+
+**Investigate an existing attempt.** A retained attempt blocks local withdrawal and a replacement permission. Staff must inspect original authentication history and provider evidence. Do not submit another request to resolve an unknown outcome.
+
+**Keep the remaining gates visible.** This release prepares consent and review only. The guarded submission step, real approved TT1 template/test payer, bank response, any later collection and financial receipt remain separate. Approved card/EFT flows continue within their own limits. Real customer, provider, finance, legal and staff acceptance must be recorded separately.
+
 ## 07 · Arrears notices and escalation boundaries
 
 Open **Collections** and review the customer's source account, approved terms, ageing and current hold before preparing a notice. A future promise or dispute hold remains effective.

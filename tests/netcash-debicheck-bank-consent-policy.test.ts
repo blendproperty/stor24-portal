@@ -13,7 +13,7 @@ test('bank-authentication permission has separate exact source bindings and no d
    const p=preview(),saved=acceptBankAuthenticationConsent(p,new Date(now.getTime()+1000));
    assert.equal(p.consentedAt,null);assert.equal(saved.recordId,p.recordId);assert.equal(saved.expiresAt,p.expiresAt);assert.deepEqual(readBankAuthenticationConsent(saved,identity(p)),saved);assert.match(saved.consentText,/one DebiCheck bank-authentication request/);assert.match(saved.consentText,/R950\.00/);assert.match(saved.consentText,/2026-11-01/);assert.match(saved.consentText,/2345/);
    assert.notEqual(bankAuthenticationConsentHash(p),bankAuthenticationConsentHash(saved));
-   for(const flag of ['bankRequestSubmitted','collectionEnabled','financialReceipt','retryAllowed']as const)assert.equal(projectBankAuthenticationConsent(saved,'CONSENTED',now)[flag],false);
+   for(const flag of ['providerActionPerformed','collectionEnabled','financialReceipt','retryAllowed']as const)assert.equal(projectBankAuthenticationConsent(saved,'CONSENTED',now)[flag],false);
   });
   await t.test('wrong subject, changed source, approval, payer or amount cannot reuse the original signed permission',()=>{
    const p=preview();
