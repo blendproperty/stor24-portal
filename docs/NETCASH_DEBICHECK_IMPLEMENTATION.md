@@ -1,5 +1,17 @@
 # DebiCheck implementation and acceptance
 
+## Current source status — 16 October 2026
+
+The native separate tenant bank-consent preparation/review is implemented in PR528; the guarded one-claim/one-physical-attempt test caller and original-contract-only status investigation are implemented separately in PR529. These are source/review checkpoints, not actual provider acceptance. Current529 source normally integrates528/0624 and actual527 main76; it still requires final actual528 main integration, all ten required checks and healthy default-off deployment evidence before promotion.
+
+The caller now verifies the exact signed/encrypted REVIEWED native consent, owning tenant/source and current independent reviewer both before claim and immediately before transport. Audit-only substitutes, withdrawn/expired consent and stale authority are rejected. Original claims are never resumed; timeout, uncertainty or failed result persistence cannot trigger another bank request. Separate later observations never replace the original outcome or authorise collection or a receipt. The transport uses200seconds and the native explicit test API/UI allows a longer response budget; this is not proof of real provider/proxy response timing.
+
+Submission/status remain separately disabled by default. The operator-purpose approval profile is an assertion of supplied external evidence, not provider verification. No actual approved TT1 template/authentication test payer, production consent, role grant, flag activation, bank request, collection or cash posting was created. Signing-only details remain signing only. Netcash testing uses developer accounts on live infrastructure; Stor24 sandbox/test labels do not imply a harmless isolated provider bank.
+
+Current consent and controlled-test expiry displays use explicit South African time. Exact source, local synthetic tests, protected checks, merge, deployment/configuration, genuine owner UI/download and actual provider/finance/customer/staff/device/training acceptance are recorded separately in PROJECT_CONTEXT.md. Separate collection preparation and actual bank/mandate/settlement acceptance remain open. The dated notes below retain the historical state at each earlier increment and must not be read as the current missing-code inventory.
+
+## Dated implementation history
+
 14 October 2026. The existing REST-shaped DebiCheck scaffold has no source callers and is not an operational provider integration. The new SOAP module prepares the documented authentication fields and performs the documented current-contract status lookup. It is a foundation for the reviewed workflow, not a finished staff/customer feature.
 
 The current NIWS_NIF service definition confirms `DebiCheckAuthenticate` with its exact ordered fields, Boolean identity/first-amount flags, named bank account enum, compact collection date, `collectionDayCode` and debtor identity enum. Preparation validates these fields, escapes text and never submits them. Netcash requires a minimum three-minute timeout for TT1 authentication; a future durable submission worker must own that call, rather than blocking a normal web request or repeating a timeout.

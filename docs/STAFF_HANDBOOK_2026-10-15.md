@@ -214,7 +214,23 @@ Read the fresh preview: exact account number, amount, method and original receip
 
 **Investigate an existing attempt.** A retained attempt blocks local withdrawal and a replacement permission. Staff must inspect original authentication history and provider evidence. Do not submit another request to resolve an unknown outcome.
 
-**Keep the remaining gates visible.** This release prepares consent and review only. The guarded submission step, real approved TT1 template/test payer, bank response, any later collection and financial receipt remain separate. Approved card/EFT flows continue within their own limits. Real customer, provider, finance, legal and staff acceptance must be recorded separately.
+**Keep the remaining gates visible.** This step prepares consent and review only. The guarded submission step, real approved TT1 template/test payer, bank response, any later collection and financial receipt remain separate. Approved card/EFT flows continue within their own limits. Real customer, provider, finance, legal and staff acceptance must be recorded separately.
+
+## 06F · Submit one separately approved bank test
+
+Guidance added 16 October. **Controlled bank-authentication test** is available only when its separate test controls and your current permissions allow it. Netcash must first supply the approved real-time template and authentication-test payer. Existing signing-only bank details are not that approval.
+
+**Choose the exact original evidence.** Select the permitted store and saved REVIEWED bank permission. Recheck the tenant’s terms, amount, date, account suffix and unexpired window. The tenant’s separate permission and an independent current staff review are required; neither is permission to collect money.
+
+**One explicit submission.** Type **SUBMIT ONE BANK TEST**, then choose **Submit one approved bank test** only for the approved test. This sends one real bank-authentication request. A bank response can take more than three minutes. Keep the page open; do not click again or repeat a timed-out request.
+
+**A retained attempt cannot be replayed.** The system records one claim before contacting Netcash and rechecks source, consent and staff authority immediately before transport. A changed guard can hold the claim without a bank call. Timeout, unknown response, browser disconnect or failed result recording also require investigation; none allows another attempt.
+
+**Read the original outcome.** Refresh saved evidence, then use **Recorded DebiCheck authentication**. REQUEST REJECTED, BANK REJECTED, BANK AUTHENTICATED and UNKNOWN are different original results. Authentication never proves a debit, settled rent, signed provider mandate or financial receipt. Do not clear a balance or allow move-in solely from it.
+
+**Later status is separate evidence.** If the original bank response returned a contract, an authorised person can select **Read current status for original bank test**. It uses that retained contract only and remains available for investigation after consent expires. A later Accepted status does not replace an original UNKNOWN result or enable collection. A missing original contract must be investigated with Netcash; do not enter a substitute reference.
+
+**Keep production gates open.** These controls do not create test approval, grant permissions, activate a schedule, send a collection or record cash. Real provider/bank acceptance, independent finance/legal decisions, staff/customer/device UAT and training sign-off remain separate. Continue approved card/EFT flows within their own limits.
 
 ## 07 · Arrears notices and escalation boundaries
 
