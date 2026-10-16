@@ -63,6 +63,24 @@ test("isolated customer appointments: retries, cover acknowledgements, store bou
         assert.equal((await db.task.findUniqueOrThrow({ where: { id: task.id } })).coverAcknowledgedAt, null);
       } finally { await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_staff_followup_audit_failure'); }
     });
+    await t.test("captured scope cannot write after actor authority is revoked", async () => {
+      const task = await createStaffFollowup(scope, input());
+      const beforeAudit = await db.auditEvent.count({ where: { entityId: task.id } });
+      const commands = [
+        { action: "UPDATE", assigneeId: cover.id, coverId: cover.id, title: task.title, description: task.description!, dueAt: task.dueAt!.toISOString() },
+        { action: "HANDOVER", coverId: cover.id }, { action: "COMPLETE" }, { action: "CANCEL" },
+      ];
+      await db.roleAssignment.deleteMany({ where: { userId: staff.id } });
+      try {
+        for (const command of commands) await assert.rejects(changeStaffFollowup(scope, task.id, { ...command, expectedUpdatedAt: task.updatedAt.toISOString() }), /FORBIDDEN/);
+        await assert.rejects(createStaffFollowup(scope, { ...input(), assigneeId: cover.id }), /FORBIDDEN/);
+        assert.deepEqual(await db.task.findUniqueOrThrow({ where: { id: task.id } }), task);
+        assert.equal(await db.auditEvent.count({ where: { entityId: task.id } }), beforeAudit);
+      } finally { await db.roleAssignment.create({ data: { userId: staff.id, roleId: role.id, facilityId: a.id } }); }
+      const accepted = await changeStaffFollowup({ ...scope, userId: cover.id }, task.id, { action: "ACKNOWLEDGE", expectedUpdatedAt: task.updatedAt.toISOString() });
+      const sameCover = await changeStaffFollowup(scope, task.id, { action: "HANDOVER", coverId: cover.id, expectedUpdatedAt: accepted.updatedAt.toISOString() });
+      assert.deepEqual(sameCover.coverAcknowledgedAt, accepted.coverAcknowledgedAt);
+    });
     await t.test("rescheduling and reassignment preserve versions, scope, cover acceptance and atomic history", async () => {
       const task = await createStaffFollowup(scope, input());
       const accepted = await changeStaffFollowup({ ...scope, userId: cover.id }, task.id, { action: "ACKNOWLEDGE", expectedUpdatedAt: task.updatedAt.toISOString() });
@@ -81,7 +99,7 @@ test("isolated customer appointments: retries, cover acknowledgements, store bou
       assert.equal((await listStaffFollowups(scope, "", undefined, "upcoming", now)).tasks.some(row => row.id === task.id), true);
       const reassigned = await changeStaffFollowup(scope, task.id, { ...edit, assigneeId: cover.id, expectedUpdatedAt: changed.updatedAt.toISOString() });
       assert.equal(reassigned.coverAcknowledgedAt, null);
-      const audit = await db.auditEvent.findFirstOrThrow({ where: { entityId: task.id, action: "staff_followup.update" }, orderBy: { createdAt: "asc" } });
+      const audit = await db.auditEvent.findFirstOrThrow({ where: { entityId: task.id, action: "staff_followup.update" }, orderBy: { occurredAt: "asc" } });
       assert.equal((audit.before as { title: string }).title, task.title);
       assert.equal((audit.after as { title: string }).title, edit.title);
       await db.user.update({ where: { id: cover.id }, data: { active: false } });
