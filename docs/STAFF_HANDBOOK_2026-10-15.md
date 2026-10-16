@@ -190,6 +190,20 @@ For an internal policy decision, expand **Request internal escalation review**, 
 
 A note saying 'lock tomorrow' is not access authorisation. Record the review required and the responsible approver. Use an approved isolated or consenting test recipient for acceptance; never train by sending to an invented real customer.
 
+## 07A · Review each scheduled arrears run
+
+Open **Collections → Scheduled collection letters**. Brett's chosen mode is **staff review each run**. Automatic dispatch remains off until separately approved configuration; saving a schedule or approving a run does not itself send an email.
+
+1. Choose the exact store and existing accounts. Enter the schedule name, first and last South African days, weekdays, SAST due time and review/delivery window. These choices start blank. The window must end by midnight that day.
+2. Open the saved schedule and use **Prepare today's due run** within its configured window, or read the due draft prepared by the separately configured worker. Source, verified-email and consent holds exclude the affected account. Read held accounts as well as included letters.
+3. A different authorised colleague reads every recipient, subject and complete letter. Record a review reference, confirm the review and use **Approve this run for configured dispatch**. The system checks the account, exact message, current permissions and timing again. Preparers and other contributors cannot approve their own letter.
+4. A new day needs a new run and a new real staff review. Yesterday's approval is never copied to recalculated letters. Cancel the run or schedule to stop future attempts; cancellation cannot recall an email already attempted.
+5. Read customer history and the delivery outcome. New letter content appears in authorised PDF, CSV and Excel downloads. Collection-letter text requires collection access at the same store as communications access; ledger access remains separate.
+
+**SENDING** and **REVIEW REQUIRED** need investigation. The worker never automatically repeats an uncertain send, and unresolved earlier delivery holds a later reminder. Source changes or expiry hold an old reviewed run instead of silently rewriting it. Ask the responsible administrator to resolve the retained record; do not create another plan to bypass the hold.
+
+Provider acceptance is separate from a recipient's inbox. Fees, account posting, SMS/WhatsApp debtor messages and physical lockout retain their own policy, approval and real acceptance gates. Use an approved isolated or consenting recipient for staff practice.
+
 ## 08 · Counter tablet and walk-in customer
 
 Prepare the actual managed tablet, network, cameras and private customer session. The Counter software does not prove that a device has been purchased, installed or handed over.

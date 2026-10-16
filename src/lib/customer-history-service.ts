@@ -3,6 +3,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { requireLeasingCustomer } from "@/lib/leasing-service";
 import { facilityWhere, type RequestScope } from "@/lib/scope";
 import { compareHistoryEntries, customerNoteSchema, decodeHistoryCursor, encodeHistoryCursor, historyQuerySchema, historyDateRange, noteCategories, type CustomerNoteInput, type HistoryEntry, type HistoryQuery } from "@/lib/customer-history-policy";
+import { canReadCollectionLetter, isCollectionLetter } from "@/lib/customer-history-body-access";
 import { archivedHistoryText } from "@/lib/customer-history-message-policy";
 import { customerHistoryRecords } from "@/lib/customer-history-records";
 
@@ -83,11 +84,11 @@ export async function customerHistory(scope: RequestScope, customerId: string, i
       where: { organisationId: scope.organisationId, customerId, ...(selectedRecordId ? { id:selectedRecordId } : {}), channel: query.channel ?? { in: ["EMAIL", "SMS", "WHATSAPP"] }, ...(query.status ? { status: query.status } : {}),
         AND: [
           ...(access.communications.unrestrictedFacilities ? [] : [{ OR: [{ facilityId: { in: access.communications.facilityIds } }, { facilityId: null }] }]),
-          ...(query.search ? [{ OR: [{ messageType: { contains: query.search, mode: "insensitive" as const } }, { channel: { contains: query.search, mode: "insensitive" as const } }, { AND: [{ NOT: { messageType: { contains: "VERIFICATION", mode: "insensitive" as const } } }, { NOT: { messageType: { contains: "OTP", mode: "insensitive" as const } } }, { NOT: { messageType: { contains: "PASSWORD", mode: "insensitive" as const } } }, { NOT: { messageType: { contains: "LOGIN", mode: "insensitive" as const } } }, { NOT: { messageType: { contains: "AUTHENTICATION", mode: "insensitive" as const } } }, { metadata: { path: ["historyEvidence", "version"], equals: 1 } }, { metadata: { path: ["historyEvidence", "text"], string_contains: query.search, mode: "insensitive" as const } }] }] }] : []),
+          ...(query.search ? [{ OR: [{ messageType: { contains: query.search, mode: "insensitive" as const } }, { channel: { contains: query.search, mode: "insensitive" as const } }, { AND: [{ NOT: { messageType: { contains: "VERIFICATION", mode: "insensitive" as const } } }, { NOT: { messageType: { contains: "OTP", mode: "insensitive" as const } } }, { NOT: { messageType: { contains: "PASSWORD", mode: "insensitive" as const } } }, { NOT: { messageType: { contains: "LOGIN", mode: "insensitive" as const } } }, { NOT: { messageType: { contains: "AUTHENTICATION", mode: "insensitive" as const } } }, { OR: [{ messageType: null }, { messageType: { not: "COLLECTION_REMINDER" } }, ...(access.collections ? [{ messageType: "COLLECTION_REMINDER", facilityId: access.collections.unrestrictedFacilities ? { not: null } : { in: access.collections.facilityIds } }] : [])] }, { metadata: { path: ["historyEvidence", "version"], equals: 1 } }, { metadata: { path: ["historyEvidence", "text"], string_contains: query.search, mode: "insensitive" as const } }] }] }] : []),
           boundary("COMMUNICATION", "queuedAt"),
         ],
       },
-      select: { id: true, queuedAt: true, messageType: true, channel: true, direction: true, status: true, sentAt: true, deliveredAt: true, readAt: true, metadata: true, facility: { select: { name: true } } },
+      select: { id: true, facilityId: true, queuedAt: true, messageType: true, channel: true, direction: true, status: true, sentAt: true, deliveredAt: true, readAt: true, metadata: true, facility: { select: { name: true } } },
       orderBy: [{ queuedAt: "desc" }, { id: "desc" }], take: PAGE_SIZE + 1,
     }) : [],
   ]);
@@ -96,7 +97,7 @@ export async function customerHistory(scope: RequestScope, customerId: string, i
     ...await customerHistoryRecords(scope, customerId, query, access.financial ?? null, boundary, selectedRecordId),
     ...notes.map(n => entry({ id: n.id, kind: "NOTE", at: n.createdAt.toISOString(), title: noteCategories[n.category as keyof typeof noteCategories] ?? n.category, body: n.body, category: n.category, author: n.authorName, facility: n.facility.name })),
     ...activities.map(a => entry({ id: a.id, kind: "COLLECTION", at: a.createdAt.toISOString(), title: `Collections · ${a.action.replaceAll("-", " ")} · ${a.case.account.accountNumber}`, body: a.note, author: actors.find(u => u.id === a.actorId)?.name ?? "Former staff member", facility: a.case.account.tenancy?.facility.name ?? null })),
-    ...messages.map(m => entry({ id: m.id, kind: "COMMUNICATION", at: m.queuedAt.toISOString(), title: `${m.channel} · ${(m.messageType ?? "Recorded communication").replaceAll("_", " ")}`, channel: m.channel, status: m.status, body: (/VERIFICATION|OTP|PASSWORD|LOGIN|AUTHENTICATION/i.test(m.messageType ?? "") ? null : archivedHistoryText(m.metadata)) ?? (m.direction === "INBOUND" ? "Inbound communication record" : "Outbound communication record"), facility: m.facility?.name ?? "Store not recorded", sentAt: m.sentAt?.toISOString() ?? null, deliveredAt: m.deliveredAt?.toISOString() ?? null, readAt: m.readAt?.toISOString() ?? null })),
+    ...messages.map(m => entry({ id: m.id, kind: "COMMUNICATION", at: m.queuedAt.toISOString(), title: `${m.channel} · ${(m.messageType ?? "Recorded communication").replaceAll("_", " ")}`, channel: m.channel, status: m.status, body: (isCollectionLetter(m.messageType) && !canReadCollectionLetter(scope, access.communications, access.collections, m.facilityId) ? "Collection letter content requires collection-view access at this store." : /VERIFICATION|OTP|PASSWORD|LOGIN|AUTHENTICATION/i.test(m.messageType ?? "") ? null : archivedHistoryText(m.metadata)) ?? (m.direction === "INBOUND" ? "Inbound communication record" : "Outbound communication record"), facility: m.facility?.name ?? "Store not recorded", sentAt: m.sentAt?.toISOString() ?? null, deliveredAt: m.deliveredAt?.toISOString() ?? null, readAt: m.readAt?.toISOString() ?? null })),
   ].sort(compareHistoryEntries);
   const data = entries.slice(0, PAGE_SIZE), last = data.at(-1);
   let writable: Array<{ id: string; name: string }> = [];

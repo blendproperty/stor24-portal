@@ -38,6 +38,7 @@ jobs:
       - run: node scripts/test-customer-save-recovery.mjs
       - run: node scripts/test-customer-history.mjs
       - run: node scripts/test-communication-log-search.mjs
+      - run: node scripts/test-collection-schedules.mjs
       - run: node scripts/test-staff-event-emails.mjs
       - run: node scripts/test-staff-handbook-download.mjs
       - run: node scripts/test-receipt-reallocation-workspace.mjs
@@ -161,6 +162,7 @@ jobs:
             output/package-update-recovery/
             output/password-form-recovery/
             output/staff-event-emails/
+            output/collection-schedules/
             output/plan-history-evidence/
             output/tenant-card-subscriptions/
             output/netcash-debicheck-requests/
