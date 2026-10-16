@@ -52,7 +52,7 @@ test("isolated PostgreSQL task status and audit commit together", async t => {
       assert.equal(first.total, 112); assert.equal(first.items.length, 25); assert.ok(first.nextCursor);
       assert.equal(first.facilities.some(store => store.id === b.id || store.id === foreignStore.id), false);
       assert.equal(first.assignees.some(person => person.id === privateColleague.id), false);
-      const seen = new Set(first.items.map(item => item.id)); let cursor = first.nextCursor;
+      const seen = new Set(first.items.map(item => item.id)); let cursor: string | null = first.nextCursor;
       while (cursor) { const page = await operationsTaskPage(scope, { q: "Page fixture", cursor }, now); assert.equal(page.total, 112); for (const item of page.items) { assert.equal(seen.has(item.id), false); seen.add(item.id); } cursor = page.nextCursor; }
       assert.equal(seen.size, 112);
       const later = await operationsTaskPage(scope, { q: "Page fixture", assignee: colleague.id }, now); assert.equal(later.total, 1); assert.equal(later.items[0].title, "Page fixture 110");
