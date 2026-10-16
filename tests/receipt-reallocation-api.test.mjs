@@ -1,18 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
+import {PrismaClientKnownRequestError} from '@prisma/client/runtime/client';
 
 test('receipt correction HTTP boundary fails closed before finance actions and routes each action through its required scope', async () => {
   const before = globalThis.__receiptApi;
-  const fixture = { calls: [], denied: null, dlp: null };
+  const fixture = { calls: [], denied: null, dlp: null, failure: null, PrismaClientKnownRequestError };
   globalThis.__receiptApi = fixture;
   const built = await build({ entryPoints: ['src/app/api/v1/adjustments/receipt-reallocations/route.ts'], bundle: true, write: false, platform: 'node', format: 'esm', plugins: [{ name: 'isolated-receipt-http', setup(b) {
+    b.onResolve({filter:/^@prisma\/client\/runtime\/client$/},()=>({path:'prisma-runtime',namespace:'fixture'}));
     b.onResolve({ filter: /^@\/lib\/(db|receipt-reallocation-access|receipt-reallocation-service|receipt-reallocation-workspace|dlp-transfer-service)$/ }, a => ({ path: a.path, namespace: 'fixture' }));
     b.onLoad({ filter: /.*/, namespace: 'fixture' }, a => {
       const head = 'const f=globalThis.__receiptApi;';
+      if(a.path==='prisma-runtime')return{contents:head+'export const PrismaClientKnownRequestError=f.PrismaClientKnownRequestError;'};
       if (a.path.endsWith('/db')) return { contents: 'export const db={};' };
       if (a.path.endsWith('access')) return { contents: head + 'export const receiptCorrectionScope=async(action="view")=>{f.calls.push(["scope",action]);if(f.denied===action)throw Error("FORBIDDEN");if(f.denied==="unauthenticated")throw Error("UNAUTHENTICATED");return {userId:"actor",organisationId:"org",facilityIds:["store"],unrestrictedFacilities:false};};export const receiptCorrectionCapabilities=async()=>({canRequest:true,canApprove:false});' };
-      if (a.path.endsWith('/receipt-reallocation-service')) return { contents: head + 'export const requestReceiptReallocation=async(...args)=>{f.calls.push(["request",...args]);return {id:"saved",idempotent:false};};export const decideReceiptReallocation=async(...args)=>{f.calls.push(["decide",...args]);return {id:"saved",status:"POSTED",idempotent:false};};' };
+      if (a.path.endsWith('/receipt-reallocation-service')) return { contents: head + 'export const requestReceiptReallocation=async(...args)=>{f.calls.push(["request",...args]);if(f.failure)throw f.failure;return {id:"saved",idempotent:false};};export const decideReceiptReallocation=async(...args)=>{f.calls.push(["decide",...args]);return {id:"saved",status:"POSTED",idempotent:false};};' };
       if (a.path.endsWith('workspace')) return { contents: head + 'export const receiptCorrectionWorkspace=async(...args)=>{f.calls.push(["workspace",...args]);return {requests:[]};};export const receiptCorrectionPreview=async(...args)=>{f.calls.push(["preview",...args]);return {fingerprint:"a".repeat(64)};};export const receiptCorrectionDocument=async()=>({content:"<html>Private account document</html>",facilityId:"store",documentId:"private-doc"});' };
       return { contents: head + 'export const protectDlpResponse=async(response,context)=>{f.calls.push(["dlp",context]);if(f.dlp)throw Error(f.dlp);return response;};' };
     });
@@ -38,6 +41,14 @@ test('receipt correction HTTP boundary fails closed before finance actions and r
     fixture.calls = []; fixture.denied = 'request'; assert.equal((await invoke(request)).status, 403); assert.ok(!fixture.calls.some(c => c[0] === 'request'));
     fixture.denied = null; fixture.calls = []; assert.equal((await invoke(request)).status, 200);
     assert.ok(fixture.calls.some(c => c[0] === 'scope' && c[1] === 'request')); assert.equal(fixture.calls.filter(c => c[0] === 'request').length, 1);
+    for(const state of ['40001','40P01']){
+      fixture.failure=new PrismaClientKnownRequestError('Synthetic native raw rollback',{code:'P2010',clientVersion:'synthetic',meta:{driverAdapterError:{cause:{kind:'TransactionWriteConflict',originalCode:state}}}});
+      assert.equal((await invoke(request)).status,409,'confirmed raw rollback is a review hold');
+    }
+    for(const failure of [new PrismaClientKnownRequestError('Unknown transaction outcome',{code:'P2028',clientVersion:'synthetic'}),new PrismaClientKnownRequestError('40001 message alone',{code:'P2010',clientVersion:'synthetic'}),{code:'P2010',meta:{driverAdapterError:{cause:{kind:'TransactionWriteConflict',originalCode:'40001'}}}}]){
+      fixture.failure=failure;assert.equal((await invoke(request)).status,500,'unknown or code-shaped result cannot be classified as a confirmed rollback');
+    }
+    fixture.failure=null;
     fixture.denied = 'approve';
     assert.equal((await invoke({ action: 'decide', id: input.sourceEntryId, revision: 0, decision: 'approve', reference: 'Independent documented decision', confirmed: true })).status, 403);
     fixture.denied = null;

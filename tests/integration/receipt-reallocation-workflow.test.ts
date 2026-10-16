@@ -8,6 +8,8 @@ import {createServer} from "node:http";
 import {readFile} from "node:fs/promises";
 import {build} from "esbuild";
 import {db} from "../../src/lib/db";
+import type {Prisma} from "../../src/generated/prisma/client";
+import {withRawRollbackFixture} from './finance-raw-rollback-fixture';
 import {previewReceiptReallocation,requestReceiptReallocation,decideReceiptReallocation} from "../../src/lib/receipt-reallocation-service";
 import {receiptAllocationGraph} from "../../src/lib/receipt-reallocation-source";
 import {settleVerifiedBookingPayment} from "../../src/lib/payments/booking-payment-settlement";
@@ -76,9 +78,15 @@ test("isolated receipt correction producers retain cash, approval, undo and sour
       type Handler=(request:Request)=>Promise<Response>;
       const loaded={exports:{} as {GET:Handler;POST:Handler}};
       const transactionFailures:{code:string;startTimeout:boolean;expired:boolean;elapsedMs:number}[]=[];
+      let forcedRawConflict:string|null=null;
       const observedDb=new Proxy(db,{get(target,key,receiver){
         if(key!=="$transaction")return Reflect.get(target,key,receiver);
-        return async(...args:unknown[])=>{const began=performance.now();try{return await Reflect.apply(target.$transaction,target,args);}catch(error){
+        return async(...args:unknown[])=>{const began=performance.now();
+          if(forcedRawConflict&&typeof args[0]==='function'){
+            const original=args[0] as (tx:Prisma.TransactionClient)=>Promise<unknown>,query=forcedRawConflict;
+            args[0]=async(tx:Parameters<typeof original>[0])=>{await tx.$queryRawUnsafe(query);return original(tx);};
+          }
+          try{return await Reflect.apply(target.$transaction,target,args);}catch(error){
           const code=error&&typeof error==="object"&&"code" in error?String(error.code):"UNKNOWN",message=error instanceof Error?error.message:"";
           if(transactionFailures.length<50)transactionFailures.push({code,startTimeout:message.includes("Unable to start a transaction in the given time"),expired:message.includes("Transaction already closed"),elapsedMs:Math.round(performance.now()-began)});
           throw error;
@@ -132,6 +140,11 @@ test("isolated receipt correction producers retain cash, approval, undo and sour
         const html=await doc.text();assert.ok(html.includes(f.source.accountNumber));assert.ok(!html.includes(f.target.accountNumber));
         assert.equal((await call(foreignToken,`?document=${id}&side=source`)).status,404);
         assert.equal((await call(foreignToken,`?sourceAccountId=${f.source.id}`)).status,404);
+        const next=input(f),nextPreview=await call(requesterToken,'',{action:'preview',input:next});assert.equal(nextPreview.status,200);const nextFingerprint=(await nextPreview.json()).data.fingerprint;
+        for(const state of ['40001','40P01']as const){
+          const result=await withRawRollbackFixture(state,3,async query=>{forcedRawConflict=query;try{return await call(requesterToken,'',{action:'request',input:next,fingerprint:nextFingerprint,confirmed:true});}finally{forcedRawConflict=null;}});
+          assert.equal(result.value.status,409,'confirmed native raw rollback exhaustion is a review hold, not an unknown500');assert.equal(result.attempts,3);assert.equal(await db.receiptReallocation.count({where:{organisationId:f.org.id}}),1);
+        }
         await db.roleAssignment.deleteMany({where:{userId:f.requester.id}});
         assert.equal((await call(requesterToken)).status,403,"current database grant revocation is effective without a new fixture session");
         assert.deepEqual(await db.payment.findUniqueOrThrow({where:{id:f.payment.id}}),f.payment);

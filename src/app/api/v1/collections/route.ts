@@ -1,3 +1,4 @@
+import {confirmedFinanceRollback} from '@/lib/finance/retry-rolled-back-transaction';
 import { protectDlpResponse } from "@/lib/dlp-transfer-service";
 import { z } from "zod";
 import { requirePermissionScope } from "@/lib/scope";
@@ -15,7 +16,7 @@ function failure(e: unknown) {
   if (["UNAUTHENTICATED", "FORBIDDEN"].includes(code)) return Response.json({ error: code === "UNAUTHENTICATED" ? "Sign in is required." : "You do not have permission for this action." }, { status: code === "UNAUTHENTICATED" ? 401 : 403 });
   if (e instanceof z.ZodError || e instanceof SyntaxError) return Response.json({ error: "Check the dates, amount, notes and confirmation." }, { status: 400 });
   if (messages[code]) return Response.json({ error: messages[code] }, { status: 409 });
-  if (e && typeof e === "object" && "code" in e && ["P2002", "P2034"].includes(String(e.code))) return Response.json({ error: messages.COLLECTION_CHANGED }, { status: 409 });
+  if (confirmedFinanceRollback(e) || e && typeof e === "object" && "code" in e && ["P2002", "P2034"].includes(String(e.code))) return Response.json({ error: messages.COLLECTION_CHANGED }, { status: 409 });
   return Response.json({ error: "Unable to load or save collections. Reload before retrying." }, { status: 500 });
 }
 export async function GET(request: Request) {

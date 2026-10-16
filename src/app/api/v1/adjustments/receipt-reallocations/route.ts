@@ -5,6 +5,7 @@ import { receiptCorrectionScope, receiptCorrectionCapabilities } from "@/lib/rec
 import { receiptReallocationInput } from "@/lib/receipt-reallocation-policy";
 import { requestReceiptReallocation, decideReceiptReallocation } from "@/lib/receipt-reallocation-service";
 import { receiptCorrectionWorkspace, receiptCorrectionPreview, receiptCorrectionDocument } from "@/lib/receipt-reallocation-workspace";
+import {confirmedFinanceRollback} from '@/lib/finance/retry-rolled-back-transaction';
 
 export const dynamic = "force-dynamic";
 const headers = { "cache-control": "private, no-store, max-age=0", "x-content-type-options": "nosniff" };
@@ -47,7 +48,7 @@ function failure(error: unknown) {
   if (error instanceof z.ZodError || error instanceof SyntaxError || code === "REALLOCATION_BODY") return json(400, "Check the request details, amount and supporting reference.");
   if (code === "PERSONAL_EXPORT_FORBIDDEN") return json(403, "You do not have permission to export this document.");
   if (code === "DLP_TRANSFER_BLOCKED") return json(422, "Data protection blocked this document.");
-  if (code.startsWith("REALLOCATION_") || error && typeof error === "object" && "code" in error && ["P2002", "P2034"].includes(String(error.code))) return json(409, "This receipt needs a fresh review. Reload the accounts and correction history before trying again; do not create another payment.");
+  if (code.startsWith("REALLOCATION_") || confirmedFinanceRollback(error) || error && typeof error === "object" && "code" in error && ["P2002", "P2034"].includes(String(error.code))) return json(409, "This receipt needs a fresh review. Reload the accounts and correction history before trying again; do not create another payment.");
   return json(500, "The result could not be confirmed. Reload the correction history before retrying.");
 }
 

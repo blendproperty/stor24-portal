@@ -1,3 +1,4 @@
+import {confirmedFinanceRollback} from '@/lib/finance/retry-rolled-back-transaction';
 import { z } from "zod";
 import { requirePermissionScope } from "@/lib/scope";
 import { sameOrigin } from "@/lib/request-security";
@@ -15,7 +16,7 @@ function failure(error: unknown) {
   if (code === "UNAUTHENTICATED" || code === "FORBIDDEN") return Response.json({ error: code === "UNAUTHENTICATED" ? "Sign in is required." : "You do not have permission for this action." }, { status: code === "UNAUTHENTICATED" ? 401 : 403 });
   if (error instanceof z.ZodError || error instanceof SyntaxError) return Response.json({ error: "Check the amount, reason and supporting reference." }, { status: 400 });
   if (adjustmentMessages[code]) return Response.json({ error: adjustmentMessages[code] }, { status: 409 });
-  if (error && typeof error === "object" && "code" in error && ["P2002", "P2034"].includes(String(error.code))) return Response.json({ error: adjustmentMessages.ADJUSTMENT_DUPLICATE }, { status: 409 });
+  if (confirmedFinanceRollback(error) || error && typeof error === "object" && "code" in error && ["P2002", "P2034"].includes(String(error.code))) return Response.json({ error: adjustmentMessages.ADJUSTMENT_DUPLICATE }, { status: 409 });
   return Response.json({ error: "The adjustment could not be completed. Reload its history before retrying." }, { status: 500 });
 }
 export async function GET(request: Request) {
