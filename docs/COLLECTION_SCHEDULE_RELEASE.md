@@ -10,7 +10,7 @@ New permission definitions are `collection_schedules.view`, `.manage` and `.appr
 
 Due evaluation creates at most one run per plan/day, reusing the existing account/day notice identity. Current source holds exclude the account; an earlier uncertain delivery also holds the next day. A draft already owned by another run is not rebound. Scheduled notices cannot be approved or sent via the manual endpoints. System preparation and dispatch audits have no invented human actor; the real policy creator and real run reviewer remain retained separately. Review is a genuine signed-in independent action over the exact recipients, subjects, full letters, revisions and run fingerprint. It approves all included notices atomically or none. Missing consent, a changed source, contributor self-approval or an expired window aborts review.
 
-The retained run remains visible after expiry/cancellation. There is no automatic regeneration of an approved run and no automatic same-day replacement of an immutable or uncertain notice. Investigate the retained source before a new explicit schedule; an unresolved attempted outcome must not be worked around by a different plan.
+The retained run remains visible after expiry/cancellation. Review controls reflect actual retained contributors and current day/window; older runs stay collapsed until opened. There is no automatic regeneration of an approved run and no automatic same-day replacement of an immutable or uncertain notice. Investigate the retained source before a new explicit schedule; an unresolved attempted outcome must not be worked around by a different plan.
 
 ## Default-off worker
 

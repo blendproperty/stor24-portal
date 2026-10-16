@@ -34,14 +34,14 @@ test("isolated native schedules require a fresh real independent review every ru
   };
   const prepare = async (f: Awaited<ReturnType<typeof fixture>>, system = false) => { const id = await evaluateCollectionSchedule(f.a, f.plan.row.id, f.plan.state.revision, system); return collectionRunRecord(db, f.org.id, id); };
   const approve = async (f: Awaited<ReturnType<typeof fixture>>) => {
-    const run = await prepare(f); await commandCollectionSchedule(f.b, { action: "review-run", id: run.row.id, revision: run.state.revision, fingerprint: run.state.fingerprint, decision: "APPROVE", reference: "Isolated exact letters reviewed", confirm: true }); return collectionRunRecord(db, f.org.id, run.row.id);
+    const run = await prepare(f); const view = await readCollectionSchedules(f.b, { facilityId: f.facility.id, planId: f.plan.row.id }); assert.equal(view.runs[0].canReview, true); assert.ok(!JSON.stringify(view).includes("payloadEncrypted")); await commandCollectionSchedule(f.b, { action: "review-run", id: run.row.id, revision: run.state.revision, fingerprint: run.state.fingerprint, decision: "APPROVE", reference: "Isolated exact letters reviewed", confirm: true }); return collectionRunRecord(db, f.org.id, run.row.id);
   };
   const activate = (f: Awaited<ReturnType<typeof fixture>>) => { process.env.COLLECTION_SCHEDULE_ENABLED = "true"; process.env.COLLECTION_SCHEDULE_APPROVED_FINGERPRINT = f.plan.state.fingerprint; };
   try {
     await t.test("default-off worker and due preparation send nothing; system audit does not impersonate staff", async () => {
       delete process.env.COLLECTION_SCHEDULE_ENABLED; delete process.env.COLLECTION_SCHEDULE_APPROVED_FINGERPRINT;
       assert.equal((await processCollectionSchedules({ send: async () => assert.fail("disabled") })).disabled, true);
-      const f = await fixture(2), run = await prepare(f, true);
+      const f = await fixture(2); await db.customer.update({ where: { id: f.accounts[0].customer.id }, data: { firstName: null, lastName: null, companyName: null } }); const picker = await readCollectionSchedules(f.a, { facilityId: f.facility.id }); assert.equal(picker.accounts.find(account => account.id === f.accounts[0].account.id)?.customer, "Unnamed customer"); const run = await prepare(f, true);
       assert.equal(run.state.status, "PENDING_REVIEW"); assert.equal(run.state.items.length, 2);
       assert.equal(await db.communicationLog.count({ where: { organisationId: f.org.id } }), 0);
       const audit = await db.auditEvent.findFirstOrThrow({ where: { organisationId: f.org.id, action: "collection.schedule.run_prepared" } }); assert.equal(audit.actorId, null);
@@ -103,6 +103,9 @@ test("isolated native schedules require a fresh real independent review every ru
       const repeat = await commandCollectionSchedule(f.a, f.command); assert.equal(repeat.id, f.plan.row.id);
       const attempts = await Promise.allSettled([prepare(f), prepare(f)]); assert.ok(attempts.some(r => r.status === "fulfilled"));
       assert.equal(await db.configurationProfile.count({ where: { organisationId: f.org.id, domain: "COLLECTION_SCHEDULE_RUN" } }), 1);
+      const otherStore = await db.facility.create({ data: { organisationId: f.org.id, code: randomUUID(), name: "Other permitted store" } });
+      await db.roleAssignment.create({ data: { userId: f.a.userId, roleId: f.role.id, facilityId: otherStore.id } });
+      await assert.rejects(readCollectionSchedules({ ...f.a, facilityIds: [f.facility.id, otherStore.id] }, { facilityId: otherStore.id, planId: f.plan.row.id }), /FORBIDDEN/);
       const changed = { ...(f.plan.row.config as object), integrity: "a".repeat(64) }; await db.configurationProfile.update({ where: { id: f.plan.row.id }, data: { config: changed } });
       await assert.rejects(prepare(f), /INTEGRITY/);
     });
@@ -117,6 +120,7 @@ test("isolated native schedules require a fresh real independent review every ru
       const notice = await db.configurationProfile.findUniqueOrThrow({ where: { id: run.state.items[0].noticeId } }); assert.ok((notice.config as { contributors: string[] }).contributors.includes(f.b.userId));
       await assert.rejects(commandCollectionSchedule(f.b, { action: "review-run", id: runId, revision: run.state.revision, fingerprint: run.state.fingerprint, decision: "APPROVE", reference: "Actual evaluator cannot approve", confirm: true }), /SELF_APPROVAL/);
       assert.equal((await collectionRunRecord(db, f.org.id, runId)).state.status, "PENDING_REVIEW");
+      assert.equal((await readCollectionSchedules(f.b, { facilityId: f.facility.id, planId: f.plan.row.id })).runs[0].canReview, false);
     });
     await t.test("overlapping plans retain one account-day draft and no hidden manual send path", async () => {
       const f = await fixture(), first = await prepare(f);
@@ -145,6 +149,18 @@ test("isolated native schedules require a fresh real independent review every ru
       const runs = await readCollectionSchedules(f.a, { facilityId: f.facility.id, planId: saved.id }); assert.equal(runs.runs.length, 25); assert.ok(runs.nextRunCursor);
       const olderRuns = await readCollectionSchedules(f.a, { facilityId: f.facility.id, planId: saved.id, runCursor: runs.nextRunCursor! }); assert.equal(olderRuns.runs.length, 2); assert.ok(!olderRuns.runs.some(r => runs.runs.some(q => q.id === r.id)));
       assert.equal(await db.communicationLog.count({ where: { organisationId: f.org.id } }), 0); t.mock.timers.setTime(fixed.getTime());
+    });
+    await t.test("the bounded twenty-account run preserves exact review and one provider attempt per account", async () => {
+      const f = await fixture(20), run = await approve(f); activate(f); const recipients: string[] = [];
+      assert.equal(run.state.items.length, 20);
+      const result = await processCollectionSchedules({ send: async message => { recipients.push(message.to); assert.equal(message.dlp?.actorId, f.b.userId); } });
+      assert.equal(result.accepted, 20); assert.equal(new Set(recipients).size, 20);
+      assert.deepEqual(recipients.toSorted(), f.accounts.map(item => item.customer.email!).toSorted());
+      assert.equal((await processCollectionSchedules({ send: async () => assert.fail("No duplicate attempt") })).accepted, 0);
+      const ids = f.accounts.map(item => item.account.id);
+      assert.equal(await db.payment.count({ where: { accountId: { in: ids } } }), 0);
+      assert.equal(await db.ledgerEntry.count({ where: { accountId: { in: ids } } }), 20);
+      assert.equal(await db.communicationLog.count({ where: { organisationId: f.org.id, status: "SUCCEEDED" } }), 20);
     });
   } finally { globalThis.fetch = originalFetch; delete process.env.COLLECTION_SCHEDULE_ENABLED; delete process.env.COLLECTION_SCHEDULE_APPROVED_FINGERPRINT; t.mock.timers.reset(); await db.$disconnect(); }
 });
