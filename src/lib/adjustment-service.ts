@@ -1,3 +1,4 @@
+import {assertNoNetcashRefundHold} from './payments/netcash-refund-interlock';
 import {receiptAllocationGraph} from "./receipt-reallocation-source";
 import { createHash } from "node:crypto";
 import { Prisma } from "@/generated/prisma/client";
@@ -154,6 +155,7 @@ export async function decideAdjustment(scope: RequestScope, id: string, action: 
     if (action !== "cancel" && request.requestedById === scope.userId) throw new Error("ADJUSTMENT_SELF_APPROVAL");
     if (action === "cancel" && request.requestedById !== scope.userId && request.reviewedById !== scope.userId) throw new Error("FORBIDDEN");
     if (action === "cancel" && request.status === "APPROVED" && !unpaidConfirmed) throw new Error("ADJUSTMENT_UNPAID_CONFIRMATION");
+    if(action==='cancel'&&request.kind==='REFUND'&&request.status==='APPROVED')await assertNoNetcashRefundHold(tx,scope.organisationId,request.accountId,request.paymentId);
     if (action !== "approve") {
       const result = await tx.financialAdjustment.update({ where: { id }, data: { status: action === "reject" ? "REJECTED" : "CANCELLED", reviewReference: reference, reviewedById: scope.userId, reviewedAt: new Date() } });
       await audit(tx, scope, request, action, { reference, previousStatus: request.status }); return result;
@@ -172,6 +174,7 @@ export async function recordRefundPayout(scope: RequestScope, id: string, refere
     const request = await locked(tx, scope, id);
     if (request.kind !== "REFUND" || request.status !== "APPROVED" || !request.reviewedAt) throw new Error("ADJUSTMENT_STATE");
     if (scope.userId === request.requestedById) throw new Error("ADJUSTMENT_SELF_APPROVAL");
+    await assertNoNetcashRefundHold(tx,scope.organisationId,request.accountId,request.paymentId);
     const parsed = new Date(`${date}T00:00:00+02:00`);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(parsed.getTime()) || southAfricaDateKey(parsed) !== date || date < southAfricaDateKey(request.reviewedAt) || date > southAfricaDateKey(new Date())) throw new Error("ADJUSTMENT_PAYOUT_DATE");
     const reviewed = await review(tx, scope, (request.snapshot as { input: unknown }).input, id);
@@ -186,4 +189,17 @@ export async function adjustmentDocument(scope: RequestScope, id: string) {
   const doc = await db.document.findUniqueOrThrow({ where: { id: request.documentId } });
   if (!doc.content || createHash("sha256").update(doc.content).digest("hex") !== doc.sha256) throw new Error("ADJUSTMENT_RECONCILIATION");
   return doc.content;
+}
+
+/** Internal read-only refund dependency. Caller holds the account lock and
+ * rederives current finance authority; preview does not reserve or post money. */
+export async function approvedRefundAdjustmentSource(tx:Client,scope:RequestScope,id:string){
+ const request=await tx.financialAdjustment.findFirst({where:{id,...scoped(scope)}});
+ if(!request||request.kind!=='REFUND'||request.status!=='APPROVED'||!request.paymentId||!request.sourceEntryId||!request.reviewedById||request.reviewedById===request.requestedById||!request.reviewedAt||!request.reviewReference||request.postedAt||request.ledgerEntryId||request.documentId||request.payoutReference||request.payoutDate)throw Error('NETCASH_REFUND_ADJUSTMENT_REVIEW');
+ const reviewed=await review(tx,scope,(request.snapshot as {input:unknown}).input,id);
+ if(reviewed.fingerprint!==request.fingerprint||reviewed.paymentId!==request.paymentId||reviewed.facilityId!==request.facilityId||reviewed.source?.id!==request.sourceEntryId)throw Error('NETCASH_REFUND_SOURCE_CHANGED');
+ const approval=await tx.auditEvent.findFirst({where:{organisationId:scope.organisationId,facilityId:request.facilityId,entityType:'FinancialAdjustment',entityId:request.id,action:'adjustment.approved',actorId:request.reviewedById},orderBy:[{occurredAt:'desc'},{id:'desc'}]});
+ const evidence=approval?.after as {fingerprint?:unknown;reference?:unknown}|null;
+ if(!evidence||evidence.fingerprint!==request.fingerprint||evidence.reference!==request.reviewReference)throw Error('NETCASH_REFUND_ADJUSTMENT_REVIEW');
+ return{request,reviewed};
 }

@@ -15,6 +15,7 @@ export default async function AdjustmentsPage() {
         description="Correct financial and inventory exceptions through reason-coded reversals, approvals and permanent audit history."
       />
       <p><Link className="button button-secondary" href="/adjustments/receipt-corrections">Correct a receipt allocation</Link></p>
+      <p><Link className="button button-secondary" href="/adjustments/netcash-refunds">Review a Netcash card refund</Link></p>
       <AdjustmentsWorkspace />
     </div>
   );
