@@ -213,8 +213,6 @@ jobs:
         with:
           path: lane
           persist-credentials: false
-      - name: Verify diagnostic safety preflight without subject execution
-        run: python3 lane/scripts/ci/test_finance_coupled_diagnostic.py
       - name: Require the reviewed immutable subject
         env:
           SUBJECT_SHA: ${{ inputs.subject_sha }}
@@ -225,6 +223,10 @@ jobs:
           ref: f385f9044f471ed46542619a83c93341e41e49da
           path: subject
           persist-credentials: false
+      - name: Verify diagnostic safety preflight without subject execution
+        env:
+          FINANCE_DIAGNOSTIC_SUBJECT_DIRECTORY: ${{ github.workspace }}/subject
+        run: python3 lane/scripts/ci/test_finance_coupled_diagnostic.py
       - uses: actions/setup-node@v4
         with:
           node-version: 22

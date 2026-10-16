@@ -37,6 +37,15 @@ def sanitized_summary(raw):
   except (ValueError,TypeError,AttributeError):pass
  result['numericAssertionPairs']=result['numericAssertionPairs'][:100]
  return result
+def verify_subject_database_guards(paths):
+ # Run after pinned original bytes are verified, before any Docker call.
+ # No Git subprocess or caller working-directory assumption in this check.
+ guarded={'receipt-reallocation-workflow.test.ts','finance-raw-rollback.test.ts','receipt-import-posting.test.ts'}
+ selected={path.name:path for path in paths if path.name in guarded}
+ if set(selected)!=guarded:raise RuntimeError('Missing original guarded suites')
+ for path in selected.values():
+  if 'receipt_correction_[a-z0-9_]+|merchandise_ci' not in path.read_text(encoding='utf-8'):raise RuntimeError('Original database guard changed')
+ if not re.fullmatch(r'/(?:receipt_correction_[a-z0-9_]+|merchandise_ci)','/merchandise_ci'):raise RuntimeError('Diagnostic database guard mismatch')
 def main():
  parser=argparse.ArgumentParser();parser.add_argument('--subject',required=True);parser.add_argument('--subject-sha',required=True);parser.add_argument('--lane-sha',required=True);args=parser.parse_args()
  if os.environ.get('GITHUB_ACTIONS')!='true' or os.environ.get('RUNNER_OS')!='Linux':raise RuntimeError('Hosted Linux Actions only; local execution refused')
@@ -50,6 +59,7 @@ def main():
  for path in paths:
   original=subprocess.check_output(['git','-C',str(subject),'show',SUBJECT+':'+str(path.relative_to(subject))]);assert path.read_bytes()==original,'Selected test bytes changed'
  if sha(paths[0])!=OBSERVER:raise RuntimeError('Original reviewed observer changed')
+ verify_subject_database_guards(paths)
  run=os.environ['GITHUB_RUN_ID'];attempt=os.environ['GITHUB_RUN_ATTEMPT']
  if not re.fullmatch('[0-9]+',run) or not re.fullmatch('[0-9]+',attempt):raise RuntimeError('Invalid owned run identity')
  identity=run+'-'+attempt;prefix='stor24-finance-diag-'+identity;label='stor24.finance.diagnostic.owner';network=prefix+'-net';postgres=prefix+'-pg'

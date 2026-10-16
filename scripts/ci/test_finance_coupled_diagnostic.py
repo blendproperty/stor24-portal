@@ -15,19 +15,38 @@ class Preflight(unittest.TestCase):
    with self.assertRaisesRegex(RuntimeError,expected):lane.main()
    calls.assert_not_called()
  def test_fixture_database_matches_unchanged_subject_guards(self):
-  # These three original suites refuse an unrelated database name before their
-  # children run. Verify actual runner arguments, not a weakened subject guard.
-  import ast,re,subprocess
+  # Inspect real runner arguments and exercise the original-guard verifier with
+  # synthetic files. No dependency on cwd, Git history, Docker or a DB.
+  import ast,tempfile
   tree=ast.parse(runner.read_text(encoding='utf-8'))
   literals=[node.value for node in ast.walk(tree) if isinstance(node,ast.Constant) and isinstance(node.value,str)]
   configured=[value for value in literals if value.startswith('DATABASE_URL=')]
   self.assertEqual(configured,['DATABASE_URL=postgresql://ci:synthetic-ci@localhost:5432/merchandise_ci'])
-  self.assertIn('POSTGRES_DB=merchandise_ci',literals)
-  self.assertIn('merchandise_ci',literals)
-  for name in ['receipt-reallocation-workflow','finance-raw-rollback','receipt-import-posting']:
-   source=subprocess.check_output(['git','show',lane.SUBJECT+':tests/integration/'+name+'.test.ts']).decode('utf-8')
-   self.assertIn('receipt_correction_[a-z0-9_]+|merchandise_ci',source)
-   self.assertRegex('/merchandise_ci',r'^/(?:receipt_correction_[a-z0-9_]+|merchandise_ci)$')
+  self.assertIn('POSTGRES_DB=merchandise_ci',literals);self.assertIn('merchandise_ci',literals)
+  with tempfile.TemporaryDirectory() as directory,mock.patch.object(lane.subprocess,'run',side_effect=AssertionError('Execution forbidden')) as calls:
+   paths=[pathlib.Path(directory)/(name+'.test.ts') for name in ['receipt-reallocation-workflow','finance-raw-rollback','receipt-import-posting']]
+   for path in paths:path.write_text('receipt_correction_[a-z0-9_]+|merchandise_ci',encoding='utf-8')
+   lane.verify_subject_database_guards(paths)
+   paths[0].write_text('different guard',encoding='utf-8')
+   with self.assertRaisesRegex(RuntimeError,'Original database guard changed'):lane.verify_subject_database_guards(paths)
+   with self.assertRaisesRegex(RuntimeError,'Missing original guarded suites'):lane.verify_subject_database_guards(paths[1:])
+   calls.assert_not_called()
+ def test_actual_pinned_subject_guards_from_separate_checkout(self):
+  import hashlib,subprocess,tempfile
+  expected={'receipt-reallocation-workflow':'87ff0b9beedade6869753eae0e24f2ac985546e6ab140574bea2875e1135eab7','finance-raw-rollback':'03419b209cc7225ac877f0c80afb8abaaa6ec22906bc76b9d91b4e3a41921fe4','receipt-import-posting':'fdd2a9db432178d6395a75ca03cb358007248c1f25101bb7a7bc02d7119efa04'}
+  configured=os.environ.get('FINANCE_DIAGNOSTIC_SUBJECT_DIRECTORY')
+  if os.environ.get('GITHUB_ACTIONS')=='true':
+   self.assertIsNotNone(configured,'Hosted preflight requires the separate literal-pinned subject checkout')
+   self.assertEqual(pathlib.Path(configured).resolve(),pathlib.Path(os.environ['GITHUB_WORKSPACE']).resolve()/'subject')
+  with tempfile.TemporaryDirectory() as directory:
+   paths=[]
+   for name,digest in expected.items():
+    relative='tests/integration/'+name+'.test.ts'
+    if configured:payload=(pathlib.Path(configured)/relative).read_bytes()
+    else:payload=subprocess.check_output(['git','-C',str(runner.resolve().parents[2]),'show',lane.SUBJECT+':'+relative])
+    self.assertEqual(hashlib.sha256(payload).hexdigest(),digest)
+    path=pathlib.Path(directory)/(name+'.test.ts');path.write_bytes(payload);paths.append(path)
+   lane.verify_subject_database_guards(paths)
  def test_local_execution_stops_before_any_subprocess(self):self.refused({'GITHUB_ACTIONS':'false','RUNNER_OS':'Windows'},lane.SUBJECT,'Hosted Linux Actions only')
  def test_unreviewed_subject_stops_before_any_subprocess(self):self.refused({'GITHUB_ACTIONS':'true','RUNNER_OS':'Linux'},'f'*40,'Unreviewed subject/lane identity')
 if __name__=='__main__':unittest.main()
