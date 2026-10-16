@@ -5,6 +5,7 @@ import {currentRoleAccess} from '@/lib/current-role-access';
 import {cardSourceHash} from './card-autopay-enrollment-policy';
 import {DEBICHECK_BANK_CONSENT_DOMAIN,bankAuthenticationConsentHash} from './netcash-debicheck-bank-consent-policy';
 import {readStoredBankConsent} from './netcash-debicheck-bank-consent-record';
+import {readBankAuthenticationTestApproval} from './netcash-debicheck-bank-test-approval';
 import {currentBankConsentSource} from './netcash-debicheck-bank-consent-source';
 import {requireNativeBankConsent} from './netcash-debicheck-bank-authority';
 import {DEBICHECK_REQUEST_DOMAIN,readDebiCheckRequest,privateDebiCheckTerms} from './netcash-debicheck-request-policy';
@@ -90,7 +91,7 @@ export async function submitReviewedDebiCheckTest(scope:RequestScope,input:{faci
   },options);
  }catch{return actionResult(claim,false,false,true)}
  // Final synchronous checks immediately before entering the one-shot transport.
- try{flags();const now=clock(),approval=JSON.parse(process.env.NETCASH_DEBICHECK_AUTHENTICATION_TEST_APPROVAL??'null');if(now>=new Date(context.value.expiresAt)||now<new Date(context.value.consentedAt!)||cardSourceHash(approval)!==context.value.source.providerApprovalHash||!approval||Date.parse(approval.expiresAt)-now.getTime()<600000)throw Error()}catch{return actionResult(claim,false,false,true)}
+ try{flags();const now=clock(),approval=readBankAuthenticationTestApproval(now);if(now>=new Date(context.value.expiresAt)||now<new Date(context.value.consentedAt!)||cardSourceHash(approval)!==context.value.source.providerApprovalHash)throw Error()}catch{return actionResult(claim,false,false,true)}
  let outboundCalls=0;
  const once:typeof fetch=(...args)=>{if(++outboundCalls!==1)throw Error('DEBICHECK_SECOND_TRANSPORT_FORBIDDEN');return request(...args)};
  const outcome=await submitDebiCheckAuthenticationOnce(context.key,context.terms,once);

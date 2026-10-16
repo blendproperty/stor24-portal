@@ -63,6 +63,17 @@ test('isolated guarded bank test worker permits one physical attempt and holds e
    const result=await submitReviewedDebiCheckTest(f.staff,f.input,request,clock);assert.equal(calls,1);assert.equal(result.originalResultRetained,true);assert.equal(result.attempt?.status,'BANK_AUTHENTICATED');
    process.env.NETCASH_DEBICHECK_BANK_AUTHENTICATION_TEST_ENABLED='false';const duplicate=await submitReviewedDebiCheckTest(f.staff,f.input,request,clock);assert.equal(duplicate.newClaim,false);assert.equal(duplicate.providerActionAttempted,false);assert.equal(calls,1);process.env.NETCASH_DEBICHECK_BANK_AUTHENTICATION_TEST_ENABLED='true';
   });
+  await t.test('unchanged documentary whitespace uses the same canonical approval through the final guard',async()=>{
+   const f=await ready(),approval=JSON.parse(process.env.NETCASH_DEBICHECK_AUTHENTICATION_TEST_APPROVAL!);approval.providerEvidenceReference='  '+approval.providerEvidenceReference+'  ';approval.approvalRecordedBy='  '+approval.approvalRecordedBy+'  ';process.env.NETCASH_DEBICHECK_AUTHENTICATION_TEST_APPROVAL=JSON.stringify(approval);
+   let calls=0;const result=await submitReviewedDebiCheckTest(f.staff,f.input,async()=>{calls++;return new Response(accepted)},clock);assert.equal(calls,1);assert.equal(result.localGuardHeld,false);assert.equal(result.originalResultRetained,true);assert.equal(result.attempt?.status,'BANK_AUTHENTICATED');
+  });
+  await t.test('a semantically changed approval rejects before claim and is held if changed at the final guard',async()=>{
+   const f=await ready(),original=process.env.NETCASH_DEBICHECK_AUTHENTICATION_TEST_APPROVAL!,approval=JSON.parse(original);approval.providerEvidenceReference+=' changed';process.env.NETCASH_DEBICHECK_AUTHENTICATION_TEST_APPROVAL=JSON.stringify(approval);
+   await assert.rejects(submitReviewedDebiCheckTest(f.staff,f.input,noNetwork,clock),/CONSENT_SOURCE_CHANGED/);assert.equal(await db.configurationProfile.count({where:{id:f.attemptId}}),0);
+   process.env.NETCASH_DEBICHECK_AUTHENTICATION_TEST_APPROVAL=original;let ticks=0,calls=0;
+   const result=await submitReviewedDebiCheckTest(f.staff,f.input,async()=>{calls++;return new Response(accepted)},()=>{if(++ticks===4)process.env.NETCASH_DEBICHECK_AUTHENTICATION_TEST_APPROVAL=JSON.stringify(approval);return clock()});
+   assert.equal(ticks,4);assert.equal(calls,0);assert.equal(result.localGuardHeld,true);assert.equal(result.originalResultRetained,false);assert.equal((await db.configurationProfile.findUniqueOrThrow({where:{id:f.attemptId}})).status,'CLAIMED');
+  });
   await t.test('parallel explicit calls reach only one physical provider attempt',async()=>{
    const f=await ready();let calls=0;const request:typeof fetch=async()=>{calls++;return new Response(accepted)};
    const results=await Promise.allSettled(Array.from({length:8},()=>submitReviewedDebiCheckTest(f.staff,f.input,request,clock)));
