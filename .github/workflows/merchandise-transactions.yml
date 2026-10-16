@@ -19,7 +19,7 @@ on:
         description: Exact immutable financial diagnostic subject
         type: string
         required: false
-        default: f385f9044f471ed46542619a83c93341e41e49da
+        default: 0ce00fa78a36ee85ff3703b7eec3f70037b9c648
       run_next_workload:
         description: Run one isolated synthetic Next HTTP workload pilot
         type: boolean
@@ -222,10 +222,10 @@ jobs:
         env:
           SUBJECT_SHA: ${{ inputs.subject_sha }}
         run: |
-          test "$SUBJECT_SHA" = f385f9044f471ed46542619a83c93341e41e49da
+          test "$SUBJECT_SHA" = 0ce00fa78a36ee85ff3703b7eec3f70037b9c648
       - uses: actions/checkout@v4
         with:
-          ref: f385f9044f471ed46542619a83c93341e41e49da
+          ref: 0ce00fa78a36ee85ff3703b7eec3f70037b9c648
           path: subject
           persist-credentials: false
       - name: Verify diagnostic safety preflight without subject execution
@@ -243,7 +243,7 @@ jobs:
         run: npm run db:generate
       - name: Run exactly one original coupled workload in an owned internal network
         env:
-          SUBJECT_SHA: f385f9044f471ed46542619a83c93341e41e49da
+          SUBJECT_SHA: 0ce00fa78a36ee85ff3703b7eec3f70037b9c648
           LANE_SHA: ${{ github.sha }}
           FINANCE_FILE_CONCURRENCY_SEVEN: ${{ inputs.finance_seven_file_concurrency }}
         run: |

@@ -21,6 +21,25 @@ class Preflight(unittest.TestCase):
   summary=lane.sanitized_summary(raw);encoded=json.dumps(summary)
   for value in ['PRIVATE-SQL','PRIVATE-TOKEN','PRIVATE-SEED','rawSql','secret','credentials']:self.assertNotIn(value,encoded)
   self.assertEqual(summary['tapTotals']['fail'],9);self.assertEqual(summary['httpObservers'][0]['stage'],'independent-approval');self.assertEqual(summary['httpObservers'][0]['routeFailures'][0]['code'],'P2010');self.assertEqual(summary['numericAssertionPairs'],[{'expected':200,'actual':409}])
+ def test_import_observer_closed_evidence_and_private_redaction(self):
+  value={'fixture':'receipt-import-contention','case':'same-key-post','stage':'post','errorClasses':['PrismaClientKnownRequestError','PRIVATE-CLASS'],'prismaCodes':['P2034','PRIVATE-CODE'],'sqlStates':['40001','25P02','P2034','ABCDE','PRIVATE-SQL'],'elapsedMs':12,'message':'PRIVATE-SQL','accountId':'PRIVATE-ID'}
+  result=lane.sanitized_summary('# '+json.dumps(value,separators=(',',':')))
+  self.assertEqual(result['importObservers'],[{'fixture':'receipt-import-contention','case':'same-key-post','stage':'post','errorClasses':['PrismaClientKnownRequestError'],'prismaCodes':['P2034'],'sqlStates':['40001','25P02'],'elapsedMs':12}])
+  for private in ['PRIVATE','ABCDE','message','accountId']:self.assertNotIn(private,json.dumps(result))
+ def test_import_observer_rejects_unknown_cases_stages_and_malformed_types(self):
+  base={'fixture':'receipt-import-contention','case':'move-undo','stage':'undo','errorClasses':['Error'],'prismaCodes':['P2010'],'sqlStates':['40P01'],'elapsedMs':1}
+  for change in [{'case':'PRIVATE'},{'stage':'PRIVATE'},{'case':[]},{'stage':{} }]:
+   value={**base,**change};self.assertEqual(lane.sanitized_summary(json.dumps(value,separators=(',',':')))['importObservers'],[])
+  for change in [{'errorClasses':'PRIVATE','prismaCodes':{},'sqlStates':None,'elapsedMs':True},{'errorClasses':[{}],'prismaCodes':[[]],'sqlStates':[{}],'elapsedMs':float('inf')}]:
+   result=lane.sanitized_summary(json.dumps({**base,**change},separators=(',',':')))['importObservers'][0]
+   self.assertNotIn('elapsedMs',result)
+   self.assertNotIn('PRIVATE',json.dumps(result))
+ def test_import_observer_payload_and_count_bounds(self):
+  value={'fixture':'receipt-import-contention','case':'netcash-card-return','stage':'netcash-return','errorClasses':['Error'],'prismaCodes':['P2010'],'sqlStates':['P0001'],'elapsedMs':3600000}
+  line=json.dumps(value,separators=(',',':'))
+  self.assertEqual(len(lane.sanitized_summary('\n'.join([line]*60))['importObservers']),50)
+  self.assertEqual(lane.sanitized_summary(line+'PRIVATE'*20000)['importObservers'],[])
+  self.assertEqual(lane.sanitized_summary('{"fixture":"receipt-import-contention","case":')['importObservers'],[])
  def refused(self,environment,subject,expected):
   with mock.patch.dict(os.environ,environment),mock.patch.object(lane.subprocess,'run',side_effect=AssertionError('Execution forbidden'))as calls,mock.patch.object(sys,'argv',[str(runner),'--subject','unused','--subject-sha',subject,'--lane-sha','1'*40]):
    with self.assertRaisesRegex(RuntimeError,expected):lane.main()
@@ -68,7 +87,7 @@ class Preflight(unittest.TestCase):
    calls.assert_not_called()
  def test_actual_pinned_subject_guards_from_separate_checkout(self):
   import hashlib,subprocess,tempfile
-  expected={'receipt-reallocation-workflow':'87ff0b9beedade6869753eae0e24f2ac985546e6ab140574bea2875e1135eab7','finance-raw-rollback':'03419b209cc7225ac877f0c80afb8abaaa6ec22906bc76b9d91b4e3a41921fe4','receipt-import-posting':'fdd2a9db432178d6395a75ca03cb358007248c1f25101bb7a7bc02d7119efa04'}
+  expected={'receipt-reallocation-workflow':'87ff0b9beedade6869753eae0e24f2ac985546e6ab140574bea2875e1135eab7','finance-raw-rollback':'03419b209cc7225ac877f0c80afb8abaaa6ec22906bc76b9d91b4e3a41921fe4','receipt-import-posting':'c9829ecaced0da7da594640543ceeb3e7f5aa038ea5c02d1ef3fdbafb74db42e'}
   configured=os.environ.get('FINANCE_DIAGNOSTIC_SUBJECT_DIRECTORY')
   if os.environ.get('GITHUB_ACTIONS')=='true':
    self.assertIsNotNone(configured,'Hosted preflight requires the separate literal-pinned subject checkout')

@@ -1,6 +1,6 @@
 """One approved hosted diagnostic; never run against laptop/production Docker."""
 import argparse, datetime, hashlib, json, os, pathlib, re, subprocess, time
-SUBJECT='f385f9044f471ed46542619a83c93341e41e49da'
+SUBJECT='0ce00fa78a36ee85ff3703b7eec3f70037b9c648'
 OBSERVER='87ff0b9beedade6869753eae0e24f2ac985546e6ab140574bea2875e1135eab7'
 TESTS=['receipt-reallocation-workflow','adjustments','collections','marketing-payment-cohorts','reservation-price-amendments','finance-raw-rollback','receipt-import-posting']
 CONDITIONS=('original-default','explicit-seven-files')
@@ -25,7 +25,7 @@ def subject_case_references(paths):
     references[title]=None if title in references else reference
  return references
 def sanitized_summary(raw,case_references=None):
- result={'tapTotals':{},'httpObservers':[],'observedPrismaCodes':sorted(set(re.findall(r"\bP[0-9]{4}\b",raw)))[:100],'numericAssertionPairs':[],'rawContentPublished':False,'caseResults':[],'unmappedCaseResultCount':0,'unresolvedFailureRecordCount':0};pending=None;current_case=None
+ result={'tapTotals':{},'httpObservers':[],'importObservers':[],'observedPrismaCodes':sorted(set(re.findall(r"\bP[0-9]{4}\b",raw)))[:100],'numericAssertionPairs':[],'rawContentPublished':False,'caseResults':[],'unmappedCaseResultCount':0,'unresolvedFailureRecordCount':0};pending=None;current_case=None
  for line in raw.splitlines():
   header=re.match(r'^\s*(not ok|ok)\b',line)
   if header:
@@ -52,6 +52,24 @@ def sanitized_summary(raw,case_references=None):
   if number:
    if number[1]=='expected':pending=int(number[2])
    elif pending is not None:result['numericAssertionPairs'].append({'expected':pending,'actual':int(number[2])});pending=None
+  import_marker=line.find('{"fixture":"receipt-import-contention"')
+  if import_marker>=0 and len(line)<=100000:
+   try:
+    value=json.JSONDecoder().raw_decode(line[import_marker:])[0]
+    if value.get('fixture')=='receipt-import-contention' and value.get('case') in {'same-key-post','netcash-card-return','move-undo'} and value.get('stage') in {'setup','intake','preview','post','verify','netcash-return','move','undo'}:
+     clean={'fixture':'receipt-import-contention','case':value['case'],'stage':value['stage']}
+     accepted={
+      'errorClasses':{'Error','AssertionError','PrismaClientKnownRequestError','PrismaClientUnknownRequestError','PrismaClientInitializationError','PrismaClientValidationError','PrismaClientRustPanicError','DriverAdapterError','DatabaseError','UNCLASSIFIED'},
+      'sqlStates':{'23505','23514','23503','23502','25P02','40001','40P01','42703','57014','P0001','55P03','53300','08000','08003','08006'}}
+     for key in ['errorClasses','prismaCodes','sqlStates']:
+      values=value.get(key,[]);clean[key]=[]
+      if isinstance(values,list):
+       for item in values[:20]:
+        if isinstance(item,str) and (bool(re.fullmatch(r'P[0-9]{4}',item)) if key=='prismaCodes' else item in accepted[key]) and item not in clean[key]:clean[key].append(item)
+     elapsed=value.get('elapsedMs')
+     if type(elapsed) in [int,float] and 0<=elapsed<=3600000:clean['elapsedMs']=elapsed
+     if len(result['importObservers'])<50:result['importObservers'].append(clean)
+   except (ValueError,TypeError,AttributeError):pass
   marker=line.find('{"fixture":"receipt-http-contention"')
   if marker<0 or len(line)>100000:continue
   try:
