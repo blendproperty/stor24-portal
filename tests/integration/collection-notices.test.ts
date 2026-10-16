@@ -2,6 +2,19 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {randomUUID} from "node:crypto";
 import {db} from "../../src/lib/db";
+import { customerHistory } from "../../src/lib/customer-history-service";
+import { historyQuerySchema } from "../../src/lib/customer-history-policy";
+import { buildCustomerHistoryExport, hydrateCustomerHistoryMessages } from "../../src/lib/customer-history-export";
+import { customerHistoryPdf } from "../../src/lib/customer-history-document";
+import { customerHistoryExcel } from "../../src/lib/customer-history-excel";
+import { toCsv } from "../../src/lib/reporting";
+import { communicationLogPage } from "../../src/lib/communication-log-service";
+import { communicationFiltersSchema } from "../../src/lib/communication-log-query";
+import { historyEvidence } from "../../src/lib/customer-history-message-policy";
+import ExcelJS from "exceljs";
+import { PDFDocument } from "pdf-lib";
+import { mkdir, writeFile } from "node:fs/promises";
+
 import {previewCollectionNotice,prepareCollectionNotice,reviewCollectionNotice,sendCollectionNotice,previewCollectionNoticeBatch,prepareCollectionNoticeBatch,approveCollectionNoticeBatch} from "../../src/lib/collection-notice-service";
 test("isolated collection notices: holds, independent review, source changes and one provider attempt",async t=>{
   assert.equal(process.env.MERCHANDISE_DB_TEST,"isolated-ci");assert.equal(new URL(process.env.DATABASE_URL!).hostname,"localhost");process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY="collection-notice-ci-only-encryption-key-at-least-32";process.env.AUTH_SECRET="collection-notice-ci-only-auth-secret-at-least-32";process.env.APP_URL="https://portal.example.invalid";
@@ -105,12 +118,33 @@ test("isolated collection notices: holds, independent review, source changes and
       for(let n=0;n<100&&!calls;n++)await new Promise(resolve=>setTimeout(resolve,10));assert.equal(calls,1);
       const concurrent=await sendCollectionNotice(f.b,{id:ready.id,revision:ready.revision,confirm:true},{send:async()=>{calls++}});assert.equal(concurrent.status,"SENDING");assert.equal(concurrent.repeated,true);release();const result=await send;assert.equal(result.status,"ACCEPTED");assert.equal(result.deliveryVerified,false);
       const repeated=await sendCollectionNotice(f.a,{id:ready.id,revision:ready.revision,confirm:true},{send:async()=>{calls++}});assert.equal(repeated.repeated,true);assert.equal(calls,1);
-      const log=await db.communicationLog.findUniqueOrThrow({where:{idempotencyKey:ready.id}});assert.equal(log.attempts,1);assert.equal(log.deliveredAt,null);assert.equal(log.nextRetryAt,null);assert.equal(await db.ledgerEntry.count({where:{accountId:f.account.id}}),1);assert.equal((await db.account.findUniqueOrThrow({where:{id:f.account.id}})).balance.toString(),"100");
+      const log=await db.communicationLog.findUniqueOrThrow({where:{idempotencyKey:ready.id}});assert.deepEqual((log.metadata as {historyEvidence:unknown}).historyEvidence,historyEvidence(ready));assert.equal(log.attempts,1);assert.equal(log.deliveredAt,null);assert.equal(log.nextRetryAt,null);assert.equal(await db.ledgerEntry.count({where:{accountId:f.account.id}}),1);assert.equal((await db.account.findUniqueOrThrow({where:{id:f.account.id}})).balance.toString(),"100");
     });
     await t.test("provider timeout/failure requires review and never permits automatic or manual replay",async()=>{
       const f=await fixture(),ready=await approved(f);let calls=0;const provider={send:async()=>{calls++;throw Error("private provider detail")}};
       const failed=await sendCollectionNotice(f.a,{id:ready.id,revision:ready.revision,confirm:true},provider);assert.equal(failed.status,"REVIEW_REQUIRED");assert.equal(failed.accepted,false);await sendCollectionNotice(f.a,{id:ready.id,revision:ready.revision,confirm:true},provider);assert.equal(calls,1);
-      const log=await db.communicationLog.findUniqueOrThrow({where:{idempotencyKey:ready.id}});assert.equal(log.failureCode,"NOTICE_DELIVERY_REVIEW");assert.ok(!JSON.stringify(log).includes("private provider detail"));await assert.rejects(reviewCollectionNotice(f.a,{id:ready.id,revision:ready.revision,action:"reopen",reference:"CI replay"}),/IMMUTABLE/);
+      const log=await db.communicationLog.findUniqueOrThrow({where:{idempotencyKey:ready.id}});assert.deepEqual((log.metadata as {historyEvidence:unknown}).historyEvidence,historyEvidence(ready));assert.equal(log.failureCode,"NOTICE_DELIVERY_REVIEW");assert.ok(!JSON.stringify(log).includes("private provider detail"));await assert.rejects(reviewCollectionNotice(f.a,{id:ready.id,revision:ready.revision,action:"reopen",reference:"CI replay"}),/IMMUTABLE/);
+    });
+    await t.test("actual letter producer remains downloadable with store-scoped content privacy and no ledger grant",async()=>{
+      const f=await fixture(),ready=await approved(f);let attempts=0;
+      await sendCollectionNotice(f.a,{id:ready.id,revision:ready.revision,confirm:true},{send:async()=>{attempts++}});assert.equal(attempts,1);
+      const query=historyQuerySchema.parse({kind:"COMMUNICATION"}),allowed={communications:f.a,collections:f.a,financial:null},low={...allowed,collections:null};
+      const full=await customerHistory(f.a,f.customer.id,query,{...allowed,write:null});assert.match(full.entries[0].body??"",/R100.00/);
+      const restricted=await customerHistory(f.a,f.customer.id,query,{...low,write:null});assert.doesNotMatch(restricted.entries[0].body??"",/R100.00/);assert.match(restricted.entries[0].body??"",/collection-view/);
+      const other=await db.facility.create({data:{organisationId:f.org.id,name:"Other synthetic store",code:randomUUID()}}),crossed={...allowed,collections:{...f.a,facilityIds:[other.id]}};
+      for(const access of [low,crossed])assert.equal((await customerHistory(f.a,f.customer.id,historyQuerySchema.parse({kind:"COMMUNICATION",search:"100.00"}),{...access,write:null})).entries.length,0);
+      assert.equal((await customerHistory(f.a,f.customer.id,historyQuerySchema.parse({kind:"COMMUNICATION",search:"100.00"}),{...allowed,write:null})).entries.length,1);
+      assert.ok(!(await customerHistory(f.a,f.customer.id,historyQuerySchema.parse({}),{...allowed,write:null})).entries.some(row=>row.kind==="ACCOUNT"));
+      const exported=await buildCustomerHistoryExport(f.a,f.customer.id,query,allowed),withheld=await buildCustomerHistoryExport(f.a,f.customer.id,query,low);
+      assert.equal((await hydrateCustomerHistoryMessages({scope:f.a,customerId:f.customer.id,phone:null,rows:exported.rows,access:allowed})).collectionBodiesReleased,true);
+      assert.equal((await hydrateCustomerHistoryMessages({scope:f.a,customerId:f.customer.id,phone:null,rows:withheld.rows,access:low})).collectionBodiesReleased,false);
+      assert.match(String(exported.rows[0].body),/R100.00/);assert.equal(withheld.rows[0].body,"");assert.equal(withheld.rows[0].subject,"");
+      const csv=toCsv(exported.rows),privateCsv=toCsv(withheld.rows);assert.match(csv,/R100.00/);assert.doesNotMatch(privateCsv,/R100.00/);
+      const xlsx=await customerHistoryExcel("Synthetic notice customer",exported.rows,"Synthetic real-producer history",new Date()),book=new ExcelJS.Workbook();await book.xlsx.load(xlsx.buffer as ArrayBuffer);assert.equal(book.worksheets[0].getCell("D6").value,exported.rows[0].body);assert.equal(book.worksheets[0].getCell("L6").value,exported.rows[0].subject);
+      const pdf=await customerHistoryPdf("Synthetic notice customer",exported.rows,"Synthetic real-producer history",new Date());assert.ok((await PDFDocument.load(pdf)).getPageCount()>0);
+      const global=await communicationLogPage(f.a,communicationFiltersSchema.parse({}));assert.doesNotMatch(JSON.stringify(global),/historyEvidence|R100.00/);
+      await mkdir("output/notice-history-content",{recursive:true});await Promise.all([writeFile("output/notice-history-content/letter.csv",csv),writeFile("output/notice-history-content/letter.xlsx",xlsx),writeFile("output/notice-history-content/letter.pdf",pdf)]);
+      assert.equal((await db.account.findUniqueOrThrow({where:{id:f.account.id}})).balance.toString(),"100");assert.equal(await db.ledgerEntry.count({where:{accountId:f.account.id}}),1);assert.equal(await db.payment.count({where:{accountId:f.account.id}}),0);
     });
     await t.test("audit failure rolls draft creation back and overlapping preparation cannot overwrite",async()=>{
       const f=await fixture(),p=await previewCollectionNotice(f.a,f.account.id);await assert.rejects(prepareCollectionNotice({...f.a,userId:"CI-missing-actor"},f.account.id,p.source.fingerprint));assert.equal((await previewCollectionNotice(f.a,f.account.id)).notice,null);
@@ -119,7 +153,7 @@ test("isolated collection notices: holds, independent review, source changes and
     await t.test("provider acceptance followed by persistence failure retains a durable no-retry claim",async()=>{
       const f=await fixture(),ready=await approved(f);let calls=0,installed=false;
       try{const result=await sendCollectionNotice(f.a,{id:ready.id,revision:ready.revision,confirm:true},{send:async()=>{calls++;await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_notice_completion_failure CHECK (false) NOT VALID');installed=true}});
-        assert.equal(result.status,"SENDING");await sendCollectionNotice(f.a,{id:ready.id,revision:ready.revision,confirm:true},{send:async()=>{calls++}});assert.equal(calls,1);const log=await db.communicationLog.findUniqueOrThrow({where:{idempotencyKey:ready.id}});assert.equal(log.status,"PENDING");assert.equal(log.nextRetryAt,null);
+        assert.equal(result.status,"SENDING");await sendCollectionNotice(f.a,{id:ready.id,revision:ready.revision,confirm:true},{send:async()=>{calls++}});assert.equal(calls,1);const log=await db.communicationLog.findUniqueOrThrow({where:{idempotencyKey:ready.id}});assert.deepEqual((log.metadata as {historyEvidence:unknown}).historyEvidence,historyEvidence(ready));assert.equal(log.status,"PENDING");assert.equal(log.nextRetryAt,null);
       }finally{if(installed)await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_notice_completion_failure')}
     });
   }finally{globalThis.fetch=nativeFetch;await db.$disconnect()}

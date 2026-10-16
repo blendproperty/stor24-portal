@@ -8,6 +8,7 @@ try{
  const id='debicheck-request:11111111-1111-4111-8111-111111111111',templateId='debicheck-template:22222222-2222-4222-8222-222222222222',display={id,accountId:'account',accountNumber:'SYNTHETIC-001',status:'PREVIEW',monthlyAmount:'950.00',startDate:'2026-11-01',bankSuffix:'2345',consentText:'I ask STOR24 to review DebiCheck setup for R950.00 monthly. This is not bank authentication or collection authority.',authenticationSubmitted:false,collectionEnabled:false,financialReceipt:false};
  page.on('pageerror',error=>errors.push(error.message));
  await context.route('**/api/**',async route=>{
+  if(new URL(route.request().url()).pathname==='/api/tenant/debicheck-bank-consents'){assert.equal(route.request().method(),'GET');return route.fulfill({json:{data:{available:false,records:[],nextCursor:null}}})}
   const url=new URL(route.request().url()),tenant=url.pathname==='/api/tenant/debicheck-requests';assert.ok(tenant||url.pathname==='/api/v1/payments/netcash/debicheck/requests','Unexpected API/provider operation');
   if(route.request().method()==='GET'){
    if(failed)return route.fulfill({status:503,json:{error:tenant?'Setup history unavailable.':{message:'Request history unavailable.'}}});

@@ -1,4 +1,5 @@
 export const securityPermissionGroups = [
+  { label: "Scheduled collection letters", permissions: [["collection_schedules.view", "View scoped schedules and exact run letters"], ["collection_schedules.manage", "Prepare or cancel collection schedules and runs"], ["collection_schedules.approve", "Independently review each collection run"]] },
   { label: "Staff event email review", permissions: [["staff_event_emails.view", "View scoped staff email policies and outbox"], ["staff_event_emails.manage", "Prepare or cancel staff event email policies"], ["staff_event_emails.approve", "Independently review staff event email policies"]] },
   { label: "Governed booking quotes", permissions: [["reservation_prices.view", "Read original booking quotes and amendment evidence"], ["reservation_prices.propose", "Propose or withdraw unsigned booking price changes"], ["reservation_prices.approve", "Independently approve booking quote proposals"]] },
   { label: "Customers and leasing", permissions: [
@@ -20,7 +21,7 @@ export const securityPermissionGroups = [
     ["debit_orders.view", "View debit-order runs"], ["debit_orders.manage", "Prepare and review debit-order runs"], ["debit_orders.submit", "Submit approved test debit-order runs"],
   ] },
   { label: "Ledgers and collections", permissions: [
-    ["ledger.view", "View tenant ledgers and statements"], ["ledger.*", "Manage tenant ledgers"], ["payments.view", "Review payment records and provider evidence"], ["payments.manage", "Record receipts and prepare payment requests"], ["payments.*", "Take and reverse payments"], ["collections.*", "Manage collections"], ["collections.view", "View aged collections"], ["collections.manage", "Record collection follow-ups"], ["collections.policy", "Record approved collection terms"], ["collections.export", "Export aged collections"],
+    ["ledger.view", "View tenant ledgers and statements"], ["ledger.*", "Manage tenant ledgers"], ["payments.view", "Review payment records and provider evidence"], ["payments.manage", "Record receipts and prepare payment requests"], ["payments.bank_auth_review", "Independently review tenant bank-authentication consent"], ["payments.bank_auth_submit", "Submit one separately approved bank-authentication test"], ["payments.bank_auth_status", "Read original bank-authentication test status"], ["payments.*", "Take and reverse payments"], ["collections.*", "Manage collections"], ["collections.view", "View aged collections"], ["collections.manage", "Record collection follow-ups"], ["collections.policy", "Record approved collection terms"], ["collections.export", "Export aged collections"],
   ] },
   { label: "Identity and physical access", permissions: [
     ["identity.review", "Privately review customer identity documents"], ["access.view", "View physical access"], ["access.manage", "Enrol and revoke physical access"], ["access.suspend", "Suspend access"], ["access.restore", "Restore access"],

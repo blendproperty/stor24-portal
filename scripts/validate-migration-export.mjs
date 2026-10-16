@@ -153,9 +153,11 @@ const output = await open(outputPath, "r+").catch(error => {
   return open(outputPath, "wx");
 });
 try {
-  const outputIdentity = await output.stat();
+  // Native file IDs can exceed Number's exact integer range on Windows.
+  // Compare both device and inode without rounding distinct files together.
+  const outputIdentity = await output.stat({ bigint: true });
   for (const path of sourcePaths) {
-    const sourceIdentity = await stat(path).catch(error => {
+    const sourceIdentity = await stat(path, { bigint: true }).catch(error => {
       if (error.code !== "ENOENT") throw error;
       return null;
     });

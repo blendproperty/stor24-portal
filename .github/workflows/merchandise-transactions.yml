@@ -15,6 +15,14 @@ on:
         type: string
         required: false
         default: f385f9044f471ed46542619a83c93341e41e49da
+      run_next_workload:
+        description: Run one isolated synthetic Next HTTP workload pilot
+        type: boolean
+        default: false
+      workload_source_sha:
+        description: Exact reviewed 40-character source SHA (required for pilot)
+        type: string
+        default: ''
 permissions:
   contents: read
 jobs:
@@ -66,6 +74,8 @@ jobs:
       - run: npx tsx --test tests/integration/netcash-debicheck-template.test.ts
       - run: npx tsx --test tests/integration/netcash-debicheck-requests.test.ts
       - run: npx tsx --test tests/integration/netcash-debicheck-attempt-journal.test.ts
+      - run: npx tsx --test tests/integration/netcash-debicheck-bank-consent.test.ts
+      - run: npx tsx --test tests/integration/netcash-debicheck-test-worker.test.ts
       - run: npx tsx --test tests/integration/posted-recurring-charge-report.test.ts
       - run: npx tsx --test tests/integration/visual-reporting.test.ts
       - run: npx tsx --test tests/integration/marketing-payment-cohorts.test.ts
@@ -122,6 +132,7 @@ jobs:
       - run: npx tsx --test tests/integration/customer-history.test.ts
       - name: Verify representative staff workload and limited offline source recovery
         run: npx tsx --test tests/integration/faeez-representative-workload.test.ts
+      - run: npx tsx --test tests/integration/collection-schedules.test.ts
       - run: npx tsx --test tests/integration/collection-notices.test.ts
       - run: npx tsx --test tests/integration/settlements.test.ts
       - run: npx tsx --test tests/integration/unidentified-receipts.test.ts
@@ -151,6 +162,44 @@ jobs:
           name: readiness-capacity-evidence
           path: output/readiness/
           if-no-files-found: error
+
+  next-workload-pilot:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_next_workload == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      REVIEWED_SOURCE_SHA: ${{ inputs.workload_source_sha }}
+      WORKFLOW_SOURCE_SHA: ${{ github.sha }}
+    steps:
+      - name: Require exact reviewed dispatch source
+        shell: bash
+        run: |
+          [[ "$REVIEWED_SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$REVIEWED_SOURCE_SHA" == "$WORKFLOW_SOURCE_SHA" ]]
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.workload_source_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: One isolated synthetic HTTP workload
+        env:
+          STOR24_NEXT_WORKLOAD_EXECUTION: approved-isolated
+        run: node scripts/test-next-representative-workload.mjs --run --source "$REVIEWED_SOURCE_SHA"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: isolated-next-workload-evidence
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            output/next-workload/*/manifest.json
+            output/next-workload/*/http-result.json
+            output/next-workload/*/database-result.json
+            output/next-workload/*/build-*.log
 
   finance-coupled-diagnostic:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.finance_coupled_diagnostic }}

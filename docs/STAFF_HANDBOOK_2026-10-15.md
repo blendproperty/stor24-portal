@@ -188,6 +188,50 @@ Read the fresh preview: exact account number, amount, method and original receip
 
 **Uncertain result:** reload saved receipt history and keep the original request reference. Do not create a second receipt to clear an error. Open the retained receipt from the posted record. Posted cash and its original source remain retained; corrections require the separately approved full reversal or section 06A MOVE/partial UNDO process. A tutorial tick is not finance approval or real receipt verification.
 
+## 06D · Read retained DebiCheck authentication evidence
+
+**History guidance added 16 October.** Open **DebiCheck setup review**, then **Recorded DebiCheck authentication**. You need current payment-view access at the selected store. This history screen reads saved evidence; it does not contact Netcash, submit a bank request or change a customer account.
+
+1. Choose **History store** and, if needed, filter **Original outcome**. Check the exact account number, agreed monthly amount, start date and masked bank-account suffix.
+2. Read the original attempt and its recording times in SAST. A claimed attempt has no saved original outcome. An unknown outcome requires investigation; neither state permits repeating the request.
+3. Use **Older authentication attempts** for earlier records. **Refresh recorded history** returns to the latest matching page and reads saved evidence again.
+4. Select **Inspect retained status reads for** the intended account. The selected panel keeps the original outcome visible separately from any later retained observations. Use **Older retained status reads** for earlier observations.
+5. If reading fails or evidence changes, the old results clear. Refresh and investigate the original retained records with an authorised colleague. Do not substitute another account, create a new request or infer that a missing result means rejection.
+
+**Keep each result distinct.** Bank authentication observed in an original response or dated later read is not collected rent, a settled payment, a signed provider mandate, a financial receipt or permission for a new debit. A later observation does not overwrite an unknown original outcome. The original provider contract, where available, stays private.
+
+**No records is an honest empty state.** It does not prove a bank request was sent. Native bank-authentication consent, independently reviewed submission, approved real-time TT1 template/test payer and separate collection/provider acceptance remain required. Setup-request consent and setup review do not satisfy those steps. Signing-only test bank details must not be used for collections. Continue to use the existing approved card/EFT flows within their own limits.
+
+## 06E · Prepare separate permission for one bank request
+
+**Use the tenant’s own verified account.** After the original setup has been reviewed, **Permission for one bank request** can show the separate authorisation when approved test preparation is available. A setup request alone is not this permission. Signing-only test bank details cannot be reused for authentication or collections.
+
+**Read the exact terms before saving.** Check the monthly amount, start date and bank-account suffix. Tick the explicit bank-authentication permission only if you may authorise that account. A preview expires after ten minutes; saving or review cannot extend it. **Save bank-request permission** records the decision for staff review and sends nothing to the bank.
+
+**Independent staff review.** Open **DebiCheck setup review → Bank-request consent review**. Choose the permitted store and inspect the saved terms and expiry. An authorised colleague with a different email from the tenant checks the current source and records their confirmation. The system rechecks their current access, billing, merchant, exact template and separately approved test payer. This review does not dispatch a bank request or enable collections.
+
+**Withdraw before an attempt.** The tenant can withdraw an unattempted permission even while new preparation is disabled. Duplicate saves keep its retained status and cannot reopen withdrawn permission. Expired permission needs a fresh preview; withdraw the old permission before replacing it. **Older bank permissions** retains access to earlier pages.
+
+**Investigate an existing attempt.** A retained attempt blocks local withdrawal and a replacement permission. Staff must inspect original authentication history and provider evidence. Do not submit another request to resolve an unknown outcome.
+
+**Keep the remaining gates visible.** This step prepares consent and review only. The guarded submission step, real approved TT1 template/test payer, bank response, any later collection and financial receipt remain separate. Approved card/EFT flows continue within their own limits. Real customer, provider, finance, legal and staff acceptance must be recorded separately.
+
+## 06F · Submit one separately approved bank test
+
+Guidance added 16 October. **Controlled bank-authentication test** is available only when its separate test controls and your current permissions allow it. Netcash must first supply the approved real-time template and authentication-test payer. Existing signing-only bank details are not that approval.
+
+**Choose the exact original evidence.** Select the permitted store and saved REVIEWED bank permission. Recheck the tenant’s terms, amount, date, account suffix and unexpired window. The tenant’s separate permission and an independent current staff review are required; neither is permission to collect money.
+
+**One explicit submission.** Type **SUBMIT ONE BANK TEST**, then choose **Submit one approved bank test** only for the approved test. This sends one real bank-authentication request. A bank response can take more than three minutes. Keep the page open; do not click again or repeat a timed-out request.
+
+**A retained attempt cannot be replayed.** The system records one claim before contacting Netcash and rechecks source, consent and staff authority immediately before transport. A changed guard can hold the claim without a bank call. Timeout, unknown response, browser disconnect or failed result recording also require investigation; none allows another attempt.
+
+**Read the original outcome.** Refresh saved evidence, then use **Recorded DebiCheck authentication**. REQUEST REJECTED, BANK REJECTED, BANK AUTHENTICATED and UNKNOWN are different original results. Authentication never proves a debit, settled rent, signed provider mandate or financial receipt. Do not clear a balance or allow move-in solely from it.
+
+**Later status is separate evidence.** If the original bank response returned a contract, an authorised person can select **Read current status for original bank test**. It uses that retained contract only and remains available for investigation after consent expires. A later Accepted status does not replace an original UNKNOWN result or enable collection. A missing original contract must be investigated with Netcash; do not enter a substitute reference.
+
+**Keep production gates open.** These controls do not create test approval, grant permissions, activate a schedule, send a collection or record cash. Real provider/bank acceptance, independent finance/legal decisions, staff/customer/device UAT and training sign-off remain separate. Continue approved card/EFT flows within their own limits.
+
 ## 07 · Arrears notices and escalation boundaries
 
 Open **Collections** and review the customer's source account, approved terms, ageing and current hold before preparing a notice. A future promise or dispute hold remains effective.
@@ -203,6 +247,20 @@ The existing controlled notice flow uses email. Do not assume automated debtor S
 For an internal policy decision, expand **Request internal escalation review**, choose Notice channel / Fee proposal / Access concern, enter the requested review date and proposed evidence reference, and use the case note for the facts. **Record held review request** adds an auditable held request; it does not execute or schedule the proposed action. Entering a reference is not approval.
 
 A note saying 'lock tomorrow' is not access authorisation. Record the review required and the responsible approver. Use an approved isolated or consenting test recipient for acceptance; never train by sending to an invented real customer.
+
+## 07A · Review each scheduled arrears run
+
+Open **Collections**, then **Scheduled collection letters**. Brett's chosen mode is **staff review each run**. Automatic dispatch remains off until separately approved configuration; saving a schedule or approving a run does not itself send an email.
+
+1. Choose the exact store and existing accounts. Enter the schedule name, first and last South African days, weekdays, SAST due time and review/delivery window. These choices start blank. The window must end by midnight that day.
+2. Open the saved schedule and use **Prepare today's due run** within its configured window, or read the due draft prepared by the separately configured worker. Source, verified-email and consent holds exclude the affected account. Read held accounts as well as included letters.
+3. A different authorised colleague reads every recipient, subject and complete letter. Record a review reference, confirm the review and use **Approve this run for configured dispatch**. The system checks the account, exact message, current permissions and timing again. Preparers and other contributors cannot approve their own letter.
+4. A new day needs a new run and a new real staff review. Yesterday's approval is never copied to recalculated letters. Cancel the run or schedule to stop future attempts; cancellation cannot recall an email already attempted.
+5. Read customer history and the delivery outcome. New letter content appears in authorised PDF, CSV and Excel downloads. Collection-letter text requires collection access at the same store as communications access; ledger access remains separate.
+
+**SENDING** and **REVIEW REQUIRED** need investigation. The worker never automatically repeats an uncertain send, and unresolved earlier delivery holds a later reminder. Source changes or expiry hold an old reviewed run instead of silently rewriting it. Ask the responsible administrator to resolve the retained record; do not create another plan to bypass the hold.
+
+Provider acceptance is separate from a recipient's inbox. Fees, account posting, SMS/WhatsApp debtor messages and physical lockout retain their own policy, approval and real acceptance gates. Use an approved isolated or consenting recipient for staff practice.
 
 ## 08 · Counter tablet and walk-in customer
 

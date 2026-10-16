@@ -4,9 +4,10 @@ import { databaseConfig } from "@/lib/database-limits";
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
-const adapter = new PrismaPg(databaseConfig(process.env.DATABASE_URL));
-export const db = globalForPrisma.prisma ?? new PrismaClient({ adapter });
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = db;
-}
+// Production route bundles can evaluate this module independently in one Node
+// process. Reuse the client (and its bounded pool) across those bundles as well
+// as development reloads; each separate process still owns its own pool.
+export const db = globalForPrisma.prisma ?? new PrismaClient({
+  adapter: new PrismaPg(databaseConfig(process.env.DATABASE_URL)),
+});
+globalForPrisma.prisma = db;

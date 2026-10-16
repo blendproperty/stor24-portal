@@ -8,12 +8,15 @@ import { PDFDocument } from "pdf-lib";
 
 test("staff handbook is a real current PDF with all23 acceptance items and protected audited download", async () => {
   const bytes = await readFile("private/staff-training/stor24-staff-handbook-2026-10-15.pdf");
-  assert.equal((await PDFDocument.load(bytes)).getPageCount(), 18);
+  assert.equal((await PDFDocument.load(bytes)).getPageCount(), 22);
   const source = await readFile("docs/STAFF_HANDBOOK_2026-10-15.md", "utf8");
   for (let item = 1; item <= 23; item++) assert.ok(source.includes(`| ${item} |`));
   assert.ok(source.includes("Excel")); assert.ok(source.includes("1 November")); assert.ok(source.includes("12 hours"));
   assert.ok(source.includes("financial")); assert.ok(source.includes("Missing historical email"));
   assert.ok(source.includes("06C")); assert.ok(source.includes("05A")); assert.ok(source.includes("Message delivery history")); assert.ok(source.includes("Load older messages"));
+  assert.ok(source.includes("06F")); assert.ok(source.includes("SUBMIT ONE BANK TEST")); assert.ok(source.includes("A retained attempt cannot be replayed"));
+  assert.ok(source.includes("06E")); assert.ok(source.includes("Save bank-request permission")); assert.ok(source.includes("guarded submission step"));
+  assert.ok(source.includes("06D")); assert.ok(source.includes("Older retained status reads")); assert.ok(source.includes("07A")); assert.ok(source.includes("staff review each run")); assert.ok(source.includes("new run and a new real staff review"));
   let allowed = false, audited = false, auditFailure = false, dlpBlocked = false;
   const scope = { organisationId: "fixture-org", userId: "fixture-staff", facilityIds: ["midpoint"], unrestrictedFacilities: false };
   const bundle = await build({ entryPoints: ["src/app/api/v1/operations/staff-guide/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "handbook-route-boundary", setup(builder) {

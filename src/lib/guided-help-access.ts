@@ -9,6 +9,7 @@ const rule = (base: string, steps: string[], organisation = false): Rule => ({ b
 // Commas mean AND, pipes mean OR. @owner uses a current database assignment, never the JWT label.
 // Missing guides/steps fail closed; the coverage test requires an explicit editorial decision.
 export const guideAccessRules: Record<string, Rule> = {
+  "collection-schedules": rule("collection_schedules.view,collections.view", ["", "collection_schedules.manage,collections.manage", "collection_schedules.approve,collections.manage,billing.documents.send", "collection_schedules.manage,collections.manage"]),
   "staff-event-emails": rule("staff_event_emails.view,operations.view", ["", "staff_event_emails.manage", "staff_event_emails.approve", "staff_event_emails.manage"]),
   "receipt-bank-sources": rule("receipt_review.bank_sources,settlements.view", ["", "", ""], true),
   "receipt-import-posting": rule("receipt_review.view,receipt_review.post,receipt_review.approve,ledger.view,payments.manage,billing.view", ["", "", ""]),
@@ -55,7 +56,7 @@ export const guideAccessRules: Record<string, Rule> = {
   adjustments: rule("adjustments.view", ["adjustments.request", "adjustments.request", "adjustments.approve", "adjustments.record_refund"]),
   "netcash-operations": rule("payments.view", ["", "", "", "integrations.manage"]),
   "netcash-payment-requests": rule("payments.view,ledger.view", ["payments.manage", "payments.manage", ""]),
-  "netcash-debicheck-templates": rule("payments.view", ["payments.manage", "payments.manage", ""]),
+  "netcash-debicheck-templates": rule("payments.view", ["payments.manage", "payments.manage", "", "", "", ""]),
   operations: rule("operations.view", ["move_in.create,ledger.view,operations.manage", "operations.manage", "operations.manage", "operations.manage", "operations.manage,daily_close.perform"]),
   units: rule("inventory.view", ["", "inventory.manage", "inventory.manage", "inventory.manage", "operations.manage", "inventory.manage", "@owner"]),
   map: rule("facility_map.view", ["", "", "inventory.manage", "inventory.manage", "inventory.manage"]),
