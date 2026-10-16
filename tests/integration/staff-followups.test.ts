@@ -81,6 +81,18 @@ test("isolated customer appointments: retries, cover acknowledgements, store bou
       const sameCover = await changeStaffFollowup(scope, task.id, { action: "HANDOVER", coverId: cover.id, expectedUpdatedAt: accepted.updatedAt.toISOString() });
       assert.deepEqual(sameCover.coverAcknowledgedAt, accepted.coverAcknowledgedAt);
     });
+    await t.test("management at another store cannot substitute for view at the actual task store", async () => {
+      const manageOnly = await db.role.create({ data: { organisationId: org.id, name: "Manage-only boundary", permissions: ["operations.manage"] } });
+      await db.roleAssignment.create({ data: { userId: staff.id, roleId: manageOnly.id, facilityId: b.id } });
+      const task = await db.task.create({ data: { organisationId: org.id, facilityId: b.id, customerId: customer.id, purpose: "AGREED_FOLLOWUP", title: "Other store fixture", description: "Boundary fixture", dueAt: new Date("2026-10-14T07:00:00Z") } });
+      const staleManageScope = { ...scope, facilityIds: [b.id] };
+      const beforeAudit = await db.auditEvent.count({ where: { entityId: task.id } });
+      try {
+        await assert.rejects(changeStaffFollowup(staleManageScope, task.id, { action: "COMPLETE", expectedUpdatedAt: task.updatedAt.toISOString() }), /FORBIDDEN/);
+        assert.deepEqual(await db.task.findUniqueOrThrow({ where: { id: task.id } }), task);
+        assert.equal(await db.auditEvent.count({ where: { entityId: task.id } }), beforeAudit);
+      } finally { await db.roleAssignment.deleteMany({ where: { roleId: manageOnly.id } }); }
+    });
     await t.test("rescheduling and reassignment preserve versions, scope, cover acceptance and atomic history", async () => {
       const task = await createStaffFollowup(scope, input());
       const accepted = await changeStaffFollowup({ ...scope, userId: cover.id }, task.id, { action: "ACKNOWLEDGE", expectedUpdatedAt: task.updatedAt.toISOString() });
@@ -97,6 +109,7 @@ test("isolated customer appointments: retries, cover acknowledgements, store bou
       const now = new Date("2026-10-15T12:00:00Z");
       assert.equal((await listStaffFollowups(scope, "", undefined, "due", now)).tasks.some(row => row.id === task.id), false);
       assert.equal((await listStaffFollowups(scope, "", undefined, "upcoming", now)).tasks.some(row => row.id === task.id), true);
+      assert.equal((await listStaffFollowups(scope, "", undefined, "due", new Date("2026-10-15T22:00:00Z"))).tasks.some(row => row.id === task.id), true);
       const reassigned = await changeStaffFollowup(scope, task.id, { ...edit, assigneeId: cover.id, expectedUpdatedAt: changed.updatedAt.toISOString() });
       assert.equal(reassigned.coverAcknowledgedAt, null);
       const audit = await db.auditEvent.findFirstOrThrow({ where: { entityId: task.id, action: "staff_followup.update" }, orderBy: { occurredAt: "asc" } });
