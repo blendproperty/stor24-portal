@@ -2,9 +2,9 @@
 
 17 October 2026. The original numbered register remains authoritative. Brett deferred hands-on/device checks: “we can do checks latr”. The deferral preserves previous reported acceptance and leaves only unaccepted scope for later. It does not approve financial/provider activation, new permissions, physical access, equipment purchasing or operational policies.
 
-## Fresh live evidence
+## Initial live observation, before PR544 deployment
 
-Authenticated genuine owner browser, using the existing Brett session; no fabricated staff session or business mutation. Read-only production inspection returned `stor24-crm:52c79201f healthy`. PR544 is already merged at `9f9a11ab`, but this checkpoint does not claim its deployment or acceptance.
+This initial 17 October observation used the authenticated genuine owner browser and existing Brett session; no fabricated staff session or business mutation. At that observation, read-only production inspection returned `stor24-crm:52c79201f healthy`; PR544 was merged but its deployment had not yet been verified. That stage-specific observation is historical, not the current deployment status. The verified PR544 release stage below supersedes it. The ordinary handbook download occurred at15:19:57.775UTC, before that guide release; its bytes remain unchanged.
 
 | Original item | Observed result | Evidence boundary |
 | --- | --- | --- |
@@ -15,16 +15,22 @@ Authenticated genuine owner browser, using the existing Brett session; no fabric
 
 Private evidence is retained in the isolated checkout under `output/faeez-23`: browser text/screenshots, handbook metadata, two rendered pages and a SHA256 manifest. Screenshots may contain staff contact choices, so they are retained locally rather than published into repository documentation. No customer/provider/financial/private document contents were exported for this audit.
 
+## Current verified guide release and acceptance boundary
+
+PR544 exact source `2ebf191412be905928b856ef1a4718032b1afb2a` passed all ten required checks, then normally merged to `9f9a11abcdc8e18c3d8da8a3186cfa1376b8d001`. Normal mainCI39044609823/native39044609900/security39044609804/push39044609935 and Deploy39045702343 succeeded. The sole source-owner runtime packet at17October15:38:51.289UTC pins healthy exact9f/restart0,17 source hashes, guide assets, retained dashboard/follow-up controls and unchanged23-page159488-byte/cf6ec handbook. Saved packet8874bytes/SHA256 `8c79f3bb290f5fc40645b6b3c579b08c617bc81a6d9ec116b14bdb3a571f2f63` was independently hash-checked here; no competing runtime probe was made. Financial/provider activation flags remain off; no new authority or business action is inferred.
+
+Subsequent agent-run genuine owner navigation verified the displayed three-step arrivals guide, category change clearing the previous selection, and its actual link opening Expected arrivals with17–23OctoberSAST dates preserved. Private proof `output/faeez-23-unattended/start-guide-{arrivals-selected,category-reset,arrivals-destination}.txt` and relevant JPGs. This is technical navigation evidence, not human acceptance or arrival assignment/financial/key-handover execution. New guide human acceptance remains deferred. The coordinator's separately reported basic9–11 passes remain accepted only at that attributed scope; do not require a repeat or infer unreported subchecks.
+
 ## Original 23 disposition
 
 | Items | Software / reported acceptance | Remaining work |
 | --- | --- | --- |
 | 1–3 | Governed receipt correction, unidentified-source/imported posting and rental amendments are released. Current item2 starting-page gap cleared above. | Actual source/independent finance/customer verification and relevant provider acceptance. No real financial action is inferred from technical fixtures. |
-| 4–6,13,15 | Shared customer chronology, history/search, PDF/CSV/Excel and dated categorized notes are released. Brett's reported general download/note/shared-visibility acceptance is preserved. | Missing original external transcripts/attachments, wider paired-staff practice and training. Do not invent historical content or require an automatic Faeez-only repeat. |
-| 7 | Appointment scheduling/rescheduling/reassignment/own-cover acknowledgement/completion after reload, Assigned to me and layout/dashboard acceptance are user-confirmed at their recorded scope. | Other titles/filters, changed-plan edge cases and incoming-manager practice. PR544 guide release is separately owned. |
-| 8,10 | Cover/arrival handover software released. Brett sees dated arrivals/blockers and can open assignment. | Arrival save/reload/acknowledgement/invalidation practice deferred. Actual named manager starts 1 November; account/delegation/onboarding remains separate. |
-| 9,12 | Event email and per-run collection scheduler software released; genuine current Midpoint disabled state verified above. | Explicit recipient/timing/audience/template decisions, independent practice/review, activation and provider/inbox outcomes. Fee/lockout/SMS/WhatsApp execution is not silently implemented or enabled by these releases. |
-| 11 | Scoped payment-review queue released; zero non-test starting state previously verified. | Consenting/source-backed independent finance practice. |
+| 4–6,13,15 | Shared customer chronology, history/search, PDF/CSV/Excel and dated categorized notes are released. Brett's reported general download/note/shared-visibility acceptance is preserved. | Software gap: future booking-confirmation and welcome emails currently lack CommunicationLog/body snapshots consumed by history/downloads. Booking-only545 is draft/unreleased; welcome capture is unbuilt. Missing historical external transcripts/attachments is a separate data gate, alongside wider staff practice/training. No historical backfill is invented and no mandatory Faeez-only repeat is required. |
+| 7 | Appointment scheduling/rescheduling/reassignment/own-cover acknowledgement/completion after reload, Assigned to me and layout/dashboard acceptance are user-confirmed at their recorded scope. Unattended title/queue edge checks also passed. PR544 guide is now normally deployed with saved runtime and genuine agent navigation proof above. | Other unreported filters/changed-plan edges and incoming-manager practice; new guide human acceptance remains deferred. Agent-run checks are not new human acceptance. |
+| 8,10 | Cover/arrival handover software released. The coordinator17October reports item10 basic workflow passed in the parent chat; exact human-turn/subcheck evidence remains with that coordinator. Preserve this reported scope without asking for a repeat. | Only unreported edges remain unverified here; do not assert that every save/reload/acknowledgement/invalidation subcheck is untested or passed without its exact evidence. Named manager starts1November; real account/delegation/onboarding and physical keys remain separate. |
+| 9,12 | Event email and per-run collection scheduler software released; genuine Midpoint disabled state verified above. Coordinator17October reports item9 basic workflow passed in the parent chat at its recorded scope; no mandatory repeat. | Explicit named recipient/timing/audience/template decisions, independent activation and provider/inbox outcomes remain separate. Scheduler per-run practice and fee/lockout/SMS/WhatsApp policy/integration gates stay open; no sending is silently activated. |
+| 11 | Scoped payment-review queue released. Coordinator17October reports its basic workflow passed in the parent chat; exact human-turn/subcheck scope remains with the coordinator. | Source-backed independent financial approval, bank/provider settlement and any unreported edge checks remain separate. Queue acceptance is not evidence of cleared money. |
 | 14,16 | Origin capture on portal/five active public forms and descriptive payment/price cohorts released. | Actual customer retention, representative source/quote/payment reconciliation and real price-amendment acceptance. Unknown historic fields remain unknown. |
 | 17 | PR530 pool fix is normally merged/deployed; isolated Next-hosted workload passed at the unchanged bound. | Real production peak and physical-device acceptance; paused521 financial stress is separate. |
 | 18 | Faeez sign-in and Midpoint opening are user-confirmed. | Governed financial approval remains separate. Historical grant counts are dated evidence, not authority to grant new access. |
@@ -40,8 +46,8 @@ The evidence handoff is retained in immutable commit `f62aee2fdf08cc826bd0f0e1b0
 ## Delivery stages
 
 - Implementation: documentation/evidence reconciliation only; released application behavior is not relabelled as new implementation.
-- Testing: genuine live read-only screens and ordinary PDF file/audit/render checks above; register numbering/format and diff checked. No heavy build, local database writer, production load or financial/provider action.
+- Testing: initial genuine read-only screens and ordinary PDF file/audit/render checks above; later unattended synthetic appointment/report/guide checks are separately documented. No heavy local build, database writer, production load or financial/provider action. The synthetic appointment was created/edited/completed through the UI only; no other customer task was changed.
 - Commit and push: recorded by the review branch/PR; canonical context travels with the register and this report.
 - Merge: pending normal protected review of this documentation checkpoint at preparation.
-- Deployment and configuration: none introduced by this documentation; runtime and PR544 stages remain separately recorded.
+- Deployment and configuration: none introduced by this documentation; PR544's verified normal deployment/runtime are now explicitly recorded above, separate from the earlier52c observation.
 - Live production verification: only the explicitly observed states above. Staff/device/finance/provider/data/training/policy gates stay open. No external project tracker is in scope.
