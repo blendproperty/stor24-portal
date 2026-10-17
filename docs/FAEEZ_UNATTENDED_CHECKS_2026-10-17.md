@@ -29,6 +29,16 @@ The account **Account activity** page is a login/device history with country sea
 
 Proof: `output/faeez-23-unattended/hostinger-latest-actions.{txt,jpg}`. No power, restart, account/security/settings, credential, support submission or provider message action was taken. The original user-owned provider tab was restored to its initial Hermes landing URL.
 
+## Items 14 and 16: current cohort and retained-location readback
+
+Ran the existing **Enquiry sources, booking quotes and payment outcomes** template through the genuine Reports library. Its actual filters are1–17October2026, Enquiry created (SAST), All permitted stores, no extra filters. Generated17:31:06SAST:15 source/result rows, all Midpoint;13 NOT_CONVERTED and2 REVIEW_REQUIRED. Both review rows explicitly say Original booking price snapshot is missing. Local result search for REVIEW_REQUIRED shows exactly those two rows. No missing quote, accepted amendment, receipt or overdue amount is invented.
+
+Independent read-only SQL under the same organisation/date interval (30September22:00UTC inclusive to17October22:00UTC exclusive) returns15 leads,10 linked bookings,0 converted bookings,2 bookings without initial snapshots and1 retained enquiry-location object. The live report shows that one city/province entry as Midrand/Gauteng. This proves current persistence/report consumption for that existing entry; it does not prove all five public forms' real-customer submissions, historic location completeness or finance reconciliation for a converted account.
+
+One of the15 rows is explicitly labelled Staff training only, with zero bookings and no financial amounts. It must not be counted as genuine customer demand when interpreting this current dataset. This verification did not alter historical sources or hide the synthetic row. The fixed R600 training amount is not represented as a posted receipt or overdue financial charge in this report.
+
+Proof: `cohort-report-current.txt/jpg`, `cohort-report-scope.txt`, `cohort-two-review-holds.txt/jpg` and `cohort-count-readback.json` in the private evidence directory. No report definition was saved, scheduled or exported; no source data was changed. A role-based selector mismatch was resolved using the observed native checkbox control, without changing the application.
+
 ## Ownership and publication
 
 This checkout owns live browser verification and its evidence/documentation only. It has **no source changes** to booking-confirmation-email, tenant-welcome-email, customer-history, exports, marketing or their producer tests. The existing guide/email-history owner retains those source changes and sole PR544 deployment/runtime proof. The outage owner retains origin logs/remedy. Main promotion remains coordinated; this report and canonical context are supplied on `codex/faeez-23-closeout-20261017`, without competing main promotion or resuming paused REA533/521.
