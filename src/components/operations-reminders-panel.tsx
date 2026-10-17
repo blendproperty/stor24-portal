@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { OperationsStartGuide } from "@/components/operations-start-guide";
 import { ArrowDownLeft, ArrowRight, ArrowRightLeft, ArrowUpRight, Bell, CalendarDays, ClipboardCheck, ClipboardList, CreditCard, LogOut, Package, Tablet, Wrench } from "lucide-react";
 import { formatSouthAfricaDateTime } from "@/lib/south-africa-time";
 
@@ -10,6 +11,7 @@ export function OperationsRemindersPanel({ items, workflows = [], updatedAt }: {
   if (!items.length && !workflows.length) return null;
   const largest = Math.max(1, ...items.map(item => item.count ?? 0));
   return <div className="operations-dashboard">
+    <OperationsStartGuide links={[...workflows, ...items].map(({ label, href }) => ({ label, href }))}/>
     {workflows.length ? <section className="panel panel-spacious operations-workflow-panel operations-dashboard-shortcuts" aria-label="Operations workspaces">
       <div className="panel-heading"><div><p className="eyebrow">Quick access</p><h2>Customer and store workflows</h2><p className="panel-subtitle">Your daily shortcuts, with the queue size beside each workflow.</p></div><span className="operations-dashboard-stamp">Store access applied</span></div>
       <div className="operations-dashboard-shortcut-grid">{workflows.map(item => { const Icon = icons[item.icon]; return <Link href={item.href} key={item.label} className={`operations-dashboard-shortcut operations-dashboard-${item.icon}`}>
