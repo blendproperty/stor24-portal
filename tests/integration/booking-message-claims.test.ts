@@ -94,6 +94,8 @@ test("welcome history retains actual scoped attempts and holds automatic uncerta
   const logs = (customerId: string) => db.communicationLog.findMany({ where: { organisationId: org.id, customerId, messageType: "TENANT_PORTAL_WELCOME" }, orderBy: [{ queuedAt: "asc" }, { id: "asc" }] });
   const cool = (email: string) => db.tenantPortalWelcome.updateMany({ where: { organisationId: org.id, email }, data: { nextAttemptAt: new Date(0) } });
   const finance = async () => ({ accounts: await db.account.findMany({ where: { customer: { organisationId: org.id } }, orderBy: { id: "asc" } }), ledger: await db.ledgerEntry.count({ where: { account: { customer: { organisationId: org.id } } } }), payments: await db.payment.count({ where: { account: { customer: { organisationId: org.id } } } }) });
+  const previousAppUrl = process.env.APP_URL;
+  process.env.APP_URL = "https://portal.welcome-fixture.example.invalid";
   try {
     const admitted = await Promise.all(Array.from({ length: 6 }, () => sendTenantWelcome(first.customer.id, org.id, { source }, db, send)));
     assert.equal(admitted.filter(value => value === "sent").length, 1); assert.equal(sends, 1);
@@ -179,7 +181,10 @@ test("welcome history retains actual scoped attempts and holds automatic uncerta
     await db.tenantPortalWelcome.create({ data: { id: createHash("sha256").update(`${org.id}\0${legacy.customer.email}`).digest("hex"), organisationId: org.id, email: legacy.customer.email!, attempts: 1, nextAttemptAt: new Date(0), failed: true } });
     assert.equal(await sendTenantWelcome(legacy.customer.id, org.id, { source: legacySource }, db, send), "delivery_review_required"); assert.equal((await logs(legacy.customer.id)).length, 0);
     assert.equal(await sendTenantWelcome(legacy.customer.id, org.id, { source: legacySource, resend: true }, db, send), "sent"); assert.equal((await logs(legacy.customer.id)).length, 1);
-  } finally { await db.$disconnect(); }
+  } finally {
+    if (previousAppUrl === undefined) delete process.env.APP_URL; else process.env.APP_URL = previousAppUrl;
+    await db.$disconnect();
+  }
 });
 
 test("booking confirmation history is atomic with delivery intent, scoped and never resends unknown outcomes", async t => {
