@@ -39,7 +39,7 @@ test("welcome eligibility, duplicate/concurrent protection, cooldown, failure an
       return { facilityId: "facility" };
     } },
     tenantPortalWelcome: {
-      upsert: async () => ({}),
+      createMany: async () => ({ count: 1 }),
       updateMany: async ({ where, data }: { where: { sentAt?: null; attempts?: number; failed?: boolean }; data: { nextAttemptAt: Date } }) => {
         if (nextAttemptAt > Date.now() || (where.sentAt === null && sentAt) || (where.attempts === 0 && attempts !== 0) || (where.failed === false && welcomeFailed)) return { count: 0 };
         nextAttemptAt = data.nextAttemptAt.getTime(); attempts++; welcomeFailed = false; return { count: 1 };

@@ -32,7 +32,9 @@ export async function sendTenantWelcome(customerId: string, organisationId: stri
     const facilityId = await tenantWelcomeFacility(tx, organisationId, customerId, options.source);
     const email = customer.email.trim().toLowerCase();
     const id = createHash("sha256").update(`${organisationId}\0${email}`).digest("hex");
-    await tx.tenantPortalWelcome.upsert({ where: { id }, create: { id, organisationId, email }, update: {} });
+    // PostgreSQL INSERT ... ON CONFLICT DO NOTHING also handles concurrent
+    // first attempts; an empty-update ORM upsert can race its SELECT/INSERT.
+    await tx.tenantPortalWelcome.createMany({ data: [{ id, organisationId, email }], skipDuplicates: true });
     // A cooldown limits explicit staff resends; time passing does not resolve
     // an unknown earlier lifecycle attempt. Successful org/email dedup remains.
     const claimed = await tx.tenantPortalWelcome.updateMany({ where: { id, organisationId, email, nextAttemptAt: { lte: new Date() }, ...(!options.resend ? { sentAt: null, attempts: 0, failed: false } : {}) }, data: { nextAttemptAt: new Date(Date.now() + 600000), attempts: { increment: 1 }, failed: false } });
