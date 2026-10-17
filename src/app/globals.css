@@ -3151,3 +3151,21 @@ a.module-card:focus-visible {
 @media(max-width:1250px){.operations-dashboard-shortcut-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:800px){.operations-dashboard-shortcut-grid,.operations-dashboard .operations-attention-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.operations-dashboard-stamp{display:none}}
 @media(max-width:480px){.operations-dashboard-shortcut-grid,.operations-dashboard .operations-attention-grid{grid-template-columns:minmax(0,1fr)}.operations-dashboard .operations-dashboard-shortcut,.operations-dashboard .operations-dashboard-metric{padding:18px}.operations-dashboard .panel-heading h2{font-size:20px}}
+
+/* Operations orientation: choose a job before opening its workflow. */
+.operations-start-guide{border-top:3px solid #e45100}
+.operations-start-choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:22px}
+.operations-start-choices>button{display:grid;gap:7px;padding:17px;text-align:left;background:#fff;border:1px solid #dce5e8;border-radius:10px;color:inherit;font:inherit;cursor:pointer;min-width:0}
+.operations-start-choices>button[aria-pressed=true]{border-color:#24766e;background:#eff8f5;box-shadow:inset 0 0 0 1px #24766e}
+.operations-start-choices strong{font-size:15px;line-height:1.4}.operations-start-choices span{font-size:12px;line-height:1.6;color:#60717a;font-weight:400}
+.operations-start-select{display:grid;gap:8px;max-width:560px;font-size:13px;font-weight:600}
+.operations-start-select select{width:100%;min-width:0;min-height:44px;padding:11px;border:1px solid #ccd9de;border-radius:8px;background:#fff;color:inherit;font:inherit}
+.operations-start-plan{margin-top:24px;padding-top:21px;border-top:1px solid #e1e8eb}
+.operations-start-plan h3{margin:0 0 18px;font-size:16px}
+.operations-start-plan ol{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;padding:0;margin:0 0 24px;list-style:none}
+.operations-start-plan li{display:flex;gap:12px;align-items:flex-start;min-width:0}
+.operations-start-plan li>span{display:grid;place-items:center;flex-shrink:0;width:29px;height:29px;border-radius:50%;background:#eaf4f1;color:#24766e;font-size:13px;font-weight:700}
+.operations-start-plan li>p{margin:0;line-height:1.7;font-size:13px;font-weight:400;overflow-wrap:anywhere}
+.operations-start-prompt,.operations-start-footnote{font-size:12px;line-height:1.6;color:#60717a;font-weight:400;margin:16px 0 0}
+.operations-start-guide button:focus-visible,.operations-start-guide select:focus-visible{outline:3px solid #24766e;outline-offset:3px}
+@media(max-width:700px){.operations-start-choices,.operations-start-plan ol{grid-template-columns:minmax(0,1fr)}.operations-start-choices{gap:10px}.operations-start-plan ol{gap:16px}}
