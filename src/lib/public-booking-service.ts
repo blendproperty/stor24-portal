@@ -476,6 +476,6 @@ export async function verifyPublicReservationEmail(reference: string, code: stri
     await tx.customer.update({ where: { id: reservation.customerId }, data: { emailVerifiedAt: verifiedAt } });
     await tx.auditEvent.create({ data: { organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, action: "public_reservation.email_verified", entityType: "Reservation", entityId: reservation.id, requestId: reservation.idempotencyKey, after: { verifiedAt: verifiedAt.toISOString() } } });
   });
-  await welcomeTenantWhenReady(reservation.customerId, reservation.customer.organisationId);
+  await welcomeTenantWhenReady(reservation.customerId, reservation.customer.organisationId, { kind: "RESERVATION", id: reservation.id, facilityId: reservation.facilityId });
   return { ok: true as const, emailVerifiedAt: verifiedAt.toISOString(), identityAccessToken: identityAccess.token };
 }

@@ -751,7 +751,7 @@ export async function moveIn(
     );
     return { tenancy, document, customer, facility, unit };
   });
-  if (!input.simulation) await welcomeTenantWhenReady(result.customer.id, scope.organisationId);
+  if (!input.simulation) await welcomeTenantWhenReady(result.customer.id, scope.organisationId, { kind: "TENANCY", id: result.tenancy.id, facilityId: result.tenancy.facilityId });
   return result;
 }
 

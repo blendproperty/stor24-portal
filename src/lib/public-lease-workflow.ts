@@ -120,7 +120,7 @@ export async function getPublicReservationLease(token: string) {
 
 export async function completePublicReservationLease(token: string, input: { signerName: string; initials: LeaseClauseKey[]; signerIp: string | null; signerUserAgent: string | null; termsAccepted?: boolean; acceptedSha256?: string }) {
   if (LEASE_CLAUSE_KEYS.some((key) => !input.initials.includes(key))) throw new Error("VALIDATION_ERROR");
-  let recipient: { id: string; organisationId: string } | undefined;
+  let recipient: { id: string; organisationId: string; reservationId: string; facilityId: string } | undefined;
   const result = await db.$transaction(async (tx) => {
     const target = await tx.publicReservationLease.findUnique({ where: { signingToken: token }, select: { reservationId: true } });
     if (!target) throw new Error("NOT_FOUND");
@@ -129,7 +129,7 @@ export async function completePublicReservationLease(token: string, input: { sig
     await tx.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id" = ${target.reservationId} FOR UPDATE`;
     const lease = await tx.publicReservationLease.findUnique({ where: { signingToken: token }, include: { reservation: { include: { customer: true } } } });
     if (!lease) throw new Error("NOT_FOUND");
-    recipient = lease.reservation.customer;
+    recipient = { ...lease.reservation.customer, reservationId: lease.reservationId, facilityId: lease.reservation.facilityId };
     if (lease.status === "SIGNED") return { reference: lease.reservation.publicReference, status: "SIGNED" as const, idempotent: true };
     if (lease.status !== "READY" || lease.reservation.status !== "ACTIVE") throw new Error("NOT_FOUND");
     if (lease.expiresAt < new Date()) throw new Error("EXPIRED");
@@ -144,7 +144,7 @@ export async function completePublicReservationLease(token: string, input: { sig
     await tx.auditEvent.create({ data: { organisationId: lease.reservation.customer.organisationId, facilityId: lease.reservation.facilityId, action: "public_lease.signed", entityType: "PublicReservationLease", entityId: lease.id, requestId: lease.reservation.idempotencyKey, after: { reservationId: lease.reservationId, version: lease.version, paymentMethod: lease.paymentMethod, sha256: lease.sha256, signedPdfSha256, signedAt: signedAt.toISOString() } } });
     return { reference: lease.reservation.publicReference, status: "SIGNED" as const, signedAt: signedAt.toISOString(), idempotent: false };
   });
-  if (recipient) await welcomeTenantWhenReady(recipient.id, recipient.organisationId);
+  if (recipient) await welcomeTenantWhenReady(recipient.id, recipient.organisationId, { kind: "RESERVATION", id: recipient.reservationId, facilityId: recipient.facilityId });
   return result;
 }
 

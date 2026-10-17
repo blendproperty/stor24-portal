@@ -24,26 +24,33 @@ test("welcome uses approved branding and a non-authenticating portal link, escap
 test("welcome eligibility, duplicate/concurrent protection, cooldown, failure and explicit resend", async () => {
   const previous = process.env.APP_URL;
   process.env.APP_URL = "https://portal.example.invalid";
-  let eligible = false, sentAt: Date | null = null, nextAttemptAt = 0, calls = 0, fail = false;
+  let eligible = false, sentAt: Date | null = null, nextAttemptAt = 0, calls = 0, fail = false, attempts = 0, welcomeFailed = false;
   const actions: string[] = [];
   const fake = {
+    $transaction: async (run: (tx: unknown) => Promise<unknown>) => run(fake),
     customer: { findFirst: async ({ where }: { where: Record<string, unknown> }) => {
       assert.equal(where.id, "customer"); assert.equal(where.organisationId, "org");
       assert.deepEqual(where.emailVerifiedAt, { not: null });
       assert.deepEqual(where.OR, [{ accounts: { some: {} } }, { reservations: { some: { publicLease: { status: "SIGNED" } } } }]);
       return eligible ? { firstName: "Test", email: "Test@Example.invalid", organisation: { slug: "stor24" } } : null;
     } },
+    reservation: { findFirst: async ({ where }: { where: { id: string; customerId: string; customer: { organisationId: string }; facility: { organisationId: string } } }) => {
+      assert.equal(where.id, "booking"); assert.equal(where.customerId, "customer"); assert.equal(where.customer.organisationId, "org"); assert.equal(where.facility.organisationId, "org");
+      return { facilityId: "facility" };
+    } },
     tenantPortalWelcome: {
       upsert: async () => ({}),
-      updateMany: async ({ where, data }: { where: { sentAt?: null }; data: { nextAttemptAt: Date } }) => {
-        if (nextAttemptAt > Date.now() || (where.sentAt === null && sentAt)) return { count: 0 };
-        nextAttemptAt = data.nextAttemptAt.getTime(); return { count: 1 };
+      updateMany: async ({ where, data }: { where: { sentAt?: null; attempts?: number; failed?: boolean }; data: { nextAttemptAt: Date } }) => {
+        if (nextAttemptAt > Date.now() || (where.sentAt === null && sentAt) || (where.attempts === 0 && attempts !== 0) || (where.failed === false && welcomeFailed)) return { count: 0 };
+        nextAttemptAt = data.nextAttemptAt.getTime(); attempts++; welcomeFailed = false; return { count: 1 };
       },
-      update: async ({ data }: { data: { sentAt?: Date } }) => { if (data.sentAt) sentAt = data.sentAt; return {}; },
+      findUniqueOrThrow: async () => ({ sentAt, attempts }),
+      update: async ({ data }: { data: { sentAt?: Date; failed: boolean } }) => { if (data.sentAt) sentAt = data.sentAt; welcomeFailed = data.failed; return {}; },
     }, auditEvent: { create: async ({ data }: { data: { action: string } }) => { actions.push(data.action); return {}; } },
+    communicationLog: { create: async () => ({ id: "log-" + attempts }), update: async () => ({}) },
   } as unknown as typeof db;
-  const send = async (message: { to: string }) => { assert.equal(message.to, "test@example.invalid"); calls++; if (fail) throw new Error("provider error"); };
-  const deliver = (resend = false) => sendTenantWelcome("customer", "org", { resend }, fake, send);
+  const send = async (message: { to: string; dlp?: { facilityId?: string } }) => { assert.equal(message.to, "test@example.invalid"); assert.equal(message.dlp?.facilityId, "facility"); calls++; if (fail) throw new Error("provider error"); };
+  const deliver = (resend = false) => sendTenantWelcome("customer", "org", { resend, source: { kind: "RESERVATION", id: "booking", facilityId: "facility" } }, fake, send);
   try {
     assert.equal(await deliver(), "ineligible"); assert.equal(calls, 0);
     eligible = true;
@@ -58,6 +65,14 @@ test("welcome eligibility, duplicate/concurrent protection, cooldown, failure an
     assert.equal(await deliver(true), "already_sent_or_cooling_down");
     nextAttemptAt = 0; fail = false;
     assert.equal(await deliver(true), "sent");
+    // A fresh identity whose first transport outcome is unknown must not be
+    // automatically retried simply because its cooldown later expires.
+    sentAt = null; attempts = 0; welcomeFailed = false; nextAttemptAt = 0; fail = true;
+    await assert.rejects(deliver(), /WELCOME_DELIVERY_FAILED/);
+    const uncertainCalls = calls;
+    nextAttemptAt = 0; fail = false;
+    assert.equal(await deliver(), "delivery_review_required"); assert.equal(calls, uncertainCalls);
+    assert.equal(await deliver(true), "sent"); assert.equal(calls, uncertainCalls + 1);
   } finally { if (previous === undefined) delete process.env.APP_URL; else process.env.APP_URL = previous; }
 });
 
