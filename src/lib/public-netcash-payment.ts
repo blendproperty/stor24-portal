@@ -62,7 +62,7 @@ export async function startPublicNetcashSandboxPayment(reference: string, idempo
     update: {},
   });
   if (account.customerId !== reservation.customerId) throw new Error("NETCASH_ACCOUNT_CONFLICT");
-  await welcomeTenantWhenReady(reservation.customerId, reservation.customer.organisationId);
+  await welcomeTenantWhenReady(reservation.customerId, reservation.customer.organisationId, { kind: "RESERVATION", id: reservation.id, facilityId: reservation.facilityId });
   // The unit's monthly rate and any storage/merchandise package selected
   // during booking are priced separately (Reservation.quotedRate vs.
   // ReservationPackage.priceSnapshot) -- both have to be summed here or a

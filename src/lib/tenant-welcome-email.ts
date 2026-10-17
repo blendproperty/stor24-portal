@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
 import { db } from "@/lib/db";
+import { historyEvidence } from "@/lib/customer-history-message-policy";
+import { privacyHash } from "@/lib/request-security";
+import { tenantWelcomeFacility, type TenantWelcomeSource } from "@/lib/tenant-welcome-source";
 import { emailProvider, escapeEmailHtml, type EmailMessage } from "@/lib/email";
 
 export function tenantWelcomeMessage(firstName: string | null, organisation: string, to: string): EmailMessage {
@@ -22,29 +25,50 @@ export function tenantWelcomeMessage(firstName: string | null, organisation: str
 }
 
 /** Called only for a specific lifecycle event or explicit staff send. Never bulk-backfills existing customers. */
-export async function sendTenantWelcome(customerId: string, organisationId: string, options: { resend?: boolean; actorId?: string } = {}, database = db, send = (message: EmailMessage) => emailProvider().send(message)) {
-  const customer = await database.customer.findFirst({ where: { id: customerId, organisationId, emailVerifiedAt: { not: null }, OR: [{ accounts: { some: {} } }, { reservations: { some: { publicLease: { status: "SIGNED" } } } }] }, select: { firstName: true, email: true, organisation: { select: { slug: true } } } });
-  if (!customer?.email) return "ineligible" as const;
-  const email = customer.email.trim().toLowerCase();
-  const message = tenantWelcomeMessage(customer.firstName, customer.organisation.slug, email);
-  const id = createHash("sha256").update(`${organisationId}\0${email}`).digest("hex");
-  await database.tenantPortalWelcome.upsert({ where: { id }, create: { id, organisationId, email }, update: {} });
-  const claimed = await database.tenantPortalWelcome.updateMany({ where: { id, nextAttemptAt: { lte: new Date() }, ...(!options.resend ? { sentAt: null } : {}) }, data: { nextAttemptAt: new Date(Date.now() + 600000), attempts: { increment: 1 }, failed: false } });
-  if (!claimed.count) return "already_sent_or_cooling_down" as const;
+export async function sendTenantWelcome(customerId: string, organisationId: string, options: { source: TenantWelcomeSource; resend?: boolean; actorId?: string }, database = db, send = (message: EmailMessage) => emailProvider().send(message)) {
+  const attempt = await database.$transaction(async tx => {
+    const customer = await tx.customer.findFirst({ where: { id: customerId, organisationId, emailVerifiedAt: { not: null }, OR: [{ accounts: { some: {} } }, { reservations: { some: { publicLease: { status: "SIGNED" } } } }] }, select: { firstName: true, email: true, organisation: { select: { slug: true } } } });
+    if (!customer?.email) return { state: "ineligible" as const };
+    const facilityId = await tenantWelcomeFacility(tx, organisationId, customerId, options.source);
+    const email = customer.email.trim().toLowerCase();
+    const id = createHash("sha256").update(`${organisationId}\0${email}`).digest("hex");
+    // PostgreSQL INSERT ... ON CONFLICT DO NOTHING also handles concurrent
+    // first attempts; an empty-update ORM upsert can race its SELECT/INSERT.
+    await tx.tenantPortalWelcome.createMany({ data: [{ id, organisationId, email }], skipDuplicates: true });
+    // A cooldown limits explicit staff resends; time passing does not resolve
+    // an unknown earlier lifecycle attempt. Successful org/email dedup remains.
+    const claimed = await tx.tenantPortalWelcome.updateMany({ where: { id, organisationId, email, nextAttemptAt: { lte: new Date() }, ...(!options.resend ? { sentAt: null, attempts: 0, failed: false } : {}) }, data: { nextAttemptAt: new Date(Date.now() + 600000), attempts: { increment: 1 }, failed: false } });
+    const welcome = await tx.tenantPortalWelcome.findUniqueOrThrow({ where: { id } });
+    if (!claimed.count) return { state: !options.resend && !welcome.sentAt && welcome.attempts > 0 ? "delivery_review_required" as const : "already_sent_or_cooling_down" as const };
+    const message = tenantWelcomeMessage(customer.firstName, customer.organisation.slug, email);
+    const evidence = historyEvidence(message);
+    if (!evidence) throw new Error("WELCOME_HISTORY_REVIEW");
+    const metadata = { source: "tenant_portal.welcome", sourceType: options.source.kind, sourceId: options.source.id, welcomeId: id, attempt: welcome.attempts, actorId: options.actorId ?? null, deliveryOutcome: "IN_PROGRESS", historyEvidence: evidence };
+    const log = await tx.communicationLog.create({ data: { organisationId, customerId, facilityId, channel: "EMAIL", direction: "OUTBOUND", messageType: "TENANT_PORTAL_WELCOME", provider: "email", recipientHash: privacyHash(email), idempotencyKey: `tenant-welcome-history:${id}:${welcome.attempts}`, status: "PENDING", attempts: 1, nextRetryAt: null, metadata } });
+    return { state: "ready" as const, id, facilityId, message, logId: log.id, metadata };
+  });
+  if (attempt.state !== "ready") return attempt.state;
+  let accepted = false;
   try {
-    await send({ ...message, dlp: { organisationId, actorId: options.actorId, resourceId: customerId, approvedRecipient: email } });
+    await send({ ...attempt.message, dlp: { organisationId, facilityId: attempt.facilityId, actorId: options.actorId, resourceId: customerId, approvedRecipient: attempt.message.to } });
+    accepted = true;
+  } catch { /* Ambiguous transport outcomes require review, not an automatic retry. */ }
+  try {
+    await database.$transaction(async tx => {
+      const at = new Date();
+      await tx.tenantPortalWelcome.update({ where: { id: attempt.id }, data: accepted ? { sentAt: at, failed: false } : { failed: true } });
+      await tx.auditEvent.create({ data: { organisationId, facilityId: attempt.facilityId, actorId: options.actorId, action: accepted ? "tenant_portal.welcome_sent" : "tenant_portal.welcome_delivery_failed", entityType: "Customer", entityId: customerId } });
+      await tx.communicationLog.update({ where: { id: attempt.logId }, data: { status: accepted ? "SUCCEEDED" : "FAILED", sentAt: accepted ? at : null, failedAt: accepted ? null : at, failureCode: accepted ? null : "DELIVERY_REVIEW_REQUIRED", failureMessage: accepted ? null : "Delivery not confirmed. Review provider evidence before any explicit resend.", metadata: { ...attempt.metadata, deliveryOutcome: accepted ? "ACCEPTED" : "UNCERTAIN" } } });
+    });
   } catch {
-    await database.tenantPortalWelcome.update({ where: { id }, data: { failed: true } });
-    await database.auditEvent.create({ data: { organisationId, actorId: options.actorId, action: "tenant_portal.welcome_delivery_failed", entityType: "Customer", entityId: customerId } });
-    throw new Error("WELCOME_DELIVERY_FAILED");
+    throw new Error("WELCOME_DELIVERY_REVIEW_REQUIRED");
   }
-  await database.tenantPortalWelcome.update({ where: { id }, data: { sentAt: new Date(), failed: false } });
-  await database.auditEvent.create({ data: { organisationId, actorId: options.actorId, action: "tenant_portal.welcome_sent", entityType: "Customer", entityId: customerId } });
+  if (!accepted) throw new Error("WELCOME_DELIVERY_FAILED");
   return "sent" as const;
 }
 
 /** Email failure must not undo an already committed signature/account/verification. Staff can retry. */
-export async function welcomeTenantWhenReady(customerId: string, organisationId: string) {
-  try { await sendTenantWelcome(customerId, organisationId); }
+export async function welcomeTenantWhenReady(customerId: string, organisationId: string, source: TenantWelcomeSource) {
+  try { await sendTenantWelcome(customerId, organisationId, { source }); }
   catch { console.error("My STOR24 welcome delivery needs staff review."); }
 }

@@ -9,6 +9,7 @@ import { deliverBookingConfirmation } from "../../src/lib/payments/booking-confi
 import { customerHistory } from "../../src/lib/customer-history-service";
 import { buildCustomerHistoryExport, hydrateCustomerHistoryMessages } from "../../src/lib/customer-history-export";
 import type { RequestScope } from "../../src/lib/scope";
+import { sendTenantWelcome } from "../../src/lib/tenant-welcome-email";
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 test("isolated PostgreSQL booking email/SMS attempt claims", async () => {
@@ -65,6 +66,125 @@ test("isolated PostgreSQL booking email/SMS attempt claims", async () => {
     try { assert.ok((await notify({ ...input, idempotencyKey: randomUUID() })).every((r: Row) => !r.ok)); assert.equal(sends.length, 0); }
     finally { await db.$executeRawUnsafe('ALTER TABLE "CommunicationLog" DROP CONSTRAINT "synthetic_notification_claim"'); }
   } finally { await db.$disconnect(); }
+});
+
+test("welcome history retains actual scoped attempts and holds automatic uncertainty beyond cooldown", async t => {
+  assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci");
+  const url = new URL(process.env.DATABASE_URL!);
+  assert.equal(url.hostname, "localhost"); assert.match(url.pathname, /_ci$/);
+  t.mock.method(globalThis, "fetch", () => { throw Error("Unexpected real welcome transport"); });
+  const org = await db.organisation.create({ data: { name: "Welcome history CI", slug: randomUUID() } });
+  const foreignOrg = await db.organisation.create({ data: { name: "Foreign welcome CI", slug: randomUUID() } });
+  const a = await db.facility.create({ data: { organisationId: org.id, code: "A", name: "Actual welcome store" } });
+  const b = await db.facility.create({ data: { organisationId: org.id, code: "B", name: "Covering store" } });
+  const foreign = await db.facility.create({ data: { organisationId: foreignOrg.id, code: "F", name: "Foreign store" } });
+  const make = async (facility = a, email = `${randomUUID()}@example.invalid`) => {
+    const customer = await db.customer.create({ data: { organisationId: org.id, firstName: `Synthetic ${randomUUID()}`, email, emailVerifiedAt: new Date() } });
+    const type = await db.unitType.create({ data: { facilityId: facility.id, name: randomUUID(), features: [] } });
+    const unit = await db.unit.create({ data: { facilityId: facility.id, unitTypeId: type.id, number: randomUUID(), monthlyRate: 100 } });
+    const reservation = await db.reservation.create({ data: { customerId: customer.id, facilityId: facility.id, unitId: unit.id, quotedRate: 100 } });
+    const account = await db.account.create({ data: { customerId: customer.id, accountNumber: randomUUID() } });
+    const tenancy = await db.tenancy.create({ data: { customerId: customer.id, facilityId: facility.id, accountId: account.id, startDate: new Date() } });
+    return { customer, reservation, account, tenancy, facility };
+  };
+  const first = await make();
+  const source = { kind: "RESERVATION" as const, id: first.reservation.id, facilityId: a.id };
+  let sends = 0;
+  const send = async (message: { to: string; text: string; dlp?: { facilityId?: string } }) => { sends++; assert.ok(message.to.endsWith("@example.invalid")); assert.match(message.text, /does not confirm payment/); assert.ok(message.dlp?.facilityId); };
+  const logs = (customerId: string) => db.communicationLog.findMany({ where: { organisationId: org.id, customerId, messageType: "TENANT_PORTAL_WELCOME" }, orderBy: [{ queuedAt: "asc" }, { id: "asc" }] });
+  const cool = (email: string) => db.tenantPortalWelcome.updateMany({ where: { organisationId: org.id, email }, data: { nextAttemptAt: new Date(0) } });
+  const finance = async () => ({ accounts: await db.account.findMany({ where: { customer: { organisationId: org.id } }, orderBy: { id: "asc" } }), ledger: await db.ledgerEntry.count({ where: { account: { customer: { organisationId: org.id } } } }), payments: await db.payment.count({ where: { account: { customer: { organisationId: org.id } } } }) });
+  const previousAppUrl = process.env.APP_URL;
+  process.env.APP_URL = "https://portal.welcome-fixture.example.invalid";
+  try {
+    const admitted = await Promise.all(Array.from({ length: 6 }, () => sendTenantWelcome(first.customer.id, org.id, { source }, db, send)));
+    assert.equal(admitted.filter(value => value === "sent").length, 1); assert.equal(sends, 1);
+    const original = (await logs(first.customer.id))[0];
+    assert.equal(original.facilityId, a.id); assert.equal(original.status, "SUCCEEDED"); assert.ok(original.sentAt); assert.equal(original.deliveredAt, null); assert.equal(original.readAt, null);
+    assert.doesNotMatch(JSON.stringify(original.metadata), /https?:\/\//);
+    await db.customer.update({ where: { id: first.customer.id }, data: { firstName: "Updated welcome name" } });
+    await cool(first.customer.email!);
+    assert.equal(await sendTenantWelcome(first.customer.id, org.id, { source }, db, send), "already_sent_or_cooling_down");
+    // All actual source kinds resolve their own store, including an exact
+    // booking account without a tenancy. Each explicit resend is a new row.
+    assert.equal(await sendTenantWelcome(first.customer.id, org.id, { resend: true, source: { kind: "ACCOUNT", id: first.account.id, facilityId: a.id } }, db, send), "sent");
+    assert.equal(await sendTenantWelcome(first.customer.id, org.id, { resend: true, source }, db, send), "already_sent_or_cooling_down");
+    await cool(first.customer.email!);
+    assert.equal(await sendTenantWelcome(first.customer.id, org.id, { resend: true, source: { kind: "TENANCY", id: first.tenancy.id, facilityId: a.id } }, db, send), "sent");
+    const bookingAccount = await db.account.create({ data: { customerId: first.customer.id, accountNumber: `ST24-T-${first.reservation.id}` } });
+    await cool(first.customer.email!);
+    assert.equal(await sendTenantWelcome(first.customer.id, org.id, { resend: true, source: { kind: "ACCOUNT", id: bookingAccount.id, facilityId: a.id } }, db, send), "sent");
+    assert.equal((await logs(first.customer.id)).length, 4); assert.equal(sends, 4);
+    const accountAttempt = (await logs(first.customer.id)).find(row => (row.metadata as Row).sourceId === first.account.id);
+    assert.ok(accountAttempt); assert.match(JSON.stringify(accountAttempt.metadata), /Updated welcome name/);
+    assert.deepEqual((await db.communicationLog.findUniqueOrThrow({ where: { id: original.id } })).metadata, original.metadata);
+    const second = await make(b, first.customer.email!);
+    const secondSource = { kind: "RESERVATION" as const, id: second.reservation.id, facilityId: b.id };
+    await cool(first.customer.email!);
+    assert.equal(await sendTenantWelcome(second.customer.id, org.id, { source: secondSource }, db, send), "already_sent_or_cooling_down");
+    assert.equal((await logs(second.customer.id)).length, 0);
+    assert.equal(await sendTenantWelcome(second.customer.id, org.id, { resend: true, source: secondSource }, db, send), "sent");
+    const secondLog = (await logs(second.customer.id))[0]; assert.equal(secondLog.facilityId, b.id);
+    assert.equal((await logs(first.customer.id)).length, 4);
+    await db.lead.create({ data: { customerId: first.customer.id, facilityId: b.id, source: "OTHER" } });
+    const staff = await db.user.create({ data: { organisationId: org.id, name: "Welcome fixture", email: `${randomUUID()}@example.invalid` } });
+    const scope: RequestScope = { organisationId: org.id, userId: staff.id, facilityIds: [a.id], unrestrictedFacilities: false };
+    const query = { kind: "COMMUNICATION" as const, search: "No password to remember" };
+    const access = { communications: scope, collections: null, write: null };
+    assert.equal((await customerHistory(scope, first.customer.id, query, access)).entries.length, 4);
+    const bScope = { ...scope, facilityIds: [b.id] };
+    assert.equal((await customerHistory(bScope, first.customer.id, query, { ...access, communications: bScope })).entries.length, 0);
+    assert.equal((await customerHistory(scope, first.customer.id, query, { ...access, communications: null })).entries.length, 0);
+    const exported = await buildCustomerHistoryExport(scope, first.customer.id, query, access, { id: original.id, kind: "COMMUNICATION" });
+    await hydrateCustomerHistoryMessages({ scope, customerId: first.customer.id, phone: null, rows: exported.rows, access });
+    assert.match(String(exported.rows[0].body), /No password to remember/); assert.ok(exported.rows[0].subject);
+    const beforeInvalid = sends;
+    for (const invalid of [{ ...source, facilityId: b.id }, { ...source, facilityId: "" }, { ...source, id: second.reservation.id }, { kind: "TENANCY" as const, id: second.tenancy.id, facilityId: b.id }]) {
+      await assert.rejects(sendTenantWelcome(first.customer.id, org.id, { source: invalid, resend: true }, db, send), /WELCOME_SOURCE_REVIEW/);
+    }
+    const foreignLinked = await make(foreign);
+    await assert.rejects(sendTenantWelcome(foreignLinked.customer.id, org.id, { source: { kind: "ACCOUNT", id: foreignLinked.account.id, facilityId: foreign.id } }, db, send), /WELCOME_SOURCE_REVIEW/);
+    assert.equal(await sendTenantWelcome(first.customer.id, foreignOrg.id, { source }, db, send), "ineligible");
+    const orphan = await db.account.create({ data: { customerId: first.customer.id, accountNumber: randomUUID() } });
+    await assert.rejects(sendTenantWelcome(first.customer.id, org.id, { source: { kind: "ACCOUNT", id: orphan.id, facilityId: a.id }, resend: true }, db, send), /WELCOME_SOURCE_REVIEW/);
+    assert.equal(sends, beforeInvalid);
+    const blocked = await make(); const before = await finance();
+    const blockedSource = { kind: "RESERVATION" as const, id: blocked.reservation.id, facilityId: a.id };
+    await db.$executeRawUnsafe('ALTER TABLE "CommunicationLog" ADD CONSTRAINT ci_welcome_intent CHECK ("messageType" <> \'TENANT_PORTAL_WELCOME\') NOT VALID');
+    try { await assert.rejects(sendTenantWelcome(blocked.customer.id, org.id, { source: blockedSource }, db, send)); }
+    finally { await db.$executeRawUnsafe('ALTER TABLE "CommunicationLog" DROP CONSTRAINT ci_welcome_intent'); }
+    assert.equal(sends, beforeInvalid); assert.equal((await logs(blocked.customer.id)).length, 0);
+    assert.equal(await db.tenantPortalWelcome.count({ where: { organisationId: org.id, email: blocked.customer.email! } }), 0);
+    assert.deepEqual(await finance(), before);
+    const unknown = await make();
+    const unknownSource = { kind: "RESERVATION" as const, id: unknown.reservation.id, facilityId: a.id };
+    await db.$executeRawUnsafe('ALTER TABLE "CommunicationLog" ADD CONSTRAINT ci_welcome_final CHECK ("messageType" <> \'TENANT_PORTAL_WELCOME\' OR "status" = \'PENDING\') NOT VALID');
+    try { await assert.rejects(sendTenantWelcome(unknown.customer.id, org.id, { source: unknownSource }, db, send), /WELCOME_DELIVERY_REVIEW_REQUIRED/); }
+    finally { await db.$executeRawUnsafe('ALTER TABLE "CommunicationLog" DROP CONSTRAINT ci_welcome_final'); }
+    const pending = (await logs(unknown.customer.id))[0]; assert.equal(pending.status, "PENDING"); assert.equal(pending.sentAt, null);
+    assert.equal((await db.tenantPortalWelcome.findFirstOrThrow({ where: { organisationId: org.id, email: unknown.customer.email! } })).sentAt, null);
+    assert.equal(await db.auditEvent.count({ where: { organisationId: org.id, entityId: unknown.customer.id, action: "tenant_portal.welcome_sent" } }), 0);
+    const unknownSends = sends; await cool(unknown.customer.email!);
+    assert.equal(await sendTenantWelcome(unknown.customer.id, org.id, { source: unknownSource }, db, send), "delivery_review_required"); assert.equal(sends, unknownSends);
+    assert.equal(await sendTenantWelcome(unknown.customer.id, org.id, { source: unknownSource, resend: true }, db, send), "sent");
+    assert.equal((await logs(unknown.customer.id)).length, 2); assert.deepEqual((await db.communicationLog.findUniqueOrThrow({ where: { id: pending.id } })).metadata, pending.metadata);
+    const rejected = await make();
+    const rejectedSource = { kind: "RESERVATION" as const, id: rejected.reservation.id, facilityId: a.id };
+    await assert.rejects(sendTenantWelcome(rejected.customer.id, org.id, { source: rejectedSource }, db, async () => { sends++; throw Error("Synthetic unknown provider result"); }), /WELCOME_DELIVERY_FAILED/);
+    const failed = (await logs(rejected.customer.id))[0]; assert.equal(failed.status, "FAILED"); assert.equal(failed.failureCode, "DELIVERY_REVIEW_REQUIRED"); assert.equal(failed.deliveredAt, null);
+    const failedSends = sends; await cool(rejected.customer.email!);
+    assert.equal(await sendTenantWelcome(rejected.customer.id, org.id, { source: rejectedSource }, db, send), "delivery_review_required"); assert.equal(sends, failedSends);
+    assert.equal(await sendTenantWelcome(rejected.customer.id, org.id, { source: rejectedSource, resend: true }, db, send), "sent");
+    const legacy = await make();
+    const legacySource = { kind: "RESERVATION" as const, id: legacy.reservation.id, facilityId: a.id };
+    const { createHash } = await import("node:crypto");
+    await db.tenantPortalWelcome.create({ data: { id: createHash("sha256").update(`${org.id}\0${legacy.customer.email}`).digest("hex"), organisationId: org.id, email: legacy.customer.email!, attempts: 1, nextAttemptAt: new Date(0), failed: true } });
+    assert.equal(await sendTenantWelcome(legacy.customer.id, org.id, { source: legacySource }, db, send), "delivery_review_required"); assert.equal((await logs(legacy.customer.id)).length, 0);
+    assert.equal(await sendTenantWelcome(legacy.customer.id, org.id, { source: legacySource, resend: true }, db, send), "sent"); assert.equal((await logs(legacy.customer.id)).length, 1);
+  } finally {
+    if (previousAppUrl === undefined) delete process.env.APP_URL; else process.env.APP_URL = previousAppUrl;
+    await db.$disconnect();
+  }
 });
 
 test("booking confirmation history is atomic with delivery intent, scoped and never resends unknown outcomes", async t => {
