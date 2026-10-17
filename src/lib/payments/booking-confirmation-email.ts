@@ -1,6 +1,9 @@
 import { db } from "@/lib/db";
 import { emailProvider, escapeEmailHtml as safe, type EmailMessage } from "@/lib/email";
 import type { Prisma } from "@/generated/prisma/client";
+import { historyEvidence } from "@/lib/customer-history-message-policy";
+import { privacyHash } from "@/lib/request-security";
+import { z } from "zod";
 
 export type BookingConfirmation = { to: string; reference: string; unit: string; amount: string; test: boolean };
 export function bookingConfirmationMessage(data: BookingConfirmation): EmailMessage {
@@ -27,16 +30,39 @@ export async function queueBookingConfirmation(tx: Prisma.TransactionClient, pay
 }
 
 /** Claim before sending. Ambiguous provider failures are retained for review, never blindly resent. */
-export async function deliverBookingConfirmation(paymentId: string, send = (message: EmailMessage) => emailProvider().send(message)) {
+export async function deliverBookingConfirmation(paymentId: string, send = (message: EmailMessage) => emailProvider().send(message), database = db) {
   const idempotencyKey = `booking-confirmation:${paymentId}`;
-  const claimed = await db.webhookOutbox.updateMany({ where: { idempotencyKey, status: "PENDING" }, data: { status: "PROCESSING", attempts: { increment: 1 } } });
-  if (!claimed.count) return;
-  const entry = await db.webhookOutbox.findUniqueOrThrow({ where: { idempotencyKey } });
+  // This is deliberately after settlement. An archive failure must never roll
+  // back a verified payment, and an unrecorded delivery intent must not send.
+  const attempt = await database.$transaction(async tx => {
+    const claimed = await tx.webhookOutbox.updateMany({ where: { idempotencyKey, status: "PENDING" }, data: { status: "PROCESSING", attempts: { increment: 1 } } });
+    if (!claimed.count) return null;
+    const entry = await tx.webhookOutbox.findUniqueOrThrow({ where: { idempotencyKey } });
+    if (entry.eventType !== "booking.payment_confirmation" || entry.aggregateType !== "Payment" || entry.aggregateId !== paymentId || entry.destination !== "email://booking-confirmation" || !entry.facilityId) throw new Error("BOOKING_EMAIL_SOURCE_REVIEW");
+    const payment = await tx.payment.findFirst({ where: { id: paymentId, account: { customer: { organisationId: entry.organisationId } } }, select: { account: { select: { customerId: true, accountNumber: true } } } });
+    const reservationId = payment?.account.accountNumber.startsWith("ST24-T-") ? payment.account.accountNumber.slice(7) : "";
+    const reservation = payment && await tx.reservation.findFirst({ where: { id: reservationId, customerId: payment.account.customerId, facilityId: entry.facilityId, facility: { organisationId: entry.organisationId } }, select: { id: true } });
+    if (!payment || !reservation) throw new Error("BOOKING_EMAIL_SOURCE_REVIEW");
+    const data = z.object({ to: z.string().email(), reference: z.string().min(1).max(200), unit: z.string().min(1).max(200), amount: z.string().regex(/^\d+\.\d{2}$/), test: z.boolean() }).parse(entry.payload);
+    const message = bookingConfirmationMessage(data);
+    const evidence = historyEvidence(message);
+    if (!evidence) throw new Error("BOOKING_EMAIL_HISTORY_REVIEW");
+    const metadata = { source: "booking.payment_confirmation", outboxId: entry.id, paymentId, test: data.test, deliveryOutcome: "IN_PROGRESS", historyEvidence: evidence };
+    const log = await tx.communicationLog.create({ data: { organisationId: entry.organisationId, facilityId: entry.facilityId, customerId: payment.account.customerId, channel: "EMAIL", direction: "OUTBOUND", messageType: "BOOKING_PAYMENT_CONFIRMATION", provider: "email", recipientHash: privacyHash(message.to), idempotencyKey: `booking-confirmation-history:${entry.id}`, status: "PENDING", attempts: 1, nextRetryAt: null, metadata } });
+    return { entry, message, logId: log.id, metadata };
+  });
+  if (!attempt) return;
+  const { entry, message, logId, metadata } = attempt;
+  let accepted = false;
   try {
-    const message = bookingConfirmationMessage(entry.payload as BookingConfirmation);
     await send({ ...message, dlp: { organisationId: entry.organisationId, facilityId: entry.facilityId ?? undefined, resourceId: paymentId, approvedRecipient: message.to } });
-    await db.webhookOutbox.update({ where: { id: entry.id }, data: { status: "SUCCEEDED", deliveredAt: new Date() } });
-  } catch {
-    await db.webhookOutbox.update({ where: { id: entry.id }, data: { status: "FAILED", failureCode: "EMAIL_DELIVERY_REVIEW", failureMessage: "Delivery not confirmed. Review provider delivery before any resend." } });
-  }
+    accepted = true;
+  } catch { /* A thrown transport result can be ambiguous; never auto-resend. */ }
+  try {
+    await database.$transaction(async tx => {
+      const at = new Date();
+      await tx.webhookOutbox.update({ where: { id: entry.id }, data: accepted ? { status: "SUCCEEDED", deliveredAt: at } : { status: "FAILED", failureCode: "EMAIL_DELIVERY_REVIEW", failureMessage: "Delivery not confirmed. Review provider delivery before any resend." } });
+      await tx.communicationLog.update({ where: { id: logId }, data: { status: accepted ? "SUCCEEDED" : "FAILED", sentAt: accepted ? at : null, failedAt: accepted ? null : at, failureCode: accepted ? null : "DELIVERY_REVIEW_REQUIRED", failureMessage: accepted ? null : "Delivery not confirmed. Review provider evidence before any resend.", metadata: { ...metadata, deliveryOutcome: accepted ? "ACCEPTED" : "UNCERTAIN" } } });
+    });
+  } catch { /* Keep the original durable intent. A finalisation failure is not a rejection or permission to resend. */ }
 }
