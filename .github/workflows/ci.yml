@@ -104,6 +104,7 @@ jobs:
       - run: node scripts/test-settlements.mjs
       - run: node scripts/test-mri.mjs
       - run: node scripts/test-collection-notices.mjs
+      - run: node scripts/test-collection-phone.mjs
       - run: node scripts/test-mri-mapping.mjs
       - run: node scripts/test-mri-sandbox.mjs
       - run: node scripts/test-mri-batches.mjs

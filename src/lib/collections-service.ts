@@ -177,6 +177,23 @@ export async function collectionEmailSource(tx: Client, scope: RequestScope, acc
     fingerprint: createHash("sha256").update(JSON.stringify(bound)).digest("hex") };
 }
 
+/** Phone-channel notices use their own verified identity and consent, never an email-address fallback. */
+export async function collectionPhoneSource(tx: Client, scope: RequestScope, accountId: string, channel: "SMS" | "WHATSAPP") {
+  const asOf = southAfricaDateKey(new Date()), account = await accountFor(tx, scope, accountId);
+  const customer = await tx.customer.findFirst({ where: { id: account.customerId, organisationId: scope.organisationId }, select: { phone: true, phoneVerifiedAt: true, communicationConsent: true, updatedAt: true } });
+  if (!customer) throw Error("COLLECTION_NOT_FOUND");
+  const result = evaluate(account, asOf, await receiptEvidence(tx, scope, [account]));
+  const blockers = [result.ageing.issue, result.hold].filter((v): v is string => !!v);
+  if (account.tenancy!.status !== "ACTIVE") blockers.push("Only an active tenancy may receive an arrears reminder.");
+  if (result.ageing.overdue <= 0) blockers.push("No reconciled overdue balance is available.");
+  if (account.payments.some(p => !isTestPayment(p) && (p.status === "FAILED" || p.status === "PENDING" || ["SUCCEEDED", "PARTIALLY_REFUNDED", "REFUNDED", "REVERSED"].includes(p.status) && !account.ledgerEntries.some(e => result.verifiedReceiptIds.includes(e.id) && (e.externalRef === p.idempotencyKey || (e.metadata as { paymentId?: string } | null)?.paymentId === p.id))))) blockers.push("A pending, failed or unposted payment requires reconciliation before contact.");
+  const consent = customer.communicationConsent as { sms?: boolean; whatsapp?: boolean; optedOutAt?: string | null } | null;
+  if (!customer.phoneVerifiedAt) blockers.push("The customer's phone number must be verified.");
+  if (consent?.[channel === "SMS" ? "sms" : "whatsapp"] !== true || consent?.optedOutAt) blockers.push(`Explicit current ${channel} consent is required.`);
+  const bound = { channel, asOf, accountId, facilityId: account.tenancy!.facilityId, customer, updatedAt: account.updatedAt, balance: account.balance.toString(), ledger: result.entries, payments: account.payments.map(p => [p.id, p.status, p.amount.toString(), p.providerRef]), caseRevision: account.collectionCase?.revision ?? 0, terms: account.collectionCase?.terms, overdue: result.ageing.overdue, blockers };
+  return { accountId, customerId: account.customerId, facilityId: account.tenancy!.facilityId, facility: account.tenancy!.facility.name, accountNumber: account.accountNumber, recipient: customer.phone ?? "", channel, asOf, overdueCents: result.ageing.overdue, blockers, fingerprint: createHash("sha256").update(JSON.stringify(bound)).digest("hex") };
+}
+
 async function prepareAccessReviewTask(tx: Client, scope: RequestScope, account: Account, ownerId: string | null, evaluated: ReturnType<typeof evaluate>, today: string, scheduled = false) {
   const assessment = accessReviewFor(account, evaluated, today);
   if (!assessment.eligible || !assessment.sourceChargeId || !assessment.reviewOn) throw Error("COLLECTION_ACCESS_REVIEW_HELD");
