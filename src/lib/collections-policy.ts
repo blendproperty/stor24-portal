@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { statementPeriod, type StatementEntry } from "@/lib/finance/account-statement";
 import { southAfricaDateKey } from "@/lib/south-africa-time";
+import { arrearsReviewScheduleInput } from "./arrears-review-schedule-policy";
 
 export const dateKey = z.string().refine(v => { try { statementPeriod(v, v); return true; } catch { return false; } }, "Use a valid date.");
 export const termsSchema = z.object({ dueDays: z.number().int().min(0).max(120), allocation: z.literal("OLDEST_DUE_FIRST"), approvalReference: z.string().trim().min(5).max(200), overrides: z.array(z.object({ entryId: z.string(), dueDate: dateKey })).max(500).default([]) }).strict();
@@ -97,6 +98,8 @@ export function csvCell(value: unknown) {
 
 const base = { accountId: z.string().cuid(), revision: z.number().int().min(0), requestKey: z.string().uuid(), note: z.string().trim().min(5).max(1000) };
 export const collectionActionSchema = z.discriminatedUnion("action", [
+  z.object({ ...base, action: z.literal("schedule-access-review"), input: arrearsReviewScheduleInput, scheduleRevision: z.uuid().nullable(), confirm: z.literal(true) }).strict(),
+  z.object({ ...base, action: z.literal("cancel-access-review-schedule"), scheduleRevision: z.uuid() }).strict(),
   z.object({ ...base, action: z.literal("access-review-task") }).strict(),
   z.object({ ...base, action: z.literal("terms"), terms: termsSchema, confirm: z.literal(true) }).strict(),
   z.object({ ...base, action: z.literal("follow-up"), ownerId: z.string().cuid().nullable(), nextFollowUp: dateKey.nullable(), outcome: z.enum(["PLAN", "REACHED", "NO_ANSWER"]) }).strict(),

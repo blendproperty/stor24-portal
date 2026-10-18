@@ -11,6 +11,8 @@ const messages: Record<string, string> = {
 };
 function failure(e: unknown) {
   const code = e instanceof Error ? e.message : "";
+  if (code === "ARREARS_REVIEW_SCHEDULE_INPUT") return Response.json({ error: "Choose an active EFT/card account, a current date range and an active plan to cancel. Holds remain in force." }, { status: 409 });
+  if (code.startsWith("ARREARS_REVIEW_SCHEDULE_")) return Response.json({ error: "The daily review plan is held. Ask an administrator to check its integrity and configuration." }, { status: 409 });
   if (code === "COLLECTION_ACCESS_REVIEW_HELD") return Response.json({ error: "Access review is held. Refresh and check the seven-day date, payment method, payment evidence, disputes and arrangements." }, { status: 409 });
   if (code === "PERSONAL_EXPORT_FORBIDDEN") return Response.json({ error: "Personal-data exports require explicit Super Admin (Organisation owner) authorisation." }, { status: 403 });
   if (["UNAUTHENTICATED", "FORBIDDEN"].includes(code)) return Response.json({ error: code === "UNAUTHENTICATED" ? "Sign in is required." : "You do not have permission for this action." }, { status: code === "UNAUTHENTICATED" ? 401 : 403 });
