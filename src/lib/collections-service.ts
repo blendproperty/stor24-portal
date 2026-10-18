@@ -1,5 +1,6 @@
 import {receiptAllocationGraph} from "./receipt-reallocation-source";
 import { arrearsAccessReview } from "./arrears-access-review-policy";
+import { currentRoleAccess } from "./current-role-access";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
@@ -22,6 +23,11 @@ async function accountFor(tx: Client, scope: RequestScope, id: string) {
 async function owners(tx: Client, scope: RequestScope) {
   const users = await tx.user.findMany({ where: { organisationId: scope.organisationId, active: true }, select: { id: true, name: true, roleAssignments: { include: { role: true } } } });
   return users.map(u => ({ id: u.id, name: u.name, facilities: u.roleAssignments.filter(a => a.role.organisationId === scope.organisationId && hasPermission(a.role.permissions, "collections.manage")).map(a => a.facilityId) })).filter(u => u.facilities.length > 0);
+}
+async function accessReviewAssignee(tx: Client, scope: RequestScope, facilityId: string, ownerId: string | null) {
+  const users = await tx.user.findMany({ where: { organisationId: scope.organisationId, active: true }, select: { id: true, roleAssignments: { include: { role: true } } } });
+  const eligible = users.filter(user => ["collections.view", "collections.manage", "operations.view", "operations.manage"].every(permission => currentRoleAccess(user.roleAssignments, permission, facilityId).allowed));
+  return eligible.some(user => user.id === ownerId) ? ownerId : eligible.some(user => user.id === scope.userId) ? scope.userId : null;
 }
 type ReceiptProof=Set<string>&{allocations:Map<string,{accountId:string;rootPaymentId:string;remainingCents:number;receivedAt:Date;recordedAt:Date}>;held:Set<string>;pending:Set<string>};
 async function receiptEvidence(tx: Client, scope: RequestScope, accounts: Account[]):Promise<ReceiptProof> {
@@ -171,18 +177,21 @@ export async function updateCollection(scope: RequestScope, raw: CollectionActio
     const evaluated = evaluate(account, today, await receiptEvidence(tx, scope, [account]));
     const data: Prisma.CollectionCaseUpdateInput = { revision: { increment: 1 } };
     let accessTaskId: string | null = null;
+    let reviewAssigneeId: string | null = null;
     if (input.action === "access-review-task") {
       const assessment = accessReviewFor(account, evaluated, today);
       if (!assessment.eligible || !assessment.sourceChargeId || !assessment.reviewOn) throw new Error("COLLECTION_ACCESS_REVIEW_HELD");
+      const assigneeId = await accessReviewAssignee(tx, scope, account.tenancy!.facilityId, c.ownerId);
+      if (!assigneeId) throw new Error("COLLECTION_OWNER");
+      reviewAssigneeId = assigneeId;
       const key = createHash("sha256").update(JSON.stringify(["ARREARS_ACCESS_REVIEW", scope.organisationId, account.id, assessment.sourceChargeId])).digest("hex");
       const previousTask = await tx.task.findUnique({ where: { requestKey: key } });
       if (previousTask) {
         if (previousTask.organisationId !== scope.organisationId || previousTask.facilityId !== account.tenancy!.facilityId || previousTask.purpose !== "ARREARS_ACCESS_REVIEW") throw new Error("COLLECTION_CHANGED");
+        if (!["COMPLETED", "CANCELLED"].includes(previousTask.status)) await tx.task.update({ where: { id: previousTask.id }, data: { assigneeId, dueAt: new Date(`${assessment.reviewOn}T00:00:00+02:00`) } });
+        else reviewAssigneeId = previousTask.assigneeId;
         accessTaskId = previousTask.id;
       } else {
-        const reviewers = (await owners(tx, scope)).filter(user => user.facilities.includes(null) || user.facilities.includes(account.tenancy!.facilityId));
-        const assigneeId = reviewers.some(user => user.id === c.ownerId) ? c.ownerId : reviewers.some(user => user.id === scope.userId) ? scope.userId : null;
-        if (!assigneeId) throw new Error("COLLECTION_OWNER");
         const task = await tx.task.create({ data: { organisationId: scope.organisationId, facilityId: account.tenancy!.facilityId, assigneeId, createdById: scope.userId, purpose: "ARREARS_ACCESS_REVIEW", requestKey: key, requestHash: createHash("sha256").update(JSON.stringify(assessment)).digest("hex"), title: `Access restriction review · ${account.accountNumber}`, description: "Authorised collections staff must open Collections and recheck current payment, dispute, arrangement and written-notice evidence. This internal task is not approval to restrict access, charge fees or change money.", dueAt: new Date(`${assessment.reviewOn}T00:00:00+02:00`) } });
         accessTaskId = task.id;
       }
@@ -222,7 +231,7 @@ export async function updateCollection(scope: RequestScope, raw: CollectionActio
     } : null;
     const activity = await tx.collectionActivity.create({ data: { caseId: c.id, requestKey: input.requestKey, actorId: scope.userId, action: input.action === "follow-up" ? input.outcome : review ? `Escalation review · ${review.target.toLowerCase()}${review.proposedChannel ? ` / ${review.proposedChannel}` : ""} · held for policy` : input.action,
       note: review ? `Internal review requested for ${review.reviewOn}. ${input.note}\n${review.blockers.join(" ")}${review.proposedPolicyReference ? ` Proposed policy evidence (unverified): ${review.proposedPolicyReference}.` : ""} No message, fee or access action was executed.` : accessTaskId ? `${input.note}\nInternal Operations review task ${accessTaskId} prepared. Separate written-notice checks and authorised access approval are still required. No message, fee, financial approval or access command was created.` : input.note, payload: json(input) } });
-    await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: account.tenancy!.facilityId, actorId: scope.userId, entityType: "CollectionCase", entityId: c.id, action: `collections.${input.action}`, after: json({ activityId: activity.id, revision: input.revision + 1, ...(review ? { review } : {}), ...(accessTaskId ? { taskId: accessTaskId, assessment: accessReviewFor(account, evaluated, today), financialApproval: false, accessApproval: false } : {}) }) } });
+    await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: account.tenancy!.facilityId, actorId: scope.userId, entityType: "CollectionCase", entityId: c.id, action: `collections.${input.action}`, after: json({ activityId: activity.id, revision: input.revision + 1, ...(review ? { review } : {}), ...(accessTaskId ? { taskId: accessTaskId, assigneeId: reviewAssigneeId, assessment: accessReviewFor(account, evaluated, today), financialApproval: false, accessApproval: false } : {}) }) } });
     return { id: activity.id, repeated: false };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000 });
 }
