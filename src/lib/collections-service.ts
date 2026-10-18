@@ -26,7 +26,7 @@ async function owners(tx: Client, scope: RequestScope) {
 }
 async function accessReviewAssignee(tx: Client, scope: RequestScope, facilityId: string, ownerId: string | null) {
   const users = await tx.user.findMany({ where: { organisationId: scope.organisationId, active: true }, select: { id: true, roleAssignments: { include: { role: true } } } });
-  const eligible = users.filter(user => ["collections.view", "collections.manage", "operations.view", "operations.manage"].every(permission => currentRoleAccess(user.roleAssignments, permission, facilityId).allowed));
+  const eligible = users.filter(user => ["collections.view", "collections.manage", "operations.view", "operations.manage"].every(permission => currentRoleAccess(user.roleAssignments.filter(assignment => assignment.role.organisationId === scope.organisationId), permission, facilityId).allowed));
   return eligible.some(user => user.id === ownerId) ? ownerId : eligible.some(user => user.id === scope.userId) ? scope.userId : null;
 }
 type ReceiptProof=Set<string>&{allocations:Map<string,{accountId:string;rootPaymentId:string;remainingCents:number;receivedAt:Date;recordedAt:Date}>;held:Set<string>;pending:Set<string>};

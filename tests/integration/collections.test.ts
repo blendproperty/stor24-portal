@@ -33,6 +33,10 @@ test("isolated PostgreSQL aged collections", async t => {
       assert.equal((await row(f)).accessReview.eligible, true);
       await assert.rejects(updateCollection(f.scope, { ...await base(f), action: "access-review-task" }), /COLLECTION_OWNER/);
       assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 0);
+      const foreignOrg = await db.organisation.create({ data: { name: "Foreign role source", slug: randomUUID() } });
+      const foreignRole = await db.role.create({ data: { organisationId: foreignOrg.id, name: "Organisation owner", permissions: ["*"] } });
+      await db.roleAssignment.create({ data: { userId: f.user.id, roleId: foreignRole.id, facilityId: null } });
+      await assert.rejects(updateCollection(f.scope, { ...await base(f), action: "access-review-task" }), /COLLECTION_OWNER/);
       await db.role.updateMany({ where: { organisationId: f.org.id }, data: { permissions: ["collections.manage", "operations.view", "operations.manage"] } });
       await assert.rejects(updateCollection(f.scope, { ...await base(f), action: "access-review-task" }), /COLLECTION_OWNER/);
       await db.role.updateMany({ where: { organisationId: f.org.id }, data: { permissions: ["collections.*", "operations.view", "operations.manage"] } });
