@@ -30,19 +30,23 @@ export async function readArrearsReviewPlan(tx: Tx, organisationId: string, acco
   return row ? { row, state: decodeArrearsReviewPlan(row) } : null;
 }
 
-const cursorSchema = z.object({ version: z.literal(1), cursor: z.string().regex(/^arrears-review-plan:[a-f0-9]{64}$/), integrity: hash }).strict();
+const leaseSchema = z.object({ token: z.uuid(), until: z.iso.datetime() }).strict();
+const cursorValue = z.object({ cursor: z.string().regex(/^arrears-review-plan:[a-f0-9]{64}$/).nullable(), lease: leaseSchema.nullable() }).strict();
+const cursorSchema = cursorValue.safeExtend({ version: z.literal(1), integrity: hash });
+export type ArrearsReviewCursorState = z.infer<typeof cursorValue>;
 const cursorId = (organisationId: string) => `arrears-review-cursor:${organisationId}`;
 export async function readArrearsReviewCursor(tx: Tx, organisationId: string) {
   const row = await tx.configurationProfile.findUnique({ where: { id: cursorId(organisationId) } });
   if (!row) return null;
   const value = cursorSchema.parse(row.config);
-  if (row.organisationId !== organisationId || row.facilityId !== null || row.domain !== ARREARS_REVIEW_CURSOR || row.status !== "ACTIVE" || value.integrity !== mac(["cursor", organisationId, value.cursor])) throw Error("ARREARS_REVIEW_SCHEDULE_INTEGRITY");
-  return value.cursor;
+  if (row.organisationId !== organisationId || row.facilityId !== null || row.domain !== ARREARS_REVIEW_CURSOR || row.status !== "ACTIVE" || value.integrity !== mac(["cursor", organisationId, value.cursor, value.lease])) throw Error("ARREARS_REVIEW_SCHEDULE_INTEGRITY");
+  return { cursor: value.cursor, lease: value.lease };
 }
-export async function advanceArrearsReviewCursor(tx: Tx, organisationId: string, cursor: string) {
+export async function saveArrearsReviewCursor(tx: Tx, organisationId: string, incoming: ArrearsReviewCursorState) {
   const id = cursorId(organisationId), existing = await tx.configurationProfile.findUnique({ where: { id } });
   if (existing && (existing.organisationId !== organisationId || existing.facilityId !== null || existing.domain !== ARREARS_REVIEW_CURSOR || existing.status !== "ACTIVE")) throw Error("ARREARS_REVIEW_SCHEDULE_INTEGRITY");
-  const config = cursorSchema.parse({ version: 1, cursor, integrity: mac(["cursor", organisationId, cursor]) });
+  const value = cursorValue.parse(incoming);
+  const config = cursorSchema.parse({ version: 1, ...value, integrity: mac(["cursor", organisationId, value.cursor, value.lease]) });
   return existing ? tx.configurationProfile.update({ where: { id }, data: { config } }) : tx.configurationProfile.create({ data: { id, organisationId, facilityId: null, domain: ARREARS_REVIEW_CURSOR, name: id, status: "ACTIVE", config } });
 }
 export async function saveArrearsReviewPlan(tx: Tx, row: { id: string; organisationId: string; facilityId: string }, incoming: ArrearsReviewScheduleState, exists: boolean) {

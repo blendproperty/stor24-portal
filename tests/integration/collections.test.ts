@@ -5,7 +5,7 @@ import type { Prisma } from "../../src/generated/prisma/client";
 import { db } from "../../src/lib/db";
 import { collectionsWorkspace, updateCollection, processArrearsReviewSchedules } from "../../src/lib/collections-service";
 import { ARREARS_REVIEW_CURSOR, ARREARS_REVIEW_SCHEDULE } from "../../src/lib/arrears-review-schedule-policy";
-import { advanceArrearsReviewCursor, readArrearsReviewPlan } from "../../src/lib/arrears-review-schedule-state";
+import { readArrearsReviewCursor, readArrearsReviewPlan, saveArrearsReviewCursor } from "../../src/lib/arrears-review-schedule-state";
 import { POST as reviewWorkerPost } from "../../src/app/api/internal/arrears-review-schedules/route";
 import { operationsTaskPage } from "../../src/lib/operations-task-service";
 import { collectionCsv } from "../../src/lib/collections-view";
@@ -186,9 +186,42 @@ test("isolated PostgreSQL aged collections", async t => {
           await processArrearsReviewSchedules(at);
           assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 1);
         });
+        await check("partial budget stops preserve the untouched tail across repeated invocations", async f => {
+          await schedule(f); const saved = (await plan(f))!;
+          const ids = [0, 1].map(index => `arrears-review-plan:${index.toString(16).padStart(64, "0")}`);
+          assert.ok(ids.every(id => id < saved.row.id));
+          await db.configurationProfile.createMany({ data: ids.map(id => ({ id, organisationId: f.org.id, facilityId: f.facility.id, domain: ARREARS_REVIEW_SCHEDULE, name: id, status: "ACTIVE", config: { version: 1, encrypted: "invalid", integrity: "0".repeat(64), nextDueAt: at().toISOString() } })) });
+          const oneAttempt = () => { let calls = 0; return () => calls++ < 2 ? 0 : 26000; };
+          await processArrearsReviewSchedules(at, oneAttempt());
+          assert.equal((await readArrearsReviewCursor(db, f.org.id))!.cursor, ids[0]);
+          await processArrearsReviewSchedules(at, oneAttempt());
+          assert.equal((await readArrearsReviewCursor(db, f.org.id))!.cursor, ids[1]);
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 0);
+          await processArrearsReviewSchedules(at, oneAttempt());
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 1);
+          assert.equal((await plan(f))!.state.last!.outcome, "PREPARED");
+        });
+        await check("an active run lease is respected and an expired lease can recover", async f => {
+          await schedule(f); const token = randomUUID();
+          await db.$transaction(tx => saveArrearsReviewCursor(tx, f.org.id, { cursor: null, lease: { token, until: new Date(Date.now() + 60000).toISOString() } }));
+          const busy = await processArrearsReviewSchedules(at);
+          assert.equal(busy.prepared, 0); assert.equal(busy.more, true);
+          assert.equal((await readArrearsReviewCursor(db, f.org.id))!.lease!.token, token);
+          await db.$transaction(tx => saveArrearsReviewCursor(tx, f.org.id, { cursor: null, lease: { token, until: new Date(Date.now() - 1000).toISOString() } }));
+          await processArrearsReviewSchedules(at);
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 1);
+          assert.equal((await readArrearsReviewCursor(db, f.org.id))!.lease, null);
+        });
+        await check("concurrent worker invocations retain one task and one case preparation", async f => {
+          await schedule(f);
+          await Promise.allSettled([processArrearsReviewSchedules(at), processArrearsReviewSchedules(at)]);
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 1);
+          assert.equal(await db.collectionActivity.count({ where: { caseId: (await db.collectionCase.findUniqueOrThrow({ where: { accountId: f.account.id } })).id, action: "Scheduled internal review task prepared" } }), 1);
+          assert.equal((await readArrearsReviewCursor(db, f.org.id))!.lease, null);
+        });
         await check("a corrupted scan cursor holds rather than silently resetting signed progress", async f => {
           await schedule(f); const saved = (await plan(f))!;
-          await db.$transaction(tx => advanceArrearsReviewCursor(tx, f.org.id, saved.row.id));
+          await db.$transaction(tx => saveArrearsReviewCursor(tx, f.org.id, { cursor: saved.row.id, lease: null }));
           const cursor = await db.configurationProfile.findFirstOrThrow({ where: { organisationId: f.org.id, domain: ARREARS_REVIEW_CURSOR } });
           await db.configurationProfile.update({ where: { id: cursor.id }, data: { config: { ...(cursor.config as Record<string, Prisma.JsonValue>), integrity: "0".repeat(64) } } });
           await assert.rejects(processArrearsReviewSchedules(at), /INTEGRITY/);

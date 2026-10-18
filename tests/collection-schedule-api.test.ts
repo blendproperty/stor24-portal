@@ -35,8 +35,28 @@ test("worker endpoint requires a strong exact private key before calling its def
   } finally { if (before === undefined) delete process.env.COLLECTION_SCHEDULE_WORKER_KEY; else process.env.COLLECTION_SCHEDULE_WORKER_KEY = before; }
 });
 
-test("generic configuration cannot disclose or overwrite protected staff email policy/outbox domains", async () => {
-  const hidden = ["COLLECTION_SCHEDULE_PLAN", "COLLECTION_SCHEDULE_RUN", "STAFF_EVENT_EMAIL_POLICY", "STAFF_EVENT_EMAIL_OUTBOX"];
+test("internal arrears endpoint rejects missing, short and incorrect keys before dispatcher access", async () => {
+  let calls = 0; const before = process.env.ARREARS_REVIEW_WORKER_KEY;
+  const bundle = await build({ entryPoints: ["src/app/api/internal/arrears-review-schedules/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "internal-review-fixture", setup(b) {
+    b.onResolve({ filter: /^@\/lib\/collections-service$/ }, a => ({ path: a.path, namespace: "fixture" }));
+    b.onLoad({ filter: /.*/, namespace: "fixture" }, () => ({ contents: "export const processArrearsReviewSchedules=async()=>{__called();return {disabled:true}};" }));
+  } }] });
+  const loaded = { exports: {} as { POST: (request: Request) => Promise<Response> } };
+  new Function("require", "module", "exports", "__called", bundle.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, () => { calls++; });
+  const request = (key: string) => new Request("https://example.invalid/api/internal/arrears-review-schedules", { method: "POST", headers: { authorization: `Bearer ${key}` } });
+  try {
+    delete process.env.ARREARS_REVIEW_WORKER_KEY; assert.equal((await loaded.exports.POST(request(""))).status, 401);
+    process.env.ARREARS_REVIEW_WORKER_KEY = "short"; assert.equal((await loaded.exports.POST(request("short"))).status, 401);
+    process.env.ARREARS_REVIEW_WORKER_KEY = "synthetic-internal-review-key-at-least-32-characters";
+    assert.equal((await loaded.exports.POST(request("wrong"))).status, 401); assert.equal(calls, 0);
+    const response = await loaded.exports.POST(request(process.env.ARREARS_REVIEW_WORKER_KEY));
+    assert.equal(response.status, 200); assert.equal((await response.json()).data.disabled, true); assert.equal(calls, 1);
+    assert.match(response.headers.get("cache-control")!, /no-store/);
+  } finally { if (before === undefined) delete process.env.ARREARS_REVIEW_WORKER_KEY; else process.env.ARREARS_REVIEW_WORKER_KEY = before; }
+});
+
+test("generic configuration cannot disclose or overwrite protected operational plan/policy/outbox domains", async () => {
+  const hidden = ["ARREARS_ACCESS_REVIEW_SCHEDULE", "ARREARS_ACCESS_REVIEW_CURSOR", "COLLECTION_SCHEDULE_PLAN", "COLLECTION_SCHEDULE_RUN", "STAFF_EVENT_EMAIL_POLICY", "STAFF_EVENT_EMAIL_OUTBOX"];
   let writes = 0, excluded: string[] = [];
   const database = { configurationProfile: { findMany: async (args: { where: { domain: { notIn: string[] } } }) => { excluded = args.where.domain.notIn; return []; } }, $transaction: async () => { writes++; throw Error("Unexpected write"); }, integrationConnection: { findMany: async () => [] }, chargeDefinition: { findMany: async () => [] }, discountPlan: { findMany: async () => [] }, facility: { findMany: async () => [] }, role: { findMany: async () => [] }, user: { findMany: async () => [] } };
   const bundle = await build({ entryPoints: ["src/app/api/v1/configuration/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "config-fixture", setup(b) {

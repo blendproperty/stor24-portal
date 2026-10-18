@@ -3,7 +3,7 @@ import { arrearsAccessReview } from "./arrears-access-review-policy";
 import { currentRoleAccess } from "./current-role-access";
 import { createHash, randomUUID } from "node:crypto";
 import { ARREARS_REVIEW_SCHEDULE, arrearsReviewScheduleWindow, nextArrearsReviewAt } from "./arrears-review-schedule-policy";
-import { advanceArrearsReviewCursor, arrearsReviewPlanId, arrearsReviewScheduleActor, decodeArrearsReviewPlan, readArrearsReviewCursor, readArrearsReviewPlan, reviewSchedulePermissions, saveArrearsReviewPlan, type ArrearsReviewScheduleState } from "./arrears-review-schedule-state";
+import { arrearsReviewPlanId, arrearsReviewScheduleActor, decodeArrearsReviewPlan, readArrearsReviewCursor, readArrearsReviewPlan, reviewSchedulePermissions, saveArrearsReviewCursor, saveArrearsReviewPlan, type ArrearsReviewScheduleState } from "./arrears-review-schedule-state";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
@@ -274,30 +274,46 @@ export async function updateCollection(scope: RequestScope, raw: CollectionActio
 }
 
 /** Explicit delegated internal-task plans only. No customer send, fee, payment or access command. */
-export async function processArrearsReviewSchedules(clock: () => Date = () => new Date()) {
+export async function processArrearsReviewSchedules(clock: () => Date = () => new Date(), elapsed: () => number = () => performance.now()) {
   if (process.env.ARREARS_REVIEW_SCHEDULE_ENABLED !== "true") return { disabled: true, evaluated: 0, prepared: 0, held: 0, more: false };
-  const started = performance.now();
+  const started = elapsed();
   const organisationId = z.cuid().parse(process.env.ARREARS_REVIEW_ORGANISATION_ID ?? "");
-  const batch = await db.$transaction(async tx => {
+  const cursorTransaction = <T>(work: (tx: Client) => Promise<T>) => db.$transaction(async tx => {
     await tx.$executeRaw`SET LOCAL statement_timeout = '5s'`;
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`arrears-review-cursor:${organisationId}`}, 0))`;
-    const cursor = await readArrearsReviewCursor(tx, organisationId);
+    return work(tx);
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, maxWait: 2000, timeout: 10000 });
+  const batch = await cursorTransaction(async tx => {
+    const current = await readArrearsReviewCursor(tx, organisationId) ?? { cursor: null, lease: null };
+    if (current.lease && new Date(current.lease.until).getTime() > Date.now()) return { candidates: [], more: true, lease: null };
+    const { cursor } = current;
     const where = { organisationId, domain: ARREARS_REVIEW_SCHEDULE, status: "ACTIVE", config: { path: ["nextDueAt"], lte: clock().toISOString() } };
     let found = await tx.configurationProfile.findMany({ where: { ...where, ...(cursor ? { id: { gt: cursor } } : {}) }, orderBy: { id: "asc" }, take: 26 });
     if (!found.length && cursor) found = await tx.configurationProfile.findMany({ where, orderBy: { id: "asc" }, take: 26 });
     const candidates = found.slice(0, 25);
-    if (candidates.length) {
-      // Scan progress is not task completion. Advance even if every selected plan is invalid.
-      await advanceArrearsReviewCursor(tx, organisationId, candidates.at(-1)!.id);
-      await tx.auditEvent.create({ data: { organisationId, actorId: null, facilityId: null, entityType: "ConfigurationProfile", entityId: `arrears-review-cursor:${organisationId}`, action: "collections.access-review-schedule.scan-advanced", after: json({ cursor: candidates.at(-1)!.id, selected: candidates.length, taskCompletionClaimed: false, financialApproval: false, accessApproval: false }) } });
-    }
-    return { candidates, more: found.length > 25 };
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 2000, timeout: 10000 });
+    if (!candidates.length) return { candidates, more: false, lease: null };
+    const lease = { token: randomUUID(), until: new Date(Date.now() + 120000).toISOString() };
+    await saveArrearsReviewCursor(tx, organisationId, { cursor, lease });
+    await tx.auditEvent.create({ data: { organisationId, actorId: null, facilityId: null, entityType: "ConfigurationProfile", entityId: `arrears-review-cursor:${organisationId}`, action: "collections.access-review-schedule.scan-started", after: json({ selected: candidates.length, taskCompletionClaimed: false, financialApproval: false, accessApproval: false }) } });
+    return { candidates, more: found.length > 25, lease };
+  });
   const { candidates } = batch;
   let evaluated = 0, prepared = 0, held = 0;
   let more = batch.more;
+  const lease = batch.lease;
+  if (!lease) return { disabled: false, evaluated, prepared, held, more };
+  try {
   for (const candidate of candidates) {
-    if (performance.now() - started > 45_000) { more = true; break; }
+    if (elapsed() - started > 25_000) { more = true; break; }
+    const claimed = await cursorTransaction(async tx => {
+      const current = await readArrearsReviewCursor(tx, organisationId), active = current?.lease;
+      if (!current || !active || active.token !== lease.token || new Date(active.until).getTime() <= Date.now()) return false;
+      // Only the row about to be attempted advances progress, never an untouched batch tail.
+      await saveArrearsReviewCursor(tx, organisationId, { cursor: candidate.id, lease: active });
+      await tx.auditEvent.create({ data: { organisationId, actorId: null, facilityId: null, entityType: "ConfigurationProfile", entityId: `arrears-review-cursor:${organisationId}`, action: "collections.access-review-schedule.scan-advanced", after: json({ attemptedPlan: candidate.id, taskCompletionClaimed: false, financialApproval: false, accessApproval: false }) } });
+      return true;
+    });
+    if (!claimed) { more = true; break; }
     try {
       const initial = decodeArrearsReviewPlan(candidate);
       const outcome = await db.$transaction(async tx => {
@@ -352,6 +368,15 @@ export async function processArrearsReviewSchedules(clock: () => Date = () => ne
       if (outcome === "PREPARED") prepared++;
       if (outcome === "HELD") held++;
     } catch { held++; /* A failed/uncertain transaction is never blindly replayed in this run. */ }
+  }
+  } finally {
+    await cursorTransaction(async tx => {
+      const current = await readArrearsReviewCursor(tx, organisationId);
+      if (current?.lease?.token === lease.token) {
+        await saveArrearsReviewCursor(tx, organisationId, { cursor: current.cursor, lease: null });
+        await tx.auditEvent.create({ data: { organisationId, actorId: null, facilityId: null, entityType: "ConfigurationProfile", entityId: `arrears-review-cursor:${organisationId}`, action: "collections.access-review-schedule.scan-released", after: json({ cursor: current.cursor, taskCompletionClaimed: false }) } });
+      }
+    });
   }
   return { disabled: false, evaluated, prepared, held, more };
 }
