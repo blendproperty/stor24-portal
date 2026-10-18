@@ -11,6 +11,7 @@ const messages: Record<string, string> = {
 };
 function failure(e: unknown) {
   const code = e instanceof Error ? e.message : "";
+  if (code === "COLLECTION_ACCESS_REVIEW_HELD") return Response.json({ error: "Access review is held. Refresh and check the seven-day date, payment method, payment evidence, disputes and arrangements." }, { status: 409 });
   if (code === "PERSONAL_EXPORT_FORBIDDEN") return Response.json({ error: "Personal-data exports require explicit Super Admin (Organisation owner) authorisation." }, { status: 403 });
   if (["UNAUTHENTICATED", "FORBIDDEN"].includes(code)) return Response.json({ error: code === "UNAUTHENTICATED" ? "Sign in is required." : "You do not have permission for this action." }, { status: code === "UNAUTHENTICATED" ? 401 : 403 });
   if (e instanceof z.ZodError || e instanceof SyntaxError) return Response.json({ error: "Check the dates, amount, notes and confirmation." }, { status: 400 });

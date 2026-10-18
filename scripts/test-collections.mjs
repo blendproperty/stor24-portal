@@ -18,6 +18,7 @@ const browser=await chromium.launch(process.env.PLAYWRIGHT_CHANNEL?{channel:proc
 const errors=[],calls=[];
 const row={id:"cmaccountfixture000001",accountNumber:"CI-101",name:"Training tenant",facilityId:"store1",facility:"Training store with a deliberately long descriptive name",currentBalance:"100",ageing:{buckets:[0,0,0,0,10000],overdue:10000,credit:0,balance:10000,oldestDays:100,charges:[{id:"source1",description:"Original rent",dueDate:"2026-06-01",remaining:10000,days:100}],issue:null},hold:null,revision:0,ownerId:null,nextFollowUp:null,disputed:false,disputeReason:null,terms:{dueDays:0,allocation:"OLDEST_DUE_FIRST",approvalReference:"CI approved",overrides:[]},promises:[],activities:[],owners:[{id:"cmownerfixture0000001",name:"CI collector"}],sources:[{id:"source1",description:"Original rent",date:"2026-06-01"}]};
 const data={asOf:"2026-09-21",today:"2026-09-21",userId:"cmownerfixture0000001",rows:[row,{...row,id:"cmaccountfixture000002",accountNumber:"CI-102",ageing:{...row.ageing,overdue:0,buckets:[0,0,0,0,0],issue:"Approved due dates and allocation terms are missing."}}]};
+row.accessReview={policy:"2026-10-18-seven-calendar-days-v1",paymentMethod:"EFT",reviewOn:"2026-06-08",sourceChargeId:"source1",blockers:[],eligible:true,financialApproval:false,accessApproval:false};
 try{
  const page=await browser.newPage({viewport:{width:1440,height:1000}});page.on("pageerror",e=>errors.push(e.message));
  await page.route("**/api/v1/collections**",async route=>{
@@ -26,7 +27,8 @@ try{
   if(body.action==="follow-up"){row.ownerId=body.ownerId;row.nextFollowUp=body.nextFollowUp;}
   else if(body.action==="dispute"){row.disputed=body.disputed;row.hold=body.disputed?"Dispute hold":null;}
   else if(body.action==="promise")row.promises=[{id:"cmpromisefixture00001",amount:body.amount,dueDate:body.dueDate,status:"OPEN",createdAt:new Date().toISOString(),progress:{label:"Awaiting receipt",received:0,onTime:0,covered:false}}];
-  else if(body.action==="terms")row.terms=body.terms;else if(body.action==="escalation-review"){assert.equal(body.target,"NOTICE");assert.equal(body.channel,"WHATSAPP");assert.equal(body.reviewOn,data.today);}else throw new Error("Unexpected action "+body.action);
+  else if(body.action==="terms")row.terms=body.terms;else if(body.action==="access-review-task"){assert.equal(body.accountId,row.id);assert.equal(body.approve,undefined);assert.equal(body.feeAmount,undefined);}else if(body.action==="escalation-review"){assert.equal(body.target,"NOTICE");assert.equal(body.channel,"WHATSAPP");assert.equal(body.reviewOn,data.today);}else throw new Error("Unexpected action "+body.action);
+  row.accessReview={...row.accessReview,eligible:!row.hold&&!row.promises.some(p=>p.status==="OPEN"),blockers:row.hold?[row.hold]:row.promises.some(p=>p.status==="OPEN")?["Agreed promise hold"]:[]};
   row.activities.unshift({id:`action${calls.length}`,action:body.action,note:body.note,actorId:data.userId,createdAt:new Date().toISOString()});return route.fulfill({json:{id:`action${calls.length}`}});
  });
  await page.goto(`http://127.0.0.1:${server.address().port}`);
@@ -44,6 +46,10 @@ try{
  await expect(page.getByLabel("Finance approved these due dates")).not.toBeChecked();
  await page.getByLabel("Finance approved these due dates").check();await page.getByRole("button",{name:"Save approved ageing terms"}).click();
  await expect(page.getByText("CI terms approval evidence",{exact:true})).toBeVisible();
+ await page.getByLabel("Case note / evidence reference").fill("CI seven-day review evidence");
+ await expect(page.getByRole("region",{name:"Seven-day access review"})).toBeVisible();
+ await page.getByRole("button",{name:"Prepare access restriction review task"}).click();
+ await expect(page.getByText("CI seven-day review evidence",{exact:true})).toBeVisible();
  await page.getByLabel("Case note / evidence reference").fill("CI actual contact outcome");
  await page.getByLabel("Follow-up owner").selectOption("cmownerfixture0000001");await page.getByLabel("Next follow-up",{exact:true}).fill(data.today);
  await page.getByRole("button",{name:"Save follow-up",exact:true}).click();await expect(page.getByText("CI actual contact outcome",{exact:true})).toBeVisible();
@@ -68,6 +74,7 @@ try{
  await page.getByText("Request internal escalation review",{exact:true}).click();
  await mkdir("output/collections",{recursive:true});
  for(const width of [1440,1024,390,320]){await page.setViewportSize({width,height:1000});await page.screenshot({path:`output/collections/${width}.png`,fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`overflow at ${width}`);}
- assert.equal(errors.length,0);assert.deepEqual(calls.map(c=>c.action),["terms","follow-up","dispute","dispute","promise","escalation-review"]);
+ await expect(page.getByRole("button",{name:"Prepare access restriction review task"})).toBeDisabled();
+ assert.equal(errors.length,0);assert.deepEqual(calls.map(c=>c.action),["terms","access-review-task","follow-up","dispute","dispute","promise","escalation-review"]);
  console.log("Collections browser checks passed: scoped filters, queue selection without contact, evidenced follow-up, dispute hold, promise gating, held internal escalation preparation, historical read-only mode and 1440/1024/390/320px bounds.");
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

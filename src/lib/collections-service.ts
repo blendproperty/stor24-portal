@@ -1,4 +1,6 @@
 import {receiptAllocationGraph} from "./receipt-reallocation-source";
+import { arrearsAccessReview } from "./arrears-access-review-policy";
+import { currentRoleAccess } from "./current-role-access";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
@@ -21,6 +23,11 @@ async function accountFor(tx: Client, scope: RequestScope, id: string) {
 async function owners(tx: Client, scope: RequestScope) {
   const users = await tx.user.findMany({ where: { organisationId: scope.organisationId, active: true }, select: { id: true, name: true, roleAssignments: { include: { role: true } } } });
   return users.map(u => ({ id: u.id, name: u.name, facilities: u.roleAssignments.filter(a => a.role.organisationId === scope.organisationId && hasPermission(a.role.permissions, "collections.manage")).map(a => a.facilityId) })).filter(u => u.facilities.length > 0);
+}
+async function accessReviewAssignee(tx: Client, scope: RequestScope, facilityId: string, ownerId: string | null) {
+  const users = await tx.user.findMany({ where: { organisationId: scope.organisationId, active: true }, select: { id: true, roleAssignments: { include: { role: true } } } });
+  const eligible = users.filter(user => ["collections.view", "collections.manage", "operations.view", "operations.manage"].every(permission => currentRoleAccess(user.roleAssignments.filter(assignment => assignment.role.organisationId === scope.organisationId), permission, facilityId).allowed));
+  return eligible.some(user => user.id === ownerId) ? ownerId : eligible.some(user => user.id === scope.userId) ? scope.userId : null;
 }
 type ReceiptProof=Set<string>&{allocations:Map<string,{accountId:string;rootPaymentId:string;remainingCents:number;receivedAt:Date;recordedAt:Date}>;held:Set<string>;pending:Set<string>};
 async function receiptEvidence(tx: Client, scope: RequestScope, accounts: Account[]):Promise<ReceiptProof> {
@@ -82,6 +89,12 @@ function evaluate(account: Account, asOf: string, provenPayments: ReceiptProof) 
   if (!hold && openPromise?.progress?.covered) hold = "Promise receipts awaiting confirmation";
   return { ageing, entries, verifiedReceiptIds, hold, promises };
 }
+function accessReviewFor(account: Account, result: ReturnType<typeof evaluate>, asOf: string) {
+  // A provider status without a verified, matching ledger receipt cannot become an access decision.
+  // FAILED alone also does not distinguish an authoritative decline from an uncertain transport result.
+  const unreviewedPayment = account.payments.filter(payment => !isTestPayment(payment)).some(payment => payment.status === "FAILED" || ["SUCCEEDED", "PARTIALLY_REFUNDED", "REFUNDED", "REVERSED"].includes(payment.status) && !account.ledgerEntries.some(entry => result.verifiedReceiptIds.includes(entry.id) && (entry.externalRef === payment.idempotencyKey || (entry.metadata as { paymentId?: string } | null)?.paymentId === payment.id)));
+  return arrearsAccessReview({ asOf, paymentMethod: account.tenancy?.paymentMethod ?? null, active: account.tenancy?.status === "ACTIVE", issue: result.ageing.issue, hold: result.hold ?? (unreviewedPayment ? "A failed or unposted payment outcome needs authoritative reconciliation review before access-review preparation." : null), charges: result.ageing.charges });
+}
 export async function collectionsWorkspace(scope: RequestScope, asOf: string) {
   dateKey.parse(asOf); if (asOf > southAfricaDateKey(new Date())) throw new Error("COLLECTION_DATE");
   return db.$transaction(async tx => {
@@ -91,7 +104,7 @@ export async function collectionsWorkspace(scope: RequestScope, asOf: string) {
     const proof = await receiptEvidence(tx, scope, accounts);
     const rows = accounts.map(a => {
       const result = evaluate(a, asOf, proof), c = a.collectionCase;
-      return { id: a.id, accountNumber: a.accountNumber, name: a.customer.companyName || [a.customer.firstName, a.customer.lastName].filter(Boolean).join(" ") || "Unnamed customer", facilityId: a.tenancy!.facilityId, facility: a.tenancy!.facility.name, currentBalance: a.balance.toString(), ageing: result.ageing, hold: result.hold, revision: c?.revision ?? 0, ownerId: c?.ownerId ?? null, nextFollowUp: c?.nextFollowUp ?? null, disputed: c?.disputed ?? false, disputeReason: c?.disputeReason ?? null, terms: termsSchema.safeParse(c?.terms).success ? termsSchema.parse(c?.terms) : null, promises: result.promises, activities: (c?.activities ?? []).map(v => ({ id: v.id, action: v.action, note: v.note, actorId: v.actorId, createdAt: v.createdAt.toISOString() })), owners: staff.filter(u => u.facilities.includes(null) || u.facilities.includes(a.tenancy!.facilityId)).map(u => ({ id: u.id, name: u.name })), sources: a.ledgerEntries.filter(e => e.type === "CHARGE").map(e => ({ id: e.id, description: e.description, date: southAfricaDateKey(e.effectiveAt) })) };
+      return { id: a.id, accountNumber: a.accountNumber, name: a.customer.companyName || [a.customer.firstName, a.customer.lastName].filter(Boolean).join(" ") || "Unnamed customer", facilityId: a.tenancy!.facilityId, facility: a.tenancy!.facility.name, currentBalance: a.balance.toString(), ageing: result.ageing, hold: result.hold, accessReview: accessReviewFor(a, result, asOf), revision: c?.revision ?? 0, ownerId: c?.ownerId ?? null, nextFollowUp: c?.nextFollowUp ?? null, disputed: c?.disputed ?? false, disputeReason: c?.disputeReason ?? null, terms: termsSchema.safeParse(c?.terms).success ? termsSchema.parse(c?.terms) : null, promises: result.promises, activities: (c?.activities ?? []).map(v => ({ id: v.id, action: v.action, note: v.note, actorId: v.actorId, createdAt: v.createdAt.toISOString() })), owners: staff.filter(u => u.facilities.includes(null) || u.facilities.includes(a.tenancy!.facilityId)).map(u => ({ id: u.id, name: u.name })), sources: a.ledgerEntries.filter(e => e.type === "CHARGE").map(e => ({ id: e.id, description: e.description, date: southAfricaDateKey(e.effectiveAt) })) };
     });
     return { asOf, today: southAfricaDateKey(new Date()), userId: scope.userId, rows };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 30000 });
@@ -166,7 +179,26 @@ export async function updateCollection(scope: RequestScope, raw: CollectionActio
     if (!c) c = { ...await tx.collectionCase.create({ data: { accountId: account.id } }), activities: [], promises: [] };
     const evaluated = evaluate(account, today, await receiptEvidence(tx, scope, [account]));
     const data: Prisma.CollectionCaseUpdateInput = { revision: { increment: 1 } };
-    if (input.action === "terms") {
+    let accessTaskId: string | null = null;
+    let reviewAssigneeId: string | null = null;
+    if (input.action === "access-review-task") {
+      const assessment = accessReviewFor(account, evaluated, today);
+      if (!assessment.eligible || !assessment.sourceChargeId || !assessment.reviewOn) throw new Error("COLLECTION_ACCESS_REVIEW_HELD");
+      const assigneeId = await accessReviewAssignee(tx, scope, account.tenancy!.facilityId, c.ownerId);
+      if (!assigneeId) throw new Error("COLLECTION_OWNER");
+      reviewAssigneeId = assigneeId;
+      const key = createHash("sha256").update(JSON.stringify(["ARREARS_ACCESS_REVIEW", scope.organisationId, account.id, assessment.sourceChargeId])).digest("hex");
+      const previousTask = await tx.task.findUnique({ where: { requestKey: key } });
+      if (previousTask) {
+        if (previousTask.organisationId !== scope.organisationId || previousTask.facilityId !== account.tenancy!.facilityId || previousTask.purpose !== "ARREARS_ACCESS_REVIEW") throw new Error("COLLECTION_CHANGED");
+        if (!["COMPLETED", "CANCELLED"].includes(previousTask.status)) await tx.task.update({ where: { id: previousTask.id }, data: { assigneeId, dueAt: new Date(`${assessment.reviewOn}T00:00:00+02:00`) } });
+        else reviewAssigneeId = previousTask.assigneeId;
+        accessTaskId = previousTask.id;
+      } else {
+        const task = await tx.task.create({ data: { organisationId: scope.organisationId, facilityId: account.tenancy!.facilityId, assigneeId, createdById: scope.userId, purpose: "ARREARS_ACCESS_REVIEW", requestKey: key, requestHash: createHash("sha256").update(JSON.stringify(assessment)).digest("hex"), title: `Access restriction review · ${account.accountNumber}`, description: "Authorised collections staff must open Collections and recheck current payment, dispute, arrangement and written-notice evidence. This internal task is not approval to restrict access, charge fees or change money.", dueAt: new Date(`${assessment.reviewOn}T00:00:00+02:00`) } });
+        accessTaskId = task.id;
+      }
+    } else if (input.action === "terms") {
       const ids = new Set<string>();
       for (const o of input.terms.overrides) {
         const source = account.ledgerEntries.find(e => e.id === o.entryId && e.type === "CHARGE");
@@ -201,8 +233,8 @@ export async function updateCollection(scope: RequestScope, raw: CollectionActio
       customerMessageSent: false, financialEntriesCreated: 0, accessCommandsCreated: 0,
     } : null;
     const activity = await tx.collectionActivity.create({ data: { caseId: c.id, requestKey: input.requestKey, actorId: scope.userId, action: input.action === "follow-up" ? input.outcome : review ? `Escalation review · ${review.target.toLowerCase()}${review.proposedChannel ? ` / ${review.proposedChannel}` : ""} · held for policy` : input.action,
-      note: review ? `Internal review requested for ${review.reviewOn}. ${input.note}\n${review.blockers.join(" ")}${review.proposedPolicyReference ? ` Proposed policy evidence (unverified): ${review.proposedPolicyReference}.` : ""} No message, fee or access action was executed.` : input.note, payload: json(input) } });
-    await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: account.tenancy!.facilityId, actorId: scope.userId, entityType: "CollectionCase", entityId: c.id, action: `collections.${input.action}`, after: json({ activityId: activity.id, revision: input.revision + 1, ...(review ? { review } : {}) }) } });
+      note: review ? `Internal review requested for ${review.reviewOn}. ${input.note}\n${review.blockers.join(" ")}${review.proposedPolicyReference ? ` Proposed policy evidence (unverified): ${review.proposedPolicyReference}.` : ""} No message, fee or access action was executed.` : accessTaskId ? `${input.note}\nInternal Operations review task ${accessTaskId} prepared. Separate written-notice checks and authorised access approval are still required. No message, fee, financial approval or access command was created.` : input.note, payload: json(input) } });
+    await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: account.tenancy!.facilityId, actorId: scope.userId, entityType: "CollectionCase", entityId: c.id, action: `collections.${input.action}`, after: json({ activityId: activity.id, revision: input.revision + 1, ...(review ? { review } : {}), ...(accessTaskId ? { taskId: accessTaskId, assigneeId: reviewAssigneeId, assessment: accessReviewFor(account, evaluated, today), financialApproval: false, accessApproval: false } : {}) }) } });
     return { id: activity.id, repeated: false };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000 });
 }

@@ -97,6 +97,7 @@ export function csvCell(value: unknown) {
 
 const base = { accountId: z.string().cuid(), revision: z.number().int().min(0), requestKey: z.string().uuid(), note: z.string().trim().min(5).max(1000) };
 export const collectionActionSchema = z.discriminatedUnion("action", [
+  z.object({ ...base, action: z.literal("access-review-task") }).strict(),
   z.object({ ...base, action: z.literal("terms"), terms: termsSchema, confirm: z.literal(true) }).strict(),
   z.object({ ...base, action: z.literal("follow-up"), ownerId: z.string().cuid().nullable(), nextFollowUp: dateKey.nullable(), outcome: z.enum(["PLAN", "REACHED", "NO_ANSWER"]) }).strict(),
   z.object({ ...base, action: z.literal("dispute"), disputed: z.boolean() }).strict(),

@@ -27,6 +27,60 @@ test("isolated PostgreSQL aged collections", async t => {
   const base = async (f: Awaited<ReturnType<typeof fixture>>) => ({ accountId: f.account.id, revision: (await row(f)).revision, requestKey: randomUUID(), note: "CI evidence reference" });
   const terms = async (f: Awaited<ReturnType<typeof fixture>>) => updateCollection(f.scope, { ...await base(f), action: "terms", terms: { dueDays: 0, allocation: "OLDEST_DUE_FIRST", approvalReference: "CI approved agreement", overrides: [] }, confirm: true });
   try {
+    await t.test("seven-day EFT/card task preparation is scoped, deduplicated and has no financial or access effects", async () => {
+      const f = await fixture(); await terms(f);
+      await db.tenancy.update({ where: { accountId: f.account.id }, data: { paymentMethod: "EFT" } });
+      assert.equal((await row(f)).accessReview.eligible, true);
+      await assert.rejects(updateCollection(f.scope, { ...await base(f), action: "access-review-task" }), /COLLECTION_OWNER/);
+      assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 0);
+      const foreignOrg = await db.organisation.create({ data: { name: "Foreign role source", slug: randomUUID() } });
+      const foreignRole = await db.role.create({ data: { organisationId: foreignOrg.id, name: "Organisation owner", permissions: ["*"] } });
+      await db.roleAssignment.create({ data: { userId: f.user.id, roleId: foreignRole.id, facilityId: null } });
+      await assert.rejects(updateCollection(f.scope, { ...await base(f), action: "access-review-task" }), /COLLECTION_OWNER/);
+      await db.role.updateMany({ where: { organisationId: f.org.id }, data: { permissions: ["collections.manage", "operations.view", "operations.manage"] } });
+      await assert.rejects(updateCollection(f.scope, { ...await base(f), action: "access-review-task" }), /COLLECTION_OWNER/);
+      await db.role.updateMany({ where: { organisationId: f.org.id }, data: { permissions: ["collections.*", "operations.view", "operations.manage"] } });
+      const financial = async () => JSON.stringify(await db.account.findUnique({ where: { id: f.account.id }, include: { ledgerEntries: true, payments: true, tenancy: { include: { occupancies: true } } } }));
+      const before = await financial();
+      const command = { ...await base(f), action: "access-review-task" as const };
+      const first = await updateCollection(f.scope, command);
+      assert.equal((await updateCollection(f.scope, command)).id, first.id);
+      await updateCollection(f.scope, { ...await base(f), action: "access-review-task" });
+      const tasks = await db.task.findMany({ where: { organisationId: f.org.id } });
+      assert.equal(tasks.length, 1); assert.equal(tasks[0].purpose, "ARREARS_ACCESS_REVIEW");
+      assert.equal(tasks[0].assigneeId, f.user.id);
+      assert.equal(tasks[0].facilityId, f.facility.id); assert.equal(tasks[0].customerId, null);
+      assert.match(tasks[0].description!, /not approval/);
+      assert.equal(await financial(), before);
+      assert.equal(await db.communicationLog.count({ where: { organisationId: f.org.id } }), 0);
+      assert.equal(await db.webhookOutbox.count({ where: { organisationId: f.org.id } }), 0);
+      const audit = await db.auditEvent.findFirstOrThrow({ where: { organisationId: f.org.id, action: "collections.access-review-task" } });
+      assert.equal((audit.after as { accessApproval: boolean }).accessApproval, false);
+      await assert.rejects(updateCollection({ ...f.scope, facilityIds: [] }, { ...await base(f), action: "access-review-task" }), /NOT_FOUND/);
+      const pending = await db.payment.create({ data: { accountId: f.account.id, amount: 100, method: "CARD", status: "PENDING", idempotencyKey: randomUUID(), environment: "live" } });
+      assert.equal((await row(f)).accessReview.eligible, false);
+      await assert.rejects(updateCollection(f.scope, { ...await base(f), action: "access-review-task" }), /ACCESS_REVIEW_HELD/);
+      assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 1);
+      for (const status of ["FAILED", "SUCCEEDED"] as const) {
+        await db.payment.update({ where: { id: pending.id }, data: { status } });
+        assert.equal((await row(f)).accessReview.eligible, false);
+        await assert.rejects(updateCollection(f.scope, { ...await base(f), action: "access-review-task" }), /ACCESS_REVIEW_HELD/);
+      }
+    });
+    await t.test("debit order needs authoritative failure evidence and task/audit failures roll back together", async () => {
+      const f = await fixture(); await terms(f);
+      await db.tenancy.update({ where: { accountId: f.account.id }, data: { paymentMethod: "DEBIT_ORDER" } });
+      assert.equal((await row(f)).accessReview.reviewOn, null);
+      await assert.rejects(updateCollection(f.scope, { ...await base(f), action: "access-review-task" }), /ACCESS_REVIEW_HELD/);
+      await db.tenancy.update({ where: { accountId: f.account.id }, data: { paymentMethod: "CARD" } });
+      await db.role.updateMany({ where: { organisationId: f.org.id }, data: { permissions: ["collections.*", "operations.view", "operations.manage"] } });
+      const revision = (await row(f)).revision;
+      await db.$executeRawUnsafe(`ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_access_review_audit_failure CHECK (action <> 'collections.access-review-task') NOT VALID`);
+      try { await assert.rejects(updateCollection(f.scope, { ...await base(f), action: "access-review-task" })); }
+      finally { await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_access_review_audit_failure'); }
+      assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 0);
+      assert.equal((await row(f)).revision, revision);
+    });
     await t.test("escalation requests remain held evidence under a promise and never send, post fees or change access", async () => {
       const f = await fixture(); await terms(f);
       await updateCollection(f.scope, { ...await base(f), action: "promise", amount: "50", dueDate: today, confirm: true });
