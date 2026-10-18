@@ -36,7 +36,7 @@ export function CollectionPhoneWorkspace() {
     {preview && <><section className="notice-panel"><h2>Recipient and full message</h2><p>{preview.source.accountNumber} · {preview.source.facility} · {preview.source.asOf} SAST</p>
       {preview.blockers.length > 0 && <ul className="notice-error">{preview.blockers.map((b, i) => <li key={i}>{b}</li>)}</ul>}
       {payload && <><p>Recipient: <strong>{payload.recipient}</strong> · {payload.channel}</p><pre className="notice-preview">{payload.text}</pre></>}
-      {stale && <p className="notice-error">The source, consent or provider template changed. Cancel the unattempted notice and prepare a fresh draft for independent review.</p>}
+      {stale && saved && ["DRAFT", "APPROVED"].includes(saved.status) && <p className="notice-error">The source, consent or provider template changed. Cancel the unattempted notice and prepare a fresh draft for independent review.</p>}
       {preview.canManage && (!saved || ["DRAFT", "CANCELLED"].includes(saved.status)) && <button disabled={busy || held} onClick={() => act("prepare")}>Prepare / refresh draft</button>}
     </section>
     {saved && <section className="notice-panel"><h2>Review and delivery · {saved.status.replaceAll("_", " ")}</h2>

@@ -100,6 +100,16 @@ test("isolated phone notices: real claims, authority, consent and immutable revi
       try { const result = await send(f, n); assert.equal(result.notice!.status, "REVIEW_REQUIRED"); await send(f, n); assert.equal(sends - count, 1); await assert.rejects(actPhoneNotice(f.b, { action: "cancel", accountId: f.account.id, channel: "SMS", id: n.id, revision: n.revision, reference: "CI no retry via cancellation" })); }
       finally { responseMode = "accepted"; }
     });
+    await t.test("an earlier-day uncertain reminder holds another channel without a new send", async () => {
+      for (const channel of ["EMAIL", "WHATSAPP"]) {
+        const f = await fixture(), count = sends;
+        await db.communicationLog.create({ data: { organisationId: f.org.id, facilityId: f.facility.id, customerId: f.customer.id, channel, messageType: "COLLECTION_REMINDER", recipientHash: "ci-uncertain", idempotencyKey: randomUUID(), status: "PENDING", queuedAt: new Date("2026-01-01"), nextRetryAt: null, metadata: { deliveryOutcome: "IN_PROGRESS" } } });
+        const p = await previewPhoneNotice(f.a, f.account.id, "SMS");
+        assert.ok(p.blockers.some(b => b.includes("earlier arrears reminder")));
+        await assert.rejects(actPhoneNotice(f.a, { action: "prepare", accountId: f.account.id, channel: "SMS", fingerprint: p.source.fingerprint }), /HOLD/);
+        assert.equal(sends, count); assert.equal(await db.configurationProfile.count({ where: { organisationId: f.org.id, domain: COLLECTION_PHONE_DOMAIN } }), 0);
+      }
+    });
     await t.test("audit rollback before a claim creates no communication or provider attempt", async () => {
       const f = await fixture(), n = (await approve(f)).notice!, count = sends; let installed = false;
       try { await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_phone_claim_failure CHECK (false) NOT VALID'); installed = true; await assert.rejects(send(f, n)); assert.equal(sends, count); assert.equal(await db.communicationLog.count({ where: { organisationId: f.org.id } }), 0); assert.equal((await db.configurationProfile.findUniqueOrThrow({ where: { id: n.id } })).status, "APPROVED"); }

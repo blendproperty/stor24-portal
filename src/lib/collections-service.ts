@@ -190,7 +190,9 @@ export async function collectionPhoneSource(tx: Client, scope: RequestScope, acc
   const consent = customer.communicationConsent as { sms?: boolean; whatsapp?: boolean; optedOutAt?: string | null } | null;
   if (!customer.phoneVerifiedAt) blockers.push("The customer's phone number must be verified.");
   if (consent?.[channel === "SMS" ? "sms" : "whatsapp"] !== true || consent?.optedOutAt) blockers.push(`Explicit current ${channel} consent is required.`);
-  const bound = { channel, asOf, accountId, facilityId: account.tenancy!.facilityId, customer, updatedAt: account.updatedAt, balance: account.balance.toString(), ledger: result.entries, payments: account.payments.map(p => [p.id, p.status, p.amount.toString(), p.providerRef]), caseRevision: account.collectionCase?.revision ?? 0, terms: account.collectionCase?.terms, overdue: result.ageing.overdue, blockers };
+  const unresolved = await tx.communicationLog.findFirst({ where: { organisationId: scope.organisationId, facilityId: account.tenancy!.facilityId, customerId: account.customerId, messageType: "COLLECTION_REMINDER", status: "PENDING" }, orderBy: { queuedAt: "asc" }, select: { id: true, status: true } });
+  if (unresolved) blockers.push("An earlier arrears reminder has an unresolved send outcome. Review its provider evidence before any new reminder or channel change.");
+  const bound = { channel, asOf, accountId, facilityId: account.tenancy!.facilityId, customer, unresolved, updatedAt: account.updatedAt, balance: account.balance.toString(), ledger: result.entries, payments: account.payments.map(p => [p.id, p.status, p.amount.toString(), p.providerRef]), caseRevision: account.collectionCase?.revision ?? 0, terms: account.collectionCase?.terms, overdue: result.ageing.overdue, blockers };
   return { accountId, customerId: account.customerId, facilityId: account.tenancy!.facilityId, facility: account.tenancy!.facility.name, accountNumber: account.accountNumber, recipient: customer.phone ?? "", channel, asOf, overdueCents: result.ageing.overdue, blockers, fingerprint: createHash("sha256").update(JSON.stringify(bound)).digest("hex") };
 }
 
