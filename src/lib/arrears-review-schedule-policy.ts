@@ -3,6 +3,7 @@ import { southAfricaDateKey } from "./south-africa-time";
 import { statementPeriod } from "./finance/account-statement";
 
 export const ARREARS_REVIEW_SCHEDULE = "ARREARS_ACCESS_REVIEW_SCHEDULE";
+export const ARREARS_REVIEW_CURSOR = "ARREARS_ACCESS_REVIEW_CURSOR";
 export const arrearsReviewScheduleInput = z.object({
   from: z.iso.date(), until: z.iso.date(), time: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/),
 }).strict().superRefine((value, ctx) => {

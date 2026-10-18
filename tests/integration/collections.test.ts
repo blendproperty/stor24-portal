@@ -4,8 +4,8 @@ import { randomUUID } from "node:crypto";
 import type { Prisma } from "../../src/generated/prisma/client";
 import { db } from "../../src/lib/db";
 import { collectionsWorkspace, updateCollection, processArrearsReviewSchedules } from "../../src/lib/collections-service";
-import { ARREARS_REVIEW_SCHEDULE } from "../../src/lib/arrears-review-schedule-policy";
-import { readArrearsReviewPlan } from "../../src/lib/arrears-review-schedule-state";
+import { ARREARS_REVIEW_CURSOR, ARREARS_REVIEW_SCHEDULE } from "../../src/lib/arrears-review-schedule-policy";
+import { advanceArrearsReviewCursor, readArrearsReviewPlan } from "../../src/lib/arrears-review-schedule-state";
 import { POST as reviewWorkerPost } from "../../src/app/api/internal/arrears-review-schedules/route";
 import { operationsTaskPage } from "../../src/lib/operations-task-service";
 import { collectionCsv } from "../../src/lib/collections-view";
@@ -33,7 +33,7 @@ test("isolated PostgreSQL aged collections", async t => {
   const terms = async (f: Awaited<ReturnType<typeof fixture>>) => updateCollection(f.scope, { ...await base(f), action: "terms", terms: { dueDays: 0, allocation: "OLDEST_DUE_FIRST", approvalReference: "CI approved agreement", overrides: [] }, confirm: true });
   try {
     await t.test("daily internal review plans keep source, permission and financial boundaries", async timed => {
-      const old = { key: process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY, enabled: process.env.ARREARS_REVIEW_SCHEDULE_ENABLED, worker: process.env.ARREARS_REVIEW_WORKER_KEY };
+      const old = { key: process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY, enabled: process.env.ARREARS_REVIEW_SCHEDULE_ENABLED, worker: process.env.ARREARS_REVIEW_WORKER_KEY, organisation: process.env.ARREARS_REVIEW_ORGANISATION_ID };
       process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY = "synthetic-arrears-review-vault-key-at-least-32-characters";
       process.env.ARREARS_REVIEW_SCHEDULE_ENABLED = "true";
       process.env.ARREARS_REVIEW_WORKER_KEY = "synthetic-internal-review-worker-key-at-least-32";
@@ -52,8 +52,9 @@ test("isolated PostgreSQL aged collections", async t => {
       async function check(name: string, fn: (f: F) => Promise<void>) {
         await timed.test(name, async () => {
           const f = await qualified();
+          process.env.ARREARS_REVIEW_ORGANISATION_ID = f.org.id;
           try { await fn(f); }
-          finally { await db.configurationProfile.deleteMany({ where: { organisationId: f.org.id, domain: ARREARS_REVIEW_SCHEDULE } }); }
+          finally { await db.configurationProfile.deleteMany({ where: { organisationId: f.org.id, domain: { in: [ARREARS_REVIEW_SCHEDULE, ARREARS_REVIEW_CURSOR] } } }); }
         });
       }
       try {
@@ -161,8 +162,41 @@ test("isolated PostgreSQL aged collections", async t => {
           assert.equal((await row(f)).accessReviewSchedule.unavailable, true);
           assert.equal((await row(f)).accessReview.eligible, true);
         });
+        await check("durable scan progress reaches a valid plan after 25 invalid plans", async f => {
+          await schedule(f); const saved = (await plan(f))!;
+          const ids = Array.from({ length: 25 }, (_, index) => `arrears-review-plan:${index.toString(16).padStart(64, "0")}`);
+          assert.ok(ids.every(id => id < saved.row.id));
+          await db.configurationProfile.createMany({ data: ids.map(id => ({ id, organisationId: f.org.id, facilityId: f.facility.id, domain: ARREARS_REVIEW_SCHEDULE, name: id, status: "ACTIVE", config: { version: 1, encrypted: "invalid", integrity: "0".repeat(64), nextDueAt: at().toISOString() } })) });
+          const first = await processArrearsReviewSchedules(at);
+          assert.equal(first.held, 25); assert.equal(first.prepared, 0); assert.equal(first.more, true);
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 0);
+          await processArrearsReviewSchedules(at);
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 1);
+          assert.equal((await plan(f))!.state.last!.outcome, "PREPARED");
+          assert.equal(await db.configurationProfile.count({ where: { organisationId: f.org.id, domain: ARREARS_REVIEW_CURSOR } }), 1);
+        });
+        await check("the configured organisation is an execution boundary", async f => {
+          await schedule(f); const other = await fixture();
+          process.env.ARREARS_REVIEW_ORGANISATION_ID = other.org.id;
+          assert.equal((await collectionsWorkspace(f.scope, today)).reviewScheduleWorkerEnabled, false);
+          await processArrearsReviewSchedules(at);
+          assert.equal((await plan(f))!.state.last, null);
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 0);
+          process.env.ARREARS_REVIEW_ORGANISATION_ID = f.org.id;
+          await processArrearsReviewSchedules(at);
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 1);
+        });
+        await check("a corrupted scan cursor holds rather than silently resetting signed progress", async f => {
+          await schedule(f); const saved = (await plan(f))!;
+          await db.$transaction(tx => advanceArrearsReviewCursor(tx, f.org.id, saved.row.id));
+          const cursor = await db.configurationProfile.findFirstOrThrow({ where: { organisationId: f.org.id, domain: ARREARS_REVIEW_CURSOR } });
+          await db.configurationProfile.update({ where: { id: cursor.id }, data: { config: { ...(cursor.config as Record<string, Prisma.JsonValue>), integrity: "0".repeat(64) } } });
+          await assert.rejects(processArrearsReviewSchedules(at), /INTEGRITY/);
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 0);
+          assert.equal((await plan(f))!.state.last, null);
+        });
       } finally {
-        for (const [name, value] of Object.entries({ INTEGRATION_CONFIG_ENCRYPTION_KEY: old.key, ARREARS_REVIEW_SCHEDULE_ENABLED: old.enabled, ARREARS_REVIEW_WORKER_KEY: old.worker })) { if (value === undefined) delete process.env[name]; else process.env[name] = value; }
+        for (const [name, value] of Object.entries({ INTEGRATION_CONFIG_ENCRYPTION_KEY: old.key, ARREARS_REVIEW_SCHEDULE_ENABLED: old.enabled, ARREARS_REVIEW_WORKER_KEY: old.worker, ARREARS_REVIEW_ORGANISATION_ID: old.organisation })) { if (value === undefined) delete process.env[name]; else process.env[name] = value; }
       }
     });
     await t.test("seven-day EFT/card task preparation is scoped, deduplicated and has no financial or access effects", async () => {

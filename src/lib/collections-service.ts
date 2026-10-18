@@ -3,7 +3,7 @@ import { arrearsAccessReview } from "./arrears-access-review-policy";
 import { currentRoleAccess } from "./current-role-access";
 import { createHash, randomUUID } from "node:crypto";
 import { ARREARS_REVIEW_SCHEDULE, arrearsReviewScheduleWindow, nextArrearsReviewAt } from "./arrears-review-schedule-policy";
-import { arrearsReviewPlanId, arrearsReviewScheduleActor, decodeArrearsReviewPlan, readArrearsReviewPlan, reviewSchedulePermissions, saveArrearsReviewPlan, type ArrearsReviewScheduleState } from "./arrears-review-schedule-state";
+import { advanceArrearsReviewCursor, arrearsReviewPlanId, arrearsReviewScheduleActor, decodeArrearsReviewPlan, readArrearsReviewCursor, readArrearsReviewPlan, reviewSchedulePermissions, saveArrearsReviewPlan, type ArrearsReviewScheduleState } from "./arrears-review-schedule-state";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
@@ -97,16 +97,16 @@ function accessReviewFor(account: Account, result: ReturnType<typeof evaluate>, 
   const unreviewedPayment = account.payments.filter(payment => !isTestPayment(payment)).some(payment => payment.status === "FAILED" || ["SUCCEEDED", "PARTIALLY_REFUNDED", "REFUNDED", "REVERSED"].includes(payment.status) && !account.ledgerEntries.some(entry => result.verifiedReceiptIds.includes(entry.id) && (entry.externalRef === payment.idempotencyKey || (entry.metadata as { paymentId?: string } | null)?.paymentId === payment.id)));
   return arrearsAccessReview({ asOf, paymentMethod: account.tenancy?.paymentMethod ?? null, active: account.tenancy?.status === "ACTIVE", issue: result.ageing.issue, hold: result.hold ?? (unreviewedPayment ? "A failed or unposted payment outcome needs authoritative reconciliation review before access-review preparation." : null), charges: result.ageing.charges });
 }
-export async function collectionsWorkspace(scope: RequestScope, asOf: string) {
+export async function collectionsWorkspace(scope: RequestScope, asOf: string, options: { reviewSchedules?: boolean } = {}) {
   dateKey.parse(asOf); if (asOf > southAfricaDateKey(new Date())) throw new Error("COLLECTION_DATE");
   return db.$transaction(async tx => {
     const accounts = await tx.account.findMany({ where: where(scope), include, orderBy: { accountNumber: "asc" }, take: 2001 });
     const staff = await owners(tx, scope);
     if (accounts.length > 2000) throw new Error("COLLECTION_LIMIT");
     const proof = await receiptEvidence(tx, scope, accounts);
-    const actor = await tx.user.findFirst({ where: { id: scope.userId, organisationId: scope.organisationId, active: true }, include: { roleAssignments: { include: { role: true } } } });
+    const actor = options.reviewSchedules === false ? null : await tx.user.findFirst({ where: { id: scope.userId, organisationId: scope.organisationId, active: true }, include: { roleAssignments: { include: { role: true } } } });
     const assignments = actor?.roleAssignments.filter(a => a.role.organisationId === scope.organisationId) ?? [];
-    const plans = await tx.configurationProfile.findMany({ where: { organisationId: scope.organisationId, domain: ARREARS_REVIEW_SCHEDULE, id: { in: accounts.map(a => arrearsReviewPlanId(scope.organisationId, a.id)) } } });
+    const plans = options.reviewSchedules === false ? [] : await tx.configurationProfile.findMany({ where: { organisationId: scope.organisationId, domain: ARREARS_REVIEW_SCHEDULE, id: { in: accounts.map(a => arrearsReviewPlanId(scope.organisationId, a.id)) } } });
     const planById = new Map(plans.map(p => [p.id, p]));
     function scheduleFor(account: Account) {
       const canManage = !!actor && reviewSchedulePermissions.every(key => currentRoleAccess(assignments, key, account.tenancy!.facilityId).allowed);
@@ -121,7 +121,7 @@ export async function collectionsWorkspace(scope: RequestScope, asOf: string) {
       const result = evaluate(a, asOf, proof), c = a.collectionCase;
       return { id: a.id, accountNumber: a.accountNumber, name: a.customer.companyName || [a.customer.firstName, a.customer.lastName].filter(Boolean).join(" ") || "Unnamed customer", facilityId: a.tenancy!.facilityId, facility: a.tenancy!.facility.name, currentBalance: a.balance.toString(), ageing: result.ageing, hold: result.hold, accessReview: accessReviewFor(a, result, asOf), revision: c?.revision ?? 0, ownerId: c?.ownerId ?? null, nextFollowUp: c?.nextFollowUp ?? null, disputed: c?.disputed ?? false, disputeReason: c?.disputeReason ?? null, terms: termsSchema.safeParse(c?.terms).success ? termsSchema.parse(c?.terms) : null, promises: result.promises, activities: (c?.activities ?? []).map(v => ({ id: v.id, action: v.action, note: v.note, actorId: v.actorId, createdAt: v.createdAt.toISOString() })), owners: staff.filter(u => u.facilities.includes(null) || u.facilities.includes(a.tenancy!.facilityId)).map(u => ({ id: u.id, name: u.name })), sources: a.ledgerEntries.filter(e => e.type === "CHARGE").map(e => ({ id: e.id, description: e.description, date: southAfricaDateKey(e.effectiveAt) })) };
     });
-    return { asOf, today: southAfricaDateKey(new Date()), userId: scope.userId, rows: rows.map((row, i) => ({ ...row, accessReviewSchedule: scheduleFor(accounts[i]) })), reviewScheduleWorkerEnabled: process.env.ARREARS_REVIEW_SCHEDULE_ENABLED === "true" };
+    return { asOf, today: southAfricaDateKey(new Date()), userId: scope.userId, rows: rows.map((row, i) => ({ ...row, accessReviewSchedule: scheduleFor(accounts[i]) })), reviewScheduleWorkerEnabled: process.env.ARREARS_REVIEW_SCHEDULE_ENABLED === "true" && process.env.ARREARS_REVIEW_ORGANISATION_ID === scope.organisationId };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 30000 });
 }
 export type CollectionsWorkspaceData = Awaited<ReturnType<typeof collectionsWorkspace>>;
@@ -276,15 +276,32 @@ export async function updateCollection(scope: RequestScope, raw: CollectionActio
 /** Explicit delegated internal-task plans only. No customer send, fee, payment or access command. */
 export async function processArrearsReviewSchedules(clock: () => Date = () => new Date()) {
   if (process.env.ARREARS_REVIEW_SCHEDULE_ENABLED !== "true") return { disabled: true, evaluated: 0, prepared: 0, held: 0, more: false };
-  const candidates = await db.configurationProfile.findMany({ where: { domain: ARREARS_REVIEW_SCHEDULE, status: "ACTIVE", config: { path: ["nextDueAt"], lte: clock().toISOString() } }, orderBy: { id: "asc" }, take: 26 });
   const started = performance.now();
+  const organisationId = z.cuid().parse(process.env.ARREARS_REVIEW_ORGANISATION_ID ?? "");
+  const batch = await db.$transaction(async tx => {
+    await tx.$executeRaw`SET LOCAL statement_timeout = '5s'`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`arrears-review-cursor:${organisationId}`}, 0))`;
+    const cursor = await readArrearsReviewCursor(tx, organisationId);
+    const where = { organisationId, domain: ARREARS_REVIEW_SCHEDULE, status: "ACTIVE", config: { path: ["nextDueAt"], lte: clock().toISOString() } };
+    let found = await tx.configurationProfile.findMany({ where: { ...where, ...(cursor ? { id: { gt: cursor } } : {}) }, orderBy: { id: "asc" }, take: 26 });
+    if (!found.length && cursor) found = await tx.configurationProfile.findMany({ where, orderBy: { id: "asc" }, take: 26 });
+    const candidates = found.slice(0, 25);
+    if (candidates.length) {
+      // Scan progress is not task completion. Advance even if every selected plan is invalid.
+      await advanceArrearsReviewCursor(tx, organisationId, candidates.at(-1)!.id);
+      await tx.auditEvent.create({ data: { organisationId, actorId: null, facilityId: null, entityType: "ConfigurationProfile", entityId: `arrears-review-cursor:${organisationId}`, action: "collections.access-review-schedule.scan-advanced", after: json({ cursor: candidates.at(-1)!.id, selected: candidates.length, taskCompletionClaimed: false, financialApproval: false, accessApproval: false }) } });
+    }
+    return { candidates, more: found.length > 25 };
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 2000, timeout: 10000 });
+  const { candidates } = batch;
   let evaluated = 0, prepared = 0, held = 0;
-  let more = candidates.length > 25;
-  for (const candidate of candidates.slice(0, 25)) {
+  let more = batch.more;
+  for (const candidate of candidates) {
     if (performance.now() - started > 45_000) { more = true; break; }
     try {
       const initial = decodeArrearsReviewPlan(candidate);
       const outcome = await db.$transaction(async tx => {
+        await tx.$executeRaw`SET LOCAL statement_timeout = '5s'`;
         // Same account lock order as manual preparation, case edits and schedule cancellation.
         await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${initial.accountId} FOR UPDATE`;
         const saved = await readArrearsReviewPlan(tx, candidate.organisationId, initial.accountId);
@@ -330,7 +347,7 @@ export async function processArrearsReviewSchedules(clock: () => Date = () => ne
         await saveArrearsReviewPlan(tx, row, next, true);
         await tx.auditEvent.create({ data: { organisationId: row.organisationId, facilityId: row.facilityId, actorId: null, entityType: "ConfigurationProfile", entityId: row.id, action: "collections.access-review-schedule.evaluated", after: json({ source: "SCHEDULED_INTERNAL_REVIEW", planRevision: state.revision, delegatedById: state.creatorId, ...last, financialApproval: false, accessApproval: false, feeAmount: null, customerMessageSent: false }) } });
         return last.outcome;
-      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000 });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 2000, timeout: 20000 });
       if (outcome !== "SKIPPED") evaluated++;
       if (outcome === "PREPARED") prepared++;
       if (outcome === "HELD") held++;

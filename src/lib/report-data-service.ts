@@ -51,7 +51,7 @@ export async function buildReportRows(scope: RequestScope, parameters: ReportPar
     }
     case "receivables-ageing": {
       const reportScope = parameters.facilityId ? { ...scope, facilityIds: [parameters.facilityId], unrestrictedFacilities: false } : scope;
-      const data = await collectionsWorkspace(reportScope, parameters.to);
+      const data = await collectionsWorkspace(reportScope, parameters.to, { reviewSchedules: false });
       return data.rows.map(row => {
         const amount = (cents: number) => row.ageing.issue ? null : (cents / 100).toFixed(2);
         return { asOfSast: data.asOf, facility: row.facility, account: row.accountNumber, customer: row.name, currentRecordedBalance: row.currentBalance,

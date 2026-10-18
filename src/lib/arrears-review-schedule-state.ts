@@ -4,7 +4,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import type { RequestScope } from "./scope";
 import { currentRoleAccess } from "./current-role-access";
 import { decryptIntegrationSecret, encryptIntegrationSecret } from "./integrations/integration-secret-vault";
-import { ARREARS_REVIEW_SCHEDULE, arrearsReviewScheduleInput } from "./arrears-review-schedule-policy";
+import { ARREARS_REVIEW_CURSOR, ARREARS_REVIEW_SCHEDULE, arrearsReviewScheduleInput } from "./arrears-review-schedule-policy";
 
 type Tx = Prisma.TransactionClient;
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
@@ -19,14 +19,31 @@ const mac = (value: unknown) => {
   return createHmac("sha256", key).update("arrears-review-schedule-v1:").update(JSON.stringify(value)).digest("hex");
 };
 export function decodeArrearsReviewPlan(row: Row) {
-  const config = z.object({ version: z.literal(1), encrypted: z.string(), integrity: hash, nextDueAt: z.iso.datetime() }).strict().parse(row.config);
+  const config = z.object({ version: z.literal(1), encrypted: z.string().max(32768), integrity: hash, nextDueAt: z.iso.datetime() }).strict().parse(row.config);
   const frame = z.object({ id: z.string(), organisationId: z.cuid(), facilityId: z.cuid(), state: stateSchema }).strict().parse(JSON.parse(decryptIntegrationSecret(config.encrypted)));
   if (row.domain !== ARREARS_REVIEW_SCHEDULE || frame.id !== row.id || frame.organisationId !== row.organisationId || frame.facilityId !== row.facilityId || frame.state.status !== row.status || frame.state.nextDueAt !== config.nextDueAt || mac(frame) !== config.integrity || row.id !== arrearsReviewPlanId(row.organisationId, frame.state.accountId)) throw Error("ARREARS_REVIEW_SCHEDULE_INTEGRITY");
   return frame.state;
 }
 export async function readArrearsReviewPlan(tx: Tx, organisationId: string, accountId: string) {
-  const row = await tx.configurationProfile.findFirst({ where: { id: arrearsReviewPlanId(organisationId, accountId), organisationId, domain: ARREARS_REVIEW_SCHEDULE } });
+  const row = await tx.configurationProfile.findUnique({ where: { id: arrearsReviewPlanId(organisationId, accountId) } });
+  if (row && (row.organisationId !== organisationId || row.domain !== ARREARS_REVIEW_SCHEDULE)) throw Error("ARREARS_REVIEW_SCHEDULE_INTEGRITY");
   return row ? { row, state: decodeArrearsReviewPlan(row) } : null;
+}
+
+const cursorSchema = z.object({ version: z.literal(1), cursor: z.string().regex(/^arrears-review-plan:[a-f0-9]{64}$/), integrity: hash }).strict();
+const cursorId = (organisationId: string) => `arrears-review-cursor:${organisationId}`;
+export async function readArrearsReviewCursor(tx: Tx, organisationId: string) {
+  const row = await tx.configurationProfile.findUnique({ where: { id: cursorId(organisationId) } });
+  if (!row) return null;
+  const value = cursorSchema.parse(row.config);
+  if (row.organisationId !== organisationId || row.facilityId !== null || row.domain !== ARREARS_REVIEW_CURSOR || row.status !== "ACTIVE" || value.integrity !== mac(["cursor", organisationId, value.cursor])) throw Error("ARREARS_REVIEW_SCHEDULE_INTEGRITY");
+  return value.cursor;
+}
+export async function advanceArrearsReviewCursor(tx: Tx, organisationId: string, cursor: string) {
+  const id = cursorId(organisationId), existing = await tx.configurationProfile.findUnique({ where: { id } });
+  if (existing && (existing.organisationId !== organisationId || existing.facilityId !== null || existing.domain !== ARREARS_REVIEW_CURSOR || existing.status !== "ACTIVE")) throw Error("ARREARS_REVIEW_SCHEDULE_INTEGRITY");
+  const config = cursorSchema.parse({ version: 1, cursor, integrity: mac(["cursor", organisationId, cursor]) });
+  return existing ? tx.configurationProfile.update({ where: { id }, data: { config } }) : tx.configurationProfile.create({ data: { id, organisationId, facilityId: null, domain: ARREARS_REVIEW_CURSOR, name: id, status: "ACTIVE", config } });
 }
 export async function saveArrearsReviewPlan(tx: Tx, row: { id: string; organisationId: string; facilityId: string }, incoming: ArrearsReviewScheduleState, exists: boolean) {
   const state = stateSchema.parse(incoming);
