@@ -11,6 +11,7 @@ test("manual retry requires a confirmed failure and preserves uncertain/legacy d
   for (const change of [{ status: "PROCESSING" }, { failureCode: "NETWORK_ERROR" }, { failureCode: "DELIVERY_REVIEW_REQUIRED" }, { deliveredAt: new Date() }, { readAt: new Date() }, { metadata: { deliveryOutcome: "UNCERTAIN" } }, { providerRef: null, failureCode: null }]) assert.equal(canRetryWhatsAppDelivery({ ...log, ...change }), false);
   assert.equal(canRetryWhatsAppDelivery({ ...log, providerRef: null, failureCode: "CONFIG_REQUIRED" }), true);
   assert.equal(canRetryWhatsAppDelivery({ ...log, providerRef: null, metadata: { deliveryOutcome: "REJECTED" } }), true);
+  assert.equal(canRetryWhatsAppDelivery({ ...log, metadata: { noticeId: "collection-phone:reviewed", deliveryOutcome: "ACCEPTED" } }), false);
 });
 async function fixture() {
   const rows: Row[] = [];

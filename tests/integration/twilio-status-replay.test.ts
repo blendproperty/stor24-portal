@@ -71,6 +71,13 @@ test("isolated PostgreSQL callback replay and rollback", async () => {
     const smsDelivered = await db.communicationLog.findUniqueOrThrow({ where: { id: sms.id } });
     assert.equal(smsDelivered.status, "SUCCEEDED"); assert.ok(smsDelivered.deliveredAt); assert.equal(smsDelivered.failedAt, null);
     assert.equal(await db.task.count({ where: { organisationId: org.id, title: "SMS delivery failed" } }), 1);
+    for (const channel of ["SMS", "WHATSAPP"]) {
+      const reviewedKey = randomUUID();
+      const reviewed = await db.communicationLog.create({ data: { organisationId: org.id, channel, messageType: "COLLECTION_REMINDER", provider: "twilio", providerRef: reviewedKey, recipientHash: "synthetic", idempotencyKey: reviewedKey, status: "PROCESSING", attempts: 1, metadata: { noticeId: "collection-phone:reviewed", deliveryOutcome: "ACCEPTED" } } });
+      await loaded.exports.POST(request("failed", reviewedKey));
+      const failed = await db.communicationLog.findUniqueOrThrow({ where: { id: reviewed.id } });
+      assert.equal(failed.status, "FAILED"); assert.equal(failed.nextRetryAt, null); assert.ok(failed.failedAt);
+    }
   } finally {
     if (saved.token === undefined) delete process.env.TWILIO_AUTH_TOKEN; else process.env.TWILIO_AUTH_TOKEN = saved.token;
     if (saved.url === undefined) delete process.env.APP_URL; else process.env.APP_URL = saved.url;

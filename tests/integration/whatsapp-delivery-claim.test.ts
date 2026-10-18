@@ -50,6 +50,9 @@ test("isolated PostgreSQL WhatsApp attempt and manual-retry claims", async () =>
     assert.equal((await retry(uncertain.logId)).status, 409); assert.equal(sends, 3);
     const uncertainLog = await db.communicationLog.findUniqueOrThrow({ where: { id: uncertain.logId } });
     assert.equal(uncertainLog.nextRetryAt, null); assert.equal(uncertainLog.attempts, 1);
+    const reviewed = await db.communicationLog.create({ data: { organisationId: org.id, facilityId: facility.id, customerId: customer.id, channel: "WHATSAPP", messageType: "COLLECTION_REMINDER", recipientHash: "synthetic", idempotencyKey: randomUUID(), status: "FAILED", providerRef: "SMreviewed", failedAt: new Date(), failureCode: "DELIVERY_FAILED", metadata: { noticeId: "collection-phone:reviewed", deliveryOutcome: "ACCEPTED" } } });
+    assert.equal((await retry(reviewed.id)).status, 409); assert.equal(sends, 3);
+    assert.equal(await db.communicationLog.count({ where: { idempotencyKey: `whatsapp-retry:${reviewed.id}` } }), 0);
   } finally {
     if (previous === undefined) delete process.env[envKey]; else process.env[envKey] = previous;
     await db.$disconnect();

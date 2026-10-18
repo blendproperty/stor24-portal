@@ -103,6 +103,7 @@ export async function sendWhatsAppTemplate(input: {
 export function canRetryWhatsAppDelivery(log: { status: string; providerRef: string | null; failureCode: string | null; failedAt: Date | null; deliveredAt?: Date | null; readAt?: Date | null; metadata: unknown }) {
   if (log.status !== "FAILED" || log.deliveredAt || log.readAt || ["NETWORK_ERROR", "DELIVERY_REVIEW_REQUIRED"].includes(log.failureCode ?? "")) return false;
   const metadata = log.metadata && typeof log.metadata === "object" && !Array.isArray(log.metadata) ? log.metadata as Record<string, unknown> : {};
+  if (typeof metadata.noticeId === "string" && metadata.noticeId.startsWith("collection-phone:")) return false;
   if (metadata.deliveryOutcome === "UNCERTAIN" || metadata.deliveryOutcome === "IN_PROGRESS") return false;
   return metadata.deliveryOutcome === "REJECTED" || Boolean(log.providerRef && log.failedAt) || ["CONFIG_REQUIRED", "INVALID_RECIPIENT", "INVALID_CONTENT_SID"].includes(log.failureCode ?? "");
 }

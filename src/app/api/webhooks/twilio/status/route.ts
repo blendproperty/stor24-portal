@@ -40,7 +40,7 @@ export async function POST(request: Request) {
         failedAt: isFailed ? new Date() : isDelivered ? null : undefined,
         failureCode: isFailed ? (payload.ErrorCode || "DELIVERY_FAILED") : isDelivered ? null : undefined,
         failureMessage: isFailed ? (payload.ChannelStatusMessage || "Twilio could not deliver the message.") : isDelivered ? null : undefined,
-        nextRetryAt: isFailed ? (current.attempts < 3 ? new Date(Date.now() + 5 * 60_000) : null) : isDelivered ? null : undefined,
+        nextRetryAt: current.messageType === "COLLECTION_REMINDER" ? null : isFailed ? (current.attempts < 3 ? new Date(Date.now() + 5 * 60_000) : null) : isDelivered ? null : undefined,
       } });
       if (isFailed) await tx.task.create({ data: { organisationId: current.organisationId, facilityId: current.facilityId, customerId: current.customerId, title: `${current.channel === "SMS" ? "SMS" : "WhatsApp"} delivery failed`, description: `Review communication ${current.id}. Twilio error ${payload.ErrorCode || "unknown"}.`, priority: current.attempts >= 3 ? "HIGH" : "NORMAL" } });
     });
