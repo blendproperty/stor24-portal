@@ -1,0 +1,22 @@
+[
+  {
+    "file": "STOR24_Facilities_Manager_Manual.pdf",
+    "pages": 27,
+    "words": 5961,
+    "outline_entries": 26,
+    "links": 52,
+    "out_of_bounds": [],
+    "sha256": "2411877fb56fe26696d6bb5f94c4112ae2339eae7e2b9024aaf556521fd179bf",
+    "rendered_pages": 27
+  },
+  {
+    "file": "STOR24_Faeez_Operating_Manual.pdf",
+    "pages": 72,
+    "words": 17204,
+    "outline_entries": 51,
+    "links": 102,
+    "out_of_bounds": [],
+    "sha256": "80c23d7d6adce07941d276eedee626fb4774348074f647411dd0c5d6b4c143c8",
+    "rendered_pages": 72
+  }
+]
