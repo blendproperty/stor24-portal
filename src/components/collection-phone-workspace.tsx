@@ -28,8 +28,8 @@ export function CollectionPhoneWorkspace() {
   return <div className="collection-notices" aria-busy={busy}>
     <header className="notice-heading"><h1>Reviewed SMS &amp; WhatsApp reminders</h1><p>1. Select an account and channel. 2. Review the complete reminder. 3. Another authorised colleague approves. 4. Authorise one send.</p><a href="/collections">Back to Collections</a></header>
     <section className="notice-panel"><p>These are payment reminders. They do not satisfy a separately required access-restriction notice, add fees, approve finance or change access.</p>
-      <label>Account<select disabled={busy} value={accountId} onChange={e => { resetPreview(); setAccountId(e.target.value); }}><option value="">Choose an account</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.accountNumber} · {a.name} · {a.facility}</option>)}</select></label>
-      <label>Channel<select disabled={busy} value={channel} onChange={e => { resetPreview(); setChannel(e.target.value as typeof channel); }}><option value="SMS">SMS</option><option value="WHATSAPP">WhatsApp</option></select></label>
+      <label>Account<select aria-label="Account" disabled={busy} value={accountId} onChange={e => { resetPreview(); setAccountId(e.target.value); }}><option value="">Choose an account</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.accountNumber} · {a.name} · {a.facility}</option>)}</select></label>
+      <label>Channel<select aria-label="Channel" disabled={busy} value={channel} onChange={e => { resetPreview(); setChannel(e.target.value as typeof channel); }}><option value="SMS">SMS</option><option value="WHATSAPP">WhatsApp</option></select></label>
       <button disabled={busy || !accountId} onClick={() => { resetPreview(); setReloadToken(v => v + 1); }}>Reload notice</button>
     </section>
     {error && <p role="alert" className="notice-error">{error}</p>}
