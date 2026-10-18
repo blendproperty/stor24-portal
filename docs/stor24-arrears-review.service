@@ -1,0 +1,13 @@
+[Unit]
+Description=STOR24 internal arrears review-task evaluation
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/stor24-crm
+ExecStart=/bin/bash /opt/stor24-crm/scripts/run-arrears-review-schedules.sh
+TimeoutStartSec=90
+Nice=10
+NoNewPrivileges=true
+PrivateTmp=true

@@ -1,7 +1,9 @@
 import {receiptAllocationGraph} from "./receipt-reallocation-source";
 import { arrearsAccessReview } from "./arrears-access-review-policy";
 import { currentRoleAccess } from "./current-role-access";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { ARREARS_REVIEW_SCHEDULE, arrearsReviewScheduleWindow, nextArrearsReviewAt } from "./arrears-review-schedule-policy";
+import { arrearsReviewPlanId, arrearsReviewScheduleActor, decodeArrearsReviewPlan, readArrearsReviewCursor, readArrearsReviewPlan, reviewSchedulePermissions, saveArrearsReviewCursor, saveArrearsReviewPlan, type ArrearsReviewScheduleState } from "./arrears-review-schedule-state";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
@@ -25,7 +27,7 @@ async function owners(tx: Client, scope: RequestScope) {
   return users.map(u => ({ id: u.id, name: u.name, facilities: u.roleAssignments.filter(a => a.role.organisationId === scope.organisationId && hasPermission(a.role.permissions, "collections.manage")).map(a => a.facilityId) })).filter(u => u.facilities.length > 0);
 }
 async function accessReviewAssignee(tx: Client, scope: RequestScope, facilityId: string, ownerId: string | null) {
-  const users = await tx.user.findMany({ where: { organisationId: scope.organisationId, active: true }, select: { id: true, roleAssignments: { include: { role: true } } } });
+  const users = await tx.user.findMany({ where: { organisationId: scope.organisationId, active: true, id: { in: [...new Set([scope.userId, ...(ownerId ? [ownerId] : [])])] } }, select: { id: true, roleAssignments: { include: { role: true } } } });
   const eligible = users.filter(user => ["collections.view", "collections.manage", "operations.view", "operations.manage"].every(permission => currentRoleAccess(user.roleAssignments.filter(assignment => assignment.role.organisationId === scope.organisationId), permission, facilityId).allowed));
   return eligible.some(user => user.id === ownerId) ? ownerId : eligible.some(user => user.id === scope.userId) ? scope.userId : null;
 }
@@ -95,18 +97,31 @@ function accessReviewFor(account: Account, result: ReturnType<typeof evaluate>, 
   const unreviewedPayment = account.payments.filter(payment => !isTestPayment(payment)).some(payment => payment.status === "FAILED" || ["SUCCEEDED", "PARTIALLY_REFUNDED", "REFUNDED", "REVERSED"].includes(payment.status) && !account.ledgerEntries.some(entry => result.verifiedReceiptIds.includes(entry.id) && (entry.externalRef === payment.idempotencyKey || (entry.metadata as { paymentId?: string } | null)?.paymentId === payment.id)));
   return arrearsAccessReview({ asOf, paymentMethod: account.tenancy?.paymentMethod ?? null, active: account.tenancy?.status === "ACTIVE", issue: result.ageing.issue, hold: result.hold ?? (unreviewedPayment ? "A failed or unposted payment outcome needs authoritative reconciliation review before access-review preparation." : null), charges: result.ageing.charges });
 }
-export async function collectionsWorkspace(scope: RequestScope, asOf: string) {
+export async function collectionsWorkspace(scope: RequestScope, asOf: string, options: { reviewSchedules?: boolean } = {}) {
   dateKey.parse(asOf); if (asOf > southAfricaDateKey(new Date())) throw new Error("COLLECTION_DATE");
   return db.$transaction(async tx => {
     const accounts = await tx.account.findMany({ where: where(scope), include, orderBy: { accountNumber: "asc" }, take: 2001 });
     const staff = await owners(tx, scope);
     if (accounts.length > 2000) throw new Error("COLLECTION_LIMIT");
     const proof = await receiptEvidence(tx, scope, accounts);
+    const actor = options.reviewSchedules === false ? null : await tx.user.findFirst({ where: { id: scope.userId, organisationId: scope.organisationId, active: true }, include: { roleAssignments: { include: { role: true } } } });
+    const assignments = actor?.roleAssignments.filter(a => a.role.organisationId === scope.organisationId) ?? [];
+    const plans = options.reviewSchedules === false ? [] : await tx.configurationProfile.findMany({ where: { organisationId: scope.organisationId, domain: ARREARS_REVIEW_SCHEDULE, id: { in: accounts.map(a => arrearsReviewPlanId(scope.organisationId, a.id)) } } });
+    const planById = new Map(plans.map(p => [p.id, p]));
+    function scheduleFor(account: Account) {
+      const canManage = !!actor && reviewSchedulePermissions.every(key => currentRoleAccess(assignments, key, account.tenancy!.facilityId).allowed);
+      try {
+        const saved = planById.get(arrearsReviewPlanId(scope.organisationId, account.id));
+        const plan = saved ? decodeArrearsReviewPlan(saved) : null;
+        if (saved && (saved.facilityId !== account.tenancy!.facilityId || plan?.accountId !== account.id)) throw Error("ARREARS_REVIEW_SCHEDULE_INTEGRITY");
+        return { plan, canManage, canSchedule: account.tenancy!.status === "ACTIVE" && ["EFT", "CARD"].includes(account.tenancy!.paymentMethod ?? ""), unavailable: false };
+      } catch { return { plan: null, canManage: false, canSchedule: false, unavailable: true }; }
+    }
     const rows = accounts.map(a => {
       const result = evaluate(a, asOf, proof), c = a.collectionCase;
       return { id: a.id, accountNumber: a.accountNumber, name: a.customer.companyName || [a.customer.firstName, a.customer.lastName].filter(Boolean).join(" ") || "Unnamed customer", facilityId: a.tenancy!.facilityId, facility: a.tenancy!.facility.name, currentBalance: a.balance.toString(), ageing: result.ageing, hold: result.hold, accessReview: accessReviewFor(a, result, asOf), revision: c?.revision ?? 0, ownerId: c?.ownerId ?? null, nextFollowUp: c?.nextFollowUp ?? null, disputed: c?.disputed ?? false, disputeReason: c?.disputeReason ?? null, terms: termsSchema.safeParse(c?.terms).success ? termsSchema.parse(c?.terms) : null, promises: result.promises, activities: (c?.activities ?? []).map(v => ({ id: v.id, action: v.action, note: v.note, actorId: v.actorId, createdAt: v.createdAt.toISOString() })), owners: staff.filter(u => u.facilities.includes(null) || u.facilities.includes(a.tenancy!.facilityId)).map(u => ({ id: u.id, name: u.name })), sources: a.ledgerEntries.filter(e => e.type === "CHARGE").map(e => ({ id: e.id, description: e.description, date: southAfricaDateKey(e.effectiveAt) })) };
     });
-    return { asOf, today: southAfricaDateKey(new Date()), userId: scope.userId, rows };
+    return { asOf, today: southAfricaDateKey(new Date()), userId: scope.userId, rows: rows.map((row, i) => ({ ...row, accessReviewSchedule: scheduleFor(accounts[i]) })), reviewScheduleWorkerEnabled: process.env.ARREARS_REVIEW_SCHEDULE_ENABLED === "true" && process.env.ARREARS_REVIEW_ORGANISATION_ID === scope.organisationId };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 30000 });
 }
 export type CollectionsWorkspaceData = Awaited<ReturnType<typeof collectionsWorkspace>>;
@@ -162,6 +177,25 @@ export async function collectionEmailSource(tx: Client, scope: RequestScope, acc
     fingerprint: createHash("sha256").update(JSON.stringify(bound)).digest("hex") };
 }
 
+async function prepareAccessReviewTask(tx: Client, scope: RequestScope, account: Account, ownerId: string | null, evaluated: ReturnType<typeof evaluate>, today: string, scheduled = false) {
+  const assessment = accessReviewFor(account, evaluated, today);
+  if (!assessment.eligible || !assessment.sourceChargeId || !assessment.reviewOn) throw Error("COLLECTION_ACCESS_REVIEW_HELD");
+  const assigneeId = await accessReviewAssignee(tx, scope, account.tenancy!.facilityId, ownerId);
+  if (!assigneeId) throw Error("COLLECTION_OWNER");
+  const key = createHash("sha256").update(JSON.stringify(["ARREARS_ACCESS_REVIEW", scope.organisationId, account.id, assessment.sourceChargeId])).digest("hex");
+  const previous = await tx.task.findUnique({ where: { requestKey: key } });
+  const dueAt = new Date(`${assessment.reviewOn}T00:00:00+02:00`);
+  if (previous) {
+    if (previous.organisationId !== scope.organisationId || previous.facilityId !== account.tenancy!.facilityId || previous.purpose !== "ARREARS_ACCESS_REVIEW") throw Error("COLLECTION_CHANGED");
+    const closed = ["COMPLETED", "CANCELLED"].includes(previous.status);
+    const changed = !closed && (previous.assigneeId !== assigneeId || previous.dueAt?.getTime() !== dueAt.getTime());
+    if (changed) await tx.task.update({ where: { id: previous.id }, data: { assigneeId, dueAt } });
+    return { taskId: previous.id, assigneeId: closed ? previous.assigneeId : assigneeId, changed, assessment };
+  }
+  const task = await tx.task.create({ data: { organisationId: scope.organisationId, facilityId: account.tenancy!.facilityId, assigneeId, createdById: scope.userId, purpose: "ARREARS_ACCESS_REVIEW", requestKey: key, requestHash: createHash("sha256").update(JSON.stringify(assessment)).digest("hex"), title: `Access restriction review · ${account.accountNumber}`, description: `${scheduled ? "Prepared by an automatic evaluation under recorded staff delegation. " : ""}Authorised collections staff must open Collections and recheck current payment, dispute, arrangement and written-notice evidence. This internal task is not approval to restrict access, charge fees or change money.`, dueAt } });
+  return { taskId: task.id, assigneeId, changed: true, assessment };
+}
+
 export async function updateCollection(scope: RequestScope, raw: CollectionAction) {
   const input = collectionActionSchema.parse(raw), today = southAfricaDateKey(new Date());
   return db.$transaction(async tx => {
@@ -182,21 +216,21 @@ export async function updateCollection(scope: RequestScope, raw: CollectionActio
     let accessTaskId: string | null = null;
     let reviewAssigneeId: string | null = null;
     if (input.action === "access-review-task") {
-      const assessment = accessReviewFor(account, evaluated, today);
-      if (!assessment.eligible || !assessment.sourceChargeId || !assessment.reviewOn) throw new Error("COLLECTION_ACCESS_REVIEW_HELD");
-      const assigneeId = await accessReviewAssignee(tx, scope, account.tenancy!.facilityId, c.ownerId);
-      if (!assigneeId) throw new Error("COLLECTION_OWNER");
-      reviewAssigneeId = assigneeId;
-      const key = createHash("sha256").update(JSON.stringify(["ARREARS_ACCESS_REVIEW", scope.organisationId, account.id, assessment.sourceChargeId])).digest("hex");
-      const previousTask = await tx.task.findUnique({ where: { requestKey: key } });
-      if (previousTask) {
-        if (previousTask.organisationId !== scope.organisationId || previousTask.facilityId !== account.tenancy!.facilityId || previousTask.purpose !== "ARREARS_ACCESS_REVIEW") throw new Error("COLLECTION_CHANGED");
-        if (!["COMPLETED", "CANCELLED"].includes(previousTask.status)) await tx.task.update({ where: { id: previousTask.id }, data: { assigneeId, dueAt: new Date(`${assessment.reviewOn}T00:00:00+02:00`) } });
-        else reviewAssigneeId = previousTask.assigneeId;
-        accessTaskId = previousTask.id;
+      const prepared = await prepareAccessReviewTask(tx, scope, account, c.ownerId, evaluated, today);
+      accessTaskId = prepared.taskId; reviewAssigneeId = prepared.assigneeId;
+    } else if (input.action === "schedule-access-review" || input.action === "cancel-access-review-schedule") {
+      await arrearsReviewScheduleActor(tx, scope, account.tenancy!.facilityId);
+      const saved = await readArrearsReviewPlan(tx, scope.organisationId, account.id);
+      if ((saved?.state.revision ?? null) !== input.scheduleRevision || saved && saved.row.facilityId !== account.tenancy!.facilityId) throw Error("COLLECTION_CHANGED");
+      const row = { id: arrearsReviewPlanId(scope.organisationId, account.id), organisationId: scope.organisationId, facilityId: account.tenancy!.facilityId };
+      if (input.action === "schedule-access-review") {
+        if (account.tenancy!.status !== "ACTIVE" || !["EFT", "CARD"].includes(account.tenancy!.paymentMethod ?? "") || input.input.from < today) throw Error("ARREARS_REVIEW_SCHEDULE_INPUT");
+        const creator = await tx.user.findUniqueOrThrow({ where: { id: scope.userId }, select: { name: true } });
+        const plan: ArrearsReviewScheduleState = { revision: randomUUID(), accountId: account.id, creatorId: scope.userId, creatorName: creator.name.trim().slice(0, 160) || "Staff member", input: input.input, status: "ACTIVE", nextDueAt: nextArrearsReviewAt(input.input), last: null };
+        await saveArrearsReviewPlan(tx, row, plan, !!saved);
       } else {
-        const task = await tx.task.create({ data: { organisationId: scope.organisationId, facilityId: account.tenancy!.facilityId, assigneeId, createdById: scope.userId, purpose: "ARREARS_ACCESS_REVIEW", requestKey: key, requestHash: createHash("sha256").update(JSON.stringify(assessment)).digest("hex"), title: `Access restriction review · ${account.accountNumber}`, description: "Authorised collections staff must open Collections and recheck current payment, dispute, arrangement and written-notice evidence. This internal task is not approval to restrict access, charge fees or change money.", dueAt: new Date(`${assessment.reviewOn}T00:00:00+02:00`) } });
-        accessTaskId = task.id;
+        if (!saved || saved.state.status !== "ACTIVE") throw Error("ARREARS_REVIEW_SCHEDULE_INPUT");
+        await saveArrearsReviewPlan(tx, row, { ...saved.state, revision: randomUUID(), status: "CANCELLED" }, true);
       }
     } else if (input.action === "terms") {
       const ids = new Set<string>();
@@ -234,7 +268,115 @@ export async function updateCollection(scope: RequestScope, raw: CollectionActio
     } : null;
     const activity = await tx.collectionActivity.create({ data: { caseId: c.id, requestKey: input.requestKey, actorId: scope.userId, action: input.action === "follow-up" ? input.outcome : review ? `Escalation review · ${review.target.toLowerCase()}${review.proposedChannel ? ` / ${review.proposedChannel}` : ""} · held for policy` : input.action,
       note: review ? `Internal review requested for ${review.reviewOn}. ${input.note}\n${review.blockers.join(" ")}${review.proposedPolicyReference ? ` Proposed policy evidence (unverified): ${review.proposedPolicyReference}.` : ""} No message, fee or access action was executed.` : accessTaskId ? `${input.note}\nInternal Operations review task ${accessTaskId} prepared. Separate written-notice checks and authorised access approval are still required. No message, fee, financial approval or access command was created.` : input.note, payload: json(input) } });
-    await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: account.tenancy!.facilityId, actorId: scope.userId, entityType: "CollectionCase", entityId: c.id, action: `collections.${input.action}`, after: json({ activityId: activity.id, revision: input.revision + 1, ...(review ? { review } : {}), ...(accessTaskId ? { taskId: accessTaskId, assigneeId: reviewAssigneeId, assessment: accessReviewFor(account, evaluated, today), financialApproval: false, accessApproval: false } : {}) }) } });
+    await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: account.tenancy!.facilityId, actorId: scope.userId, entityType: "CollectionCase", entityId: c.id, action: `collections.${input.action}`, after: json({ activityId: activity.id, revision: input.revision + 1, ...(review ? { review } : {}), ...(accessTaskId ? { taskId: accessTaskId, assigneeId: reviewAssigneeId, assessment: accessReviewFor(account, evaluated, today), financialApproval: false, accessApproval: false } : {}), ...(["schedule-access-review", "cancel-access-review-schedule"].includes(input.action) ? { effect: "INTERNAL_REVIEW_TASKS_ONLY", financialApproval: false, accessApproval: false, feeAmount: null } : {}) }) } });
     return { id: activity.id, repeated: false };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000 });
+}
+
+/** Explicit delegated internal-task plans only. No customer send, fee, payment or access command. */
+export async function processArrearsReviewSchedules(clock: () => Date = () => new Date(), elapsed: () => number = () => performance.now()) {
+  if (process.env.ARREARS_REVIEW_SCHEDULE_ENABLED !== "true") return { disabled: true, evaluated: 0, prepared: 0, held: 0, more: false };
+  const started = elapsed();
+  const organisationId = z.cuid().parse(process.env.ARREARS_REVIEW_ORGANISATION_ID ?? "");
+  const cursorTransaction = <T>(work: (tx: Client) => Promise<T>) => db.$transaction(async tx => {
+    await tx.$executeRaw`SET LOCAL statement_timeout = '5s'`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`arrears-review-cursor:${organisationId}`}, 0))`;
+    return work(tx);
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, maxWait: 2000, timeout: 10000 });
+  const batch = await cursorTransaction(async tx => {
+    const current = await readArrearsReviewCursor(tx, organisationId) ?? { cursor: null, lease: null };
+    if (current.lease && new Date(current.lease.until).getTime() > Date.now()) return { candidates: [], more: true, lease: null };
+    const { cursor } = current;
+    const where = { organisationId, domain: ARREARS_REVIEW_SCHEDULE, status: "ACTIVE", config: { path: ["nextDueAt"], lte: clock().toISOString() } };
+    let found = await tx.configurationProfile.findMany({ where: { ...where, ...(cursor ? { id: { gt: cursor } } : {}) }, orderBy: { id: "asc" }, take: 26 });
+    if (!found.length && cursor) found = await tx.configurationProfile.findMany({ where, orderBy: { id: "asc" }, take: 26 });
+    const candidates = found.slice(0, 25);
+    if (!candidates.length) return { candidates, more: false, lease: null };
+    const lease = { token: randomUUID(), until: new Date(Date.now() + 120000).toISOString() };
+    await saveArrearsReviewCursor(tx, organisationId, { cursor, lease });
+    await tx.auditEvent.create({ data: { organisationId, actorId: null, facilityId: null, entityType: "ConfigurationProfile", entityId: `arrears-review-cursor:${organisationId}`, action: "collections.access-review-schedule.scan-started", after: json({ selected: candidates.length, taskCompletionClaimed: false, financialApproval: false, accessApproval: false }) } });
+    return { candidates, more: found.length > 25, lease };
+  });
+  const { candidates } = batch;
+  let evaluated = 0, prepared = 0, held = 0;
+  let more = batch.more;
+  const lease = batch.lease;
+  if (!lease) return { disabled: false, evaluated, prepared, held, more };
+  try {
+  for (const candidate of candidates) {
+    if (elapsed() - started > 25_000) { more = true; break; }
+    const claimed = await cursorTransaction(async tx => {
+      const current = await readArrearsReviewCursor(tx, organisationId), active = current?.lease;
+      if (!current || !active || active.token !== lease.token || new Date(active.until).getTime() <= Date.now()) return false;
+      // Only the row about to be attempted advances progress, never an untouched batch tail.
+      await saveArrearsReviewCursor(tx, organisationId, { cursor: candidate.id, lease: active });
+      await tx.auditEvent.create({ data: { organisationId, actorId: null, facilityId: null, entityType: "ConfigurationProfile", entityId: `arrears-review-cursor:${organisationId}`, action: "collections.access-review-schedule.scan-advanced", after: json({ attemptedPlan: candidate.id, taskCompletionClaimed: false, financialApproval: false, accessApproval: false }) } });
+      return true;
+    });
+    if (!claimed) { more = true; break; }
+    try {
+      const initial = decodeArrearsReviewPlan(candidate);
+      const outcome = await db.$transaction(async tx => {
+        await tx.$executeRaw`SET LOCAL statement_timeout = '5s'`;
+        // Same account lock order as manual preparation, case edits and schedule cancellation.
+        await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${initial.accountId} FOR UPDATE`;
+        const saved = await readArrearsReviewPlan(tx, candidate.organisationId, initial.accountId);
+        if (!saved || saved.state.status !== "ACTIVE" || !saved.row.facilityId) return "SKIPPED";
+        const { state } = saved, at = clock(), window = arrearsReviewScheduleWindow(state.input, state.nextDueAt, at);
+        const row = { id: saved.row.id, organisationId: saved.row.organisationId, facilityId: saved.row.facilityId };
+        if (!window.due && !window.expired) {
+          // A missed previous day never generates a backdated task or blocks later due plans.
+          const next = new Date(`${window.day < state.input.from ? state.input.from : window.day}T${state.input.time}:00+02:00`).toISOString();
+          if (state.nextDueAt < next) {
+            await saveArrearsReviewPlan(tx, row, { ...state, nextDueAt: next }, true);
+            await tx.auditEvent.create({ data: { organisationId: row.organisationId, facilityId: row.facilityId, actorId: null, entityType: "ConfigurationProfile", entityId: row.id, action: "collections.access-review-schedule.deferred", after: json({ day: window.day, nextDueAt: next, taskPrepared: false, financialApproval: false, accessApproval: false }) } });
+          }
+          return "SKIPPED";
+        }
+        if (state.last?.day === window.day) return "SKIPPED";
+        let last: NonNullable<ArrearsReviewScheduleState["last"]> = { day: window.day, at: at.toISOString(), outcome: "HELD", taskId: null, reasons: [] };
+        if (window.expired) last = { ...last, outcome: "EXPIRED", reasons: ["The explicit daily review date range has ended."] };
+        else {
+          const incoming: RequestScope = { userId: state.creatorId, organisationId: row.organisationId, facilityIds: [row.facilityId], unrestrictedFacilities: false };
+          try {
+            const scope = await arrearsReviewScheduleActor(tx, incoming, row.facilityId);
+            const account = await accountFor(tx, scope, state.accountId);
+            const source = evaluate(account, window.day, await receiptEvidence(tx, scope, [account]));
+            const assessment = accessReviewFor(account, source, window.day);
+            if (!assessment.eligible || !account.collectionCase) last.reasons = assessment.blockers.length ? assessment.blockers : ["Approved current case evidence is required."];
+            else {
+              const result = await prepareAccessReviewTask(tx, scope, account, account.collectionCase.ownerId, source, window.day, true);
+              last = { ...last, outcome: result.changed ? "PREPARED" : "ALREADY_PREPARED", taskId: result.taskId };
+              if (result.changed) {
+                const requestKey = `scheduled-arrears-review:${createHash("sha256").update(JSON.stringify([row.id, state.revision, window.day])).digest("hex")}`;
+                await tx.collectionActivity.create({ data: { caseId: account.collectionCase.id, requestKey, actorId: state.creatorId, action: "Scheduled internal review task prepared", note: "An automatic evaluation under the recorded staff delegation prepared an internal Operations review task. Staff have not approved restriction or fees. Recheck all current sources and required notice before any separately authorised action.", payload: json({ source: "SCHEDULED_INTERNAL_REVIEW", planId: row.id, planRevision: state.revision, day: window.day, taskId: result.taskId, delegatedById: state.creatorId, assessment: result.assessment, financialApproval: false, accessApproval: false, feeAmount: null }) } });
+                await tx.collectionCase.update({ where: { id: account.collectionCase.id }, data: { revision: { increment: 1 } } });
+              }
+            }
+          } catch (error) {
+            const code = error instanceof Error ? error.message : "";
+            if (!["FORBIDDEN", "COLLECTION_NOT_FOUND", "COLLECTION_OWNER", "COLLECTION_LIMIT", "COLLECTION_REVIEW"].includes(code)) throw error;
+            last.reasons = [code === "FORBIDDEN" ? "The delegating staff member no longer has all required current store permissions." : "Current account, payment or assignee sources require staff review."];
+          }
+        }
+        const next = { ...state, last, nextDueAt: nextArrearsReviewAt(state.input, window.day), status: window.expired || window.day >= state.input.until ? "EXPIRED" as const : "ACTIVE" as const };
+        await saveArrearsReviewPlan(tx, row, next, true);
+        await tx.auditEvent.create({ data: { organisationId: row.organisationId, facilityId: row.facilityId, actorId: null, entityType: "ConfigurationProfile", entityId: row.id, action: "collections.access-review-schedule.evaluated", after: json({ source: "SCHEDULED_INTERNAL_REVIEW", planRevision: state.revision, delegatedById: state.creatorId, ...last, financialApproval: false, accessApproval: false, feeAmount: null, customerMessageSent: false }) } });
+        return last.outcome;
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 2000, timeout: 20000 });
+      if (outcome !== "SKIPPED") evaluated++;
+      if (outcome === "PREPARED") prepared++;
+      if (outcome === "HELD") held++;
+    } catch { held++; /* A failed/uncertain transaction is never blindly replayed in this run. */ }
+  }
+  } finally {
+    await cursorTransaction(async tx => {
+      const current = await readArrearsReviewCursor(tx, organisationId);
+      if (current?.lease?.token === lease.token) {
+        await saveArrearsReviewCursor(tx, organisationId, { cursor: current.cursor, lease: null });
+        await tx.auditEvent.create({ data: { organisationId, actorId: null, facilityId: null, entityType: "ConfigurationProfile", entityId: `arrears-review-cursor:${organisationId}`, action: "collections.access-review-schedule.scan-released", after: json({ cursor: current.cursor, taskCompletionClaimed: false }) } });
+      }
+    });
+  }
+  return { disabled: false, evaluated, prepared, held, more };
 }

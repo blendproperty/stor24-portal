@@ -54,7 +54,7 @@ export const guideAccessRules: Record<string, Rule> = {
   "move-out": rule("ledger.view,operations.manage", ["", "", "", "", "access.manage"]),
   statements: rule("ledger.view", ["", "", "", "billing.documents.send"]),
   billing: rule("billing.view", ["", "ledger.view,billing.manage,payments.view,daily_close.perform", "", "daily_close.perform,payments.view"]),
-  collections: rule("collections.view", ["", "", "collections.manage", "collections.manage"]),
+  collections: rule("collections.view", ["", "", "collections.manage", "collections.manage", "collections.manage,operations.view,operations.manage"]),
   adjustments: rule("adjustments.view", ["adjustments.request", "adjustments.request", "adjustments.approve", "adjustments.record_refund"]),
   "netcash-operations": rule("payments.view", ["", "", "", "integrations.manage"]),
   "netcash-payment-requests": rule("payments.view,ledger.view", ["payments.manage", "payments.manage", ""]),

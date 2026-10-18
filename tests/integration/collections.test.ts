@@ -1,8 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
+import type { Prisma } from "../../src/generated/prisma/client";
 import { db } from "../../src/lib/db";
-import { collectionsWorkspace, updateCollection } from "../../src/lib/collections-service";
+import { collectionsWorkspace, updateCollection, processArrearsReviewSchedules } from "../../src/lib/collections-service";
+import { ARREARS_REVIEW_CURSOR, ARREARS_REVIEW_SCHEDULE } from "../../src/lib/arrears-review-schedule-policy";
+import { readArrearsReviewCursor, readArrearsReviewPlan, saveArrearsReviewCursor } from "../../src/lib/arrears-review-schedule-state";
+import { POST as reviewWorkerPost } from "../../src/app/api/internal/arrears-review-schedules/route";
+import { operationsTaskPage } from "../../src/lib/operations-task-service";
 import { collectionCsv } from "../../src/lib/collections-view";
 import { buildReportRows } from "../../src/lib/report-data-service";
 import { southAfricaDateKey } from "../../src/lib/south-africa-time";
@@ -27,6 +32,206 @@ test("isolated PostgreSQL aged collections", async t => {
   const base = async (f: Awaited<ReturnType<typeof fixture>>) => ({ accountId: f.account.id, revision: (await row(f)).revision, requestKey: randomUUID(), note: "CI evidence reference" });
   const terms = async (f: Awaited<ReturnType<typeof fixture>>) => updateCollection(f.scope, { ...await base(f), action: "terms", terms: { dueDays: 0, allocation: "OLDEST_DUE_FIRST", approvalReference: "CI approved agreement", overrides: [] }, confirm: true });
   try {
+    await t.test("daily internal review plans keep source, permission and financial boundaries", async timed => {
+      const old = { key: process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY, enabled: process.env.ARREARS_REVIEW_SCHEDULE_ENABLED, worker: process.env.ARREARS_REVIEW_WORKER_KEY, organisation: process.env.ARREARS_REVIEW_ORGANISATION_ID };
+      process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY = "synthetic-arrears-review-vault-key-at-least-32-characters";
+      process.env.ARREARS_REVIEW_SCHEDULE_ENABLED = "true";
+      process.env.ARREARS_REVIEW_WORKER_KEY = "synthetic-internal-review-worker-key-at-least-32";
+      const tomorrow = southAfricaDateKey(new Date(new Date(`${today}T12:00:00+02:00`).getTime() + 86400000));
+      const at = () => new Date(`${today}T09:00:00+02:00`);
+      const qualified = async () => {
+        const f = await fixture(); await terms(f);
+        await db.tenancy.update({ where: { accountId: f.account.id }, data: { paymentMethod: "EFT" } });
+        await db.role.updateMany({ where: { organisationId: f.org.id }, data: { permissions: ["collections.*", "operations.view", "operations.manage"] } });
+        return f;
+      };
+      type F = Awaited<ReturnType<typeof qualified>>;
+      const plan = (f: F) => readArrearsReviewPlan(db, f.org.id, f.account.id);
+      const schedule = async (f: F, until = tomorrow) => updateCollection(f.scope, { ...await base(f), action: "schedule-access-review", input: { from: today, until, time: "09:00" }, scheduleRevision: (await plan(f))?.state.revision ?? null, confirm: true });
+      const finances = async (f: F) => JSON.stringify(await db.account.findUnique({ where: { id: f.account.id }, include: { ledgerEntries: true, payments: true, tenancy: { include: { occupancies: true } } } }));
+      async function check(name: string, fn: (f: F) => Promise<void>) {
+        await timed.test(name, async () => {
+          const f = await qualified();
+          process.env.ARREARS_REVIEW_ORGANISATION_ID = f.org.id;
+          try { await fn(f); }
+          finally { await db.configurationProfile.deleteMany({ where: { organisationId: f.org.id, domain: { in: [ARREARS_REVIEW_SCHEDULE, ARREARS_REVIEW_CURSOR] } } }); }
+        });
+      }
+      try {
+        await check("authenticated default-off worker and manual/scheduled race deduplicate the same debt", async f => {
+          await schedule(f); const before = await finances(f);
+          assert.equal((await reviewWorkerPost(new Request("http://localhost/api/internal/arrears-review-schedules", { method: "POST" }))).status, 401);
+          assert.equal((await reviewWorkerPost(new Request("http://localhost/api/internal/arrears-review-schedules", { method: "POST", headers: { authorization: "Bearer wrong" } }))).status, 401);
+          process.env.ARREARS_REVIEW_SCHEDULE_ENABLED = "false";
+          const off = await reviewWorkerPost(new Request("http://localhost/api/internal/arrears-review-schedules", { method: "POST", headers: { authorization: `Bearer ${process.env.ARREARS_REVIEW_WORKER_KEY}` } }));
+          assert.equal((await off.json()).data.disabled, true);
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 0);
+          process.env.ARREARS_REVIEW_SCHEDULE_ENABLED = "true";
+          await processArrearsReviewSchedules(() => new Date(`${today}T08:59:00+02:00`));
+          assert.equal((await plan(f))!.state.last, null);
+          const manual = { ...await base(f), action: "access-review-task" as const };
+          await Promise.allSettled([processArrearsReviewSchedules(at), updateCollection(f.scope, manual)]);
+          await processArrearsReviewSchedules(at);
+          const tasks = await db.task.findMany({ where: { organisationId: f.org.id } });
+          assert.equal(tasks.length, 1); assert.equal(tasks[0].assigneeId, f.user.id);
+          assert.equal(southAfricaDateKey(tasks[0].dueAt!), "2026-01-08");
+          const queue = await operationsTaskPage(f.scope, { assignee: "mine" });
+          assert.ok(queue.items.some(task => task.id === tasks[0].id && task.purpose === "ARREARS_ACCESS_REVIEW"));
+          assert.equal((await plan(f))!.state.last!.taskId, tasks[0].id);
+          assert.equal(await db.auditEvent.count({ where: { organisationId: f.org.id, action: "collections.access-review-schedule.evaluated" } }), 1);
+          assert.equal(await finances(f), before);
+          assert.equal(await db.communicationLog.count({ where: { organisationId: f.org.id } }), 0);
+          assert.equal(await db.webhookOutbox.count({ where: { organisationId: f.org.id } }), 0);
+        });
+        for (const kind of ["PENDING", "FAILED", "SUCCEEDED", "DEBIT_ORDER", "dispute", "promise"] as const) {
+          await check(`${kind} remains held during automatic evaluation`, async f => {
+            await schedule(f);
+            if (kind === "DEBIT_ORDER") await db.tenancy.update({ where: { accountId: f.account.id }, data: { paymentMethod: "DEBIT_ORDER" } });
+            else if (kind === "dispute") await updateCollection(f.scope, { ...await base(f), action: "dispute", disputed: true });
+            else if (kind === "promise") await updateCollection(f.scope, { ...await base(f), action: "promise", amount: "50", dueDate: today, confirm: true });
+            else await db.payment.create({ data: { accountId: f.account.id, amount: 100, status: kind, method: "EFT", environment: "live", idempotencyKey: randomUUID() } });
+            const before = await finances(f); await processArrearsReviewSchedules(at);
+            assert.equal((await plan(f))!.state.last!.outcome, "HELD");
+            assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 0);
+            assert.equal(await finances(f), before);
+          });
+        }
+        await check("creator permission revocation and foreign-organisation owner roles do not authorise a worker", async f => {
+          await schedule(f);
+          await db.role.updateMany({ where: { organisationId: f.org.id }, data: { permissions: ["collections.*"] } });
+          const foreign = await fixture();
+          const role = await db.role.create({ data: { organisationId: foreign.org.id, name: "Organisation owner", permissions: ["*"] } });
+          await db.roleAssignment.create({ data: { userId: f.user.id, roleId: role.id, facilityId: null } });
+          await processArrearsReviewSchedules(at);
+          assert.equal((await plan(f))!.state.last!.outcome, "HELD");
+          assert.equal((await row(f)).accessReviewSchedule.canManage, false);
+          await assert.rejects(schedule(f), /FORBIDDEN/);
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 0);
+          const other = { ...f.scope, facilityIds: [] };
+          await assert.rejects(updateCollection(other, { ...await base(f), action: "cancel-access-review-schedule", scheduleRevision: (await plan(f))!.state.revision }), /NOT_FOUND/);
+        });
+        await check("an inactive delegating staff member is held without a task", async f => {
+          await schedule(f); await db.user.update({ where: { id: f.user.id }, data: { active: false } });
+          await processArrearsReviewSchedules(at);
+          assert.equal((await plan(f))!.state.last!.outcome, "HELD");
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 0);
+        });
+        await check("a verified settled account is not turned into an arrears task", async f => {
+          await schedule(f);
+          const payment = await db.payment.create({ data: { accountId: f.account.id, amount: 100, status: "SUCCEEDED", method: "EFT", environment: "live", idempotencyKey: randomUUID() } });
+          await db.ledgerEntry.create({ data: { accountId: f.account.id, type: "PAYMENT", amount: 100, description: "Isolated verified settlement", effectiveAt: new Date(), metadata: { paymentId: payment.id } } });
+          await db.auditEvent.create({ data: { organisationId: f.org.id, facilityId: f.facility.id, actorId: f.user.id, entityType: "Payment", entityId: payment.id, action: "payment.posted" } });
+          await db.account.update({ where: { id: f.account.id }, data: { balance: 0 } });
+          const before = await finances(f); await processArrearsReviewSchedules(at);
+          assert.equal((await plan(f))!.state.last!.outcome, "HELD");
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 0);
+          assert.equal(await finances(f), before);
+        });
+        await check("cancellation works after method changes; completed tasks and explicit expiry stay closed", async f => {
+          await schedule(f); await db.tenancy.update({ where: { accountId: f.account.id }, data: { paymentMethod: "DEBIT_ORDER" } });
+          await updateCollection(f.scope, { ...await base(f), action: "cancel-access-review-schedule", scheduleRevision: (await plan(f))!.state.revision });
+          await processArrearsReviewSchedules(at);
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 0);
+          await db.tenancy.update({ where: { accountId: f.account.id }, data: { paymentMethod: "CARD" } });
+          await schedule(f, today); await processArrearsReviewSchedules(at);
+          const saved = (await plan(f))!; assert.equal(saved.state.status, "EXPIRED");
+          const taskId = saved.state.last!.taskId!;
+          await db.task.update({ where: { id: taskId }, data: { status: "COMPLETED" } });
+          await schedule(f); await processArrearsReviewSchedules(at);
+          assert.equal((await plan(f))!.state.last!.outcome, "ALREADY_PREPARED");
+          assert.equal((await db.task.findUniqueOrThrow({ where: { id: taskId } })).status, "COMPLETED");
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 1);
+        });
+        await check("task, case, plan outcome and system audit roll back atomically", async f => {
+          await schedule(f); const saved = (await plan(f))!, before = await finances(f), revision = (await row(f)).revision;
+          await db.$executeRawUnsafe(`ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_timed_arrears_audit_failure CHECK (action <> 'collections.access-review-schedule.evaluated') NOT VALID`);
+          try { await processArrearsReviewSchedules(at); }
+          finally { await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_timed_arrears_audit_failure'); }
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 0);
+          assert.equal((await row(f)).revision, revision); assert.equal(await finances(f), before);
+          assert.deepEqual((await plan(f))!.state, saved.state);
+          await processArrearsReviewSchedules(at);
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 1);
+        });
+        await check("tampered plan metadata is held and never clears the manual source checks", async f => {
+          await schedule(f); const saved = (await plan(f))!;
+          const config = saved.row.config as Record<string, Prisma.JsonValue>;
+          await db.configurationProfile.update({ where: { id: saved.row.id }, data: { config: { ...config, nextDueAt: "2020-01-01T00:00:00.000Z" } } });
+          await processArrearsReviewSchedules(at);
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 0);
+          assert.equal((await row(f)).accessReviewSchedule.unavailable, true);
+          assert.equal((await row(f)).accessReview.eligible, true);
+        });
+        await check("durable scan progress reaches a valid plan after 25 invalid plans", async f => {
+          await schedule(f); const saved = (await plan(f))!;
+          const ids = Array.from({ length: 25 }, (_, index) => `arrears-review-plan:${index.toString(16).padStart(64, "0")}`);
+          assert.ok(ids.every(id => id < saved.row.id));
+          await db.configurationProfile.createMany({ data: ids.map(id => ({ id, organisationId: f.org.id, facilityId: f.facility.id, domain: ARREARS_REVIEW_SCHEDULE, name: id, status: "ACTIVE", config: { version: 1, encrypted: "invalid", integrity: "0".repeat(64), nextDueAt: at().toISOString() } })) });
+          const first = await processArrearsReviewSchedules(at);
+          assert.equal(first.held, 25); assert.equal(first.prepared, 0); assert.equal(first.more, true);
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 0);
+          await processArrearsReviewSchedules(at);
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 1);
+          assert.equal((await plan(f))!.state.last!.outcome, "PREPARED");
+          assert.equal(await db.configurationProfile.count({ where: { organisationId: f.org.id, domain: ARREARS_REVIEW_CURSOR } }), 1);
+        });
+        await check("the configured organisation is an execution boundary", async f => {
+          await schedule(f); const other = await fixture();
+          process.env.ARREARS_REVIEW_ORGANISATION_ID = other.org.id;
+          assert.equal((await collectionsWorkspace(f.scope, today)).reviewScheduleWorkerEnabled, false);
+          await processArrearsReviewSchedules(at);
+          assert.equal((await plan(f))!.state.last, null);
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 0);
+          process.env.ARREARS_REVIEW_ORGANISATION_ID = f.org.id;
+          await processArrearsReviewSchedules(at);
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 1);
+        });
+        await check("partial budget stops preserve the untouched tail across repeated invocations", async f => {
+          await schedule(f); const saved = (await plan(f))!;
+          const ids = [0, 1].map(index => `arrears-review-plan:${index.toString(16).padStart(64, "0")}`);
+          assert.ok(ids.every(id => id < saved.row.id));
+          await db.configurationProfile.createMany({ data: ids.map(id => ({ id, organisationId: f.org.id, facilityId: f.facility.id, domain: ARREARS_REVIEW_SCHEDULE, name: id, status: "ACTIVE", config: { version: 1, encrypted: "invalid", integrity: "0".repeat(64), nextDueAt: at().toISOString() } })) });
+          const oneAttempt = () => { let calls = 0; return () => calls++ < 2 ? 0 : 26000; };
+          await processArrearsReviewSchedules(at, oneAttempt());
+          assert.equal((await readArrearsReviewCursor(db, f.org.id))!.cursor, ids[0]);
+          await processArrearsReviewSchedules(at, oneAttempt());
+          assert.equal((await readArrearsReviewCursor(db, f.org.id))!.cursor, ids[1]);
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 0);
+          await processArrearsReviewSchedules(at, oneAttempt());
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 1);
+          assert.equal((await plan(f))!.state.last!.outcome, "PREPARED");
+        });
+        await check("an active run lease is respected and an expired lease can recover", async f => {
+          await schedule(f); const token = randomUUID();
+          await db.$transaction(tx => saveArrearsReviewCursor(tx, f.org.id, { cursor: null, lease: { token, until: new Date(Date.now() + 60000).toISOString() } }));
+          const busy = await processArrearsReviewSchedules(at);
+          assert.equal(busy.prepared, 0); assert.equal(busy.more, true);
+          assert.equal((await readArrearsReviewCursor(db, f.org.id))!.lease!.token, token);
+          await db.$transaction(tx => saveArrearsReviewCursor(tx, f.org.id, { cursor: null, lease: { token, until: new Date(Date.now() - 1000).toISOString() } }));
+          await processArrearsReviewSchedules(at);
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 1);
+          assert.equal((await readArrearsReviewCursor(db, f.org.id))!.lease, null);
+        });
+        await check("concurrent worker invocations retain one task and one case preparation", async f => {
+          await schedule(f);
+          await Promise.allSettled([processArrearsReviewSchedules(at), processArrearsReviewSchedules(at)]);
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 1);
+          assert.equal(await db.collectionActivity.count({ where: { caseId: (await db.collectionCase.findUniqueOrThrow({ where: { accountId: f.account.id } })).id, action: "Scheduled internal review task prepared" } }), 1);
+          assert.equal((await readArrearsReviewCursor(db, f.org.id))!.lease, null);
+        });
+        await check("a corrupted scan cursor holds rather than silently resetting signed progress", async f => {
+          await schedule(f); const saved = (await plan(f))!;
+          await db.$transaction(tx => saveArrearsReviewCursor(tx, f.org.id, { cursor: saved.row.id, lease: null }));
+          const cursor = await db.configurationProfile.findFirstOrThrow({ where: { organisationId: f.org.id, domain: ARREARS_REVIEW_CURSOR } });
+          await db.configurationProfile.update({ where: { id: cursor.id }, data: { config: { ...(cursor.config as Record<string, Prisma.JsonValue>), integrity: "0".repeat(64) } } });
+          await assert.rejects(processArrearsReviewSchedules(at), /INTEGRITY/);
+          assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 0);
+          assert.equal((await plan(f))!.state.last, null);
+        });
+      } finally {
+        for (const [name, value] of Object.entries({ INTEGRATION_CONFIG_ENCRYPTION_KEY: old.key, ARREARS_REVIEW_SCHEDULE_ENABLED: old.enabled, ARREARS_REVIEW_WORKER_KEY: old.worker, ARREARS_REVIEW_ORGANISATION_ID: old.organisation })) { if (value === undefined) delete process.env[name]; else process.env[name] = value; }
+      }
+    });
     await t.test("seven-day EFT/card task preparation is scoped, deduplicated and has no financial or access effects", async () => {
       const f = await fixture(); await terms(f);
       await db.tenancy.update({ where: { accountId: f.account.id }, data: { paymentMethod: "EFT" } });

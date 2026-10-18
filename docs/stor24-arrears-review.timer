@@ -1,0 +1,11 @@
+[Unit]
+Description=Check due STOR24 internal review-task plans every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Unit=stor24-arrears-review.service
+
+[Install]
+WantedBy=timers.target
