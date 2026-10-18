@@ -1,0 +1,16 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { smsPayload, approvedWhatsAppPayload, phoneCommand } from "../src/lib/collection-phone-policy";
+process.env.APP_URL = "https://portal.stor24.co.za";
+const source = { recipient: "0821234567", accountNumber: "TRAINING-001", facility: "Midpoint", asOf: "2026-10-18", overdueCents: 60000, channel: "WHATSAPP" as const };
+const account = "AC" + "a".repeat(32), sid = "HX" + "b".repeat(32);
+function template() {
+  const text = smsPayload({ ...source, channel: "SMS" }).text;
+  const body = text.replace(source.accountNumber, "{{1}}").replace(source.facility, "{{2}}").replace("600.00", "{{3}}").replace(source.asOf, "{{4}}").replace("https://portal.stor24.co.za/my", "{{5}}");
+  return { content: { sid, account_sid: account, language: "en", types: { "twilio/text": { body } } }, approval: { sid, account_sid: account, whatsapp: { status: "approved", category: "UTILITY", content_type: "twilio/text" } }, map: { "1": "account", "2": "store", "3": "amount", "4": "date", "5": "portal" } };
+}
+test("SMS preview contains the exact reminder and normalised verified recipient", () => { const v = smsPayload({ ...source, channel: "SMS" }); assert.equal(v.recipient, "+27821234567"); assert.match(v.text, /R600.00/); assert.match(v.text, /does not add fees/); assert.equal(v.contentSid, null); });
+test("WhatsApp approved utility text resolves every reviewed variable to the canonical reminder", () => { const t = template(), v = approvedWhatsAppPayload(source, t.content, t.approval, t.map, account, sid); assert.equal(v.text, smsPayload({ ...source, channel: "SMS" }).text); assert.equal(v.variables["3"], "600.00"); assert.equal(v.contentSid, sid); });
+test("unapproved, wrong-account, changed body and non-text WhatsApp content are held", () => { const t = template(); for (const bad of [{ ...t.approval, whatsapp: { ...t.approval.whatsapp, status: "pending" } }, { ...t.approval, account_sid: "AC" + "c".repeat(32) }]) assert.throws(() => approvedWhatsAppPayload(source, t.content, bad, t.map, account, sid)); assert.throws(() => approvedWhatsAppPayload(source, { ...t.content, types: { "twilio/text": { body: t.content.types["twilio/text"].body + " Lockout tomorrow." } } }, t.approval, t.map, account, sid)); assert.throws(() => approvedWhatsAppPayload(source, { ...t.content, types: { ...t.content.types, "twilio/media": {} } }, t.approval, t.map, account, sid)); });
+test("missing, extra and unsupported placeholders never fall back to sample variables", () => { const t = template(); for (const map of [{ ...t.map, "6": "amount" }, { "1": "account" }, { ...t.map, "3": "fee" }]) assert.throws(() => approvedWhatsAppPayload(source, t.content, t.approval, map, account, sid)); });
+test("phone notice actions reject financial, access and automatic-fallback fields", () => { const c = { action: "prepare", accountId: "cm00000000000000000000001", channel: "SMS", fingerprint: "a".repeat(64) }; assert.equal(phoneCommand.safeParse(c).success, true); for (const extra of [{ amount: "100" }, { restrictAccess: true }, { retry: true }, { autoFallback: "WHATSAPP" }, { approvedBy: "owner" }]) assert.equal(phoneCommand.safeParse({ ...c, ...extra }).success, false); assert.equal(phoneCommand.safeParse({ action: "send", accountId: c.accountId, channel: "SMS", confirm: true }).success, false); });

@@ -31,6 +31,15 @@ test("every authored guide and step has an explicit access policy; owner retains
   assert.deepEqual(catalogueForAssignments(owner).guides, workflowGuides);
 });
 
+test("phone reminder guidance follows current same-store review and send grants", () => {
+  const steps = (grants: GuideAssignment[]) => catalogueForAssignments(grants).guides.find(g => g.id === "collection-phone-notices")?.steps.length ?? 0;
+  assert.equal(steps([assignment(["operations.manage"])]), 0);
+  assert.equal(steps([assignment(["collections.view"])]), 1);
+  assert.equal(steps([assignment(["collections.view", "collections.manage"])]), 3);
+  assert.equal(steps([assignment(["collections.view", "collections.manage", "billing.documents.send"])]), 4);
+  assert.equal(steps([assignment(["collections.view", "collections.manage"], "store-a"), assignment(["billing.documents.send"], "store-b")]), 3);
+});
+
 test("facility managers have operational guidance without configuration, credentials, owner actions or admin search results", () => {
   const data = catalogueForAssignments([assignment(["facility.*", "users.view", "operations.*", "inventory.*", "daily_close.*", "configuration.view", "facility_map.view", "phone.view", "reports.view", "reports.export", "communications.view", "integrations.view", "access.view", "access.manage"], "store-a", "Facility manager")]);
   for (const id of ["company", "tenant-defaults", "program-defaults", "settings", "hikvision", "netcash-settings", "operations-alerts", "troubleshooting"]) assert.ok(!data.guides.some(g => g.id === id), id);

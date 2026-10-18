@@ -56,7 +56,7 @@ test("internal arrears endpoint rejects missing, short and incorrect keys before
 });
 
 test("generic configuration cannot disclose or overwrite protected operational plan/policy/outbox domains", async () => {
-  const hidden = ["ARREARS_ACCESS_REVIEW_SCHEDULE", "ARREARS_ACCESS_REVIEW_CURSOR", "COLLECTION_SCHEDULE_PLAN", "COLLECTION_SCHEDULE_RUN", "STAFF_EVENT_EMAIL_POLICY", "STAFF_EVENT_EMAIL_OUTBOX"];
+  const hidden = ["COLLECTION_PHONE_NOTICE", "ARREARS_ACCESS_REVIEW_SCHEDULE", "ARREARS_ACCESS_REVIEW_CURSOR", "COLLECTION_SCHEDULE_PLAN", "COLLECTION_SCHEDULE_RUN", "STAFF_EVENT_EMAIL_POLICY", "STAFF_EVENT_EMAIL_OUTBOX"];
   let writes = 0, excluded: string[] = [];
   const database = { configurationProfile: { findMany: async (args: { where: { domain: { notIn: string[] } } }) => { excluded = args.where.domain.notIn; return []; } }, $transaction: async () => { writes++; throw Error("Unexpected write"); }, integrationConnection: { findMany: async () => [] }, chargeDefinition: { findMany: async () => [] }, discountPlan: { findMany: async () => [] }, facility: { findMany: async () => [] }, role: { findMany: async () => [] }, user: { findMany: async () => [] } };
   const bundle = await build({ entryPoints: ["src/app/api/v1/configuration/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "config-fixture", setup(b) {

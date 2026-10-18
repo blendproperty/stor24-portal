@@ -28,7 +28,7 @@ export function CollectionsWorkspace() {
   }
   const query = new URLSearchParams({ ...filters, asOf: data?.asOf ?? "", export: "csv" });
   return <div className="monthly-billing collections-workspace">
-    <section className="monthly-card"><strong>Ageing uses approved due dates</strong><p>Charges are aged in calendar days after their due date. Receipts reduce the oldest due charges after source-linked credits. Missing terms and unreconciled history go to finance review and are excluded from aged totals. No messages, charges, debit runs or access changes are triggered here.</p></section>
+    <section className="monthly-card"><strong>Ageing uses approved due dates</strong><p>Charges are aged in calendar days after their due date. Receipts reduce the oldest due charges after source-linked credits. Missing terms and unreconciled history go to finance review and are excluded from aged totals. No messages, charges, debit runs or access changes are triggered here.</p><p><a href="/collections/phone-notices">Review SMS and WhatsApp reminders</a></p></section>
     {message && <p role="status" className="monthly-card">{message}</p>}
     <section className="monthly-card collections-filters"><div className="monthly-grid">
       <label>As of (South Africa)<input type="date" value={asOf || data?.asOf || ""} max={data?.today} disabled={busy} onChange={e => { if (!e.target.value || e.target.value === (asOf || data?.asOf)) return; setData(null); setSelected(""); setAsOf(e.target.value); }}/></label>

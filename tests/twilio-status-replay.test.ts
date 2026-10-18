@@ -83,6 +83,11 @@ test("signed delivery callbacks process each event once and preserve retry after
     await loaded.exports.POST(request("failed", true, "SMaccepted"));
     assert.equal(log.status, "FAILED");
     assert.equal(tasks.at(-1)?.title, "SMS delivery failed");
+    for (const channel of ["SMS", "WHATSAPP"]) {
+      log = { id: `reviewed-${channel}`, organisationId: "org", facilityId: "facility", customerId: "customer", channel, messageType: "COLLECTION_REMINDER", provider: "twilio", providerRef: `SMreviewed-${channel}`, attempts: 1, status: "PROCESSING", metadata: { noticeId: "collection-phone:reviewed", deliveryOutcome: "ACCEPTED" } };
+      await loaded.exports.POST(request("failed", true, `SMreviewed-${channel}`));
+      assert.equal(log.status, "FAILED"); assert.equal(log.nextRetryAt, null); assert.ok(log.failedAt);
+    }
   } finally {
     if (saved.token === undefined) delete process.env.TWILIO_AUTH_TOKEN; else process.env.TWILIO_AUTH_TOKEN = saved.token;
     if (saved.url === undefined) delete process.env.APP_URL; else process.env.APP_URL = saved.url;

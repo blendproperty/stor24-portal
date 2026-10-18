@@ -12,6 +12,7 @@ export async function POST(request: Request) {
     const { logId } = await request.json() as { logId?: string };
     const log = logId ? await db.communicationLog.findFirst({ where: { id: logId, organisationId: actor.organisationId, channel: "WHATSAPP", status: "FAILED" } }) : null;
     if (!log?.customerId || !log.messageType || !log.metadata || typeof log.metadata !== "object" || Array.isArray(log.metadata)) return Response.json({ error: "Retry is not available for this message." }, { status: 404 });
+    if (log.messageType === "COLLECTION_REMINDER") return Response.json({ error: "Reviewed arrears reminders require delivery review and cannot be retried here.", code: "DELIVERY_REVIEW_REQUIRED" }, { status: 409 });
     if (log.facilityId) await requireFacility(actor, log.facilityId);
     const customer = await requireLeasingCustomer(actor, log.customerId);
     if (!customer.phone) return Response.json({ error: "Retry is not available for this message." }, { status: 404 });
