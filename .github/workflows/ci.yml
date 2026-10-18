@@ -149,6 +149,7 @@ jobs:
             output/report-export-recovery/
             output/recurring-charges/
             output/collection-notices/
+            output/collection-phone/
             output/mri-mapping/
             output/mri-sandbox/
             output/mri-batches/
