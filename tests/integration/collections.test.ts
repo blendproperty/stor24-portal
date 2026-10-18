@@ -53,10 +53,15 @@ test("isolated PostgreSQL aged collections", async t => {
       const audit = await db.auditEvent.findFirstOrThrow({ where: { organisationId: f.org.id, action: "collections.access-review-task" } });
       assert.equal((audit.after as { accessApproval: boolean }).accessApproval, false);
       await assert.rejects(updateCollection({ ...f.scope, facilityIds: [] }, { ...await base(f), action: "access-review-task" }), /NOT_FOUND/);
-      await db.payment.create({ data: { accountId: f.account.id, amount: 100, method: "CARD", status: "PENDING", idempotencyKey: randomUUID(), environment: "live" } });
+      const pending = await db.payment.create({ data: { accountId: f.account.id, amount: 100, method: "CARD", status: "PENDING", idempotencyKey: randomUUID(), environment: "live" } });
       assert.equal((await row(f)).accessReview.eligible, false);
       await assert.rejects(updateCollection(f.scope, { ...await base(f), action: "access-review-task" }), /ACCESS_REVIEW_HELD/);
       assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 1);
+      for (const status of ["FAILED", "SUCCEEDED"] as const) {
+        await db.payment.update({ where: { id: pending.id }, data: { status } });
+        assert.equal((await row(f)).accessReview.eligible, false);
+        await assert.rejects(updateCollection(f.scope, { ...await base(f), action: "access-review-task" }), /ACCESS_REVIEW_HELD/);
+      }
     });
     await t.test("debit order needs authoritative failure evidence and task/audit failures roll back together", async () => {
       const f = await fixture(); await terms(f);

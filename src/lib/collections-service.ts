@@ -90,7 +90,10 @@ function evaluate(account: Account, asOf: string, provenPayments: ReceiptProof) 
   return { ageing, entries, verifiedReceiptIds, hold, promises };
 }
 function accessReviewFor(account: Account, result: ReturnType<typeof evaluate>, asOf: string) {
-  return arrearsAccessReview({ asOf, paymentMethod: account.tenancy?.paymentMethod ?? null, active: account.tenancy?.status === "ACTIVE", issue: result.ageing.issue, hold: result.hold, charges: result.ageing.charges });
+  // A provider status without a verified, matching ledger receipt cannot become an access decision.
+  // FAILED alone also does not distinguish an authoritative decline from an uncertain transport result.
+  const unreviewedPayment = account.payments.filter(payment => !isTestPayment(payment)).some(payment => payment.status === "FAILED" || ["SUCCEEDED", "PARTIALLY_REFUNDED", "REFUNDED", "REVERSED"].includes(payment.status) && !account.ledgerEntries.some(entry => result.verifiedReceiptIds.includes(entry.id) && (entry.externalRef === payment.idempotencyKey || (entry.metadata as { paymentId?: string } | null)?.paymentId === payment.id)));
+  return arrearsAccessReview({ asOf, paymentMethod: account.tenancy?.paymentMethod ?? null, active: account.tenancy?.status === "ACTIVE", issue: result.ageing.issue, hold: result.hold ?? (unreviewedPayment ? "A failed or unposted payment outcome needs authoritative reconciliation review before access-review preparation." : null), charges: result.ageing.charges });
 }
 export async function collectionsWorkspace(scope: RequestScope, asOf: string) {
   dateKey.parse(asOf); if (asOf > southAfricaDateKey(new Date())) throw new Error("COLLECTION_DATE");
