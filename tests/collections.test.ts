@@ -61,3 +61,10 @@ test("CSV quotes cells and neutralises spreadsheet formulas including leading wh
   for (const s of ["=1+1", " +CMD", "-2+3", "@SUM(A1)", "\tformula"]) assert.ok(csvCell(s).startsWith('"\''));
   assert.equal(csvCell('Customer "A", B'), '"Customer ""A"", B"');
 });
+
+
+test("internal review task commands cannot carry approval, fee or access execution fields", () => {
+  const request = { accountId: "cmaccountfixture000001", revision: 0, requestKey: randomUUID(), note: "Policy decision needed", action: "escalation-review-task", target: "FEE", channel: "EMAIL", reviewOn: "2026-10-19", policyReference: "" };
+  assert.equal(collectionActionSchema.safeParse(request).success, true);
+  for (const extra of [{ financialApproval: true }, { accessApproval: true }, { feeAmount: 100 }, { assigneeId: "other" }, { status: "APPROVED" }, { execute: true }]) assert.equal(collectionActionSchema.safeParse({ ...request, ...extra }).success, false);
+});

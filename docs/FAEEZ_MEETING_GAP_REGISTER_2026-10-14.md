@@ -133,3 +133,6 @@ All three approved legal/access/Netcash information requests were sent19October 
 
 
 19October scope correction: item19 also contains an actual unbuilt installed-provider access lifecycle consumer, shared with item12. Existing private photo queue and Counter software do not implement that consumer. Active Motion documentation request is sent; no legacy adapter is reconnected or unverified provider endpoint invented. The final reconciliation regression suite is now18 focused passing cases; earlier15/17-case checkpoints remain historical.
+
+
+19October review-task implementation checkpoint: original12 has an explicit assigned Operations policy/source task option implemented on codex/arrears-review-tasks-20261019, preserving the existing held request and seven-day review behaviours.28 local unit cases/lint/TypeScript passed; new hosted native/browser qualification, merge/deployment/live and deferred staff acceptance remain pending. Completion never approves finance, notices or access. PR556 has merged with all10 source checks passed; its normal main CI/deployment is being observed separately. Original12/19 provider/legal/fee build gates remain open.

@@ -30,7 +30,7 @@ try{
   if(body.action==="follow-up"){row.ownerId=body.ownerId;row.nextFollowUp=body.nextFollowUp;}
   else if(body.action==="dispute"){row.disputed=body.disputed;row.hold=body.disputed?"Dispute hold":null;}
   else if(body.action==="promise")row.promises=[{id:"cmpromisefixture00001",amount:body.amount,dueDate:body.dueDate,status:"OPEN",createdAt:new Date().toISOString(),progress:{label:"Awaiting receipt",received:0,onTime:0,covered:false}}];
-  else if(body.action==="terms")row.terms=body.terms;else if(body.action==="access-review-task"){assert.equal(body.accountId,row.id);assert.equal(body.approve,undefined);assert.equal(body.feeAmount,undefined);}else if(body.action==="escalation-review"){assert.equal(body.target,"NOTICE");assert.equal(body.channel,"WHATSAPP");assert.equal(body.reviewOn,data.today);}else if(!["schedule-access-review","cancel-access-review-schedule"].includes(body.action))throw new Error("Unexpected action "+body.action);
+  else if(body.action==="terms")row.terms=body.terms;else if(body.action==="access-review-task"){assert.equal(body.accountId,row.id);assert.equal(body.approve,undefined);assert.equal(body.feeAmount,undefined);}else if(body.action==="escalation-review"){assert.equal(body.target,"NOTICE");assert.equal(body.channel,"WHATSAPP");assert.equal(body.reviewOn,data.today);}else if(body.action==="escalation-review-task"){assert.equal(body.target,"FEE");assert.equal(body.reviewOn,data.today);assert.equal(body.approve,undefined);assert.equal(body.feeAmount,undefined);assert.equal(body.accessApproval,undefined);}else if(!["schedule-access-review","cancel-access-review-schedule"].includes(body.action))throw new Error("Unexpected action "+body.action);
   if(body.action==="schedule-access-review"){assert.equal(body.confirm,true);assert.equal(body.feeAmount,undefined);assert.equal(body.send,undefined);row.accessReviewSchedule.plan={revision:randomUUID(),accountId:row.id,creatorId:data.userId,creatorName:"CI collector",input:body.input,status:"ACTIVE",nextDueAt:new Date(`${body.input.from}T${body.input.time}:00+02:00`).toISOString(),last:null};}
   if(body.action==="cancel-access-review-schedule"){assert.equal(body.scheduleRevision,row.accessReviewSchedule.plan.revision);row.accessReviewSchedule.plan={...row.accessReviewSchedule.plan,revision:randomUUID(),status:"CANCELLED"};}
   row.accessReview={...row.accessReview,eligible:!row.hold&&!row.promises.some(p=>p.status==="OPEN"),blockers:row.hold?[row.hold]:row.promises.some(p=>p.status==="OPEN")?["Agreed promise hold"]:[]};
@@ -95,9 +95,16 @@ try{
  await page.getByRole("button",{name:"Record held review request"}).click();
  await expect(page.getByText("CI proposed channel needs policy review",{exact:true})).toBeVisible();
  await page.getByText("Request internal escalation review",{exact:true}).click();
+ await page.getByLabel("Case note / evidence reference").fill("CI explicit Operations review request");
+ await page.getByLabel("Review topic").selectOption("FEE");
+ await page.getByLabel("Internal review requested by").fill(data.today);
+ await page.getByRole("button",{name:"Create internal review task",exact:true}).click();
+ await expect(page.getByText("CI explicit Operations review request",{exact:true})).toBeVisible();
+ await page.getByText("Request internal escalation review",{exact:true}).click();
+ await expect(page.getByText(/Completing it does not approve a fee/)).toBeVisible();
  await mkdir("output/collections",{recursive:true});
  for(const width of [1440,1024,390,320]){await page.setViewportSize({width,height:1000});await page.screenshot({path:`output/collections/${width}.png`,fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`overflow at ${width}`);}
  await expect(page.getByRole("button",{name:"Prepare access restriction review task"})).toBeDisabled();
- assert.equal(errors.length,0);assert.deepEqual(calls.map(c=>c.action),["terms","access-review-task","schedule-access-review","cancel-access-review-schedule","follow-up","dispute","dispute","promise","escalation-review"]);
+ assert.equal(errors.length,0);assert.deepEqual(calls.map(c=>c.action),["terms","access-review-task","schedule-access-review","cancel-access-review-schedule","follow-up","dispute","dispute","promise","escalation-review","escalation-review-task"]);
  console.log("Collections browser checks passed: scoped filters, queue selection without contact, evidenced follow-up, dispute hold, promise gating, held internal escalation preparation, historical read-only mode and 1440/1024/390/320px bounds.");
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
