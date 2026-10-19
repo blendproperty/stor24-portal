@@ -1,6 +1,6 @@
 import type { Prisma, TaskStatus } from "@/generated/prisma/client";
 import { arrearsAuthority } from "./arrears-authority";
-import { facilityWhere, type RequestScope } from "./scope";
+import type { RequestScope } from "./scope";
 
 export function assertReviewTaskTransition(previous: TaskStatus, next: TaskStatus) {
   if (["COMPLETED", "CANCELLED"].includes(previous) && !["COMPLETED", "CANCELLED"].includes(next)) throw Error("ARREARS_REVIEW_TASK_CLOSED");
@@ -8,7 +8,7 @@ export function assertReviewTaskTransition(previous: TaskStatus, next: TaskStatu
 
 /** Progress only. A closed review cannot reopen behind a replacement request. */
 export async function updateArrearsReviewTaskStatus(tx: Prisma.TransactionClient, scope: RequestScope, id: string, status: TaskStatus) {
-  const where = { id, organisationId: scope.organisationId, purpose: "ARREARS_ESCALATION_REVIEW", facility: facilityWhere(scope) };
+  const where = { id, organisationId: scope.organisationId, purpose: "ARREARS_ESCALATION_REVIEW", facility: { organisationId: scope.organisationId, ...(scope.unrestrictedFacilities ? {} : { id: { in: scope.facilityIds } }) } };
   if (!await tx.task.findFirst({ where, select: { id: true } })) throw Error("ARREARS_REVIEW_TASK_NOT_FOUND");
   await tx.$queryRaw`SELECT "id" FROM "Task" WHERE "id" = ${id} AND "organisationId" = ${scope.organisationId} FOR UPDATE`;
   const before = await tx.task.findFirst({ where });
