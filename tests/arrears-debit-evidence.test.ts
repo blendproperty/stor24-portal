@@ -91,6 +91,8 @@ test("invalid dates, non-final failure dates, future/as-of evidence and client a
   }
   assert.equal(run([unpaid], [instruction], "2026-10-10").reconciled, false);
   assert.throws(() => run([unpaid], [instruction], "not-a-date"));
+  assert.throws(() => run([unpaid], [instruction], "9999-12-31"));
+  assert.throws(() => run([unpaid], [instruction], "0000-01-01"));
   assert.throws(() => run(Array(10001).fill(unpaid)), /DEBIT_EVIDENCE_LIMIT/);
 });
 

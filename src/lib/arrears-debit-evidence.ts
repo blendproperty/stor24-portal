@@ -5,8 +5,12 @@ import { southAfricaDateKey } from "./south-africa-time";
  * adapter may supply these records. Parsing a record does not authenticate it.
  * This reducer is deliberately not connected to the live arrears eligibility path. */
 const id = z.string().trim().min(1).max(200);
-const date = z.iso.date();
-const instant = z.iso.datetime({ offset: true });
+// Keep four-digit calendar arithmetic inside its representable range after +7.
+const date = z.iso.date().refine(value => value >= "1900-01-01" && value <= "9998-12-31");
+const instant = z.iso.datetime({ offset: true }).refine(value => {
+  const year = new Date(value).getUTCFullYear();
+  return year >= 1900 && year <= 9998;
+});
 const cents = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 const binding = {
   organisationId: id, facilityId: id, merchantId: id, connectionId: id,
