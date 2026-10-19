@@ -28,7 +28,7 @@ export class HostingerEmailProvider implements EmailProvider {
       const result = await transport.sendMail({
         from: { name: "Stor24", address: HOSTINGER_EMAIL_ADDRESS },
         envelope: { from: HOSTINGER_EMAIL_ADDRESS, to: [message.to] },
-        to: [{ address: message.to }], subject: message.subject,
+        to: [{ name: "", address: message.to }], subject: message.subject,
         text: message.text, html: message.html,
         disableFileAccess: true, disableUrlAccess: true,
       });
