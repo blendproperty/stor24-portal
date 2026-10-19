@@ -5361,3 +5361,6 @@ At the same53d2e3c3 checkpoint, the hosted real PostgreSQL task-status and colle
 
 
 19 October receipt-training presentation refinement: the reused card now says TRAINING SAVED and explicitly has no financial approval step, replacing the ordinary pending-approval instruction only on the training page. Production labels and decision permissions are unchanged. Final local TypeScript passes; corrected-head normal qualification remains required.
+
+
+19 October receipt-training qualification correction: source5e0ef972 passed hosted PostgreSQL transactions, including the new isolation/request/rollback checks, but full unit validation correctly failed for a missing contextual guide on the new page. Added a dedicated three-step Guide me entry covering sample selection, shared-planner preview, saved training/cancellation and separate financial acceptance. No test/assertion or finance control was weakened. Corrected-head full qualification remains required; earlier native success is partial evidence only.
