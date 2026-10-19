@@ -1,6 +1,6 @@
 # Receipt correction training
 
-19 October 2026. Engineering qualification, promotion, deployment and hands-on acceptance are separate stages recorded in PROJECT_CONTEXT.md.
+19 October 2026. Exact-head engineering qualification, normal promotion/deployment and bounded runtime plus genuine owner sample-selection/preview verification passed. Staff acceptance and live financial approval/posting/undo remain separate stages recorded in PROJECT_CONTEXT.md.
 
 The live correction search lists existing tenancy Accounts, not every enquiry or booking customer. The previous shared debtor example has no Account, Tenancy, Payment or LedgerEntry, so it cannot supply a verified receipt. Live correction rules continue to reject test payments.
 
