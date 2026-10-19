@@ -2,7 +2,7 @@ import {build} from 'esbuild';
 import {chromium,expect} from '@playwright/test';
 import {createServer} from 'node:http';
 import {readFile,mkdir} from 'node:fs/promises';
-const bundle=await build({stdin:{contents:"import React from 'react';import{createRoot}from'react-dom/client';import{LeadsWorkspace}from'./src/components/leads-workspace';createRoot(document.getElementById('root')).render(<LeadsWorkspace/>);",resolveDir:process.cwd(),loader:'jsx'},bundle:true,write:false,format:'esm',jsx:'automatic'});
+const bundle=await build({stdin:{contents:"import React from 'react';import{createRoot}from'react-dom/client';import{LeadsWorkspace}from'./src/components/leads-workspace';createRoot(document.getElementById('root')).render(<LeadsWorkspace followupsDue={new URLSearchParams(location.search).get(\"view\")===\"due\"}/>);",resolveDir:process.cwd(),loader:'jsx'},bundle:true,write:false,format:'esm',jsx:'automatic'});
 const css=(await Promise.all(['src/app/globals.css','src/styles/stor24-brand.css','src/styles/staff-workspace.css','src/styles/workspace-insights.css'].map(p=>readFile(p,'utf8')))).join('\n').replace('@import "tailwindcss";','')+'\nbody{display:block;font-family:Arial,sans-serif;padding:24px;background:#f4f6f3}';
 let stage,bookings,patch,reservation,capture,rejectReservation,newLead,refreshFailed;
 const booking=(extra={})=>({id:'saved/booking',status:'ACTIVE',journey:'RENTAL',quotedRate:1400,convertedTenancyId:null,unit:{number:'101'},publicLease:null,convertedTenancy:null,...extra});
@@ -24,7 +24,7 @@ const server=createServer(async(req,res)=>{
    }
    return res.end(JSON.stringify({data:{id:'saved/booking'}}));
   }
-  if(req.url==='/api/v1/leads/workspace'){if(refreshFailed){res.statusCode=503;return res.end('{}');}return res.end(JSON.stringify({data:make()}));}
+  if(req.url.startsWith('/api/v1/leads/workspace')){if(refreshFailed){res.statusCode=503;return res.end('{}');}const view=make();if(req.url.includes('view=due')){view.leads=patch?.nextActionAt?[]:[{...view.leads[0],createdAt:'2020-01-01T00:00:00Z',nextActionAt:'2026-01-01T10:00:00Z'}];view.count=view.leads.length;}return res.end(JSON.stringify({data:view}));}
   if(req.url.startsWith('/api/v1/leads/customers?'))return res.end(JSON.stringify({data:[{id:'existing',firstName:'Existing',lastName:'Customer',companyName:null,email:'existing@example.invalid',phone:'+27000000000'}]}));
   if(req.url==='/api/v1/reservations')return res.end(JSON.stringify({data:{facilities:[{id:'store',units:[{id:'unit',facilityId:'store',number:'101',monthlyRate:'1400'}],maps:[{id:'map',name:'Ground floor',width:600,height:400,elements:[{id:'shape',type:'UNIT',x:20,y:20,width:100,height:80,rotation:0,label:'101',unitId:'unit'},{id:'closed',type:'UNIT',x:140,y:20,width:100,height:80,rotation:0,label:'102',unitId:'blocked'}]}]}]}}));
   return res.end(JSON.stringify({data:[]}));
@@ -45,9 +45,11 @@ try{
   const nav=page.getByRole('navigation',{name:'Lead to lease progress'});await expect(nav.locator('li')).toHaveCount(4);
   await expect(page.getByRole('heading',{name:'Activity history'})).toBeVisible();
   await expect(nav.getByRole('button',{name:/Lease agreement/})).toBeDisabled();
+  await page.getByLabel('Needed date / expected move-in').fill('2026-11-01');
   await page.getByLabel('Sales stage',{exact:true}).selectOption('CONTACTED');await page.getByLabel('Assigned owner').selectOption('staff');await page.getByLabel('Next follow-up (South Africa time)').fill('2026-10-12T14:30');
   await page.getByLabel('Enquiry city / town').fill('Pretoria');await page.getByLabel('Enquiry postal code').fill('0081');await page.screenshot({path:`output/leads-design/enquiry-origin-${width}.png`,fullPage:false});
   await page.getByRole('button',{name:'Save & continue to unit',exact:true}).click();
+  if(patch.expectedMoveIn!=='2026-11-01')throw Error('Needed date was not saved');
   if(patch.enquiryLocation.city!=='Pretoria'||patch.enquiryLocation.postalCode!=='0081')throw Error('Optional enquiry origin was not retained in update request');
   await expect(page.getByRole('dialog')).toHaveCount(1);await expect(page.getByRole('heading',{name:'Choose and reserve storage space'})).toBeVisible();
   if(patch.stage!=='CONTACTED'||patch.nextActionAt!=='2026-10-12T12:30:00.000Z')throw Error('Stage or SAST payload mismatch');
@@ -80,5 +82,7 @@ try{
   if(errors.length)throw Error(errors.join('\n'));
   console.log(`${width}px: four stages, customer context, saved reservation, signing evidence, pending account, multiple bookings, conflict recovery, keyboard and viewport passed`);await page.close();
  }
+ const duePage=await browser.newPage({viewport:{width:390,height:900}});stage='NEW';bookings=[];newLead=null;patch=null;
+ await duePage.goto(`http://127.0.0.1:${server.address().port}/?view=due`);await expect(duePage.locator('.leads-name')).toHaveCount(1);await duePage.getByRole('button',{name:'Example 1 Customer',exact:true}).click();await duePage.getByLabel('Next follow-up (South Africa time)').fill('2099-11-01T10:00');await duePage.getByRole('button',{name:'Save follow-up',exact:true}).click();await expect(duePage.getByRole('dialog')).toHaveCount(0);await expect(duePage.locator('.leads-name')).toHaveCount(0);await expect(duePage.getByRole('button',{name:'Reload saved enquiries'})).toHaveCount(0);console.log('Due lead queue: old enquiry visible, rescheduling removes reminder without false refresh failure');await duePage.close();
 }finally{await browser.close();server.close();}
 
