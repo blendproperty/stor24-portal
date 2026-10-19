@@ -1,3 +1,4 @@
+import { updateArrearsReviewTaskStatus } from "../../src/lib/arrears-review-task-service";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
@@ -32,6 +33,61 @@ test("isolated PostgreSQL aged collections", async t => {
   const base = async (f: Awaited<ReturnType<typeof fixture>>) => ({ accountId: f.account.id, revision: (await row(f)).revision, requestKey: randomUUID(), note: "CI evidence reference" });
   const terms = async (f: Awaited<ReturnType<typeof fixture>>) => updateCollection(f.scope, { ...await base(f), action: "terms", terms: { dueDays: 0, allocation: "OLDEST_DUE_FIRST", approvalReference: "CI approved agreement", overrides: [] }, confirm: true });
   try {
+    await t.test("explicit escalation tasks preserve holds, deduplicate open work and require fresh authority", async () => {
+      const f = await fixture();
+      const request = { ...await base(f), action: "escalation-review-task" as const, target: "FEE" as const, channel: "EMAIL" as const, reviewOn: today, policyReference: "Unapproved policy evidence" };
+      await assert.rejects(updateCollection(f.scope, request), /FORBIDDEN/);
+      assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 0);
+      await db.role.updateMany({ where: { organisationId: f.org.id }, data: { permissions: ["collections.*", "operations.view", "operations.manage"] } });
+      await updateCollection(f.scope, { ...await base(f), action: "dispute", disputed: true });
+      const before = JSON.stringify(await db.account.findUnique({ where: { id: f.account.id }, include: { ledgerEntries: true, payments: true, tenancy: { include: { occupancies: true } } } }));
+      const command = { ...request, ...await base(f) };
+      const saved = await updateCollection(f.scope, command);
+      assert.equal((await updateCollection(f.scope, command)).repeated, true);
+      const task = await db.task.findFirstOrThrow({ where: { organisationId: f.org.id } });
+      assert.equal(task.assigneeId, f.user.id); assert.equal(task.facilityId, f.facility.id); assert.equal(task.customerId, (await db.account.findUniqueOrThrow({ where: { id: f.account.id } })).customerId);
+      assert.equal(task.purpose, "ARREARS_ESCALATION_REVIEW"); assert.equal(task.status, "OPEN");
+      assert.equal(southAfricaDateKey(task.dueAt!), today); assert.match(task.description!, /does not approve/); assert.match(task.description!, /amount remains unset/);
+      assert.equal(task.description!.includes(command.note), false);
+      const tomorrow = southAfricaDateKey(new Date(new Date(`${today}T12:00:00+02:00`).getTime() + 86400000));
+      const linked = await updateCollection(f.scope, { ...command, ...await base(f), reviewOn: tomorrow, channel: "WHATSAPP" });
+      assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 1);
+      assert.equal((await db.task.findUniqueOrThrow({ where: { id: task.id } })).dueAt?.getTime(), task.dueAt?.getTime());
+      const activity = await db.collectionActivity.findUniqueOrThrow({ where: { id: saved.id } }); assert.match(activity.note, /Completing it is not financial or access approval/);
+      const audit = await db.auditEvent.findFirstOrThrow({ where: { organisationId: f.org.id, action: "collections.escalation-review-task", after: { path: ["activityId"], equals: linked.id } } });
+      const review = (audit.after as { review: { task: { created: boolean }; feeAmount: null; financialApproval: boolean; accessApproval: boolean } }).review;
+      assert.equal(review.task.created, false); assert.equal(review.feeAmount, null); assert.equal(review.financialApproval, false); assert.equal(review.accessApproval, false);
+      const queue = await operationsTaskPage(f.scope, { assignee: "mine" }); assert.ok(queue.items.some(item => item.id === task.id));
+      await db.task.update({ where: { id: task.id }, data: { assigneeId: null } });
+      await assert.rejects(updateCollection(f.scope, { ...command, ...await base(f) }), /COLLECTION_REVIEW_TASK_OWNER/);
+      assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 1);
+      await db.task.update({ where: { id: task.id }, data: { assigneeId: f.user.id } });
+      await db.task.update({ where: { id: task.id }, data: { status: "COMPLETED", completedAt: new Date() } });
+      await updateCollection(f.scope, { ...command, ...await base(f) });
+      assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 2);
+      assert.equal(await db.task.count({ where: { organisationId: f.org.id, status: "OPEN" } }), 1);
+      for (const status of ["OPEN", "WAITING", "IN_PROGRESS"] as const) await assert.rejects(db.$transaction(tx => updateArrearsReviewTaskStatus(tx, f.scope, task.id, status)), /ARREARS_REVIEW_TASK_CLOSED/);
+      assert.equal(await db.task.count({ where: { organisationId: f.org.id, status: "OPEN" } }), 1);
+      const replacement = await db.task.findFirstOrThrow({ where: { organisationId: f.org.id, status: "OPEN" } });
+      await assert.rejects(db.$transaction(tx => updateArrearsReviewTaskStatus(tx, { ...f.scope, facilityIds: [] }, replacement.id, "COMPLETED")), /ARREARS_REVIEW_TASK_NOT_FOUND/);
+      await db.$transaction(tx => updateArrearsReviewTaskStatus(tx, f.scope, replacement.id, "WAITING"));
+      assert.equal((await db.task.findUniqueOrThrow({ where: { id: replacement.id } })).status, "WAITING");
+      assert.equal(JSON.stringify(await db.account.findUnique({ where: { id: f.account.id }, include: { ledgerEntries: true, payments: true, tenancy: { include: { occupancies: true } } } })), before);
+      assert.equal(await db.communicationLog.count({ where: { organisationId: f.org.id } }), 0); assert.equal(await db.webhookOutbox.count({ where: { organisationId: f.org.id } }), 0);
+      assert.equal((await row(f)).disputed, true);
+      await db.role.updateMany({ where: { organisationId: f.org.id }, data: { permissions: ["collections.*"] } });
+      await assert.rejects(updateCollection(f.scope, command), /FORBIDDEN/);
+      await assert.rejects(updateCollection({ ...f.scope, facilityIds: [] }, command), /COLLECTION_NOT_FOUND/);
+    });
+    await t.test("escalation task and case record roll back together on audit failure", async () => {
+      const f = await fixture();
+      await db.role.updateMany({ where: { organisationId: f.org.id }, data: { permissions: ["collections.*", "operations.view", "operations.manage"] } });
+      const command = { ...await base(f), action: "escalation-review-task" as const, target: "ACCESS" as const, channel: "EMAIL" as const, reviewOn: today, policyReference: "" };
+      await db.$executeRawUnsafe(`ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_escalation_task_failure CHECK (action <> 'collections.escalation-review-task') NOT VALID`);
+      try { await assert.rejects(updateCollection(f.scope, command)); } finally { await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_escalation_task_failure'); }
+      assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 0);
+      assert.equal((await row(f)).revision, 0); assert.equal((await row(f)).activities.length, 0);
+    });
     await t.test("daily internal review plans keep source, permission and financial boundaries", async timed => {
       const old = { key: process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY, enabled: process.env.ARREARS_REVIEW_SCHEDULE_ENABLED, worker: process.env.ARREARS_REVIEW_WORKER_KEY, organisation: process.env.ARREARS_REVIEW_ORGANISATION_ID };
       process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY = "synthetic-arrears-review-vault-key-at-least-32-characters";

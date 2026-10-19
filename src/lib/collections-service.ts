@@ -1,3 +1,4 @@
+import { arrearsAuthority } from "./arrears-authority";
 import {receiptAllocationGraph} from "./receipt-reallocation-source";
 import { arrearsAccessReview } from "./arrears-access-review-policy";
 import { currentRoleAccess } from "./current-role-access";
@@ -215,6 +216,26 @@ async function prepareAccessReviewTask(tx: Client, scope: RequestScope, account:
   return { taskId: task.id, assigneeId, changed: true, assessment };
 }
 
+async function prepareEscalationReviewTask(tx: Client, scope: RequestScope, account: Account, caseId: string, ownerId: string | null, input: Extract<CollectionAction, { action: "escalation-review-task" }>) {
+  const facilityId = account.tenancy!.facilityId;
+  const assigneeId = await accessReviewAssignee(tx, scope, facilityId, ownerId);
+  if (!assigneeId) throw Error("COLLECTION_OWNER");
+  const requestHash = createHash("sha256").update(JSON.stringify(["ARREARS_ESCALATION_REVIEW", scope.organisationId, account.id, caseId, input.target, input.target === "NOTICE" ? input.channel : null])).digest("hex");
+  const existing = await tx.task.findMany({ where: { organisationId: scope.organisationId, facilityId, customerId: account.customerId, purpose: "ARREARS_ESCALATION_REVIEW", requestHash, status: { notIn: ["COMPLETED", "CANCELLED"] } }, take: 2 });
+  if (existing.length > 1) throw Error("COLLECTION_CHANGED");
+  if (existing[0]) {
+    if (!existing[0].assigneeId || await accessReviewAssignee(tx, scope, facilityId, existing[0].assigneeId) !== existing[0].assigneeId) throw Error("COLLECTION_REVIEW_TASK_OWNER");
+    return { taskId: existing[0].id, assigneeId: existing[0].assigneeId, created: false };
+  }
+  const topic = input.target === "FEE" ? "Fee policy" : input.target === "ACCESS" ? "Access concern" : `${input.channel} notice policy`;
+  const task = await tx.task.create({ data: { organisationId: scope.organisationId, facilityId, customerId: account.customerId, assigneeId, createdById: scope.userId,
+    purpose: "ARREARS_ESCALATION_REVIEW", requestHash, requestKey: createHash("sha256").update(JSON.stringify(["COLLECTION_REVIEW_TASK", scope.organisationId, caseId, input.requestKey])).digest("hex"),
+    title: `${topic} review · ${account.accountNumber}`, dueAt: new Date(`${input.reviewOn}T23:59:59.999+02:00`),
+    description: `Open Collections and search ${account.accountNumber}. Review the current case history, source evidence and unresolved policy decision. Completing this internal task records task progress only. It does not approve a notice, fee, financial entry or physical access change. Fee amount remains unset pending approved policy. Existing payment, dispute and arrangement holds remain in force.`,
+  } });
+  return { taskId: task.id, assigneeId, created: true };
+}
+
 export async function updateCollection(scope: RequestScope, raw: CollectionAction) {
   const input = collectionActionSchema.parse(raw), today = southAfricaDateKey(new Date());
   return db.$transaction(async tx => {
@@ -222,6 +243,7 @@ export async function updateCollection(scope: RequestScope, raw: CollectionActio
     await accountFor(tx, scope, input.accountId);
     await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${input.accountId} FOR UPDATE`;
     const account = await accountFor(tx, scope, input.accountId);
+    if (input.action === "escalation-review-task") await arrearsAuthority(tx, scope, account.tenancy!.facilityId, ["collections.view", "collections.manage", "operations.view", "operations.manage"]);
     let c = account.collectionCase;
     const previous = c ? await tx.collectionActivity.findUnique({ where: { caseId_requestKey: { caseId: c.id, requestKey: input.requestKey } } }) : null;
     if (previous) {
@@ -234,6 +256,7 @@ export async function updateCollection(scope: RequestScope, raw: CollectionActio
     const data: Prisma.CollectionCaseUpdateInput = { revision: { increment: 1 } };
     let accessTaskId: string | null = null;
     let reviewAssigneeId: string | null = null;
+    let escalationTask: Awaited<ReturnType<typeof prepareEscalationReviewTask>> | null = null;
     if (input.action === "access-review-task") {
       const prepared = await prepareAccessReviewTask(tx, scope, account, c.ownerId, evaluated, today);
       accessTaskId = prepared.taskId; reviewAssigneeId = prepared.assigneeId;
@@ -264,8 +287,9 @@ export async function updateCollection(scope: RequestScope, raw: CollectionActio
       if (input.ownerId && !eligible.some(u => u.id === input.ownerId && (u.facilities.includes(null) || u.facilities.includes(account.tenancy!.facilityId)))) throw new Error("COLLECTION_OWNER");
       data.ownerId = input.ownerId; data.nextFollowUp = input.nextFollowUp;
     } else if (input.action === "dispute") { data.disputed = input.disputed; data.disputeReason = input.disputed ? input.note : null; }
-    else if (input.action === "escalation-review") {
+    else if (input.action === "escalation-review" || input.action === "escalation-review-task") {
       if (input.reviewOn < today) throw new Error("COLLECTION_DATE");
+      if (input.action === "escalation-review-task") escalationTask = await prepareEscalationReviewTask(tx, scope, account, c.id, c.ownerId, input);
       // Internal review record only. Never clear a hold, change terms, schedule a customer send, post a fee or command access.
     }
     else if (input.action === "promise") {
@@ -279,14 +303,14 @@ export async function updateCollection(scope: RequestScope, raw: CollectionActio
       await tx.collectionPromise.update({ where: { id: p.id }, data: { status: input.status, closedAt: new Date() } });
     }
     await tx.collectionCase.update({ where: { id: c.id }, data });
-    const review = input.action === "escalation-review" ? {
+    const review = input.action === "escalation-review" || input.action === "escalation-review-task" ? {
       status: "HELD_POLICY", effect: "INTERNAL_REVIEW_ONLY", target: input.target, proposedChannel: input.target === "NOTICE" ? input.channel : null, reviewOn: input.reviewOn, proposedPolicyReference: input.policyReference || null,
       blockers: ["An approved escalation policy and responsible approver are required.", ...(evaluated.ageing.issue ? [evaluated.ageing.issue] : []), ...(evaluated.hold ? [evaluated.hold] : []), ...(input.target === "NOTICE" ? ["Use the existing independently reviewed email workflow where approved. Additional channels require approved templates, consent and provider acceptance."] : input.target === "FEE" ? ["Finance fee authority and the supported adjustment workflow are required."] : ["Approved access/legal policy, an authorised access operator and physical validation are required."])],
       sourceHash: createHash("sha256").update(JSON.stringify({ accountId: account.id, updatedAt: account.updatedAt, balance: account.balance.toString(), ledger: account.ledgerEntries.map(e => [e.id, e.type, e.amount.toString(), e.effectiveAt, e.reversalOfId]), caseRevision: input.revision, terms: c.terms, hold: evaluated.hold, issue: evaluated.ageing.issue })).digest("hex"),
-      customerMessageSent: false, financialEntriesCreated: 0, accessCommandsCreated: 0,
+      customerMessageSent: false, financialEntriesCreated: 0, accessCommandsCreated: 0, feeAmount: null, financialApproval: false, accessApproval: false, ...(escalationTask ? { task: escalationTask } : {}),
     } : null;
     const activity = await tx.collectionActivity.create({ data: { caseId: c.id, requestKey: input.requestKey, actorId: scope.userId, action: input.action === "follow-up" ? input.outcome : review ? `Escalation review · ${review.target.toLowerCase()}${review.proposedChannel ? ` / ${review.proposedChannel}` : ""} · held for policy` : input.action,
-      note: review ? `Internal review requested for ${review.reviewOn}. ${input.note}\n${review.blockers.join(" ")}${review.proposedPolicyReference ? ` Proposed policy evidence (unverified): ${review.proposedPolicyReference}.` : ""} No message, fee or access action was executed.` : accessTaskId ? `${input.note}\nInternal Operations review task ${accessTaskId} prepared. Separate written-notice checks and authorised access approval are still required. No message, fee, financial approval or access command was created.` : input.note, payload: json(input) } });
+      note: review ? `Internal review requested for ${review.reviewOn}. ${input.note}\n${review.blockers.join(" ")}${review.proposedPolicyReference ? ` Proposed policy evidence (unverified): ${review.proposedPolicyReference}.` : ""} No message, fee or access action was executed.${escalationTask ? ` Operations task ${escalationTask.taskId} ${escalationTask.created ? "created" : "already open; original due date and assignee retained"}. Completing it is not financial or access approval.` : ""}` : accessTaskId ? `${input.note}\nInternal Operations review task ${accessTaskId} prepared. Separate written-notice checks and authorised access approval are still required. No message, fee, financial approval or access command was created.` : input.note, payload: json(input) } });
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: account.tenancy!.facilityId, actorId: scope.userId, entityType: "CollectionCase", entityId: c.id, action: `collections.${input.action}`, after: json({ activityId: activity.id, revision: input.revision + 1, ...(review ? { review } : {}), ...(accessTaskId ? { taskId: accessTaskId, assigneeId: reviewAssigneeId, assessment: accessReviewFor(account, evaluated, today), financialApproval: false, accessApproval: false } : {}), ...(["schedule-access-review", "cancel-access-review-schedule"].includes(input.action) ? { effect: "INTERNAL_REVIEW_TASKS_ONLY", financialApproval: false, accessApproval: false, feeAmount: null } : {}) }) } });
     return { id: activity.id, repeated: false };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000 });

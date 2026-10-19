@@ -1,23 +1,32 @@
+import { updateArrearsReviewTaskStatus } from "@/lib/arrears-review-task-service";
 import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { updateTaskSchema } from "@/lib/validators";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { organisationId, user } = await requirePermission("operations.manage");
+    const { organisationId, user, allowedFacilityIds } = await requirePermission("operations.manage");
     const { id } = await params;
     const input = updateTaskSchema.parse(await request.json());
     const before = await db.task.findFirst({ where: { id, organisationId } });
     if (!before) return Response.json({ error: { code: "NOT_FOUND", message: "Task not found." } }, { status: 404 });
     if (before.facilityId) await requirePermission("operations.manage", before.facilityId);
     if (before.purpose === "AGREED_FOLLOWUP") return Response.json({ error: { code: "CONFLICT", message: "Open Follow-ups & handovers to update this appointment using its current version." } }, { status: 409 });
+    if (before.purpose === "ARREARS_ESCALATION_REVIEW") {
+      const task = await db.$transaction(tx => updateArrearsReviewTaskStatus(tx, { organisationId, userId: user.id, facilityIds: allowedFacilityIds ?? [], unrestrictedFacilities: allowedFacilityIds === null }, id, input.status));
+      return Response.json({ data: task });
+    }
     const task = await db.$transaction(async tx => {
       const updated = await tx.task.update({ where: { id }, data: { status: input.status, completedAt: input.status === "COMPLETED" ? new Date() : null } });
       await tx.auditEvent.create({ data: { organisationId, actorId: user.id, action: "task.status.change", entityType: "task", entityId: id, before, after: updated } });
       return updated;
     });
     return Response.json({ data: task });
-  } catch (error) { return authErrorResponse(error); }
+  } catch (error) {
+    if (error instanceof Error && error.message === "ARREARS_REVIEW_TASK_CLOSED") return Response.json({ error: { code: "CONFLICT", message: "This closed review task cannot be reopened. Create a new review request in Collections." } }, { status: 409 });
+    if (error instanceof Error && error.message === "ARREARS_REVIEW_TASK_NOT_FOUND") return Response.json({ error: { code: "NOT_FOUND", message: "Review task is outside your current store access." } }, { status: 404 });
+    return authErrorResponse(error);
+  }
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {

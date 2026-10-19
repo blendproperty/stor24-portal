@@ -1,3 +1,4 @@
+import { assertReviewTaskTransition } from "../src/lib/arrears-review-task-service";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ageAccount, csvCell, dateKey, effectiveEntries, promiseProgress, collectionActionSchema, type AgeEntry } from "../src/lib/collections-policy";
@@ -60,4 +61,21 @@ test("promise evidence excludes earlier receipts, credits, backdated entries and
 test("CSV quotes cells and neutralises spreadsheet formulas including leading whitespace", () => {
   for (const s of ["=1+1", " +CMD", "-2+3", "@SUM(A1)", "\tformula"]) assert.ok(csvCell(s).startsWith('"\''));
   assert.equal(csvCell('Customer "A", B'), '"Customer ""A"", B"');
+});
+
+
+test("internal review task commands cannot carry approval, fee or access execution fields", () => {
+  const request = { accountId: "cmaccountfixture000001", revision: 0, requestKey: randomUUID(), note: "Policy decision needed", action: "escalation-review-task", target: "FEE", channel: "EMAIL", reviewOn: "2026-10-19", policyReference: "" };
+  assert.equal(collectionActionSchema.safeParse(request).success, true);
+  for (const extra of [{ financialApproval: true }, { accessApproval: true }, { feeAmount: 100 }, { assigneeId: "other" }, { status: "APPROVED" }, { execute: true }]) assert.equal(collectionActionSchema.safeParse({ ...request, ...extra }).success, false);
+});
+
+
+test("closed internal reviews cannot be reopened behind a replacement task", () => {
+  for (const previous of ["COMPLETED", "CANCELLED"] as const) {
+    for (const next of ["OPEN", "IN_PROGRESS", "WAITING"] as const) assert.throws(() => assertReviewTaskTransition(previous, next), /ARREARS_REVIEW_TASK_CLOSED/);
+    for (const next of ["COMPLETED", "CANCELLED"] as const) assert.doesNotThrow(() => assertReviewTaskTransition(previous, next));
+  }
+  assert.doesNotThrow(() => assertReviewTaskTransition("OPEN", "COMPLETED"));
+  assert.doesNotThrow(() => assertReviewTaskTransition("WAITING", "IN_PROGRESS"));
 });

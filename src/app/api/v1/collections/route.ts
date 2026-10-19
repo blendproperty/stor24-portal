@@ -7,6 +7,7 @@ import { collectionCsv } from "@/lib/collections-view";
 import { collectionsWorkspace, updateCollection } from "@/lib/collections-service";
 import { southAfricaDateKey } from "@/lib/south-africa-time";
 const messages: Record<string, string> = {
+  COLLECTION_REVIEW_TASK_OWNER: "The existing review task has no currently eligible assignee. Cancel it in Operations before creating a replacement review task.",
   COLLECTION_NOT_FOUND: "This account is outside your permitted stores.", COLLECTION_CHANGED: "This case changed or the request was already used. Reload before retrying.", COLLECTION_DATE: "Check the date. Reports cannot be future dated and new follow-ups cannot be backdated.", COLLECTION_TERMS: "Check the due-date overrides against this account's original charges.", COLLECTION_OWNER: "Choose an active colleague permitted to manage collections at this store.", COLLECTION_PROMISE: "Check the overdue balance, holds, existing promise and verified receipt evidence.", COLLECTION_LIMIT: "More than 2,000 accounts are in scope. An administrator must arrange a narrower store role before running this report.",
 };
 function failure(e: unknown) {
