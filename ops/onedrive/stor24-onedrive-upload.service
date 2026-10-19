@@ -1,0 +1,16 @@
+[Unit]
+Description=STOR24 encrypted database archive upload to OneDrive
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+UMask=0077
+EnvironmentFile=/etc/stor24-backup-cloud.env
+ExecStart=/bin/bash /opt/stor24-backup-cloud/upload.sh
+TimeoutStartSec=900
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/opt/stor24-backup-cloud /root/.config/rclone

@@ -1,0 +1,10 @@
+[Unit]
+Description=Nightly STOR24 direct OneDrive upload at 03:20 SAST
+
+[Timer]
+OnCalendar=*-*-* 01:20:00 UTC
+Persistent=true
+Unit=stor24-onedrive-upload.service
+
+[Install]
+WantedBy=timers.target
