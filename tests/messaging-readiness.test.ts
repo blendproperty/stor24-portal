@@ -30,3 +30,10 @@ test("missing channels are reported as configuration required", () => {
   assert.equal(readiness.state, "Configuration required");
   assert.equal(readiness.detail, "Configure SMS, WhatsApp");
 });
+
+
+test("Hostinger configuration is opt-in and does not claim verified delivery", () => {
+  assert.equal(configuredMessagingChannels({ EMAIL_PROVIDER: "hostinger" }).has("Email"), false);
+  assert.equal(configuredMessagingChannels({ EMAIL_PROVIDER: "hostinger", HOSTINGER_SMTP_PASSWORD: "synthetic" }).has("Email"), true);
+  assert.equal(configuredMessagingChannels({ EMAIL_PROVIDER: "sendgrid", HOSTINGER_SMTP_PASSWORD: "synthetic" }).has("Email"), false);
+});

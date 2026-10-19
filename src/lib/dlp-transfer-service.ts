@@ -13,7 +13,7 @@ export async function guardDlpTransfer(input: DlpTransfer) {
   const bytes = input.byteLength ?? new TextEncoder().encode(input.content ?? "").byteLength;
   if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > 20 * 1024 * 1024) reasons.add("TRANSFER_SIZE_LIMIT");
   if (input.content) for (const reason of inspectReportExport("rent-roll", [{ customer: input.content }]).reasons) reasons.add(reason);
-  if (input.content && ["AUTH_SECRET", "PUBLIC_BOOKING_API_KEY", "RESEND_API_KEY", "SENDGRID_API_KEY", "TWILIO_AUTH_TOKEN", "INTEGRATION_CONFIG_ENCRYPTION_KEY", "IDENTITY_DOCUMENT_ENCRYPTION_KEY"].some(key => { const secret = process.env[key]; return secret && secret.length >= 16 && input.content!.includes(secret); })) reasons.add("CONFIGURED_CREDENTIAL");
+  if (input.content && ["AUTH_SECRET", "PUBLIC_BOOKING_API_KEY", "RESEND_API_KEY", "SENDGRID_API_KEY", "HOSTINGER_SMTP_PASSWORD", "TWILIO_AUTH_TOKEN", "INTEGRATION_CONFIG_ENCRYPTION_KEY", "IDENTITY_DOCUMENT_ENCRYPTION_KEY"].some(key => { const secret = process.env[key]; return secret && (key === "HOSTINGER_SMTP_PASSWORD" || secret.length >= 16) && input.content!.includes(secret); })) reasons.add("CONFIGURED_CREDENTIAL");
   if (input.channel !== "DOWNLOAD" && (!input.recipient || !input.approvedRecipient || input.recipient.trim().toLowerCase() !== input.approvedRecipient.trim().toLowerCase())) reasons.add("RECIPIENT_MISMATCH");
   // Scope the shared counter to the actual actor or destination. It survives
   // restarts and correlates split transfers without storing raw recipients.

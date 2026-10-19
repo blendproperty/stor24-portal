@@ -41,10 +41,10 @@ export function staffEmailMac(value: unknown) {
   return createHmac("sha256", createHash("sha256").update(`staff-event-email-v1:${secret}`).digest()).update(JSON.stringify(value)).digest("hex");
 }
 export async function staffEmailSender() {
-  const provider = process.env.EMAIL_PROVIDER === "resend" ? "Resend" : process.env.EMAIL_PROVIDER === "sendgrid" ? "SendGrid" : process.env.EMAIL_PROVIDER === "twilio" || process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN ? "Twilio email" : "Not configured";
+  const provider = process.env.EMAIL_PROVIDER === "hostinger" ? "Hostinger SMTP" : process.env.EMAIL_PROVIDER === "resend" ? "Resend" : process.env.EMAIL_PROVIDER === "sendgrid" ? "SendGrid" : process.env.EMAIL_PROVIDER === "twilio" || process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN ? "Twilio email" : "Not configured";
   // Bind credential rotation without storing credentials or hashing them with a fast digest.
   // Async memory-hard derivation also avoids blocking the request event loop.
-  const material = JSON.stringify([process.env.TWILIO_ACCOUNT_SID ?? "", process.env.TWILIO_AUTH_TOKEN ?? "", process.env.RESEND_API_KEY ?? "", process.env.SENDGRID_API_KEY ?? ""]);
+  const material = JSON.stringify(process.env.EMAIL_PROVIDER === "hostinger" ? ["bookings@stor24.co.za", process.env.HOSTINGER_SMTP_PASSWORD ?? ""] : [process.env.TWILIO_ACCOUNT_SID ?? "", process.env.TWILIO_AUTH_TOKEN ?? "", process.env.RESEND_API_KEY ?? "", process.env.SENDGRID_API_KEY ?? ""]);
   const salt = staffEmailMac(["sender-credential-derivation", STAFF_EMAIL_TEMPLATE_VERSION]);
   const derived = await new Promise<Buffer>((resolve, reject) => scrypt(material, salt, 32, { N: 16384, r: 8, p: 1 }, (error, value) => error ? reject(error) : resolve(value)));
   return { label: provider, fingerprint: staffEmailMac([STAFF_EMAIL_TEMPLATE_VERSION, process.env.EMAIL_PROVIDER ?? "", process.env.EMAIL_FROM ?? "", process.env.TWILIO_EMAIL_FROM ?? "", derived.toString("hex")]) };

@@ -11,6 +11,7 @@ export function renderCollectionNotice(input: { accountNumber: string; facility:
 }
 export const noticeHash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 export function collectionEmailConfigured() {
+  if (process.env.EMAIL_PROVIDER === "hostinger") return Boolean(process.env.HOSTINGER_SMTP_PASSWORD);
   if (process.env.EMAIL_PROVIDER === "sendgrid") return Boolean(process.env.EMAIL_FROM && process.env.SENDGRID_API_KEY);
   if (process.env.EMAIL_PROVIDER === "resend") return Boolean(process.env.EMAIL_FROM && process.env.RESEND_API_KEY);
   return Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN);
