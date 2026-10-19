@@ -1,6 +1,6 @@
 # Receipt correction training
 
-19 October 2026. Engineering qualification, promotion, deployment and hands-on acceptance are separate stages recorded in PROJECT_CONTEXT.md.
+19 October 2026. Exact-head engineering qualification, normal promotion/deployment and bounded runtime plus genuine owner sample-selection/preview verification passed. Staff acceptance and live financial approval/posting/undo remain separate stages recorded in PROJECT_CONTEXT.md.
 
 The live correction search lists existing tenancy Accounts, not every enquiry or booking customer. The previous shared debtor example has no Account, Tenancy, Payment or LedgerEntry, so it cannot supply a verified receipt. Live correction rules continue to reject test payments.
 
@@ -14,3 +14,8 @@ Select the source, destination and sample receipt. Preview R75.25 with a trainin
 These are stable server-generated sample accounts, not new live customer/tenancy/Account records. Only training request/cancellation audit events persist. No Account, Payment, LedgerEntry, ReceiptReallocation, occupied unit, provider request, communication or role grant is created. Current receipt view/billing scopes apply; requests and cancellations require existing request permission. Training has no financial approve, post, reject or undo endpoint. The production endpoint cannot resolve these sample identifiers.
 
 This supports account selection, the shared validation/planner, preview, saved training request and cancellation practice. It does not prove live receipt provenance, independent financial approval/posting, live paired ledger writes, correction documents or undo. Original #1 remains open for those separately authorised finance checks and staff acceptance. A training result must never be reported as real bank receipt or financial approval.
+
+
+## User acceptance — 19 October 2026
+
+Brett confirms sample selection, expected R75.25 preview, one saved request after refresh with correct author/SAST time, and one retained cancellation without duplicates. This training walkthrough passes at that reported scope. Live receipt provenance, independent financial approval/posting, paired ledger/documents and undo remain separate and unaccepted; original #1 is not fully financially closed.
