@@ -148,3 +148,8 @@ All three approved legal/access/Netcash information requests were sent19October 
 
 
 19 October original1 direct user acceptance supplement: Brett confirms training source/destination/R200 receipt selection; expected R75.25 preview (-R124.75 / R374.75 / R124.75 remaining); exactly one saved training request after refresh with correct author/SAST time; exactly one CANCELLED result after his cancellation/reload. The training walkthrough is USER-PASSED. This is not actual source/independent financial approval/posting, paired ledger/documents or undo acceptance; those original1 gates remain OPEN. Technical release and private dated reply receipts are in canonical PROJECT_CONTEXT.md; no all23 closure or financial authority is inferred.
+
+
+### 19 October 2026 — original2 synthetic investigation setup
+
+At Brett's request, the genuine owner portal retained and reloaded one Midpoint TEST-UNIDENTIFIED-001, R150/date19October, OPEN, explicitly MANUAL_REPORTED / REPORTED_UNVERIFIED. Its note states no payment or original bank/provider evidence exists and prohibits treating the example as a real receipt or matching to a live customer. Actual intake persistence/reopening verified; no suggestion, independent review, posting or withdrawal performed. Private screenshot/DOM/proof: output/unidentified-test-live-20261019.*. This enables retaining/reopening/withdrawal practice only; suitable isolated matching accounts, actual source, independent review and finance/provider acceptance remain open. No application/deployment/configuration/grant change. This supplement's final-head documentation checks/review/merge remain pending.
