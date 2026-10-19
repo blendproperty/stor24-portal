@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 
-const bundle = await build({ stdin: { contents: `import React from 'react';import {createRoot} from 'react-dom/client';import {ReceiptReallocationWorkspace} from './src/components/receipt-reallocation-workspace';createRoot(document.getElementById('root')).render(<main style={{padding:16,maxWidth:1200,margin:'auto'}}><ReceiptReallocationWorkspace/></main>);`, resolveDir: process.cwd(), loader: 'jsx' }, bundle: true, write: false, format: 'esm', jsx: 'automatic', outfile: 'output/receipt-staff-ui/app.js' });
+const bundle = await build({ stdin: { contents: `import React from 'react';import {createRoot} from 'react-dom/client';import {ReceiptReallocationWorkspace} from './src/components/receipt-reallocation-workspace';createRoot(document.getElementById('root')).render(<main style={{padding:16,maxWidth:1200,margin:'auto'}}><ReceiptReallocationWorkspace training={location.pathname === "/training"}/></main>);`, resolveDir: process.cwd(), loader: 'jsx' }, bundle: true, write: false, format: 'esm', jsx: 'automatic', outfile: 'output/receipt-staff-ui/app.js' });
 const css = (await readFile('src/app/globals.css', 'utf8') + '\n' + await readFile('src/styles/stor24-brand.css', 'utf8')).replace('@import "tailwindcss";', '') + '\n' + (bundle.outputFiles.find(file => file.path.endsWith('.css'))?.text ?? '');
 const js = bundle.outputFiles.find(file => file.path.endsWith('.js')).text;
 const server = createServer((req, res) => { res.setHeader('Content-Type', req.url === '/app.js' ? 'text/javascript' : 'text/html'); res.end(req.url === '/app.js' ? js : `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css} body{font-family:Arial,sans-serif;margin:0;background:#f3f6f7}</style></head><body><div id="root"></div><script type="module" src="/app.js"></script></body></html>`); });
@@ -173,6 +173,53 @@ try {
     mode = 'success'; await page.getByRole('button', { name: 'Refresh recorded state', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Retained requests and decisions', exact: true })).toBeVisible();
     assert.deepEqual(errors, []); await page.close();
+  }
+  for (const width of [1440, 768, 390, 320]) {
+    const page = await browser.newPage({ viewport: { width, height: 1000 } });
+    let records = []; const writes = [];
+    await page.route('**/api/v1/training/receipt-corrections**', async route => {
+      const request = route.request(), url = new URL(request.url());
+      if (request.method() === 'GET') {
+        const search = (url.searchParams.get('search') ?? '').toLowerCase();
+        return route.fulfill({ json: { data: { userId, capabilities: {canRequest:true,canApprove:false}, facilities:[{id:facilityId,name:'Midpoint training'}], accounts:accounts.slice(0,2).filter(a => !search || a.accountNumber.toLowerCase().includes(search)), accountsLimited:false, receipts:url.searchParams.get('sourceAccountId')===sourceId?[{entryId,description:'Training receipt',recordedAt:'2026-10-19T06:00:00.000Z',remaining:'200.00',paymentReference:'TRAINING SAMPLE ONLY'}]:[], requests:records, nextCursor:null,nextReceiptCursor:null } } });
+      }
+      const command = request.postDataJSON(); writes.push(command);
+      assert.ok(command.action !== 'decide' || command.decision === 'cancel');
+      if (command.action === 'preview') return route.fulfill({ json:{data:{fingerprint:'a'.repeat(64),operation:'MOVE',source:{accountNumber:'SOURCE-001',balance:'-200.00'},target:{accountNumber:'TARGET-002',balance:'450.00'},amount:'75.25',sourceBalanceAfter:'-124.75',targetBalanceAfter:'374.75',sourceReceiptRemaining:'124.75',notice:'TRAINING ONLY - no approval or posting'}} });
+      if (command.action === 'request') { records=[{...row(ownId,userId),...command.input}]; return route.fulfill({json:{data:{id:ownId,idempotent:false}}}); }
+      records[0].status='CANCELLED';records[0].revision=1;
+      return route.fulfill({json:{data:{id:ownId,status:'CANCELLED',idempotent:false}}});
+    });
+    await page.goto(`http://127.0.0.1:${server.address().port}/training`);
+    await expect(page.getByRole('heading',{name:'Receipt correction training',exact:true})).toBeVisible();
+    await expect(page.getByText('TRAINING ONLY: two sample accounts', {exact:false})).toBeVisible();
+    await page.getByLabel('Find an account',{exact:true}).fill('unknown');await page.getByRole('button',{name:'Search accounts',exact:true}).click();
+    await expect(page.getByRole('status')).toContainText('No training accounts match');
+    await page.getByLabel('Find an account',{exact:true}).fill('');await page.getByRole('button',{name:'Search accounts',exact:true}).click();
+    await page.getByLabel('Source account',{exact:true}).selectOption(sourceId);
+    await page.getByLabel('Destination account',{exact:true}).selectOption(targetId);
+    await page.getByLabel('Verified receipt position',{exact:true}).selectOption(entryId);
+    await page.getByLabel('Amount in rand',{exact:true}).fill('75.25');
+    await page.getByLabel('Source evidence reference',{exact:true}).fill('TRAINING-ONLY');
+    await page.getByLabel('Correction reason',{exact:true}).fill('Training receipt allocation only');
+    await page.getByRole('button',{name:'Preview account changes',exact:true}).click();
+    await expect(page.getByRole('region',{name:'Correction preview'})).toBeVisible();
+    await page.getByLabel('I checked the source receipt, both accounts and this amount.',{exact:true}).check();
+    await page.getByRole('button',{name:'Save training request',exact:true}).click();
+    await expect(page.getByRole('heading',{name:'Saved training requests',exact:true})).toBeVisible();
+    await page.reload();await expect(page.locator('article')).toHaveCount(1);
+    await page.getByText('View source and decision history',{exact:true}).click();
+    await expect(page.getByRole('button',{name:'Independently approve and post',exact:true})).toHaveCount(0);
+    await expect(page.getByRole('button',{name:'Prepare an undo request',exact:true})).toHaveCount(0);
+    assert.equal(await page.locator('body').evaluate(el=>el.scrollWidth > innerWidth),false);
+    await page.screenshot({path:`output/receipt-staff-ui/training-${width}.png`,fullPage:true});
+    await page.getByText('Cancellation options',{exact:true}).click();
+    await page.getByLabel('Independent review or cancellation reference',{exact:true}).fill('TRAINING-CANCEL');
+    await page.getByLabel('I checked this correction and its retained source evidence.',{exact:true}).check();
+    await page.getByRole('button',{name:'Cancel my request',exact:true}).click();
+    await expect(page.locator('article')).toContainText('CANCELLED');
+    assert.equal(writes.filter(w=>w.action==='request').length,1);
+    await page.close();
   }
   console.log('Receipt staff actual-component workflow passed1440/768/390/320: scoped choices, preview/source holds, edit invalidation, immutable uncertain retry, independent review, uncertain decision refresh, retained undo, independent receipt/history cursors, empty receipt pages, earlier selection and source reset, and direct control bounds.');
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
