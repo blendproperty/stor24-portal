@@ -1,6 +1,6 @@
 # Internal arrears review tasks
 
-19 October 2026. Implementation slice; protected source/native/browser qualification, promotion, deployment and staff acceptance are separate stages in PROJECT_CONTEXT.md.
+19 October 2026. Source/native/browser qualification, promotion and normal deployment are technically verified. Staff acceptance remains deferred. Exact dates/refs/runtime evidence and separate stages are recorded in PROJECT_CONTEXT.md.
 
 In Collections, open an account and Request internal escalation review. Enter the case note, review topic, proposed notice channel if relevant, and requested review date. Record held review request retains the existing history-only behaviour. Create internal review task records the same held request and an assigned Operations task together.
 
