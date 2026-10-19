@@ -5299,3 +5299,8 @@ Official Netcash statement/report documentation was checked on18October; docs/AR
 ### 19 October — source publication checkpoint
 
 Implementation commit619593a20d165c00646b5449895e1d3f179a7527 was pushed and PR556 opened through the existing authorised repository credential after the GitHub connector returned403. The remote review branch contains the canonical PROJECT_CONTEXT.md. Hosted protected checks are running, not yet qualified; no merge or deployment is claimed. A subsequent boundary refinement rejects unsupported calendar years to prevent seven-day overflow; its focused15-test rerun passed. Final source head will include this checkpoint. This source-stage result does not close item12: authenticated ingestion, installed access execution, legal notice and fee policy dependencies remain, with staff UAT deferred and financial approvals separate.
+
+
+### 19 October — independent review corrections before qualification
+
+Independent read-only PR556 review of2a4f628d identified two source defects before merge: same-SAST-day instants were sorted lexically rather than chronologically; conflicting duplicate events retained the first encountered date. Both are corrected: timestamp ties use actual epoch time, conflicting instruction/event identities are quarantined, and integrity-held evidence exposes no plausible first-failure/review date. Two new regression cases prove offset ordering and permutation-stable conflict holds (including three deliveries). Final focused suite17/17 passed. Earlier15-test/source checkpoints are superseded at this narrow scope; source remains unmerged/unreleased with live debit holds unchanged. Full corrected-head hosted qualification and independent re-review remain pending.

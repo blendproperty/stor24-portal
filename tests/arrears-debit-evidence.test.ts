@@ -64,6 +64,29 @@ test("pending retry holds review without erasing original clock", () => {
   assert.equal(run([unpaid], [instruction, retry]).reconciled, false);
 });
 
+test("same-day failure instants compare by real time across different offsets", () => {
+  const retry = { ...instruction, instructionId: "retry", batchId: "retry-batch" };
+  const later = result({ failure: { precision: "INSTANT", value: "2026-10-10T23:00:00Z" } });
+  const earlier = { ...unpaid, ...retry, eventId: "earlier", failure: { precision: "INSTANT", value: "2026-10-11T00:30:00+02:00" } };
+  const r = run([later, earlier], [instruction, retry]);
+  assert.equal(r.firstFailure?.eventId, "earlier"); assert.equal(r.reviewOn, "2026-10-18");
+  assert.deepEqual(run([earlier, later], [retry, instruction]), r);
+});
+
+test("conflicting results and instructions are quarantined with permutation-stable null clocks", () => {
+  const changed = result({ failure: { precision: "DAY", value: "2026-10-10" } });
+  const r = run([unpaid, changed, unpaid]);
+  assert.equal(r.firstFailure, null); assert.equal(r.reviewOn, null);
+  assert.deepEqual(run([changed, unpaid, changed]), r);
+  const otherInstruction = { ...instruction, batchId: "other" };
+  const originalFirst = run([unpaid], [instruction, otherInstruction, instruction]);
+  assert.equal(originalFirst.firstFailure, null); assert.equal(originalFirst.reviewOn, null);
+  assert.deepEqual(run([unpaid], [otherInstruction, instruction, otherInstruction]), originalFirst);
+  const badDate = result({ eventId: "changed-date", failure: { precision: "DAY", value: "2026-10-10" } });
+  assert.equal(run([unpaid, badDate]).reviewOn, null);
+  assert.deepEqual(run([unpaid, badDate]), run([badDate, unpaid]));
+});
+
 test("tracking to final is order-independent; same-time contradictory outcome stays held", () => {
   const tracking = result({ eventId: "tracking", outcome: "TRACKING", failure: null, sourceAt: "2026-10-10T08:00:00Z" });
   assert.equal(run([unpaid, tracking]).reconciled, true);

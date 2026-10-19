@@ -63,6 +63,7 @@ export function reconcileDebitFailure(input: {
   const debt = z.object({ organisationId: id, facilityId: id, merchantId: id, connectionId: id, accountId: id, originalChargeId: id, invoiceId: id, amountCents: cents }).strict().parse(input.debt);
   const blockers = new Set<string>();
   const instructions = new Map<string, DebitInstructionEvidence>();
+  const conflictingInstructions = new Set<string>();
   if (input.instructions.length > 1000 || input.results.length > 10000) throw Error("DEBIT_EVIDENCE_LIMIT");
   for (const raw of input.instructions) {
     const parsed = debitInstructionEvidenceSchema.safeParse(raw);
@@ -72,13 +73,15 @@ export function reconcileDebitFailure(input: {
       blockers.add("ORIGINAL_DEBT_MISMATCH"); continue;
     }
     const prior = instructions.get(instruction.instructionId);
-    if (prior && keys.some(key => prior[key] !== instruction[key])) blockers.add("CONFLICTING_INSTRUCTION");
-    else instructions.set(instruction.instructionId, instruction);
+    if (prior && keys.some(key => prior[key] !== instruction[key])) {
+      blockers.add("CONFLICTING_INSTRUCTION"); conflictingInstructions.add(instruction.instructionId); instructions.delete(instruction.instructionId);
+    } else if (!conflictingInstructions.has(instruction.instructionId)) instructions.set(instruction.instructionId, instruction);
   }
   if (!instructions.size) blockers.add("NO_ORIGINAL_INSTRUCTION");
   // Identical re-deliveries are harmless. Conflicting reuse of an event identity
   // is retained as a hold, never last-write-wins. Retrieval time may differ.
   const events = new Map<string, DebitResultEvidence>();
+  const conflictingEvents = new Set<string>();
   for (const raw of input.results) {
     const parsed = debitResultEvidenceSchema.safeParse(raw);
     if (!parsed.success) { blockers.add("INVALID_PROVIDER_RESULT"); continue; }
@@ -89,8 +92,9 @@ export function reconcileDebitFailure(input: {
     const identity = JSON.stringify([event.merchantId, event.connectionId, event.eventId]);
     const previous = events.get(identity);
     const canonical = (value: DebitResultEvidence) => Object.fromEntries(Object.entries(value).filter(([key]) => key !== "observedAt"));
-    if (previous && JSON.stringify(canonical(previous)) !== JSON.stringify(canonical(event))) blockers.add("CONFLICTING_PROVIDER_EVENT");
-    else events.set(identity, event);
+    if (previous && JSON.stringify(canonical(previous)) !== JSON.stringify(canonical(event))) {
+      blockers.add("CONFLICTING_PROVIDER_EVENT"); conflictingEvents.add(identity); events.delete(identity);
+    } else if (!conflictingEvents.has(identity)) events.set(identity, event);
     if (southAfricaDateKey(event.sourceAt) > input.asOf) blockers.add("EVIDENCE_AFTER_AS_OF");
   }
   const failures: { day: string; eventId: string; precision: "DAY" | "INSTANT"; value: string }[] = [];
@@ -109,8 +113,12 @@ export function reconcileDebitFailure(input: {
       failures.push({ day, eventId: event.eventId, precision: event.failure.precision, value: event.failure.value });
     }
   }
-  failures.sort((a, b) => a.day.localeCompare(b.day) || a.value.localeCompare(b.value) || a.eventId.localeCompare(b.eventId));
-  const first = failures[0] ?? null;
+  failures.sort((a, b) => a.day.localeCompare(b.day) ||
+    (a.precision === "INSTANT" && b.precision === "INSTANT" ? Date.parse(a.value) - Date.parse(b.value) : a.precision.localeCompare(b.precision)) ||
+    a.eventId.localeCompare(b.eventId));
+  const integrityHeld = [...blockers].some(blocker => /^(INVALID_|CONFLICTING_|UNMATCHED_|ORIGINAL_DEBT_|NO_ORIGINAL_)/.test(blocker));
+  // Do not expose a plausible date chosen from contradictory/invalid evidence.
+  const first = integrityHeld ? null : failures[0] ?? null;
   if (!first) blockers.add("NO_CONFIRMED_FAILURE");
   if (first && first.day > input.asOf) blockers.add("FAILURE_AFTER_AS_OF");
   const reviewOn = first ? dayAfterSeven(first.day) : null;
