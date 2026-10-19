@@ -10,9 +10,9 @@ export function ReservationPriceWorkspace({initialReference=""}:{initialReferenc
   const requestKey=useRef<string|null>(null);
   const [query,setQuery]=useState(""),[matches,setMatches]=useState<SearchItem[]>([]),[searched,setSearched]=useState(false),[searching,setSearching]=useState(false),[searchNotice,setSearchNotice]=useState(""),[page,setPage]=useState(0),[hasMore,setHasMore]=useState(false);
   const searchVersion=useRef(0);
-  function changeQuery(value:string){searchVersion.current++;setQuery(value);setMatches([]);setSearched(false);setHasMore(false);setSearching(false);setSearchNotice("");}
+  function changeQuery(value:string){setData(null);searchVersion.current++;setQuery(value);setMatches([]);setSearched(false);setHasMore(false);setSearching(false);setSearchNotice("");}
   async function search(nextPage=0){
-    const version=++searchVersion.current;setSearching(true);setSearchNotice("");setMatches([]);setSearched(false);
+    const version=++searchVersion.current;setData(null);setSearching(true);setSearchNotice("");setMatches([]);setSearched(false);
     try{const response=await fetch(`/api/v1/reservations/prices/search?query=${encodeURIComponent(query.trim())}&page=${nextPage}`,{cache:"no-store"});const result=await response.json();if(version!==searchVersion.current)return;if(!response.ok)throw Error(result.error?.message||"Booking search is unavailable.");if(!Array.isArray(result.data?.items)||typeof result.data.hasMore!=="boolean")throw Error("Booking search could not be read.");setMatches(result.data.items);setPage(nextPage);setHasMore(result.data.hasMore);setSearched(true);}
     catch(error){if(version===searchVersion.current)setSearchNotice(error instanceof Error?error.message:"Booking search is unavailable.");}
     finally{if(version===searchVersion.current)setSearching(false);}
