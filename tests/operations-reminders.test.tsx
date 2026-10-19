@@ -12,7 +12,7 @@ async function fixture() {
   const state = { denied: new Set<string>(), failed: new Set<string>(), reads,
     scope: { userId: "staff", organisationId: "org", facilityIds: ["store-a"], unrestrictedFacilities: false },
     db: {} as Record<string, unknown> };
-  for (const model of ["task", "product", "tenancy", "maintenanceRequest", "reservation"]) {
+  for (const model of ["lead", "task", "product", "tenancy", "maintenanceRequest", "reservation"]) {
     const read = async (query: Query) => {
       reads.push({ model, query });
       if (state.failed.has(model)) throw Error("SYNTHETIC_READ_FAILURE");
@@ -32,6 +32,7 @@ async function fixture() {
 test("reminder aggregates enforce permission-specific organisation and facility scope without truncation", async () => {
   const f = await fixture();
   assert.match(await f.render(), /Call past dues/);
+  assert.match(await f.render(), /leads\?view=due/);
   for (const { model, query } of f.state.reads) {
     assert.equal("take" in query, false);
     if (model === "task") {
@@ -59,7 +60,7 @@ test("a failed aggregate is unavailable instead of a reassuring zero; other queu
 
 test("all-denied panel renders no queue and performs no aggregate reads", async () => {
   const f = await fixture();
-  for (const p of ["operations.view", "inventory.view", "collections.view", "ledger.view", "payments.view", "reservations.manage"]) f.state.denied.add(p);
+  for (const p of ["operations.view", "inventory.view", "collections.view", "ledger.view", "payments.view", "reservations.manage", "leads.view"]) f.state.denied.add(p);
   assert.equal(await f.render(), ""); assert.equal(f.state.reads.length, 0);
 });
 

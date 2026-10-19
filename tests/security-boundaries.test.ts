@@ -429,7 +429,7 @@ test("report exports require overlapping export and report facility grants", asy
 
 test("receivables export uses approved ageing and shows review states instead of plausible buckets", async () => {
   const state = fixture();
-  const account: Row = { id: "age-account", accountNumber: "AGE-SYN", balance: "100", currency: "ZAR", customer: { firstName: "Synthetic", lastName: "Ageing", companyName: null }, tenancy: { facilityId: "a", facility: { name: "A" } }, ledgerEntries: [{ id: "charge", type: "CHARGE", amount: "100", description: "Synthetic rent", effectiveAt: new Date("2020-01-01T00:00:00+02:00"), metadata: null }], payments: [], adjustments: [], debitInstructions: [], collectionCase: { terms: { dueDays: 0, allocation: "OLDEST_DUE_FIRST", approvalReference: "Synthetic approved terms", overrides: [] }, activities: [], promises: [] } };
+  const account: Row = { id: "age-account", accountNumber: "AGE-SYN", balance: "100", currency: "ZAR", customer: { firstName: "Synthetic", lastName: "Ageing", companyName: null }, tenancy: { facilityId: "a", facility: { name: "A" }, occupancies: [] }, ledgerEntries: [{ id: "charge", type: "CHARGE", amount: "100", description: "Synthetic rent", effectiveAt: new Date("2020-01-01T00:00:00+02:00"), metadata: null }], payments: [], adjustments: [], debitInstructions: [], collectionCase: { terms: { dueDays: 0, allocation: "OLDEST_DUE_FIRST", approvalReference: "Synthetic approved terms", overrides: [] }, activities: [], promises: [] } };
   state.db.account = { findMany: async () => [account] };
   state.db.tenancy = { findMany: async () => [{ ...account.tenancy, customer: account.customer, account, occupancies: [], status: "ACTIVE" }] };
   const api = await load("./src/lib/report-data-service.ts", state);

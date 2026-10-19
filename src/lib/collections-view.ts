@@ -2,7 +2,7 @@ import { buckets, csvCell } from "@/lib/collections-policy";
 import type { CollectionsWorkspaceData } from "@/lib/collections-service";
 export type CollectionFilters = { search: string; facility: string; mode: string; owner: string };
 export function filterCollections(data: CollectionsWorkspaceData, filters: CollectionFilters) {
-  return data.rows.filter(r => (!filters.facility || r.facilityId === filters.facility) && (!filters.owner || (filters.owner === "unassigned" ? !r.ownerId : r.ownerId === filters.owner)) && `${r.accountNumber} ${r.name}`.toLowerCase().includes(filters.search.toLowerCase()) && (
+  return data.rows.filter(r => (!filters.facility || r.facilityId === filters.facility) && (!filters.owner || (filters.owner === "unassigned" ? !r.ownerId : r.ownerId === filters.owner)) && `${r.accountNumber} ${r.name} ${r.units?.join(" ") ?? ""} ${r.phone ?? ""} ${r.alternatePhone ?? ""}`.toLowerCase().includes(filters.search.toLowerCase()) && (
     filters.mode === "all" || (filters.mode === "review" ? !!r.ageing.issue : filters.mode === "disputes" ? r.disputed : filters.mode === "promises" ? r.promises.some(p => p.status === "OPEN") : filters.mode === "follow-up" ? !!r.nextFollowUp && r.nextFollowUp <= data.today && !r.ageing.issue && !r.hold && r.ageing.overdue > 0 : filters.mode.startsWith("bucket-") ? !r.ageing.issue && r.ageing.buckets[Number(filters.mode.slice(7))] > 0 : !r.ageing.issue && r.ageing.overdue > 0)
   )).sort((a, b) => b.ageing.oldestDays - a.ageing.oldestDays || b.ageing.overdue - a.ageing.overdue || a.accountNumber.localeCompare(b.accountNumber));
 }
