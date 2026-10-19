@@ -5,6 +5,7 @@ import { facilityWhere, type RequestScope } from "@/lib/scope";
 import { leadAttributionSchema } from "@/lib/lead-attribution";
 import { z } from "zod";
 import { marketProfileSchema } from './lead-market-profile';
+import { leadFollowupWhere } from "./lead-followup-policy";
 
 export const leadUpdateSchema = z.object({
   enquiryLocation: enquiryLocationInputSchema.optional(),
@@ -12,14 +13,15 @@ export const leadUpdateSchema = z.object({
   updatedAt: z.iso.datetime(),
   stage: z.enum(["NEW", "CONTACTED", "QUALIFIED", "QUOTED", "VIEWING_BOOKED", "RESERVED", "WON", "LOST"]),
   nextActionAt: z.iso.datetime().nullable(),
+  expectedMoveIn: z.iso.date().nullable().optional(),
   notes: z.string().trim().max(2000),
   assignedToId: z.string().min(1).max(100).nullable(),
 }).strict();
 export type LeadUpdate = z.infer<typeof leadUpdateSchema>;
 
-export async function leadsWorkspace(scope: RequestScope) {
+export async function leadsWorkspace(scope: RequestScope, followupsDue = false) {
   const facilities = await db.facility.findMany({ where: facilityWhere(scope), select: { id: true, name: true }, orderBy: { name: "asc" } });
-  const where = { facilityId: { in: facilities.map(f => f.id) } };
+  const where = { facilityId: { in: facilities.map(f => f.id) }, ...(followupsDue ? leadFollowupWhere() : {}) };
   const [leads, count, staff] = await Promise.all([
     db.lead.findMany({ where, orderBy: { createdAt: "desc" }, take: 2000,
       include: { customer: { select: { id: true, firstName: true, lastName: true, companyName: true, email: true, phone: true } },
@@ -73,13 +75,14 @@ export async function updateLead(scope: RequestScope, id: string, input: LeadUpd
     const changed = await tx.lead.updateMany({ where: { id, updatedAt: new Date(input.updatedAt) }, data: {
       ...(input.enquiryLocation !== undefined ? { enquiryLocation: location ?? Prisma.DbNull } : {}),
       stage: input.stage, nextActionAt: input.nextActionAt ? new Date(input.nextActionAt) : null,
+      ...(input.expectedMoveIn !== undefined ? { expectedMoveIn: input.expectedMoveIn ? new Date(`${input.expectedMoveIn}T00:00:00.000Z`) : null } : {}),
       notes: input.notes || null, assignedToId: input.assignedToId,
     } });
     if (changed.count !== 1) throw new Error("CONFLICT");
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: lead.facilityId, actorId: scope.userId,
       action: "lead.updated", entityType: "Lead", entityId: id,
-      before: { enquiryLocation: lead.enquiryLocation, stage: lead.stage, nextActionAt: lead.nextActionAt?.toISOString() ?? null, assignedToId: lead.assignedToId, notes: lead.notes },
-      after: { enquiryLocation: location, stage: input.stage, nextActionAt: input.nextActionAt, assignedToId: input.assignedToId, notes: input.notes || null } } });
+      before: { expectedMoveIn: lead.expectedMoveIn?.toISOString() ?? null, enquiryLocation: lead.enquiryLocation, stage: lead.stage, nextActionAt: lead.nextActionAt?.toISOString() ?? null, assignedToId: lead.assignedToId, notes: lead.notes },
+      after: { expectedMoveIn: input.expectedMoveIn === undefined ? lead.expectedMoveIn?.toISOString() ?? null : input.expectedMoveIn, enquiryLocation: location, stage: input.stage, nextActionAt: input.nextActionAt, assignedToId: input.assignedToId, notes: input.notes || null } } });
     if(input.marketProfile)await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:lead.facilityId,actorId:scope.userId,action:'lead.market_profile.captured',entityType:'Lead',entityId:id,after:{marketProfile:input.marketProfile}}});
     return { id };
   });

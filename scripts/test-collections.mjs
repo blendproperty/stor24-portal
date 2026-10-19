@@ -6,7 +6,7 @@ import { readFile, mkdir } from "node:fs/promises";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 const bundle = await build({entryPoints:["tests/browser/collections-fixture.jsx"],bundle:true,write:false,format:"esm",jsx:"automatic"});
-const css=(await readFile("src/app/globals.css","utf8")).replace('@import "tailwindcss";',"");
+const css=(await Promise.all(["src/app/globals.css","src/styles/staff-workspace.css","src/styles/collection-notices.css"].map(p=>readFile(p,"utf8")))).join("\n").replace('@import "tailwindcss";',"");
 const brandAssets = await fixtureBrandAssets();
 const server=createServer(async(req,res)=>{
   if(req.url==="/fixture.js"){res.setHeader("Content-Type","text/javascript");return res.end(bundle.outputFiles[0].text);}
@@ -17,7 +17,7 @@ const server=createServer(async(req,res)=>{
 await new Promise(resolve=>server.listen(0,"127.0.0.1",resolve));
 const browser=await chromium.launch(process.env.PLAYWRIGHT_CHANNEL?{channel:process.env.PLAYWRIGHT_CHANNEL}:{});
 const errors=[],calls=[];
-const row={id:"cmaccountfixture000001",accountNumber:"CI-101",name:"Training tenant",facilityId:"store1",facility:"Training store with a deliberately long descriptive name",currentBalance:"100",ageing:{buckets:[0,0,0,0,10000],overdue:10000,credit:0,balance:10000,oldestDays:100,charges:[{id:"source1",description:"Original rent",dueDate:"2026-06-01",remaining:10000,days:100}],issue:null},hold:null,revision:0,ownerId:null,nextFollowUp:null,disputed:false,disputeReason:null,terms:{dueDays:0,allocation:"OLDEST_DUE_FIRST",approvalReference:"CI approved",overrides:[]},promises:[],activities:[],owners:[{id:"cmownerfixture0000001",name:"CI collector"}],sources:[{id:"source1",description:"Original rent",date:"2026-06-01"}]};
+const row={id:"cmaccountfixture000001",accountNumber:"CI-101",name:"Training tenant",customerId:"customer1",phone:"+27000000000",alternatePhone:"+27000000001",email:"synthetic@example.invalid",units:["101"],lastNoteAt:"2026-09-20T10:00:00Z",facilityId:"store1",facility:"Training store with a deliberately long descriptive name",currentBalance:"100",ageing:{buckets:[0,0,0,0,10000],overdue:10000,credit:0,balance:10000,oldestDays:100,charges:[{id:"source1",description:"Original rent",dueDate:"2026-06-01",remaining:10000,days:100}],issue:null},hold:null,revision:0,ownerId:null,nextFollowUp:null,disputed:false,disputeReason:null,terms:{dueDays:0,allocation:"OLDEST_DUE_FIRST",approvalReference:"CI approved",overrides:[]},promises:[],activities:[],owners:[{id:"cmownerfixture0000001",name:"CI collector"}],sources:[{id:"source1",description:"Original rent",date:"2026-06-01"}]};
 const data={asOf:"2026-09-21",today:"2026-09-21",userId:"cmownerfixture0000001",rows:[row,{...row,id:"cmaccountfixture000002",accountNumber:"CI-102",ageing:{...row.ageing,overdue:0,buckets:[0,0,0,0,0],issue:"Approved due dates and allocation terms are missing."}}]};
 row.accessReview={policy:"2026-10-18-seven-calendar-days-v1",paymentMethod:"EFT",reviewOn:"2026-06-08",sourceChargeId:"source1",blockers:[],eligible:true,financialApproval:false,accessApproval:false};
 row.accessReviewSchedule={plan:null,canManage:true,canSchedule:true,unavailable:false};
@@ -36,12 +36,26 @@ try{
   row.accessReview={...row.accessReview,eligible:!row.hold&&!row.promises.some(p=>p.status==="OPEN"),blockers:row.hold?[row.hold]:row.promises.some(p=>p.status==="OPEN")?["Agreed promise hold"]:[]};
   row.activities.unshift({id:`action${calls.length}`,action:body.action,note:body.note,actorId:data.userId,createdAt:new Date().toISOString()});return route.fulfill({json:{id:`action${calls.length}`}});
  });
+ await page.route("**/api/v1/accounts?accountId=*",route=>route.fulfill({json:{data:{accounts:[{id:row.id,financialReviewRequired:false,ledgerEntries:[{id:"charge",type:"CHARGE",description:"Synthetic rent",amount:"100",effectiveAt:"2026-09-01T00:00:00Z"}],payments:[{id:"payment /1",amount:"40",method:"EFT",status:"SUCCEEDED",processedAt:"2026-09-02T10:00:00Z",createdAt:"2026-09-02T10:00:00Z"}]}]}}}));
+ await page.route("**/api/v1/collections/notices?accountId=*",route=>{assert.equal(new URL(route.request().url()).searchParams.get("accountId"),row.id);assert.equal(route.request().method(),"GET");return route.fulfill({json:{source:{accountId:row.id,asOf:data.today,overdueCents:10000,fingerprint:"a".repeat(64),blockers:["Explicit email communication consent is required."]},message:null,notice:null,canManage:true,canSend:false,sendConfigured:false}})});
+ await page.route("**/api/v1/collections/phone-notices?*",route=>{assert.equal(new URL(route.request().url()).searchParams.get("accountId"),row.id);assert.equal(route.request().method(),"GET");return route.fulfill({json:{source:{accountId:row.id,accountNumber:row.accountNumber,facility:row.facility,asOf:data.today},blockers:["SMS activation remains off."],message:null,notice:null,canManage:true,canSend:false,sendConfigured:false}})});
+ await page.route("**/api/v1/customers/customer1/history**",route=>route.fulfill({json:{data:{entries:[],nextCursor:null,facilities:[{id:"store1",name:row.facility}],writableFacilities:[],visibility:{communications:false,collections:true},legacyNotes:null,canExport:false}}}));
  await page.goto(`http://127.0.0.1:${server.address().port}`);
  await expect(page.getByRole("button",{name:"Review CI-102",exact:true})).toBeVisible();
  await page.getByLabel("As of (South Africa)").fill("");
  await expect(page.getByRole("button",{name:"Review CI-102",exact:true})).toBeVisible();
  await page.getByRole("button",{name:"Open next follow-up"}).click();assert.equal(calls.length,0);
  await expect(page.getByRole("heading",{name:"CI-101 · Training tenant"})).toBeVisible();
+ await expect(page.locator(".collection-contact").getByText("+27000000001",{exact:true})).toBeVisible();
+ await page.getByRole("button",{name:"Ledger, payments & receipts",exact:true}).click();
+ await expect(page.getByRole("link",{name:"View / print receipt"})).toHaveAttribute("href",`/api/v1/accounts/${row.id}/receipts/payment%20%2F1`);
+ await expect(page.getByRole("link",{name:"Open full account"})).toHaveAttribute("href",`/operations/accounts?accountId=${row.id}`);
+ await expect(page.getByText("Synthetic rent",{exact:true})).toBeVisible();
+ await page.getByRole("button",{name:"Email",exact:true}).click();await expect(page.getByText("Explicit email communication consent is required.",{exact:true})).toBeVisible();await expect(page.getByRole("button",{name:"Prepare notice draft",exact:true})).toBeDisabled();
+ await page.getByRole("button",{name:"SMS & WhatsApp",exact:true}).click();await expect(page.getByText("SMS activation remains off.",{exact:true})).toBeVisible();await expect(page.getByRole("button",{name:"Prepare / refresh draft",exact:true})).toBeDisabled();
+ await page.getByRole("button",{name:"Customer history",exact:true}).click();await expect(page.getByRole("heading",{name:"Customer history & staff notes"})).toBeVisible();
+ assert.equal(calls.length,0,"Opening case tabs must not create collection actions");
+ await page.getByRole("button",{name:"Case notes",exact:true}).click();
  await expect(page.getByRole("button",{name:"Save follow-up",exact:true})).toBeDisabled();
  await page.getByText("Review charge ageing and approved terms",{exact:true}).click();
  await page.getByLabel("Case note / evidence reference").fill("CI terms approval evidence");

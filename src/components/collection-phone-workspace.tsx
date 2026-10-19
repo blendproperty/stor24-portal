@@ -4,14 +4,14 @@ import type { previewPhoneNotice } from "@/lib/collection-phone-service";
 type Preview = Awaited<ReturnType<typeof previewPhoneNotice>>;
 type Account = { id: string; accountNumber: string; name: string; facility: string };
 const endpoint = "/api/v1/collections/phone-notices";
-export function CollectionPhoneWorkspace() {
-  const [accounts, setAccounts] = useState<Account[]>([]), [accountId, setAccountId] = useState(""), [channel, setChannel] = useState<"SMS" | "WHATSAPP">("SMS");
+export function CollectionPhoneWorkspace({ initialAccountId = "", embedded = false }: { initialAccountId?: string; embedded?: boolean }) {
+  const [accounts, setAccounts] = useState<Account[]>([]), [accountId, setAccountId] = useState(initialAccountId), [channel, setChannel] = useState<"SMS" | "WHATSAPP">("SMS");
   const [preview, setPreview] = useState<Preview | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState(""), [reference, setReference] = useState(""), [confirm, setConfirm] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
-  useEffect(() => { const abort = new AbortController();
+  useEffect(() => { if (initialAccountId) return; const abort = new AbortController();
     fetch("/api/v1/collections", { cache: "no-store", signal: abort.signal }).then(async r => { const v = await r.json(); if (!r.ok) throw Error(v.error); setAccounts(v.rows); const requested = new URLSearchParams(window.location.search).get("account"); if (v.rows.some((a: Account) => a.id === requested)) setAccountId(requested!); }).catch(e => { if (!abort.signal.aborted) setError(e.message); });
     return () => abort.abort();
-  }, []);
+  }, [initialAccountId]);
   useEffect(() => { if (!accountId) return;
     const abort = new AbortController();
     fetch(`${endpoint}?${new URLSearchParams({ accountId, channel })}`, { cache: "no-store", signal: abort.signal }).then(async r => { const v = await r.json(); if (!r.ok) throw Error(v.error); if (!abort.signal.aborted) setPreview(v); }).catch(e => { if (!abort.signal.aborted) setError(e.message); });
@@ -26,9 +26,9 @@ export function CollectionPhoneWorkspace() {
   }
   const saved = preview?.notice, payload = saved ?? preview?.message, held = !preview || !!preview.blockers.length, stale = !!saved && !saved.sourceCurrent;
   return <div className="collection-notices" aria-busy={busy}>
-    <header className="notice-heading"><h1>Reviewed SMS &amp; WhatsApp reminders</h1><p>1. Select an account and channel. 2. Review the complete reminder. 3. Another authorised colleague approves. 4. Authorise one send.</p><a href="/collections">Back to Collections</a></header>
+    <header className="notice-heading"><h1>Reviewed SMS &amp; WhatsApp reminders</h1><p>1. Select an account and channel. 2. Review the complete reminder. 3. Another authorised colleague approves. 4. Authorise one send.</p>{!embedded&&<a href="/collections">Back to Collections</a>}</header>
     <section className="notice-panel"><p>These are payment reminders. They do not satisfy a separately required access-restriction notice, add fees, approve finance or change access.</p>
-      <label>Account<select aria-label="Account" disabled={busy} value={accountId} onChange={e => { resetPreview(); setAccountId(e.target.value); }}><option value="">Choose an account</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.accountNumber} · {a.name} · {a.facility}</option>)}</select></label>
+      {!embedded&&<label>Account<select aria-label="Account" disabled={busy} value={accountId} onChange={e => { resetPreview(); setAccountId(e.target.value); }}><option value="">Choose an account</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.accountNumber} · {a.name} · {a.facility}</option>)}</select></label>}
       <label>Channel<select aria-label="Channel" disabled={busy} value={channel} onChange={e => { resetPreview(); setChannel(e.target.value as typeof channel); }}><option value="SMS">SMS</option><option value="WHATSAPP">WhatsApp</option></select></label>
       <button disabled={busy || !accountId} onClick={() => { resetPreview(); setReloadToken(v => v + 1); }}>Reload notice</button>
     </section>
