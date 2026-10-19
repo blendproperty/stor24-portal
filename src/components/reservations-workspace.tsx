@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import Link from "next/link";
-import { CalendarCheck, Plus, Search, X } from "lucide-react";
+import { CalendarCheck, Plus, Search, Tags, X } from "lucide-react";
 import { ReservationUnitPicker, type ReservationMap } from "@/components/reservation-unit-picker";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
@@ -402,7 +402,7 @@ export function ReservationsWorkspace({initialCustomerId="",canReviewPrices=fals
                         </StatusPill>
                       </td>
                       <td>
-                        {canReviewPrices?<Link href={`/reservations/prices?reference=${encodeURIComponent(item.id)}`} className="text-button">Price review</Link>:null}
+                        {canReviewPrices?<Link href={`/reservations/prices?reference=${encodeURIComponent(item.id)}`} className="reservation-price-review"><Tags size={16} aria-hidden="true"/><span>Price review</span></Link>:null}
                         {item.status === "ACTIVE" ? (
                           <div className="reservation-actions">
                             <Link

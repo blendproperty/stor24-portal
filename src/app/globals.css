@@ -3181,3 +3181,10 @@ a.module-card:focus-visible {
 .price-search-result p{margin:6px 0}
 .price-search-result .button{flex-shrink:0}
 @media(max-width:600px){.price-search-result{align-items:stretch;flex-direction:column;gap:12px}}
+
+/* Distinguish quote review from lifecycle actions without implying approval. */
+.reservation-price-review{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:9px 14px;margin:2px 0 12px;border:1px solid #e9b79b;border-radius:9px;background:#fff0e7;color:#873200;font-weight:700;font-size:13px;line-height:1.25;text-decoration:none;white-space:nowrap;transition:background .15s,border-color .15s}
+.reservation-price-review:hover{background:#ffe2cf;border-color:#d96b2b;color:#6d2700;text-decoration:none}
+.reservation-price-review:focus-visible{outline:3px solid #147d72;outline-offset:3px}
+.reservation-price-review svg{flex-shrink:0}
+.reservation-actions{flex-wrap:wrap;row-gap:10px}
