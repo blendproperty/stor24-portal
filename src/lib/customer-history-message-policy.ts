@@ -1,6 +1,6 @@
 export function redactHistoryMessage(text:string) {
   let value=text.replace(/https?:\/\/[^\s<>"]+/gi,"[link omitted]").replace(/\b(?:Bearer\s+)[A-Za-z0-9._~+\/-]+/gi,"[credential omitted]").replace(/\b(?:verification|one.time|security|login|OTP)\s*(?:code)?\s*[:=]?\s*\d{4,8}\b/gi,"[verification code omitted]");
-  for(const key of ["AUTH_SECRET","TWILIO_AUTH_TOKEN","RESEND_API_KEY","SENDGRID_API_KEY","PUBLIC_BOOKING_API_KEY","INTEGRATION_CONFIG_ENCRYPTION_KEY"]){const secret=process.env[key];if(secret&&secret.length>=16)value=value.replaceAll(secret,"[credential omitted]");}
+  for(const key of ["AUTH_SECRET","TWILIO_AUTH_TOKEN","RESEND_API_KEY","SENDGRID_API_KEY", "HOSTINGER_SMTP_PASSWORD","PUBLIC_BOOKING_API_KEY","INTEGRATION_CONFIG_ENCRYPTION_KEY"]){const secret=process.env[key];if(secret&&(key === "HOSTINGER_SMTP_PASSWORD" || secret.length>=16))value=value.replaceAll(secret,"[credential omitted]");}
   return value;
 }
 export function historyEvidence(payload:unknown) {

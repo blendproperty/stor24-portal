@@ -1,3 +1,4 @@
+import { HostingerEmailProvider } from "@/lib/hostinger-email";
 import { guardDlpTransfer, type DlpContext } from "@/lib/dlp-transfer-service";
 export type EmailMessage = { to: string; subject: string; text: string; html: string; dlp?: DlpContext };
 export interface EmailProvider { send(message: EmailMessage): Promise<void> }
@@ -162,6 +163,7 @@ export function emailProvider(protect = guardDlpTransfer): EmailProvider {
   } };
 }
 function unguardedEmailProvider(): EmailProvider {
+  if (process.env.EMAIL_PROVIDER === "hostinger") return new HostingerEmailProvider();
   if (process.env.EMAIL_PROVIDER === "resend") return new ResendEmailProvider();
   if (process.env.EMAIL_PROVIDER === "sendgrid") return new SendGridEmailProvider();
   if (process.env.EMAIL_PROVIDER === "twilio") return new TwilioEmailProvider();

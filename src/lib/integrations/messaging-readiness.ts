@@ -21,7 +21,9 @@ export function configuredMessagingChannels(env: MessagingEnvironment): Set<Mess
   const channels = new Set<MessagingChannel>();
   const twilioCredentials = present(env.TWILIO_ACCOUNT_SID) && present(env.TWILIO_AUTH_TOKEN);
   const emailProvider = env.EMAIL_PROVIDER?.trim().toLowerCase();
-  const emailConfigured = emailProvider === "resend"
+  const emailConfigured = emailProvider === "hostinger"
+    ? present(env.HOSTINGER_SMTP_PASSWORD)
+    : emailProvider === "resend"
     ? present(env.RESEND_API_KEY) && present(env.EMAIL_FROM)
     : emailProvider === "sendgrid"
       ? present(env.SENDGRID_API_KEY) && present(env.EMAIL_FROM)
