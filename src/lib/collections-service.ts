@@ -230,7 +230,7 @@ async function prepareEscalationReviewTask(tx: Client, scope: RequestScope, acco
   const topic = input.target === "FEE" ? "Fee policy" : input.target === "ACCESS" ? "Access concern" : `${input.channel} notice policy`;
   const task = await tx.task.create({ data: { organisationId: scope.organisationId, facilityId, customerId: account.customerId, assigneeId, createdById: scope.userId,
     purpose: "ARREARS_ESCALATION_REVIEW", requestHash, requestKey: createHash("sha256").update(JSON.stringify(["COLLECTION_REVIEW_TASK", scope.organisationId, caseId, input.requestKey])).digest("hex"),
-    title: `${topic} review · ${account.accountNumber}`, dueAt: new Date(`${input.reviewOn}T23:59:59.999+02:00`),
+    title: `${topic} review Â· ${account.accountNumber}`, dueAt: new Date(`${input.reviewOn}T23:59:59.999+02:00`),
     description: `Open Collections and search ${account.accountNumber}. Review the current case history, source evidence and unresolved policy decision. Completing this internal task records task progress only. It does not approve a notice, fee, financial entry or physical access change. Fee amount remains unset pending approved policy. Existing payment, dispute and arrangement holds remain in force.`,
   } });
   return { taskId: task.id, assigneeId, created: true };
