@@ -5399,3 +5399,10 @@ At the same53d2e3c3 checkpoint, the hosted real PostgreSQL task-status and colle
 
 - Browser follow-up: production build and validate now PASS. Updated price browser fixture successfully found and selected the customer, then caught an ambiguous generic status selector (new search count plus save-recovery notice). Scoped that assertion to the recovery message; final exact-head browser/release checks still pending.
 - Focused responsive browser validation after selector repair: all 1440/768/390/320px cases PASS locally, including customer-name selection, proposal save-response recovery, independent reviewer, explicit customer acceptance retry and agreement handoff. APIs intercepted; this is synthetic evidence, not live or customer UAT.
+
+
+## 19 October 2026 - Reservation Price review action visibility
+
+- Implementation: replace the plain Price review text link with a warm coloured button-style link and price-tags icon, a keyboard focus outline and a separate margin above the lifecycle actions. Lifecycle action rows can wrap with spacing. Link target, permission checks and all financial approval behaviour unchanged. No proposal, booking, payment or provider changes.
+- Testing: existing reservation browser recovery fixture exercised with price-review visibility enabled for visual validation; final results and rendered QA pending. Commit/push, merge, deployment/configuration and live production verification PENDING for this cosmetic follow-up. Full gap3 unsigned/unpaid negotiation UAT and all financial/provider/legal/data/training/REA gates remain OPEN. Prior lookup deployment evidence is retained on codex/booking-price-search-release-evidence-20261019 / PR564.
+- Focused validation: existing reservation recovery browser checks PASS at1440/390/320px with Price review enabled; rendered desktop visual inspected with coloured icon button separated above lifecycle actions. API interception only, no live financial changes. Normal hosted checks and deployment still required.
