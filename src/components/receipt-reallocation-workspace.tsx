@@ -11,7 +11,8 @@ type AccountChoice = { id: string; accountNumber: string; customerName: string; 
 type SavedRequest = Extract<ReceiptCorrectionCommand, { action: "request" }>;
 const zar = (value: string) => new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR" }).format(Number(value));
 
-export function ReceiptReallocationWorkspace() {
+export function ReceiptReallocationWorkspace({ training = false }: { training?: boolean }) {
+  const endpoint = training ? "/api/v1/training/receipt-corrections" : RECEIPT_CORRECTION_ENDPOINT;
   const [data, setData] = useState<ReceiptCorrectionWorkspace | null>(null);
   const [facilityId, setFacilityId] = useState("");
   const [search, setSearch] = useState("");
@@ -51,7 +52,7 @@ export function ReceiptReallocationWorkspace() {
       if (appliedSearch.current.trim()) params.set("search", appliedSearch.current.trim());
       if (cursor) params.set("cursor", cursor);
       if (receiptCursor && sourceAccountId) params.set("receiptCursor", receiptCursor);
-      const response = await fetch(`${RECEIPT_CORRECTION_ENDPOINT}?${params}`, { cache: "no-store", signal: controller.signal });
+      const response = await fetch(`${endpoint}?${params}`, { cache: "no-store", signal: controller.signal });
       if (!response.ok) throw Error(response.status === 401 ? "Sign in again to review receipt corrections." : response.status === 403 ? "Your account cannot view receipt corrections for this store." : "Receipt corrections could not be loaded. Refresh to try again.");
       const parsed = receiptCorrectionWorkspaceSchema.safeParse((await response.json()).data);
       if (!parsed.success) throw Error("The receipt correction records could not be verified. Refresh before continuing.");
@@ -75,7 +76,7 @@ export function ReceiptReallocationWorkspace() {
     } catch (failure) {
       if (reader.current === controller) { setData(null); setPreview(null); setConfirmed(false); setReadError(failure instanceof Error && failure.name !== "AbortError" ? failure.message : "The receipt review timed out. Refresh to try again."); }
     } finally { clearTimeout(timer); if (reader.current === controller) { reader.current = null; setReadBusy(false); } }
-  }, [facilityId, sourceAccountId]);
+  }, [facilityId, sourceAccountId, endpoint]);
   useEffect(() => { const timer = setTimeout(() => void load(), 0); return () => { clearTimeout(timer); reader.current?.abort(); }; }, [load]);
   useEffect(() => () => { reader.current?.abort(); writer.current?.abort(); writer.current = null; }, []);
 
@@ -84,7 +85,7 @@ export function ReceiptReallocationWorkspace() {
     const controller = new AbortController(); writer.current = controller; setWriteBusy(true);
     const timer = setTimeout(() => controller.abort(), 30_000);
     try {
-      const response = await fetch(RECEIPT_CORRECTION_ENDPOINT, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input), signal: controller.signal });
+      const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input), signal: controller.signal });
       const result = await response.json();
       if (!response.ok) throw Error(typeof result?.error?.message === "string" ? result.error.message : "The receipt correction could not be confirmed.");
       return result.data as unknown;
@@ -111,7 +112,7 @@ export function ReceiptReallocationWorkspace() {
       const result = await command(input) as { id?: unknown; idempotent?: unknown };
       if (typeof result?.id !== "string" || typeof result.idempotent !== "boolean") throw Error("The saved request could not be verified.");
       setUncertain(null); setPreview(null); setConfirmed(false); requestKey.current = null; setEntryId("");
-      setMessage("Request recorded for independent review. No second payment or provider refund was created."); await load();
+      setMessage(training ? "Training request saved. Live balances are unchanged; approval and posting are unavailable in training." : "Request recorded for independent review. No second payment or provider refund was created."); await load();
     } catch { setUncertain(input); setPreview(null); setConfirmed(false); setError("We could not confirm whether this request was saved. Its account details and request reference are retained. Check the recorded requests or retry exactly the same request."); }
   }
   async function decide(row: ReceiptCorrectionRow, decision: "approve" | "reject" | "cancel", reference: string) {
@@ -134,8 +135,9 @@ export function ReceiptReallocationWorkspace() {
   const accountChoices = (selected: AccountChoice | null) => selected && !data?.accounts.some(account => account.id === selected.id) ? [selected, ...(data?.accounts ?? [])] : data?.accounts ?? [];
 
   return <div className={styles.workspace}>
-    <PageHeader eyebrow="FINANCE REVIEW" title="Receipt allocation corrections" description="Review an existing receipt, request an allocation correction and retain its independent decision." />
-    <p className={styles.notice}>{receiptReallocationNotice}</p>
+    <PageHeader eyebrow={training ? "STAFF TRAINING" : "FINANCE REVIEW"} title={training ? "Receipt correction training" : "Receipt allocation corrections"} description={training ? "Practise account selection, preview and a saved training request with sample data." : "Review an existing receipt, request an allocation correction and retain its independent decision."} />
+    <p className={styles.notice}>{training ? "TRAINING ONLY: two sample accounts and a R200 sample receipt per permitted store. No live tenancy, money, ledger, financial approval, provider or access change. Training requests cannot be approved or posted." : receiptReallocationNotice}</p>
+    <p><a className="button button-secondary" href={training ? "/adjustments/receipt-corrections" : "/adjustments/receipt-corrections/training"}>{training ? "Return to live receipt corrections" : "Practise with training accounts"}</a></p>
     <form className={styles.filters} onSubmit={event => { event.preventDefault(); appliedSearch.current = search; invalidate(); void load(); }}>
       <label>Store<select aria-label="Store" value={facilityId} disabled={writeBusy || !!uncertain} onChange={event => { setFacilityId(event.target.value); setSource(null); setTarget(null); setEntryId(""); setUndo(null); invalidate(); }}><option value="">All permitted stores</option>{data?.facilities.map(facility => <option key={facility.id} value={facility.id}>{facility.name}</option>)}</select></label>
       <label>Find an account<input value={search} maxLength={200} disabled={writeBusy || !!uncertain} onChange={event => setSearch(event.target.value)} placeholder="Customer or account reference" /></label>
@@ -147,9 +149,10 @@ export function ReceiptReallocationWorkspace() {
     {message && <p role="status" className={styles.notice}>{message}</p>}
     {readBusy && <p role="status">Loading scoped receipt records…</p>}
     {uncertain && <div className={styles.notice}><p>The pending request is locked so its saved details cannot change.</p><button type="button" className="button button-secondary" disabled={readBusy || writeBusy || !data?.capabilities.canRequest} onClick={() => void submit(uncertain)}>Retry exactly the same request</button></div>}
+    {data && !readBusy && <p role="status">{data.accounts.length ? `${data.accounts.length} matching ${training ? "training " : ""}accounts. Choose a Source account below; clear the search to see other destinations.` : training ? "No training accounts match. Clear the search or select another permitted store." : "No tenancy accounts match this search and store. Customer enquiries and bookings without a tenancy account are not included. Clear the search or use training accounts."}</p>}
     {data?.accountsLimited && <p className={styles.notice}>More matching accounts exist. Narrow the store or account search to find another account.</p>}
     {data?.capabilities.canRequest ? <section className={styles.panel}>
-      <div className={styles.sectionHeading}><h2>{undo ? "Prepare an allocation undo" : "Request a receipt allocation correction"}</h2>{undo && <button type="button" className="button button-secondary" disabled={locked} onClick={() => { setUndo(null); setSource(null); setTarget(null); setEntryId(""); invalidate(); }}>Back to a new allocation</button>}</div>
+      <div className={styles.sectionHeading}><h2>{undo ? "Prepare an allocation undo" : (training ? "Practise a receipt allocation" : "Request a receipt allocation correction")}</h2>{undo && <button type="button" className="button button-secondary" disabled={locked} onClick={() => { setUndo(null); setSource(null); setTarget(null); setEntryId(""); invalidate(); }}>Back to a new allocation</button>}</div>
       <form onSubmit={event => { event.preventDefault(); void prepare(); }}><fieldset disabled={locked} className={styles.fieldset}>
         <div className={styles.grid}>
           <label>Source account<select aria-label="Source account" value={source?.id ?? ""} disabled={!!undo} required onChange={event => { setSource(data.accounts.find(account => account.id === event.target.value) ?? null); setTarget(null); setEntryId(""); invalidate(); }}><option value="">Choose the current receipt account</option>{accountChoices(source).map(account => <option key={account.id} value={account.id}>{account.accountNumber} · {account.customerName}</option>)}</select></label>
@@ -166,31 +169,31 @@ export function ReceiptReallocationWorkspace() {
       {preview && <section className={styles.preview} aria-label="Correction preview"><h3>Check the exact account changes</h3><div className={styles.grid}>
         <div><h4>Source · {preview.value.source.accountNumber}</h4><p>{zar(preview.value.source.balance)} → {zar(preview.value.sourceBalanceAfter)}</p></div>
         <div><h4>Destination · {preview.value.target.accountNumber}</h4><p>{zar(preview.value.target.balance)} → {zar(preview.value.targetBalanceAfter)}</p></div>
-      </div><p>Allocation amount: <strong>{zar(preview.value.amount)}</strong> · Remaining on source receipt: {zar(preview.value.sourceReceiptRemaining)}</p><p>{preview.value.notice}</p><label className={styles.confirm}><input type="checkbox" checked={confirmed} disabled={locked} onChange={event => setConfirmed(event.target.checked)} />I checked the source receipt, both accounts and this amount.</label><button type="button" className="button button-primary" disabled={locked || !confirmed} onClick={() => void submit()}>Submit for independent review</button></section>}
+      </div><p>Allocation amount: <strong>{zar(preview.value.amount)}</strong> · Remaining on source receipt: {zar(preview.value.sourceReceiptRemaining)}</p><p>{preview.value.notice}</p><label className={styles.confirm}><input type="checkbox" checked={confirmed} disabled={locked} onChange={event => setConfirmed(event.target.checked)} />I checked the source receipt, both accounts and this amount.</label><button type="button" className="button button-primary" disabled={locked || !confirmed} onClick={() => void submit()}>{training ? "Save training request" : "Submit for independent review"}</button></section>}
     </section> : data && <p className={styles.notice}>Your role can review the permitted history. Creating a correction requires separate permission.</p>}
-    {data && <section className={styles.panel}><h2>Retained requests and decisions</h2><p>Newest first · SAST. A posted correction reallocates existing cash; it does not prove a new bank settlement.</p>
+    {data && <section className={styles.panel}><h2>{training ? "Saved training requests" : "Retained requests and decisions"}</h2><p>{training ? "Newest first · SAST. Training requests remain separate from financial approval and posting. Cancel a completed practice request to tidy up." : "Newest first · SAST. A posted correction reallocates existing cash; it does not prove a new bank settlement."}</p>
       {!data.requests.length && <p>No correction requests match this view.</p>}
-      <div className={styles.history}>{data.requests.map(row => <CorrectionCard key={`${row.id}:${row.revision}:${generation}`} row={row} data={data} locked={locked} onDecide={decide} onUndo={startUndo} />)}</div>
+      <div className={styles.history}>{data.requests.map(row => <CorrectionCard key={`${row.id}:${row.revision}:${generation}`} row={row} data={data} training={training} locked={locked} onDecide={decide} onUndo={startUndo} />)}</div>
       {data.nextCursor && <button type="button" className="button button-secondary" disabled={locked} onClick={() => { invalidate(); void load(data.nextCursor!); }}>Load older requests</button>}
     </section>}
   </div>;
 }
 
-function CorrectionCard({ row, data, locked, onDecide, onUndo }: { row: ReceiptCorrectionRow; data: ReceiptCorrectionWorkspace; locked: boolean; onDecide: (row: ReceiptCorrectionRow, decision: "approve" | "reject" | "cancel", reference: string) => Promise<void>; onUndo: (row: ReceiptCorrectionRow) => void }) {
+function CorrectionCard({ row, data, training, locked, onDecide, onUndo }: { row: ReceiptCorrectionRow; data: ReceiptCorrectionWorkspace; training: boolean; locked: boolean; onDecide: (row: ReceiptCorrectionRow, decision: "approve" | "reject" | "cancel", reference: string) => Promise<void>; onUndo: (row: ReceiptCorrectionRow) => void }) {
   const [reference, setReference] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const own = row.requestedById === data.userId;
-  const review = data.capabilities.canApprove && !own;
+  const review = !training && data.capabilities.canApprove && !own;
   const pending = row.status === "PENDING_APPROVAL";
   const ready = !locked && confirmed && reference.trim().length >= 5;
   return <article className={styles.card}>
-    <div className={styles.sectionHeading}><h3>{row.operation === "UNDO" ? "Allocation undo" : "Receipt allocation"} · {zar(row.amount)}</h3><span className={styles.status}>{row.status.replaceAll("_", " ")}</span></div>
+    <div className={styles.sectionHeading}><h3>{row.operation === "UNDO" ? "Allocation undo" : "Receipt allocation"} · {zar(row.amount)}</h3><span className={styles.status}>{training && row.status === "PENDING_APPROVAL" ? "TRAINING SAVED" : row.status.replaceAll("_", " ")}</span></div>
     <p><strong>{row.sourceAccountNumber}</strong> → <strong>{row.targetAccountNumber}</strong> · {data.facilities.find(facility => facility.id === row.facilityId)?.name ?? "Permitted store"}</p>
     <p>{formatSouthAfricaDateTime(row.createdAt)} SAST · {row.requestedByName || "Recorded staff member"}</p><details className={styles.decision}><summary>View source and decision history</summary><p>{row.reason}</p><p>Source evidence: {row.evidenceReference}</p>
-    {row.retainedPreview ? <div className={styles.retained}><h4>At submission</h4><div className={styles.grid}><p>Source balance: {zar(row.retainedPreview.sourceBalance)} → {zar(row.retainedPreview.sourceBalanceAfter)}</p><p>Destination balance: {zar(row.retainedPreview.targetBalance)} → {zar(row.retainedPreview.targetBalanceAfter)}</p></div><p>Remaining on source receipt: {zar(row.retainedPreview.sourceReceiptRemaining)}</p>{row.retainedPreview.paymentReference && <p>Original internal receipt reference: {row.retainedPreview.paymentReference}</p>}<p>Retained submission evidence. Approval rechecks the current source; this reference is not bank settlement proof.</p></div> : <p className={styles.notice}>The retained submission preview is unavailable. Posting approval and undo preparation are held for source review; the requester&apos;s evidence reference is not a substitute.</p>}
+    {row.retainedPreview ? <div className={styles.retained}><h4>At submission</h4><div className={styles.grid}><p>Source balance: {zar(row.retainedPreview.sourceBalance)} → {zar(row.retainedPreview.sourceBalanceAfter)}</p><p>Destination balance: {zar(row.retainedPreview.targetBalance)} → {zar(row.retainedPreview.targetBalanceAfter)}</p></div><p>Remaining on source receipt: {zar(row.retainedPreview.sourceReceiptRemaining)}</p>{row.retainedPreview.paymentReference && <p>Original internal receipt reference: {row.retainedPreview.paymentReference}</p>}<p>{training ? "Retained sample preview only. No live balances have changed and this training request cannot be approved or posted." : "Retained submission evidence. Approval rechecks the current source; this reference is not bank settlement proof."}</p></div> : <p className={styles.notice}>The retained submission preview is unavailable. Posting approval and undo preparation are held for source review; the requester&apos;s evidence reference is not a substitute.</p>}
     {row.reviewReference && <p>Decision reference: {row.reviewReference}</p>}{row.postedAt && <p>Posted {formatSouthAfricaDateTime(row.postedAt)} SAST</p>}
     <div className={styles.actions}>{row.sourceDocumentHref && <a className="button button-secondary" href={row.sourceDocumentHref}>Source correction document</a>}{row.targetDocumentHref && <a className="button button-secondary" href={row.targetDocumentHref}>Destination correction document</a>}</div>
-    {pending && own && <p>A different authorised colleague must approve or reject your request.</p>}
+    {pending && own && <p>{training ? "Training has no financial approval step. You can cancel your practice request below." : "A different authorised colleague must approve or reject your request."}</p>}
     {pending && (review || own && data.capabilities.canRequest) && <details className={styles.decision}><summary>{review ? "Review decision options" : "Cancellation options"}</summary><fieldset disabled={locked} className={styles.fieldset}><label>Independent review or cancellation reference<input value={reference} minLength={5} maxLength={200} onChange={event => { setReference(event.target.value); setConfirmed(false); }} /></label><label className={styles.confirm}><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />I checked this correction and its retained source evidence.</label><div className={styles.actions}>{review && <><button type="button" className="button button-primary" disabled={!ready || !row.retainedPreview} onClick={() => void onDecide(row, "approve", reference.trim())}>Independently approve and post</button><button type="button" className="button button-secondary" disabled={!ready} onClick={() => void onDecide(row, "reject", reference.trim())}>Reject request</button></>}{own && data.capabilities.canRequest && <button type="button" className="button button-secondary" disabled={!ready} onClick={() => void onDecide(row, "cancel", reference.trim())}>Cancel my request</button>}</div></fieldset></details>}
     {row.status === "POSTED" && row.operation === "MOVE" && row.targetLedgerEntryId && data.capabilities.canRequest && <button type="button" className="button button-secondary" disabled={locked || !row.retainedPreview} onClick={() => onUndo(row)}>Prepare an undo request</button>}</details>
   </article>;

@@ -108,3 +108,15 @@ test("operational offline lessons follow permissions while cached public help co
   assert.ok(endpoint.includes("auth.user.roleAssignments"));
   assert.ok(endpoint.includes("private, no-store"));
 });
+
+
+test("receipt training guide requires same-store viewing and separate request grants", () => {
+  const steps = (grants: GuideAssignment[]) => catalogueForAssignments(grants).guides.find(g => g.id === "receipt-correction-training")?.steps.length ?? 0;
+  assert.equal(steps(owner), 3);
+  assert.equal(steps([assignment(["adjustments.view", "billing.view"])]), 2);
+  assert.equal(steps([assignment(["adjustments.view", "billing.view", "adjustments.request"])]), 3);
+  assert.equal(steps([assignment(["adjustments.view"], "store-a"), assignment(["billing.view"], "store-b")]), 0);
+  assert.equal(steps([assignment(["adjustments.view", "billing.view"], "store-a"), assignment(["adjustments.request"], "store-b")]), 2);
+  assert.equal(steps([assignment(["adjustments.view"])]), 0);
+  assert.equal(steps([]), 0);
+});

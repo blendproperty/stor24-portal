@@ -15,6 +15,7 @@ export const guideAccessRules: Record<string, Rule> = {
   "receipt-bank-sources": rule("receipt_review.bank_sources,settlements.view", ["", "", ""], true),
   "receipt-import-posting": rule("receipt_review.view,receipt_review.post,receipt_review.approve,ledger.view,payments.manage,billing.view", ["", "", ""]),
   "netcash-refunds": rule("adjustments.view", ["", "payments.refund_prepare", "payments.refund_review", "payments.refund_reserve", "payments.refund_release_review"]),
+  "receipt-correction-training": rule("adjustments.view,billing.view", ["", "", "adjustments.request"]),
   "receipt-corrections": rule("adjustments.view,billing.view", ["", "adjustments.request", "adjustments.approve", "adjustments.request"]),
   "reservation-prices": rule("reservation_prices.view,reservations.manage,billing.view", ["", "reservation_prices.propose", "reservation_prices.approve", ""]),
   "unidentified-receipts": rule("receipt_review.view", ["receipt_review.capture", "", "receipt_review.propose,ledger.view", "receipt_review.approve,ledger.view"]),
