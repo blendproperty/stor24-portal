@@ -1,3 +1,4 @@
+import { updateArrearsReviewTaskStatus } from "../../src/lib/arrears-review-task-service";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
@@ -65,6 +66,12 @@ test("isolated PostgreSQL aged collections", async t => {
       await updateCollection(f.scope, { ...command, ...await base(f) });
       assert.equal(await db.task.count({ where: { organisationId: f.org.id } }), 2);
       assert.equal(await db.task.count({ where: { organisationId: f.org.id, status: "OPEN" } }), 1);
+      for (const status of ["OPEN", "WAITING", "IN_PROGRESS"] as const) await assert.rejects(db.$transaction(tx => updateArrearsReviewTaskStatus(tx, f.scope, task.id, status)), /ARREARS_REVIEW_TASK_CLOSED/);
+      assert.equal(await db.task.count({ where: { organisationId: f.org.id, status: "OPEN" } }), 1);
+      const replacement = await db.task.findFirstOrThrow({ where: { organisationId: f.org.id, status: "OPEN" } });
+      await assert.rejects(db.$transaction(tx => updateArrearsReviewTaskStatus(tx, { ...f.scope, facilityIds: [] }, replacement.id, "COMPLETED")), /ARREARS_REVIEW_TASK_NOT_FOUND/);
+      await db.$transaction(tx => updateArrearsReviewTaskStatus(tx, f.scope, replacement.id, "WAITING"));
+      assert.equal((await db.task.findUniqueOrThrow({ where: { id: replacement.id } })).status, "WAITING");
       assert.equal(JSON.stringify(await db.account.findUnique({ where: { id: f.account.id }, include: { ledgerEntries: true, payments: true, tenancy: { include: { occupancies: true } } } })), before);
       assert.equal(await db.communicationLog.count({ where: { organisationId: f.org.id } }), 0); assert.equal(await db.webhookOutbox.count({ where: { organisationId: f.org.id } }), 0);
       assert.equal((await row(f)).disputed, true);
