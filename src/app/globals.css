@@ -3172,3 +3172,12 @@ a.module-card:focus-visible {
 .operations-start-prompt,.operations-start-footnote{font-size:12px;line-height:1.6;color:#60717a;font-weight:400;margin:16px 0 0}
 .operations-start-guide button:focus-visible,.operations-start-guide select:focus-visible{outline:3px solid #24766e;outline-offset:3px}
 @media(max-width:700px){.operations-start-choices,.operations-start-plan ol{grid-template-columns:minmax(0,1fr)}.operations-start-choices{gap:10px}.operations-start-plan ol{gap:16px}}
+
+/* Booking search keeps customer identity, quote and action readable at every width. */
+.price-search-results{display:grid;gap:16px;margin-top:20px}
+.price-search-result{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:20px;border:1px solid var(--border,#d5e1e5);border-radius:12px;min-width:0}
+.price-search-result>div{min-width:0;overflow-wrap:anywhere}
+.price-search-result h3{margin:0 0 10px}
+.price-search-result p{margin:6px 0}
+.price-search-result .button{flex-shrink:0}
+@media(max-width:600px){.price-search-result{align-items:stretch;flex-direction:column;gap:12px}}

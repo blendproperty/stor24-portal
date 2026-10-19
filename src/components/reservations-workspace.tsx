@@ -60,7 +60,7 @@ const reservationReadSchema = z.object({ data: z.object({
 }) });
 const emptyData: Payload = { facilities: [], customers: [], reservations: [] };
 
-export function ReservationsWorkspace({initialCustomerId=""}: {initialCustomerId?: string}) {
+export function ReservationsWorkspace({initialCustomerId="",canReviewPrices=false}: {initialCustomerId?: string;canReviewPrices?:boolean}) {
   const [data, setData] = useState<Payload>({
     facilities: [],
     customers: [],
@@ -402,6 +402,7 @@ export function ReservationsWorkspace({initialCustomerId=""}: {initialCustomerId
                         </StatusPill>
                       </td>
                       <td>
+                        {canReviewPrices?<Link href={`/reservations/prices?reference=${encodeURIComponent(item.id)}`} className="text-button">Price review</Link>:null}
                         {item.status === "ACTIVE" ? (
                           <div className="reservation-actions">
                             <Link
