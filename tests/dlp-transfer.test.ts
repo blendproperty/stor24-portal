@@ -75,3 +75,13 @@ test("bulk personal transfers require explicit live scoped grants, revoke immedi
 });
 
 
+
+
+test("Hostinger credential is blocked from outbound content without audit leakage", async t => {
+  const original = process.env.HOSTINGER_SMTP_PASSWORD;
+  t.after(() => { if (original === undefined) delete process.env.HOSTINGER_SMTP_PASSWORD; else process.env.HOSTINGER_SMTP_PASSWORD = original; });
+  process.env.HOSTINGER_SMTP_PASSWORD = "smtp-test-secret";
+  const f = await fixture();
+  await assert.rejects(f.api.guardDlpTransfer({ ...context, channel: "EMAIL", classification: "confidential", recipient: context.approvedRecipient, content: "accidental smtp-test-secret" }), /DLP_TRANSFER_BLOCKED/);
+  assert.doesNotMatch(JSON.stringify(f.state.audits), /smtp-test-secret/);
+});

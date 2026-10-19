@@ -26,3 +26,11 @@ test("provider message recovery is GET-only, account/SID/channel/recipient-bound
     const archived=await readHistoryMessage({...proof,provider:null,metadata:{historyEvidence:{version:1,text:"Retained booking email",subject:"Booking"}}},null,request);assert.equal(archived.body,"Retained booking email");assert.equal(calls,count);
   } finally {for(const [key,value]of Object.entries({TWILIO_ACCOUNT_SID:old.account,TWILIO_AUTH_TOKEN:old.token,AUTH_SECRET:old.auth})){if(value===undefined)delete process.env[key];else process.env[key]=value;}}
 });
+
+
+test("history exports redact the Hostinger mailbox credential", t => {
+  const original = process.env.HOSTINGER_SMTP_PASSWORD;
+  t.after(() => { if (original === undefined) delete process.env.HOSTINGER_SMTP_PASSWORD; else process.env.HOSTINGER_SMTP_PASSWORD = original; });
+  process.env.HOSTINGER_SMTP_PASSWORD = "smtp-test-secret";
+  assert.equal(redactHistoryMessage("accidental smtp-test-secret"), "accidental [credential omitted]");
+});
