@@ -123,3 +123,10 @@ PR551/8f5aac3e1cffc7260be20ea4645185c56c530ec5 and normal Deploy39107072570 are 
 ## 18 October - approved internal worker activation
 
 The later direct owner approval and verified internal-worker activation supersede the earlier activation-held status only. The separate email scheduler, financial/provider/access authority and genuine remaining builds/UAT remain held as recorded in item12 and PROJECT_CONTEXT.md.
+
+
+## 19 October — actual remaining software and correspondence
+
+Item12 now has a provider-independent final-unpaid/original-debt reconciliation core on the review branch, with15 focused tests, lint and TypeScript passing. This is not live ingestion: current debit holds remain. Authenticated merchant-specific Netcash ingestion/durable mapping, legal restriction notice, provider suspension/restoration and fee policy/posting remain unbuilt or contract/policy gated. Existing internal escalation requests already support held fee/access/notice concerns. User hands-on testing remains deferred. Canonical PROJECT_CONTEXT.md distinguishes source, publication, deployment and live stages.
+
+All three approved legal/access/Netcash information requests were sent19October and independently verified in Sent Items. Earlier unsent-only wording is historical; original draft copies remain unsent and must not be resent. Replies/contracts and all separate approvals remain outstanding. No full gap12 or all23 closure is claimed; prior passed scopes and other gates remain intact.
