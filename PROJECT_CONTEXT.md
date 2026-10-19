@@ -5399,3 +5399,12 @@ At the same53d2e3c3 checkpoint, the hosted real PostgreSQL task-status and colle
 
 - Browser follow-up: production build and validate now PASS. Updated price browser fixture successfully found and selected the customer, then caught an ambiguous generic status selector (new search count plus save-recovery notice). Scoped that assertion to the recovery message; final exact-head browser/release checks still pending.
 - Focused responsive browser validation after selector repair: all 1440/768/390/320px cases PASS locally, including customer-name selection, proposal save-response recovery, independent reviewer, explicit customer acceptance retry and agreement handoff. APIs intercepted; this is synthetic evidence, not live or customer UAT.
+
+
+## 19 October 2026 - Booking price lookup release evidence
+
+- Implementation: PR563 adds read-only scoped customer/company/email/phone/unit/reference lookup and permission-gated Price review links on Reservations. Existing financial write routes and independent approval rules unchanged; no grants added.
+- Testing: final source 7316c73665f67f53cd0dfaf3373a3b16d459d645 passed CI39244100214 validate and full guided-help (including responsive name selection, save uncertainty recovery and independent approval), Security39244100213, Transactions39244100208 and CodeQL. All ten applicable checks SUCCESS; optional workload pilot skipped. Focused actual API and 1440/768/390/320px synthetic browser tests also pass locally. Earlier failed candidates were corrected before promotion.
+- Commit/push: source and canonical implementation evidence verified on remote branch before merge. Merge: PR563 merged normally to main89f5fffb40e97db96147feba3d0691dce7963c3a after final-head checks passed. Canonical PROJECT_CONTEXT.md verified present on main (blob17cf7224e7e5538be18cea2ce7da01bb0e846855).
+- Deployment/configuration: pending exact-main CI39246059073, Security39246059025 and Transactions39246058993 and the normal deployment. No manual release bypass or provider/financial configuration change. Live production verification still pending; this checkpoint does not close gap3 UAT.
+- Outstanding: fresh unsigned/unpaid online-booking negotiation UAT, separate independent financial approval and customer acceptance/signing/payment stages; all prior provider/legal/data/training/REA gates preserved. Hostinger operational evidence remains in separate PR562. No project tracker in scope.
