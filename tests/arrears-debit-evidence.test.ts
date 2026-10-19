@@ -94,6 +94,16 @@ test("tracking to final is order-independent; same-time contradictory outcome st
   assert.equal(run([unpaid, { ...tracking, sourceAt: unpaid.sourceAt }]).reconciled, false);
 });
 
+test("pre-epoch result chronology still holds a later pending outcome", () => {
+  const original = { ...instruction, actionDate: "1960-10-09" };
+  const final = { ...unpaid, ...original, failure: { precision: "DAY", value: "1960-10-10" }, sourceAt: "1960-10-10T10:00:00Z", observedAt: "1960-10-10T10:01:00Z" };
+  const pending = { ...final, eventId: "pending", outcome: "PENDING", failure: null, sourceAt: "1960-10-11T10:00:00Z", observedAt: "1960-10-11T10:01:00Z" };
+  const r = run([final, pending], [original], "1960-10-18");
+  assert.equal(r.reconciled, false); assert.equal(r.reviewDateReached, false);
+  assert.ok(r.blockers.includes("OUTCOME_REVIEW_REQUIRED"));
+  assert.deepEqual(run([pending, final], [original], "1960-10-18"), r);
+});
+
 test("conflicting duplicate, failure date or instruction is held rather than overwritten", () => {
   assert.ok(run([unpaid, result({ rawEvidenceSha256: "b".repeat(64) })]).blockers.includes("CONFLICTING_PROVIDER_EVENT"));
   assert.ok(run([unpaid, result({ eventId: "changed-date", failure: { precision: "DAY", value: "2026-10-10" } })]).blockers.includes("CONFLICTING_FAILURE_DATE"));

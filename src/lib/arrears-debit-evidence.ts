@@ -104,7 +104,7 @@ export function reconcileDebitFailure(input: {
     // Any correction/dispute/settlement needs authoritative reconciliation. No
     // subsequent unpaid result may silently clear it or start a replacement clock.
     if (results.some(event => ["CORRECTION", "DISPUTED", "SETTLED"].includes(event.outcome))) blockers.add("RECONCILIATION_REQUIRED");
-    const latestTime = results.reduce((n, event) => Math.max(n, Date.parse(event.sourceAt)), 0);
+    const latestTime = results.reduce((n, event) => Math.max(n, Date.parse(event.sourceAt)), Number.NEGATIVE_INFINITY);
     if (results.some(event => Date.parse(event.sourceAt) === latestTime && event.outcome !== "FINAL_UNPAID")) blockers.add("OUTCOME_REVIEW_REQUIRED");
     if (new Set(results.filter(event => event.failure).map(event => JSON.stringify(event.failure))).size > 1) blockers.add("CONFLICTING_FAILURE_DATE");
     for (const event of results) {
