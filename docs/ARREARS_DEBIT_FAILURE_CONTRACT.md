@@ -1,6 +1,6 @@
 # Debit failure evidence required for the seven-day arrears clock
 
-Status on 18 October 2026: the authoritative final-failure-to-original-debt ingestion is **not implemented**. Debit cases remain held. Upload acceptance, a submission exception, a pending result and `Payment.FAILED` do not start the clock. No collection-date fallback is allowed.
+Status on 19 October 2026: the authoritative final-failure-to-original-debt ingestion is **not implemented**. The provider-independent reconciliation core is now implemented separately in `src/lib/arrears-debit-evidence.ts`, but is not connected to live eligibility. Debit cases remain held. Upload acceptance, a submission exception, a pending result and `Payment.FAILED` do not start the clock. No collection-date fallback is allowed.
 
 ## Verified source and current limitation
 
@@ -17,3 +17,16 @@ Current STOR24 compact uploads contain customer mandate reference and amount, wh
 5. Evaluate seven calendar days in South African time, then recheck outstanding original debt, reconciled receipts, pending evidence, disputes and arrangements. The result prepares an internal review only. Legal notice, access approval/execution/restoration and every fee/financial entry remain separate.
 
 Provider fixture qualification must include redacted real-format first-unpaid and retry results, duplicates, tracking-to-final transition, mismatched merchant/batch/amount, ambiguous references, later correction and settlement. Synthetic fixtures alone do not prove actual merchant delivery or original-charge binding. No financial posting or bank/provider activation is authorised by this document.
+
+## Implemented reconciliation core (19 October)
+
+The strict normalized instruction/result schemas and deterministic reducer bind organisation, store, merchant, connection, account, original charge, invoice, mandate, batch, instruction, customer reference, original action date, exact amount and rand currency. Partial/ambiguous mappings stay held. Date-only failure evidence retains its precision; timestamp evidence uses its South African calendar day, with seven calendar days including weekends. Retrieval time never becomes failure time.
+
+The complete retained result set preserves the earliest confirmed failure across retries. Exact duplicate deliveries do not restart the clock. Reused event identities with conflicting evidence, changing instruction/failure dates, unmatched records, missing retry outcomes, pending/tracking/technical results and correction/dispute/settlement evidence remain held as appropriate. Out-of-order tracking-to-final transitions are deterministic. A later unpaid result cannot silently clear a correction or settlement hold. This conservative version requires separate reconciliation for such cases.
+
+This is an internal adapter contract, **not a public import endpoint**. Schema validation is not provider authentication. No consumer, durable importer, merchant-specific parser, reconciliation-clearance command or route is added. The future adapter must authenticate the real source, retain raw evidence and complete history, uniquely map real local instructions to original charges, establish retrieval completeness and recheck current ledger/payment/dispute/arrangement holds before using any reconciled clock. `reviewDateReached` is not eligibility or approval for access or fees. Existing debit-order preparation remains held even if this standalone reducer qualifies synthetic evidence.
+
+Remaining integration requires Netcash's merchant-specific results/mapping contract and real-format fixtures. The approved information request was sent on19October and independently verified in Sent Items, together with the legal wording and installed access-system contract requests. Copies of the original reviewed drafts remain unsent; do not send them again.
+
+
+Review refinement: conflicting identities are quarantined and integrity-held evidence returns no first-failure/review date. Same-day timestamps compare chronologically across offsets. Seventeen focused tests cover these and the unchanged live-debit hold; final hosted qualification is separate.
