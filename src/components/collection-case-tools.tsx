@@ -9,7 +9,7 @@ import { formatSouthAfricaDate } from "@/lib/south-africa-time";
 
 type Row = CollectionsWorkspaceData["rows"][number];
 const amount = z.string().refine(v => v.trim() !== "" && Number.isFinite(Number(v)));
-const accountSchema = z.object({ id: z.string(), financialReviewRequired: z.boolean().optional(), ledgerEntries: z.array(z.object({ id: z.string(), type: z.string(), description: z.string(), amount, effectiveAt: z.string() })), payments: z.array(z.object({ id: z.string(), amount, status: z.string(), method: z.string(), processedAt: z.string().nullable(), createdAt: z.string() })) });
+const accountSchema = z.object({ id: z.string(), financialReviewRequired: z.boolean().optional(), ledgerEntries: z.array(z.object({ id: z.string(), type: z.string(), description: z.string(), amount, effectiveAt: z.iso.datetime({offset:true}) })), payments: z.array(z.object({ id: z.string(), amount, status: z.string(), method: z.string(), processedAt: z.iso.datetime({offset:true}).nullable(), createdAt: z.iso.datetime({offset:true}) })) });
 const money = (value: string) => new Intl.NumberFormat("en-ZA", {style:"currency",currency:"ZAR"}).format(Number(value));
 
 export function CollectionCaseTools({ row }: { row: Row }) {
@@ -30,14 +30,16 @@ function CollectionAccountRecords({ accountId }: { accountId: string }) {
   const [retry, setRetry] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
+    let active = true;
+    const timeout = setTimeout(() => controller.abort(), 20_000);
     void fetch(`/api/v1/accounts?accountId=${encodeURIComponent(accountId)}`, {cache:"no-store",signal:controller.signal}).then(async response => {
       if(!response.ok) throw Error(response.status===403 ? "Ledger access is required for this account." : "Account records could not be loaded.");
       const result = await response.json();
       const selected = z.array(accountSchema).parse(result.data?.accounts).find(a => a.id === accountId);
       if(!selected) throw Error("This account is unavailable or outside your access.");
-      if(!controller.signal.aborted) setAccount(selected);
-    }).catch(e => {if(!controller.signal.aborted) setError(e instanceof Error && e.name!=="ZodError" ? e.message : "Account records could not be read. Reload to try again.");});
-    return () => controller.abort();
+      if(active) setAccount(selected);
+    }).catch(e => {if(active) setError(e instanceof Error && !["ZodError","AbortError"].includes(e.name) ? e.message : "Account records could not be read. Reload to try again.");}).finally(() => clearTimeout(timeout));
+    return () => {active=false;clearTimeout(timeout);controller.abort();};
   }, [accountId,retry]);
   return <section aria-label="Account financial records"><h3>Ledger, payments &amp; receipts</h3>{error ? <p role="alert">{error} <button type="button" className="button button-secondary" onClick={() => {setError("");setAccount(null);setRetry(v=>v+1);}}>Reload account records</button></p> : !account ? <p>Loading account records…</p> : <>
     {account.financialReviewRequired && <p role="status">Historical test entries require financial reconciliation. They are not cleared rent.</p>}
