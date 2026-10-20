@@ -63,3 +63,9 @@ test("only recorded terminal declines are confirmed failures; pending and ambigu
   assert.equal(confirmedFailedPricePayment({...declined,status:"DECLINED"}),true);
   for(const change of [{status:"PENDING"},{status:"TEST_PENDING"},{status:"SUCCEEDED"},{status:"TEST_SUCCEEDED"},{status:"REFUNDED"},{status:"CANCELLED"},{failureCode:"TIMEOUT"},{failureCode:"CHECKOUT_CREATE_FAILED"},{failureCode:"NETCASH_CUSTOMER_CANCELLED"},{failureCode:null},{processedAt:null}])assert.equal(confirmedFailedPricePayment({...declined,...change}),false);
 });
+
+test("structured proposal reasons require an exact campaign selection, unlisted campaign name or Other explanation",()=>{
+  const base={reservationId:"booking",facilityId:"store",requestKey:randomUUID(),monthlyRate:"900",reason:"Retained negotiation explanation"};
+  for(const reasonSelection of [{type:"CAMPAIGN",campaignId:"campaign"},{type:"OTHER_CAMPAIGN",campaignName:"Summer campaign"},{type:"OTHER",explanation:"Customer circumstances recorded"}])assert.equal(reservationPriceProposalSchema.safeParse({...base,reasonSelection}).success,true);
+  for(const reasonSelection of [{type:"CAMPAIGN",campaignId:""},{type:"CAMPAIGN",campaignId:"id",campaignName:"Spoofed name"},{type:"OTHER_CAMPAIGN",campaignName:" "},{type:"OTHER",explanation:"Short"},{type:"UNKNOWN",explanation:"Not a supported reason"}])assert.equal(reservationPriceProposalSchema.safeParse({...base,reasonSelection}).success,false);
+});
