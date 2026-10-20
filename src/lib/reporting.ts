@@ -27,6 +27,7 @@ export const reportDefinitions: readonly ReportDefinition[] = [
   { key: "integration-health", name: "Integration health", group: "Integrations", description: "Current connection state, last health checks and recorded failures.", permission: "integrations.view", formats: ["CSV", "JSON", "XLSX", "PDF"] },
   { key: "recurring-charges", name: "Recurring charges", group: "Finance", description: "Current approved monthly-plan projections with review exceptions. Review Netcash collections separately; CSV is a backup.", permission: "reports.financial", formats: ["CSV", "JSON"] },
   { key: "posted-recurring-charges", name: "Posted recurring-charge history", group: "Finance", description: "Original posted monthly billing lines and included tax, with invoice/source review exceptions. Excludes later corrections; not outstanding debt, receipts or recognised income.", permission: "reports.financial", formats: ["CSV", "JSON", "XLSX", "PDF"] },
+  {key:"booking-discounts",name:"Booking discounts & approvals",group:"Sales",description:"Negotiated quotes created in the selected dates, current status, staff proposals and recorded approvals. Not payments or signed rent.",permission:"reports.financial",formats:["CSV","JSON","XLSX","PDF"]},
 ] as const;
 
 export const reportParametersSchema = z.object({

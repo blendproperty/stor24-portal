@@ -1,3 +1,4 @@
+import {reservationDiscountReport} from "./reservation-price-service";
 import { recurringChargeReport } from "./recurring-charge-service";
 import { postedRecurringChargeReport } from "./posted-recurring-charge-service";
 import { rentReviewReport } from "@/lib/rent-review-service";
@@ -20,6 +21,7 @@ export async function buildReportRows(scope: RequestScope, parameters: ReportPar
   const snapshotTakenAt = new Date().toISOString();
 
   switch (parameters.reportKey) {
+    case "booking-discounts": return reservationDiscountReport(scope,parameters);
     case "recurring-charges": return recurringChargeReport(scope, parameters);
     case "posted-recurring-charges": return postedRecurringChargeReport(scope, parameters);
     case "tenant-duration": {
