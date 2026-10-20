@@ -9,9 +9,9 @@ import {marketingPaymentCohortRows} from "../src/lib/marketing-payment-cohorts";
 const canonical=(value:unknown):string=>JSON.stringify(value,(_,item)=>item&&typeof item==="object"&&!Array.isArray(item)?Object.fromEntries(Object.entries(item).sort(([a],[b])=>a<b?-1:a>b?1:0)):item);
 const hash=(value:unknown)=>createHash("sha256").update(canonical(value)).digest("hex");
 const moveIn=new Date("2026-10-20T10:00:00Z"),reviewedAt=new Date("2026-10-15T08:00:00Z"),acceptedAt=new Date("2026-10-15T08:01:00Z");
-function fixture(){
+function fixture(structured=false){
   const original={version:1,reservationId:"booking",organisationId:"org",facilityId:"store",customerId:"customer",quotedRate:"1000.00",initialRentSnapshot:newPublicInitialRent(1000,moveIn),intendedMoveIn:moveIn.toISOString()};
-  const proposed={version:1,monthlyRate:"900.25",initialRentSnapshot:newPublicInitialRent(900.25,moveIn),reason:"Synthetic independently approved negotiation"};
+  const proposed={version:1,monthlyRate:"900.25",initialRentSnapshot:newPublicInitialRent(900.25,moveIn),reason:"Synthetic approved negotiation",...(structured?{adjustment:{mode:"DISCOUNT_AMOUNT" as const,value:"99.75"},reasonSelection:{type:"CAMPAIGN" as const,campaignId:"summer",campaignName:"Summer campaign"}}:{})};
   const sourceFingerprint=hash(original),expiresAt=new Date("2026-10-16T08:00:00Z"),quoteFingerprint=hash({reservationId:"booking",sourceFingerprint,proposed,expiresAt:expiresAt.toISOString()});
   const item:PriceHistoryItem={id:"change",organisationId:"org",facilityId:"store",reservationId:"booking",sourceFingerprint,quoteFingerprint,originalEncrypted:encryptIntegrationSecret(canonical(original)),proposedEncrypted:encryptIntegrationSecret(canonical(proposed)),proposedById:"proposer",reviewedById:"reviewer",reviewedAt,reviewReference:"Synthetic review",acceptedCustomerId:"customer",acceptedAt,acceptanceFingerprint:quoteFingerprint,expiresAt,createdAt:new Date("2026-10-15T07:00:00Z")};
   const audits:PriceHistoryAudit[]=[{entityId:item.id,facilityId:"store",actorId:"reviewer",action:"reservation.price_approved",after:{reservationId:"booking",quoteFingerprint,reference:item.reviewReference,financialPosting:false}},{entityId:item.id,facilityId:"store",actorId:null,action:"reservation.price_customer_accepted",after:{reservationId:"booking",customerId:"customer",quoteFingerprint,verifiedAt:"2026-10-15T08:00:30.000Z",acceptedAt:acceptedAt.toISOString(),newAgreementRequired:true,financialPosting:false}}];
@@ -25,6 +25,7 @@ test("immutable quote evidence preserves original price and customer acceptance 
     const evidence=bookingPriceEvidence("org",booking,[item],audits,after);
     assert.equal(evidence.issue,null);assert.equal(evidence.original?.quotedRate,"1000.00");assert.equal(evidence.latestAcceptedQuote,"900.25");assert.equal(evidence.acceptedChanges,1);
     const own={...item,reviewedById:item.proposedById};assert.equal(bookingPriceEvidence("org",booking,[own],audits.map(a=>a.action==="reservation.price_approved"?{...a,actorId:own.reviewedById}:a),after).issue,null);
+    const campaign=fixture(true);assert.equal(bookingPriceEvidence("org",campaign.booking,[campaign.item],campaign.audits,after).issue,null);
     const earlier=bookingPriceEvidence("org",booking,[item],audits,acceptedAt);assert.equal(earlier.original?.quotedRate,"1000.00");assert.equal(earlier.acceptedChanges,0);assert.equal(earlier.latestAcceptedQuote,null);
     const lead={id:"lead",facilityId:"store",facility:"Synthetic",customerId:"customer",source:"PUBLIC_QUOTE_FORM",stage:"NEW",createdAt:reviewedAt,enquiryLocation:null,bookings:[{...booking,status:"ACTIVE",convertedTenancyId:null,tenancy:null,priceEvidence:evidence}]};
     const row=marketingPaymentCohortRows([lead],[],[],"2026-10-16")[0];assert.equal(row.originalMonthlyQuote,"1000.00");assert.equal(row.latestAcceptedQuote,"900.25");assert.equal(row.acceptedPriceChanges,1);
