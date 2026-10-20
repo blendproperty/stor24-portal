@@ -60,7 +60,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
           builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : args.path.endsWith("/session") ? "export const getSession=async()=>__session;" : "export class TwilioWhatsAppProvider { sendTemplate(...args) { return __provider(...args); } }" }));
         } }] });
         const loaded = { exports: {} as { POST: (request: Request) => Promise<Response> } };
-        new Function("require", "module", "exports", "__db", "__session", "__provider", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: user.id, sessionVersion: user.sessionVersion }, provider);
+        new Function("require", "module", "exports", "__db", "__session", "__provider", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: user.id, sessionVersion: user.sessionVersion, mfaVerified: true }, provider);
         return loaded.exports;
       };
       const sendApi = await load("src/app/api/v1/communications/send-whatsapp/route.ts");
@@ -110,7 +110,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
         builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
       } }] });
       const loaded = { exports: {} as { GET: (request: Request, context: { params: Promise<{ id: string }> }) => Promise<Response> } };
-      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: user.id, sessionVersion: user.sessionVersion });
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: user.id, sessionVersion: user.sessionVersion, mfaVerified: true });
       const read = (id: string) => loaded.exports.GET(new Request("https://example.invalid/api/v1/accounts/test/documents"), { params: Promise.resolve({ id }) });
       for (const roleId of [reader.id, owner.id]) {
         await db.roleAssignment.deleteMany({ where: { userId: user.id } });
@@ -184,7 +184,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
         builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
       } }] });
       const loaded = { exports: {} as { POST: (request: Request) => Promise<Response> } };
-      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: user.id, sessionVersion: user.sessionVersion });
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: user.id, sessionVersion: user.sessionVersion, mfaVerified: true });
       const send = (productId: string) => loaded.exports.POST(new Request("https://example.invalid/api/v1/operations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "stockMovement", payload: { productId, type: "RECEIPT", quantity: 1 } }) }));
       assert.equal((await send(products[1].id)).status, 403);
       assert.equal((await db.product.findUniqueOrThrow({ where: { id: products[1].id } })).quantityOnHand, 10);
@@ -225,7 +225,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
         builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
       } }] });
       const loaded = { exports: {} as { GET: (request: Request) => Promise<Response> } };
-      new Function("require", "module", "exports", "__db", "__session", "__prisma", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: actor.id, sessionVersion: actor.sessionVersion }, Prisma);
+      new Function("require", "module", "exports", "__db", "__session", "__prisma", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: actor.id, sessionVersion: actor.sessionVersion, mfaVerified: true }, Prisma);
       const read = (facilityId = "", format = "JSON") => loaded.exports.GET(new Request(`https://example.invalid/api/v1/reports/export?reportKey=unit-availability&from=2026-09-01&to=2026-09-26&format=${format}${facilityId ? `&facilityId=${facilityId}` : ""}`));
       await grants(a.id, b.id);
       assert.equal((await read(b.id)).status, 403); assert.equal((await read()).status, 403);
@@ -258,7 +258,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
         builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
       } }] });
       const loaded = { exports: {} as { PATCH: (request: Request, context: { params: Promise<{ resource: string }> }) => Promise<Response> } };
-      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: user.id, sessionVersion: user.sessionVersion });
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: user.id, sessionVersion: user.sessionVersion, mfaVerified: true });
       const patch = (id = own.id, data: Record<string, unknown> = { firstName: "After", communicationConsent: { email: true } }) => loaded.exports.PATCH(new Request("https://example.invalid/api/v1/leasing/customers", { method: "PATCH", headers: { origin: "https://example.invalid", "content-type": "application/json" }, body: JSON.stringify({ id, data }) }), { params: Promise.resolve({ resource: "customers" }) });
       assert.equal((await patch(otherCustomer.id)).status, 403);
       await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_customer_patch_failure CHECK (false) NOT VALID');
@@ -285,7 +285,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
         builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
       } }] });
       const loaded = { exports: {} as { DELETE: (request: Request, context: { params: Promise<{ resource: string }> }) => Promise<Response> } };
-      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: actor.id, sessionVersion: actor.sessionVersion });
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: actor.id, sessionVersion: actor.sessionVersion, mfaVerified: true });
       const remove = (id = own.id) => loaded.exports.DELETE(new Request(`https://example.invalid/api/v1/leasing/customers?id=${id}`, { method: "DELETE", headers: { origin: "https://example.invalid" } }), { params: Promise.resolve({ resource: "customers" }) });
       assert.equal((await remove(foreignCustomer.id)).status, 403);
       await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_customer_delete_failure CHECK (false) NOT VALID');
@@ -314,7 +314,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
         builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
       } }] });
       const loaded = { exports: {} as { DELETE: (request: Request, context: { params: Promise<{ resource: string }> }) => Promise<Response> } };
-      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: actor.id, sessionVersion: actor.sessionVersion });
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: actor.id, sessionVersion: actor.sessionVersion, mfaVerified: true });
       const remove = (id = own.id) => loaded.exports.DELETE(new Request(`https://example.invalid/api/v1/leasing/leads?id=${id}`, { method: "DELETE", headers: { origin: "https://example.invalid" } }), { params: Promise.resolve({ resource: "leads" }) });
       assert.equal((await remove(foreignCustomer.id)).status, 403);
       await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_lead_delete_failure CHECK (false) NOT VALID');
@@ -346,7 +346,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
         builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
       } }] });
       const loaded = { exports: {} as { POST: (request: Request) => Promise<Response> } };
-      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: actor.id, sessionVersion: actor.sessionVersion });
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: actor.id, sessionVersion: actor.sessionVersion, mfaVerified: true });
       const apply = (facilityId = facility.id) => loaded.exports.POST(new Request("https://example.invalid/api/v1/leasing/unit-rates", { method: "POST", headers: { origin: "https://example.invalid", "content-type": "application/json" }, body: JSON.stringify({ facilityId, modelVersion: "MIDRAND_2026_08_V1" }) }));
       const rates = async () => Promise.all([one, two, skipped].map(async unit => Number((await db.unit.findUniqueOrThrow({ where: { id: unit.id } })).monthlyRate)));
       assert.equal((await apply(foreign.id)).status, 404);
@@ -378,7 +378,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
         builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
       } }] });
       const loaded = { exports: {} as { DELETE: (request: Request, context: { params: Promise<{ resource: string }> }) => Promise<Response> } };
-      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: actor.id, sessionVersion: actor.sessionVersion });
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: actor.id, sessionVersion: actor.sessionVersion, mfaVerified: true });
       const remove = (id = own.id) => loaded.exports.DELETE(new Request(`https://example.invalid/api/v1/leasing/reservations?id=${id}`, { method: "DELETE", headers: { origin: "https://example.invalid" } }), { params: Promise.resolve({ resource: "reservations" }) });
       assert.equal((await remove(foreignCustomer.id)).status, 403);
       await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_reservation_cancel_failure CHECK (false) NOT VALID');
@@ -406,7 +406,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
         builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
       } }] });
       const loaded = { exports: {} as { DELETE: (request: Request, context: { params: Promise<{ resource: string }> }) => Promise<Response> } };
-      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: actor.id, sessionVersion: actor.sessionVersion });
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: actor.id, sessionVersion: actor.sessionVersion, mfaVerified: true });
       const remove = (id = own.id, force = false) => loaded.exports.DELETE(new Request(`https://example.invalid/api/v1/leasing/units?id=${id}&force=${force}`, { method: "DELETE", headers: { origin: "https://example.invalid" } }), { params: Promise.resolve({ resource: "units" }) });
       assert.equal((await remove(foreignCustomer.id)).status, 403);
       await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_unit_remove_failure CHECK (false) NOT VALID');
@@ -452,7 +452,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
         builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
       } }] });
       const loaded = { exports: {} as { DELETE: (request: Request, context: { params: Promise<{ resource: string }> }) => Promise<Response> } };
-      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: actor.id, sessionVersion: actor.sessionVersion });
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: actor.id, sessionVersion: actor.sessionVersion, mfaVerified: true });
       const remove = (id = type.id, force = false) => loaded.exports.DELETE(new Request(`https://example.invalid/api/v1/leasing/unit-types?id=${id}&force=${force}`, { method: "DELETE", headers: { origin: "https://example.invalid" } }), { params: Promise.resolve({ resource: "unit-types" }) });
       assert.equal((await remove(otherType.id)).status, 403);
       const empty = await db.unitType.create({ data: { facilityId: a.id, name: "Empty remove type" } });
@@ -502,7 +502,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
         builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
       } }] });
       const loaded = { exports: {} as { DELETE: (request: Request, context: { params: Promise<{ resource: string }> }) => Promise<Response> } };
-      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: actor.id, sessionVersion: actor.sessionVersion });
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: actor.id, sessionVersion: actor.sessionVersion, mfaVerified: true });
       const remove = (id = own.id) => loaded.exports.DELETE(new Request(`https://example.invalid/api/v1/leasing/facilities?id=${id}`, { method: "DELETE", headers: { origin: "https://example.invalid" } }), { params: Promise.resolve({ resource: "facilities" }) });
       assert.equal((await remove(foreignFacility.id)).status, 404);
       await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_facility_deactivate_failure CHECK (false) NOT VALID');
@@ -529,7 +529,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
         builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
       } }] });
       const loaded = { exports: {} as { PATCH: (request: Request, context: { params: Promise<{ resource: string }> }) => Promise<Response> } };
-      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: user.id, sessionVersion: user.sessionVersion });
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: user.id, sessionVersion: user.sessionVersion, mfaVerified: true });
       const patch = (id = own.id, data: Record<string, unknown> = { stage: "CONTACTED", notes: "After" }) => loaded.exports.PATCH(new Request("https://example.invalid/api/v1/leasing/leads", { method: "PATCH", headers: { origin: "https://example.invalid", "content-type": "application/json" }, body: JSON.stringify({ id, data }) }), { params: Promise.resolve({ resource: "leads" }) });
       assert.equal((await patch(otherCustomer.id)).status, 403);
       await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_lead_patch_failure CHECK (false) NOT VALID');
@@ -558,7 +558,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
         builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
       } }] });
       const loaded = { exports: {} as { PATCH: (request: Request, context: { params: Promise<{ resource: string }> }) => Promise<Response> } };
-      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: typeActor.id, sessionVersion: typeActor.sessionVersion });
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: typeActor.id, sessionVersion: typeActor.sessionVersion, mfaVerified: true });
       const patch = (id = own.id, data: Record<string, unknown> = { areaSqMetres: 200 }) => loaded.exports.PATCH(new Request("https://example.invalid/api/v1/leasing/unit-types", { method: "PATCH", headers: { origin: "https://example.invalid", "content-type": "application/json" }, body: JSON.stringify({ id, data }) }), { params: Promise.resolve({ resource: "unit-types" }) });
       assert.equal((await patch(otherType.id)).status, 403);
       await db.unitType.create({ data: { facilityId: a.id, name: "Existing atomic type" } });
@@ -589,7 +589,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
         builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
       } }] });
       const loaded = { exports: {} as { PATCH: (request: Request, context: { params: Promise<{ resource: string }> }) => Promise<Response> } };
-      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: facilityActor.id, sessionVersion: facilityActor.sessionVersion });
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: facilityActor.id, sessionVersion: facilityActor.sessionVersion, mfaVerified: true });
       const patch = (id = own.id, data: Record<string, unknown> = { name: "After" }) => loaded.exports.PATCH(new Request("https://example.invalid/api/v1/leasing/facilities", { method: "PATCH", headers: { origin: "https://example.invalid", "content-type": "application/json" }, body: JSON.stringify({ id, data }) }), { params: Promise.resolve({ resource: "facilities" }) });
       assert.equal((await patch(otherFacility.id)).status, 404);
       await db.facility.create({ data: { organisationId: org.id, code: "slug-test", name: "Slug conflict", publicSlug: `${key}-taken` } });
@@ -623,7 +623,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
         builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
       } }] });
       const loaded = { exports: {} as { PATCH: (request: Request, context: { params: Promise<{ resource: string }> }) => Promise<Response> } };
-      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: reservationActor.id, sessionVersion: reservationActor.sessionVersion });
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: reservationActor.id, sessionVersion: reservationActor.sessionVersion, mfaVerified: true });
       const patch = (id = own.id, data: Record<string, unknown> = { quotedRate: 200 }) => loaded.exports.PATCH(new Request("https://example.invalid/api/v1/leasing/reservations", { method: "PATCH", headers: { origin: "https://example.invalid", "content-type": "application/json" }, body: JSON.stringify({ id, data }) }), { params: Promise.resolve({ resource: "reservations" }) });
       await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_reservation_patch_failure CHECK (false) NOT VALID');
       try {
@@ -656,7 +656,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
         builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
       } }] });
       const loaded = { exports: {} as { PATCH: (request: Request, context: { params: Promise<{ resource: string }> }) => Promise<Response> } };
-      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: unitActor.id, sessionVersion: unitActor.sessionVersion });
+      new Function("require", "module", "exports", "__db", "__session", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: unitActor.id, sessionVersion: unitActor.sessionVersion, mfaVerified: true });
       const patch = (id = own.id, data: Record<string, unknown> = { number: "After-audit", monthlyRate: 200 }) => loaded.exports.PATCH(new Request("https://example.invalid/api/v1/leasing/units", { method: "PATCH", headers: { origin: "https://example.invalid", "content-type": "application/json" }, body: JSON.stringify({ id, data }) }), { params: Promise.resolve({ resource: "units" }) });
       await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_unit_patch_failure CHECK (false) NOT VALID');
       try {

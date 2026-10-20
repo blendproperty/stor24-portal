@@ -35,10 +35,10 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isPublic = isPublicPathname(pathname);
   const session = await verifySessionToken(request.cookies.get(sessionCookieName)?.value);
-  const user = session ? await db.user.findUnique({ where: { id: session.userId }, select: { active: true, sessionVersion: true, roleAssignments: { include: { role: true } } } }) : null;
+  const user = session ? await db.user.findUnique({ where: { id: session.userId }, select: { active: true, sessionVersion: true, mfaCredential: { select: { enabledAt: true } }, roleAssignments: { include: { role: true } } } }) : null;
   const validSession = Boolean(session && user?.active && user.sessionVersion === session.sessionVersion);
 
-  if (pathname === "/login" && validSession) {
+  if (pathname === "/login" && validSession && session?.mfaVerified === true) {
     return NextResponse.redirect(new URL("/", request.url));
   }
   if (isPublic) return NextResponse.next();
@@ -51,6 +51,12 @@ export async function proxy(request: NextRequest) {
     const response = NextResponse.redirect(loginUrl);
     response.cookies.delete(sessionCookieName);
     return response;
+  }
+  // Password-only and pre-enforcement sessions can reach only their own enrolment and logout.
+  const mfaSetupPath = pathname === "/mfa-setup" || pathname === "/api/auth/mfa" || pathname === "/api/auth/logout";
+  if (session?.mfaVerified !== true && !mfaSetupPath) {
+    if (pathname.startsWith("/api/")) return Response.json({ error: { code: "MFA_REQUIRED", message: "Complete two-step verification before using the staff portal." } }, { status: 403 });
+    return NextResponse.redirect(new URL(user?.mfaCredential?.enabledAt ? "/login" : "/mfa-setup", request.url));
   }
   if (!pathname.startsWith("/api/") && user && !canVisit(pathname, {
     owner: user.roleAssignments.some(a => a.facilityId === null && a.role.name === "Organisation owner"),

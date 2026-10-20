@@ -3,11 +3,12 @@ import { db } from "@/lib/db";
 import { currentRoleAccess } from "@/lib/current-role-access";
 import { ZodError } from "zod";
 
-export async function requireSession() {
+export async function requireSession(options: { allowMfaSetup?: boolean } = {}) {
   const session = await getSession();
   if (!session) throw new Error("UNAUTHENTICATED");
   const user = await db.user.findUnique({ where: { id: session.userId }, include: { roleAssignments: { include: { role: true, facility: true } } } });
   if (!user?.active || user.sessionVersion !== session.sessionVersion) throw new Error("UNAUTHENTICATED");
+  if (!options.allowMfaSetup && session.mfaVerified !== true) throw new Error("MFA_REQUIRED");
   const current = currentRoleAccess(user.roleAssignments);
   return { ...session, role: current.owner ? "Organisation owner" : user.roleAssignments[0]?.role.name ?? "", user, permissions: user.roleAssignments.flatMap((assignment) => assignment.role.permissions) };
 }
@@ -32,5 +33,6 @@ export function authErrorResponse(error: unknown) {
   const message = error instanceof Error ? error.message : "UNKNOWN";
   if (message === "UNAUTHENTICATED") return Response.json({ error: { code: message, message: "Sign in is required." } }, { status: 401 });
   if (message === "FORBIDDEN") return Response.json({ error: { code: message, message: "You do not have permission for this action." } }, { status: 403 });
+  if (message === "MFA_REQUIRED") return Response.json({ error: { code: message, message: "Complete two-step verification before using the staff portal." } }, { status: 403 });
   return Response.json({ error: { code: "INTERNAL_ERROR", message: "The request could not be completed." } }, { status: 500 });
 }

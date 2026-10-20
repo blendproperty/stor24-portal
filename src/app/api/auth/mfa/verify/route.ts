@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   });
   if (!result.ok) return result.response;
   const user = result.user;
-  await setSession({ userId: user.id, name: user.name, email: user.email, role: user.roleAssignments[0]?.role.name ?? "Unassigned", sessionVersion: user.sessionVersion });
+  await setSession({ userId: user.id, name: user.name, email: user.email, role: user.roleAssignments[0]?.role.name ?? "Unassigned", sessionVersion: user.sessionVersion, mfaVerified: true });
   await clearMfaChallenge();
   return Response.json({ data: { name: user.name } });
 }

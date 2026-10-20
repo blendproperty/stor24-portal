@@ -19,14 +19,14 @@ test("isolated PostgreSQL MFA one-time recovery and credential lifecycle", async
     const user = await db.user.create({ data: { organisationId: org.id, name: "Synthetic MFA", email: `${key}@example.invalid`, passwordHash: await hash(password, 4) } });
     await db.mfaCredential.create({ data: { userId: user.id, enabledAt: enabled ? new Date() : null, secretEncrypted: encryptMfaSecret(secret), recoveryCodeHashes: enabled ? hashRecoveryCodes(codes) : [] } });
     const sessions: { sessionVersion: number }[] = []; let clears = 0;
-    const routes = await mfaRoutesFixture(db, { getSession: async () => ({ userId: user.id, sessionVersion: user.sessionVersion }), setSession: async value => { sessions.push(value as { sessionVersion: number }); }, getChallenge: async () => ({ userId: user.id, sessionVersion: user.sessionVersion }), clearChallenge: async () => { clears++; } });
+    const routes = await mfaRoutesFixture(db, { getSession: async () => ({ userId: user.id, sessionVersion: user.sessionVersion, mfaVerified: true }), setSession: async value => { sessions.push(value as { sessionVersion: number }); }, getChallenge: async () => ({ userId: user.id, sessionVersion: user.sessionVersion }), clearChallenge: async () => { clears++; } });
     return { org, user, routes, sessions, clears: () => clears, credential: () => db.mfaCredential.findUnique({ where: { userId: user.id } }) };
   }
   try {
     await t.test("password reset and change revoke signed pending challenges without consuming recovery codes", async () => {
       for (const action of ["reset", "change"]) {
         const f = await fixture();
-        const login = await mfaLoginFixture(db, { userId: f.user.id, sessionVersion: f.user.sessionVersion });
+        const login = await mfaLoginFixture(db, { userId: f.user.id, sessionVersion: f.user.sessionVersion, mfaVerified: true });
         assert.equal((await login.login(mfaRequest({ email: f.user.email, password }))).status, 200);
         assert.deepEqual(await login.getMfaChallenge(), { userId: f.user.id, sessionVersion: f.user.sessionVersion });
         const newPassword = "New-Synthetic-Password-2026!";
@@ -99,27 +99,23 @@ test("isolated PostgreSQL MFA one-time recovery and credential lifecycle", async
       assert.ok([200, 401].includes(before.status)); assert.equal(after.status, 200);
       assert.deepEqual((await other.credential())!.recoveryCodeHashes, hashRecoveryCodes((await after.json()).data.recoveryCodes));
     });
-    await t.test("disable consumes the current proof and invalidates a previously committed session", async () => {
+    await t.test("mandatory MFA cannot be disabled, including alongside a login", async () => {
       const f = await fixture();
-      const results = await Promise.all([f.routes.verify(mfaRequest({ code: codes[0] })), f.routes.manage(mfaRequest({ action: "disable", code: codes[0], password }))]);
-      assert.equal(results.filter(r => r.status === 200).length, 1);
-      const other = await fixture();
-      const [login, disabled] = await Promise.all([other.routes.verify(mfaRequest({ code: codes[0] })), other.routes.manage(mfaRequest({ action: "disable", code: totpCode(secret), password }))]);
-      assert.ok([200, 401].includes(login.status)); assert.equal(disabled.status, 200); assert.equal(await other.credential(), null);
-      const current = await db.user.findUniqueOrThrow({ where: { id: other.user.id } });
-      assert.equal(current.sessionVersion, other.user.sessionVersion + 1);
-      for (const session of other.sessions) assert.notEqual(session.sessionVersion, current.sessionVersion);
-      assert.equal((await other.routes.manage(mfaRequest({ action: "begin" }))).status, 401);
+      const before = await f.credential();
+      const [login, disabled] = await Promise.all([f.routes.verify(mfaRequest({ code: totpCode(secret) })), f.routes.manage(mfaRequest({ action: "disable", code: totpCode(secret), password }))]);
+      assert.equal(login.status, 200); assert.equal(disabled.status, 403);
+      assert.deepEqual(await f.credential(), before);
+      assert.equal((await db.user.findUniqueOrThrow({ where: { id: f.user.id } })).sessionVersion, f.user.sessionVersion);
     });
     await t.test("concurrent enrollment cannot overwrite a committed enabled credential", async () => {
       const f = await fixture(false);
       const [enabled, begun] = await Promise.all([f.routes.manage(mfaRequest({ action: "enable", code: totpCode(secret) })), f.routes.manage(mfaRequest({ action: "begin" }))]);
-      assert.ok([200, 422].includes(enabled.status)); assert.ok([200, 409].includes(begun.status));
+      assert.ok([200, 422].includes(enabled.status)); assert.ok([200, 409, 401].includes(begun.status));
       if (enabled.status === 200) assert.ok((await f.credential())!.enabledAt);
       else { assert.equal(begun.status, 200); assert.equal((await f.credential())!.enabledAt, null); }
     });
     await t.test("audit failures roll back every credential mutation and session version", async () => {
-      for (const action of ["verify", "begin", "enable", "regenerate", "disable"]) {
+      for (const action of ["verify", "begin", "enable", "regenerate"]) {
         const f = await fixture(action !== "enable" && action !== "begin");
         if (action === "begin") await db.mfaCredential.delete({ where: { userId: f.user.id } });
         const before = await f.credential();

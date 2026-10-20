@@ -10,7 +10,7 @@ import { build } from "esbuild";
 import { db } from "../../src/lib/db";
 import { databaseLimits } from "../../src/lib/database-limits";
 
-type Session = { userId: string; sessionVersion: number };
+type Session = { userId: string; sessionVersion: number; mfaVerified?: boolean };
 type Handler = (request: Request, context?: unknown) => Promise<Response>;
 type Routes = Record<string, { GET?: Handler; POST?: Handler }>;
 
@@ -34,7 +34,7 @@ test("representative isolated workload:180 customers,150 tenancies and25 scoped 
   await db.customerNote.createMany({ data: customers.flatMap(customer => Array.from({ length: 3 }, (_, i) => ({ organisationId: org.id, facilityId: store.id, customerId: customer.id, authorId: users[0].id, authorName: "Fixture staff 0", category: "HANDOVER", body: `Synthetic handover detail ${i}`, requestKey: randomUUID() }))) });
   await db.communicationLog.createMany({ data: customers.map(customer => ({ organisationId: org.id, facilityId: store.id, customerId: customer.id, channel: "EMAIL", recipientHash: "synthetic", idempotencyKey: randomUUID(), messageType: "RENT_NOTICE", status: "SUCCEEDED", metadata: { historyEvidence: { version: 1, text: "Synthetic retained communication", redacted: true } } })) });
   const sessions = new AsyncLocalStorage<Session | null>();
-  const tokens = new Map<string, Session>(users.map(user => [randomUUID(), { userId: user.id, sessionVersion: user.sessionVersion }]));
+  const tokens = new Map<string, Session>(users.map(user => [randomUUID(), { userId: user.id, sessionVersion: user.sessionVersion, mfaVerified: true }]));
   const tokenList = [...tokens.keys()];
   const bundle = await build({ stdin: { contents: `export * as guide from './src/app/api/v1/operations/staff-guide/route';export * as history from './src/app/api/v1/customers/[customerId]/history/route';export * as search from './src/app/api/v1/operations/followups/route';export * as leasing from './src/app/api/v1/leasing/[resource]/route';export * as report from './src/app/api/v1/reports/preview/route';export * as offline from './src/app/api/v1/offline/snapshot/route';export * as offlineLead from './src/app/api/v1/offline/leads/route';export * as offlineReservation from './src/app/api/v1/offline/reservations/route';`, resolveDir: process.cwd(), loader: "ts" }, bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "isolated-http-session-boundary", setup(builder) {
     builder.onResolve({ filter: /generated\/prisma\/client$/ }, () => ({ path: resolve("src/generated/prisma/client.ts"), external: true }));

@@ -16,7 +16,7 @@ test("isolated PostgreSQL password changes cannot overwrite revoked credentials"
     const user = await db.user.create({ data: { organisationId: org.id, name: "Synthetic", email: `${key}@example.invalid`, passwordHash: await hash(password, 4) } });
     const token = randomUUID();
     const reset = await db.passwordResetToken.create({ data: { userId: user.id, organisationId: org.id, tokenHash: hashResetToken(token), expiresAt: new Date(Date.now() + 60_000) } });
-    const session = { userId: user.id, sessionVersion: user.sessionVersion };
+    const session = { userId: user.id, sessionVersion: user.sessionVersion, mfaVerified: true };
     return { user, token, reset, session, routes: await mfaLoginFixture(db, session) };
   }
   try {

@@ -32,13 +32,14 @@ export async function POST(request: Request) {
     return Response.json({ data: { mfaRequired: true } });
   }
 
-  await db.auditEvent.create({ data: { organisationId: user.organisationId, actorId: user.id, action: "user.login.succeeded", entityType: "User", entityId: user.id, ipHash: privacyHash(ip) } });
+  await db.auditEvent.create({ data: { organisationId: user.organisationId, actorId: user.id, action: "user.login.mfa_setup_required", entityType: "User", entityId: user.id, ipHash: privacyHash(ip) } });
   await setSession({
     userId: user.id,
     name: user.name,
     email: user.email,
     role: user.roleAssignments[0]?.role.name ?? "Unassigned",
     sessionVersion: user.sessionVersion,
+    mfaVerified: false,
   });
-  return Response.json({ data: { name: user.name } });
+  return Response.json({ data: { name: user.name, mfaSetupRequired: true } });
 }

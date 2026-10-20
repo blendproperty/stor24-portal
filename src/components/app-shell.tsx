@@ -98,7 +98,7 @@ export function AppShell({ children, session, facilityLabel = "Your facilities",
   const sidebarHidden = useSyncExternalStore(subscribeSidebarPreference, sidebarHiddenSnapshot, () => false);
   const pathname = usePathname();
   const router = useRouter();
-  const publicPage = pathname === "/login" || pathname === "/forgot-password" || pathname.startsWith("/reset-password/") || pathname.startsWith("/invite/") || pathname.startsWith("/setup/");
+  const publicPage = pathname === "/mfa-setup" || pathname === "/login" || pathname === "/forgot-password" || pathname.startsWith("/reset-password/") || pathname.startsWith("/invite/") || pathname.startsWith("/setup/");
   if (publicPage || pathname === "/privacy" || pathname === "/paia" || pathname === "/my" || pathname.startsWith("/my/")) return children;
 
   async function signOut() {
