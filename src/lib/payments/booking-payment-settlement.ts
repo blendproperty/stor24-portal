@@ -17,7 +17,7 @@ export async function settleVerifiedBookingPayment(paymentId: string, evidence: 
     if (["REVERSED", "REFUNDED", "PARTIALLY_REFUNDED"].includes(payment.status)) return { financial: false, terminal: true }; // Original success cannot undo a later approved correction.
     if (payment.status === "SUCCEEDED" || payment.status === "TEST_SUCCEEDED") return { financial: !test, terminal: true };
     if (!evidence.accepted) return { financial: false, terminal: false }; // May be asynchronous EFT; never downgrade success.
-    if (reservationId) {
+    if (reservationId && await tx.reservationPriceAmendment.count({ where: { reservationId, status: "APPLIED" } })) {
       const booking = await tx.reservation.findUnique({ where: { id: reservationId }, include: { packageSelection: true } });
       if (!booking || publicCheckoutTotal(booking) !== Number(payment.amount)) throw new Error("BOOKING_QUOTE_CHANGED");
     }
