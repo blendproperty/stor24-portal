@@ -36,12 +36,11 @@ export async function requestManagerPriceApproval(scope:RequestScope,input:unkno
  const id=randomUUID(),code=String(randomInt(100000,1000000));
  const prepared=await db.$transaction(async tx=>{
   const {requester,approver}=await usersForApproval(tx,scope,data.approverId,data.facilityId),row=await contact(tx,scope.organisationId,approver.id),phone=readContact(row);
-  const {booking,item:proposal}=await reservationPriceApprovalTarget(tx,scope,data.id,data.facilityId,data.revision);
+  const {item:proposal}=await reservationPriceApprovalTarget(tx,scope,data.id,data.facilityId,data.revision);
   await tx.priceApprovalChallenge.updateMany({where:{organisationId:scope.organisationId,requestedById:scope.userId,amendmentId:data.id,status:{in:["SENDING","SENT"]}},data:{status:"CANCELLED"}});
   const expiresAt=new Date(Math.min(Date.now()+300000,proposal.expiresAt.getTime()));
   await tx.priceApprovalChallenge.create({data:{id,organisationId:scope.organisationId,facilityId:data.facilityId,amendmentId:proposal.id,revision:proposal.revision,quoteFingerprint:proposal.quoteFingerprint,requestedById:scope.userId,approverId:approver.id,requesterSessionVersion:requester.sessionVersion,requesterSessionHash:sessionHash,approverSessionVersion:approver.sessionVersion,contactVersion:version(row!),codeHash:priceApprovalCodeHash(id,code),reference:data.reference,expiresAt}});
-  const original=JSON.parse(decryptIntegrationSecret(proposal.originalEncrypted)),proposed=JSON.parse(decryptIntegrationSecret(proposal.proposedEncrypted));
-  return {phone,expiresAt,variables:{"1":code,"2":booking.publicReference??proposal.reservationId,"3":String(original.quotedRate),"4":String(proposed.monthlyRate),"5":requester.name,"6":String(proposed.reason)}};
+  return {phone,expiresAt,variables:{"1":code}};
  });
  // Durable claim is made before sending. Never retry an uncertain external attempt.
  const result=await new TwilioWhatsAppProvider().sendTemplate(prepared.phone,template,prepared.variables,{organisationId:scope.organisationId,facilityId:data.facilityId,idempotencyKey:id});
