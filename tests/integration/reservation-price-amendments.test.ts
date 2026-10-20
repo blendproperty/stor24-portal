@@ -50,6 +50,28 @@ test("isolated governed price amendments preserve original quotes, consent, sour
   }
   const financial=(f:Fixture)=>Promise.all([db.account.findMany({where:{customerId:f.customer.id},orderBy:{id:"asc"}}),db.payment.findMany({where:{account:{customerId:f.customer.id}},orderBy:{id:"asc"}}),db.ledgerEntry.findMany({where:{account:{customerId:f.customer.id}},orderBy:{id:"asc"}}),db.tenancy.findMany({where:{customerId:f.customer.id},orderBy:{id:"asc"}}),db.publicPaymentSession.findMany({where:{reservationId:f.booking.id},orderBy:{id:"asc"}})]);
   try{
+    await t.test("campaign reasons are scoped, current and snapshotted without granting a price or changing finance",async()=>{
+      const f=await fixture(),other=await fixture(),now=new Date();
+      const campaign=await db.marketingCampaign.create({data:{organisationId:f.org.id,facilityId:f.facility.id,name:"Summer campaign",source:"OTHER",medium:"PROMOTION",budget:0,status:"ACTIVE",startsAt:new Date(now.getTime()-86400000)}});
+      const foreign=await db.marketingCampaign.create({data:{organisationId:other.org.id,facilityId:other.facility.id,name:"Other store private campaign",source:"OTHER",medium:"PROMOTION",budget:0,status:"ACTIVE",startsAt:new Date(0)}});
+      assert.deepEqual((await reservationPriceWorkspace(f.scope,f.booking.id)).campaigns,[{id:campaign.id,name:"Summer campaign"}]);
+      await assert.rejects(proposeReservationPrice(f.scope,{...propose(f),reasonSelection:{type:"CAMPAIGN",campaignId:foreign.id}}),/CAMPAIGN_UNAVAILABLE/);
+      for(const patch of [{status:"PLANNED"},{status:"PAUSED"},{status:"COMPLETE"},{startsAt:new Date(now.getTime()+86400000)},{endsAt:new Date(now.getTime()-86400000)}]){
+        await db.marketingCampaign.update({where:{id:campaign.id},data:{status:"ACTIVE",startsAt:new Date(0),endsAt:null,...patch}});
+        assert.deepEqual((await reservationPriceWorkspace(f.scope,f.booking.id)).campaigns,[]);
+        await assert.rejects(proposeReservationPrice(f.scope,{...propose(f),reasonSelection:{type:"CAMPAIGN",campaignId:campaign.id}}),/CAMPAIGN_UNAVAILABLE/);
+      }
+      await db.marketingCampaign.update({where:{id:campaign.id},data:{startsAt:new Date(0),endsAt:null}});
+      const before=await financial(f),proposal=await proposeReservationPrice(f.scope,{...propose(f),reason:"Spoofed client campaign description",reasonSelection:{type:"CAMPAIGN",campaignId:campaign.id}});
+      const row=await db.reservationPriceAmendment.findUniqueOrThrow({where:{id:proposal.id}}),saved=JSON.parse(decryptIntegrationSecret(row.proposedEncrypted));
+      assert.equal(row.status,"PROPOSED");assert.equal(saved.reason,"Promotion campaign: Summer campaign");assert.deepEqual(saved.reasonSelection,{type:"CAMPAIGN",campaignId:campaign.id,campaignName:"Summer campaign"});
+      await db.marketingCampaign.update({where:{id:campaign.id},data:{name:"Renamed campaign"}});
+      assert.equal((await reservationPriceWorkspace(f.scope,f.booking.id)).amendments[0].reason,"Promotion campaign: Summer campaign");assert.deepEqual(await financial(f),before);
+      const manual=await fixture(),unlisted=await proposeReservationPrice(manual.scope,{...propose(manual),reasonSelection:{type:"OTHER_CAMPAIGN",campaignName:"Unlisted summer offer"}});
+      assert.equal(JSON.parse(decryptIntegrationSecret((await db.reservationPriceAmendment.findUniqueOrThrow({where:{id:unlisted.id}})).proposedEncrypted)).reason,"Promotion campaign (not listed): Unlisted summer offer");
+      const custom=await fixture(),record=await proposeReservationPrice(custom.scope,{...propose(custom),reasonSelection:{type:"OTHER",explanation:"Customer circumstances explained"}});
+      assert.equal(JSON.parse(decryptIntegrationSecret((await db.reservationPriceAmendment.findUniqueOrThrow({where:{id:record.id}})).proposedEncrypted)).reason,"Other: Customer circumstances explained");
+    });
     await t.test("unsigned unpaid online rental quotes can propose without changing financial records",async()=>{
       const f=await fixture();await db.reservation.update({where:{id:f.booking.id},data:{source:"PUBLIC_WEBSITE"}});const before=await financial(f);const item=await proposeReservationPrice(f.scope,propose(f));assert.ok(item.id);assert.deepEqual(await financial(f),before);
     });
@@ -216,7 +238,7 @@ test("isolated governed price amendments preserve original quotes, consent, sour
   }finally{
     for(const organisationId of organisations){
       await db.reservationPriceAmendment.deleteMany({where:{organisationId}});await db.auditEvent.deleteMany({where:{organisationId}});await db.tenantPortalWelcome.deleteMany({where:{organisationId}});
-      await db.publicPaymentSession.deleteMany({where:{reservation:{customer:{organisationId}}}});await db.publicReservationLease.deleteMany({where:{reservation:{customer:{organisationId}}}});await db.reservation.deleteMany({where:{customer:{organisationId}}});await db.payment.deleteMany({where:{account:{customer:{organisationId}}}});await db.account.deleteMany({where:{customer:{organisationId}}});await db.organisation.delete({where:{id:organisationId}});
+      await db.publicPaymentSession.deleteMany({where:{reservation:{customer:{organisationId}}}});await db.publicReservationLease.deleteMany({where:{reservation:{customer:{organisationId}}}});await db.reservation.deleteMany({where:{customer:{organisationId}}});await db.payment.deleteMany({where:{account:{customer:{organisationId}}}});await db.account.deleteMany({where:{customer:{organisationId}}});await db.marketingCampaign.deleteMany({where:{organisationId}});await db.organisation.delete({where:{id:organisationId}});
     }
     if(oldKey===undefined)delete process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY;else process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY=oldKey;if(oldUrl===undefined)delete process.env.APP_URL;else process.env.APP_URL=oldUrl;await db.$disconnect();
   }
