@@ -216,7 +216,7 @@ test("isolated governed price amendments preserve original quotes, consent, sour
   }finally{
     for(const organisationId of organisations){
       await db.reservationPriceAmendment.deleteMany({where:{organisationId}});await db.auditEvent.deleteMany({where:{organisationId}});await db.tenantPortalWelcome.deleteMany({where:{organisationId}});
-      await db.publicPaymentSession.deleteMany({where:{reservation:{customer:{organisationId}}}});await db.publicReservationLease.deleteMany({where:{reservation:{customer:{organisationId}}}});await db.reservation.deleteMany({where:{customer:{organisationId}}});await db.organisation.delete({where:{id:organisationId}});
+      await db.publicPaymentSession.deleteMany({where:{reservation:{customer:{organisationId}}}});await db.publicReservationLease.deleteMany({where:{reservation:{customer:{organisationId}}}});await db.reservation.deleteMany({where:{customer:{organisationId}}});await db.payment.deleteMany({where:{account:{customer:{organisationId}}}});await db.account.deleteMany({where:{customer:{organisationId}}});await db.organisation.delete({where:{id:organisationId}});
     }
     if(oldKey===undefined)delete process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY;else process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY=oldKey;if(oldUrl===undefined)delete process.env.APP_URL;else process.env.APP_URL=oldUrl;await db.$disconnect();
   }
