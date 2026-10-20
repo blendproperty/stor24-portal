@@ -1,7 +1,7 @@
 export const securityPermissionGroups = [
   { label: "Scheduled collection letters", permissions: [["collection_schedules.view", "View scoped schedules and exact run letters"], ["collection_schedules.manage", "Prepare or cancel collection schedules and runs"], ["collection_schedules.approve", "Independently review each collection run"]] },
   { label: "Staff event email review", permissions: [["staff_event_emails.view", "View scoped staff email policies and outbox"], ["staff_event_emails.manage", "Prepare or cancel staff event email policies"], ["staff_event_emails.approve", "Independently review staff event email policies"]] },
-  { label: "Governed booking quotes", permissions: [["reservation_prices.view", "Read original booking quotes and amendment evidence"], ["reservation_prices.propose", "Propose or withdraw unsigned booking price changes"], ["reservation_prices.approve", "Independently approve booking quote proposals"]] },
+  { label: "Governed booking quotes", permissions: [["reservation_prices.view", "Read original booking quotes and amendment evidence"], ["reservation_prices.propose", "Propose or withdraw unsigned booking price changes"], ["reservation_prices.approve", "Approve booking quote proposals (including own proposals)"]] },
   { label: "Customers and leasing", permissions: [
     ["customer_history.export", "Download a customer's contact history (scoped delegation)"],
     ["leads.*", "Manage leads"], ["reservations.*", "Manage reservations"], ["move_in.create", "Process move-ins"], ["operations.view", "View tenant operations"], ["operations.manage", "Edit customers and operational work"],

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {createHash,randomBytes,randomUUID} from "node:crypto";
 import {Prisma} from "../../src/generated/prisma/client";
 import {db} from "../../src/lib/db";
+import {saveStaffPriceContact,staffPriceContact,requestManagerPriceApproval,verifyManagerPriceApproval} from "../../src/lib/price-manager-service";
 import {newPublicInitialRent,publicCheckoutTotal} from "../../src/lib/public-initial-rent";
 import {newIdentityAccess} from "../../src/lib/identity-document-security";
 import {decryptIntegrationSecret} from "../../src/lib/integrations/integration-secret-vault";
@@ -26,6 +27,8 @@ test("isolated governed price amendments preserve original quotes, consent, sour
     const facility=await db.facility.create({data:{organisationId:org.id,name:"Synthetic quote store",code:randomUUID()}});
     const customer=await db.customer.create({data:{organisationId:org.id,firstName:"Synthetic",lastName:"Customer",email:randomUUID()+"@example.invalid",emailVerifiedAt:new Date(Date.now()-3600000)}});
     const proposer=await db.user.create({data:{organisationId:org.id,name:"Synthetic proposer",email:randomUUID()+"@example.invalid"}}),reviewer=await db.user.create({data:{organisationId:org.id,name:"Synthetic reviewer",email:randomUUID()+"@example.invalid"}});
+    const role=await db.role.create({data:{organisationId:org.id,name:"Synthetic price authority",permissions:["reservation_prices.view","reservation_prices.propose","reservation_prices.approve","reservations.manage","billing.view"]}});
+    await db.roleAssignment.createMany({data:[{userId:proposer.id,roleId:role.id,facilityId:facility.id},{userId:reviewer.id,roleId:role.id,facilityId:facility.id}]});
     const type=await db.unitType.create({data:{facilityId:facility.id,name:"Synthetic quote unit"}}),unit=await db.unit.create({data:{facilityId:facility.id,unitTypeId:type.id,number:"QUOTE-CI",floor:"Ground Floor",status:"RESERVED",monthlyRate:2000}});
     const moveIn=new Date(Date.now()+2*86400000),holdExpiresAt=new Date(Date.now()+86400000);
     const booking=await db.reservation.create({data:{facilityId:facility.id,customerId:customer.id,unitId:unit.id,status:"ACTIVE",journey:"RENTAL",source:"PUBLIC_VIEWING",publicReference:randomUUID(),quotedRate:1000,initialRentSnapshot:newPublicInitialRent(1000,moveIn),intendedMoveIn:moveIn,holdExpiresAt,contactVerifiedAt:new Date()}});
@@ -50,6 +53,32 @@ test("isolated governed price amendments preserve original quotes, consent, sour
   }
   const financial=(f:Fixture)=>Promise.all([db.account.findMany({where:{customerId:f.customer.id},orderBy:{id:"asc"}}),db.payment.findMany({where:{account:{customerId:f.customer.id}},orderBy:{id:"asc"}}),db.ledgerEntry.findMany({where:{account:{customerId:f.customer.id}},orderBy:{id:"asc"}}),db.tenancy.findMany({where:{customerId:f.customer.id},orderBy:{id:"asc"}}),db.publicPaymentSession.findMany({where:{reservationId:f.booking.id},orderBy:{id:"asc"}})]);
   try{
+    await t.test("manager WhatsApp codes bind the exact deal, operator session and current authority, and consume once without finance",async()=>{
+      const keys=["AUTH_SECRET","TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_WHATSAPP_FROM","TWILIO_WHATSAPP_PRICE_APPROVAL_SID"] as const,old=Object.fromEntries(keys.map(k=>[k,process.env[k]])),realFetch=globalThis.fetch;
+      Object.assign(process.env,{AUTH_SECRET:"synthetic-price-otp-key-".repeat(3),TWILIO_ACCOUNT_SID:"AC"+"a".repeat(32),TWILIO_AUTH_TOKEN:"synthetic-token",TWILIO_WHATSAPP_FROM:"+27820000000",TWILIO_WHATSAPP_PRICE_APPROVAL_SID:"HX"+"b".repeat(32)});
+      let lastCode="",sendCount=0;
+      globalThis.fetch=async(input,init)=>{assert.equal(String(input),"https://api.twilio.com/2010-04-01/Accounts/"+process.env.TWILIO_ACCOUNT_SID+"/Messages.json");const fields=new URLSearchParams(String(init?.body));assert.equal(fields.get("To"),"whatsapp:+27821234567");lastCode=JSON.parse(fields.get("ContentVariables")!)["1"];sendCount++;return Response.json({sid:"SM"+"c".repeat(32)});};
+      async function setup(){const f=await fixture(),proposal=await proposeReservationPrice(f.scope,propose(f));await saveStaffPriceContact(f.org.id,f.proposer.id,f.reviewer.id,{phone:"+27821234567",consent:true});const pending=await requestManagerPriceApproval(f.scope,{id:proposal.id,facilityId:f.facility.id,revision:0,approverId:f.reviewer.id,reference:"Synthetic manager approval",confirmed:true},"operator-session");const code=lastCode;return {...f,proposal,pending,code,verify:{challengeId:pending.challengeId,facilityId:f.facility.id,code,confirmed:true as const}};}
+      try{
+        const f=await setup(),before=await financial(f);assert.deepEqual(await staffPriceContact(f.org.id,f.reviewer.id),{configured:true,maskedPhone:"Ending 4567"});
+        const retained=await db.priceApprovalChallenge.findUniqueOrThrow({where:{id:f.pending.challengeId}});assert.ok(!JSON.stringify(retained).includes(f.code));assert.equal(retained.status,"SENT");
+        await assert.rejects(verifyManagerPriceApproval(f.scope,f.verify,"another-session"),/OTP_INVALID/);
+        await assert.rejects(verifyManagerPriceApproval({...f.scope,userId:f.reviewer.id},f.verify,"operator-session"),/OTP_INVALID/);
+        await assert.rejects(verifyManagerPriceApproval(f.scope,{...f.verify,code:f.code==="111111"?"222222":"111111"},"operator-session"),/OTP_INVALID/);
+        assert.equal((await db.priceApprovalChallenge.findUniqueOrThrow({where:{id:retained.id}})).attempts,1);
+        const result=await Promise.allSettled([verifyManagerPriceApproval(f.scope,f.verify,"operator-session"),verifyManagerPriceApproval(f.scope,f.verify,"operator-session")]);assert.equal(result.filter(r=>r.status==="fulfilled").length,1);
+        const approved=await db.reservationPriceAmendment.findUniqueOrThrow({where:{id:f.proposal.id}});assert.equal(approved.status,"APPROVED");assert.equal(approved.reviewedById,f.reviewer.id);assert.deepEqual(await financial(f),before);assert.equal((await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}})).quotedRate.toFixed(2),"1000.00");
+        const event=await db.auditEvent.findFirstOrThrow({where:{entityId:f.proposal.id,action:"reservation.price_approved"}});assert.equal(event.actorId,f.reviewer.id);assert.equal((event.after as {requestedById:string}).requestedById,f.proposer.id);assert.ok(!JSON.stringify(event).includes(f.code));
+        const revoked=await setup();await db.user.update({where:{id:revoked.reviewer.id},data:{sessionVersion:{increment:1}}});await assert.rejects(verifyManagerPriceApproval(revoked.scope,revoked.verify,"operator-session"),/OTP_INVALID/);
+        const permission=await setup();const assignment=await db.roleAssignment.findFirstOrThrow({where:{userId:permission.reviewer.id}});await db.role.update({where:{id:assignment.roleId},data:{permissions:["reservation_prices.view"]}});await assert.rejects(verifyManagerPriceApproval(permission.scope,permission.verify,"operator-session"),/FORBIDDEN/);
+        const changed=await setup();await db.reservationPriceAmendment.update({where:{id:changed.proposal.id},data:{revision:{increment:1}}});await assert.rejects(verifyManagerPriceApproval(changed.scope,changed.verify,"operator-session"),/SOURCE_CHANGED/);
+        const contact=await setup();await saveStaffPriceContact(contact.org.id,contact.proposer.id,contact.reviewer.id,{phone:"",consent:true});await assert.rejects(verifyManagerPriceApproval(contact.scope,contact.verify,"operator-session"),/OTP_INVALID/);
+        const expired=await setup();await db.priceApprovalChallenge.update({where:{id:expired.pending.challengeId},data:{expiresAt:new Date(0)}});await assert.rejects(verifyManagerPriceApproval(expired.scope,expired.verify,"operator-session"),/OTP_INVALID/);
+        const exhausted=await setup();await db.priceApprovalChallenge.update({where:{id:exhausted.pending.challengeId},data:{attempts:5}});await assert.rejects(verifyManagerPriceApproval(exhausted.scope,exhausted.verify,"operator-session"),/OTP_INVALID/);
+        const pending=await setup(),account=await db.account.create({data:{customerId:pending.customer.id,accountNumber:`ST24-T-${pending.booking.id}`}});await db.payment.create({data:{accountId:account.id,amount:1000,currency:"ZAR",method:"PAY_NOW",provider:"NETCASH",providerRef:randomUUID(),status:"PENDING",idempotencyKey:randomUUID()}});const financialBefore=await financial(pending);await assert.rejects(verifyManagerPriceApproval(pending.scope,pending.verify,"operator-session"),/REVIEW_REQUIRED/);assert.deepEqual(await financial(pending),financialBefore);assert.equal((await db.priceApprovalChallenge.findUniqueOrThrow({where:{id:pending.pending.challengeId}})).status,"SENT");
+        const noConfig=await fixture(),proposal=await proposeReservationPrice(noConfig.scope,propose(noConfig));delete process.env.TWILIO_WHATSAPP_PRICE_APPROVAL_SID;const count=sendCount;await assert.rejects(requestManagerPriceApproval(noConfig.scope,{id:proposal.id,facilityId:noConfig.facility.id,revision:0,approverId:noConfig.reviewer.id,reference:"No configured template",confirmed:true},"operator-session"),/CONFIG_REQUIRED/);assert.equal(sendCount,count);
+      }finally{globalThis.fetch=realFetch;for(const key of keys){if(old[key]===undefined)delete process.env[key];else process.env[key]=old[key];}}
+    });
     await t.test("campaign reasons are scoped, current and snapshotted without granting a price or changing finance",async()=>{
       const f=await fixture(),other=await fixture(),now=new Date();
       const campaign=await db.marketingCampaign.create({data:{organisationId:f.org.id,facilityId:f.facility.id,name:"Summer campaign",source:"OTHER",medium:"PROMOTION",budget:0,status:"ACTIVE",startsAt:new Date(now.getTime()-86400000)}});
@@ -88,7 +117,6 @@ test("isolated governed price amendments preserve original quotes, consent, sour
       for(const status of ["PENDING","SUCCEEDED","TIMEOUT","CANCELLED","UNKNOWN"]){await db.publicPaymentSession.update({where:{id:session.id},data:{status}});await assert.rejects(proposeReservationPrice(f.scope,propose(f)),/REVIEW_REQUIRED/);}
       await db.publicPaymentSession.update({where:{id:session.id},data:{status:"DECLINED"}});
       const before=await financial(f),proposal=await proposeReservationPrice(f.scope,propose(f));
-      await assert.rejects(decideReservationPrice(f.scope,{id:proposal.id,facilityId:f.facility.id,revision:0,decision:"APPROVED",reference:"Synthetic self review blocked",confirmed:true}),/INDEPENDENT/);
       await approve(f,proposal.id);const consent=await fresh(f,proposal.id);
       assert.deepEqual(await financial(f),before);
       await db.payment.update({where:{id:payment.id},data:{status:"PENDING"}});
@@ -166,7 +194,7 @@ test("isolated governed price amendments preserve original quotes, consent, sour
         assert.deepEqual(await financial(f),baseline);
       }finally{if(oldEnabled===undefined)delete process.env.PUBLIC_RESERVATION_VERIFICATION_ENABLED;else process.env.PUBLIC_RESERVATION_VERIFICATION_ENABLED=oldEnabled;if(oldPublicKey===undefined)delete process.env.PUBLIC_BOOKING_API_KEY;else process.env.PUBLIC_BOOKING_API_KEY=oldPublicKey;}
     });
-    await t.test("concurrent proposals are idempotent, originals immutable and independent approval does not change the booking",async()=>{
+    await t.test("concurrent proposals are idempotent, originals immutable and authorised own-proposal approval does not change the booking",async()=>{
       const f=await fixture(),input=propose(f),before=await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}}),baseline=await financial(f);
       const [first,retry]=await Promise.all([proposeReservationPrice(f.scope,input),proposeReservationPrice(f.scope,input)]);assert.equal(first.id,retry.id);
       assert.equal(await db.reservationPriceAmendment.count({where:{reservationId:f.booking.id}}),1);
@@ -175,8 +203,8 @@ test("isolated governed price amendments preserve original quotes, consent, sour
       const item=await db.reservationPriceAmendment.findUniqueOrThrow({where:{id:first.id}}),original=JSON.parse(decryptIntegrationSecret(item.originalEncrypted));
       assert.equal(original.quotedRate,"1000.00");assert.deepEqual(original.initialRentSnapshot,before.initialRentSnapshot);assert.ok(original.lease.content);assert.ok(!item.originalEncrypted.includes("Synthetic Customer"));
       await assert.rejects(db.reservationPriceAmendment.update({where:{id:item.id},data:{originalEncrypted:"not-an-original"}}));
-      await assert.rejects(decideReservationPrice(f.scope,{id:item.id,facilityId:f.facility.id,revision:0,decision:"APPROVED",reference:"Invalid self approval",confirmed:true}),/INDEPENDENT/);
-      await approve(f,item.id);assert.deepEqual(await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}}),before);assert.deepEqual(await financial(f),baseline);
+      await decideReservationPrice(f.scope,{id:item.id,facilityId:f.facility.id,revision:0,decision:"APPROVED",reference:"Authorised own proposal approval",confirmed:true});
+      const approved=await db.reservationPriceAmendment.findUniqueOrThrow({where:{id:item.id}});assert.equal(approved.reviewedById,f.proposer.id);assert.ok(approved.reviewedAt);assert.deepEqual(await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}}),before);assert.deepEqual(await financial(f),baseline);
       assert.equal((await reservationPriceWorkspace(f.scope,f.booking.publicReference!)).amendments.length,1);
       await assert.rejects(reservationPriceWorkspace({...f.scope,facilityIds:[]},f.booking.publicReference!),/NOT_FOUND/);
     });

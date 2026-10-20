@@ -24,6 +24,7 @@ test("immutable quote evidence preserves original price and customer acceptance 
     const {item,audits,booking}=fixture(),after=new Date("2026-10-16T00:00:00Z");
     const evidence=bookingPriceEvidence("org",booking,[item],audits,after);
     assert.equal(evidence.issue,null);assert.equal(evidence.original?.quotedRate,"1000.00");assert.equal(evidence.latestAcceptedQuote,"900.25");assert.equal(evidence.acceptedChanges,1);
+    const own={...item,reviewedById:item.proposedById};assert.equal(bookingPriceEvidence("org",booking,[own],audits.map(a=>a.action==="reservation.price_approved"?{...a,actorId:own.reviewedById}:a),after).issue,null);
     const earlier=bookingPriceEvidence("org",booking,[item],audits,acceptedAt);assert.equal(earlier.original?.quotedRate,"1000.00");assert.equal(earlier.acceptedChanges,0);assert.equal(earlier.latestAcceptedQuote,null);
     const lead={id:"lead",facilityId:"store",facility:"Synthetic",customerId:"customer",source:"PUBLIC_QUOTE_FORM",stage:"NEW",createdAt:reviewedAt,enquiryLocation:null,bookings:[{...booking,status:"ACTIVE",convertedTenancyId:null,tenancy:null,priceEvidence:evidence}]};
     const row=marketingPaymentCohortRows([lead],[],[],"2026-10-16")[0];assert.equal(row.originalMonthlyQuote,"1000.00");assert.equal(row.latestAcceptedQuote,"900.25");assert.equal(row.acceptedPriceChanges,1);

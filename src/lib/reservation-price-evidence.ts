@@ -22,7 +22,7 @@ export function bookingPriceEvidence(organisationId:string,booking:PriceHistoryB
     const ordered=[...items].sort((a,b)=>a.createdAt.getTime()-b.createdAt.getTime()||(a.id<b.id?-1:a.id>b.id?1:0));
     let previous:z.infer<typeof proposedSchema>|null=null,previousAccepted:Date|null=null;
     for(const item of ordered){
-      if(item.organisationId!==organisationId||item.facilityId!==booking.facilityId||item.reservationId!==booking.id||item.acceptedCustomerId!==booking.customerId||!item.reviewedById||item.reviewedById===item.proposedById||!item.reviewedAt||!item.acceptedAt||!item.reviewReference||item.acceptanceFingerprint!==item.quoteFingerprint||item.acceptedAt<=item.reviewedAt||item.acceptedAt>item.expiresAt||previousAccepted&&item.reviewedAt<=previousAccepted)throw Error();
+      if(item.organisationId!==organisationId||item.facilityId!==booking.facilityId||item.reservationId!==booking.id||item.acceptedCustomerId!==booking.customerId||!item.reviewedById||!item.reviewedAt||!item.acceptedAt||!item.reviewReference||item.acceptanceFingerprint!==item.quoteFingerprint||item.acceptedAt<=item.reviewedAt||item.acceptedAt>item.expiresAt||previousAccepted&&item.reviewedAt<=previousAccepted)throw Error();
       const raw=JSON.parse(decryptIntegrationSecret(item.originalEncrypted));
       if(hash(raw)!==item.sourceFingerprint)throw Error();
       const original=originalSchema.parse(raw),proposed=proposedSchema.parse(JSON.parse(decryptIntegrationSecret(item.proposedEncrypted)));

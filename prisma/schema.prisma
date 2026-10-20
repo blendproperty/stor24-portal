@@ -201,6 +201,7 @@ enum AccessDecisionState {
 }
 
 model Organisation {
+  priceApprovalChallenges PriceApprovalChallenge[]
   receiptBankSources ReceiptBankSourceProfile[]
   receiptImportPostings ReceiptImportPosting[]
   staffOperationalAcknowledgements StaffOperationalAcknowledgement[]
@@ -269,6 +270,7 @@ model UserInvitation {
 }
 
 model Facility {
+  priceApprovalChallenges PriceApprovalChallenge[]
   receiptImportPostings ReceiptImportPosting[]
   staffOperationalAcknowledgements StaffOperationalAcknowledgement[]
   arrivalHandovers ArrivalHandover[]
@@ -468,6 +470,7 @@ model Lead {
 }
 
 model ReservationPriceAmendment {
+  managerChallenges PriceApprovalChallenge[]
   id String @id @default(cuid())
   organisationId String
   facilityId String
@@ -1253,6 +1256,8 @@ model Document {
 }
 
 model User {
+  requestedPriceApprovals PriceApprovalChallenge[] @relation("PriceRequester")
+  authorisedPriceApprovals PriceApprovalChallenge[] @relation("PriceApprover")
   staffOperationalAcknowledgements StaffOperationalAcknowledgement[]
   ownedArrivalHandovers ArrivalHandover[] @relation("ArrivalOwner")
   coveringArrivalHandovers ArrivalHandover[] @relation("ArrivalCover")
@@ -2247,4 +2252,36 @@ model ReceiptImportPosting {
   @@unique([organisationId, sourceIdentity])
   @@unique([organisationId, requestKey])
   @@index([organisationId, facilityId, postedAt, id])
+}
+
+
+// Deal-specific staff authorisation; codes are keyed hashes, never plaintext.
+model PriceApprovalChallenge {
+  id String @id
+  organisationId String
+  organisation Organisation @relation(fields:[organisationId],references:[id],onDelete:Cascade)
+  facilityId String
+  facility Facility @relation(fields:[facilityId],references:[id],onDelete:Cascade)
+  amendmentId String
+  amendment ReservationPriceAmendment @relation(fields:[amendmentId],references:[id],onDelete:Cascade)
+  revision Int
+  quoteFingerprint String
+  requestedById String
+  requester User @relation("PriceRequester",fields:[requestedById],references:[id],onDelete:Cascade)
+  approverId String
+  approver User @relation("PriceApprover",fields:[approverId],references:[id],onDelete:Cascade)
+  requesterSessionVersion Int
+  requesterSessionHash String
+  approverSessionVersion Int
+  contactVersion String
+  codeHash String
+  reference String
+  expiresAt DateTime
+  attempts Int @default(0)
+  status String @default("SENDING")
+  providerRef String?
+  consumedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([organisationId, requestedById, createdAt])
+  @@index([expiresAt])
 }

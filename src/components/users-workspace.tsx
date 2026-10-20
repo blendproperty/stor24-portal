@@ -11,6 +11,7 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
+import { StaffPriceApprovalContact } from "./staff-price-approval-contact";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { securityPermissionGroups } from "@/lib/security-permissions";
@@ -509,6 +510,7 @@ export function UsersWorkspace() {
             <p className="permission-summary">{selectedPermissions.length} permissions selected</p>
             </div>
             <div className="permission-groups">
+              <StaffPriceApprovalContact key={permissionUser.id} userId={permissionUser.id}/>
               {securityPermissionGroups.map((group) => (
                 <fieldset key={group.label}>
                   <legend>{group.label} <span>{group.permissions.filter(([key]) => selectedPermissions.includes(key)).length}/{group.permissions.length}</span></legend>
