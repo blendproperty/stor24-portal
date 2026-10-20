@@ -12,6 +12,8 @@ import {visualReportSource} from "../../src/lib/visual-report-data";
 import {defaultVisualQuery} from "../../src/lib/visual-report-engine";
 import {southAfricaDateKey} from "../../src/lib/south-africa-time";
 import {startPublicEmailVerification,emailVerificationHash,verifyPublicReservationEmail} from "../../src/lib/public-booking-service";
+import {settleVerifiedBookingPayment} from "../../src/lib/payments/booking-payment-settlement";
+import {startSimulatedPayment} from "../../src/lib/public-payment-simulator";
 import {LEASE_CLAUSE_KEYS} from "../../src/lib/lease-agreement-content";
 
 test("isolated governed price amendments preserve original quotes, consent, source locks and financial baselines",async t=>{
@@ -48,8 +50,43 @@ test("isolated governed price amendments preserve original quotes, consent, sour
   }
   const financial=(f:Fixture)=>Promise.all([db.account.findMany({where:{customerId:f.customer.id},orderBy:{id:"asc"}}),db.payment.findMany({where:{account:{customerId:f.customer.id}},orderBy:{id:"asc"}}),db.ledgerEntry.findMany({where:{account:{customerId:f.customer.id}},orderBy:{id:"asc"}}),db.tenancy.findMany({where:{customerId:f.customer.id},orderBy:{id:"asc"}}),db.publicPaymentSession.findMany({where:{reservationId:f.booking.id},orderBy:{id:"asc"}})]);
   try{
-    await t.test("normal online rental quotes cannot negotiate even before signing or payment",async()=>{
-      const f=await fixture();await db.reservation.update({where:{id:f.booking.id},data:{source:"PUBLIC_WEBSITE"}});await assert.rejects(proposeReservationPrice(f.scope,propose(f)),/REVIEW_REQUIRED/);
+    await t.test("unsigned unpaid online rental quotes can propose without changing financial records",async()=>{
+      const f=await fixture();await db.reservation.update({where:{id:f.booking.id},data:{source:"PUBLIC_WEBSITE"}});const before=await financial(f);const item=await proposeReservationPrice(f.scope,propose(f));assert.ok(item.id);assert.deepEqual(await financial(f),before);
+    });
+    await t.test("Pay now confirmed declines allow a proposal but pending/successful/uncertain payments and changed evidence block acceptance",async()=>{
+      const f=await fixture();await db.reservation.update({where:{id:f.booking.id},data:{source:"PUBLIC_WEBSITE"}});
+      const account=await db.account.create({data:{customerId:f.customer.id,accountNumber:`ST24-T-${f.booking.id}`}});
+      const payment=await db.payment.create({data:{accountId:account.id,amount:1000,currency:"ZAR",method:"PAY_NOW",provider:"NETCASH",providerRef:randomUUID(),environment:"live",status:"FAILED",failureCode:"DECLINED",processedAt:new Date(),idempotencyKey:randomUUID()}});
+      const session=await db.publicPaymentSession.create({data:{reservationId:f.booking.id,amount:1000,description:"Synthetic terminal decline",checkoutTokenHash:"a".repeat(64),idempotencyKey:randomUUID(),providerReference:randomUUID(),expiresAt:new Date(Date.now()+3600000),status:"DECLINED",failureCode:"DECLINED",processedAt:new Date()}});
+      for(const patch of [{status:"PENDING"},{status:"TEST_PENDING"},{status:"SUCCEEDED"},{status:"TEST_SUCCEEDED"},{status:"REFUNDED"},{status:"FAILED",failureCode:"TIMEOUT"},{status:"FAILED",failureCode:"CHECKOUT_CREATE_FAILED"},{status:"FAILED",failureCode:"DECLINED",processedAt:null}] as Prisma.PaymentUpdateInput[]){
+        await db.payment.update({where:{id:payment.id},data:{status:"FAILED",failureCode:"DECLINED",processedAt:new Date(),...patch}});
+        await assert.rejects(proposeReservationPrice(f.scope,propose(f)),/REVIEW_REQUIRED/);
+      }
+      await db.payment.update({where:{id:payment.id},data:{status:"FAILED",failureCode:"DECLINED",processedAt:new Date()}});
+      for(const status of ["PENDING","SUCCEEDED","TIMEOUT","CANCELLED","UNKNOWN"]){await db.publicPaymentSession.update({where:{id:session.id},data:{status}});await assert.rejects(proposeReservationPrice(f.scope,propose(f)),/REVIEW_REQUIRED/);}
+      await db.publicPaymentSession.update({where:{id:session.id},data:{status:"DECLINED"}});
+      const before=await financial(f),proposal=await proposeReservationPrice(f.scope,propose(f));
+      await assert.rejects(decideReservationPrice(f.scope,{id:proposal.id,facilityId:f.facility.id,revision:0,decision:"APPROVED",reference:"Synthetic self review blocked",confirmed:true}),/INDEPENDENT/);
+      await approve(f,proposal.id);const consent=await fresh(f,proposal.id);
+      assert.deepEqual(await financial(f),before);
+      await db.payment.update({where:{id:payment.id},data:{status:"PENDING"}});
+      await assert.rejects(acceptCustomerReservationPrice(consent),/REVIEW_REQUIRED/);
+      await db.payment.update({where:{id:payment.id},data:{status:"FAILED"}});
+      const beforeAcceptance=await financial(f);
+      await acceptCustomerReservationPrice(consent);
+      assert.deepEqual(await financial(f),beforeAcceptance);
+      assert.equal((await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}})).quotedRate.toFixed(2),"900.25");
+      await assert.rejects(settleVerifiedBookingPayment(payment.id,{reference:payment.providerRef!,amount:1000,accepted:true,requestTrace:"Synthetic late callback"}),/QUOTE_CHANGED/);
+      assert.deepEqual(await financial(f),beforeAcceptance);
+    });
+    await t.test("checkout starts on the current quote and a newly pending session blocks price proposals",async()=>{
+      const f=await fixture();await db.reservation.update({where:{id:f.booking.id},data:{source:"PUBLIC_WEBSITE"}});
+      const previous=process.env.PUBLIC_PAYMENT_SIMULATOR_ENABLED;process.env.PUBLIC_PAYMENT_SIMULATOR_ENABLED="true";
+      try{
+        const started=await startSimulatedPayment(f.booking.publicReference!,randomUUID());assert.ok(started.ok);
+        if(!started.ok)throw Error("Synthetic checkout failed");assert.equal(started.amountZar,publicCheckoutTotal(f.booking));
+        await assert.rejects(proposeReservationPrice(f.scope,propose(f)),/REVIEW_REQUIRED/);
+      }finally{if(previous===undefined)delete process.env.PUBLIC_PAYMENT_SIMULATOR_ENABLED;else process.env.PUBLIC_PAYMENT_SIMULATOR_ENABLED=previous;}
     });
     await t.test("a verified viewing hold needs an agreed date and explicit rental preparation without extending its hold",async()=>{
       const f=await fixture();await db.publicReservationLease.delete({where:{reservationId:f.booking.id}});
@@ -179,7 +216,7 @@ test("isolated governed price amendments preserve original quotes, consent, sour
   }finally{
     for(const organisationId of organisations){
       await db.reservationPriceAmendment.deleteMany({where:{organisationId}});await db.auditEvent.deleteMany({where:{organisationId}});await db.tenantPortalWelcome.deleteMany({where:{organisationId}});
-      await db.publicPaymentSession.deleteMany({where:{reservation:{customer:{organisationId}}}});await db.publicReservationLease.deleteMany({where:{reservation:{customer:{organisationId}}}});await db.reservation.deleteMany({where:{customer:{organisationId}}});await db.organisation.delete({where:{id:organisationId}});
+      await db.publicPaymentSession.deleteMany({where:{reservation:{customer:{organisationId}}}});await db.publicReservationLease.deleteMany({where:{reservation:{customer:{organisationId}}}});await db.reservation.deleteMany({where:{customer:{organisationId}}});await db.payment.deleteMany({where:{account:{customer:{organisationId}}}});await db.account.deleteMany({where:{customer:{organisationId}}});await db.organisation.delete({where:{id:organisationId}});
     }
     if(oldKey===undefined)delete process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY;else process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY=oldKey;if(oldUrl===undefined)delete process.env.APP_URL;else process.env.APP_URL=oldUrl;await db.$disconnect();
   }

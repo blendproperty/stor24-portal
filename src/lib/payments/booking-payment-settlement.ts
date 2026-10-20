@@ -1,3 +1,4 @@
+import { publicCheckoutTotal } from "../public-initial-rent";
 import { queueBookingConfirmation } from "./booking-confirmation-email";
 import { db } from "@/lib/db";
 import { isTestPayment } from "./payment-evidence";
@@ -5,7 +6,9 @@ import { isTestPayment } from "./payment-evidence";
 /** Called only after server-to-server provider verification. Serialises callbacks and staff handover. */
 export async function settleVerifiedBookingPayment(paymentId: string, evidence: { reference: string; amount: number; accepted: boolean; requestTrace: string }) {
   return db.$transaction(async tx => {
-    const target = await tx.payment.findUniqueOrThrow({ where: { id: paymentId }, select: { accountId: true } });
+    const target = await tx.payment.findUniqueOrThrow({ where: { id: paymentId }, select: { accountId: true, account: { select: { accountNumber: true } } } });
+    const reservationId = target.account.accountNumber.startsWith("ST24-T-") ? target.account.accountNumber.slice(7) : null;
+    if (reservationId) await tx.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id" = ${reservationId} FOR UPDATE`;
     await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${target.accountId} FOR UPDATE`;
     const payment = await tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
     if (payment.provider !== "NETCASH" || payment.providerRef !== evidence.reference || payment.currency !== "ZAR" || Number(payment.amount) !== evidence.amount) throw new Error("PAYMENT_VERIFICATION_MISMATCH");
@@ -14,6 +17,10 @@ export async function settleVerifiedBookingPayment(paymentId: string, evidence: 
     if (["REVERSED", "REFUNDED", "PARTIALLY_REFUNDED"].includes(payment.status)) return { financial: false, terminal: true }; // Original success cannot undo a later approved correction.
     if (payment.status === "SUCCEEDED" || payment.status === "TEST_SUCCEEDED") return { financial: !test, terminal: true };
     if (!evidence.accepted) return { financial: false, terminal: false }; // May be asynchronous EFT; never downgrade success.
+    if (reservationId && await tx.reservationPriceAmendment.count({ where: { reservationId, status: "APPLIED" } })) {
+      const booking = await tx.reservation.findUnique({ where: { id: reservationId }, include: { packageSelection: true } });
+      if (!booking || publicCheckoutTotal(booking) !== Number(payment.amount)) throw new Error("BOOKING_QUOTE_CHANGED");
+    }
     await tx.payment.update({ where: { id: paymentId }, data: { status: test ? "TEST_SUCCEEDED" : "SUCCEEDED", processedAt: new Date(), failureCode: null } });
     await queueBookingConfirmation(tx, paymentId, test);
     if (test) return { financial: false, terminal: true }; // No ledger, balance, financial receipt or finance export.

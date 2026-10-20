@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {randomUUID} from "node:crypto";
 import {newPublicInitialRent} from "../src/lib/public-initial-rent";
-import {negotiatedMonthlyRate,reservationPriceBlockers,reservationPriceProposalSchema,reservationPriceAcceptanceSchema,proposedReservationPrice,requireIndependentPriceApproval,assertReservationQuotePatch} from "../src/lib/reservation-price-policy";
+import {confirmedFailedPricePayment,negotiatedMonthlyRate,reservationPriceBlockers,reservationPriceProposalSchema,reservationPriceAcceptanceSchema,proposedReservationPrice,requireIndependentPriceApproval,assertReservationQuotePatch} from "../src/lib/reservation-price-policy";
 const now=new Date("2026-10-15T08:00:00Z"),moveIn=new Date("2026-10-20T10:00:00Z");
 const original=()=>({source:"PUBLIC_VIEWING",status:"ACTIVE",journey:"RENTAL",convertedTenancyId:null,publicReference:"PUBLIC-ORIGINAL",quotedRate:1000,initialRentSnapshot:newPublicInitialRent(1000,moveIn),intendedMoveIn:moveIn,holdExpiresAt:new Date("2026-10-16"),contactVerifiedAt:now,emailVerifiedAt:now,signed:false,mandate:false,paymentSessions:0,financialActivity:false});
 test("only a verified, held, unsigned and financially untouched original quote is eligible",()=>{
@@ -47,12 +47,19 @@ test("staff quotes require explicit preparation and retain signed, paid and expi
   for(const patch of [{signed:true},{mandate:true},{financialActivity:true},{paymentSessions:1},{holdExpiresAt:now}])assert.ok(reservationPriceBlockers({...staff,...patch},now,true).length>0);
 });
 
-test("normal online bookings are excluded even if unsigned, unpaid and within a 24-hour hold",()=>{
-  assert.ok(reservationPriceBlockers({...original(),source:"PUBLIC_WEBSITE"},now).some(reason=>reason.includes("Hold to view")));
+test("unsigned unpaid Pay now quotes are eligible while other quote guards remain",()=>{
+  assert.deepEqual(reservationPriceBlockers({...original(),source:"PUBLIC_WEBSITE"},now),[]);
   const viewing={...original(),journey:"VIEWING",intendedMoveIn:null,initialRentSnapshot:null,emailVerifiedAt:null};
   assert.ok(reservationPriceBlockers(viewing,now).length>0);
   assert.deepEqual(reservationPriceBlockers(viewing,now,true),[]);
   assert.deepEqual(reservationPriceBlockers({...original(),journey:"VIEWING"},now),[]);
   assert.ok(reservationPriceBlockers({...original(),source:"INTERNAL",journey:"VIEWING"},now).length>0);
   assert.deepEqual(reservationPriceBlockers({...original(),source:"INTERNAL"},now),[]);
+});
+
+test("only recorded terminal declines are confirmed failures; pending and ambiguous outcomes stay blocked",()=>{
+  const declined={status:"FAILED",failureCode:"DECLINED",processedAt:now};
+  assert.equal(confirmedFailedPricePayment(declined),true);
+  assert.equal(confirmedFailedPricePayment({...declined,status:"DECLINED"}),true);
+  for(const change of [{status:"PENDING"},{status:"TEST_PENDING"},{status:"SUCCEEDED"},{status:"TEST_SUCCEEDED"},{status:"REFUNDED"},{status:"CANCELLED"},{failureCode:"TIMEOUT"},{failureCode:"CHECKOUT_CREATE_FAILED"},{failureCode:"NETCASH_CUSTOMER_CANCELLED"},{failureCode:null},{processedAt:null}])assert.equal(confirmedFailedPricePayment({...declined,...change}),false);
 });

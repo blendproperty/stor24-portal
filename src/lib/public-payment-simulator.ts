@@ -15,25 +15,30 @@ function tokenHash(token: string) {
 
 export async function startSimulatedPayment(reference: string, idempotencyKey: string) {
   if (!publicPaymentSimulatorEnabled()) return { ok: false as const, code: "DISABLED" };
-  const reservation = await db.reservation.findUnique({
-    where: { publicReference: reference },
-    include: { facility: true, unit: true, customer: true, packageSelection: true, publicPaymentSessions: { orderBy: { createdAt: "desc" }, take: 1 } },
-  });
-  if (!reservation || reservation.status !== "ACTIVE" || !reservation.contactVerifiedAt || !reservation.customer.emailVerifiedAt || reservation.journey !== "RENTAL")
-    return { ok: false as const, code: "RESERVATION_UNAVAILABLE" };
+  return db.$transaction(async tx => {
+    const target = await tx.reservation.findUnique({ where: { publicReference: reference }, select: { id: true } });
+    if (!target) return { ok: false as const, code: "RESERVATION_UNAVAILABLE" };
+    await tx.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id" = ${target.id} FOR UPDATE`;
+    const reservation = await tx.reservation.findUnique({
+      where: { publicReference: reference },
+      include: { facility: true, unit: true, customer: true, packageSelection: true, publicPaymentSessions: { orderBy: { createdAt: "desc" }, take: 1 } },
+    });
+    if (!reservation || reservation.status !== "ACTIVE" || !reservation.contactVerifiedAt || !reservation.customer.emailVerifiedAt || reservation.journey !== "RENTAL")
+      return { ok: false as const, code: "RESERVATION_UNAVAILABLE" };
 
-  const existing = reservation.publicPaymentSessions[0];
-  if (existing?.status === "SUCCEEDED") return { ok: false as const, code: "ALREADY_PAID" };
-  const token = randomBytes(32).toString("base64url");
-  const expiresAt = new Date(Date.now() + 20 * 60 * 1000);
-  const providerReference = `SIM-${randomBytes(6).toString("hex").toUpperCase()}`;
-  const session = await db.publicPaymentSession.create({ data: {
-    reservationId: reservation.id, amount: publicCheckoutTotal(reservation), currency: "ZAR",
-    description: `Initial storage and selected goods - Unit ${reservation.unit.number}`,
-    checkoutTokenHash: tokenHash(token), idempotencyKey, providerReference, expiresAt,
-  }});
-  await db.auditEvent.create({ data: { organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, action: "public_payment.simulator_started", entityType: "PublicPaymentSession", entityId: session.id, requestId: idempotencyKey, after: { providerReference, amount: session.amount.toString(), expiresAt: expiresAt.toISOString() } } });
-  return { ok: true as const, sessionId: session.id, checkoutToken: token, providerReference, expiresAt: expiresAt.toISOString(), amountZar: Number(session.amount), currency: session.currency, description: session.description, facilityName: reservation.facility.name, unitNumber: reservation.unit.number, customerName: reservation.customer.firstName };
+    const existing = reservation.publicPaymentSessions[0];
+    if (existing?.status === "SUCCEEDED") return { ok: false as const, code: "ALREADY_PAID" };
+    const token = randomBytes(32).toString("base64url");
+    const expiresAt = new Date(Date.now() + 20 * 60 * 1000);
+    const providerReference = `SIM-${randomBytes(6).toString("hex").toUpperCase()}`;
+    const session = await tx.publicPaymentSession.create({ data: {
+      reservationId: reservation.id, amount: publicCheckoutTotal(reservation), currency: "ZAR",
+      description: `Initial storage and selected goods - Unit ${reservation.unit.number}`,
+      checkoutTokenHash: tokenHash(token), idempotencyKey, providerReference, expiresAt,
+    }});
+    await tx.auditEvent.create({ data: { organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, action: "public_payment.simulator_started", entityType: "PublicPaymentSession", entityId: session.id, requestId: idempotencyKey, after: { providerReference, amount: session.amount.toString(), expiresAt: expiresAt.toISOString() } } });
+    return { ok: true as const, sessionId: session.id, checkoutToken: token, providerReference, expiresAt: expiresAt.toISOString(), amountZar: Number(session.amount), currency: session.currency, description: session.description, facilityName: reservation.facility.name, unitNumber: reservation.unit.number, customerName: reservation.customer.firstName };
+  });
 }
 
 export async function completeSimulatedPayment(sessionId: string, checkoutToken: string, outcome: SimulatedPaymentOutcome, paymentMethod?: "DEBIT_ORDER" | "CARD" | "EFT") {
@@ -50,6 +55,9 @@ export async function completeSimulatedPayment(sessionId: string, checkoutToken:
   const status = effectiveOutcome === "SUCCESS" ? "SUCCEEDED" : effectiveOutcome;
   const now = new Date();
   await db.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id" = ${session.reservationId} FOR UPDATE`;
+    const current = await tx.publicPaymentSession.findUniqueOrThrow({ where: { id: session.id } });
+    if (current.status !== "PENDING") throw new Error("PAYMENT_STATE_CHANGED");
     await tx.publicPaymentSession.update({ where: { id: session.id }, data: { status, paymentMethod, failureCode: effectiveOutcome === "SUCCESS" ? null : effectiveOutcome, processedAt: now } });
     if (effectiveOutcome === "SUCCESS") {
       await tx.reservation.update({ where: { id: session.reservationId }, data: { holdExpiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000) } });
