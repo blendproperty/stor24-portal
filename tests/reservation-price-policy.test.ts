@@ -4,10 +4,10 @@ import {randomUUID} from "node:crypto";
 import {newPublicInitialRent} from "../src/lib/public-initial-rent";
 import {negotiatedMonthlyRate,reservationPriceBlockers,reservationPriceProposalSchema,reservationPriceAcceptanceSchema,proposedReservationPrice,requireIndependentPriceApproval,assertReservationQuotePatch} from "../src/lib/reservation-price-policy";
 const now=new Date("2026-10-15T08:00:00Z"),moveIn=new Date("2026-10-20T10:00:00Z");
-const original=()=>({source:"PUBLIC_WEBSITE",status:"ACTIVE",journey:"RENTAL",convertedTenancyId:null,publicReference:"PUBLIC-ORIGINAL",quotedRate:1000,initialRentSnapshot:newPublicInitialRent(1000,moveIn),intendedMoveIn:moveIn,holdExpiresAt:new Date("2026-10-16"),contactVerifiedAt:now,emailVerifiedAt:now,signed:false,mandate:false,paymentSessions:0,financialActivity:false});
+const original=()=>({source:"PUBLIC_VIEWING",status:"ACTIVE",journey:"RENTAL",convertedTenancyId:null,publicReference:"PUBLIC-ORIGINAL",quotedRate:1000,initialRentSnapshot:newPublicInitialRent(1000,moveIn),intendedMoveIn:moveIn,holdExpiresAt:new Date("2026-10-16"),contactVerifiedAt:now,emailVerifiedAt:now,signed:false,mandate:false,paymentSessions:0,financialActivity:false});
 test("only a verified, held, unsigned and financially untouched original quote is eligible",()=>{
   assert.deepEqual(reservationPriceBlockers(original(),now),[]);
-  for(const changed of [{signed:true},{status:"CONVERTED"},{convertedTenancyId:"tenancy"},{paymentSessions:1},{financialActivity:true},{mandate:true},{contactVerifiedAt:null},{emailVerifiedAt:null},{holdExpiresAt:new Date("2026-10-14")},{initialRentSnapshot:null},{source:"UNKNOWN"},{journey:"VIEWING"}])assert.ok(reservationPriceBlockers({...original(),...changed},now).length>0);
+  for(const changed of [{signed:true},{status:"CONVERTED"},{convertedTenancyId:"tenancy"},{paymentSessions:1},{financialActivity:true},{mandate:true},{contactVerifiedAt:null},{holdExpiresAt:new Date("2026-10-14")},{initialRentSnapshot:null},{source:"UNKNOWN"},{journey:"VIEWING"}])assert.ok(reservationPriceBlockers({...original(),...changed},now).length>0);
   assert.ok(reservationPriceBlockers({...original(),quotedRate:999},now).some(text=>text.includes("snapshot")));
 });
 test("price proposals use whole cents and the existing proration policy",()=>{
@@ -39,10 +39,18 @@ test("negotiated amounts and discounts are rounded once to cents and cannot crea
   assert.throws(()=>negotiatedMonthlyRate("1250.00",{mode:"DISCOUNT_AMOUNT",value:"1250"}),/INVALID/);
   assert.throws(()=>negotiatedMonthlyRate("1250.00",{mode:"AMOUNT",value:"10000000.01"}),/INVALID/);
 });
-test("staff quotes require explicit preparation and retain signed, paid, expired and missing-date holds",()=>{
+test("staff quotes require explicit preparation and retain signed, paid and expired holds",()=>{
   const staff={...original(),source:"INTERNAL",contactVerifiedAt:null,emailVerifiedAt:null,initialRentSnapshot:null,publicReference:null};
   assert.ok(reservationPriceBlockers(staff,now).length>0);
   assert.deepEqual(reservationPriceBlockers(staff,now,true),[]);
   assert.deepEqual(reservationPriceBlockers({...staff,publicReference:"PREPARED",initialRentSnapshot:original().initialRentSnapshot},now),[]);
-  for(const patch of [{signed:true},{mandate:true},{financialActivity:true},{paymentSessions:1},{intendedMoveIn:null},{holdExpiresAt:now}])assert.ok(reservationPriceBlockers({...staff,...patch},now,true).length>0);
+  for(const patch of [{signed:true},{mandate:true},{financialActivity:true},{paymentSessions:1},{holdExpiresAt:now}])assert.ok(reservationPriceBlockers({...staff,...patch},now,true).length>0);
+});
+
+test("normal online bookings are excluded even if unsigned, unpaid and within a 24-hour hold",()=>{
+  assert.ok(reservationPriceBlockers({...original(),source:"PUBLIC_WEBSITE"},now).some(reason=>reason.includes("Hold to view")));
+  const viewing={...original(),journey:"VIEWING",intendedMoveIn:null,initialRentSnapshot:null,emailVerifiedAt:null};
+  assert.ok(reservationPriceBlockers(viewing,now).length>0);
+  assert.deepEqual(reservationPriceBlockers(viewing,now,true),[]);
+  assert.deepEqual(reservationPriceBlockers({...original(),source:"INTERNAL"},now),[]);
 });

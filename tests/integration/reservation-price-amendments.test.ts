@@ -26,7 +26,7 @@ test("isolated governed price amendments preserve original quotes, consent, sour
     const proposer=await db.user.create({data:{organisationId:org.id,name:"Synthetic proposer",email:randomUUID()+"@example.invalid"}}),reviewer=await db.user.create({data:{organisationId:org.id,name:"Synthetic reviewer",email:randomUUID()+"@example.invalid"}});
     const type=await db.unitType.create({data:{facilityId:facility.id,name:"Synthetic quote unit"}}),unit=await db.unit.create({data:{facilityId:facility.id,unitTypeId:type.id,number:"QUOTE-CI",floor:"Ground Floor",status:"RESERVED",monthlyRate:2000}});
     const moveIn=new Date(Date.now()+2*86400000),holdExpiresAt=new Date(Date.now()+86400000);
-    const booking=await db.reservation.create({data:{facilityId:facility.id,customerId:customer.id,unitId:unit.id,status:"ACTIVE",journey:"RENTAL",source:"PUBLIC_WEBSITE",publicReference:randomUUID(),quotedRate:1000,initialRentSnapshot:newPublicInitialRent(1000,moveIn),intendedMoveIn:moveIn,holdExpiresAt,contactVerifiedAt:new Date()}});
+    const booking=await db.reservation.create({data:{facilityId:facility.id,customerId:customer.id,unitId:unit.id,status:"ACTIVE",journey:"RENTAL",source:"PUBLIC_VIEWING",publicReference:randomUUID(),quotedRate:1000,initialRentSnapshot:newPublicInitialRent(1000,moveIn),intendedMoveIn:moveIn,holdExpiresAt,contactVerifiedAt:new Date()}});
     const prepared=await preparePublicReservationLease(booking.publicReference!,"CARD");assert.ok(prepared.ok);
     // Suppress lifecycle delivery deliberately in this synthetic fixture. This is
     // not delivery evidence and never invokes an external email provider.
@@ -48,6 +48,19 @@ test("isolated governed price amendments preserve original quotes, consent, sour
   }
   const financial=(f:Fixture)=>Promise.all([db.account.findMany({where:{customerId:f.customer.id},orderBy:{id:"asc"}}),db.payment.findMany({where:{account:{customerId:f.customer.id}},orderBy:{id:"asc"}}),db.ledgerEntry.findMany({where:{account:{customerId:f.customer.id}},orderBy:{id:"asc"}}),db.tenancy.findMany({where:{customerId:f.customer.id},orderBy:{id:"asc"}}),db.publicPaymentSession.findMany({where:{reservationId:f.booking.id},orderBy:{id:"asc"}})]);
   try{
+    await t.test("normal online rental quotes cannot negotiate even before signing or payment",async()=>{
+      const f=await fixture();await db.reservation.update({where:{id:f.booking.id},data:{source:"PUBLIC_WEBSITE"}});await assert.rejects(proposeReservationPrice(f.scope,propose(f)),/REVIEW_REQUIRED/);
+    });
+    await t.test("a verified viewing hold needs an agreed date and explicit rental preparation without extending its hold",async()=>{
+      const f=await fixture();await db.publicReservationLease.delete({where:{reservationId:f.booking.id}});
+      await db.reservation.update({where:{id:f.booking.id},data:{journey:"VIEWING",intendedMoveIn:null,initialRentSnapshot:Prisma.DbNull}});
+      const view=await reservationPriceWorkspace(f.scope,f.booking.id),input={reservationId:f.booking.id,facilityId:f.facility.id,sourceFingerprint:view.preparation!.sourceFingerprint,confirmed:true};
+      await assert.rejects(proposeReservationPrice(f.scope,propose(f)),/REVIEW_REQUIRED/);
+      await assert.rejects(prepareStaffReservationQuote(f.scope,input),/INVALID/);
+      await prepareStaffReservationQuote(f.scope,{...input,intendedMoveIn:southAfricaDateKey(new Date(Date.now()+86400000))});
+      const current=await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}});assert.equal(current.journey,"RENTAL");assert.equal(current.source,"PUBLIC_VIEWING");assert.equal(current.holdExpiresAt!.getTime(),f.booking.holdExpiresAt!.getTime());assert.equal(current.quotedRate.toFixed(2),"1000.00");
+      await proposeReservationPrice(f.scope,propose(f));
+    });
     await t.test("staff quote preparation retains the real original, discounts are checked server-side and fresh email proof precedes acceptance",async()=>{
       const f=await fixture();
       await db.publicReservationLease.delete({where:{reservationId:f.booking.id}});
