@@ -11,7 +11,7 @@ import {preparePublicReservationLease,completePublicReservationLease} from "../.
 import {visualReportSource} from "../../src/lib/visual-report-data";
 import {defaultVisualQuery} from "../../src/lib/visual-report-engine";
 import {southAfricaDateKey} from "../../src/lib/south-africa-time";
-import {emailVerificationHash,verifyPublicReservationEmail} from "../../src/lib/public-booking-service";
+import {startPublicEmailVerification,emailVerificationHash,verifyPublicReservationEmail} from "../../src/lib/public-booking-service";
 import {LEASE_CLAUSE_KEYS} from "../../src/lib/lease-agreement-content";
 
 test("isolated governed price amendments preserve original quotes, consent, source locks and financial baselines",async t=>{
@@ -59,7 +59,17 @@ test("isolated governed price amendments preserve original quotes, consent, sour
       await assert.rejects(prepareStaffReservationQuote(f.scope,input),/INVALID/);
       await prepareStaffReservationQuote(f.scope,{...input,intendedMoveIn:southAfricaDateKey(new Date(Date.now()+86400000))});
       const current=await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}});assert.equal(current.journey,"VIEWING");assert.equal(current.source,"PUBLIC_VIEWING");assert.equal(current.holdExpiresAt!.getTime(),f.booking.holdExpiresAt!.getTime());assert.equal(current.quotedRate.toFixed(2),"1000.00");
-      const proposal=await proposeReservationPrice(f.scope,propose(f));await approve(f,proposal.id);await acceptCustomerReservationPrice(await fresh(f,proposal.id));assert.equal((await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}})).journey,"RENTAL");
+      const proposal=await proposeReservationPrice(f.scope,propose(f));
+      const oldEnabled=process.env.PUBLIC_RESERVATION_VERIFICATION_ENABLED,oldProvider=process.env.EMAIL_PROVIDER;
+      process.env.PUBLIC_RESERVATION_VERIFICATION_ENABLED="true";process.env.EMAIL_PROVIDER="disabled";
+      assert.ok(!process.env.TWILIO_ACCOUNT_SID,"Synthetic quote test forbids external fallback transport");
+      try{
+        const unavailable=await startPublicEmailVerification(f.booking.publicReference!,true,proposal.id);assert.equal(unavailable.ok,false);assert.ok("code" in unavailable&&unavailable.code==="NOT_FOUND");
+        await approve(f,proposal.id);
+        const challenge=await startPublicEmailVerification(f.booking.publicReference!,true,proposal.id);assert.equal(challenge.ok,false);assert.ok("code" in challenge&&challenge.code==="DELIVERY_FAILED");
+        const challenged=await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}});assert.ok(challenged.verificationCodeHash);assert.equal(challenged.journey,"VIEWING");assert.equal(challenged.holdExpiresAt!.getTime(),f.booking.holdExpiresAt!.getTime());
+      }finally{if(oldEnabled===undefined)delete process.env.PUBLIC_RESERVATION_VERIFICATION_ENABLED;else process.env.PUBLIC_RESERVATION_VERIFICATION_ENABLED=oldEnabled;if(oldProvider===undefined)delete process.env.EMAIL_PROVIDER;else process.env.EMAIL_PROVIDER=oldProvider;}
+      await acceptCustomerReservationPrice(await fresh(f,proposal.id));assert.equal((await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}})).journey,"RENTAL");
     });
     await t.test("staff quote preparation retains the real original, discounts are checked server-side and fresh email proof precedes acceptance",async()=>{
       const f=await fixture();
