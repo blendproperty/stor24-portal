@@ -2,12 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {randomUUID} from "node:crypto";
 import {newPublicInitialRent} from "../src/lib/public-initial-rent";
-import {reservationPriceBlockers,reservationPriceProposalSchema,reservationPriceAcceptanceSchema,proposedReservationPrice,requireIndependentPriceApproval,assertReservationQuotePatch} from "../src/lib/reservation-price-policy";
+import {negotiatedMonthlyRate,reservationPriceBlockers,reservationPriceProposalSchema,reservationPriceAcceptanceSchema,proposedReservationPrice,requireIndependentPriceApproval,assertReservationQuotePatch} from "../src/lib/reservation-price-policy";
 const now=new Date("2026-10-15T08:00:00Z"),moveIn=new Date("2026-10-20T10:00:00Z");
-const original=()=>({source:"PUBLIC_WEBSITE",status:"ACTIVE",journey:"RENTAL",convertedTenancyId:null,publicReference:"PUBLIC-ORIGINAL",quotedRate:1000,initialRentSnapshot:newPublicInitialRent(1000,moveIn),intendedMoveIn:moveIn,holdExpiresAt:new Date("2026-10-16"),contactVerifiedAt:now,emailVerifiedAt:now,signed:false,mandate:false,paymentSessions:0,financialActivity:false});
+const original=()=>({source:"PUBLIC_VIEWING",status:"ACTIVE",journey:"RENTAL",convertedTenancyId:null,publicReference:"PUBLIC-ORIGINAL",quotedRate:1000,initialRentSnapshot:newPublicInitialRent(1000,moveIn),intendedMoveIn:moveIn,holdExpiresAt:new Date("2026-10-16"),contactVerifiedAt:now,emailVerifiedAt:now,signed:false,mandate:false,paymentSessions:0,financialActivity:false});
 test("only a verified, held, unsigned and financially untouched original quote is eligible",()=>{
   assert.deepEqual(reservationPriceBlockers(original(),now),[]);
-  for(const changed of [{signed:true},{status:"CONVERTED"},{convertedTenancyId:"tenancy"},{paymentSessions:1},{financialActivity:true},{mandate:true},{contactVerifiedAt:null},{emailVerifiedAt:null},{holdExpiresAt:new Date("2026-10-14")},{initialRentSnapshot:null},{source:"INTERNAL"},{journey:"VIEWING"}])assert.ok(reservationPriceBlockers({...original(),...changed},now).length>0);
+  for(const changed of [{signed:true},{status:"CONVERTED"},{convertedTenancyId:"tenancy"},{paymentSessions:1},{financialActivity:true},{mandate:true},{contactVerifiedAt:null},{holdExpiresAt:new Date("2026-10-14")},{initialRentSnapshot:null},{source:"UNKNOWN"},{journey:"UNKNOWN"}])assert.ok(reservationPriceBlockers({...original(),...changed},now).length>0);
   assert.ok(reservationPriceBlockers({...original(),quotedRate:999},now).some(text=>text.includes("snapshot")));
 });
 test("price proposals use whole cents and the existing proration policy",()=>{
@@ -28,4 +28,31 @@ test("generic reservation edits cannot silently change protected online particul
   assert.doesNotThrow(()=>assertReservationQuotePatch(row,{quotedRate:1000,intendedMoveIn:moveIn,unitId:"unit"}));
   for(const patch of [{quotedRate:900},{intendedMoveIn:new Date("2026-10-21")},{unitId:"other"},{customerId:"other"},{facilityId:"other"}])assert.throws(()=>assertReservationQuotePatch(row,patch),/GOVERNED_WORKFLOW/);
   assert.doesNotThrow(()=>assertReservationQuotePatch({...row,initialRentSnapshot:null},{quotedRate:900}));
+});
+
+test("negotiated amounts and discounts are rounded once to cents and cannot create zero or negative rent",()=>{
+  assert.equal(negotiatedMonthlyRate("1250.00",{mode:"AMOUNT",value:"1100"}),"1100.00");
+  assert.equal(negotiatedMonthlyRate("1250.00",{mode:"DISCOUNT_AMOUNT",value:"150.25"}),"1099.75");
+  assert.equal(negotiatedMonthlyRate("1250.00",{mode:"DISCOUNT_PERCENT",value:"12.5"}),"1093.75");
+  assert.equal(negotiatedMonthlyRate("1.01",{mode:"DISCOUNT_PERCENT",value:"50"}),"0.51");
+  for(const value of ["0","100","100.01","-1","1.001","1e2"])assert.throws(()=>negotiatedMonthlyRate("1250.00",{mode:"DISCOUNT_PERCENT",value}),/INVALID/);
+  assert.throws(()=>negotiatedMonthlyRate("1250.00",{mode:"DISCOUNT_AMOUNT",value:"1250"}),/INVALID/);
+  assert.throws(()=>negotiatedMonthlyRate("1250.00",{mode:"AMOUNT",value:"10000000.01"}),/INVALID/);
+});
+test("staff quotes require explicit preparation and retain signed, paid and expired holds",()=>{
+  const staff={...original(),source:"INTERNAL",contactVerifiedAt:null,emailVerifiedAt:null,initialRentSnapshot:null,publicReference:null};
+  assert.ok(reservationPriceBlockers(staff,now).length>0);
+  assert.deepEqual(reservationPriceBlockers(staff,now,true),[]);
+  assert.deepEqual(reservationPriceBlockers({...staff,publicReference:"PREPARED",initialRentSnapshot:original().initialRentSnapshot},now),[]);
+  for(const patch of [{signed:true},{mandate:true},{financialActivity:true},{paymentSessions:1},{holdExpiresAt:now}])assert.ok(reservationPriceBlockers({...staff,...patch},now,true).length>0);
+});
+
+test("normal online bookings are excluded even if unsigned, unpaid and within a 24-hour hold",()=>{
+  assert.ok(reservationPriceBlockers({...original(),source:"PUBLIC_WEBSITE"},now).some(reason=>reason.includes("Hold to view")));
+  const viewing={...original(),journey:"VIEWING",intendedMoveIn:null,initialRentSnapshot:null,emailVerifiedAt:null};
+  assert.ok(reservationPriceBlockers(viewing,now).length>0);
+  assert.deepEqual(reservationPriceBlockers(viewing,now,true),[]);
+  assert.deepEqual(reservationPriceBlockers({...original(),journey:"VIEWING"},now),[]);
+  assert.ok(reservationPriceBlockers({...original(),source:"INTERNAL",journey:"VIEWING"},now).length>0);
+  assert.deepEqual(reservationPriceBlockers({...original(),source:"INTERNAL"},now),[]);
 });

@@ -10,7 +10,7 @@ type Attempt = { ok: true; providerReference?: string } | { ok: false; code: str
 export async function sendNotificationOnce(input: {
   organisationId: string; facilityId: string; customerId: string;
   templateId: string | null; channel: "EMAIL" | "SMS";
-  messageType: "RESERVATION_CONFIRMED" | "VIEWING_BOOKED";
+  messageType: "RESERVATION_CONFIRMED" | "VIEWING_BOOKED" | "BOOKING_PRICE_REVIEW";
   recipient: string; idempotencyKey: string; provider: string;
   payload: unknown; send: () => Promise<Attempt>;
 }): Promise<boolean> {

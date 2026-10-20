@@ -1,15 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {createHash,randomBytes,randomUUID} from "node:crypto";
+import {Prisma} from "../../src/generated/prisma/client";
 import {db} from "../../src/lib/db";
 import {newPublicInitialRent,publicCheckoutTotal} from "../../src/lib/public-initial-rent";
 import {newIdentityAccess} from "../../src/lib/identity-document-security";
 import {decryptIntegrationSecret} from "../../src/lib/integrations/integration-secret-vault";
-import {proposeReservationPrice,decideReservationPrice,previewCustomerReservationPrice,acceptCustomerReservationPrice,reservationPriceWorkspace,appliedCustomerReservationPrice} from "../../src/lib/reservation-price-service";
+import {prepareStaffReservationQuote,proposeReservationPrice,decideReservationPrice,previewCustomerReservationPrice,acceptCustomerReservationPrice,reservationPriceWorkspace,appliedCustomerReservationPrice} from "../../src/lib/reservation-price-service";
 import {preparePublicReservationLease,completePublicReservationLease} from "../../src/lib/public-lease-workflow";
 import {visualReportSource} from "../../src/lib/visual-report-data";
 import {defaultVisualQuery} from "../../src/lib/visual-report-engine";
 import {southAfricaDateKey} from "../../src/lib/south-africa-time";
+import {startPublicEmailVerification,emailVerificationHash,verifyPublicReservationEmail} from "../../src/lib/public-booking-service";
 import {LEASE_CLAUSE_KEYS} from "../../src/lib/lease-agreement-content";
 
 test("isolated governed price amendments preserve original quotes, consent, source locks and financial baselines",async t=>{
@@ -24,7 +26,7 @@ test("isolated governed price amendments preserve original quotes, consent, sour
     const proposer=await db.user.create({data:{organisationId:org.id,name:"Synthetic proposer",email:randomUUID()+"@example.invalid"}}),reviewer=await db.user.create({data:{organisationId:org.id,name:"Synthetic reviewer",email:randomUUID()+"@example.invalid"}});
     const type=await db.unitType.create({data:{facilityId:facility.id,name:"Synthetic quote unit"}}),unit=await db.unit.create({data:{facilityId:facility.id,unitTypeId:type.id,number:"QUOTE-CI",floor:"Ground Floor",status:"RESERVED",monthlyRate:2000}});
     const moveIn=new Date(Date.now()+2*86400000),holdExpiresAt=new Date(Date.now()+86400000);
-    const booking=await db.reservation.create({data:{facilityId:facility.id,customerId:customer.id,unitId:unit.id,status:"ACTIVE",journey:"RENTAL",source:"PUBLIC_WEBSITE",publicReference:randomUUID(),quotedRate:1000,initialRentSnapshot:newPublicInitialRent(1000,moveIn),intendedMoveIn:moveIn,holdExpiresAt,contactVerifiedAt:new Date()}});
+    const booking=await db.reservation.create({data:{facilityId:facility.id,customerId:customer.id,unitId:unit.id,status:"ACTIVE",journey:"RENTAL",source:"PUBLIC_VIEWING",publicReference:randomUUID(),quotedRate:1000,initialRentSnapshot:newPublicInitialRent(1000,moveIn),intendedMoveIn:moveIn,holdExpiresAt,contactVerifiedAt:new Date()}});
     const prepared=await preparePublicReservationLease(booking.publicReference!,"CARD");assert.ok(prepared.ok);
     // Suppress lifecycle delivery deliberately in this synthetic fixture. This is
     // not delivery evidence and never invokes an external email provider.
@@ -46,6 +48,65 @@ test("isolated governed price amendments preserve original quotes, consent, sour
   }
   const financial=(f:Fixture)=>Promise.all([db.account.findMany({where:{customerId:f.customer.id},orderBy:{id:"asc"}}),db.payment.findMany({where:{account:{customerId:f.customer.id}},orderBy:{id:"asc"}}),db.ledgerEntry.findMany({where:{account:{customerId:f.customer.id}},orderBy:{id:"asc"}}),db.tenancy.findMany({where:{customerId:f.customer.id},orderBy:{id:"asc"}}),db.publicPaymentSession.findMany({where:{reservationId:f.booking.id},orderBy:{id:"asc"}})]);
   try{
+    await t.test("normal online rental quotes cannot negotiate even before signing or payment",async()=>{
+      const f=await fixture();await db.reservation.update({where:{id:f.booking.id},data:{source:"PUBLIC_WEBSITE"}});await assert.rejects(proposeReservationPrice(f.scope,propose(f)),/REVIEW_REQUIRED/);
+    });
+    await t.test("a verified viewing hold needs an agreed date and explicit rental preparation without extending its hold",async()=>{
+      const f=await fixture();await db.publicReservationLease.delete({where:{reservationId:f.booking.id}});
+      await db.reservation.update({where:{id:f.booking.id},data:{journey:"VIEWING",intendedMoveIn:null,initialRentSnapshot:Prisma.DbNull}});
+      const view=await reservationPriceWorkspace(f.scope,f.booking.id),input={reservationId:f.booking.id,facilityId:f.facility.id,sourceFingerprint:view.preparation!.sourceFingerprint,confirmed:true};
+      await assert.rejects(proposeReservationPrice(f.scope,propose(f)),/REVIEW_REQUIRED/);
+      await assert.rejects(prepareStaffReservationQuote(f.scope,input),/INVALID/);
+      await prepareStaffReservationQuote(f.scope,{...input,intendedMoveIn:southAfricaDateKey(new Date(Date.now()+86400000))});
+      const current=await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}});assert.equal(current.journey,"VIEWING");assert.equal(current.source,"PUBLIC_VIEWING");assert.equal(current.holdExpiresAt!.getTime(),f.booking.holdExpiresAt!.getTime());assert.equal(current.quotedRate.toFixed(2),"1000.00");
+      const proposal=await proposeReservationPrice(f.scope,propose(f));
+      const oldEnabled=process.env.PUBLIC_RESERVATION_VERIFICATION_ENABLED,oldProvider=process.env.EMAIL_PROVIDER;
+      process.env.PUBLIC_RESERVATION_VERIFICATION_ENABLED="true";process.env.EMAIL_PROVIDER="disabled";
+      assert.ok(!process.env.TWILIO_ACCOUNT_SID,"Synthetic quote test forbids external fallback transport");
+      try{
+        const unavailable=await startPublicEmailVerification(f.booking.publicReference!,true,proposal.id);assert.equal(unavailable.ok,false);assert.ok("code" in unavailable&&unavailable.code==="NOT_FOUND");
+        await approve(f,proposal.id);
+        const challenge=await startPublicEmailVerification(f.booking.publicReference!,true,proposal.id);assert.equal(challenge.ok,false);assert.ok("code" in challenge&&challenge.code==="DELIVERY_FAILED");
+        const challenged=await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}});assert.ok(challenged.verificationCodeHash);assert.equal(challenged.journey,"VIEWING");assert.equal(challenged.holdExpiresAt!.getTime(),f.booking.holdExpiresAt!.getTime());
+      }finally{if(oldEnabled===undefined)delete process.env.PUBLIC_RESERVATION_VERIFICATION_ENABLED;else process.env.PUBLIC_RESERVATION_VERIFICATION_ENABLED=oldEnabled;if(oldProvider===undefined)delete process.env.EMAIL_PROVIDER;else process.env.EMAIL_PROVIDER=oldProvider;}
+      await acceptCustomerReservationPrice(await fresh(f,proposal.id));assert.equal((await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}})).journey,"RENTAL");
+    });
+    await t.test("staff quote preparation retains the real original, discounts are checked server-side and fresh email proof precedes acceptance",async()=>{
+      const f=await fixture();
+      await db.publicReservationLease.delete({where:{reservationId:f.booking.id}});
+      await db.reservation.update({where:{id:f.booking.id},data:{source:"INTERNAL",initialRentSnapshot:Prisma.DbNull,publicReference:null,contactVerifiedAt:null}});
+      await db.customer.update({where:{id:f.customer.id},data:{emailVerifiedAt:null}});
+      const baseline=await financial(f),input={reservationId:f.booking.id,facilityId:f.facility.id,sourceFingerprint:(await reservationPriceWorkspace(f.scope,f.booking.id)).preparation!.sourceFingerprint,confirmed:true as const};
+      await assert.rejects(proposeReservationPrice(f.scope,propose(f)),/REVIEW_REQUIRED/);
+      await assert.rejects(prepareStaffReservationQuote({...f.scope,facilityIds:[]},input),/NOT_FOUND/);
+      await assert.rejects(prepareStaffReservationQuote(f.scope,{...input,sourceFingerprint:"a".repeat(64)}),/SOURCE_CHANGED/);
+      await prepareStaffReservationQuote(f.scope,input);await prepareStaffReservationQuote(f.scope,input);
+      const prepared=await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}});
+      assert.ok(prepared.publicReference);assert.equal(prepared.contactVerifiedAt,null);assert.equal(prepared.source,"INTERNAL");assert.equal(prepared.quotedRate.toFixed(2),"1000.00");
+      assert.equal(await db.auditEvent.count({where:{entityId:f.booking.id,action:"reservation.price_staff_quote_prepared"}}),1);
+      const evidence=await db.auditEvent.findFirstOrThrow({where:{entityId:f.booking.id,action:"reservation.price_staff_quote_prepared"}});
+      const retained=JSON.parse(decryptIntegrationSecret((evidence.after as {originalEncrypted:string}).originalEncrypted));assert.equal(retained.initialRentSnapshot,null);assert.equal(retained.quotedRate,"1000.00");
+      assert.deepEqual(prepared.initialRentSnapshot,newPublicInitialRent(1000,prepared.intendedMoveIn!));
+      await assert.rejects(proposeReservationPrice(f.scope,{...propose(f),monthlyRate:"800",adjustment:{mode:"DISCOUNT_PERCENT",value:"10"}}),/INVALID/);
+      const proposal=await proposeReservationPrice(f.scope,{...propose(f),monthlyRate:"900.00",adjustment:{mode:"DISCOUNT_PERCENT",value:"10"}});await approve(f,proposal.id);
+      const oldEnabled=process.env.PUBLIC_RESERVATION_VERIFICATION_ENABLED,oldPublicKey=process.env.PUBLIC_BOOKING_API_KEY;
+      process.env.PUBLIC_RESERVATION_VERIFICATION_ENABLED="true";process.env.PUBLIC_BOOKING_API_KEY="isolated-synthetic-staff-quote";
+      try{
+        await new Promise(resolve=>setTimeout(resolve,5));
+        await db.reservation.update({where:{id:f.booking.id},data:{verificationCodeHash:emailVerificationHash(f.booking.id,"123456"),verificationExpiresAt:new Date(Date.now()+60000)}});
+        assert.equal((await verifyPublicReservationEmail(prepared.publicReference!,"123456")).ok,false);
+        assert.equal((await verifyPublicReservationEmail(prepared.publicReference!,"123456","wrong-proposal")).ok,false);
+        assert.equal((await verifyPublicReservationEmail(prepared.publicReference!,"111111",proposal.id)).ok,false);
+        assert.equal((await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}})).contactVerifiedAt,null);
+        const verified=await verifyPublicReservationEmail(prepared.publicReference!,"123456",proposal.id);assert.ok(verified.ok&&"identityAccessToken" in verified);
+        if(!verified.ok||!("identityAccessToken" in verified))throw Error("Synthetic verification failed");
+        const view=await previewCustomerReservationPrice(prepared.publicReference!,verified.identityAccessToken,proposal.id);assert.equal(view.monthlyRate,"900.00");
+        await acceptCustomerReservationPrice({reference:prepared.publicReference!,id:proposal.id,identityAccessToken:verified.identityAccessToken,quoteFingerprint:view.quoteFingerprint,accepted:true,understandsNewAgreementRequired:true});
+        const agreement=await preparePublicReservationLease(prepared.publicReference!,"EFT");assert.ok(agreement.ok);
+        const lease=await db.publicReservationLease.findUniqueOrThrow({where:{reservationId:f.booking.id}});assert.equal(lease.status,"READY");assert.equal(lease.signedAt,null);assert.match(lease.content,/900/);
+        assert.deepEqual(await financial(f),baseline);
+      }finally{if(oldEnabled===undefined)delete process.env.PUBLIC_RESERVATION_VERIFICATION_ENABLED;else process.env.PUBLIC_RESERVATION_VERIFICATION_ENABLED=oldEnabled;if(oldPublicKey===undefined)delete process.env.PUBLIC_BOOKING_API_KEY;else process.env.PUBLIC_BOOKING_API_KEY=oldPublicKey;}
+    });
     await t.test("concurrent proposals are idempotent, originals immutable and independent approval does not change the booking",async()=>{
       const f=await fixture(),input=propose(f),before=await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}}),baseline=await financial(f);
       const [first,retry]=await Promise.all([proposeReservationPrice(f.scope,input),proposeReservationPrice(f.scope,input)]);assert.equal(first.id,retry.id);
