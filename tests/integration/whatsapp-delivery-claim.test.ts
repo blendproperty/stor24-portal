@@ -23,7 +23,7 @@ test("isolated PostgreSQL WhatsApp attempt and manual-retry claims", async () =>
     builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : args.path.endsWith("/session") ? "export const getSession=async()=>__session;" : "export class TwilioWhatsAppProvider {sendTemplate(...args) {return __provider(...args);}}" }));
   } }] });
   const loaded = { exports: {} as Row };
-  new Function("require", "module", "exports", "__db", "__session", "__provider", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: user.id, sessionVersion: user.sessionVersion }, provider);
+  new Function("require", "module", "exports", "__db", "__session", "__provider", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: user.id, sessionVersion: user.sessionVersion, mfaVerified: true }, provider);
   const input = { organisationId: org.id, facilityId: facility.id, customerId: customer.id, recipient: customer.phone, consent: customer.communicationConsent, messageType: "PAYMENT_REMINDER", variables: { "1": "Synthetic" }, idempotencyKey: key, allowWhenAutomationDisabled: true };
   const retry = (logId: string) => loaded.exports.POST(new Request("https://example.invalid/api/v1/communications/retry-whatsapp", { method: "POST", headers: { origin: "https://example.invalid", "content-type": "application/json" }, body: JSON.stringify({ logId }) }));
   const envKey = "TWILIO_WHATSAPP_PAYMENT_REMINDER_SID", previous = process.env[envKey]; process.env[envKey] = "HXsynthetic";

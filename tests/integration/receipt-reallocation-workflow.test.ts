@@ -52,9 +52,9 @@ test("isolated receipt correction producers retain cash, approval, undo and sour
         const role=await db.role.create({data:{organisationId:f.org.id,name:"Synthetic receipt HTTP "+randomUUID(),permissions:["adjustments.view","billing.view",...extra]}});
         await db.roleAssignment.create({data:{userId:user.id,roleId:role.id,facilityId:store.id}});
       }
-      type Session={userId:string;sessionVersion:number};
+      type Session={userId:string;sessionVersion:number;mfaVerified?:boolean};
       const sessions=new AsyncLocalStorage<Session|null>();
-      const tokens=new Map<string,Session>([f.requester,f.reviewer,viewer].map(user=>[randomUUID(),{userId:user.id,sessionVersion:user.sessionVersion}]));
+      const tokens=new Map<string,Session>([f.requester,f.reviewer,viewer].map(user=>[randomUUID(),{ userId: user.id, sessionVersion: user.sessionVersion, mfaVerified: true }]));
       const [requesterToken,reviewerToken,foreignToken]=[...tokens.keys()];
       const bundle=await build({entryPoints:["src/app/api/v1/adjustments/receipt-reallocations/route.ts"],bundle:true,write:false,platform:"node",format:"cjs",packages:"external",plugins:[{name:"synthetic-receipt-session-only",setup(b){
         b.onResolve({filter:/generated\/prisma\/client$/},()=>({path:resolve("src/generated/prisma/client.ts"),external:true}));

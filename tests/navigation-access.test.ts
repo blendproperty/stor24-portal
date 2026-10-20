@@ -20,7 +20,7 @@ test("navigation follows grants and specific subpage rules, not job title", () =
 
 test("restricted direct navigation redirects before rendering; APIs and current grants retain their own checks", async () => {
   process.env.AUTH_SECRET = "navigation-test-secret-only-12345678901234567890";
-  const token = await createSessionToken({userId:"fixture",name:"Test",email:"test@example.invalid",role:"Organisation owner",sessionVersion:1});
+  const token = await createSessionToken({userId:"fixture",name:"Test",email:"test@example.invalid",role:"Organisation owner",sessionVersion:1,mfaVerified:true});
   const original = db.user.findUnique;
   let grants = ["operations.view"];
   let active = true;

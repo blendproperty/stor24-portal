@@ -9,6 +9,7 @@ export type SessionPayload = JWTPayload & {
   email: string;
   role: string;
   sessionVersion: number;
+  mfaVerified?: boolean;
 };
 
 function sessionKey() {

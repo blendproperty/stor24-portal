@@ -46,6 +46,7 @@ const roles = [
   ["Organisation owner", "Full portfolio control"],
   ["Facility manager", "Facility operations and approvals"],
   ["Sales / leasing", "Leads, reservations and move-ins"],
+  ["Customer service operator", "Customer service and proposals; manager approval required"],
   ["Collections", "Past-due workflows and access actions"],
   ["Finance", "Ledger, payments, close and reports"],
   ["Auditor / read only", "Governed view and export access"],
@@ -322,7 +323,7 @@ export function UsersWorkspace() {
                       {user.active === false ? "Inactive" : "Active"}
                     </StatusPill>
                   </td>
-                  <td><StatusPill tone={user.mfaEnabled ? "positive" : "neutral"}>{user.mfaEnabled ? "MFA enabled" : "MFA not enabled"}</StatusPill></td>
+                  <td><StatusPill tone={user.mfaEnabled ? "positive" : "neutral"}>{user.mfaEnabled ? "MFA enabled" : "MFA setup required"}</StatusPill></td>
                   <td>
                     <div className="user-actions">
                       <button

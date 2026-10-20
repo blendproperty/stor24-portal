@@ -46,7 +46,7 @@ function fixture() {
     delete: async (args: Row) => { writes.push({ model, ...args }); return {}; },
   };
   db.$transaction = async (fn: (client: Row) => unknown) => fn(db);
-  const session = { userId: "staff", role: "Facility manager", sessionVersion: 1 };
+  const session = { userId: "staff", role: "Facility manager", sessionVersion: 1, mfaVerified: true };
   const grant = (permission: string, facilityId: string | null = "a", name = "Facility manager") => {
     tables.user[0].roleAssignments.push({ facilityId, role: { name, permissions: [permission] } });
   };

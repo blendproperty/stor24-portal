@@ -24,7 +24,7 @@ test("isolated actual communication lookup, scope, dates, keyset and current-rol
   const syntheticId = () => "c" + randomUUID().replaceAll("-", "").slice(0, 24);
   const ids = Array.from({ length: 135 }, syntheticId);
   const createLog = (customerId: string | null, facilityId: string | null, queuedAt: Date, extra: Record<string, unknown> = {}) => db.communicationLog.create({ data: { organisationId: org.id, customerId, facilityId, queuedAt, channel: "EMAIL", status: "SUCCEEDED", recipientHash: "PRIVATE-RECIPIENT-HASH", providerRef: "PRIVATE-PROVIDER-REFERENCE", idempotencyKey: randomUUID(), metadata: { private: "PRIVATE-PAYLOAD", historyEvidence: { version: 1, text: "PRIVATE-MESSAGE-BODY" } }, ...extra } });
-  let session: { userId: string; sessionVersion: number } | null = { userId: staff.id, sessionVersion: staff.sessionVersion }, outage = false;
+  let session: { userId: string; sessionVersion: number; mfaVerified?: boolean } | null = { userId: staff.id, sessionVersion: staff.sessionVersion, mfaVerified: true }, outage = false;
   try {
     await db.communicationLog.createMany({ data: ids.map((id, index) => ({ id, organisationId: org.id, customerId: customer.id, facilityId: a.id, channel: ["EMAIL", "SMS", "WHATSAPP"][index % 3], direction: index === 0 ? "LEGACY_UNKNOWN" : "OUTBOUND", status: (["PENDING", "PROCESSING", "SUCCEEDED", "FAILED", "DEAD_LETTER"] as const)[index % 5], queuedAt: new Date(index < 60 ? "2026-10-14T08:00:00Z" : new Date("2026-10-14T09:00:00Z").getTime() + index * 1000), recipientHash: "PRIVATE-RECIPIENT-HASH", providerRef: "PRIVATE-PROVIDER-REFERENCE", idempotencyKey: randomUUID(), metadata: { private: "PRIVATE-PAYLOAD", historyEvidence: { version: 1, text: "PRIVATE-MESSAGE-BODY" } } })) });
     const old = await createLog(oldestCustomer.id, a.id, new Date("2026-09-01T08:00:00Z"));
@@ -73,7 +73,7 @@ test("isolated actual communication lookup, scope, dates, keyset and current-rol
       new Function("require", "module", "exports", "__db", "__getSession", compiled.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, bridge, () => session);
       const get = (query = "") => loaded.exports.GET(new Request("https://example.invalid/api/v1/communications/logs?" + query));
       session = null; assert.equal((await loaded.exports.GET(Object.defineProperty({}, "url", { get() { throw Error("QUERY_READ_BEFORE_AUTH"); } }) as Request)).status, 401);
-      session = { userId: staff.id, sessionVersion: staff.sessionVersion };
+      session = { userId: staff.id, sessionVersion: staff.sessionVersion, mfaVerified: true };
       const before = await db.communicationLog.count({ where: { organisationId: org.id } });
       const result = await get("search=Search&channel=SMS"); assert.equal(result.status, 200); assert.match(result.headers.get("cache-control")!, /private, no-store/);
       const json = await result.json(); assert.equal(communicationLogReadSchema.safeParse(json).success, true);

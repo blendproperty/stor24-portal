@@ -9,7 +9,7 @@ import { Prisma } from "../../src/generated/prisma/client";
 test("receipt copy uses real scoped ledger evidence and denies revoked, foreign, test and changed sources", {skip:process.env.MERCHANDISE_DB_TEST!=="isolated-ci"}, async()=>{
   assert.ok(["localhost","127.0.0.1"].includes(new URL(process.env.DATABASE_URL!).hostname));
   const org=await db.organisation.create({data:{name:"Synthetic receipt viewing",slug:randomUUID()}});
-  const state={db,Prisma,session:{userId:"",sessionVersion:0}};
+  const state={db,Prisma,session:{ userId: "", sessionVersion: 0, mfaVerified: true }};
   const bundle=await build({entryPoints:["src/app/api/v1/accounts/[id]/receipts/[paymentId]/route.ts","src/app/api/v1/accounts/route.ts"],bundle:true,write:false,outdir:"fixture",platform:"node",format:"cjs",packages:"external",plugins:[{name:"real-db-no-provider",setup(b){
     b.onResolve({filter:/^@\/lib\/(db|session|dlp-transfer-service|whatsapp|hostinger-email)$/},a=>({path:a.path,namespace:"fixture"}));
     b.onLoad({filter:/.*/,namespace:"fixture"},a=>({contents:a.path.endsWith("/db")?"export const db=__state.db;":a.path.endsWith("/session")?"export const getSession=async()=>__state.session;":a.path.endsWith("/hostinger-email")?"export class HostingerEmailProvider {}":a.path.endsWith("/whatsapp")?"export const sendWhatsAppTemplate=async()=>{throw Error('NO_SEND_IN_RECEIPT_READ_TEST')};":"export const guardDlpTransfer=async()=>({});export const protectDlpResponse=async r=>r;"}));
@@ -22,7 +22,7 @@ test("receipt copy uses real scoped ledger evidence and denies revoked, foreign,
   try{
     const store=await db.facility.create({data:{organisationId:org.id,name:"Synthetic store",code:randomUUID()}}),other=await db.facility.create({data:{organisationId:org.id,name:"Excluded store",code:randomUUID()}});
     const role=await db.role.create({data:{organisationId:org.id,name:"Synthetic ledger reader",permissions:["ledger.view"]}});
-    const user=await db.user.create({data:{organisationId:org.id,name:"Synthetic reader",email:randomUUID()+"@example.invalid",roleAssignments:{create:{roleId:role.id,facilityId:store.id}}}});state.session={userId:user.id,sessionVersion:user.sessionVersion};
+    const user=await db.user.create({data:{organisationId:org.id,name:"Synthetic reader",email:randomUUID()+"@example.invalid",roleAssignments:{create:{roleId:role.id,facilityId:store.id}}}});state.session={ userId: user.id, sessionVersion: user.sessionVersion, mfaVerified: true };
     async function fixture(facilityId=store.id){
       const customer=await db.customer.create({data:{organisationId:org.id,firstName:"Synthetic <customer>"}});
       const account=await db.account.create({data:{customerId:customer.id,accountNumber:randomUUID(),balance:60}});

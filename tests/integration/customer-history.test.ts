@@ -125,7 +125,7 @@ test("isolated PostgreSQL shared customer notebook and scoped history", async t 
         builder.onLoad({filter:/.*/,namespace:"fixture"},args=>({contents:args.path.endsWith("/db")?"export const db=__db;":"export const getSession=async()=>__session;"}));
       }}]});
       const loaded={exports:{} as {POST:(r:Request,c:unknown)=>Promise<Response>}};
-      new Function("require","module","exports","__db","__session",output.outputFiles[0].text)(createRequire(import.meta.url),loaded,loaded.exports,db,{userId:staff.id,sessionVersion:staff.sessionVersion});
+      new Function("require","module","exports","__db","__session",output.outputFiles[0].text)(createRequire(import.meta.url),loaded,loaded.exports,db,{ userId: staff.id, sessionVersion: staff.sessionVersion, mfaVerified: true });
       const download=(body:unknown={format:"CSV"},id=customer.id,origin="https://example.invalid")=>loaded.exports.POST(new Request("https://example.invalid/api/v1/customers/one/history/export",{method:"POST",headers:{origin,"content-type":"application/json"},body:JSON.stringify(body)}),{params:Promise.resolve({customerId:id})});
       assert.equal((await download()).status,403);
       await db.role.update({where:{id:role.id},data:{permissions:[...permissions,"customer_history.export"]}});
@@ -230,7 +230,7 @@ test("isolated PostgreSQL shared customer notebook and scoped history", async t 
         builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : "export const getSession=async()=>__session;" }));
       } }] });
       const loaded = { exports: {} as { POST: (r: Request, c: unknown) => Promise<Response> } };
-      new Function("require", "module", "exports", "__db", "__session", bundle.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: staff.id, sessionVersion: staff.sessionVersion });
+      new Function("require", "module", "exports", "__db", "__session", bundle.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: staff.id, sessionVersion: staff.sessionVersion, mfaVerified: true });
       const download = () => loaded.exports.POST(new Request("https://example.invalid/api/v1/customers/one/history/export", { method: "POST", headers: { origin: "https://example.invalid", "content-type": "application/json" }, body: JSON.stringify({ format: "XLSX", kind: "ACCOUNT" }) }), { params: Promise.resolve({ customerId: customer.id }) });
       assert.equal((await download()).status, 200);
       const originalAudit = db.auditEvent.create.bind(db.auditEvent);

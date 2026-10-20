@@ -52,7 +52,7 @@ export default async function RootLayout({
 }>) {
   const session = await getSession();
   const user = session ? await db.user.findUnique({ where: { id: session.userId }, include: { roleAssignments: { include: { role: true, facility: true } } } }) : null;
-  const assignments = user?.active && user.sessionVersion === session?.sessionVersion ? user.roleAssignments : [];
+  const assignments = session?.mfaVerified === true && user?.active && user.sessionVersion === session?.sessionVersion ? user.roleAssignments : [];
   const access = { owner: assignments.some(a => a.facilityId === null && a.role.name === "Organisation owner"), permissions: assignments.flatMap(a => a.role.permissions) };
   const scopedNames = [...new Set(assignments.flatMap(a => a.facility ? [a.facility.name] : []))];
   const facilityLabel = assignments.some(a => a.facilityId === null) ? "All facilities" : scopedNames.length === 1 ? scopedNames[0] : scopedNames.length ? `${scopedNames.length} assigned facilities` : "No facility assigned";

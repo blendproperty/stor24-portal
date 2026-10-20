@@ -39,6 +39,7 @@ export function PortalAuthForm(props: Props) {
       return;
     }
     if (payload.data?.mfaRequired) { setMfaRequired(true); return; }
+    if (payload.data?.mfaSetupRequired) { router.replace("/mfa-setup"); router.refresh(); return; }
     router.replace(setup ? "/" : loginDestination(searchParams.get("next")));
     router.refresh();
   }

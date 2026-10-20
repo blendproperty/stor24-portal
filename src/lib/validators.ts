@@ -295,6 +295,7 @@ export const createInvitationSchema = z.object({
     "Organisation owner",
     "Facility manager",
     "Sales / leasing",
+    "Customer service operator",
     "Collections",
     "Finance",
     "Auditor / read only",
