@@ -22,15 +22,16 @@ async function eligibleActor(tx: Client, scope: RequestScope, facilityId: string
   if (manage && !currentRoleAccess(actor.roleAssignments, "operations.manage", facilityId).allowed) throw new Error("FORBIDDEN");
 }
 
-export async function listStaffFollowups(scope: RequestScope, search = "", cursor?: string, view: StaffFollowupView = "all", now = new Date()) {
+export async function listStaffFollowups(scope: RequestScope, search = "", cursor?: string, view: StaffFollowupView = "all", now = new Date(), customerId?: string) {
   staffFollowupViewSchema.parse(view);
-  const facilities = await db.facility.findMany({ where: { ...facilityWhere(scope), active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } });
-  const where: Prisma.TaskWhereInput = { organisationId: scope.organisationId, facilityId: { in: facilities.map(f => f.id) }, purpose: "AGREED_FOLLOWUP", status: { notIn: ["COMPLETED", "CANCELLED"] } };
+  const selected = customerId ? await customerNoteFacilities(scope, customerId) : null;
+  const facilities = await db.facility.findMany({ where: { ...facilityWhere(scope), active: true, ...(selected ? { id: { in: selected.facilities.map(f => f.id) } } : {}) }, select: { id: true, name: true }, orderBy: { name: "asc" } });
+  const where: Prisma.TaskWhereInput = { organisationId: scope.organisationId, facilityId: { in: facilities.map(f => f.id) }, purpose: "AGREED_FOLLOWUP", ...(customerId ? { customerId } : {}), status: { notIn: ["COMPLETED", "CANCELLED"] } };
   if (view !== "all") where.dueAt = view === "due" ? { lt: followupDayEnd(now) } : { gte: followupDayEnd(now) };
   if (cursor && !await db.task.count({ where: { AND: [where, { id: cursor }] } })) throw new Error("CONFLICT");
   const [tasks, customers, users] = await Promise.all([
     db.task.findMany({ where, include, orderBy: [{ dueAt: "asc" }, { id: "asc" }], ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}), take: 101 }),
-    search.trim().length >= 2 ? db.customer.findMany({ where: { AND: [leasingCustomerWhere(scope, facilities.map(f => f.id)), { OR: ["firstName", "lastName", "companyName"].map(key => ({ [key]: { contains: search.trim().slice(0, 100), mode: "insensitive" } })) }] }, select: { id: true, firstName: true, lastName: true, companyName: true }, orderBy: { id: "asc" }, take: 20 }) : [],
+    selected ? [{ id: selected.customer.id, firstName: selected.customer.firstName, lastName: selected.customer.lastName, companyName: selected.customer.companyName }] : search.trim().length >= 2 ? db.customer.findMany({ where: { AND: [leasingCustomerWhere(scope, facilities.map(f => f.id)), { OR: ["firstName", "lastName", "companyName"].map(key => ({ [key]: { contains: search.trim().slice(0, 100), mode: "insensitive" } })) }] }, select: { id: true, firstName: true, lastName: true, companyName: true }, orderBy: { id: "asc" }, take: 20 }) : [],
     db.user.findMany({ where: { organisationId: scope.organisationId, active: true }, select: { ...staffSelect, roleAssignments: { include: { role: true } } }, orderBy: { name: "asc" } }),
   ]);
   return { tasks: tasks.slice(0, 100), nextCursor: tasks.length > 100 ? tasks[99].id : null, facilities, customers, staff: users.flatMap(u => { const facilityIds = facilities.filter(f => currentRoleAccess(u.roleAssignments, "operations.view", f.id).allowed).map(f => f.id); return facilityIds.length ? [{ id: u.id, name: u.name, facilityIds }] : []; }), userId: scope.userId };

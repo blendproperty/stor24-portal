@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { apiError } from "@/lib/api";
 import { sameOrigin } from "@/lib/request-security";
 import { requirePermissionScope } from "@/lib/scope";
@@ -9,9 +10,11 @@ export async function GET(request: Request) {
     const scope = await requirePermissionScope("operations.view");
     const managed = await requirePermissionScope("operations.manage").catch(error => { if (error instanceof Error && error.message === "FORBIDDEN") return null; throw error; });
     const params = new URL(request.url).searchParams;
+    const customer = z.string().cuid().optional().safeParse(params.get("customer") ?? undefined);
+    if (!customer.success) return Response.json({ error: { message: "Choose a valid customer." } }, { status: 422, headers: { "Cache-Control": "private, no-store" } });
     const view = staffFollowupViewSchema.safeParse(params.get("view") ?? "all");
     if (!view.success) return Response.json({ error: { message: "Choose all, due or upcoming appointments." } }, { status: 422, headers: { "Cache-Control": "private, no-store" } });
-    return Response.json({ data: { ...await listStaffFollowups(scope, params.get("search") ?? "", params.get("cursor")?.slice(0, 100), view.data), canManage: !!managed && (scope.unrestrictedFacilities || managed.unrestrictedFacilities || scope.facilityIds.some(id => managed.facilityIds.includes(id))) } }, { headers: { "Cache-Control": "private, no-store" } });
+    return Response.json({ data: { ...await listStaffFollowups(scope, params.get("search") ?? "", params.get("cursor")?.slice(0, 100), view.data, new Date(), customer.data), canManage: !!managed && (scope.unrestrictedFacilities || managed.unrestrictedFacilities || scope.facilityIds.some(id => managed.facilityIds.includes(id))) } }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) { return apiError(error); }
 }
 export async function POST(request: Request) {

@@ -9,13 +9,13 @@ const excel=new ExcelJS.Workbook();excel.addWorksheet('Customer history').addRow
 const policyBundle=await build({entryPoints:['src/lib/customer-history-policy.ts'],bundle:true,write:false,format:'esm',platform:'node'});
 const {historyExportSchema}=await import('data:text/javascript;base64,'+Buffer.from(policyBundle.outputFiles[0].text).toString('base64'));
 const fixturePdf=await PDFDocument.create();fixturePdf.addPage().drawText('Synthetic customer contact history');const fixturePdfBytes=await fixturePdf.save();
-const bundle=await build({stdin:{contents:`import React from 'react';import{createRoot}from'react-dom/client';import{CustomerOperationsWorkspace}from'./src/components/customer-operations-workspace';createRoot(document.getElementById('root')).render(<CustomerOperationsWorkspace/>);`,resolveDir:process.cwd(),loader:'jsx'},bundle:true,write:false,format:'esm',jsx:'automatic',plugins:[{name:'next-link',setup(b){b.onResolve({filter:/^next\/link$/},a=>({path:a.path,namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:"import React from 'react';export default function Link(p){return React.createElement('a',p)}",loader:'jsx',resolveDir:process.cwd()}));}}]});
+const bundle=await build({stdin:{contents:`import React from 'react';import{createRoot}from'react-dom/client';import{CustomerOperationsWorkspace}from'./src/components/customer-operations-workspace';createRoot(document.getElementById('root')).render(<CustomerOperationsWorkspace initialFollowups={new URLSearchParams(window.location.search).get("section") === "followups"}/>);`,resolveDir:process.cwd(),loader:'jsx'},bundle:true,write:false,format:'esm',jsx:'automatic',plugins:[{name:'next-link',setup(b){b.onResolve({filter:/^next\/link$/},a=>({path:a.path,namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:"import React from 'react';export default function Link(p){return React.createElement('a',p)}",loader:'jsx',resolveDir:process.cwd()}));}}]});
 const css=(await Promise.all(['src/app/globals.css','src/styles/stor24-brand.css','src/styles/staff-workspace.css'].map(p=>readFile(p,'utf8')))).join('\n').replace('@import "tailwindcss";','')+"\nbody{font-family:Arial,sans-serif;margin:0;background:#eff4f7;}#root{padding:28px;max-width:1440px;margin:auto;}";
 const server=createServer((req,res)=>{res.setHeader('Content-Type',req.url==='/app.js'?'text/javascript':'text/html');res.end(req.url==='/app.js'?bundle.outputFiles[0].text:`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div id="root"></div><script type="module" src="/app.js"></script></body></html>`);});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromium.launch();await mkdir('output/customer-dossier',{recursive:true});
 const customer={id:'synthetic-customer',type:'INDIVIDUAL',firstName:'Alex',lastName:'Example',companyName:null,email:'alex@example.invalid',phone:'+27820000000',identityRef:null,taxNumber:null,dateOfBirth:null,notes:null,billingAddress:null,alternateContact:null,workContact:null,emergencyContact:null,communicationConsent:{email:true,sms:true,whatsapp:true,phone:true},tenancies:[],leads:[],reservations:[]};
-const base={id:'message-1',kind:'COMMUNICATION',at:'2026-10-14T09:30:00.000Z',title:'WHATSAPP · RESERVATION CONFIRMED',body:'Outbound communication record',category:null,author:null,facility:'Midpoint',channel:'WHATSAPP',status:'SUCCEEDED',sentAt:'2026-10-14T09:30:00.000Z',deliveredAt:'2026-10-14T09:31:00.000Z',readAt:'2026-10-14T09:32:00.000Z'};
-const data={entries:[{...base,id:'note',kind:'NOTE',category:'HANDOVER',channel:null,status:null,title:'Staff handover',body:'Customer expects to arrive on Saturday. Covering staff to confirm the arrival requirements.',author:'Synthetic Faeez'},base,{...base,id:'sms',channel:'SMS',title:'SMS · RESERVATION CONFIRMED',readAt:null},{...base,id:'email',channel:'EMAIL',title:'EMAIL · RESERVATION CONFIRMED',deliveredAt:null,readAt:null}],nextCursor:null,facilities:[{id:'midpoint',name:'Midpoint'}],writableFacilities:[{id:'midpoint',name:'Midpoint'}],visibility:{communications:true,collections:true},legacyNotes:null,canExport:true};
+const base={id:'message-1',kind:'COMMUNICATION',at:'2026-10-14T09:30:00.000Z',title:'WHATSAPP Â· RESERVATION CONFIRMED',body:'Outbound communication record',category:null,author:null,facility:'Midpoint',channel:'WHATSAPP',status:'SUCCEEDED',sentAt:'2026-10-14T09:30:00.000Z',deliveredAt:'2026-10-14T09:31:00.000Z',readAt:'2026-10-14T09:32:00.000Z'};
+const data={entries:[{...base,id:'note',kind:'NOTE',category:'HANDOVER',channel:null,status:null,title:'Staff handover',body:'Customer expects to arrive on Saturday. Covering staff to confirm the arrival requirements.',author:'Synthetic Faeez'},base,{...base,id:'sms',channel:'SMS',title:'SMS Â· RESERVATION CONFIRMED',readAt:null},{...base,id:'email',channel:'EMAIL',title:'EMAIL Â· RESERVATION CONFIRMED',deliveredAt:null,readAt:null}],nextCursor:null,facilities:[{id:'midpoint',name:'Midpoint'}],writableFacilities:[{id:'midpoint',name:'Midpoint'}],visibility:{communications:true,collections:true},legacyNotes:null,canExport:true};
 try{
  for(const width of [1440,1024,390,320]){
   const page=await browser.newPage({viewport:{width,height:1000},acceptDownloads:true});let requests=[],mode='success';const errors=[];page.on('pageerror',e=>errors.push(e.message));
@@ -31,6 +31,7 @@ try{
     }
     return route.fulfill({json:{data}});
   });
+  await page.route('**/api/v1/operations/followups**', r => { assert.equal(new URL(r.request().url()).searchParams.get('customer'), customer.id); return r.fulfill({json:{data:{userId:'staff',canManage:true,tasks:[],nextCursor:null,facilities:[{id:'midpoint',name:'Midpoint'}],customers:[customer],staff:[]}}}); });
   await page.goto(`http://127.0.0.1:${server.address().port}`);
   await expect(page.getByRole('heading',{name:'Alex Example',exact:true})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Customer history & staff notes'})).toBeVisible();
@@ -38,6 +39,17 @@ try{
   await expect(page.getByLabel('Staff note',{exact:true})).toBeHidden();
   await page.getByRole('button',{name:'Contact details',exact:true}).click();await expect(page.getByRole('heading',{name:'Identity',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Documents',exact:true}).click();await expect(page.getByRole('heading',{name:'Signed booking agreements'})).toBeVisible();
+  await page.getByRole('button',{name:'Follow-ups',exact:true}).click();
+  await page.getByRole('button',{name:'Schedule follow-up',exact:true}).click();
+  await expect(page.getByLabel('Customer',{exact:true})).toHaveValue(customer.id);
+  await expect(page.getByLabel('Customer',{exact:true})).toBeDisabled();
+  await expect(page.getByLabel('Agreed date and time (SAST)')).toBeVisible();
+  await page.getByLabel('Agreed date and time (SAST)').fill('2026-10-21T10:30');
+  await page.getByRole('button',{name:'Contact details',exact:true}).click();
+  await page.getByRole('button',{name:'Follow-ups',exact:true}).click();
+  await expect(page.getByLabel('Agreed date and time (SAST)')).toHaveValue('2026-10-21T10:30');
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  await page.screenshot({path:`output/customer-dossier/followups-${width}.png`,fullPage:true});
   await page.getByRole('button',{name:'History & notes',exact:true}).click();
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   const initialHeight=await page.locator('.customer-detail').evaluate(e=>e.getBoundingClientRect().height);
@@ -53,10 +65,13 @@ try{
   await page.getByRole('button',{name:'Apply filters',exact:true}).click();
   const filteredDownload=page.waitForEvent('download');await page.getByRole('button',{name:'Excel',exact:true}).click();await filteredDownload;
   assert.equal(requests.at(-1).category,'HANDOVER');assert.ok(historyExportSchema.safeParse(requests.at(-1)).success);
-  const pending=page.waitForEvent('download');await page.getByRole('button',{name:'Download WHATSAPP · RESERVATION CONFIRMED',exact:true}).click();await pending;assert.equal(requests.at(-1).entryId,'message-1');assert.equal(requests.at(-1).entryKind,'COMMUNICATION');
+  const pending=page.waitForEvent('download');await page.getByRole('button',{name:'Download WHATSAPP Â· RESERVATION CONFIRMED',exact:true}).click();await pending;assert.equal(requests.at(-1).entryId,'message-1');assert.equal(requests.at(-1).entryKind,'COMMUNICATION');
   for(const failure of ['403','malformed']){mode=failure;for(const name of ['Download history','Excel']){await page.getByRole('button',{name,exact:true}).click();await expect(page.getByRole('alert')).toBeVisible();}}
   mode='success';await page.getByRole('button',{name:'Add note',exact:true}).click();await page.getByLabel('Staff note',{exact:true}).fill('Draft retained between sections');
   await page.getByRole('button',{name:'Contact details',exact:true}).click();await page.getByRole('button',{name:'History & notes',exact:true}).click();await expect(page.getByLabel('Staff note',{exact:true})).toHaveValue('Draft retained between sections');
+  await page.goto(`http://127.0.0.1:${server.address().port}?section=followups`);
+  await expect(page.getByRole("heading",{name:"Customer appointments",exact:true})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Follow-ups",exact:true})).toHaveAttribute("aria-current","page");
   assert.deepEqual(errors,[]);await page.close();console.log(`PASS ${width}px: compact customer tabs, draft retention, PDF/CSV/Excel download, single comm download and access/content failure recovery`);
  }
 }finally{await browser.close();await new Promise(r=>server.close(r));}

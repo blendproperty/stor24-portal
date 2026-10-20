@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 
 const policy = await build({ entryPoints: ['src/lib/staff-followup-policy.ts'], bundle: true, write: false, format: 'esm', platform: 'node' });
 const { staffFollowupSchema, staffFollowupChangeSchema } = await import('data:text/javascript;base64,' + Buffer.from(policy.outputFiles[0].text).toString('base64'));
-const bundle = await build({ stdin: { contents: `import React from 'react';import{createRoot}from'react-dom/client';import{StaffFollowups}from'./src/components/staff-followups';createRoot(document.getElementById('root')).render(<StaffFollowups/>);`, resolveDir: process.cwd(), loader: 'jsx' }, bundle: true, write: false, format: 'esm', jsx: 'automatic', plugins: [{ name: 'next-link', setup(b) { b.onResolve({ filter: /^next\/link$/ }, a => ({ path: a.path, namespace: 'fixture' })); b.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ contents: "import React from 'react';export default function Link(p){return React.createElement('a',p)}", loader: 'jsx', resolveDir: process.cwd() })); } }] });
+const bundle = await build({ stdin: { contents: `import React from 'react';import{createRoot}from'react-dom/client';import{StaffFollowups}from'./src/components/staff-followups';createRoot(document.getElementById('root')).render(<StaffFollowups fixedCustomerId={new URLSearchParams(window.location.search).get("customer") ?? ""}/>);`, resolveDir: process.cwd(), loader: 'jsx' }, bundle: true, write: false, format: 'esm', jsx: 'automatic', plugins: [{ name: 'next-link', setup(b) { b.onResolve({ filter: /^next\/link$/ }, a => ({ path: a.path, namespace: 'fixture' })); b.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ contents: "import React from 'react';export default function Link(p){return React.createElement('a',p)}", loader: 'jsx', resolveDir: process.cwd() })); } }] });
 const css = (await Promise.all(['src/app/globals.css', 'src/styles/stor24-brand.css', 'src/styles/staff-workspace.css'].map(p => readFile(p, 'utf8')))).join('\n').replace('@import "tailwindcss";', '') + '\nbody{--font-satoshi:Arial;font-family:Arial,sans-serif;margin:0;background:#eff4f7}#root{padding:20px;max-width:1440px;margin:auto}';
 const server = createServer((req, res) => { res.setHeader('Content-Type', req.url === '/app.js' ? 'text/javascript' : 'text/html'); res.end(req.url === '/app.js' ? bundle.outputFiles[0].text : `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body class="app-shell"><div id="root" class="content"></div><script type="module" src="/app.js"></script></body></html>`); });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -15,16 +15,17 @@ const ids = ['cm00000000000000000000001', 'cm00000000000000000000002', 'cm000000
 const customer = { id: ids[1], firstName: 'Alex', lastName: 'Example', companyName: null };
 const responsible = { id: ids[2], name: 'Responsible staff' }, cover = { id: ids[3], name: 'Weekend cover' };
 try {
-  for (const width of [1440, 1024, 390, 320]) {
+  for (const fixedCustomerId of ["", customer.id]) for (const width of [1440, 1024, 390, 320]) {
     const page = await browser.newPage({ viewport: { width, height: 1000 } });
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     let mode = 'success', tasks = [], created = [], changes = [], canManage = true;
     await page.route('**/api/v1/operations/followups**', async route => {
       const request = route.request();
       if (request.method() === 'GET') {
+        assert.equal(new URL(request.url()).searchParams.get('customer') ?? '', fixedCustomerId);
         if (mode === 'denied') return route.fulfill({ status: 403, json: { error: {} } });
         if (mode === 'read-failure') return route.fulfill({ status: 503, json: { error: {} } });
-        return route.fulfill({ json: { data: { userId: canManage ? responsible.id : cover.id, canManage, tasks, nextCursor: null, facilities: [{ id: ids[0], name: 'Midpoint' }], customers: new URL(request.url()).searchParams.get('search') ? [customer] : [], staff: [responsible, cover].map(s => ({ ...s, facilityIds: [ids[0]] })) } } });
+        return route.fulfill({ json: { data: { userId: canManage ? responsible.id : cover.id, canManage, tasks, nextCursor: null, facilities: [{ id: ids[0], name: 'Midpoint' }], customers: (new URL(request.url()).searchParams.get('search') || fixedCustomerId) ? [customer] : [], staff: [responsible, cover].map(s => ({ ...s, facilityIds: [ids[0]] })) } } });
       }
       const body = request.postDataJSON();
       if (request.method() === 'POST') {
@@ -40,11 +41,12 @@ try {
       if (mode === 'uncertain') return route.abort();
       return route.fulfill({ json: { data: { id: 'synthetic-appointment' } } });
     });
-    await page.goto(`http://127.0.0.1:${server.address().port}`);
-    await expect(page.getByRole('heading', { name: 'Follow-ups & handovers' })).toBeVisible();
+    await page.goto(`http://127.0.0.1:${server.address().port}${fixedCustomerId ? `?customer=${fixedCustomerId}` : ""}`);
+    if (!fixedCustomerId) await expect(page.getByRole('heading', { name: 'Follow-ups & handovers' })).toBeVisible();
     await page.getByRole('button', { name: 'Schedule follow-up', exact: true }).click();
-    await page.getByLabel('Find customer by name').fill('Alex'); await page.getByRole('button', { name: 'Search customers' }).click();
-    await page.getByLabel('Customer', { exact: true }).selectOption(customer.id);
+    if (!fixedCustomerId) { await page.getByLabel('Find customer by name').fill('Alex'); await page.getByRole('button', { name: 'Search customers' }).click();
+    await page.getByLabel('Customer', { exact: true }).selectOption(customer.id); }
+    else { await expect(page.getByLabel('Customer', { exact: true })).toHaveValue(customer.id); await expect(page.getByLabel('Customer', { exact: true })).toBeDisabled(); }
     await page.getByLabel('Responsible staff', { exact: true }).selectOption(responsible.id);
     await page.getByLabel('Covering staff', { exact: true }).selectOption(cover.id);
     await page.getByLabel('Agreed date and time (SAST)').fill('2026-10-14T09:00');
@@ -57,12 +59,12 @@ try {
     assert.equal(created.length, 0);
     assert.equal(await page.getByLabel('Other appointment title').evaluate(input => input.validity.valueMissing), true);
     await page.getByLabel('Other appointment title').fill('Agreed advance call');
-    await page.screenshot({ path: `output/staff-followups/title-options-${width}.png`, fullPage: true });
+    await page.screenshot({ path: `output/staff-followups/title-options-${fixedCustomerId ? "customer-" : ""}${width}.png`, fullPage: true });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${width}px title form overflow`);
     await page.getByRole('button', { name: 'Save agreed appointment' }).click();
     await expect(page.getByRole('button', { name: 'Complete', exact: true })).toBeVisible();
     assert.equal(created.length, 1); assert.equal(created[0].dueAt, '2026-10-14T07:00:00.000Z');
-    assert.ok(await page.getByRole('link', { name: /Customer history/ }).getAttribute('href').then(s => s.includes(customer.id)));
+    assert.ok(await page.getByRole('link', { name: /Open customer follow-ups/ }).getAttribute('href').then(s => s.includes(customer.id) && s.includes("section=followups")));
     // The visible details/actions and separate cover form must have real breathing space.
     const card = page.locator('.followup-card').first();
     const geometry = await card.evaluate(node => {
@@ -79,11 +81,11 @@ try {
     });
     assert.ok(geometry.detailGap >= 13 && geometry.actionGap >= 28 && geometry.coverGap >= 23, `${width}px crowded appointment sections: ${JSON.stringify(geometry)}`);
     assert.ok(geometry.rowGap >= 12 && geometry.buttonHeights.every(height=>height>=44), `${width}px crowded controls`);
-    await page.screenshot({ path: `output/staff-followups/${width}.png`, fullPage: true });
+    await page.screenshot({ path: `output/staff-followups/${fixedCustomerId ? "customer-" : ""}${width}.png`, fullPage: true });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${width}px overflow`);
     await page.getByLabel('Appointment queue').selectOption('due');
     await expect(page.getByRole('heading', { name: 'Due today & overdue', exact: true })).toBeVisible();
-    assert.equal(new URL(page.url()).searchParams.get('view'), 'due');
+    assert.equal(new URL(page.url()).searchParams.get('view'), fixedCustomerId ? null : 'due');
     await page.getByRole('button', { name: 'Edit appointment', exact: true }).click();
     const edit = page.getByRole('form', { name: 'Edit Agreed advance call' });
     await expect(edit.getByLabel('Other appointment title')).toHaveValue('Agreed advance call');
@@ -115,6 +117,6 @@ try {
     mode = 'read-failure'; await page.getByRole('button', { name: 'Reload follow-ups' }).click(); await expect(page.getByRole('alert')).toBeVisible();
     mode = 'success'; await page.getByRole('button', { name: 'Reload follow-ups' }).click(); await expect(page.getByText(/Acknowledged/)).toBeVisible();
     mode = 'denied'; await page.getByRole('button', { name: 'Reload follow-ups' }).click(); await expect(page.getByText('Move-in follow-up', { exact: true })).toHaveCount(0);
-    assert.deepEqual(errors, []); await page.close(); console.log(`PASS ${width}px actual follow-up creation, SAST, named cover, conflict, uncertain save/read recovery and access removal`);
+    assert.deepEqual(errors, []); await page.close(); console.log(`PASS ${fixedCustomerId ? "customer" : "operations"} ${width}px actual follow-up creation, SAST, named cover, conflict, uncertain save/read recovery and access removal`);
   }
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }

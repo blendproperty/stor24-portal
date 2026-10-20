@@ -52,6 +52,20 @@ test("isolated customer appointments: retries, cover acknowledgements, store bou
       await db.user.update({ where: { id: cover.id }, data: { active: true } });
       assert.equal((await listStaffFollowups({ ...scope, facilityIds: [b.id] })).tasks.length, 0);
     });
+    await t.test("customer profile filters exact appointments and enforces customer and cursor scope", async () => {
+      const second = await db.customer.create({ data: { organisationId: org.id, firstName: "Other permitted customer" } });
+      await db.lead.create({ data: { customerId: second.id, facilityId: a.id, source: "OTHER" } });
+      const otherTask = await createStaffFollowup(scope, { ...input(), customerId: second.id });
+      const filtered = await listStaffFollowups(scope, "", undefined, "all", new Date(), customer.id);
+      assert.ok(filtered.tasks.length > 0);
+      assert.ok(filtered.tasks.every(task => task.customerId === customer.id));
+      assert.deepEqual(filtered.customers.map(c => c.id), [customer.id]);
+      assert.deepEqual(Object.keys(filtered.customers[0]).sort(), ["companyName", "firstName", "id", "lastName"]);
+      assert.deepEqual(filtered.facilities.map(f => f.id), [a.id]);
+      await assert.rejects(listStaffFollowups(scope, "", otherTask.id, "all", new Date(), customer.id), /CONFLICT/);
+      await assert.rejects(listStaffFollowups({ ...scope, facilityIds: [b.id] }, "", undefined, "all", new Date(), customer.id), /FORBIDDEN/);
+      assert.ok((await listStaffFollowups(scope)).tasks.some(task => task.id === otherTask.id));
+    });
     await t.test("audit outage rolls back both creation and acknowledgement", async () => {
       const beforeCount = await db.task.count({ where: { organisationId: org.id } });
       const task = await createStaffFollowup(scope, input());

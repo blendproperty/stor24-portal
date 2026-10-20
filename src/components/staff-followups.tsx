@@ -18,7 +18,7 @@ const responseSchema = z.object({ data: z.object({
 type Data = z.infer<typeof responseSchema>["data"];
 const nameOf = (p: z.infer<typeof person>) => p.companyName || [p.firstName, p.lastName].filter(Boolean).join(" ") || "Unnamed customer";
 
-export function StaffFollowups() {
+export function StaffFollowups({ fixedCustomerId = "" }: { fixedCustomerId?: string }) {
   const [data, setData] = useState<Data | null>(null);
   const [view, setView] = useState<StaffFollowupView>("all");
   const viewRef = useRef<StaffFollowupView>("all");
@@ -26,7 +26,7 @@ export function StaffFollowups() {
   const [validation, setValidation] = useState("");
   const [search, setSearch] = useState("");
   const [facilityId, setFacilityId] = useState("");
-  const [customerId, setCustomerId] = useState("");
+  const [customerId, setCustomerId] = useState(fixedCustomerId);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
@@ -41,7 +41,7 @@ export function StaffFollowups() {
     const controller = new AbortController(); reader.current = controller; setLoading(true); setError("");
     const timer = setTimeout(() => controller.abort(), 20_000);
     try {
-      const response = await fetch(`/api/v1/operations/followups?view=${viewRef.current}&search=${encodeURIComponent(query)}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`, { cache: "no-store", signal: controller.signal });
+      const response = await fetch(`/api/v1/operations/followups?view=${viewRef.current}&search=${encodeURIComponent(query)}${fixedCustomerId ? `&customer=${encodeURIComponent(fixedCustomerId)}` : ""}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`, { cache: "no-store", signal: controller.signal });
       if (reader.current !== controller) return;
       if (response.status === 401 || response.status === 403) { setData(null); throw new Error(response.status === 401 ? "Sign in again to view follow-ups." : "You do not have access to follow-ups."); }
       if (!response.ok) throw new Error("Follow-ups could not be loaded. Retry before making changes.");
@@ -50,8 +50,8 @@ export function StaffFollowups() {
       setData(current => cursor && current ? { ...loaded, tasks: [...current.tasks, ...loaded.tasks.filter(t => !current.tasks.some(previous => previous.id === t.id))] } : loaded); setUncertain(false); setFacilityId(current => loaded.facilities.some(f => f.id === current) ? current : loaded.facilities[0]?.id ?? "");
     } catch (e) { if (reader.current === controller) setError(e instanceof Error && !e.message.startsWith("[") ? e.message : "Follow-ups could not be loaded. Retry before making changes."); }
     finally { clearTimeout(timer); if (reader.current === controller) { setLoading(false); reader.current = null; } }
-  }, []);
-  useEffect(() => { const initial = staffFollowupViewSchema.safeParse(new URLSearchParams(window.location.search).get("view") ?? "all"); viewRef.current = initial.success ? initial.data : "all"; const timer = setTimeout(() => { setView(viewRef.current); void load(""); }, 0); return () => { clearTimeout(timer); reader.current?.abort(); }; }, [load]);
+  }, [fixedCustomerId]);
+  useEffect(() => { const initial = staffFollowupViewSchema.safeParse((fixedCustomerId ? "all" : new URLSearchParams(window.location.search).get("view")) ?? "all"); viewRef.current = initial.success ? initial.data : "all"; const timer = setTimeout(() => { setView(viewRef.current); void load(""); }, 0); return () => { clearTimeout(timer); reader.current?.abort(); }; }, [load, fixedCustomerId]);
 
   async function mutate(url: string, method: string, body: unknown, onSaved?: () => void) {
     if (writing.current || uncertain || loading) return;
@@ -78,7 +78,7 @@ export function StaffFollowups() {
 
   const disabled = loading || saving || uncertain || !!error;
   return <div className="page-stack staff-followup-workspace followup-appointments-workspace">
-    <PageHeader eyebrow="Operations centre" title="Follow-ups & handovers" description="Agreed appointments, named responsibility and cover acknowledgement. All dates and times are South African time." action={<Link href="/operations" className="button button-secondary">Operations centre</Link>}/>
+    {!fixedCustomerId ? <PageHeader eyebrow="Operations centre" title="Follow-ups & handovers" description="Agreed appointments, named responsibility and cover acknowledgement. All dates and times are South African time." action={<Link href="/operations" className="button button-secondary">Operations centre</Link>}/> : null}
     <section className="panel panel-spacious">
       <div className="followup-toolbar"><div><h2>Customer appointments</h2><p>A payment promise still holds debt-chasing calls. Record a separate appointment only when the customer agreed to it.</p></div><div className="followup-actions"><button className="button button-secondary" disabled={loading || saving} onClick={() => void load(search)}>{loading ? "Loading…" : "Reload follow-ups"}</button>{data?.canManage ? <button className="button button-primary" aria-expanded={composerOpen} onClick={() => setComposerOpen(!composerOpen)}>{composerOpen ? "Close appointment form" : "Schedule follow-up"}</button> : null}</div></div>
       {validation ? <p role="alert">{validation}</p> : null}
@@ -86,12 +86,12 @@ export function StaffFollowups() {
       {!data && !error ? <p role="status">Loading follow-ups…</p> : null}
       {data ? <div className={`followup-layout${composerOpen && data.canManage ? "" : " followup-list-only"}`}>
         <div>
-          <label>Appointment queue<select aria-label="Appointment queue" value={view} disabled={loading || saving} onChange={e => { const selected = staffFollowupViewSchema.parse(e.target.value); viewRef.current = selected; setView(selected); setEditing(null); const url = new URL(window.location.href); url.searchParams.set("view", selected); window.history.replaceState(null, "", url); void load(search); }}><option value="all">All open appointments</option><option value="due">Due today &amp; overdue</option><option value="upcoming">From tomorrow</option></select></label>
+          <label>Appointment queue<select aria-label="Appointment queue" value={view} disabled={loading || saving} onChange={e => { const selected = staffFollowupViewSchema.parse(e.target.value); viewRef.current = selected; setView(selected); setEditing(null); if (!fixedCustomerId) { const url = new URL(window.location.href); url.searchParams.set("view", selected); window.history.replaceState(null, "", url); } void load(search); }}><option value="all">All open appointments</option><option value="due">Due today &amp; overdue</option><option value="upcoming">From tomorrow</option></select></label>
           <h3>{view === "due" ? "Due today & overdue" : view === "upcoming" ? "Upcoming appointments" : "Open appointments"}</h3>
           {data.tasks.length ? data.tasks.map(task => <article className="followup-card" key={task.id}>
             <div className="followup-toolbar"><strong>{task.title}</strong><span>{task.status.replaceAll("_", " ")}</span></div>
             <p>{task.dueAt ? formatSouthAfricaDateTime(task.dueAt) : "No date recorded"} · {task.facility.name}</p>
-            {task.customer ? <Link href={`/tenants?customer=${encodeURIComponent(task.customer.id)}`}>{nameOf(task.customer)} · Customer history</Link> : null}
+            {task.customer ? <Link href={`/tenants?customer=${encodeURIComponent(task.customer.id)}&section=followups`}>{nameOf(task.customer)} · Open customer follow-ups</Link> : null}
             <p className="followup-description">{task.description}</p>
             <p>Responsible: {task.assignee?.name ?? "Unassigned"}<br/>Cover: {task.cover?.name ?? "Not assigned"} · {task.coverAcknowledgedAt ? `Acknowledged ${formatSouthAfricaDateTime(task.coverAcknowledgedAt)}` : "Awaiting acknowledgement"}</p>
             <div className="followup-actions">
@@ -111,9 +111,9 @@ export function StaffFollowups() {
           {data.nextCursor ? <button className="button button-secondary" disabled={loading || saving} onClick={() => void load(search, data.nextCursor!)}>Load more appointments</button> : null}
         </div>
         {data.canManage && composerOpen ? <aside className="followup-composer"><h3>Schedule an agreed follow-up</h3>
-          <form onSubmit={e => { e.preventDefault(); setCustomerId(""); void load(search); }}><label>Find customer by name<input value={search} onChange={e => setSearch(e.target.value)} minLength={2} maxLength={100} required/></label><button className="button button-secondary" disabled={loading || saving}>Search customers</button></form>
-          <form onSubmit={e => { e.preventDefault(); const form = e.currentTarget, fields = new FormData(form); const dueAt = appointmentDate(fields.get("dueAt")); if (!dueAt) return; requestKey.current ??= crypto.randomUUID(); void mutate("/api/v1/operations/followups", "POST", { requestKey: requestKey.current, facilityId, customerId, assigneeId: fields.get("assigneeId"), coverId: fields.get("coverId") || null, title: fields.get("title"), description: fields.get("description"), dueAt }, () => { requestKey.current = null; form.reset(); setCustomerId(""); setComposerOpen(false); }); }}>
-            <label>Customer<select aria-label="Customer" value={customerId} onChange={e => setCustomerId(e.target.value)} required disabled={disabled}><option value="">Search and choose a customer</option>{data.customers.map(c => <option value={c.id} key={c.id}>{nameOf(c)}</option>)}</select></label>
+          {!fixedCustomerId ? <form onSubmit={e => { e.preventDefault(); setCustomerId(""); void load(search); }}><label>Find customer by name<input value={search} onChange={e => setSearch(e.target.value)} minLength={2} maxLength={100} required/></label><button className="button button-secondary" disabled={loading || saving}>Search customers</button></form> : null}
+          <form onSubmit={e => { e.preventDefault(); const form = e.currentTarget, fields = new FormData(form); const dueAt = appointmentDate(fields.get("dueAt")); if (!dueAt) return; requestKey.current ??= crypto.randomUUID(); void mutate("/api/v1/operations/followups", "POST", { requestKey: requestKey.current, facilityId, customerId, assigneeId: fields.get("assigneeId"), coverId: fields.get("coverId") || null, title: fields.get("title"), description: fields.get("description"), dueAt }, () => { requestKey.current = null; form.reset(); setCustomerId(fixedCustomerId); setComposerOpen(false); }); }}>
+            <label>Customer<select aria-label="Customer" value={customerId} onChange={e => setCustomerId(e.target.value)} required disabled={disabled || !!fixedCustomerId}><option value="">Search and choose a customer</option>{data.customers.map(c => <option value={c.id} key={c.id}>{nameOf(c)}</option>)}</select></label>
             <label>Store<select aria-label="Store" value={facilityId} onChange={e => setFacilityId(e.target.value)} required disabled={disabled}>{data.facilities.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select></label>
             <label>Responsible staff<select aria-label="Responsible staff" name="assigneeId" key={`assignee-${facilityId}`} required disabled={disabled}><option value="">Choose responsible staff</option>{data.staff.filter(s => s.facilityIds.includes(facilityId)).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
             <label>Covering staff<select aria-label="Covering staff" name="coverId" key={`cover-${facilityId}`} disabled={disabled}><option value="">No cover assigned</option>{data.staff.filter(s => s.facilityIds.includes(facilityId)).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
