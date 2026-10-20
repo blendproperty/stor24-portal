@@ -58,7 +58,7 @@ test("isolated governed price amendments preserve original quotes, consent, sour
       const account=await db.account.create({data:{customerId:f.customer.id,accountNumber:`ST24-T-${f.booking.id}`}});
       const payment=await db.payment.create({data:{accountId:account.id,amount:1000,currency:"ZAR",method:"PAY_NOW",provider:"NETCASH",providerRef:randomUUID(),environment:"live",status:"FAILED",failureCode:"DECLINED",processedAt:new Date(),idempotencyKey:randomUUID()}});
       const session=await db.publicPaymentSession.create({data:{reservationId:f.booking.id,amount:1000,description:"Synthetic terminal decline",checkoutTokenHash:"a".repeat(64),idempotencyKey:randomUUID(),providerReference:randomUUID(),expiresAt:new Date(Date.now()+3600000),status:"DECLINED",failureCode:"DECLINED",processedAt:new Date()}});
-      for(const patch of [{status:"PENDING"},{status:"TEST_PENDING"},{status:"SUCCEEDED"},{status:"TEST_SUCCEEDED"},{status:"REFUNDED"},{status:"FAILED",failureCode:"TIMEOUT"},{status:"FAILED",failureCode:"CHECKOUT_CREATE_FAILED"},{status:"FAILED",failureCode:"DECLINED",processedAt:null}]){
+      for(const patch of [{status:"PENDING"},{status:"TEST_PENDING"},{status:"SUCCEEDED"},{status:"TEST_SUCCEEDED"},{status:"REFUNDED"},{status:"FAILED",failureCode:"TIMEOUT"},{status:"FAILED",failureCode:"CHECKOUT_CREATE_FAILED"},{status:"FAILED",failureCode:"DECLINED",processedAt:null}] as Prisma.PaymentUpdateInput[]){
         await db.payment.update({where:{id:payment.id},data:{status:"FAILED",failureCode:"DECLINED",processedAt:new Date(),...patch}});
         await assert.rejects(proposeReservationPrice(f.scope,propose(f)),/REVIEW_REQUIRED/);
       }
