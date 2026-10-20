@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import Link from "next/link";
-import { CalendarCheck, Plus, Search, Tags, X } from "lucide-react";
+import { CalendarCheck, CalendarPlus, ClockAlert, LogIn, Plus, Search, Tags, X, XCircle } from "lucide-react";
 import { ReservationUnitPicker, type ReservationMap } from "@/components/reservation-unit-picker";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
@@ -407,32 +407,32 @@ export function ReservationsWorkspace({initialCustomerId="",canReviewPrices=fals
                           <div className="reservation-actions">
                             <Link
                               href={`/operations/move-in?reservation=${encodeURIComponent(item.id)}`}
-                              className="text-button"
+                              className="reservation-action reservation-action--move-in"
                             >
-                              Move in
+                              <LogIn size={16} aria-hidden="true"/><span>Move in</span>
                             </Link>
                             <button
-                              className="text-button"
+                              className="reservation-action reservation-action--extend"
                               onClick={() => void extend(item)}
                               disabled={lifecycleBusy || lifecycleBlocked || busy}
                             >
-                              Extend
+                              <CalendarPlus size={16} aria-hidden="true"/><span>Extend</span>
                             </button>
                             {overdue ? (
                               <button
-                                className="text-button danger"
+                                className="reservation-action reservation-action--expire"
                                 onClick={() => void expire(item)}
                                 disabled={lifecycleBusy || lifecycleBlocked || busy}
                               >
-                                Expire
+                                <ClockAlert size={16} aria-hidden="true"/><span>Expire</span>
                               </button>
                             ) : null}
                             <button
-                              className="text-button danger"
+                              className="reservation-action reservation-action--cancel"
                               onClick={() => void cancel(item)}
                               disabled={lifecycleBusy || lifecycleBlocked || busy}
                             >
-                              Cancel
+                              <XCircle size={16} aria-hidden="true"/><span>Cancel</span>
                             </button>
                           </div>
                         ) : null}

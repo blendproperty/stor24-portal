@@ -5450,6 +5450,16 @@ Main advanced to ae6448b0 (PR565 Price review icon) while this PR was running. I
 - Outstanding release/acceptance: review/normal protected promotion and deployment, current Faeez role/store real-customer or approved training walkthrough, actual receipt/source reconciliation and live operational acceptance remain. SMS/WhatsApp activation/provider delivery, authoritative paid-through/source/financial/legal/fee policy and original23 data/device/tablet/manager/training/UAT gates remain separate; fee UNSET and REA521/533 pause retained. No tracker in scope.
 
 
+## 19 October 2026 - All reservation actions as coloured icon buttons
+
+- Implementation: extend the Price review visual treatment to Move in (teal entry icon), Extend (blue calendar-plus), Expire (amber clock alert) and Cancel (red cross-circle). Consistent target height, visible focus and a spaced two-column action grid; Price review spans the row above. Existing links, enabled/disabled conditions, lifecycle confirmations, permissions and financial approval rules unchanged.
+- Testing: existing reservation browser recovery fixture reused with review access enabled and an overdue synthetic reservation so every action is visible; desktop/mobile results and visual QA pending. Commit/push, merge, deployment/configuration and live production verification pending. No live reservation, price, payment or approval changes. Full gap3 negotiation UAT and prior provider/legal/data/training/REA gates remain OPEN. Prior individual Price review release evidence retained separately in PR567.
+- Focused validation: existing reservation read/recovery checks PASS at1440/390/320px with every action enabled by synthetic scope and overdue hold; rendered desktop visually inspected. No page overflow or browser errors; normal cancel confirmation/read-recovery behaviour retained in intercepted fixture. Hosted checks, merge, deployment and live visual verification remain required.
+- Final diff audit restored pre-existing stylesheet rules byte-for-byte after an over-broad edit was detected before merge. Only the appended reservation-action rules remain changed; new final-head hosted checks are required. No production change from the earlier candidate.
+
+- Main reconciliation: incoming PR566/main6042631f advanced while button checks ran. The only conflict was append-only canonical context; verified both complete base prefixes and retained all incoming-main evidence plus this task supplement. Incoming Faeez source files are preserved unchanged. Reservation button source remains the same; final integrated-head hosted qualification required. No production change or approval bypass.
+
+
 ## 19 October 2026 - PR566 merged, deployed and verified on the live portal
 
 - Implementation: PR566 merged by GitHub into main as 6042631f2bdfa75cc300e96efa0bfc67901bb952; verified remote main and identical tree to qualified PR head 37f95bb47d206899800bbc081f57fc4ae805a787. Editable/clearable enquiry needed dates, saved-date manager follow-up reminders and the consolidated selected collections case are now deployed. Existing history, reviewed messaging, ledger/payment records and source-verified receipt copying are reused. No dependency, schema or provider activation change in this slice.
