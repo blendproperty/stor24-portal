@@ -44,7 +44,7 @@ test("actual customer quote route checks approved source before OTP and cannot a
     for(const change of [{accepted:false},{understandsNewAgreementRequired:false},{takePayment:true},{staffAccepted:true}]){assert.equal((await api.POST(request("/api/booking-price-review",{...acceptance,...change}))).status,422);assert.equal(calls.length,0);}
     assert.equal((await api.POST(request("/api/booking-price-review",acceptance))).status,200);assert.equal(calls[0].name,"accept");assert.equal("action" in calls[0].args[0],false);calls=[];
     assert.equal((await api.POST(request("/api/booking-price-review",{...common,action:"agreement",identityAccessToken:"a".repeat(43),paymentMethod:"DEBIT_ORDER"}))).status,422);assert.equal(calls.length,0);
-    assert.equal((await api.POST(request("/api/booking-price-review",{...common,action:"agreement",identityAccessToken:"a".repeat(43),paymentMethod:"EFT"}))).status,200);assert.deepEqual(calls.map(c=>c.name),["applied","agreement"]);
+    const agreement=await api.POST(request("/api/booking-price-review",{...common,action:"agreement",identityAccessToken:"a".repeat(43),paymentMethod:"EFT"}));assert.equal(agreement.status,200);assert.equal((await agreement.json()).data.url,"https://stor24.co.za/book/lease/"+"c".repeat(43));assert.deepEqual(calls.map(c=>c.name),["applied","agreement"]);
   }finally{if(previous===undefined)delete globalThis.__priceApi;else globalThis.__priceApi=previous;}
 });
 test("customer quote middleware exemption is exact and never exposes neighbouring staff or API paths",async()=>{

@@ -21,6 +21,7 @@ export const visualReportTemplates:VisualReportTemplate[]=[
   template("eft-roll","EFT payment-method roll","Tenants","tenants",{filters:[equal("paymentMethod","EFT")]}),
   {key:"recurring-native",name:"Current-plan recurring charges",group:"Finance",legacyKey:"recurring-charges"},
   {key:"posted-recurring-native",name:"Original posted recurring-charge history",group:"Finance",legacyKey:"posted-recurring-charges"},
+  {key:"booking-discounts-native",name:"Booking discounts & approvals",group:"Management",legacyKey:"booking-discounts"},
   {key:"past-due",name:"Past due balances",group:"Tenants",legacyKey:"receivables-ageing"},
   template("balances","Balances due (all recorded leases)","Tenants","tenants",{filters:[{field:"balance",operator:"gt",value:0}]}),
   template("contact-activity","Communication history","Tenants","communications",{dateField:"date"}),

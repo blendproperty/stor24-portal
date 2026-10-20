@@ -1,8 +1,9 @@
+import {southAfricaDateKey} from "./south-africa-time";
 import { buildLeaseClauses, renderLeaseDocument, type LeaseClauseContext } from "./lease-agreement-content";
 
 // New editions must retain their historical renderers and acceptance requirements.
 // Publication does not activate a pricing, collection or provider policy.
-export const STORAGE_TERMS_VERSION = "storage-terms-2026-09-22";
+export const STORAGE_TERMS_VERSION = "storage-terms-2026-10-20";
 export const STORAGE_TERMS_STATUS = "Working draft for legal review - not legal-approved";
 export const STORAGE_TERMS_INTRODUCTION = [
   "These terms govern STOR24 storage services, use of the STOR24 website and purchases made through its approved channels. Read them with your personalised booking schedule, the Privacy Policy and any specific terms disclosed for a product or promotion. Mandatory consumer rights remain unaffected.",
@@ -130,7 +131,7 @@ export function storageTermsText() {
 
 export function buildReviewLeaseClauses(ctx: LeaseClauseContext) {
   return buildLeaseClauses(ctx).map(clause => ({ ...clause, body: ({
-    term_and_rent: `Storage starts on ${ctx.startDate.toISOString().slice(0, 10)} and runs month to month. The recorded monthly rate is R ${ctx.monthlyRate.toFixed(2)}. VAT treatment, any deposit and first-period calculation must be disclosed in the final schedule before production payment; these draft terms add no undisclosed charge. See full terms 3-6.`,
+    term_and_rent: `Storage starts on ${southAfricaDateKey(ctx.startDate)} and runs month to month. The recorded monthly rate is R ${ctx.monthlyRate.toFixed(2)}. VAT treatment, any deposit and first-period calculation must be disclosed in the final schedule before production payment; these draft terms add no undisclosed charge. See full terms 3-6.`,
     access_and_security: "Access and keys require the agreed payment and operational checks. Follow the facility hours and safety rules, keep credentials secure and report lost keys. Security is not insurance. See full terms 9-10.",
     insurance_and_liability: "IMPORTANT RISK NOTICE: Goods may be lost or damaged. Rental does not include insurance unless expressly agreed. Arrange appropriate cover. Responsibility for damage and third-party claims is limited to what is lawful and attributable to each party; statutory rights and liability that cannot be excluded remain intact. Read full terms 11-12 before initialling.",
     default_and_termination: "For this draft month-to-month arrangement, give at least 14 calendar days' written notice before the intended month-end termination. Statutory rights take precedence. Breach remedies require lawful notice and procedure; there is no automatic disposal of goods or waiver of protection against unlawful dispossession. See full terms 6 and 13-14.",
@@ -150,12 +151,15 @@ export function renderReviewLeaseDocument(ctx: LeaseClauseContext) {
 export { STORAGE_TERMS_VERSION as PREVIOUS_STORAGE_TERMS_VERSION } from "./storage-terms-2026-09-10";
 import { STORAGE_TERMS_VERSION as previousVersion, renderReviewLeaseDocument as renderPreviousEdition } from "./storage-terms-2026-09-10";
 
+import {STORAGE_TERMS_VERSION as september22Version, renderReviewLeaseDocument as renderSeptember22Edition} from "./storage-terms-2026-09-22";
+
 export function requiresFullTermsAcceptance(version: string) {
-  return version === STORAGE_TERMS_VERSION || version === previousVersion;
+  return version === STORAGE_TERMS_VERSION || version === previousVersion || version === september22Version;
 }
 
 export function renderStorageTermsEdition(ctx: LeaseClauseContext, version: string): string | null {
   if (version === STORAGE_TERMS_VERSION) return renderReviewLeaseDocument(ctx);
   if (version === previousVersion) return renderPreviousEdition(ctx);
+  if (version === september22Version) return renderSeptember22Edition(ctx);
   return null;
 }

@@ -1,3 +1,4 @@
+import {visualReportTemplates} from "../src/lib/visual-report-templates";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
@@ -9,7 +10,7 @@ test("report catalogue is filtered by role", () => {
   const owner = availableReports(["*"]);
   assert.equal(owner.length, 13);
   assert.ok(owner.some(report=>report.key==="posted-recurring-charges"));
-  const discounts=availableReports(["reports.financial"]).find(report=>report.key==="booking-discounts");assert.deepEqual(discounts?.formats,["CSV","JSON","XLSX","PDF"]);assert.ok(!sales.includes("booking-discounts"));
+  const discounts=availableReports(["reports.financial"]).find(report=>report.key==="booking-discounts");assert.deepEqual(discounts?.formats,["CSV","JSON","XLSX","PDF"]);assert.ok(!sales.includes("booking-discounts"));assert.equal(visualReportTemplates.find(report=>report.key==="booking-discounts-native")?.legacyKey,"booking-discounts");
 });
 
 test("report exports use scoped production data and never synthetic rows", () => {
