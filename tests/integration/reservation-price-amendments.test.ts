@@ -1,15 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {createHash,randomBytes,randomUUID} from "node:crypto";
+import {Prisma} from "../../src/generated/prisma/client";
 import {db} from "../../src/lib/db";
 import {newPublicInitialRent,publicCheckoutTotal} from "../../src/lib/public-initial-rent";
 import {newIdentityAccess} from "../../src/lib/identity-document-security";
 import {decryptIntegrationSecret} from "../../src/lib/integrations/integration-secret-vault";
-import {proposeReservationPrice,decideReservationPrice,previewCustomerReservationPrice,acceptCustomerReservationPrice,reservationPriceWorkspace,appliedCustomerReservationPrice} from "../../src/lib/reservation-price-service";
+import {prepareStaffReservationQuote,proposeReservationPrice,decideReservationPrice,previewCustomerReservationPrice,acceptCustomerReservationPrice,reservationPriceWorkspace,appliedCustomerReservationPrice} from "../../src/lib/reservation-price-service";
 import {preparePublicReservationLease,completePublicReservationLease} from "../../src/lib/public-lease-workflow";
 import {visualReportSource} from "../../src/lib/visual-report-data";
 import {defaultVisualQuery} from "../../src/lib/visual-report-engine";
 import {southAfricaDateKey} from "../../src/lib/south-africa-time";
+import {emailVerificationHash,verifyPublicReservationEmail} from "../../src/lib/public-booking-service";
 import {LEASE_CLAUSE_KEYS} from "../../src/lib/lease-agreement-content";
 
 test("isolated governed price amendments preserve original quotes, consent, source locks and financial baselines",async t=>{
@@ -46,6 +48,41 @@ test("isolated governed price amendments preserve original quotes, consent, sour
   }
   const financial=(f:Fixture)=>Promise.all([db.account.findMany({where:{customerId:f.customer.id},orderBy:{id:"asc"}}),db.payment.findMany({where:{account:{customerId:f.customer.id}},orderBy:{id:"asc"}}),db.ledgerEntry.findMany({where:{account:{customerId:f.customer.id}},orderBy:{id:"asc"}}),db.tenancy.findMany({where:{customerId:f.customer.id},orderBy:{id:"asc"}}),db.publicPaymentSession.findMany({where:{reservationId:f.booking.id},orderBy:{id:"asc"}})]);
   try{
+    await t.test("staff quote preparation retains the real original, discounts are checked server-side and fresh email proof precedes acceptance",async()=>{
+      const f=await fixture();
+      await db.publicReservationLease.delete({where:{reservationId:f.booking.id}});
+      await db.reservation.update({where:{id:f.booking.id},data:{source:"INTERNAL",initialRentSnapshot:Prisma.DbNull,publicReference:null,contactVerifiedAt:null}});
+      await db.customer.update({where:{id:f.customer.id},data:{emailVerifiedAt:null}});
+      const baseline=await financial(f),input={reservationId:f.booking.id,facilityId:f.facility.id,confirmed:true as const};
+      await assert.rejects(proposeReservationPrice(f.scope,propose(f)),/REVIEW_REQUIRED/);
+      await assert.rejects(prepareStaffReservationQuote({...f.scope,facilityIds:[]},input),/NOT_FOUND/);
+      await prepareStaffReservationQuote(f.scope,input);await prepareStaffReservationQuote(f.scope,input);
+      const prepared=await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}});
+      assert.ok(prepared.publicReference);assert.equal(prepared.contactVerifiedAt,null);assert.equal(prepared.source,"INTERNAL");assert.equal(prepared.quotedRate.toFixed(2),"1000.00");
+      assert.equal(await db.auditEvent.count({where:{entityId:f.booking.id,action:"reservation.price_staff_quote_prepared"}}),1);
+      const evidence=await db.auditEvent.findFirstOrThrow({where:{entityId:f.booking.id,action:"reservation.price_staff_quote_prepared"}});
+      const retained=JSON.parse(decryptIntegrationSecret((evidence.after as {originalEncrypted:string}).originalEncrypted));assert.equal(retained.initialRentSnapshot,null);assert.equal(retained.quotedRate,"1000.00");
+      assert.deepEqual(prepared.initialRentSnapshot,newPublicInitialRent(1000,prepared.intendedMoveIn!));
+      await assert.rejects(proposeReservationPrice(f.scope,{...propose(f),monthlyRate:"800",adjustment:{mode:"DISCOUNT_PERCENT",value:"10"}}),/INVALID/);
+      const proposal=await proposeReservationPrice(f.scope,{...propose(f),monthlyRate:"900.00",adjustment:{mode:"DISCOUNT_PERCENT",value:"10"}});await approve(f,proposal.id);
+      const oldEnabled=process.env.PUBLIC_RESERVATION_VERIFICATION_ENABLED,oldPublicKey=process.env.PUBLIC_BOOKING_API_KEY;
+      process.env.PUBLIC_RESERVATION_VERIFICATION_ENABLED="true";process.env.PUBLIC_BOOKING_API_KEY="isolated-synthetic-staff-quote";
+      try{
+        await new Promise(resolve=>setTimeout(resolve,5));
+        await db.reservation.update({where:{id:f.booking.id},data:{verificationCodeHash:emailVerificationHash(f.booking.id,"123456"),verificationExpiresAt:new Date(Date.now()+60000)}});
+        assert.equal((await verifyPublicReservationEmail(prepared.publicReference!,"123456")).ok,false);
+        assert.equal((await verifyPublicReservationEmail(prepared.publicReference!,"123456","wrong-proposal")).ok,false);
+        assert.equal((await verifyPublicReservationEmail(prepared.publicReference!,"111111",proposal.id)).ok,false);
+        assert.equal((await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}})).contactVerifiedAt,null);
+        const verified=await verifyPublicReservationEmail(prepared.publicReference!,"123456",proposal.id);assert.ok(verified.ok&&"identityAccessToken" in verified);
+        if(!verified.ok||!("identityAccessToken" in verified))throw Error("Synthetic verification failed");
+        const view=await previewCustomerReservationPrice(prepared.publicReference!,verified.identityAccessToken,proposal.id);assert.equal(view.monthlyRate,"900.00");
+        await acceptCustomerReservationPrice({reference:prepared.publicReference!,id:proposal.id,identityAccessToken:verified.identityAccessToken,quoteFingerprint:view.quoteFingerprint,accepted:true,understandsNewAgreementRequired:true});
+        const agreement=await preparePublicReservationLease(prepared.publicReference!,"EFT");assert.ok(agreement.ok);
+        const lease=await db.publicReservationLease.findUniqueOrThrow({where:{reservationId:f.booking.id}});assert.equal(lease.status,"READY");assert.equal(lease.signedAt,null);assert.match(lease.content,/900/);
+        assert.deepEqual(await financial(f),baseline);
+      }finally{if(oldEnabled===undefined)delete process.env.PUBLIC_RESERVATION_VERIFICATION_ENABLED;else process.env.PUBLIC_RESERVATION_VERIFICATION_ENABLED=oldEnabled;if(oldPublicKey===undefined)delete process.env.PUBLIC_BOOKING_API_KEY;else process.env.PUBLIC_BOOKING_API_KEY=oldPublicKey;}
+    });
     await t.test("concurrent proposals are idempotent, originals immutable and independent approval does not change the booking",async()=>{
       const f=await fixture(),input=propose(f),before=await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}}),baseline=await financial(f);
       const [first,retry]=await Promise.all([proposeReservationPrice(f.scope,input),proposeReservationPrice(f.scope,input)]);assert.equal(first.id,retry.id);

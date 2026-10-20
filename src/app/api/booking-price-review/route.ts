@@ -23,7 +23,7 @@ export async function POST(request:Request){try{
   if(await rateLimit(`booking-price:${body.action}:${privacyHash(requestIp(request))}`,maximum,15*60*1000))return Response.json({error:{message:"Too many attempts. Please wait before retrying."}},{status:429,headers:priceHeaders});
   if(body.action==="request-code"||body.action==="verify"){
     await reservationPriceVerificationAvailable(body.reference,body.id);
-    const result=body.action==="request-code"?await startPublicEmailVerification(body.reference,true):await verifyPublicReservationEmail(body.reference,body.code);
+    const result=body.action==="request-code"?await startPublicEmailVerification(body.reference,true,body.id):await verifyPublicReservationEmail(body.reference,body.code,body.id);
     if(!result.ok)return Response.json({error:{message:"The code could not be confirmed or delivered. Check the code or contact the store."}},{status:409,headers:priceHeaders});
     return Response.json({data:result},{headers:priceHeaders});
   }
