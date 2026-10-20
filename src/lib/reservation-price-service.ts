@@ -1,6 +1,6 @@
 import {createHash, randomBytes, randomUUID} from "node:crypto";
 import {Prisma} from "@/generated/prisma/client";
-import {db} from "./db";
+import {db} from "@/lib/db";
 import {facilityWhere,type RequestScope} from "./scope";
 import {decryptIntegrationSecret,encryptIntegrationSecret} from "./integrations/integration-secret-vault";
 import {identityAccessMatches} from "./identity-document-security";
