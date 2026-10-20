@@ -21,17 +21,22 @@ export type ReservationPriceProposal=z.infer<typeof reservationPriceProposalSche
 export type ReservationPriceDecision=z.infer<typeof reservationPriceDecisionSchema>;
 export type ReservationPriceAcceptance=z.infer<typeof reservationPriceAcceptanceSchema>;
 
+export function confirmedFailedPricePayment(payment:{status:string;failureCode:string|null;processedAt:Date|null}){
+  // An unaccepted callback, cancellation or timeout does not prove a terminal decline.
+  return Boolean(payment.processedAt&&((payment.status==="DECLINED"&&payment.failureCode==="DECLINED")||(payment.status==="FAILED"&&["DECLINED","NETCASH_DECLINED"].includes(payment.failureCode??""))));
+}
+
 type Booking={source:string;status:string;journey:string;convertedTenancyId:string|null;publicReference:string|null;quotedRate:unknown;initialRentSnapshot:unknown;intendedMoveIn:Date|null;holdExpiresAt:Date|null;contactVerifiedAt:Date|null;emailVerifiedAt:Date|null;signed:boolean;mandate:boolean;paymentSessions:number;financialActivity:boolean};
 export function reservationPriceBlockers(booking:Booking,now=new Date(),preparing=false){
   const reasons:string[]=[];
   const staff=booking.source==="INTERNAL",viewingHold=booking.source==="PUBLIC_VIEWING";
-  if(!["PUBLIC_VIEWING","PUBLIC_WALK_IN","INTERNAL"].includes(booking.source)||(!booking.publicReference&&!(staff&&preparing))||(booking.journey!=="RENTAL"&&!(viewingHold&&booking.journey==="VIEWING")))reasons.push("Price negotiation is only available for Hold to view (24hrs) and backend walk-in or phone-in bookings. Prepare an eligible rental quote first.");
+  if(!["PUBLIC_WEBSITE","PUBLIC_VIEWING","PUBLIC_WALK_IN","INTERNAL"].includes(booking.source)||(!booking.publicReference&&!(staff&&preparing))||(booking.journey!=="RENTAL"&&!(viewingHold&&booking.journey==="VIEWING")))reasons.push("Price negotiation requires an eligible unsigned Pay now, Hold to view (24hrs), or backend walk-in or phone-in quote.");
   if(booking.status!=="ACTIVE"||booking.convertedTenancyId)reasons.push("The booking is no longer an active unsigned quote.");
   if(!booking.holdExpiresAt||booking.holdExpiresAt<=now)reasons.push("The original reservation hold has expired.");
   if(!staff&&(!booking.contactVerifiedAt||!viewingHold&&!booking.emailVerifiedAt))reasons.push("The customer must complete the original contact verification.");
   if(booking.signed)reasons.push("A signed agreement requires the separate legal/finance amendment process.");
   if(booking.mandate)reasons.push("Existing payment authority requires finance review.");
-  if(booking.paymentSessions||booking.financialActivity)reasons.push("Payment, invoice or ledger activity requires finance review.");
+  if(booking.paymentSessions||booking.financialActivity)reasons.push("A pending, successful or unconfirmed payment, invoice or ledger activity requires finance review.");
   if((!booking.intendedMoveIn||booking.initialRentSnapshot==null)&&!((staff||viewingHold)&&preparing))reasons.push("Prepare and retain the current quote, including its move-in date and initial rent.");
   else try{publicInitialRent(booking);}catch{reasons.push("The original saved price snapshot needs review.");}
   return reasons;

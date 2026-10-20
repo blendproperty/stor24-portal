@@ -71,18 +71,24 @@ export async function startPublicNetcashSandboxPayment(reference: string, idempo
   const quotedRate = Number(reservation.quotedRate);
   const packageAmount = Number(reservation.packageSelection?.priceSnapshot ?? 0);
   const amount = publicCheckoutTotal(reservation);
-  const checkout = await createOnceOffCheckout(
-    reservation.customer.organisationId,
-    null,
-    {
-      accountId: account.id,
-      amount,
-      description: `STOR24 test - Unit ${reservation.unit.number}`,
-      customerEmail: reservation.customer.email ?? undefined,
-      extra1: reference,
-      idempotencyKey: `netcash-public-test-${idempotencyKey}`,
-    },
-  );
+  const checkout = await db.$transaction(async tx => {
+    // Serialise checkout creation with quote acceptance; never charge a stale quote.
+    await tx.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id" = ${reservation.id} FOR UPDATE`;
+    const current = await tx.reservation.findUniqueOrThrow({ where: { id: reservation.id }, include: { packageSelection: true } });
+    if (current.status !== "ACTIVE" || !current.holdExpiresAt || current.holdExpiresAt <= new Date() || publicCheckoutTotal(current) !== amount) throw new Error("BOOKING_QUOTE_CHANGED");
+    return createOnceOffCheckout(
+      reservation.customer.organisationId,
+      null,
+      {
+        accountId: account.id,
+        amount,
+        description: `STOR24 test - Unit ${reservation.unit.number}`,
+        customerEmail: reservation.customer.email ?? undefined,
+        extra1: reference,
+        idempotencyKey: `netcash-public-test-${idempotencyKey}`,
+      },
+    );
+  });
   await db.auditEvent.create({
     data: {
       organisationId: reservation.customer.organisationId,
