@@ -64,7 +64,7 @@ try {
     await page.getByRole('button', { name: 'Save agreed appointment' }).click();
     await expect(page.getByRole('button', { name: 'Complete', exact: true })).toBeVisible();
     assert.equal(created.length, 1); assert.equal(created[0].dueAt, '2026-10-14T07:00:00.000Z');
-    assert.ok(await page.getByRole('link', { name: /Customer history/ }).getAttribute('href').then(s => s.includes(customer.id)));
+    assert.ok(await page.getByRole('link', { name: /Open customer follow-ups/ }).getAttribute('href').then(s => s.includes(customer.id) && s.includes("section=followups")));
     // The visible details/actions and separate cover form must have real breathing space.
     const card = page.locator('.followup-card').first();
     const geometry = await card.evaluate(node => {

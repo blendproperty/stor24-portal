@@ -31,11 +31,11 @@ const SOUTH_AFRICAN_LOCATIONS = {
 } satisfies Record<string, [string, string][]>;
 const RELATIONSHIPS = ["Spouse", "Partner", "Parent", "Child", "Sibling", "Relative", "Friend", "Colleague", "Employer", "Employee", "Guardian", "Other"];
 
-export function CustomerOperationsWorkspace({ initialCustomerId = "" }: { initialCustomerId?: string }) {
+export function CustomerOperationsWorkspace({ initialCustomerId = "", initialFollowups = false }: { initialCustomerId?: string; initialFollowups?: boolean }) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [search, setSearch] = useState("");
-  const [customerTab, setCustomerTab] = useState("history");
+  const [customerTab, setCustomerTab] = useState(initialFollowups ? "followups" : "history");
   const [chooseCustomer, setChooseCustomer] = useState(false);
   const [editing, setEditing] = useState<Customer | "new" | null>(null);
   const [busy, setBusy] = useState(false);

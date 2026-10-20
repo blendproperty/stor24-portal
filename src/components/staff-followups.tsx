@@ -91,7 +91,7 @@ export function StaffFollowups({ fixedCustomerId = "" }: { fixedCustomerId?: str
           {data.tasks.length ? data.tasks.map(task => <article className="followup-card" key={task.id}>
             <div className="followup-toolbar"><strong>{task.title}</strong><span>{task.status.replaceAll("_", " ")}</span></div>
             <p>{task.dueAt ? formatSouthAfricaDateTime(task.dueAt) : "No date recorded"} · {task.facility.name}</p>
-            {task.customer ? <Link href={`/tenants?customer=${encodeURIComponent(task.customer.id)}`}>{nameOf(task.customer)} · Customer history</Link> : null}
+            {task.customer ? <Link href={`/tenants?customer=${encodeURIComponent(task.customer.id)}&section=followups`}>{nameOf(task.customer)} · Open customer follow-ups</Link> : null}
             <p className="followup-description">{task.description}</p>
             <p>Responsible: {task.assignee?.name ?? "Unassigned"}<br/>Cover: {task.cover?.name ?? "Not assigned"} · {task.coverAcknowledgedAt ? `Acknowledged ${formatSouthAfricaDateTime(task.coverAcknowledgedAt)}` : "Awaiting acknowledgement"}</p>
             <div className="followup-actions">
