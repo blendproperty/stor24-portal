@@ -44,6 +44,10 @@ try{
   await expect(page.getByLabel('Customer',{exact:true})).toHaveValue(customer.id);
   await expect(page.getByLabel('Customer',{exact:true})).toBeDisabled();
   await expect(page.getByLabel('Agreed date and time (SAST)')).toBeVisible();
+  await page.getByLabel('Agreed date and time (SAST)').fill('2026-10-21T10:30');
+  await page.getByRole('button',{name:'Contact details',exact:true}).click();
+  await page.getByRole('button',{name:'Follow-ups',exact:true}).click();
+  await expect(page.getByLabel('Agreed date and time (SAST)')).toHaveValue('2026-10-21T10:30');
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   await page.screenshot({path:`output/customer-dossier/followups-${width}.png`,fullPage:true});
   await page.getByRole('button',{name:'History & notes',exact:true}).click();
