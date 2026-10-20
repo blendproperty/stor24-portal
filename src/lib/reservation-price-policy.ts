@@ -41,7 +41,7 @@ export function proposedReservationPrice(rate:string,moveIn:Date){
   return newPublicInitialRent(Number(parsed),moveIn);
 }
 export function requireIndependentPriceApproval(proposer:string,reviewer:string){if(proposer===reviewer)throw Error("PRICE_INDEPENDENT_REVIEW_REQUIRED");}
-export const reservationPriceNotice="This changes only an unsigned booking quote after your acceptance. You must review and sign the updated agreement separately. It does not take payment, alter a signed agreement or authorise a collection.";
+export const reservationPriceNotice="This changes only an unsigned booking quote after your acceptance. For a viewing hold, accepting this quote changes it to a rental booking. You must review and sign the updated agreement separately. It does not take payment, alter a signed agreement or authorise a collection.";
 
 /** Existing generic edits must not bypass a saved online quote or signed terms. */
 export function assertReservationQuotePatch(current:{status:string;convertedTenancyId:string|null;quotedRate:unknown;initialRentSnapshot:unknown;unitId:string;customerId:string;facilityId:string;intendedMoveIn:Date|null;publicLease?:{status:string}|null},patch:{quotedRate?:unknown;unitId?:string;customerId?:string;facilityId?:string;intendedMoveIn?:Date}){

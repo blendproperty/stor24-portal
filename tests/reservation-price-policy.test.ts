@@ -7,7 +7,7 @@ const now=new Date("2026-10-15T08:00:00Z"),moveIn=new Date("2026-10-20T10:00:00Z
 const original=()=>({source:"PUBLIC_VIEWING",status:"ACTIVE",journey:"RENTAL",convertedTenancyId:null,publicReference:"PUBLIC-ORIGINAL",quotedRate:1000,initialRentSnapshot:newPublicInitialRent(1000,moveIn),intendedMoveIn:moveIn,holdExpiresAt:new Date("2026-10-16"),contactVerifiedAt:now,emailVerifiedAt:now,signed:false,mandate:false,paymentSessions:0,financialActivity:false});
 test("only a verified, held, unsigned and financially untouched original quote is eligible",()=>{
   assert.deepEqual(reservationPriceBlockers(original(),now),[]);
-  for(const changed of [{signed:true},{status:"CONVERTED"},{convertedTenancyId:"tenancy"},{paymentSessions:1},{financialActivity:true},{mandate:true},{contactVerifiedAt:null},{holdExpiresAt:new Date("2026-10-14")},{initialRentSnapshot:null},{source:"UNKNOWN"},{journey:"VIEWING"}])assert.ok(reservationPriceBlockers({...original(),...changed},now).length>0);
+  for(const changed of [{signed:true},{status:"CONVERTED"},{convertedTenancyId:"tenancy"},{paymentSessions:1},{financialActivity:true},{mandate:true},{contactVerifiedAt:null},{holdExpiresAt:new Date("2026-10-14")},{initialRentSnapshot:null},{source:"UNKNOWN"},{journey:"UNKNOWN"}])assert.ok(reservationPriceBlockers({...original(),...changed},now).length>0);
   assert.ok(reservationPriceBlockers({...original(),quotedRate:999},now).some(text=>text.includes("snapshot")));
 });
 test("price proposals use whole cents and the existing proration policy",()=>{
@@ -52,5 +52,7 @@ test("normal online bookings are excluded even if unsigned, unpaid and within a 
   const viewing={...original(),journey:"VIEWING",intendedMoveIn:null,initialRentSnapshot:null,emailVerifiedAt:null};
   assert.ok(reservationPriceBlockers(viewing,now).length>0);
   assert.deepEqual(reservationPriceBlockers(viewing,now,true),[]);
+  assert.deepEqual(reservationPriceBlockers({...original(),journey:"VIEWING"},now),[]);
+  assert.ok(reservationPriceBlockers({...original(),source:"INTERNAL",journey:"VIEWING"},now).length>0);
   assert.deepEqual(reservationPriceBlockers({...original(),source:"INTERNAL"},now),[]);
 });
