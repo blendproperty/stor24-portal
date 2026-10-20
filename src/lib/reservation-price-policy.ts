@@ -5,7 +5,7 @@ const id=z.string().min(1).max(100);
 export const reservationPriceAdjustmentSchema=z.object({mode:z.enum(["AMOUNT","DISCOUNT_AMOUNT","DISCOUNT_PERCENT"]),value:z.string().regex(/^\d{1,8}(?:\.\d{1,2})?$/)}).strict();
 export const reservationPriceProposalSchema=z.object({reservationId:id,facilityId:id,requestKey:z.uuid(),monthlyRate:z.string().regex(/^\d{1,8}(?:\.\d{1,2})?$/).refine(v=>Number(v)>0&&Number(v)<=10000000),adjustment:reservationPriceAdjustmentSchema.optional(),reason:z.string().trim().min(10).max(1000)}).strict();
 export const reservationPriceSendSchema=z.object({id,facilityId:id,confirmed:z.literal(true)}).strict();
-export const reservationPricePreparationSchema=z.object({reservationId:id,facilityId:id,confirmed:z.literal(true)}).strict();
+export const reservationPricePreparationSchema=z.object({reservationId:id,facilityId:id,sourceFingerprint:z.string().regex(/^[a-f0-9]{64}$/),confirmed:z.literal(true)}).strict();
 export function negotiatedMonthlyRate(current:string,adjustment:z.infer<typeof reservationPriceAdjustmentSchema>){
   const parsed=reservationPriceAdjustmentSchema.safeParse(adjustment);
   if(!parsed.success||!/^\d{1,8}(?:\.\d{1,2})?$/.test(current))throw Error("PRICE_INVALID");

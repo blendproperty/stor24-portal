@@ -53,9 +53,10 @@ test("isolated governed price amendments preserve original quotes, consent, sour
       await db.publicReservationLease.delete({where:{reservationId:f.booking.id}});
       await db.reservation.update({where:{id:f.booking.id},data:{source:"INTERNAL",initialRentSnapshot:Prisma.DbNull,publicReference:null,contactVerifiedAt:null}});
       await db.customer.update({where:{id:f.customer.id},data:{emailVerifiedAt:null}});
-      const baseline=await financial(f),input={reservationId:f.booking.id,facilityId:f.facility.id,confirmed:true as const};
+      const baseline=await financial(f),input={reservationId:f.booking.id,facilityId:f.facility.id,sourceFingerprint:(await reservationPriceWorkspace(f.scope,f.booking.id)).preparation!.sourceFingerprint,confirmed:true as const};
       await assert.rejects(proposeReservationPrice(f.scope,propose(f)),/REVIEW_REQUIRED/);
       await assert.rejects(prepareStaffReservationQuote({...f.scope,facilityIds:[]},input),/NOT_FOUND/);
+      await assert.rejects(prepareStaffReservationQuote(f.scope,{...input,sourceFingerprint:"a".repeat(64)}),/SOURCE_CHANGED/);
       await prepareStaffReservationQuote(f.scope,input);await prepareStaffReservationQuote(f.scope,input);
       const prepared=await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}});
       assert.ok(prepared.publicReference);assert.equal(prepared.contactVerifiedAt,null);assert.equal(prepared.source,"INTERNAL");assert.equal(prepared.quotedRate.toFixed(2),"1000.00");

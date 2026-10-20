@@ -53,11 +53,12 @@ export async function prepareStaffReservationQuote(scope:RequestScope,input:unkn
     if(booking.source!=="INTERNAL")throw Error("PRICE_REVIEW_REQUIRED");
     const proof=await source(tx,booking,true);assertSource(proof);
     if(booking.initialRentSnapshot&&booking.publicReference)return {id:booking.id};
+    if(proof.fingerprint!==data.sourceFingerprint)throw Error("PRICE_SOURCE_CHANGED");
     if(booking.publicLease||await tx.reservationPriceAmendment.count({where:{reservationId:booking.id}}))throw Error("PRICE_REVIEW_REQUIRED");
     const snapshot=booking.initialRentSnapshot??newPublicInitialRent(Number(booking.quotedRate),booking.intendedMoveIn!);
     const reference=booking.publicReference??createPublicReference();
     await tx.reservation.update({where:{id:booking.id},data:{initialRentSnapshot:json(snapshot),publicReference:reference}});
-    await audit(tx,scope.organisationId,booking.facilityId,scope.userId,booking.id,"staff_quote_prepared",{originalEncrypted:encryptIntegrationSecret(canonical(proof.original)),sourceFingerprint:proof.fingerprint,reference,monthlyRate:booking.quotedRate.toFixed(2),initialRentSnapshot:json(snapshot),preparedAt:new Date().toISOString(),financialPosting:false,customerVerificationRequired:true});
+    await audit(tx,scope.organisationId,booking.facilityId,scope.userId,booking.id,"staff_quote_prepared",{reservationId:booking.id,originalEncrypted:encryptIntegrationSecret(canonical(proof.original)),sourceFingerprint:proof.fingerprint,reference,monthlyRate:booking.quotedRate.toFixed(2),initialRentSnapshot:json(snapshot),preparedAt:new Date().toISOString(),financialPosting:false,customerVerificationRequired:true});
     return {id:booking.id};
   });
 }
@@ -198,5 +199,5 @@ export async function reservationPriceWorkspace(scope:RequestScope,reference:str
     if(["PROPOSED","APPROVED"].includes(item.status)&&(proof.fingerprint!==item.sourceFingerprint||proof.blockers.length))issue="The original booking changed or needs review.";
     return {id:item.id,status:item.status,revision:item.revision,proposedById:item.proposedById,reviewedById:item.reviewedById,reviewReference:item.reviewReference,expiresAt:item.expiresAt,createdAt:item.createdAt,acceptedAt:item.acceptedAt,quoteFingerprint:item.quoteFingerprint,previousMonthlyRate:original?.quotedRate??null,monthlyRate:proposed?.monthlyRate??null,reason:proposed?.reason??null,adjustment:proposed?.adjustment??null,issue};
   });
-  return {userId:scope.userId,reservation:{id:booking.id,reference:booking.publicReference,facilityId:booking.facilityId,email:booking.customer.email,monthlyRate:booking.quotedRate.toFixed(2),intendedMoveIn:booking.intendedMoveIn,holdExpiresAt:booking.holdExpiresAt,status:booking.status},preparation:booking.source==="INTERNAL"&&(!booking.initialRentSnapshot||!booking.publicReference)?{blockers:(await source(tx,booking,true)).blockers,initialRent:booking.intendedMoveIn?newPublicInitialRent(Number(booking.quotedRate),booking.intendedMoveIn).total.toFixed(2):null}:null,blockers:proof.blockers,amendments,historyTruncated:records.length>50,notice:reservationPriceNotice};
+  return {userId:scope.userId,reservation:{id:booking.id,reference:booking.publicReference,facilityId:booking.facilityId,email:booking.customer.email,monthlyRate:booking.quotedRate.toFixed(2),intendedMoveIn:booking.intendedMoveIn,holdExpiresAt:booking.holdExpiresAt,status:booking.status},preparation:booking.source==="INTERNAL"&&(!booking.initialRentSnapshot||!booking.publicReference)?{sourceFingerprint:proof.fingerprint,blockers:(await source(tx,booking,true)).blockers,initialRent:booking.intendedMoveIn?newPublicInitialRent(Number(booking.quotedRate),booking.intendedMoveIn).total.toFixed(2):null}:null,blockers:proof.blockers,amendments,historyTruncated:records.length>50,notice:reservationPriceNotice};
 },{isolationLevel:"RepeatableRead"});}

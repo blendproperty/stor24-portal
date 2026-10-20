@@ -22,7 +22,7 @@ test("actual staff price routes authenticate before body reads and require all g
     assert.equal((await api.POST(request("/api/v1/reservations/prices",{...proposal,extra:"x".repeat(17000)}))).status,413);assert.equal(calls.length,0);
     assert.equal((await api.POST(request("/api/v1/reservations/prices",proposal))).status,200);assert.equal(calls[0].name,"propose");assert.equal("action" in calls[0].args[1],false);
     calls=[];
-    const prepare={action:"prepare",reservationId:"booking",facilityId:"store",confirmed:true};
+    const prepare={action:"prepare",reservationId:"booking",facilityId:"store",sourceFingerprint:"a".repeat(64),confirmed:true};
     assert.equal((await api.POST(request("/api/v1/reservations/prices",{...prepare,confirmed:false}))).status,422);assert.equal(calls.length,0);
     for(const permission of ["reservation_prices.propose","reservations.manage","billing.view"]){denied=permission;assert.equal((await api.POST(request("/api/v1/reservations/prices",prepare))).status,403);assert.equal(calls.length,0);}denied="";
     assert.equal((await api.POST(request("/api/v1/reservations/prices",prepare))).status,200);assert.equal(calls[0].name,"prepare");calls=[];
