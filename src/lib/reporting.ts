@@ -15,6 +15,7 @@ export type ReportDefinition = {
 };
 
 export const reportDefinitions: readonly ReportDefinition[] = [
+  {key:"booking-discounts",name:"Booking discounts & approvals",group:"Sales",description:"Negotiated quotes created in the selected dates, current status, staff proposals and recorded approvals. Not payments or signed rent.",permission:"reports.financial",formats:["CSV","JSON","XLSX","PDF"]},
   { key: "occupancy-revenue", name: "Occupancy & revenue", group: "Operations", description: "Current unit occupancy and monthly contracted/potential rent snapshot.", permission: "reports.view", formats: ["CSV", "JSON", "XLSX", "PDF"] },
   { key: "unit-availability", name: "Unit availability", group: "Operations", description: "Current unit states, rates and recorded reservation hold expiry.", permission: "reports.view", formats: ["CSV", "JSON", "XLSX", "PDF"] },
   { key: "move-activity", name: "Move activity", group: "Operations", description: "Move-ins, move-outs, transfers, notices and net rentals.", permission: "reports.view", formats: ["CSV", "JSON", "XLSX", "PDF"] },

@@ -8,6 +8,8 @@ import {newPublicInitialRent,publicInitialRent,publicCheckoutTotal} from "./publ
 import {createPublicReference} from "./public-booking-contract";
 import {emailProvider,escapeEmailHtml} from "./email";
 import {sendNotificationOnce} from "./notification-delivery";
+import {formatSouthAfricaDateTime} from "./south-africa-time";
+import type {ReportParameters} from "./reporting";
 import {southAfricaDateKey} from "./south-africa-time";
 import {requireOperationalUnit} from "./floor-availability-service";
 import {confirmedFailedPricePayment,reservationPriceSendSchema,negotiatedMonthlyRate,reservationPricePreparationSchema,proposedReservationPrice,reservationPriceBlockers,reservationPriceProposalSchema,reservationPriceDecisionSchema,reservationPriceAcceptanceSchema,type ReservationPriceProposal,type ReservationPriceDecision,type ReservationPriceAcceptance,reservationPriceNotice} from "./reservation-price-policy";
@@ -118,8 +120,10 @@ export async function decideReservationPriceInTransaction(tx:Tx,scope:RequestSco
       if(item.status!=="PROPOSED"||item.expiresAt<=new Date())throw Error("PRICE_EXPIRED");
       assertSource(await source(tx,booking),item.sourceFingerprint);
     }
-    const changed=await tx.reservationPriceAmendment.updateMany({where:{id:item.id,revision:data.revision,status:item.status},data:{status:data.decision,revision:{increment:1},reviewedById:scope.userId,reviewedAt:new Date(),reviewReference:data.reference}});if(changed.count!==1)throw Error("CONFLICT");
-    await audit(tx,scope.organisationId,item.facilityId,scope.userId,item.id,data.decision.toLowerCase(),{reservationId:item.reservationId,revision:data.revision+1,quoteFingerprint:item.quoteFingerprint,reference:data.reference,approvalMethod:delegation?"MANAGER_WHATSAPP_OTP":"SIGNED_IN",proposedById:item.proposedById,selfApproved:item.proposedById===scope.userId,...delegation,financialPosting:false});return {id:item.id};
+    const actor=await tx.user.findFirst({where:{id:scope.userId,organisationId:scope.organisationId,active:true},select:{name:true}});if(!actor)throw Error("FORBIDDEN");
+    const reference=`${actor.name.slice(0,120)} | ${data.decision} | ${item.id} v${data.revision}`;
+    const changed=await tx.reservationPriceAmendment.updateMany({where:{id:item.id,revision:data.revision,status:item.status},data:{status:data.decision,revision:{increment:1},reviewedById:scope.userId,reviewedAt:new Date(),reviewReference:reference}});if(changed.count!==1)throw Error("CONFLICT");
+    await audit(tx,scope.organisationId,item.facilityId,scope.userId,item.id,data.decision.toLowerCase(),{reservationId:item.reservationId,revision:data.revision+1,quoteFingerprint:item.quoteFingerprint,reference,approvalMethod:delegation?"MANAGER_WHATSAPP_OTP":"SIGNED_IN",proposedById:item.proposedById,selfApproved:item.proposedById===scope.userId,...delegation,financialPosting:false});return {id:item.id};
 }
 
 export async function sendReservationPriceReview(scope:RequestScope,input:unknown){
@@ -216,7 +220,7 @@ export async function reservationPriceWorkspace(scope:RequestScope,reference:str
   const booking=await tx.reservation.findFirst({where:{OR:[{id:reference},{publicReference:reference}],facility:facilityWhere(scope),customer:{organisationId:scope.organisationId}},include});
   if(!booking)throw Error("NOT_FOUND");const proof=await source(tx,booking);
   const records=await tx.reservationPriceAmendment.findMany({where:{organisationId:scope.organisationId,facilityId:booking.facilityId,reservationId:booking.id},take:51,orderBy:[{createdAt:"desc"},{id:"desc"}]});
-  const staff=await tx.user.findMany({where:{organisationId:scope.organisationId,id:{in:[...new Set(records.flatMap(item=>[item.proposedById,...(item.reviewedById?[item.reviewedById]:[])]))]}},select:{id:true,name:true}});
+  const staff=await tx.user.findMany({where:{organisationId:scope.organisationId,id:{in:[...new Set([scope.userId,...records.flatMap(item=>[item.proposedById,...(item.reviewedById?[item.reviewedById]:[])])])]}},select:{id:true,name:true}});
   const names=new Map(staff.map(user=>[user.id,user.name]));
   const amendments=records.slice(0,50).map(item=>{
     let original:ReturnType<typeof read>|null=null,proposed:ReturnType<typeof read>|null=null,issue:string|null=null;
@@ -226,5 +230,22 @@ export async function reservationPriceWorkspace(scope:RequestScope,reference:str
   });
   const now=new Date();
   const campaigns=await tx.marketingCampaign.findMany({where:{organisationId:scope.organisationId,facilityId:booking.facilityId,status:"ACTIVE",startsAt:{lte:now},OR:[{endsAt:null},{endsAt:{gte:now}}]},select:{id:true,name:true},orderBy:[{name:"asc"},{id:"asc"}],take:100});
-  return {userId:scope.userId,campaigns,reservation:{id:booking.id,reference:booking.publicReference,facilityId:booking.facilityId,email:booking.customer.email,monthlyRate:booking.quotedRate.toFixed(2),intendedMoveIn:booking.intendedMoveIn,holdExpiresAt:booking.holdExpiresAt,status:booking.status},preparation:["INTERNAL","PUBLIC_VIEWING"].includes(booking.source)&&(!booking.initialRentSnapshot||!booking.publicReference)?{needsMoveIn:!booking.intendedMoveIn,sourceFingerprint:proof.fingerprint,blockers:(await source(tx,booking,true)).blockers,initialRent:booking.intendedMoveIn?newPublicInitialRent(Number(booking.quotedRate),booking.intendedMoveIn).total.toFixed(2):null}:null,blockers:proof.blockers,amendments,historyTruncated:records.length>50,notice:reservationPriceNotice};
+  return {userId:scope.userId,userName:names.get(scope.userId)??"Staff member",campaigns,reservation:{id:booking.id,reference:booking.publicReference,facilityId:booking.facilityId,email:booking.customer.email,monthlyRate:booking.quotedRate.toFixed(2),intendedMoveIn:booking.intendedMoveIn,holdExpiresAt:booking.holdExpiresAt,status:booking.status},preparation:["INTERNAL","PUBLIC_VIEWING"].includes(booking.source)&&(!booking.initialRentSnapshot||!booking.publicReference)?{needsMoveIn:!booking.intendedMoveIn,sourceFingerprint:proof.fingerprint,blockers:(await source(tx,booking,true)).blockers,initialRent:booking.intendedMoveIn?newPublicInitialRent(Number(booking.quotedRate),booking.intendedMoveIn).total.toFixed(2):null}:null,blockers:proof.blockers,amendments,historyTruncated:records.length>50,notice:reservationPriceNotice};
 },{isolationLevel:"RepeatableRead"});}
+
+
+export async function reservationDiscountReport(scope:RequestScope,parameters:ReportParameters){
+  const records=await db.reservationPriceAmendment.findMany({where:{organisationId:scope.organisationId,AND:[...(scope.unrestrictedFacilities?[]:[{facilityId:{in:scope.facilityIds}}]),...(parameters.facilityId?[{facilityId:parameters.facilityId}]:[])],createdAt:{gte:new Date(`${parameters.from}T00:00:00+02:00`),lte:new Date(`${parameters.to}T23:59:59.999+02:00`)}},orderBy:[{createdAt:"desc"},{id:"desc"}],take:5001});
+  const bookings=await db.reservation.findMany({where:{id:{in:records.map(row=>row.reservationId)},facility:facilityWhere(scope)},include:{facility:{select:{name:true}},unit:{select:{number:true}},customer:{select:{firstName:true,lastName:true,companyName:true}}}}),byBooking=new Map(bookings.map(booking=>[booking.id,booking]));
+  const staff=await db.user.findMany({where:{organisationId:scope.organisationId},select:{id:true,name:true}}),names=new Map(staff.map(user=>[user.id,user.name]));
+  const audits=await db.auditEvent.findMany({where:{organisationId:scope.organisationId,entityType:"ReservationPriceAmendment",entityId:{in:records.map(row=>row.id)},action:"reservation.price_approved"},select:{entityId:true,actorId:true,occurredAt:true,after:true}});
+  return records.map(item=>{
+    let originalMonthlyRent:string|null=null,proposedMonthlyRent:string|null=null,discountRand:string|null=null,discountPercent:string|null=null,reason:string|null=null,issue:string|null=null;
+    try{originalIntact(item);const original=read(item.originalEncrypted),proposed=read(item.proposedEncrypted);if(hash({reservationId:item.reservationId,sourceFingerprint:item.sourceFingerprint,proposed,expiresAt:item.expiresAt.toISOString()})!==item.quoteFingerprint)throw Error();const before=new Prisma.Decimal(String(original.quotedRate)),after=new Prisma.Decimal(String(proposed.monthlyRate));if(!before.isPositive()||!after.isPositive())throw Error();originalMonthlyRent=before.toFixed(2);proposedMonthlyRent=after.toFixed(2);discountRand=before.minus(after).toFixed(2);discountPercent=before.minus(after).div(before).mul(100).toFixed(2);reason=String(proposed.reason);}catch{issue="Retained quote evidence requires review";}
+    const matches=audits.filter(a=>a.entityId===item.id),audit=matches.length===1?matches[0]:null,details=audit?.after as Record<string,unknown>|undefined;
+    const approved=!!audit?.actorId&&typeof details?.reference==="string"&&details?.reservationId===item.reservationId&&details?.financialPosting===false&&details?.quoteFingerprint===item.quoteFingerprint&&(!["APPROVED","APPLIED"].includes(item.status)||(audit.actorId===item.reviewedById&&details.reference===item.reviewReference));
+    if(["APPROVED","APPLIED"].includes(item.status)&&!approved)issue="Approval evidence requires review";
+    const booking=byBooking.get(item.reservationId),customer=booking?.customer;if(!booking||booking.facilityId!==item.facilityId)issue="Booking evidence requires review";
+    return {facility:booking?.facility.name??"Unavailable",booking:booking?.publicReference??item.reservationId,proposalId:item.id,unit:booking?.unit.number??null,customer:customer?.companyName||[customer?.firstName,customer?.lastName].filter(Boolean).join(" "),status:item.status,proposedAtSast:formatSouthAfricaDateTime(item.createdAt),originalMonthlyRent,proposedMonthlyRent,discountRand,discountPercent,reason,proposedBy:names.get(item.proposedById)??"Former staff member",approvedBy:approved?names.get(audit!.actorId!)??"Former staff member":null,approvedAtSast:approved?formatSouthAfricaDateTime(audit!.occurredAt):null,approvalMethod:approved?String(details?.approvalMethod??"SIGNED_IN"):null,requestedBy:approved&&typeof details?.requestedById==="string"?names.get(details.requestedById)??"Former staff member":null,approvalReference:approved?String(details!.reference):null,customerAcceptedAtSast:item.acceptedAt?formatSouthAfricaDateTime(item.acceptedAt):null,issue,basis:"Proposals created in selected dates; current status. Approval is not customer acceptance, signed rent or payment."};
+  });
+}

@@ -7,7 +7,7 @@ import {saveStaffPriceContact,staffPriceContact,requestManagerPriceApproval,veri
 import {newPublicInitialRent,publicCheckoutTotal} from "../../src/lib/public-initial-rent";
 import {newIdentityAccess} from "../../src/lib/identity-document-security";
 import {decryptIntegrationSecret} from "../../src/lib/integrations/integration-secret-vault";
-import {prepareStaffReservationQuote,proposeReservationPrice,decideReservationPrice,previewCustomerReservationPrice,acceptCustomerReservationPrice,reservationPriceWorkspace,appliedCustomerReservationPrice} from "../../src/lib/reservation-price-service";
+import {reservationDiscountReport,prepareStaffReservationQuote,proposeReservationPrice,decideReservationPrice,previewCustomerReservationPrice,acceptCustomerReservationPrice,reservationPriceWorkspace,appliedCustomerReservationPrice} from "../../src/lib/reservation-price-service";
 import {preparePublicReservationLease,completePublicReservationLease} from "../../src/lib/public-lease-workflow";
 import {visualReportSource} from "../../src/lib/visual-report-data";
 import {defaultVisualQuery} from "../../src/lib/visual-report-engine";
@@ -206,8 +206,9 @@ test("isolated governed price amendments preserve original quotes, consent, sour
       assert.equal(original.quotedRate,"1000.00");assert.deepEqual(original.initialRentSnapshot,before.initialRentSnapshot);assert.ok(original.lease.content);assert.ok(!item.originalEncrypted.includes("Synthetic Customer"));
       await assert.rejects(db.reservationPriceAmendment.update({where:{id:item.id},data:{originalEncrypted:"not-an-original"}}));
       await decideReservationPrice(f.scope,{id:item.id,facilityId:f.facility.id,revision:0,decision:"APPROVED",reference:"Authorised own proposal approval",confirmed:true});
-      const approved=await db.reservationPriceAmendment.findUniqueOrThrow({where:{id:item.id}});assert.equal(approved.reviewedById,f.proposer.id);assert.ok(approved.reviewedAt);assert.deepEqual(await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}}),before);assert.deepEqual(await financial(f),baseline);
+      const approved=await db.reservationPriceAmendment.findUniqueOrThrow({where:{id:item.id}});assert.equal(approved.reviewedById,f.proposer.id);assert.match(approved.reviewReference!,/^Synthetic proposer \| APPROVED \|/);assert.ok(!approved.reviewReference!.includes("Authorised own proposal approval"));assert.ok(approved.reviewedAt);assert.deepEqual(await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}}),before);assert.deepEqual(await financial(f),baseline);
       assert.equal((await reservationPriceWorkspace(f.scope,f.booking.publicReference!)).amendments.length,1);
+      const report=await reservationDiscountReport(f.scope,{reportKey:"booking-discounts",from:southAfricaDateKey(new Date()),to:southAfricaDateKey(new Date()),format:"CSV",groupBy:"month"});const row=report.find(r=>r.proposalId===item.id)!;assert.equal(row.approvedBy,f.proposer.name);assert.equal(row.originalMonthlyRent,"1000.00");assert.equal(row.proposedMonthlyRent,"900.25");assert.equal(row.discountRand,"99.75");assert.equal(row.issue,null);assert.deepEqual(await reservationDiscountReport({...f.scope,facilityIds:[]},{reportKey:"booking-discounts",from:southAfricaDateKey(new Date()),to:southAfricaDateKey(new Date()),format:"CSV",groupBy:"month"}),[]);
       await assert.rejects(reservationPriceWorkspace({...f.scope,facilityIds:[]},f.booking.publicReference!),/NOT_FOUND/);
     });
     await t.test("customer acceptance needs fresh booking-specific proof and changes one quote exactly once with original signing link invalidated",async()=>{
