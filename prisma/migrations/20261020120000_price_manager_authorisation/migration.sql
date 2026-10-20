@@ -1,3 +1,7 @@
+-- Only booking-price separation of duties changes. Decision identity/time/reference remain mandatory.
+ALTER TABLE "ReservationPriceAmendment" DROP CONSTRAINT "ReservationPriceAmendment_check";
+ALTER TABLE "ReservationPriceAmendment" ADD CONSTRAINT "ReservationPriceAmendment_review_evidence_check"
+ CHECK ("status" NOT IN ('APPROVED','APPLIED') OR ("reviewedById" IS NOT NULL AND "reviewedAt" IS NOT NULL AND "reviewReference" IS NOT NULL));
 CREATE TABLE "PriceApprovalChallenge" (
  "id" TEXT PRIMARY KEY, "organisationId" TEXT NOT NULL REFERENCES "Organisation"("id") ON DELETE CASCADE,
  "facilityId" TEXT NOT NULL REFERENCES "Facility"("id") ON DELETE CASCADE,

@@ -50,7 +50,7 @@ export async function requestManagerPriceApproval(scope:RequestScope,input:unkno
 }
 export async function verifyManagerPriceApproval(scope:RequestScope,input:unknown,sessionHash:string){const data=priceManagerVerifySchema.parse(input);await requireFacility(scope,data.facilityId);if(await rateLimit(`price-otp-check:${scope.organisationId}:${scope.userId}`,20,300000))throw Error("PRICE_OTP_LIMIT");
  const result=await db.$transaction(async tx=>{
-  await tx.$queryRaw`SELECT "id" FROM "PriceApprovalChallenge" WHERE "id"=${data.challengeId} FOR UPDATE`;
+  await tx.$queryRaw`SELECT "id" FROM "PriceApprovalChallenge" WHERE "id"=${data.challengeId} AND "organisationId"=${scope.organisationId} AND "facilityId"=${data.facilityId} AND "requestedById"=${scope.userId} FOR UPDATE`;
   const challenge=await tx.priceApprovalChallenge.findFirst({where:{id:data.challengeId,organisationId:scope.organisationId,facilityId:data.facilityId,requestedById:scope.userId}});if(!challenge)throw Error("PRICE_OTP_INVALID");requireUsablePriceChallenge(challenge);
   const {requester,approver}=await usersForApproval(tx,scope,challenge.approverId,data.facilityId),registered=await contact(tx,scope.organisationId,approver.id);readContact(registered);
   if(sessionHash!==challenge.requesterSessionHash||requester.sessionVersion!==challenge.requesterSessionVersion||approver.sessionVersion!==challenge.approverSessionVersion||version(registered!)!==challenge.contactVersion)throw Error("PRICE_OTP_INVALID");
