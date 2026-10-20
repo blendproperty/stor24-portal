@@ -14,9 +14,18 @@ test("follow-up GET rejects invalid queue input before reading appointments and 
   new Function("require", "module", "exports", "__scope", "__calls", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, scope, calls);
   const invalid = await loaded.exports.GET(new Request("https://example.invalid/api/v1/operations/followups?view=bad"));
   assert.equal(invalid.status, 422); assert.equal(calls.length, 0);
+  const badCustomer = await loaded.exports.GET(new Request("https://example.invalid/api/v1/operations/followups?customer=bad"));
+  assert.equal(badCustomer.status, 422); assert.equal(calls.length, 0);
   for (const view of ["all", "due", "upcoming"]) {
     const response = await loaded.exports.GET(new Request(`https://example.invalid/api/v1/operations/followups?view=${view}&search=Alex`));
     assert.equal(response.status, 200); assert.match(response.headers.get("cache-control")!, /no-store/);
-    assert.deepEqual(calls.at(-1), [scope, "Alex", undefined, view]);
+    assert.deepEqual(calls.at(-1)?.slice(0, 4), [scope, "Alex", undefined, view]);
+    assert.ok(calls.at(-1)?.[4] instanceof Date);
+    assert.equal(calls.at(-1)?.[5], undefined);
   }
+  const customer = "cm00000000000000000000002";
+  const filtered = await loaded.exports.GET(new Request(`https://example.invalid/api/v1/operations/followups?customer=${customer}&cursor=page-two`));
+  assert.equal(filtered.status, 200);
+  assert.deepEqual(calls.at(-1)?.slice(0, 4), [scope, "", "page-two", "all"]);
+  assert.equal(calls.at(-1)?.[5], customer);
 });
