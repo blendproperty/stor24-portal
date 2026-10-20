@@ -53,16 +53,15 @@ export async function prepareStaffReservationQuote(scope:RequestScope,input:unkn
     if(booking.facilityId!==data.facilityId)throw Error("FORBIDDEN");
     if(!["INTERNAL","PUBLIC_VIEWING"].includes(booking.source))throw Error("PRICE_REVIEW_REQUIRED");
     const proof=await source(tx,booking,true);assertSource(proof);
-    if(booking.journey==="RENTAL"&&booking.initialRentSnapshot&&booking.publicReference)return {id:booking.id};
+    if(booking.initialRentSnapshot&&booking.publicReference)return {id:booking.id};
     if(proof.fingerprint!==data.sourceFingerprint)throw Error("PRICE_SOURCE_CHANGED");
     if(booking.publicLease||await tx.reservationPriceAmendment.count({where:{reservationId:booking.id}}))throw Error("PRICE_REVIEW_REQUIRED");
     const moveIn=booking.intendedMoveIn??(data.intendedMoveIn?new Date(`${data.intendedMoveIn}T00:00:00+02:00`):null);
     if(!moveIn||(!booking.intendedMoveIn&&southAfricaDateKey(moveIn)<southAfricaDateKey(new Date())))throw Error("PRICE_INVALID");
     const snapshot=booking.initialRentSnapshot??newPublicInitialRent(Number(booking.quotedRate),moveIn);
     const reference=booking.publicReference??createPublicReference();
-    await tx.reservation.update({where:{id:booking.id},data:{initialRentSnapshot:json(snapshot),publicReference:reference,intendedMoveIn:moveIn,journey:"RENTAL"}});
-    const leadChange=booking.journey==="VIEWING"&&booking.leadId?await tx.lead.updateMany({where:{id:booking.leadId,facilityId:booking.facilityId,customerId:booking.customerId,stage:"VIEWING_BOOKED"},data:{stage:"RESERVED"}}):null;
-    await audit(tx,scope.organisationId,booking.facilityId,scope.userId,booking.id,"staff_quote_prepared",{reservationId:booking.id,originalEncrypted:encryptIntegrationSecret(canonical(proof.original)),sourceFingerprint:proof.fingerprint,reference,originalJourney:booking.journey,leadId:booking.leadId,leadStageChanged:Boolean(leadChange?.count),intendedMoveIn:moveIn.toISOString(),monthlyRate:booking.quotedRate.toFixed(2),initialRentSnapshot:json(snapshot),preparedAt:new Date().toISOString(),financialPosting:false,customerVerificationRequired:true});
+    await tx.reservation.update({where:{id:booking.id},data:{initialRentSnapshot:json(snapshot),publicReference:reference,intendedMoveIn:moveIn}});
+    await audit(tx,scope.organisationId,booking.facilityId,scope.userId,booking.id,"staff_quote_prepared",{reservationId:booking.id,originalEncrypted:encryptIntegrationSecret(canonical(proof.original)),sourceFingerprint:proof.fingerprint,reference,originalJourney:booking.journey,leadId:booking.leadId,intendedMoveIn:moveIn.toISOString(),monthlyRate:booking.quotedRate.toFixed(2),initialRentSnapshot:json(snapshot),preparedAt:new Date().toISOString(),financialPosting:false,customerVerificationRequired:true});
     return {id:booking.id};
   });
 }
@@ -168,7 +167,8 @@ export async function acceptCustomerReservationPrice(input:ReservationPriceAccep
     // Keep the original quote and unsigned document encrypted in the immutable
     // amendment; a previous signing link can no longer accept old particulars.
     if(booking.publicLease)await tx.publicReservationLease.update({where:{id:booking.publicLease.id},data:{status:"REQUOTE_REQUIRED",expiresAt:new Date(),signingToken:randomBytes(32).toString("base64url")}});
-    await tx.reservation.update({where:{id:booking.id},data:{quotedRate:proposed.monthlyRate,initialRentSnapshot:json(proposed.initialRentSnapshot)}});
+    await tx.reservation.update({where:{id:booking.id},data:{quotedRate:proposed.monthlyRate,initialRentSnapshot:json(proposed.initialRentSnapshot),journey:"RENTAL"}});
+    if(booking.journey==="VIEWING"&&booking.leadId)await tx.lead.updateMany({where:{id:booking.leadId,facilityId:booking.facilityId,customerId:booking.customerId,stage:"VIEWING_BOOKED"},data:{stage:"RESERVED"}});
     const acceptedAt=new Date();
     if(item.expiresAt<=acceptedAt||!booking.holdExpiresAt||booking.holdExpiresAt<=acceptedAt)throw Error("PRICE_EXPIRED");
     const changed=await tx.reservationPriceAmendment.updateMany({where:{id:item.id,status:"APPROVED",revision:item.revision},data:{status:"APPLIED",revision:{increment:1},acceptedCustomerId:booking.customerId,acceptedAt,acceptanceFingerprint:item.quoteFingerprint}});if(changed.count!==1)throw Error("CONFLICT");
@@ -203,5 +203,5 @@ export async function reservationPriceWorkspace(scope:RequestScope,reference:str
     if(["PROPOSED","APPROVED"].includes(item.status)&&(proof.fingerprint!==item.sourceFingerprint||proof.blockers.length))issue="The original booking changed or needs review.";
     return {id:item.id,status:item.status,revision:item.revision,proposedById:item.proposedById,reviewedById:item.reviewedById,reviewReference:item.reviewReference,expiresAt:item.expiresAt,createdAt:item.createdAt,acceptedAt:item.acceptedAt,quoteFingerprint:item.quoteFingerprint,previousMonthlyRate:original?.quotedRate??null,monthlyRate:proposed?.monthlyRate??null,reason:proposed?.reason??null,adjustment:proposed?.adjustment??null,issue};
   });
-  return {userId:scope.userId,reservation:{id:booking.id,reference:booking.publicReference,facilityId:booking.facilityId,email:booking.customer.email,monthlyRate:booking.quotedRate.toFixed(2),intendedMoveIn:booking.intendedMoveIn,holdExpiresAt:booking.holdExpiresAt,status:booking.status},preparation:["INTERNAL","PUBLIC_VIEWING"].includes(booking.source)&&(!booking.initialRentSnapshot||!booking.publicReference||booking.journey==="VIEWING")?{needsMoveIn:!booking.intendedMoveIn,sourceFingerprint:proof.fingerprint,blockers:(await source(tx,booking,true)).blockers,initialRent:booking.intendedMoveIn?newPublicInitialRent(Number(booking.quotedRate),booking.intendedMoveIn).total.toFixed(2):null}:null,blockers:proof.blockers,amendments,historyTruncated:records.length>50,notice:reservationPriceNotice};
+  return {userId:scope.userId,reservation:{id:booking.id,reference:booking.publicReference,facilityId:booking.facilityId,email:booking.customer.email,monthlyRate:booking.quotedRate.toFixed(2),intendedMoveIn:booking.intendedMoveIn,holdExpiresAt:booking.holdExpiresAt,status:booking.status},preparation:["INTERNAL","PUBLIC_VIEWING"].includes(booking.source)&&(!booking.initialRentSnapshot||!booking.publicReference)?{needsMoveIn:!booking.intendedMoveIn,sourceFingerprint:proof.fingerprint,blockers:(await source(tx,booking,true)).blockers,initialRent:booking.intendedMoveIn?newPublicInitialRent(Number(booking.quotedRate),booking.intendedMoveIn).total.toFixed(2):null}:null,blockers:proof.blockers,amendments,historyTruncated:records.length>50,notice:reservationPriceNotice};
 },{isolationLevel:"RepeatableRead"});}

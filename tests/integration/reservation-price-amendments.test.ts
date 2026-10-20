@@ -58,8 +58,8 @@ test("isolated governed price amendments preserve original quotes, consent, sour
       await assert.rejects(proposeReservationPrice(f.scope,propose(f)),/REVIEW_REQUIRED/);
       await assert.rejects(prepareStaffReservationQuote(f.scope,input),/INVALID/);
       await prepareStaffReservationQuote(f.scope,{...input,intendedMoveIn:southAfricaDateKey(new Date(Date.now()+86400000))});
-      const current=await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}});assert.equal(current.journey,"RENTAL");assert.equal(current.source,"PUBLIC_VIEWING");assert.equal(current.holdExpiresAt!.getTime(),f.booking.holdExpiresAt!.getTime());assert.equal(current.quotedRate.toFixed(2),"1000.00");
-      await proposeReservationPrice(f.scope,propose(f));
+      const current=await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}});assert.equal(current.journey,"VIEWING");assert.equal(current.source,"PUBLIC_VIEWING");assert.equal(current.holdExpiresAt!.getTime(),f.booking.holdExpiresAt!.getTime());assert.equal(current.quotedRate.toFixed(2),"1000.00");
+      const proposal=await proposeReservationPrice(f.scope,propose(f));await approve(f,proposal.id);await acceptCustomerReservationPrice(await fresh(f,proposal.id));assert.equal((await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}})).journey,"RENTAL");
     });
     await t.test("staff quote preparation retains the real original, discounts are checked server-side and fresh email proof precedes acceptance",async()=>{
       const f=await fixture();

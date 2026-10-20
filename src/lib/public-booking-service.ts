@@ -442,13 +442,13 @@ export async function resendPublicReservationVerification(reference: string) {
 }
 
 async function approvedStaffPriceEmail(reservation:{id:string;source:string},proposalId?:string){
-  return reservation.source==="INTERNAL"&&Boolean(proposalId)&&Boolean(await db.reservationPriceAmendment.findFirst({where:{id:proposalId,reservationId:reservation.id,status:"APPROVED",expiresAt:{gt:new Date()},reviewedAt:{not:null}},select:{id:true}}));
+  return ["INTERNAL","PUBLIC_VIEWING"].includes(reservation.source)&&Boolean(proposalId)&&Boolean(await db.reservationPriceAmendment.findFirst({where:{id:proposalId,reservationId:reservation.id,status:"APPROVED",expiresAt:{gt:new Date()},reviewedAt:{not:null}},select:{id:true}}));
 }
 
 export async function startPublicEmailVerification(reference: string, refreshIdentity = false, staffPriceId?:string) {
   if (!publicReservationVerificationEnabled()) return { ok: false as const, code: "DISABLED" };
   const reservation = await db.reservation.findUnique({ where: { publicReference: reference }, include: { customer: true, publicLease: { select: { status: true } } } });
-  if (!reservation || reservation.status !== "ACTIVE" || (!reservation.contactVerifiedAt&&!await approvedStaffPriceEmail(reservation,staffPriceId)) || reservation.journey !== "RENTAL" || !reservation.customer.email) return { ok: false as const, code: "NOT_FOUND" };
+  if (!reservation || reservation.status !== "ACTIVE" || (!reservation.contactVerifiedAt&&!await approvedStaffPriceEmail(reservation,staffPriceId)) || (reservation.journey !== "RENTAL"&&!(reservation.journey==="VIEWING"&&await approvedStaffPriceEmail(reservation,staffPriceId))) || !reservation.customer.email) return { ok: false as const, code: "NOT_FOUND" };
   if (reservation.customer.emailVerifiedAt && !refreshIdentity) return { ok: true as const, alreadyVerified: true, verificationExpiresAt: null };
   if (reservation.verificationAttempts >= 9 || (reservation.publicLease?.status !== "SIGNED" && (!reservation.holdExpiresAt || reservation.holdExpiresAt <= new Date()))) return { ok: false as const, code: "EXPIRED" };
   const code = randomInt(0, 1_000_000).toString().padStart(6, "0");

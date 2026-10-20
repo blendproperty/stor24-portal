@@ -25,7 +25,7 @@ type Booking={source:string;status:string;journey:string;convertedTenancyId:stri
 export function reservationPriceBlockers(booking:Booking,now=new Date(),preparing=false){
   const reasons:string[]=[];
   const staff=booking.source==="INTERNAL",viewingHold=booking.source==="PUBLIC_VIEWING";
-  if(!["PUBLIC_VIEWING","PUBLIC_WALK_IN","INTERNAL"].includes(booking.source)||(!booking.publicReference&&!(staff&&preparing))||(booking.journey!=="RENTAL"&&!(viewingHold&&preparing&&booking.journey==="VIEWING")))reasons.push("Price negotiation is only available for Hold to view (24hrs) and backend walk-in or phone-in bookings. Prepare an eligible rental quote first.");
+  if(!["PUBLIC_VIEWING","PUBLIC_WALK_IN","INTERNAL"].includes(booking.source)||(!booking.publicReference&&!(staff&&preparing))||(booking.journey!=="RENTAL"&&!(viewingHold&&booking.journey==="VIEWING")))reasons.push("Price negotiation is only available for Hold to view (24hrs) and backend walk-in or phone-in bookings. Prepare an eligible rental quote first.");
   if(booking.status!=="ACTIVE"||booking.convertedTenancyId)reasons.push("The booking is no longer an active unsigned quote.");
   if(!booking.holdExpiresAt||booking.holdExpiresAt<=now)reasons.push("The original reservation hold has expired.");
   if(!staff&&(!booking.contactVerifiedAt||!viewingHold&&!booking.emailVerifiedAt))reasons.push("The customer must complete the original contact verification.");
