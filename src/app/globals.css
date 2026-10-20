@@ -3188,3 +3188,19 @@ a.module-card:focus-visible {
 .reservation-price-review:focus-visible{outline:3px solid #147d72;outline-offset:3px}
 .reservation-price-review svg{flex-shrink:0}
 .reservation-actions{flex-wrap:wrap;row-gap:10px}
+
+/* Reservation actions share clear targets and retain distinct operational meanings. */
+.reservation-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;min-width:224px;white-space:normal}
+.reservation-actions .reservation-action{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px;min-width:0;padding:9px 10px;border:1px solid;border-radius:9px;font:inherit;font-size:13px;font-weight:700;line-height:1.25;text-decoration:none;white-space:nowrap;cursor:pointer;transition:background .15s,border-color .15s}
+.reservation-action svg{flex-shrink:0}
+.reservation-actions .reservation-action--move-in{background:#12675c;border-color:#12675c;color:#fff}
+.reservation-actions .reservation-action--move-in:hover{background:#0c5148;color:#fff}
+.reservation-actions .reservation-action--extend{background:#edf4ff;border-color:#b8cde9;color:#184f82}
+.reservation-actions .reservation-action--extend:hover{background:#dceaff}
+.reservation-actions .reservation-action--expire{background:#fff7dd;border-color:#dbc278;color:#775100}
+.reservation-actions .reservation-action--expire:hover{background:#ffedb0}
+.reservation-actions .reservation-action--cancel{background:#fff0ef;border-color:#efb6b1;color:#9b2525}
+.reservation-actions .reservation-action--cancel:hover{background:#ffdfdc}
+.reservation-action:focus-visible{outline:3px solid #147d72;outline-offset:3px}
+.reservation-action:disabled{opacity:.5;cursor:not-allowed}
+.reservation-price-review{width:100%;box-sizing:border-box}
