@@ -68,14 +68,16 @@ test("isolated governed price amendments preserve original quotes, consent, sour
       const before=await financial(f),proposal=await proposeReservationPrice(f.scope,propose(f));
       await assert.rejects(decideReservationPrice(f.scope,{id:proposal.id,facilityId:f.facility.id,revision:0,decision:"APPROVED",reference:"Synthetic self review blocked",confirmed:true}),/INDEPENDENT/);
       await approve(f,proposal.id);const consent=await fresh(f,proposal.id);
+      assert.deepEqual(await financial(f),before);
       await db.payment.update({where:{id:payment.id},data:{status:"PENDING"}});
       await assert.rejects(acceptCustomerReservationPrice(consent),/REVIEW_REQUIRED/);
       await db.payment.update({where:{id:payment.id},data:{status:"FAILED"}});
+      const beforeAcceptance=await financial(f);
       await acceptCustomerReservationPrice(consent);
-      assert.deepEqual(await financial(f),before);
+      assert.deepEqual(await financial(f),beforeAcceptance);
       assert.equal((await db.reservation.findUniqueOrThrow({where:{id:f.booking.id}})).quotedRate.toFixed(2),"900.25");
       await assert.rejects(settleVerifiedBookingPayment(payment.id,{reference:payment.providerRef!,amount:1000,accepted:true,requestTrace:"Synthetic late callback"}),/QUOTE_CHANGED/);
-      assert.deepEqual(await financial(f),before);
+      assert.deepEqual(await financial(f),beforeAcceptance);
     });
     await t.test("checkout starts on the current quote and a newly pending session blocks price proposals",async()=>{
       const f=await fixture();await db.reservation.update({where:{id:f.booking.id},data:{source:"PUBLIC_WEBSITE"}});
