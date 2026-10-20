@@ -10,7 +10,7 @@ import {emailProvider,escapeEmailHtml} from "./email";
 import {sendNotificationOnce} from "./notification-delivery";
 import {southAfricaDateKey} from "./south-africa-time";
 import {requireOperationalUnit} from "./floor-availability-service";
-import {confirmedFailedPricePayment,reservationPriceSendSchema,negotiatedMonthlyRate,reservationPricePreparationSchema,proposedReservationPrice,reservationPriceBlockers,requireIndependentPriceApproval,reservationPriceProposalSchema,reservationPriceDecisionSchema,reservationPriceAcceptanceSchema,type ReservationPriceProposal,type ReservationPriceDecision,type ReservationPriceAcceptance,reservationPriceNotice} from "./reservation-price-policy";
+import {confirmedFailedPricePayment,reservationPriceSendSchema,negotiatedMonthlyRate,reservationPricePreparationSchema,proposedReservationPrice,reservationPriceBlockers,reservationPriceProposalSchema,reservationPriceDecisionSchema,reservationPriceAcceptanceSchema,type ReservationPriceProposal,type ReservationPriceDecision,type ReservationPriceAcceptance,reservationPriceNotice} from "./reservation-price-policy";
 
 type Tx=Prisma.TransactionClient;
 const include={customer:{select:{id:true,organisationId:true,email:true,emailVerifiedAt:true}},publicLease:{include:{mandate:{select:{id:true}}}},packageSelection:true,_count:{select:{publicPaymentSessions:true}}} satisfies Prisma.ReservationInclude;
@@ -98,22 +98,28 @@ export async function proposeReservationPrice(scope:RequestScope,input:Reservati
     return {id,idempotent:false};
   });
 }
+export async function reservationPriceApprovalTarget(tx:Tx,scope:RequestScope,id:string,facilityId:string,revision:number){
+  const target=await tx.reservationPriceAmendment.findFirst({where:{id,organisationId:scope.organisationId,facilityId}});if(!target)throw Error("NOT_FOUND");
+  const booking=await scopedBooking(tx,scope,target.reservationId),item=await tx.reservationPriceAmendment.findUniqueOrThrow({where:{id}});
+  if(item.revision!==revision||item.status!=="PROPOSED"||item.expiresAt<=new Date())throw Error("PRICE_SOURCE_CHANGED");
+  originalIntact(item);assertSource(await source(tx,booking),item.sourceFingerprint);return {booking,item};
+}
 export async function decideReservationPrice(scope:RequestScope,input:ReservationPriceDecision){
   const data=reservationPriceDecisionSchema.parse(input);
-  return db.$transaction(async tx=>{
+  return db.$transaction(tx=>decideReservationPriceInTransaction(tx,scope,data));
+}
+export async function decideReservationPriceInTransaction(tx:Tx,scope:RequestScope,data:ReservationPriceDecision,delegation?:{requestedById:string;challengeId:string}){
     const target=await tx.reservationPriceAmendment.findFirst({where:{id:data.id,organisationId:scope.organisationId,facilityId:data.facilityId}});if(!target)throw Error("NOT_FOUND");
     const booking=await scopedBooking(tx,scope,target.reservationId);
     const item=await tx.reservationPriceAmendment.findUniqueOrThrow({where:{id:target.id}});
     if(item.revision!==data.revision||!["PROPOSED","APPROVED"].includes(item.status))throw Error("CONFLICT");
-    if(data.decision!=="WITHDRAWN")requireIndependentPriceApproval(item.proposedById,scope.userId);
     if(data.decision==="APPROVED"){
       originalIntact(item);
       if(item.status!=="PROPOSED"||item.expiresAt<=new Date())throw Error("PRICE_EXPIRED");
       assertSource(await source(tx,booking),item.sourceFingerprint);
     }
     const changed=await tx.reservationPriceAmendment.updateMany({where:{id:item.id,revision:data.revision,status:item.status},data:{status:data.decision,revision:{increment:1},reviewedById:scope.userId,reviewedAt:new Date(),reviewReference:data.reference}});if(changed.count!==1)throw Error("CONFLICT");
-    await audit(tx,scope.organisationId,item.facilityId,scope.userId,item.id,data.decision.toLowerCase(),{reservationId:item.reservationId,revision:data.revision+1,quoteFingerprint:item.quoteFingerprint,reference:data.reference,financialPosting:false});return {id:item.id};
-  });
+    await audit(tx,scope.organisationId,item.facilityId,scope.userId,item.id,data.decision.toLowerCase(),{reservationId:item.reservationId,revision:data.revision+1,quoteFingerprint:item.quoteFingerprint,reference:data.reference,approvalMethod:delegation?"MANAGER_WHATSAPP_OTP":"SIGNED_IN",proposedById:item.proposedById,selfApproved:item.proposedById===scope.userId,...delegation,financialPosting:false});return {id:item.id};
 }
 
 export async function sendReservationPriceReview(scope:RequestScope,input:unknown){
@@ -130,7 +136,7 @@ export async function sendReservationPriceReview(scope:RequestScope,input:unknow
     if(process.env.NODE_ENV==="production"&&link.protocol!=="https:")throw Error("PRICE_INVALID");
     link.searchParams.set("reference",booking.publicReference!);link.searchParams.set("proposal",item.id);
     const proposed=read(item.proposedEncrypted);
-    const text=`Your STOR24 booking ${booking.publicReference} has a proposed new monthly rent of R${proposed.monthlyRate}, independently approved for your review.\n\nReview the price: ${link}\n\nVerify your booking email, review the full initial charge and accept only if you agree. You can then review and sign the updated agreement separately. No payment is taken by accepting the quote. This link does not grant access by itself.`;
+    const text=`Your STOR24 booking ${booking.publicReference} has a proposed new monthly rent of R${proposed.monthlyRate}, approved for your review.\n\nReview the price: ${link}\n\nVerify your booking email, review the full initial charge and accept only if you agree. You can then review and sign the updated agreement separately. No payment is taken by accepting the quote. This link does not grant access by itself.`;
     return {booking,payload:{to:booking.customer.email!,subject:"STOR24 — review your updated rental quote",text,html:`<p>${escapeEmailHtml(text).replaceAll("\n","<br>")}</p>`}};
   });
   const {booking,payload}=message;
@@ -210,11 +216,13 @@ export async function reservationPriceWorkspace(scope:RequestScope,reference:str
   const booking=await tx.reservation.findFirst({where:{OR:[{id:reference},{publicReference:reference}],facility:facilityWhere(scope),customer:{organisationId:scope.organisationId}},include});
   if(!booking)throw Error("NOT_FOUND");const proof=await source(tx,booking);
   const records=await tx.reservationPriceAmendment.findMany({where:{organisationId:scope.organisationId,facilityId:booking.facilityId,reservationId:booking.id},take:51,orderBy:[{createdAt:"desc"},{id:"desc"}]});
+  const staff=await tx.user.findMany({where:{organisationId:scope.organisationId,id:{in:[...new Set(records.flatMap(item=>[item.proposedById,...(item.reviewedById?[item.reviewedById]:[])]))]}},select:{id:true,name:true}});
+  const names=new Map(staff.map(user=>[user.id,user.name]));
   const amendments=records.slice(0,50).map(item=>{
     let original:ReturnType<typeof read>|null=null,proposed:ReturnType<typeof read>|null=null,issue:string|null=null;
     try{originalIntact(item);original=read(item.originalEncrypted);proposed=read(item.proposedEncrypted);}catch{issue="Retained quote evidence needs review.";}
     if(["PROPOSED","APPROVED"].includes(item.status)&&(proof.fingerprint!==item.sourceFingerprint||proof.blockers.length))issue="The original booking changed or needs review.";
-    return {id:item.id,status:item.status,revision:item.revision,proposedById:item.proposedById,reviewedById:item.reviewedById,reviewReference:item.reviewReference,expiresAt:item.expiresAt,createdAt:item.createdAt,acceptedAt:item.acceptedAt,quoteFingerprint:item.quoteFingerprint,previousMonthlyRate:original?.quotedRate??null,monthlyRate:proposed?.monthlyRate??null,reason:proposed?.reason??null,adjustment:proposed?.adjustment??null,issue};
+    return {id:item.id,status:item.status,revision:item.revision,proposedById:item.proposedById,reviewedById:item.reviewedById,proposedByName:names.get(item.proposedById)??"Former staff member",reviewedByName:item.reviewedById?names.get(item.reviewedById)??"Former staff member":null,reviewedAt:item.reviewedAt,reviewReference:item.reviewReference,expiresAt:item.expiresAt,createdAt:item.createdAt,acceptedAt:item.acceptedAt,quoteFingerprint:item.quoteFingerprint,previousMonthlyRate:original?.quotedRate??null,monthlyRate:proposed?.monthlyRate??null,reason:proposed?.reason??null,adjustment:proposed?.adjustment??null,issue};
   });
   const now=new Date();
   const campaigns=await tx.marketingCampaign.findMany({where:{organisationId:scope.organisationId,facilityId:booking.facilityId,status:"ACTIVE",startsAt:{lte:now},OR:[{endsAt:null},{endsAt:{gte:now}}]},select:{id:true,name:true},orderBy:[{name:"asc"},{id:"asc"}],take:100});

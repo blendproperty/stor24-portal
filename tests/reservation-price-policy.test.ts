@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {randomUUID} from "node:crypto";
 import {newPublicInitialRent} from "../src/lib/public-initial-rent";
-import {confirmedFailedPricePayment,negotiatedMonthlyRate,reservationPriceBlockers,reservationPriceProposalSchema,reservationPriceAcceptanceSchema,proposedReservationPrice,requireIndependentPriceApproval,assertReservationQuotePatch} from "../src/lib/reservation-price-policy";
+import {confirmedFailedPricePayment,negotiatedMonthlyRate,reservationPriceBlockers,reservationPriceProposalSchema,reservationPriceAcceptanceSchema,proposedReservationPrice,assertReservationQuotePatch} from "../src/lib/reservation-price-policy";
 const now=new Date("2026-10-15T08:00:00Z"),moveIn=new Date("2026-10-20T10:00:00Z");
 const original=()=>({source:"PUBLIC_VIEWING",status:"ACTIVE",journey:"RENTAL",convertedTenancyId:null,publicReference:"PUBLIC-ORIGINAL",quotedRate:1000,initialRentSnapshot:newPublicInitialRent(1000,moveIn),intendedMoveIn:moveIn,holdExpiresAt:new Date("2026-10-16"),contactVerifiedAt:now,emailVerifiedAt:now,signed:false,mandate:false,paymentSessions:0,financialActivity:false});
 test("only a verified, held, unsigned and financially untouched original quote is eligible",()=>{
@@ -17,8 +17,7 @@ test("price proposals use whole cents and the existing proration policy",()=>{
   assert.deepEqual(proposedReservationPrice("123.45",moveIn),newPublicInitialRent(123.45,moveIn));
   assert.equal(original().quotedRate,1000);
 });
-test("independent approval and exact customer acceptance cannot be replaced with implicit consent",()=>{
-  assert.throws(()=>requireIndependentPriceApproval("staff","staff"),/INDEPENDENT/);assert.doesNotThrow(()=>requireIndependentPriceApproval("staff","reviewer"));
+test("exact customer acceptance cannot be replaced with implicit consent",()=>{
   const acceptance={reference:"booking",id:"proposal",identityAccessToken:"a".repeat(43),quoteFingerprint:"b".repeat(64),accepted:true,understandsNewAgreementRequired:true};
   assert.equal(reservationPriceAcceptanceSchema.safeParse(acceptance).success,true);
   for(const changed of [{accepted:false},{understandsNewAgreementRequired:false},{quoteFingerprint:""},{executePayment:true},{staffAcceptedForCustomer:true}])assert.equal(reservationPriceAcceptanceSchema.safeParse({...acceptance,...changed}).success,false);

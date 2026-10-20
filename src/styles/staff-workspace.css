@@ -735,3 +735,13 @@
 .billing-plan-history li { margin-block:0.8rem; }
 
 .collection-contact{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:16px;margin:20px 0}.collection-contact div{min-width:0}.collection-contact dt{font-weight:600}.collection-contact dd{margin:4px 0;overflow-wrap:anywhere}.collection-case-tools{min-width:0}.collection-case-tools .collection-notices{margin-block:20px}.collection-case-tools :is(h1,h2,h3,h4){overflow-wrap:anywhere}.collection-case-tools .adjustment-actions{flex-wrap:wrap}.collection-case-tools .button{white-space:normal;max-width:100%}.collection-case-tools th,.collection-case-tools td{overflow-wrap:anywhere}
+
+/* Staff approval forms keep confirmation text separate from actions at every width. */
+.price-manager-form { display: grid; gap: 1rem; min-width: 0; padding: 1.25rem; margin-top: 1rem; border: 1px solid var(--border, #d5dfe3); border-radius: 12px; }
+.price-manager-form > p { margin: 0; overflow-wrap: anywhere; }
+.price-manager-form > label:not(.check-label) { display: grid; gap: .5rem; min-width: 0; }
+.price-manager-form input:not([type="checkbox"]), .price-manager-form select { width: 100%; min-width: 0; min-height: 46px; height: auto; box-sizing: border-box; padding: 11px 12px; border: 1px solid #cbd5db; border-radius: 8px; font: inherit; background: #fff; color: #152b31; }
+.permission-groups .price-manager-form { grid-column: 1 / -1; gap: 1rem; padding: 18px; }
+.price-manager-form > .button { justify-self: start; max-width: 100%; white-space: normal; }
+.price-manager-form .check-label { align-items: start; gap: .65rem; }
+@media (max-width: 540px) { .price-manager-form { padding: 1rem; } .price-manager-form > .button { width: 100%; justify-self: stretch; } }

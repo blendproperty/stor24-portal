@@ -1,12 +1,13 @@
 import {createHash} from "node:crypto";
 import {z} from "zod";
 import {decryptIntegrationSecret} from "./integrations/integration-secret-vault";
+import {reservationPriceAdjustmentSchema,reservationPriceReasonSchema,negotiatedMonthlyRate} from "./reservation-price-policy";
 import {publicInitialRent} from "./public-initial-rent";
 
 const canonical=(value:unknown):string=>JSON.stringify(value,(_,item)=>item&&typeof item==="object"&&!Array.isArray(item)?Object.fromEntries(Object.entries(item).sort(([a],[b])=>a<b?-1:a>b?1:0)):item);
 const hash=(value:unknown)=>createHash("sha256").update(canonical(value)).digest("hex");
 const originalSchema=z.object({version:z.literal(1),reservationId:z.string(),organisationId:z.string(),facilityId:z.string(),customerId:z.string(),quotedRate:z.string(),initialRentSnapshot:z.unknown(),intendedMoveIn:z.iso.datetime()}).passthrough();
-const proposedSchema=z.object({version:z.literal(1),monthlyRate:z.string(),initialRentSnapshot:z.unknown(),reason:z.string().min(10)}).strict();
+const proposedSchema=z.object({version:z.literal(1),monthlyRate:z.string(),initialRentSnapshot:z.unknown(),reason:z.string().min(10),adjustment:reservationPriceAdjustmentSchema.optional(),reasonSelection:z.union([reservationPriceReasonSchema,reservationPriceReasonSchema.options[0].extend({campaignName:z.string().min(1).max(300)})]).optional()}).strict();
 export type PriceHistoryBooking={id:string;facilityId:string;customerId:string;quotedRate:unknown;initialRentSnapshot:unknown;intendedMoveIn:Date|null};
 export type PriceHistoryItem={id:string;organisationId:string;facilityId:string;reservationId:string;sourceFingerprint:string;quoteFingerprint:string;originalEncrypted:string;proposedEncrypted:string;proposedById:string;reviewedById:string|null;reviewedAt:Date|null;reviewReference:string|null;acceptedCustomerId:string|null;acceptedAt:Date|null;acceptanceFingerprint:string|null;expiresAt:Date;createdAt:Date};
 export type PriceHistoryAudit={entityId:string;facilityId:string|null;actorId:string|null;action:string;after:unknown};
@@ -22,13 +23,13 @@ export function bookingPriceEvidence(organisationId:string,booking:PriceHistoryB
     const ordered=[...items].sort((a,b)=>a.createdAt.getTime()-b.createdAt.getTime()||(a.id<b.id?-1:a.id>b.id?1:0));
     let previous:z.infer<typeof proposedSchema>|null=null,previousAccepted:Date|null=null;
     for(const item of ordered){
-      if(item.organisationId!==organisationId||item.facilityId!==booking.facilityId||item.reservationId!==booking.id||item.acceptedCustomerId!==booking.customerId||!item.reviewedById||item.reviewedById===item.proposedById||!item.reviewedAt||!item.acceptedAt||!item.reviewReference||item.acceptanceFingerprint!==item.quoteFingerprint||item.acceptedAt<=item.reviewedAt||item.acceptedAt>item.expiresAt||previousAccepted&&item.reviewedAt<=previousAccepted)throw Error();
+      if(item.organisationId!==organisationId||item.facilityId!==booking.facilityId||item.reservationId!==booking.id||item.acceptedCustomerId!==booking.customerId||!item.reviewedById||!item.reviewedAt||!item.acceptedAt||!item.reviewReference||item.acceptanceFingerprint!==item.quoteFingerprint||item.acceptedAt<=item.reviewedAt||item.acceptedAt>item.expiresAt||previousAccepted&&item.reviewedAt<=previousAccepted)throw Error();
       const raw=JSON.parse(decryptIntegrationSecret(item.originalEncrypted));
       if(hash(raw)!==item.sourceFingerprint)throw Error();
       const original=originalSchema.parse(raw),proposed=proposedSchema.parse(JSON.parse(decryptIntegrationSecret(item.proposedEncrypted)));
       if(original.intendedMoveIn!==booking.intendedMoveIn?.toISOString()||original.organisationId!==organisationId||original.reservationId!==booking.id||original.facilityId!==booking.facilityId||original.customerId!==booking.customerId)throw Error();
       if(hash({reservationId:booking.id,sourceFingerprint:item.sourceFingerprint,proposed,expiresAt:item.expiresAt.toISOString()})!==item.quoteFingerprint)throw Error();
-      if(Number(proposed.monthlyRate)>10000000)throw Error();
+      if(Number(proposed.monthlyRate)>10000000||proposed.adjustment&&negotiatedMonthlyRate(original.quotedRate,proposed.adjustment)!==proposed.monthlyRate)throw Error();
       const date=new Date(original.intendedMoveIn);
       for(const quote of [{quotedRate:original.quotedRate,initialRentSnapshot:original.initialRentSnapshot},{quotedRate:proposed.monthlyRate,initialRentSnapshot:proposed.initialRentSnapshot}]){
         const rate=Number(quote.quotedRate);if(!Number.isFinite(rate)||rate<=0||!Number.isSafeInteger(Math.round(rate*100))||Math.abs(rate*100-Math.round(rate*100))>0.000001||quote.initialRentSnapshot==null)throw Error();
