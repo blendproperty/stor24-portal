@@ -1,4 +1,5 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { getPublicReservationLease } from "@/lib/public-lease-workflow";
 import { getLeaseForSigning } from "@/lib/leasing-service";
 import { buildLeaseClauses } from "@/lib/lease-agreement-content";
 import { LeaseSigningForm } from "@/components/lease-signing-form";
@@ -13,7 +14,10 @@ export default async function SignLeasePage({
 }) {
   const { token } = await params;
   const lease = await getLeaseForSigning(token);
-  if (!lease) notFound();
+  if (!lease) {
+    if (/^[A-Za-z0-9_-]{43}$/.test(token) && await getPublicReservationLease(token)) redirect(`https://stor24.co.za/book/lease/${encodeURIComponent(token)}`);
+    notFound();
+  }
 
   const clauses = buildLeaseClauses({
     facilityName: lease.facilityName,

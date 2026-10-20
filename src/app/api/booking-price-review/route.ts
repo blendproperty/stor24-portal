@@ -32,5 +32,5 @@ export async function POST(request:Request){try{
   await appliedCustomerReservationPrice(body.reference,body.identityAccessToken,body.id);
   const agreement=await preparePublicReservationLease(body.reference,body.paymentMethod);
   if(!agreement.ok)return Response.json({error:{message:"Your quote is saved. The agreement still needs identity or booking review; contact the store."}},{status:409,headers:priceHeaders});
-  return Response.json({data:{url:`/sign/${agreement.token}`,status:agreement.status}},{headers:priceHeaders});
+  return Response.json({data:{url:`https://stor24.co.za/book/lease/${encodeURIComponent(agreement.token)}`,status:agreement.status}},{headers:priceHeaders});
 }catch(error){return reservationPriceError(error);}}

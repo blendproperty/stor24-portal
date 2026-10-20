@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { PDFDocument } from "pdf-lib";
 import { readFile } from "node:fs/promises";
 import { STORAGE_TERMS, STORAGE_TERMS_INTRODUCTION, STORAGE_TERMS_VERSION, PREVIOUS_STORAGE_TERMS_VERSION, buildReviewLeaseClauses, renderReviewLeaseDocument, renderStorageTermsEdition, requiresFullTermsAcceptance } from "../src/lib/storage-terms";
+import {renderReviewLeaseDocument as renderSeptember22Edition} from "../src/lib/storage-terms-2026-09-22";
 import { renderReviewLeaseDocument as renderPreviousEdition } from "../src/lib/storage-terms-2026-09-10";
 import { renderLeaseDocument, LEASE_VERSION } from "../src/lib/lease-agreement-content";
 import { renderSignedLeasePdf } from "../src/lib/public-lease-pdf";
@@ -122,4 +123,14 @@ test("historical signed reservation can resume but changed commercial terms cann
     reservation.quotedRate = 1600;
     assert.deepEqual(await preparePublicReservationLease("SAMPLE", "DEBIT_ORDER"), { ok: false, code: "SIGNED_LEASE_CHANGED" });
   } finally { Reflect.set(db, "$transaction", original); }
+});
+
+
+test("new agreements use the South African start date while September editions retain their exact renderer",()=>{
+ const boundary={...context,startDate:new Date("2026-10-31T22:00:00.000Z")};
+ assert.match(buildReviewLeaseClauses(boundary).find(c=>c.key==="term_and_rent")!.body,/Storage starts on 2026-11-01/);
+ assert.match(renderReviewLeaseDocument(boundary),/Storage starts on 2026-11-01/);
+ assert.equal(renderStorageTermsEdition(boundary,"storage-terms-2026-09-22"),renderSeptember22Edition(boundary));
+ assert.match(renderSeptember22Edition(boundary),/Storage starts on 2026-10-31/);
+ assert.equal(requiresFullTermsAcceptance("storage-terms-2026-09-22"),true);
 });
