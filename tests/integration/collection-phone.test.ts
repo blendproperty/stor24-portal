@@ -5,6 +5,7 @@ import { db } from "../../src/lib/db";
 import { actPhoneNotice, previewPhoneNotice, COLLECTION_PHONE_DOMAIN } from "../../src/lib/collection-phone-service";
 import { smsPayload } from "../../src/lib/collection-phone-policy";
 import { historyEvidence } from "../../src/lib/customer-history-message-policy";
+import { inspectReportExport } from "../../src/lib/dlp-policy";
 
 test("isolated phone notices: real claims, authority, consent and immutable reviewed bodies", async t => {
   assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci"); assert.equal(new URL(process.env.DATABASE_URL!).hostname, "localhost");
@@ -16,7 +17,7 @@ test("isolated phone notices: real claims, authority, consent and immutable revi
   process.env.ARREARS_SMS_ENABLED = "true"; process.env.ARREARS_WHATSAPP_ENABLED = "true"; process.env.WHATSAPP_AUTOMATION_ENABLED = "true";
   process.env.ARREARS_WHATSAPP_CONTENT_SID = "HX" + "b".repeat(32);
   process.env.ARREARS_WHATSAPP_VARIABLE_MAP = JSON.stringify({ "1": "account", "2": "store", "3": "amount", "4": "date", "5": "portal" });
-  let sends = 0, responseMode = "accepted", templateBody = "", beforeResponse: (() => Promise<void>) | null = null;
+  let sends = 0, acceptedResponses = 0, responseMode = "accepted", templateBody = "", beforeResponse: (() => Promise<void>) | null = null;
   const nativeFetch = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
     const url = String(input);
@@ -24,6 +25,7 @@ test("isolated phone notices: real claims, authority, consent and immutable revi
     if (!url.startsWith("https://api.twilio.com/2010-04-01/Accounts/") || !url.endsWith("/Messages.json") || init?.method !== "POST") throw Error("Unexpected provider request");
     sends++; if (beforeResponse) await beforeResponse();
     if (responseMode === "throw") throw Error("Uncertain provider outcome");
+    acceptedResponses++;
     return Response.json({ sid: "SM" + "c".repeat(32) });
   };
   async function fixture() {
@@ -33,7 +35,10 @@ test("isolated phone notices: real claims, authority, consent and immutable revi
     const role = await db.role.create({ data: { organisationId: org.id, name: "Phone reviewer", permissions: ["collections.view", "collections.manage", "billing.documents.send", "communications.view", "customer_history.export"] } });
     await db.roleAssignment.createMany({ data: users.map(u => ({ roleId: role.id, userId: u.id, facilityId: facility.id })) });
     const customer = await db.customer.create({ data: { organisationId: org.id, firstName: "Phone CI", phone: "+27821234567", phoneVerifiedAt: new Date(), communicationConsent: { sms: true, whatsapp: true } } });
-    const account = await db.account.create({ data: { customerId: customer.id, accountNumber: "PHONE-CI-" + key, balance: 100 } });
+    // Keep the unique identity, but deterministically encode its hexadecimal
+    // digits as letters: random numeric UUID runs must not trip the real DLP.
+    const accountNumber = "PHONE-CI-" + key.replace(/[0-9a-f]/g, digit => "abcdefghijklmnop"[parseInt(digit, 16)]);
+    const account = await db.account.create({ data: { customerId: customer.id, accountNumber, balance: 100 } });
     await db.tenancy.create({ data: { customerId: customer.id, accountId: account.id, facilityId: facility.id, status: "ACTIVE", paymentMethod: "EFT", startDate: new Date("2026-01-01") } });
     await db.ledgerEntry.create({ data: { accountId: account.id, type: "CHARGE", amount: 100, description: "CI original rent", effectiveAt: new Date("2026-01-01") } });
     await db.collectionCase.create({ data: { accountId: account.id, terms: { dueDays: 0, allocation: "OLDEST_DUE_FIRST", approvalReference: "CI original approved terms", overrides: [] } } });
@@ -115,12 +120,34 @@ test("isolated phone notices: real claims, authority, consent and immutable revi
       try { await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_phone_claim_failure CHECK (false) NOT VALID'); installed = true; await assert.rejects(send(f, n)); assert.equal(sends, count); assert.equal(await db.communicationLog.count({ where: { organisationId: f.org.id } }), 0); assert.equal((await db.configurationProfile.findUniqueOrThrow({ where: { id: n.id } })).status, "APPROVED"); }
       finally { if (installed) await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_phone_claim_failure'); }
     });
-    await t.test("accepted persistence failure retains SENDING and blocks all replay", async () => {
-      const f = await fixture(), n = (await approve(f)).notice!, count = sends; let installed = false;
-      beforeResponse = async () => { await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_phone_final_failure CHECK (false) NOT VALID'); installed = true; };
-      try { assert.equal((await send(f, n)).notice!.status, "SENDING"); beforeResponse = null; await send(f, n); assert.equal(sends - count, 1); assert.equal((await db.communicationLog.findUniqueOrThrow({ where: { idempotencyKey: n.id } })).status, "PENDING"); }
-      finally { beforeResponse = null; if (installed) await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_phone_final_failure'); }
+    await t.test("a card-shaped UUID reference is held by real DLP before the provider callback", async () => {
+      const f = await fixture(), count = sends, accepted = acceptedResponses; let callbackInvoked = false;
+      await db.account.update({ where: { id: f.account.id }, data: { accountNumber: `${f.account.accountNumber}-40000000-0000-4004-8000-000000000000` } });
+      const n = (await approve(f)).notice!;
+      assert.ok(inspectReportExport("rent-roll", [{ customer: n.text }]).reasons.includes("PAYMENT_CARD_PATTERN"));
+      beforeResponse = async () => { callbackInvoked = true; };
+      try {
+        assert.equal((await send(f, n)).notice!.status, "REVIEW_REQUIRED");
+        assert.equal(callbackInvoked, false); assert.equal(sends, count); assert.equal(acceptedResponses, accepted);
+        const audit = await db.auditEvent.findFirstOrThrow({ where: { organisationId: f.org.id, entityId: n.id, action: "dlp.transfer.blocked" } });
+        assert.ok((audit.after as { reasons: string[] }).reasons.includes("PAYMENT_CARD_PATTERN"));
+        await send(f, n); assert.equal(sends, count);
+      } finally { beforeResponse = null; }
     });
+    for (let repetition = 1; repetition <= 3; repetition++) {
+      await t.test(`accepted persistence failure retains SENDING and blocks all replay (${repetition}/3)`, async () => {
+        const f = await fixture(), n = (await approve(f)).notice!, count = sends, accepted = acceptedResponses; let installed = false, callbacks = 0;
+        assert.equal(inspectReportExport("rent-roll", [{ customer: n.text }]).allowed, true, "The intended persistence-failure fixture must pass content DLP");
+        beforeResponse = async () => { callbacks++; await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_phone_final_failure CHECK (false) NOT VALID'); installed = true; };
+        try {
+          const result = await send(f, n);
+          assert.equal(callbacks, 1, "The provider callback must run before testing final persistence");
+          assert.equal(installed, true, "The final-audit failure constraint must be installed");
+          assert.equal(acceptedResponses - accepted, 1, "The provider mock must return one accepted response");
+          assert.equal(result.notice!.status, "SENDING"); beforeResponse = null; await send(f, n); assert.equal(sends - count, 1); assert.equal((await db.communicationLog.findUniqueOrThrow({ where: { idempotencyKey: n.id } })).status, "PENDING");
+        } finally { beforeResponse = null; if (installed) await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_phone_final_failure'); }
+      });
+    }
     await t.test("WhatsApp freezes the actual approved text and refuses changed templates or existing disabled provider gate", async () => {
       const f = await fixture(), p = await previewPhoneNotice(f.a, f.account.id, "SMS"), s = { ...p.source, channel: "SMS" as const };
       templateBody = smsPayload(s).text.replace(s.accountNumber, "{{1}}").replace(s.facility, "{{2}}").replace("100.00", "{{3}}").replace(s.asOf, "{{4}}").replace("https://portal.example.invalid/my", "{{5}}");
