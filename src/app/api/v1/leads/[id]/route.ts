@@ -28,7 +28,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     const scope = await requirePermissionScope("leads.view"); const { id } = await context.params;
     if (!await db.lead.findFirst({ where: { id, facility: facilityWhere(scope) }, select: { id: true } })) throw new Error("NOT_FOUND");
     const events = await db.auditEvent.findMany({ where: { organisationId: scope.organisationId, entityType: "Lead", entityId: id,
-      action: { in: ["lead.created", "public_lead.created", "lead.updated", "lead.stage_changed"] } },
+      action: { in: ["lead.created", "public_lead.created", "lead.updated", "lead.stage_changed", "lead.test_cancelled"] } },
       include: { actor: { select: { name: true } } }, orderBy: { occurredAt: "desc" }, take: 50 });
     return Response.json({ data: events.map(e => ({ id: e.id, at: e.occurredAt, actor: e.actor?.name ?? "Website / system", action: e.action,
       beforeStage: (e.before as { stage?: string } | null)?.stage ?? null, afterStage: (e.after as { stage?: string } | null)?.stage ?? null })) }, { headers: { "Cache-Control": "private, no-store" } });
