@@ -31,6 +31,10 @@ export async function POST(request:Request){try{
   if(body.action==="accept"){const {action,...acceptance}=body;void action;return Response.json({data:await acceptCustomerReservationPrice(acceptance)},{headers:priceHeaders});}
   await appliedCustomerReservationPrice(body.reference,body.identityAccessToken,body.id);
   const agreement=await preparePublicReservationLease(body.reference,body.paymentMethod);
-  if(!agreement.ok)return Response.json({error:{message:"Your quote is saved. The agreement still needs identity or booking review; contact the store."}},{status:409,headers:priceHeaders});
+  if(!agreement.ok){
+    if(agreement.code==="IDENTITY_REQUIRED")return Response.json({data:{url:`https://stor24.co.za/book/identity?reference=${encodeURIComponent(body.reference)}`,status:agreement.code}},{headers:priceHeaders});
+    const message=agreement.code==="MOVE_IN_DATE_REQUIRED"?"Your quote is saved. Contact the store to set your move-in date before opening the agreement.":agreement.code==="SIGNED_LEASE_CHANGED"?"Your quote is saved. Contact the store to review your existing signed agreement before continuing.":"Your quote is saved. This booking is unavailable for agreement review; contact the store.";
+    return Response.json({error:{message}},{status:409,headers:priceHeaders});
+  }
   return Response.json({data:{url:`https://stor24.co.za/book/lease/${encodeURIComponent(agreement.token)}`,status:agreement.status}},{headers:priceHeaders});
 }catch(error){return reservationPriceError(error);}}

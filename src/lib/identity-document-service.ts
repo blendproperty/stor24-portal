@@ -32,8 +32,8 @@ export async function identityStatus(reference: string, token: string) {
   let available = false;
   if (policy) { try { await collectionReady(db); available = true; } catch { /* Fail closed for new uploads, retain readable status. */ } }
   const valid = document && policy && document.policyHash === policy.hash && (document.status === "ACCEPTED" || (document.status === "AWAITING_REVIEW" && copyWithinRetention(document)));
-  const lease = await db.publicReservationLease.findUnique({ where: { reservationId: booking.id }, select: { signingToken: true } });
-  return { agreementToken: lease?.signingToken ?? null, required: Boolean(policy), available, canContinue: !policy || Boolean(valid),
+  const lease = await db.publicReservationLease.findUnique({ where: { reservationId: booking.id }, select: { signingToken: true, status: true, expiresAt: true } });
+  return { agreementToken: lease && (lease.status === "SIGNED" || (lease.status === "READY" && lease.expiresAt > new Date())) ? lease.signingToken : null, required: Boolean(policy), available, canContinue: !policy || Boolean(valid),
     policy: policy ? { hash: policy.hash, notice: policy.notice, acknowledgementLabel: policy.acknowledgementLabel, acceptedTypes: policy.acceptedTypes, alternativeContact: policy.alternativeContact } : null,
     document: document ? { ...document, status: document.status === "AWAITING_REVIEW" && !copyWithinRetention(document) ? "EXPIRED" : document.status } : null };
 }
