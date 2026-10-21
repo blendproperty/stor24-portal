@@ -19,8 +19,9 @@ test("bulk cancellation validates the selection and intersects view/manage store
   assert.equal((await loaded.exports.POST(request(selection, "https://other.invalid"))).status, 403);
   for (const permission of ["leads.view", "leads.manage"]) { fixture.denied = permission; assert.equal((await loaded.exports.POST(request(selection))).status, 403); }
   fixture.denied = "";
-  for (const body of [{ ...selection, confirmed: false }, { ...selection, leads: [] }, { ...selection, leads: [selection.leads[0], selection.leads[0]] }, { ...selection, leads: Array.from({ length: 101 }, (_, i) => ({ ...selection.leads[0], id: String(i) })) }, { ...selection, leads: [{ id: "one" }] }, { ...selection, deleteCustomers: true }]) assert.equal((await loaded.exports.POST(request(body))).status, 422);
+  for (const body of [{ ...selection, confirmed: false }, { ...selection, leads: [] }, { ...selection, leads: [selection.leads[0], selection.leads[0]] }, { ...selection, leads: Array.from({ length: 101 }, (_, i) => ({ ...selection.leads[0], id: String(i) })) }, { ...selection, leads: [{ id: "one" }] }, { ...selection, operation: "purge" }, { ...selection, deleteCustomers: true }]) assert.equal((await loaded.exports.POST(request(body))).status, 422);
   assert.equal(fixture.calls.length, 0);
+  assert.equal((await loaded.exports.POST(request({...selection, operation:"delete"}))).status,404);
   assert.equal((await loaded.exports.POST(new Request("https://fixture.invalid/api/v1/leads/cancel-tests", { method: "POST", headers: { origin: "https://fixture.invalid" }, body: "{" }))).status, 422);
   for (const [visible, managed, expected] of [
     [{ ...scope, facilityIds: ["store", "view-only"] }, { ...scope, facilityIds: ["store", "manage-only"] }, ["store"]],

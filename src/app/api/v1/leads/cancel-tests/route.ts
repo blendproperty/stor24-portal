@@ -18,8 +18,9 @@ export async function POST(request: Request) {
     };
     return Response.json({ data: await cancelTestLeads(scope, input.data) }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
-    if (error instanceof Error && error.message === "CONFLICT") return Response.json({ error: { message: "Nothing was cancelled. An enquiry changed or was already closed. Reload and review your selection." } }, { status: 409 });
-    if (error instanceof Error && error.message === "LEAD_BOOKING_STAGE") return Response.json({ error: { message: "Nothing was cancelled. A selected enquiry has a booking or tenancy. Manage it through Reservations and Move-in first." } }, { status: 409 });
+    if (error instanceof Error && error.message === "CONFLICT") return Response.json({ error: { message: "Nothing was changed. An enquiry changed or is not eligible for this action. Reload and review your selection." } }, { status: 409 });
+    if (error instanceof Error && error.message === "LEAD_BOOKING_STAGE") return Response.json({ error: { message: "Nothing was changed. A selected enquiry has a booking or tenancy. Manage it through Reservations and Move-in first." } }, { status: 409 });
+    if (error instanceof Error && error.message === "TRAINING_LEAD") return Response.json({ error: { message: "Nothing was changed. The shared training balance enquiry must be kept for staff training access." } }, { status: 409 });
     return apiError(error);
   }
 }
