@@ -1,2 +1,8 @@
 # Keep the printable handbook byte-exact across Windows and Linux checkouts.
 private/staff-training/*.pdf binary
+
+# Preserve reviewed staff-guide media bytes.
+docs/training/**/*.pdf binary
+docs/training/**/*.png binary
+docs/training/**/*.jpg binary
+docs/training/**/*.zip binary
