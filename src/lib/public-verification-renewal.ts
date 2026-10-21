@@ -29,6 +29,7 @@ export async function preparePublicVerificationCode(input:{id:string;hash:string
     const last=await tx.auditEvent.findFirst({where:{entityType:"Reservation",entityId:r.id},orderBy:{occurredAt:"desc"},select:{action:true}});
     if(r.status!=="CANCELLED"||last?.action!=="public_reservation.hold_expired")return unavailable();
    }
+   if(await tx.account.count({where:{accountNumber:`ST24-T-${r.id}`}}))return unavailable();
    if(r.unit.status!=="AVAILABLE"&&!(r.status==="ACTIVE"&&r.unit.status==="RESERVED")||!r.unit.monthlyRate.equals(r.quotedRate))return unavailable();
    if(await tx.reservation.count({where:{unitId:r.unitId,status:"ACTIVE",id:{not:r.id}}})||await tx.occupancy.count({where:{unitId:r.unitId,status:{in:["PENDING","ACTIVE","NOTICE_GIVEN","TRANSFERRING"]}}})||await tx.maintenanceRequest.count({where:{unitId:r.unitId,status:{in:["OPEN","SCHEDULED","IN_PROGRESS","BLOCKED"]}}}))return unavailable();
    if(r.lead&&!["QUOTED","CONTACTED","RESERVED","VIEWING_BOOKED"].includes(r.lead.stage))return unavailable();
