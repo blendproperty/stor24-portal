@@ -18,10 +18,11 @@ import {
   type PublicReservationInput,
 } from "@/lib/public-booking-contract";
 import { notifyReservationConfirmed, notifyViewingBooked } from "@/lib/notifications";
-import { createHash, randomInt, timingSafeEqual } from "node:crypto";
+import { createHash, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { TwilioSmsProvider, TwilioWhatsAppProvider, normalizeTwilioRecipient } from "@/lib/integrations/twilio-provider";
 import { emailProvider, stor24EmailVerificationHtml } from "@/lib/email";
-import { privacyHash } from "@/lib/request-security";
+import {preparePublicVerificationCode} from "./public-verification-renewal";
+import { privacyHash, rateLimit } from "@/lib/request-security";
 import { bookingPreferenceRecord } from "@/lib/privacy-preferences";
 
 export class PublicBookingError extends Error {
@@ -429,14 +430,16 @@ export async function verifyPublicReservation(reference: string, code: string) {
   return { ok: true as const, ...reservationResult(updated), identityAccessToken: identityAccess.token };
 }
 
-export async function resendPublicReservationVerification(reference: string) {
+export async function resendPublicReservationVerification(reference: string, bookingKey?:string) {
   if (!publicReservationVerificationEnabled()) return { ok: false as const, code: "DISABLED" };
   const reservation = await db.reservation.findUnique({ where: { publicReference: reference }, include: { customer: true } });
-  if (!reservation || reservation.status !== "ACTIVE" || reservation.contactVerifiedAt || reservation.verificationAttempts >= 5) return { ok: false as const, code: "NOT_FOUND" };
+  if (!reservation || reservation.contactVerifiedAt) return { ok: false as const, code: "NOT_FOUND" };
   const code = randomInt(0, 1_000_000).toString().padStart(6, "0");
-  const verificationExpiresAt = new Date(Date.now() + verificationWindowMs);
-  await db.reservation.update({ where: { id: reservation.id }, data: { verificationCodeHash: verificationHash(reservation.id, code), verificationExpiresAt, holdExpiresAt: verificationExpiresAt, verificationAttempts: { increment: 1 } } });
-  const result = await deliverVerificationCode({ code, phone: reservation.customer.phone ?? "", organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, idempotencyKey: `${reservation.idempotencyKey ?? reservation.id}:VERIFY:${reservation.verificationAttempts + 1}` });
+  if(await rateLimit(`public-code-resend:${reservation.id}`,3,15*60_000))return {ok:false as const,code:"RATE_LIMITED"};
+  const prepared=await preparePublicVerificationCode({id:reservation.id,hash:verificationHash(reservation.id,code),channel:"MOBILE",bookingKey});
+  if(!prepared.ok)return prepared;
+  const verificationExpiresAt=prepared.verificationExpiresAt;
+  const result = await deliverVerificationCode({ code, phone: reservation.customer.phone ?? "", organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, idempotencyKey: `${reservation.idempotencyKey ?? reservation.id}:VERIFY:${randomUUID()}` });
   await db.auditEvent.create({ data: { organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, action: result.ok ? "public_reservation.verification_resent" : "public_reservation.verification_resend_failed", entityType: "Reservation", entityId: reservation.id, requestId: reservation.idempotencyKey, after: { channel: result.ok ? result.channel : null, expiresAt: verificationExpiresAt.toISOString() } } });
   return result.ok ? { ok: true as const, verificationChannel: result.channel, verificationExpiresAt: verificationExpiresAt.toISOString() } : { ok: false as const, code: "DELIVERY_FAILED" };
 }
@@ -445,16 +448,17 @@ async function approvedStaffPriceEmail(reservation:{id:string;source:string},pro
   return ["INTERNAL","PUBLIC_VIEWING"].includes(reservation.source)&&Boolean(proposalId)&&Boolean(await db.reservationPriceAmendment.findFirst({where:{id:proposalId,reservationId:reservation.id,status:"APPROVED",expiresAt:{gt:new Date()},reviewedAt:{not:null}},select:{id:true}}));
 }
 
-export async function startPublicEmailVerification(reference: string, refreshIdentity = false, staffPriceId?:string) {
+export async function startPublicEmailVerification(reference: string, refreshIdentity = false, staffPriceId?:string, bookingKey?:string) {
   if (!publicReservationVerificationEnabled()) return { ok: false as const, code: "DISABLED" };
   const reservation = await db.reservation.findUnique({ where: { publicReference: reference }, include: { customer: true, publicLease: { select: { status: true } } } });
-  if (!reservation || reservation.status !== "ACTIVE" || (!reservation.contactVerifiedAt&&!await approvedStaffPriceEmail(reservation,staffPriceId)) || (reservation.journey !== "RENTAL"&&!(reservation.journey==="VIEWING"&&await approvedStaffPriceEmail(reservation,staffPriceId))) || !reservation.customer.email) return { ok: false as const, code: "NOT_FOUND" };
-  if (reservation.customer.emailVerifiedAt && !refreshIdentity) return { ok: true as const, alreadyVerified: true, verificationExpiresAt: null };
-  if (reservation.verificationAttempts >= 9 || (reservation.publicLease?.status !== "SIGNED" && (!reservation.holdExpiresAt || reservation.holdExpiresAt <= new Date()))) return { ok: false as const, code: "EXPIRED" };
+  if (!reservation || (!reservation.contactVerifiedAt&&!await approvedStaffPriceEmail(reservation,staffPriceId)) || (reservation.journey !== "RENTAL"&&!(reservation.journey==="VIEWING"&&await approvedStaffPriceEmail(reservation,staffPriceId))) || !reservation.customer.email) return { ok: false as const, code: "NOT_FOUND" };
+  if (reservation.customer.emailVerifiedAt && !refreshIdentity) return reservation.status === "ACTIVE" && (reservation.publicLease?.status === "SIGNED" || Boolean(reservation.holdExpiresAt && reservation.holdExpiresAt > new Date())) ? { ok: true as const, alreadyVerified: true, verificationExpiresAt: null } : {ok:false as const,code:"RESERVATION_UNAVAILABLE"};
+  if(await rateLimit(`public-email-resend:${reservation.id}`,5,15*60_000))return {ok:false as const,code:"RATE_LIMITED"};
   const code = randomInt(0, 1_000_000).toString().padStart(6, "0");
-  const verificationExpiresAt = new Date(Date.now() + verificationWindowMs);
-  const attempt = reservation.verificationAttempts + 1;
-  await db.reservation.update({ where: { id: reservation.id }, data: { verificationCodeHash: emailVerificationHash(reservation.id, code), verificationExpiresAt, verificationAttempts: attempt } });
+  const prepared=await preparePublicVerificationCode({id:reservation.id,hash:emailVerificationHash(reservation.id,code),channel:"EMAIL",bookingKey,allowStaffEmail:await approvedStaffPriceEmail(reservation,staffPriceId)});
+  if(!prepared.ok)return prepared;
+  const verificationExpiresAt=prepared.verificationExpiresAt;
+  const attempt=randomUUID();
   const delivery = await deliverEmailVerificationCode({ code, email: reservation.customer.email, organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, customerId: reservation.customerId, idempotencyKey: `${reservation.idempotencyKey ?? reservation.id}:EMAIL_VERIFY:${attempt}` });
   await db.auditEvent.create({ data: { organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, action: delivery.ok ? "public_reservation.email_verification_sent" : "public_reservation.email_verification_failed", entityType: "Reservation", entityId: reservation.id, requestId: reservation.idempotencyKey, after: { expiresAt: verificationExpiresAt.toISOString() } } });
   if (!delivery.ok) return { ok: false as const, code: "DELIVERY_FAILED" };
@@ -464,7 +468,7 @@ export async function startPublicEmailVerification(reference: string, refreshIde
 export async function verifyPublicReservationEmail(reference: string, code: string, staffPriceId?:string) {
   if (!publicReservationVerificationEnabled()) return { ok: false as const, code: "DISABLED" };
   const reservation = await db.reservation.findUnique({ where: { publicReference: reference }, include: { customer: true } });
-  if (!reservation || reservation.status !== "ACTIVE" || (!reservation.contactVerifiedAt&&!await approvedStaffPriceEmail(reservation,staffPriceId))) return { ok: false as const, code: "NOT_FOUND" };
+  if (!reservation || (!reservation.contactVerifiedAt&&!await approvedStaffPriceEmail(reservation,staffPriceId))) return { ok: false as const, code: "NOT_FOUND" };
   if (!reservation.verificationExpiresAt || reservation.verificationExpiresAt < new Date() || reservation.verificationAttempts >= 10) return { ok: false as const, code: "EXPIRED" };
   const expected = Buffer.from(reservation.verificationCodeHash ?? "", "hex");
   const actual = Buffer.from(emailVerificationHash(reservation.id, code), "hex");
