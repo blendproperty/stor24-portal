@@ -31,6 +31,23 @@ test("isolated PostgreSQL private identity workflow", async t => {
     return { org, facility, user, customer, booking, scope, input, reference: booking.publicReference!, token: access.token };
   }
   try {
+    await t.test("identity return recovers only a current agreement after a quote change", async () => {
+      const f = await fixture();
+      await submitIdentity(f.reference, f.token, f.input);
+      const prepared = await preparePublicReservationLease(f.reference, "CARD"); assert.ok(prepared.ok);
+      if (!prepared.ok) return;
+      assert.equal((await identityStatus(f.reference, f.token)).agreementToken, prepared.token);
+      await db.publicReservationLease.update({ where: { reservationId: f.booking.id }, data: { status: "REQUOTE_REQUIRED" } });
+      assert.equal((await identityStatus(f.reference, f.token)).agreementToken, null);
+      await db.publicReservationLease.update({ where: { reservationId: f.booking.id }, data: { status: "READY", expiresAt: new Date(0) } });
+      assert.equal((await identityStatus(f.reference, f.token)).agreementToken, null);
+      const renewed = await preparePublicReservationLease(f.reference, "EFT"); assert.ok(renewed.ok);
+      if (!renewed.ok) return;
+      assert.notEqual(renewed.token, prepared.token);
+      assert.equal((await identityStatus(f.reference, f.token)).agreementToken, renewed.token);
+      await db.publicReservationLease.update({ where: { reservationId: f.booking.id }, data: { status: "SIGNED", expiresAt: new Date(0) } });
+      assert.equal((await identityStatus(f.reference, f.token)).agreementToken, renewed.token);
+    });
     await t.test("booking-filtered review retains organisation and facility isolation", async () => {
       const f = await fixture(), other = await fixture();
       await submitIdentity(f.reference, f.token, f.input);

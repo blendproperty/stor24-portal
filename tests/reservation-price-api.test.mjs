@@ -52,6 +52,19 @@ test("actual customer quote route checks approved source before OTP and cannot a
     const agreement=await api.POST(request("/api/booking-price-review",{...common,action:"agreement",identityAccessToken:"a".repeat(43),paymentMethod:"EFT"}));assert.equal(agreement.status,200);assert.equal((await agreement.json()).data.url,"https://stor24.co.za/book/lease/"+"c".repeat(43));assert.deepEqual(calls.map(c=>c.name),["applied","agreement"]);
   }finally{if(previous===undefined)delete globalThis.__priceApi;else globalThis.__priceApi=previous;}
 });
+test("accepted quote continuation sends authenticated customers to identity and preserves other blockers",async()=>{
+  const api=await compile("src/app/api/booking-price-review/route.ts"),previous=globalThis.__priceApi;
+  let code="IDENTITY_REQUIRED",authenticated=true,calls=[];
+  globalThis.__priceApi={limited:false,call:async(name)=>{calls.push(name);if(name==="applied"&&!authenticated)throw Error("FORBIDDEN");return name==="agreement"?{ok:false,code}:{};}};
+  const body={action:"agreement",reference:"ST24-20261021-139BEA",id:"proposal",identityAccessToken:"a".repeat(43),paymentMethod:"CARD"};
+  try{
+    const response=await api.POST(request("/api/booking-price-review",body));assert.equal(response.status,200);
+    const payload=await response.json();assert.equal(payload.data.url,"https://stor24.co.za/book/identity?reference=ST24-20261021-139BEA");assert.equal(payload.data.status,"IDENTITY_REQUIRED");assert.equal(JSON.stringify(payload).includes(body.identityAccessToken),false);assert.deepEqual(calls,["applied","agreement"]);
+    for(const [blocker,message] of [["MOVE_IN_DATE_REQUIRED","move-in date"],["SIGNED_LEASE_CHANGED","signed agreement"],["RESERVATION_UNAVAILABLE","unavailable"]]){code=blocker;const blocked=await api.POST(request("/api/booking-price-review",body));assert.equal(blocked.status,409);const result=await blocked.json();assert.ok(result.error.message.includes(message));assert.equal(result.data,undefined);}
+    authenticated=false;calls=[];assert.equal((await api.POST(request("/api/booking-price-review",body))).status,403);assert.deepEqual(calls,["applied"]);
+  }finally{if(previous===undefined)delete globalThis.__priceApi;else globalThis.__priceApi=previous;}
+});
+
 test("customer quote middleware exemption is exact and never exposes neighbouring staff or API paths",async()=>{
   const compiled=await build({entryPoints:["src/proxy.ts"],bundle:true,write:false,platform:"node",format:"esm",plugins:[{name:"isolated-price-proxy",setup(b){
     b.onResolve({filter:/^(?:next\/server|@\/lib\/(?:session|navigation-access|db))$/},args=>({path:args.path,namespace:"price-proxy-fixture"}));
