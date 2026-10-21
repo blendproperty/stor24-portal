@@ -79,6 +79,30 @@ test('lead updates are scoped, concurrent-safe, auditable and cannot fabricate a
  assert.equal(await db.auditEvent.count({where:{entityId:{in:[a.id,b.id]},action:'lead.test_cancelled'}}),2);
  assert.equal((await db.lead.findUniqueOrThrow({where:{id:untouched.id}})).stage,'NEW');
  await assert.rejects(cancelTestLeads(scope,selection),/CONFLICT/);
+
+ const deletion={confirmed:true as const,operation:"delete" as const,leads:await Promise.all([a,b].map(async l=>{const row=await db.lead.findUniqueOrThrow({where:{id:l.id}});return{id:row.id,updatedAt:row.updatedAt.toISOString()};}))};
+ await assert.rejects(cancelTestLeads({...scope,facilityIds:[]},deletion),/NOT_FOUND/);
+ await assert.rejects(cancelTestLeads(scope,{...deletion,leads:[{id:untouched.id,updatedAt:untouched.updatedAt.toISOString()}]}),/CONFLICT/);
+ await assert.rejects(cancelTestLeads(scope,{...deletion,leads:[deletion.leads[0],{...deletion.leads[1],updatedAt:'2000-01-01T00:00:00.000Z'}]}),/CONFLICT/);
+ const deleteType=await db.unitType.create({data:{facilityId:f.id,name:'Deletion fixture',features:[]}});
+ const deleteUnit=await db.unit.create({data:{facilityId:f.id,unitTypeId:deleteType.id,number:'Deletion fixture',monthlyRate:100}});
+ const ended=await db.reservation.create({data:{facilityId:f.id,customerId:captured.customerId!,leadId:b.id,unitId:deleteUnit.id,quotedRate:100,status:'CANCELLED'}});
+ await assert.rejects(cancelTestLeads(scope,deletion),/LEAD_BOOKING_STAGE/);
+ assert.equal(await db.lead.count({where:{id:{in:[a.id,b.id]}}}),2);
+ await db.reservation.delete({where:{id:ended.id}});await db.unit.delete({where:{id:deleteUnit.id}});await db.unitType.delete({where:{id:deleteType.id}});
+ const deleteConstraint=`delete_audit_${key.replaceAll('-','')}`;
+ await db.$executeRawUnsafe(`ALTER TABLE "AuditEvent" ADD CONSTRAINT "${deleteConstraint}" CHECK ("entityId" <> '${b.id}' OR "action" <> 'lead.test_deleted') NOT VALID`);
+ try{await assert.rejects(cancelTestLeads(scope,deletion));assert.equal(await db.lead.count({where:{id:{in:[a.id,b.id]}}}),2);assert.equal(await db.auditEvent.count({where:{entityId:{in:[a.id,b.id]},action:'lead.test_deleted'}}),0);}finally{await db.$executeRawUnsafe(`ALTER TABLE "AuditEvent" DROP CONSTRAINT "${deleteConstraint}"`);}
+ const training=await db.lead.create({data:{facilityId:f.id,stage:'LOST',source:'Staff training only'}});
+ await assert.rejects(cancelTestLeads(scope,{confirmed:true,operation:'delete',leads:[{id:training.id,updatedAt:training.updatedAt.toISOString()}]}),/TRAINING_LEAD/);
+ const customerCount=await db.customer.count({where:{organisationId:org.id}});
+ const deletes=await Promise.allSettled([cancelTestLeads(scope,deletion),cancelTestLeads(scope,{...deletion,leads:[...deletion.leads].reverse()})]);
+ assert.equal(deletes.filter(r=>r.status==='fulfilled').length,1);
+ assert.equal(await db.lead.count({where:{id:{in:[a.id,b.id]}}}),0);
+ assert.equal(await db.auditEvent.count({where:{entityId:{in:[a.id,b.id]},action:'lead.test_deleted',actorId:user.id}}),2);
+ assert.equal(await db.auditEvent.count({where:{entityId:{in:[a.id,b.id]},action:'lead.test_cancelled'}}),2);
+ assert.equal(await db.customer.count({where:{organisationId:org.id}}),customerCount);
+ assert.equal((await db.lead.findUniqueOrThrow({where:{id:untouched.id}})).stage,'NEW');
  assert.equal(await db.task.count({where:{organisationId:org.id}}),0,'Manager reminders read saved lead dates, without duplicate tasks');
  }finally{await db.roleAssignment.deleteMany({where:{user:{organisationId:org.id}}});await db.lead.deleteMany({where:{facility:{organisationId:org.id}}});await db.auditEvent.deleteMany({where:{organisationId:org.id}});await db.user.deleteMany({where:{organisationId:org.id}});await db.organisation.delete({where:{id:org.id}});await db.$disconnect();}
 });
