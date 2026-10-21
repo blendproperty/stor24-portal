@@ -8,7 +8,8 @@ export async function POST(request: Request) {
   if (await rateLimit(`public-email-verification:${privacyHash(request.headers.get("x-stor24-client-ip")?.slice(0, 128) || requestIp(request))}`, 5, 15 * 60 * 1000)) return Response.json({ error: { message: "Too many email codes requested. Try again later." } }, { status: 429 });
   const parsed = publicReservationResendSchema.extend({ refreshIdentity: z.boolean().optional() }).safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: { message: "Invalid reservation reference." } }, { status: 422 });
-  const result = await startPublicEmailVerification(parsed.data.reference, parsed.data.refreshIdentity);
-  if (!result.ok) return Response.json({ error: { code: result.code, message: result.code === "DELIVERY_FAILED" ? "We could not send the email code. Check the email address or contact Stor24." : "Email verification is unavailable." } }, { status: result.code === "DELIVERY_FAILED" ? 502 : 404 });
+  const result = await startPublicEmailVerification(parsed.data.reference, parsed.data.refreshIdentity,undefined,parsed.data.bookingKey);
+  if (!result.ok && result.code === "RATE_LIMITED") return Response.json({error:{code:result.code,message:"Too many email codes requested. Please wait 15 minutes before requesting another."}},{status:429});
+  if (!result.ok) return Response.json({ error: { code: result.code, message: result.code === "DELIVERY_FAILED" ? "We could not send the email code. Check the email address or contact Stor24." : "The booking cannot be renewed for email verification. Check availability and choose a unit again." } }, { status: result.code === "DELIVERY_FAILED" ? 502 : 404 });
   return Response.json({ data: result });
 }

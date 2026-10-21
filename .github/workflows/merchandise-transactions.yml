@@ -87,6 +87,7 @@ jobs:
       - run: npx tsx --test tests/integration/whatsapp-delivery-claim.test.ts
       - run: npx tsx --test tests/integration/booking-message-claims.test.ts
       - run: npx tsx --test tests/integration/booking-contact-correction.test.ts
+      - run: npx tsx --test tests/integration/public-verification-renewal.test.ts
       - run: npx tsx --test tests/integration/public-booking-origin.test.ts
       - run: npx tsx --test tests/integration/merchandise-transactions.test.ts
       - run: npx tsx --test tests/integration/uat-reset.test.ts
