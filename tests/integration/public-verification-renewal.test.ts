@@ -38,7 +38,7 @@ test("expired code renewal atomically reclaims only available expired holds and 
   await db.unit.update({where:{id:unit.id},data:{status:"AVAILABLE"}});
   const other=await db.reservation.create({data:{facilityId:facility.id,unitId:unit.id,customerId:customer.id,status:"ACTIVE",quotedRate:100}});
   assert.equal((await issue()).ok,false,"another booking is never stolen");await db.reservation.delete({where:{id:other.id}});
-  const products=await Promise.all([db.product.create({data:{id:`a-${key}`,organisationId:org.id,facilityId:facility.id,sku:`a-${key}`,name:"Synthetic A",sellingPrice:15,quantityOnHand:10}}),db.product.create({data:{id:`b-${key}`,organisationId:org.id,facilityId:facility.id,sku:`b-${key}`,name:"Synthetic B",sellingPrice:20,quantityOnHand:0}})]);
+  const products=await Promise.all([db.product.create({data:{id:`a-${key}`,organisationId:org.id,facilityId:facility.id,sku:`a-${key}`,name:"Synthetic A",category:"BOX",sellingPrice:15,quantityOnHand:10}}),db.product.create({data:{id:`b-${key}`,organisationId:org.id,facilityId:facility.id,sku:`b-${key}`,name:"Synthetic B",category:"BOX",sellingPrice:20,quantityOnHand:0}})]);
   const pack=await db.reservationPackage.create({data:{reservationId:reservation.id,status:"RELEASED",packageCode:"SYNTHETIC",packageName:"Synthetic",priceSnapshot:35,itemsSnapshot:products.map(p=>({productId:p.id,quantity:1,unitPriceZar:Number(p.sellingPrice)}))}});
   assert.equal((await issue()).ok,false,"insufficient package stock must reject the entire renewal");
   assert.equal((await db.product.findUniqueOrThrow({where:{id:products[0].id}})).quantityReserved,0,"earlier stock claims roll back atomically");
