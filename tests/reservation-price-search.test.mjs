@@ -7,7 +7,7 @@ async function compile(entry){const result=await build({entryPoints:[entry],bund
 }}]});return import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString("base64")}`);}
 test("price search intersects every grant, scopes all name OR branches and bounds pages without writes",async()=>{
  const api=await compile("src/app/api/v1/reservations/prices/search/route.ts");let allowed=true,calls=[];const previous=globalThis.__priceSearch;
- globalThis.__priceSearch={authorise:async permission=>{if(!allowed)throw Error("FORBIDDEN");return {user:{id:"staff"},organisationId:"org",allowedFacilityIds:permission==="billing.view"?["midpoint"]:["midpoint","other"]};},find:async args=>{calls.push(args);return Array.from({length:21},(_,i)=>({id:`r${i}`,publicReference:`REF${i}`,status:"ACTIVE",quotedRate:{toFixed:()=>"1250.00"},facility:{name:"Midpoint"},unit:{number:"53"},customer:{firstName:"Brett",lastName:"Dovey",companyName:null,email:"test@example.invalid"}}));}};
+ globalThis.__priceSearch={authorise:async permission=>{if(!allowed)throw Error("FORBIDDEN");return {user:{id:"staff"},organisationId:"org",allowedFacilityIds:permission==="reservations.manage"?["midpoint"]:["midpoint","other"]};},find:async args=>{calls.push(args);return Array.from({length:21},(_,i)=>({id:`r${i}`,publicReference:`REF${i}`,status:"ACTIVE",quotedRate:{toFixed:()=>"1250.00"},facility:{name:"Midpoint"},unit:{number:"53"},customer:{firstName:"Brett",lastName:"Dovey",companyName:null,email:"test@example.invalid"}}));}};
  const get=query=>api.GET(new Request(`https://fixture.invalid/api/v1/reservations/prices/search?${query}`));
  try{
  allowed=false;assert.equal((await get("query=Brett")).status,403);assert.equal(calls.length,0);allowed=true;

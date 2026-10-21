@@ -11,7 +11,7 @@ export async function boundedPriceJson(request:Request){
   try{return JSON.parse(new TextDecoder("utf-8",{fatal:true}).decode(Buffer.concat(chunks)));}catch{throw Error("PRICE_INVALID");}
 }
 export async function reservationPriceScope(action="reservation_prices.view",facilityId?:string):Promise<RequestScope>{
-  const required=[...new Set(["reservation_prices.view","reservations.manage","billing.view",action])];
+  const required=[...new Set(["reservation_prices.view","reservations.manage",...(action==="reservation_prices.approve"?["billing.view"]:[]),action])];
   let facilities:string[]|null=null,userId="",organisationId="";
   for(const permission of required){const auth=await requirePermission(permission,facilityId);if(userId&&(userId!==auth.user.id||organisationId!==auth.organisationId))throw Error("UNAUTHENTICATED");userId=auth.user.id;organisationId=auth.organisationId;if(auth.allowedFacilityIds!==null)facilities=facilities===null?auth.allowedFacilityIds:facilities.filter(id=>auth.allowedFacilityIds!.includes(id));}
   if(facilities!==null&&!facilities.length)throw Error("FORBIDDEN");

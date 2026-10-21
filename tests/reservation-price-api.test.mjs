@@ -11,20 +11,25 @@ const request=(url,body,origin="https://fixture.invalid")=>new Request(`https://
 test("actual staff price routes authenticate before body reads and require all grants in the selected store",async()=>{
   const api=await compile("src/app/api/v1/reservations/prices/route.ts"),previous=globalThis.__priceApi;
   let authenticated=true,denied="",mixed=false,calls=[];
-  globalThis.__priceApi={authorise:async(permission,facilityId)=>{if(!authenticated)throw Error("UNAUTHENTICATED");if(permission===denied)throw Error("FORBIDDEN");const allowed=mixed&&permission==="billing.view"?["other"]:["store"];if(facilityId&&!allowed.includes(facilityId))throw Error("FORBIDDEN");return {user:{id:"staff"},organisationId:"org",allowedFacilityIds:allowed};},call:async(name,args)=>{calls.push({name,args});return name==="workspace"?{reservation:{id:"booking",facilityId:"store"},amendments:[],blockers:[]}:{id:"proposal"};}};
+  globalThis.__priceApi={authorise:async(permission,facilityId)=>{if(!authenticated)throw Error("UNAUTHENTICATED");if(permission===denied)throw Error("FORBIDDEN");const allowed=mixed&&permission==="reservations.manage"?["other"]:["store"];if(facilityId&&!allowed.includes(facilityId))throw Error("FORBIDDEN");return {user:{id:"staff"},organisationId:"org",allowedFacilityIds:allowed};},call:async(name,args)=>{calls.push({name,args});return name==="workspace"?{reservation:{id:"booking",facilityId:"store"},amendments:[],blockers:[]}:{id:"proposal"};}};
   const proposal={action:"propose",reservationId:"booking",facilityId:"store",requestKey:randomUUID(),monthlyRate:"900.25",reason:"Synthetic negotiated quote for review"};
   try{
     authenticated=false;assert.equal((await api.POST({headers:new Headers({origin:"https://fixture.invalid"}),get body(){throw Error("Private body read without authentication");}})).status,401);assert.equal(calls.length,0);authenticated=true;
-    for(const permission of ["reservation_prices.view","reservations.manage","billing.view","reservation_prices.propose"]){denied=permission;assert.equal((await api.POST(request("/api/v1/reservations/prices",proposal))).status,403);assert.equal(calls.length,0);}denied="";
+    for(const permission of ["reservation_prices.view","reservations.manage","reservation_prices.propose"]){denied=permission;assert.equal((await api.POST(request("/api/v1/reservations/prices",proposal))).status,403);assert.equal(calls.length,0);}denied="";
     mixed=true;assert.equal((await api.GET(new Request("https://fixture.invalid/api/v1/reservations/prices?reference=booking"))).status,403);assert.equal(calls.length,0);mixed=false;
     assert.equal((await api.POST(request("/api/v1/reservations/prices",proposal,"https://other.invalid"))).status,403);assert.equal(calls.length,0);
     assert.equal((await api.POST(request("/api/v1/reservations/prices",{...proposal,monthlyRate:"1.001"}))).status,422);assert.equal(calls.length,0);
     assert.equal((await api.POST(request("/api/v1/reservations/prices",{...proposal,extra:"x".repeat(17000)}))).status,413);assert.equal(calls.length,0);
     assert.equal((await api.POST(request("/api/v1/reservations/prices",proposal))).status,200);assert.equal(calls[0].name,"propose");assert.equal("action" in calls[0].args[1],false);
     calls=[];
+    denied="billing.view";assert.equal((await api.GET(new Request("https://fixture.invalid/api/v1/reservations/prices?reference=booking"))).status,200);calls=[];
+    assert.equal((await api.POST(request("/api/v1/reservations/prices",proposal))).status,200);calls=[];
+    const decision={action:"decide",id:"proposal",facilityId:"store",revision:0,decision:"APPROVED",reference:"Synthetic approval",confirmed:true};
+    assert.equal((await api.POST(request("/api/v1/reservations/prices",decision))).status,403);assert.equal(calls.length,0);
+    denied="reservation_prices.approve";assert.equal((await api.POST(request("/api/v1/reservations/prices",decision))).status,403);assert.equal(calls.length,0);denied="";
     const prepare={action:"prepare",reservationId:"booking",facilityId:"store",sourceFingerprint:"a".repeat(64),confirmed:true};
     assert.equal((await api.POST(request("/api/v1/reservations/prices",{...prepare,confirmed:false}))).status,422);assert.equal(calls.length,0);
-    for(const permission of ["reservation_prices.propose","reservations.manage","billing.view"]){denied=permission;assert.equal((await api.POST(request("/api/v1/reservations/prices",prepare))).status,403);assert.equal(calls.length,0);}denied="";
+    for(const permission of ["reservation_prices.propose","reservations.manage"]){denied=permission;assert.equal((await api.POST(request("/api/v1/reservations/prices",prepare))).status,403);assert.equal(calls.length,0);}denied="";
     assert.equal((await api.POST(request("/api/v1/reservations/prices",prepare))).status,200);assert.equal(calls[0].name,"prepare");calls=[];
     const send={action:"send",id:"proposal",facilityId:"store",confirmed:true};
     denied="operations.manage";assert.equal((await api.POST(request("/api/v1/reservations/prices",send))).status,403);assert.equal(calls.length,0);denied="";
