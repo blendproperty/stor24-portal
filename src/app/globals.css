@@ -3093,8 +3093,32 @@ a.module-card:focus-visible {
 .operations-centre-workspace .operations-task-row{grid-template-columns:38px minmax(0,1fr) auto}.operations-centre-workspace .operations-task-row .work-copy{min-width:0;overflow-wrap:anywhere}
 @media(max-width:600px){.operations-centre-workspace .operations-task-row{grid-template-columns:32px minmax(0,1fr);gap:10px}.operations-centre-workspace .operations-task-row .work-icon{width:30px;height:30px}.operations-centre-workspace .operations-task-row-actions{grid-column:2;padding-left:0;justify-content:flex-start}}
 
-.operations-centre-workspace .operations-task-panel>.work-list{max-height:640px;overflow:auto;overscroll-behavior:contain;padding-right:6px}
-@media(max-width:600px){.operations-centre-workspace .operations-task-panel>.work-list{max-height:65vh;min-height:0}}
+.operations-centre-workspace .operations-queue>.work-list{max-height:640px;overflow:auto;overscroll-behavior:contain;padding-right:6px}
+@media(max-width:600px){.operations-centre-workspace .operations-queue>.work-list{max-height:65vh;min-height:0}}
+
+.operations-queue{min-width:0}
+.operations-queue-views{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}
+.operations-queue-list-copy{min-width:0;overflow-wrap:anywhere}
+.operations-queue-list-copy>small,.operations-queue-card>small{display:block;color:var(--muted);font-size:12px;line-height:1.7}
+.operations-queue .work-copy{min-width:0;overflow-wrap:anywhere}
+.operations-queue details{font-size:13px;margin-top:8px}
+.operations-queue summary{cursor:pointer}
+.operations-queue details p{line-height:1.6}
+.operations-queue-table{max-width:100%;max-height:640px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.operations-queue-table table{min-width:760px}
+.operations-queue-table caption{text-align:left;padding:12px 16px;color:var(--muted);font-size:12px}
+.operations-queue-table td{vertical-align:top;overflow-wrap:anywhere}
+.operations-queue-table td:first-child{min-width:200px;max-width:360px}
+.operations-queue-table .operations-task-row-actions{justify-content:flex-start;min-width:140px}
+.operations-queue-board{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;align-items:start}
+.operations-queue-column{min-width:0;max-height:640px;overflow:auto;overscroll-behavior:contain;padding:12px;background:var(--surface-soft,#f3f7f8);border:1px solid var(--line);border-radius:10px}
+.operations-queue-column h3{display:flex;justify-content:space-between;gap:8px;margin:0 0 14px;font-size:14px}
+.operations-queue-column h3 span{font-size:12px;color:var(--muted)}
+.operations-queue-card{display:grid;gap:10px;min-width:0;margin-top:12px;padding:14px;background:var(--surface,#fff);border:1px solid var(--line);border-radius:8px;overflow-wrap:anywhere}
+.operations-queue-card .operations-task-row-actions{justify-content:flex-start;padding:0}
+@media(max-width:1200px){.operations-queue-board{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:800px){.operations-queue-board{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.operations-queue-board{grid-template-columns:minmax(0,1fr)}.operations-queue-views .button{flex:1 1 0;min-width:0;justify-content:center;gap:4px;padding:10px 6px;font-size:12px}.operations-centre-workspace .operations-queue-card .operations-task-row-actions{padding:0;grid-column:auto}}
 
 /* Follow-ups: separate appointment details, actions and cover assignment. */
 .followup-appointments-workspace > .panel > .followup-toolbar{gap:20px 28px;align-items:flex-start}

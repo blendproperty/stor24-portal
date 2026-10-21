@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { CheckCircle2, ClipboardList, PackageCheck, Plus, RefreshCw, Search, Wrench } from "lucide-react";
+import { CheckCircle2, PackageCheck, Plus, RefreshCw, Search, Wrench } from "lucide-react";
+import { OperationsTaskQueue, type OperationsQueueTask } from "@/components/operations-task-queue";
 import { OperationsTaskFilters } from "@/components/operations-task-filters";
 import { operationsTaskFiltersSchema, operationsTaskPageSchema, type OperationsTaskPage, type OperationsTaskFilters as TaskFilters } from "@/lib/operations-task-policy";
 import { PageHeader } from "@/components/page-header";
@@ -14,7 +15,7 @@ import Link from "next/link";
 import { formatSouthAfricaDateTime } from "@/lib/south-africa-time";
 import { PackageEditorModal, ProductEditorModal, type MerchandisePackage, type MerchandiseProduct } from "@/components/merchandise-editor";
 
-type Task = { purpose?: string; id: string; title: string; description?: string | null; customerId?: string | null; status: string; priority: string; dueAt: string | null; facility?: { name: string } | null; assignee?: { name: string } | null };
+type Task = OperationsQueueTask;
 type Maintenance = { id: string; title: string; status: string; priority: string; unit?: { number: string } | null; facility: { name: string } };
 type Product = MerchandiseProduct;
 type StoragePackage = MerchandisePackage;
@@ -526,11 +527,8 @@ export function OperationsWorkspace({ view = "operations", reminders }: { view?:
       {taskPage ? <OperationsTaskFilters key={JSON.stringify(taskPage.filters)} page={taskPage} disabled={taskBusy || loading || readFailed} onApply={filters => void loadTaskPage(filters)}/> : <p className="panel-subtitle">Showing loaded records only. Reload the page to enable filtering across the full permitted queue.</p>}
       {taskReadError ? <p role="alert">{taskReadError}</p> : null}
       <p className="operations-task-result-count">{taskLoading ? "Updating task queue…" : taskReadError || readFailed ? "Task results need refreshing before you act." : taskPage ? `Showing ${openTasks.length} of ${taskPage.total} matching tasks · Updated ${formatSouthAfricaDateTime(taskPage.asOf)} SAST` : `${openTasks.length} open tasks on the loaded page`}</p>
-      <div className="work-list">{openTasks.length ? openTasks.map(task => <div className="work-row operations-task-row" key={task.id}>
-        <span className={`work-icon ${task.priority === "URGENT" ? "work-icon-danger" : task.priority === "HIGH" ? "work-icon-warning" : ""}`}><ClipboardList size={18}/></span>
-        <div className="work-copy"><strong>{task.title}</strong><small>{task.facility?.name ?? "Portfolio"} · {task.assignee?.name ?? "Unassigned"} · {task.dueAt ? `${formatSouthAfricaDateTime(task.dueAt)} SAST` : "No due date"}</small>{task.description && <details><summary>View request details</summary><p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{task.description}</p>{task.customerId && <Link href={`/tenants?customer=${encodeURIComponent(task.customerId)}`}>Open customer record →</Link>}</details>}</div>
-        <span className="operations-task-row-actions"><StatusPill tone={task.status === "COMPLETED" ? "positive" : "neutral"}>{task.status.replaceAll("_", " ")}</StatusPill>{task.purpose === "ARREARS_ACCESS_REVIEW" ? <Link className="text-button" href="/collections">Open Collections</Link> : null}{!["COMPLETED", "CANCELLED"].includes(task.status) ? task.purpose === "AGREED_FOLLOWUP" ? <Link className="text-button" href={task.customerId ? `/tenants?customer=${encodeURIComponent(task.customerId)}&section=followups` : "/operations/followups"}>Open appointment</Link> : <button className="text-button" disabled={taskActionsBlocked} onClick={() => completeTask(task.id)}>{taskBusy ? "Please wait…" : "Complete"}</button> : null}</span>
-      </div>) : !taskLoading && !taskReadError && !readFailed ? <div className="empty-state"><CheckCircle2 size={32}/><strong>{taskPage ? "No tasks match these filters" : "No open tasks"}</strong><p>{taskPage ? "Clear a filter or create a new task." : "Create a task to start the facility work queue."}</p></div> : null}</div>
+      <OperationsTaskQueue tasks={openTasks} userId={taskPage?.userId} blocked={taskActionsBlocked} busy={taskBusy} onComplete={id => void completeTask(id)}/>
+      {!openTasks.length && !taskLoading && !taskReadError && !readFailed ? <div className="empty-state"><CheckCircle2 size={32}/><strong>{taskPage ? "No tasks match these filters" : "No open tasks"}</strong><p>{taskPage ? "Clear a filter or create a new task." : "Create a task to start the facility work queue."}</p></div> : null}
       {taskPage?.nextCursor ? <button className="button button-secondary" disabled={taskBusy || taskLoading || !!taskReadError || readFailed} onClick={() => void loadTaskPage(taskPage.filters, taskPage.nextCursor!)}>Load more tasks</button> : null}
     </section>
     <section id="operations-maintenance" className="panel panel-spacious"><div className="panel-heading"><div><p className="eyebrow">Store upkeep</p><h2>Maintenance queue</h2><p className="panel-subtitle">Unit and facility requests, separate from the task queue.</p></div><button className="button button-secondary" disabled={busy || maintenanceUncertain} onClick={() => setShowMaintenance(true)}><Plus size={16}/> New request</button></div>
