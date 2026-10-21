@@ -58,6 +58,31 @@ test("customer quote middleware exemption is exact and never exposes neighbourin
     b.onLoad({filter:/.*/,namespace:"price-proxy-fixture"},args=>({contents:args.path==="next/server"?"export const NextResponse={};":args.path.endsWith("session")?"export const sessionCookieName='fixture';export const verifySessionToken=async()=>null;":args.path.endsWith("navigation-access")?"export const canVisit=()=>false;":"export const db={};"}));
   }}]});
   const proxy=await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`);
-  assert.equal(proxy.isPublicPathname("/booking-price-review"),true);assert.equal(proxy.isPublicPathname("/api/booking-price-review"),true);
-  for(const path of ["/booking-price-review/admin","/api/booking-price-review/debug","/reservations/prices","/api/v1/reservations/prices","/api/v1/reservations"])assert.equal(proxy.isPublicPathname(path),false,path);
+  assert.equal(proxy.isPublicPathname("/booking-price-review"),true);assert.equal(proxy.isPublicPathname("/my/booking-price-review"),true);assert.equal(proxy.isPublicPathname("/api/booking-price-review"),true);
+  for(const path of ["/my/booking-price-review/admin","/booking-price-review/admin","/api/booking-price-review/debug","/reservations/prices","/api/v1/reservations/prices","/api/v1/reservations"])assert.equal(proxy.isPublicPathname(path),false,path);
+});
+
+
+test("legacy customer review links redirect to My STOR24 with bounded encoded booking context", async()=>{
+  const compiled=await build({entryPoints:["src/app/booking-price-review/page.tsx"],bundle:true,write:false,platform:"node",format:"esm",plugins:[{name:"redirect-fixture",setup(b){
+    b.onResolve({filter:/^next\/navigation$/},()=>({path:"redirect",namespace:"redirect-fixture"}));
+    b.onLoad({filter:/.*/,namespace:"redirect-fixture"},()=>({contents:"export function redirect(url){throw Object.assign(new Error('REDIRECT'),{url});}"}));
+  }}]});
+  const page=await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`);
+  for(const query of [{reference:"ST24-20261021-139BEA",proposal:"02c21b9a-7129-4f2a-87f2-301bb1812d7b"},{reference:"a&proposal=wrong?",proposal:"b#fragment"},{reference:"r".repeat(90),proposal:"p".repeat(110)},{}]){
+    await assert.rejects(page.default({searchParams:Promise.resolve(query)}),error=>{
+      const url=new URL(error.url,"https://fixture.invalid");assert.equal(url.origin,"https://fixture.invalid");assert.equal(url.pathname,"/my/booking-price-review");assert.equal(url.searchParams.get("reference"),(query.reference??"").slice(0,80));assert.equal(url.searchParams.get("proposal"),(query.proposal??"").slice(0,100));assert.equal(url.hash,"");return true;
+    });
+  }
+});
+
+
+test("My STOR24 quote page overrides staff metadata and bounds booking props",async()=>{
+  const compiled=await build({entryPoints:["src/app/my/booking-price-review/page.tsx"],bundle:true,write:false,platform:"node",format:"esm",jsx:"automatic",plugins:[{name:"customer-page-fixture",setup(b){
+    b.onResolve({filter:/^@\/(?:styles\/tenant-portal.css|components\/customer-booking-price-review)$/},args=>({path:args.path,namespace:"customer-page-fixture"}));
+    b.onLoad({filter:/.*/,namespace:"customer-page-fixture"},args=>({contents:args.path.endsWith(".css")?"":"export const CustomerBookingPriceReview=()=>null;"}));
+  }}]});
+  const page=await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`);
+  assert.deepEqual(page.metadata.title,{absolute:"Review your quote | My STOR24"});assert.equal(page.metadata.applicationName,"My STOR24");assert.deepEqual(page.metadata.robots,{index:false,follow:false});assert.equal(page.metadata.referrer,"no-referrer");
+  const element=await page.default({searchParams:Promise.resolve({reference:"r".repeat(90),proposal:"p".repeat(110)})});assert.equal(element.props.reference.length,80);assert.equal(element.props.id.length,100);
 });

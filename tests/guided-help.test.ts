@@ -66,7 +66,7 @@ test("editorial guide destinations are fixed staff read screens and IDs are uniq
 
 test("every staff page and navigation destination has a substantive contextual tutorial", () => {
   // Standalone authentication screens carry their own instructions, outside the staff shell.
-  const authAndPublicPages = new Set(["/mfa-setup", "/booking-price-review","/privacy", "/paia", "/login", "/forgot-password", "/reset-password/[token]", "/invite/[token]", "/setup/[token]", "/sign/[token]", "/my", "/my/orders/[id]"]);
+  const authAndPublicPages = new Set(["/mfa-setup", "/booking-price-review", "/my/booking-price-review","/privacy", "/paia", "/login", "/forgot-password", "/reset-password/[token]", "/invite/[token]", "/setup/[token]", "/sign/[token]", "/my", "/my/orders/[id]"]);
   const routes = readdirSync("src/app", { recursive: true }).map(String).map(path => path.replaceAll("\\", "/"))
     .filter(path => path === "page.tsx" || path.endsWith("/page.tsx"))
     .map(path => path === "page.tsx" ? "/" : `/${path.slice(0, -9)}`).filter(route => !authAndPublicPages.has(route));
