@@ -18,7 +18,7 @@ export async function preparePublicVerificationCode(input:{id:string;hash:string
   else await requireOperationalUnit(tx,found.facilityId,found.unitId);
   await tx.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id"=${input.id} FOR UPDATE`;
   const r=await tx.reservation.findUnique({where:{id:input.id},include:{customer:true,unit:true,lead:true,publicLease:true,packageSelection:true,_count:{select:{publicPaymentSessions:true}}}});
-  if(!r||r.convertedTenancyId||input.channel==="MOBILE"&&r.contactVerifiedAt||input.channel==="EMAIL"&&!r.contactVerifiedAt&&!input.allowStaffEmail)return unavailable();
+  if(!r||r.unitId!==found.unitId||r.facilityId!==found.facilityId||r.convertedTenancyId||input.channel==="MOBILE"&&r.contactVerifiedAt||input.channel==="EMAIL"&&!r.contactVerifiedAt&&!input.allowStaffEmail)return unavailable();
   const now=new Date(),expiresAt=new Date(now.getTime()+10*60_000);
   const signedEmail=input.channel==="EMAIL"&&r.status==="ACTIVE"&&r.publicLease?.status==="SIGNED";
   let holdExpiresAt=r.holdExpiresAt;

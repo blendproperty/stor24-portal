@@ -38,6 +38,12 @@ test("expired code renewal atomically reclaims only available expired holds and 
   await db.unit.update({where:{id:unit.id},data:{status:"AVAILABLE"}});
   const other=await db.reservation.create({data:{facilityId:facility.id,unitId:unit.id,customerId:customer.id,status:"ACTIVE",quotedRate:100}});
   assert.equal((await issue()).ok,false,"another booking is never stolen");await db.reservation.delete({where:{id:other.id}});
+  const products=await Promise.all([db.product.create({data:{id:`a-${key}`,organisationId:org.id,facilityId:facility.id,sku:`a-${key}`,name:"Synthetic A",sellingPrice:15,quantityOnHand:10}}),db.product.create({data:{id:`b-${key}`,organisationId:org.id,facilityId:facility.id,sku:`b-${key}`,name:"Synthetic B",sellingPrice:20,quantityOnHand:0}})]);
+  const pack=await db.reservationPackage.create({data:{reservationId:reservation.id,status:"RELEASED",packageCode:"SYNTHETIC",packageName:"Synthetic",priceSnapshot:35,itemsSnapshot:products.map(p=>({productId:p.id,quantity:1,unitPriceZar:Number(p.sellingPrice)}))}});
+  assert.equal((await issue()).ok,false,"insufficient package stock must reject the entire renewal");
+  assert.equal((await db.product.findUniqueOrThrow({where:{id:products[0].id}})).quantityReserved,0,"earlier stock claims roll back atomically");
+  assert.equal((await db.reservation.findUniqueOrThrow({where:{id:reservation.id}})).status,"CANCELLED");
+  await db.reservationPackage.delete({where:{id:pack.id}});
   const competitor=await db.reservation.create({data:{facilityId:facility.id,unitId:unit.id,customerId:customer.id,status:"CANCELLED",source:"PUBLIC_WEBSITE",quotedRate:100,idempotencyKey:randomUUID(),holdExpiresAt:past,intendedMoveIn:future}});
   await db.auditEvent.create({data:{organisationId:org.id,entityType:"Reservation",entityId:competitor.id,action:"public_reservation.hold_expired"}});
   const results=await Promise.all([issue(),preparePublicVerificationCode({id:competitor.id,channel:"MOBILE",bookingKey:competitor.idempotencyKey!,hash:"competitor"})]);
@@ -45,6 +51,6 @@ test("expired code renewal atomically reclaims only available expired holds and 
   assert.equal(await db.reservation.count({where:{unitId:unit.id,status:"ACTIVE"}}),1);
   assert.equal(await db.publicPaymentSession.count({where:{reservationId:reservation.id}}),0);
  }finally{
-  await db.auditEvent.deleteMany({where:{organisationId:org.id}});await db.reservation.deleteMany({where:{facilityId:facility.id}});await db.customer.deleteMany({where:{organisationId:org.id}});await db.unit.delete({where:{id:unit.id}});await db.unitType.delete({where:{id:type.id}});await db.facility.delete({where:{id:facility.id}});await db.organisation.delete({where:{id:org.id}});await db.$disconnect();
+  await db.auditEvent.deleteMany({where:{organisationId:org.id}});await db.reservation.deleteMany({where:{facilityId:facility.id}});await db.customer.deleteMany({where:{organisationId:org.id}});await db.unit.delete({where:{id:unit.id}});await db.unitType.delete({where:{id:type.id}});await db.product.deleteMany({where:{facilityId:facility.id}});await db.facility.delete({where:{id:facility.id}});await db.organisation.delete({where:{id:org.id}});await db.$disconnect();
  }
 });
