@@ -111,4 +111,5 @@ export const publicReservationVerificationSchema = z.object({
 
 export const publicReservationResendSchema = z.object({
   reference: publicReservationReferenceSchema,
+  bookingKey: z.string().trim().min(16).max(100).optional(),
 });
