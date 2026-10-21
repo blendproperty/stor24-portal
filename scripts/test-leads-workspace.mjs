@@ -4,10 +4,11 @@ import {createServer} from 'node:http';
 import {readFile,mkdir} from 'node:fs/promises';
 const bundle=await build({stdin:{contents:"import React from 'react';import{createRoot}from'react-dom/client';import{LeadsWorkspace}from'./src/components/leads-workspace';createRoot(document.getElementById('root')).render(<LeadsWorkspace followupsDue={new URLSearchParams(location.search).get(\"view\")===\"due\"}/>);",resolveDir:process.cwd(),loader:'jsx'},bundle:true,write:false,format:'esm',jsx:'automatic'});
 const css=(await Promise.all(['src/app/globals.css','src/styles/stor24-brand.css','src/styles/staff-workspace.css','src/styles/workspace-insights.css'].map(p=>readFile(p,'utf8')))).join('\n').replace('@import "tailwindcss";','')+'\n@font-face{font-family:Satoshi;src:url(/satoshi.ttf);font-weight:300 900}html{--font-satoshi:Satoshi}body{display:block;padding:24px;background:#f4f6f3}@media(max-width:600px){body{padding:12px}}';
+let protectedLost="";
 let stage,bookings,patch,reservation,capture,rejectReservation,newLead,refreshFailed;
 let bulk,bulkError=false,bulkRefreshFailed=false,readOnly=false,bulkClosed=new Set(),bulkDeleted=new Set();
 const booking=(extra={})=>({id:'saved/booking',status:'ACTIVE',journey:'RENTAL',quotedRate:1400,convertedTenancyId:null,unit:{number:'101'},publicLease:null,convertedTenancy:null,...extra});
-const make=()=>({leads:[...Array.from({length:8},(_,i)=>({id:`lead${i}`,stage:bulkClosed.has(`lead${i}`)?'LOST':i===0?stage:['NEW','CONTACTED','QUALIFIED','QUOTED','VIEWING_BOOKED','RESERVED','WON','LOST'][i],source:i%2?'Phone':'PUBLIC_QUOTE_FORM',createdAt:new Date(Date.now()-i*7*86400000).toISOString(),updatedAt:'2026-10-02T08:00:00Z',notes:'Household furniture',expectedMoveIn:'2026-10-15T00:00:00Z',nextActionAt:null,assignedToId:null,assignedTo:null,facility:{id:'store',name:'Midpoint'},desiredUnitType:{name:'10 m²'},customer:{id:`customer${i}`,firstName:`Example ${i+1}`,lastName:'Customer',email:'example@example.invalid',phone:'+27000000000',companyName:null},attribution:null,reservations:i===0?bookings:[]})),...(newLead?[newLead]:[])].filter(l=>!bulkDeleted.has(l.id)),count:newLead?9:8,facilities:[{id:'store',name:'Midpoint',canCreate:true,canManage:!readOnly,canReserve:true}],staff:[{id:'staff',name:'Example Sales Owner',facilityIds:['store']}]});
+const make=()=>({leads:[...Array.from({length:8},(_,i)=>({id:`lead${i}`,stage:bulkClosed.has(`lead${i}`)?'LOST':i===0?stage:['NEW','CONTACTED','QUALIFIED','QUOTED','VIEWING_BOOKED','RESERVED','WON','LOST'][i],source:i===7&&protectedLost==='training'?'Staff training only':i%2?'Phone':'PUBLIC_QUOTE_FORM',createdAt:new Date(Date.now()-i*7*86400000).toISOString(),updatedAt:'2026-10-02T08:00:00Z',notes:'Household furniture',expectedMoveIn:'2026-10-15T00:00:00Z',nextActionAt:null,assignedToId:null,assignedTo:null,facility:{id:'store',name:'Midpoint'},desiredUnitType:{name:'10 m²'},customer:{id:`customer${i}`,firstName:`Example ${i+1}`,lastName:'Customer',email:'example@example.invalid',phone:'+27000000000',companyName:null},attribution:null,reservations:i===0?bookings:i===7&&protectedLost==='booking'?[booking({status:'CANCELLED'})]:[]})),...(newLead?[newLead]:[])].filter(l=>!bulkDeleted.has(l.id)),count:newLead?9:8,facilities:[{id:'store',name:'Midpoint',canCreate:true,canManage:!readOnly,canReserve:true}],staff:[{id:'staff',name:'Example Sales Owner',facilityIds:['store']}]});
 const server=createServer(async(req,res)=>{
  if(req.url==='/satoshi.ttf'){res.setHeader('Content-Type','font/ttf');return res.end(await readFile('public/brand/Satoshi-Variable.ttf'));}
  if(req.url==='/app.js'){res.setHeader('Content-Type','text/javascript');return res.end(bundle.outputFiles[0].text);}
@@ -50,6 +51,17 @@ try{
   await page.goto(base);await expect(page.getByRole('heading',{name:'Leads & sales performance'})).toBeVisible();await expect(page.locator('.leads-name')).toHaveCount(7);
   if(!await page.locator('.leads-search').evaluate(label=>{const input=label.querySelector('input'),icon=label.querySelector('svg');return input.getBoundingClientRect().left+parseFloat(getComputedStyle(input).paddingLeft)>icon.getBoundingClientRect().right+4;}))throw Error('Search text overlaps the icon');
   await expect(page.locator('.profile-card-heading').first()).toContainText('7 enquiries');
+
+  await page.getByLabel('Filter stage',{exact:true}).selectOption('');
+  await expect(page.locator('.leads-name')).toHaveCount(8);
+  for(const protection of ['training','booking']){
+   protectedLost=protection;await page.reload();
+   await page.getByLabel('Filter stage',{exact:true}).selectOption('LOST');
+   await expect(page.getByRole('checkbox',{name:'Select enquiry Example 8 Customer (lead7)',exact:true})).toBeDisabled();
+   await expect(page.getByRole('checkbox',{name:'Select all eligible enquiries shown',exact:true})).toBeDisabled();
+   await expect(page.getByRole('button',{name:'Delete selected tests permanently',exact:true})).toBeDisabled();
+  }
+  protectedLost='';await page.reload();
   await expect(page.getByRole('button',{name:'Cancel selected tests',exact:true})).toBeDisabled();
   await page.locator('.leads-register').evaluate(el=>el.scrollIntoView({block:'start'}));
   await page.evaluate(()=>document.fonts.ready);
