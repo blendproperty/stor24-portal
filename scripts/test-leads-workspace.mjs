@@ -3,12 +3,13 @@ import {chromium,expect} from '@playwright/test';
 import {createServer} from 'node:http';
 import {readFile,mkdir} from 'node:fs/promises';
 const bundle=await build({stdin:{contents:"import React from 'react';import{createRoot}from'react-dom/client';import{LeadsWorkspace}from'./src/components/leads-workspace';createRoot(document.getElementById('root')).render(<LeadsWorkspace followupsDue={new URLSearchParams(location.search).get(\"view\")===\"due\"}/>);",resolveDir:process.cwd(),loader:'jsx'},bundle:true,write:false,format:'esm',jsx:'automatic'});
-const css=(await Promise.all(['src/app/globals.css','src/styles/stor24-brand.css','src/styles/staff-workspace.css','src/styles/workspace-insights.css'].map(p=>readFile(p,'utf8')))).join('\n').replace('@import "tailwindcss";','')+'\nbody{display:block;font-family:Arial,sans-serif;padding:24px;background:#f4f6f3}';
+const css=(await Promise.all(['src/app/globals.css','src/styles/stor24-brand.css','src/styles/staff-workspace.css','src/styles/workspace-insights.css'].map(p=>readFile(p,'utf8')))).join('\n').replace('@import "tailwindcss";','')+'\n@font-face{font-family:Satoshi;src:url(/satoshi.ttf);font-weight:300 900}html{--font-satoshi:Satoshi}body{display:block;padding:24px;background:#f4f6f3}@media(max-width:600px){body{padding:12px}}';
 let stage,bookings,patch,reservation,capture,rejectReservation,newLead,refreshFailed;
 let bulk,bulkError=false,bulkRefreshFailed=false,readOnly=false,bulkClosed=new Set();
 const booking=(extra={})=>({id:'saved/booking',status:'ACTIVE',journey:'RENTAL',quotedRate:1400,convertedTenancyId:null,unit:{number:'101'},publicLease:null,convertedTenancy:null,...extra});
 const make=()=>({leads:[...Array.from({length:8},(_,i)=>({id:`lead${i}`,stage:bulkClosed.has(`lead${i}`)?'LOST':i===0?stage:['NEW','CONTACTED','QUALIFIED','QUOTED','VIEWING_BOOKED','RESERVED','WON','LOST'][i],source:i%2?'Phone':'PUBLIC_QUOTE_FORM',createdAt:new Date(Date.now()-i*7*86400000).toISOString(),updatedAt:'2026-10-02T08:00:00Z',notes:'Household furniture',expectedMoveIn:'2026-10-15T00:00:00Z',nextActionAt:null,assignedToId:null,assignedTo:null,facility:{id:'store',name:'Midpoint'},desiredUnitType:{name:'10 m²'},customer:{id:`customer${i}`,firstName:`Example ${i+1}`,lastName:'Customer',email:'example@example.invalid',phone:'+27000000000',companyName:null},attribution:null,reservations:i===0?bookings:[]})),...(newLead?[newLead]:[])],count:newLead?9:8,facilities:[{id:'store',name:'Midpoint',canCreate:true,canManage:!readOnly,canReserve:true}],staff:[{id:'staff',name:'Example Sales Owner',facilityIds:['store']}]});
 const server=createServer(async(req,res)=>{
+ if(req.url==='/satoshi.ttf'){res.setHeader('Content-Type','font/ttf');return res.end(await readFile('public/brand/Satoshi-Variable.ttf'));}
  if(req.url==='/app.js'){res.setHeader('Content-Type','text/javascript');return res.end(bundle.outputFiles[0].text);}
  if(req.url==='/app.css'){res.setHeader('Content-Type','text/css');return res.end(css);}
  if(req.url.startsWith('/api/')){
@@ -50,6 +51,9 @@ try{
   if(!await page.locator('.leads-search').evaluate(label=>{const input=label.querySelector('input'),icon=label.querySelector('svg');return input.getBoundingClientRect().left+parseFloat(getComputedStyle(input).paddingLeft)>icon.getBoundingClientRect().right+4;}))throw Error('Search text overlaps the icon');
   await expect(page.locator('.profile-card-heading').first()).toContainText('8 enquiries');
   await expect(page.getByRole('button',{name:'Cancel selected tests',exact:true})).toBeDisabled();
+  await page.locator('.leads-register').evaluate(el=>el.scrollIntoView({block:'start'}));
+  await page.evaluate(()=>document.fonts.ready);
+  await page.screenshot({path:`output/leads-design/bulk-worklist-${width}.png`,fullPage:false});
   await expect(page.getByRole('checkbox',{name:'Select enquiry Example 6 Customer (lead5)',exact:true})).toBeDisabled();
   await page.getByRole('checkbox',{name:'Select enquiry Example 1 Customer (lead0)',exact:true}).check();
   await page.getByLabel('Search leads',{exact:true}).fill('Example 2');
@@ -60,6 +64,8 @@ try{
   await expect(page.getByText('0 selected',{exact:true})).toBeVisible();
   await page.getByRole('checkbox',{name:'Select enquiry Example 1 Customer (lead0)',exact:true}).check();
   await page.getByRole('checkbox',{name:'Select enquiry Example 2 Customer (lead1)',exact:true}).focus();await page.keyboard.press('Space');
+  await page.locator('.leads-register').evaluate(el=>el.scrollIntoView({block:'start'}));
+  await page.screenshot({path:`output/leads-design/bulk-worklist-selected-${width}.png`,fullPage:false});
   await page.getByRole('button',{name:'Cancel selected tests',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Cancel 2 selected test enquiries?',exact:true})).toBeVisible();
   await expect(page.locator('.leads-cancel-review li')).toHaveCount(2);
