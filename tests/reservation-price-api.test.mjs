@@ -75,3 +75,14 @@ test("legacy customer review links redirect to My STOR24 with bounded encoded bo
     });
   }
 });
+
+
+test("My STOR24 quote page overrides staff metadata and bounds booking props",async()=>{
+  const compiled=await build({entryPoints:["src/app/my/booking-price-review/page.tsx"],bundle:true,write:false,platform:"node",format:"esm",jsx:"automatic",plugins:[{name:"customer-page-fixture",setup(b){
+    b.onResolve({filter:/^@\/(?:styles\/tenant-portal.css|components\/customer-booking-price-review)$/},args=>({path:args.path,namespace:"customer-page-fixture"}));
+    b.onLoad({filter:/.*/,namespace:"customer-page-fixture"},args=>({contents:args.path.endsWith(".css")?"":"export const CustomerBookingPriceReview=()=>null;"}));
+  }}]});
+  const page=await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`);
+  assert.deepEqual(page.metadata.title,{absolute:"Review your quote | My STOR24"});assert.equal(page.metadata.applicationName,"My STOR24");assert.deepEqual(page.metadata.robots,{index:false,follow:false});assert.equal(page.metadata.referrer,"no-referrer");
+  const element=await page.default({searchParams:Promise.resolve({reference:"r".repeat(90),proposal:"p".repeat(110)})});assert.equal(element.props.reference.length,80);assert.equal(element.props.id.length,100);
+});
