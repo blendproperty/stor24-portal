@@ -5,8 +5,9 @@ import {readFile,mkdir} from 'node:fs/promises';
 const bundle=await build({stdin:{contents:"import React from 'react';import{createRoot}from'react-dom/client';import{LeadsWorkspace}from'./src/components/leads-workspace';createRoot(document.getElementById('root')).render(<LeadsWorkspace followupsDue={new URLSearchParams(location.search).get(\"view\")===\"due\"}/>);",resolveDir:process.cwd(),loader:'jsx'},bundle:true,write:false,format:'esm',jsx:'automatic'});
 const css=(await Promise.all(['src/app/globals.css','src/styles/stor24-brand.css','src/styles/staff-workspace.css','src/styles/workspace-insights.css'].map(p=>readFile(p,'utf8')))).join('\n').replace('@import "tailwindcss";','')+'\nbody{display:block;font-family:Arial,sans-serif;padding:24px;background:#f4f6f3}';
 let stage,bookings,patch,reservation,capture,rejectReservation,newLead,refreshFailed;
+let bulk,bulkError=false,bulkRefreshFailed=false,readOnly=false,bulkClosed=new Set();
 const booking=(extra={})=>({id:'saved/booking',status:'ACTIVE',journey:'RENTAL',quotedRate:1400,convertedTenancyId:null,unit:{number:'101'},publicLease:null,convertedTenancy:null,...extra});
-const make=()=>({leads:[...Array.from({length:8},(_,i)=>({id:`lead${i}`,stage:i===0?stage:['NEW','CONTACTED','QUALIFIED','QUOTED','VIEWING_BOOKED','RESERVED','WON','LOST'][i],source:i%2?'Phone':'PUBLIC_QUOTE_FORM',createdAt:new Date(Date.now()-i*7*86400000).toISOString(),updatedAt:'2026-10-02T08:00:00Z',notes:'Household furniture',expectedMoveIn:'2026-10-15T00:00:00Z',nextActionAt:null,assignedToId:null,assignedTo:null,facility:{id:'store',name:'Midpoint'},desiredUnitType:{name:'10 m²'},customer:{id:`customer${i}`,firstName:`Example ${i+1}`,lastName:'Customer',email:'example@example.invalid',phone:'+27000000000',companyName:null},attribution:null,reservations:i===0?bookings:[]})),...(newLead?[newLead]:[])],count:newLead?9:8,facilities:[{id:'store',name:'Midpoint',canCreate:true,canManage:true,canReserve:true}],staff:[{id:'staff',name:'Example Sales Owner',facilityIds:['store']}]});
+const make=()=>({leads:[...Array.from({length:8},(_,i)=>({id:`lead${i}`,stage:bulkClosed.has(`lead${i}`)?'LOST':i===0?stage:['NEW','CONTACTED','QUALIFIED','QUOTED','VIEWING_BOOKED','RESERVED','WON','LOST'][i],source:i%2?'Phone':'PUBLIC_QUOTE_FORM',createdAt:new Date(Date.now()-i*7*86400000).toISOString(),updatedAt:'2026-10-02T08:00:00Z',notes:'Household furniture',expectedMoveIn:'2026-10-15T00:00:00Z',nextActionAt:null,assignedToId:null,assignedTo:null,facility:{id:'store',name:'Midpoint'},desiredUnitType:{name:'10 m²'},customer:{id:`customer${i}`,firstName:`Example ${i+1}`,lastName:'Customer',email:'example@example.invalid',phone:'+27000000000',companyName:null},attribution:null,reservations:i===0?bookings:[]})),...(newLead?[newLead]:[])],count:newLead?9:8,facilities:[{id:'store',name:'Midpoint',canCreate:true,canManage:!readOnly,canReserve:true}],staff:[{id:'staff',name:'Example Sales Owner',facilityIds:['store']}]});
 const server=createServer(async(req,res)=>{
  if(req.url==='/app.js'){res.setHeader('Content-Type','text/javascript');return res.end(bundle.outputFiles[0].text);}
  if(req.url==='/app.css'){res.setHeader('Content-Type','text/css');return res.end(css);}
@@ -14,6 +15,13 @@ const server=createServer(async(req,res)=>{
   res.setHeader('Content-Type','application/json');
   if(req.method==='PATCH'||req.method==='POST'){
    let raw='';for await(const c of req)raw+=c;const body=JSON.parse(raw);
+   if(req.url==='/api/v1/leads/cancel-tests'){
+    bulk=body;
+    if(bulkError){res.statusCode=409;return res.end(JSON.stringify({error:{message:'Nothing was cancelled. An enquiry changed. Reload and review your selection.'}}));}
+    for(const lead of body.leads)bulkClosed.add(lead.id);
+    if(bulkRefreshFailed)refreshFailed=true;
+    return res.end(JSON.stringify({data:{count:body.leads.length}}));
+   }
    if(req.method==='PATCH'){patch=body;stage=patch.stage;}
    else if(req.url==='/api/v1/leads'){
     capture=body;newLead={...make().leads[0],id:'new-lead',stage:'NEW',reservations:[],customer:{id:body.customerId||'new-customer',firstName:body.firstName||'Existing',lastName:body.lastName||'Customer',phone:'+27000000000',email:null,companyName:null}};
@@ -41,6 +49,49 @@ try{
   await page.goto(base);await expect(page.getByRole('heading',{name:'Leads & sales performance'})).toBeVisible();await expect(page.locator('.leads-name')).toHaveCount(8);
   if(!await page.locator('.leads-search').evaluate(label=>{const input=label.querySelector('input'),icon=label.querySelector('svg');return input.getBoundingClientRect().left+parseFloat(getComputedStyle(input).paddingLeft)>icon.getBoundingClientRect().right+4;}))throw Error('Search text overlaps the icon');
   await expect(page.locator('.profile-card-heading').first()).toContainText('8 enquiries');
+  await expect(page.getByRole('button',{name:'Cancel selected tests',exact:true})).toBeDisabled();
+  await expect(page.getByRole('checkbox',{name:'Select enquiry Example 6 Customer (lead5)',exact:true})).toBeDisabled();
+  await page.getByRole('checkbox',{name:'Select enquiry Example 1 Customer (lead0)',exact:true}).check();
+  await page.getByLabel('Search leads',{exact:true}).fill('Example 2');
+  await expect(page.getByText('0 selected',{exact:true})).toBeVisible();
+  await page.getByRole('checkbox',{name:'Select all eligible enquiries shown',exact:true}).check();
+  await expect(page.getByText('1 selected',{exact:true})).toBeVisible();
+  await page.getByLabel('Search leads',{exact:true}).fill('');
+  await expect(page.getByText('0 selected',{exact:true})).toBeVisible();
+  await page.getByRole('checkbox',{name:'Select enquiry Example 1 Customer (lead0)',exact:true}).check();
+  await page.getByRole('checkbox',{name:'Select enquiry Example 2 Customer (lead1)',exact:true}).focus();await page.keyboard.press('Space');
+  await page.getByRole('button',{name:'Cancel selected tests',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Cancel 2 selected test enquiries?',exact:true})).toBeVisible();
+  await expect(page.locator('.leads-cancel-review li')).toHaveCount(2);
+  await page.screenshot({path:`output/leads-design/bulk-cancel-review-${width}.png`,fullPage:false});
+  await page.getByRole('button',{name:'Keep enquiries',exact:true}).click();if(bulkClosed.size)throw Error('Review cancel wrote records');
+  await page.getByRole('button',{name:'Cancel selected tests',exact:true}).click();bulkError=true;
+  await page.getByRole('button',{name:'Confirm cancellation',exact:true}).click();
+  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Nothing was cancelled');
+  if(bulkClosed.size)throw Error('Rejected bulk cancellation changed records');
+  bulkError=false;await page.getByRole('button',{name:'Confirm cancellation',exact:true}).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.getByText('2 test enquiries closed as Lost.',{exact:true})).toBeVisible();
+  if(JSON.stringify(bulk.leads.map(l=>l.id))!==JSON.stringify(['lead0','lead1'])||bulk.confirmed!==true||bulk.leads.some(l=>!l.updatedAt))throw Error('Bulk action did not use exact selected IDs and versions');
+  if(bulkClosed.has('lead2'))throw Error('Unselected enquiry was closed');
+  await expect(page.getByRole('checkbox',{name:'Select enquiry Example 1 Customer (lead0)',exact:true})).toBeDisabled();
+  bulkClosed.clear();bulk=null;await page.reload();
+  await page.getByRole('checkbox',{name:'Select enquiry Example 1 Customer (lead0)',exact:true}).check();
+  await page.getByRole('button',{name:'Cancel selected tests',exact:true}).click();
+  await page.route('**/api/v1/leads/cancel-tests',route=>route.abort());
+  await page.getByRole('button',{name:'Confirm cancellation',exact:true}).click();
+  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Cancellation could not be confirmed');
+  await expect(page.getByRole('button',{name:'Confirm cancellation',exact:true})).toBeDisabled();
+  await page.getByRole('button',{name:'Keep enquiries',exact:true}).click();await page.unroute('**/api/v1/leads/cancel-tests');
+  await page.getByRole('button',{name:'Reload saved enquiries',exact:true}).click();
+  await page.getByRole('checkbox',{name:'Select enquiry Example 1 Customer (lead0)',exact:true}).check();
+  await page.getByRole('button',{name:'Cancel selected tests',exact:true}).click();bulkRefreshFailed=true;
+  await page.getByRole('button',{name:'Confirm cancellation',exact:true}).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.getByRole('alert')).toContainText('Cancelled, but');
+  await expect(page.getByRole('button',{name:'Cancel selected tests',exact:true})).toBeDisabled();
+  bulkRefreshFailed=false;refreshFailed=false;bulkClosed.clear();readOnly=true;await page.reload();
+  await expect(page.getByRole('button',{name:'Cancel selected tests',exact:true})).toHaveCount(0);
+  readOnly=false;await page.reload();
+  console.log(`${width}px: exact multi-selection, filtered select-all, filter reset, review, rejection, cancellation, lost-response recovery, refresh-failure guard and read-only access passed`);
   await page.getByRole('button',{name:'Example 1 Customer',exact:true}).click();
   const nav=page.getByRole('navigation',{name:'Lead to lease progress'});await expect(nav.locator('li')).toHaveCount(4);
   await expect(page.getByRole('heading',{name:'Activity history'})).toBeVisible();

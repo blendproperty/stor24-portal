@@ -1,3 +1,4 @@
+import { cancelTestLeads } from '../../src/lib/bulk-lead-cancel-service';
 import test from 'node:test';import assert from 'node:assert/strict';import{randomUUID}from'node:crypto';import{db}from'../../src/lib/db';import{createManualLead}from'../../src/lib/manual-lead-service';import{updateLead,leadsWorkspace}from'../../src/lib/leads-workspace-service';import{releaseLeadBookingStage}from'../../src/lib/lead-booking-stage';import{createPublicLead}from'../../src/lib/public-lead-service';
 const enabled=process.env.LEADS_DB_TEST==='isolated-ci';
 test('lead updates are scoped, concurrent-safe, auditable and cannot fabricate a booking outcome',{skip:!enabled},async()=>{
@@ -51,6 +52,33 @@ test('lead updates are scoped, concurrent-safe, auditable and cannot fabricate a
  await updateLead(scope,lead.id,{...input,updatedAt:currentLead.updatedAt.toISOString(),stage:'QUOTED',nextActionAt:null,expectedMoveIn:null});
  const cleared=await db.lead.findUniqueOrThrow({where:{id:lead.id}});assert.equal(cleared.expectedMoveIn,null);assert.equal(cleared.nextActionAt,null);assert.ok(!(await leadsWorkspace(scope,true)).leads.some(l=>l.id===lead.id));
  await updateLead(scope,lead.id,{...input,updatedAt:cleared.updatedAt.toISOString(),stage:'LOST'});assert.ok(!(await leadsWorkspace(scope,true)).leads.some(l=>l.id===lead.id));
+ // Bulk cancellation is scoped, versioned and atomic, and preserves customers and notes.
+ const a=await db.lead.create({data:{facilityId:f.id,source:'Synthetic test A',notes:'Keep requirements',nextActionAt:new Date()}});
+ const b=await db.lead.create({data:{facilityId:f.id,source:'Synthetic test B'}});
+ const untouched=await db.lead.create({data:{facilityId:f.id,source:'Legitimate fixture control'}});
+ const selection={confirmed:true as const,leads:[a,b].map(l=>({id:l.id,updatedAt:l.updatedAt.toISOString()}))};
+ await assert.rejects(cancelTestLeads({...scope,facilityIds:[]},selection),/NOT_FOUND/);
+ await assert.rejects(cancelTestLeads(scope,{...selection,leads:[selection.leads[0],{id:'missing',updatedAt:b.updatedAt.toISOString()}]}),/NOT_FOUND/);
+ await assert.rejects(cancelTestLeads(scope,{...selection,leads:[selection.leads[0],{id:b.id,updatedAt:'2000-01-01T00:00:00.000Z'}]}),/CONFLICT/);
+ assert.equal((await db.lead.findUniqueOrThrow({where:{id:a.id}})).stage,'NEW');
+ const unitType=await db.unitType.create({data:{facilityId:f.id,name:'Bulk cancellation fixture',features:[]}});
+ const unit=await db.unit.create({data:{facilityId:f.id,unitTypeId:unitType.id,number:'Bulk fixture',monthlyRate:100,status:'RESERVED'}});
+ const hold=await db.reservation.create({data:{facilityId:f.id,customerId:captured.customerId!,leadId:b.id,unitId:unit.id,quotedRate:100,journey:'VIEWING'}});
+ await assert.rejects(cancelTestLeads(scope,selection),/LEAD_BOOKING_STAGE/);
+ assert.equal((await db.lead.findUniqueOrThrow({where:{id:a.id}})).stage,'NEW');
+ await db.reservation.update({where:{id:hold.id},data:{status:'CONVERTED'}});
+ await assert.rejects(cancelTestLeads(scope,selection),/LEAD_BOOKING_STAGE/);
+ await db.reservation.delete({where:{id:hold.id}});
+ await db.unit.delete({where:{id:unit.id}});await db.unitType.delete({where:{id:unitType.id}});
+ const bulkConstraint=`bulk_audit_${key.replaceAll('-','')}`;
+ await db.$executeRawUnsafe(`ALTER TABLE "AuditEvent" ADD CONSTRAINT "${bulkConstraint}" CHECK ("entityId" <> '${b.id}' OR "action" <> 'lead.test_cancelled') NOT VALID`);
+ try{await assert.rejects(cancelTestLeads(scope,selection));for(const l of [a,b])assert.equal((await db.lead.findUniqueOrThrow({where:{id:l.id}})).stage,'NEW');assert.equal(await db.auditEvent.count({where:{entityId:{in:[a.id,b.id]},action:'lead.test_cancelled'}}),0);}finally{await db.$executeRawUnsafe(`ALTER TABLE "AuditEvent" DROP CONSTRAINT "${bulkConstraint}"`);}
+ const cancellations=await Promise.allSettled([cancelTestLeads(scope,selection),cancelTestLeads(scope,{...selection,leads:[...selection.leads].reverse()})]);
+ assert.equal(cancellations.filter(r=>r.status==='fulfilled').length,1);assert.equal(cancellations.filter(r=>r.status==='rejected').length,1);
+ for(const l of [a,b]){const savedTest=await db.lead.findUniqueOrThrow({where:{id:l.id}});assert.equal(savedTest.stage,'LOST');assert.equal(savedTest.nextActionAt,null);assert.equal(savedTest.notes,l.notes);assert.equal(savedTest.customerId,l.customerId);const receipt=await db.auditEvent.findFirstOrThrow({where:{entityId:l.id,action:'lead.test_cancelled'}});assert.equal(receipt.actorId,user.id);assert.equal((receipt.after as {reason:string}).reason,'TEST_ENQUIRY');}
+ assert.equal(await db.auditEvent.count({where:{entityId:{in:[a.id,b.id]},action:'lead.test_cancelled'}}),2);
+ assert.equal((await db.lead.findUniqueOrThrow({where:{id:untouched.id}})).stage,'NEW');
+ await assert.rejects(cancelTestLeads(scope,selection),/CONFLICT/);
  assert.equal(await db.task.count({where:{organisationId:org.id}}),0,'Manager reminders read saved lead dates, without duplicate tasks');
  }finally{await db.roleAssignment.deleteMany({where:{user:{organisationId:org.id}}});await db.lead.deleteMany({where:{facility:{organisationId:org.id}}});await db.auditEvent.deleteMany({where:{organisationId:org.id}});await db.user.deleteMany({where:{organisationId:org.id}});await db.organisation.delete({where:{id:org.id}});await db.$disconnect();}
 });
