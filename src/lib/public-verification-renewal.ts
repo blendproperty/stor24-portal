@@ -50,6 +50,6 @@ export async function preparePublicVerificationCode(input:{id:string;hash:string
    await tx.auditEvent.create({data:{organisationId:r.customer.organisationId,facilityId:r.facilityId,entityType:"Reservation",entityId:r.id,action:"public_reservation.verification_hold_renewed",after:{channel:input.channel,holdExpiresAt:holdExpiresAt.toISOString()}}});
   }else if(r.status!=="ACTIVE")return unavailable();
   await tx.reservation.update({where:{id:r.id},data:{status:"ACTIVE",verificationCodeHash:input.hash,verificationExpiresAt:expiresAt,verificationAttempts:0,holdExpiresAt:input.channel==="MOBILE"?expiresAt:holdExpiresAt}});
-  return {ok:true as const,verificationExpiresAt:expiresAt,holdExpiresAt:input.channel==="MOBILE"?expiresAt:holdExpiresAt};
+  return {ok:true as const,verificationExpiresAt:expiresAt,holdExpiresAt:input.channel==="MOBILE"?expiresAt:holdExpiresAt,delivery:{phone:r.customer.phone,email:r.customer.email,organisationId:r.customer.organisationId,facilityId:r.facilityId,customerId:r.customerId}};
  });}catch(error){if(error instanceof RenewalUnavailable||error instanceof Error&&["UNIT_UNAVAILABLE","FLOOR_NOT_OPERATIONAL"].includes(error.message))return {ok:false as const,code:"RESERVATION_UNAVAILABLE"};throw error;}
 }
