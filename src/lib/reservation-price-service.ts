@@ -1,3 +1,4 @@
+import { customerPriceReviewLink } from "@/lib/customer-price-review-link";
 import {createHash, randomBytes, randomUUID} from "node:crypto";
 import {Prisma} from "@/generated/prisma/client";
 import {db} from "@/lib/db";
@@ -136,9 +137,8 @@ export async function sendReservationPriceReview(scope:RequestScope,input:unknow
     if(item.status!=="APPROVED"||item.expiresAt<=new Date())throw Error("PRICE_EXPIRED");
     originalIntact(item);assertSource(await source(tx,booking),item.sourceFingerprint);
     if(!process.env.APP_URL)throw Error("PRICE_INVALID");
-    const link=new URL("/booking-price-review",process.env.APP_URL);
+    const link=new URL(customerPriceReviewLink(booking.publicReference!,item.id),process.env.APP_URL);
     if(process.env.NODE_ENV==="production"&&link.protocol!=="https:")throw Error("PRICE_INVALID");
-    link.searchParams.set("reference",booking.publicReference!);link.searchParams.set("proposal",item.id);
     const proposed=read(item.proposedEncrypted);
     const text=`Your STOR24 booking ${booking.publicReference} has a proposed new monthly rent of R${proposed.monthlyRate}, approved for your review.\n\nReview the price: ${link}\n\nVerify your booking email, review the full initial charge and accept only if you agree. You can then review and sign the updated agreement separately. No payment is taken by accepting the quote. This link does not grant access by itself.`;
     return {booking,payload:{to:booking.customer.email!,subject:"STOR24 — review your updated rental quote",text,html:`<p>${escapeEmailHtml(text).replaceAll("\n","<br>")}</p>`}};

@@ -1,4 +1,5 @@
 "use client";
+import { customerPriceReviewLink } from "@/lib/customer-price-review-link";
 import {useRef,useState} from "react";
 import {proposedReservationPrice,negotiatedMonthlyRate} from "@/lib/reservation-price-policy";
 import {PriceManagerApproval} from "./price-manager-approval";
@@ -53,7 +54,7 @@ export function ReservationPriceWorkspace({initialReference=""}:{initialReferenc
       {data.canPropose&&row.status==="PROPOSED"&&!data.canApprove&&<PriceManagerApproval key={`${row.id}:${row.revision}`} id={row.id} revision={row.revision} facilityId={data.reservation.facilityId} reference={reviewRef} confirmed={confirmed} disabled={busy||uncertain||!!row.issue||new Date(row.expiresAt)<=new Date()} onApproved={()=>{setData(null);setNotice("Manager approval saved. Load booking review to read the recorded decision before sending anything to the customer.");setConfirmed(false);}}/>}
       {data.canPropose&&["PROPOSED","APPROVED"].includes(row.status)&&<button className="button button-secondary" disabled={busy||uncertain||!confirmed||reviewRef.trim().length<5} onClick={()=>void save({action:"decide",id:row.id,facilityId:data.reservation.facilityId,revision:row.revision,decision:"WITHDRAWN",reference:reviewRef,confirmed:true})}>Withdraw proposal</button>}
       {row.status==="APPROVED"&&!row.issue&&data.canSend&&<div><p>Send the approved review to {data.reservation.email}. The customer verifies their email, accepts the price and continues to the updated agreement. Sending does not apply the price.</p><button type="button" className="button button-primary" disabled={busy||uncertain||!confirmed||new Date(row.expiresAt)<=new Date()} onClick={()=>void save({action:"send",id:row.id,facilityId:data.reservation.facilityId,confirmed:true})}>Email approved quote and agreement steps</button></div>}
-      {row.status==="APPROVED"&&!row.issue&&data.reservation.reference&&<p><a href={`/booking-price-review?reference=${encodeURIComponent(data.reservation.reference)}&proposal=${encodeURIComponent(row.id)}`} target="_blank" rel="noreferrer">Customer review page — fresh verification required</a></p>}</article>)}{data.historyTruncated&&<p>Only the latest 50 retained proposals are displayed. Earlier evidence remains retained.</p>}</section>
+      {row.status==="APPROVED"&&!row.issue&&data.reservation.reference&&<p><a href={customerPriceReviewLink(data.reservation.reference,row.id)} target="_blank" rel="noreferrer">Customer review page — fresh verification required</a></p>}</article>)}{data.historyTruncated&&<p>Only the latest 50 retained proposals are displayed. Earlier evidence remains retained.</p>}</section>
     </>}
   </div>;
 }
