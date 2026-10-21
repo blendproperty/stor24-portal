@@ -439,7 +439,7 @@ export async function resendPublicReservationVerification(reference: string, boo
   const prepared=await preparePublicVerificationCode({id:reservation.id,hash:verificationHash(reservation.id,code),channel:"MOBILE",bookingKey});
   if(!prepared.ok)return prepared;
   const verificationExpiresAt=prepared.verificationExpiresAt;
-  const result = await deliverVerificationCode({ code, phone: reservation.customer.phone ?? "", organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, idempotencyKey: `${reservation.idempotencyKey ?? reservation.id}:VERIFY:${randomUUID()}` });
+  const result = await deliverVerificationCode({ code, phone: prepared.delivery.phone ?? "", organisationId: prepared.delivery.organisationId, facilityId: prepared.delivery.facilityId, idempotencyKey: `${reservation.idempotencyKey ?? reservation.id}:VERIFY:${randomUUID()}` });
   await db.auditEvent.create({ data: { organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, action: result.ok ? "public_reservation.verification_resent" : "public_reservation.verification_resend_failed", entityType: "Reservation", entityId: reservation.id, requestId: reservation.idempotencyKey, after: { channel: result.ok ? result.channel : null, expiresAt: verificationExpiresAt.toISOString() } } });
   return result.ok ? { ok: true as const, verificationChannel: result.channel, verificationExpiresAt: verificationExpiresAt.toISOString() } : { ok: false as const, code: "DELIVERY_FAILED" };
 }
@@ -459,7 +459,7 @@ export async function startPublicEmailVerification(reference: string, refreshIde
   if(!prepared.ok)return prepared;
   const verificationExpiresAt=prepared.verificationExpiresAt;
   const attempt=randomUUID();
-  const delivery = await deliverEmailVerificationCode({ code, email: reservation.customer.email, organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, customerId: reservation.customerId, idempotencyKey: `${reservation.idempotencyKey ?? reservation.id}:EMAIL_VERIFY:${attempt}` });
+  const delivery = await deliverEmailVerificationCode({ code, email: prepared.delivery.email ?? "", organisationId: prepared.delivery.organisationId, facilityId: prepared.delivery.facilityId, customerId: prepared.delivery.customerId, idempotencyKey: `${reservation.idempotencyKey ?? reservation.id}:EMAIL_VERIFY:${attempt}` });
   await db.auditEvent.create({ data: { organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, action: delivery.ok ? "public_reservation.email_verification_sent" : "public_reservation.email_verification_failed", entityType: "Reservation", entityId: reservation.id, requestId: reservation.idempotencyKey, after: { expiresAt: verificationExpiresAt.toISOString() } } });
   if (!delivery.ok) return { ok: false as const, code: "DELIVERY_FAILED" };
   return { ok: true as const, alreadyVerified: false, verificationExpiresAt: verificationExpiresAt.toISOString() };
