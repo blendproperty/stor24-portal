@@ -301,7 +301,7 @@
 @media(max-width:760px) { .app-shell .topbar { gap:8px; } .workspace-finder-trigger { width:36px; min-height:36px; padding:8px; justify-content:center; border:0; flex-shrink:0; } .workspace-finder-trigger span,.workspace-finder-trigger kbd { display:none; } .skip-to-workspace { left:12px; } }
 @media(prefers-reduced-motion:reduce) { .app-shell *, .app-shell *::before, .app-shell *::after { scroll-behavior:auto !important; transition:none !important; animation:none !important; } }
 
-@media(max-width:400px) { .app-shell .top-actions [aria-label="Scheduled work"] { display:none; } .workspace-finder-trigger { width:32px; min-height:32px; padding:6px; } }
+@media(max-width:400px) { .app-shell .topbar { gap:4px; } .app-shell .top-actions [aria-label="Scheduled work"] { display:none; } .workspace-finder-trigger { width:32px; min-height:32px; padding:6px; } }
 
 .app-shell .content :where(input:not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=range]):not([type=color]):not([type=file]), select) { height:46px; }
 .app-shell .content textarea { min-height:96px; resize:vertical; }

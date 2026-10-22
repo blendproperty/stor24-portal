@@ -181,9 +181,10 @@ try {
 
   const searchPage = await context.newPage();
   const searchDialog = searchPage.getByRole("dialog", {name: "Find a workspace", exact: true});
-  for (const [width, route] of [[1440, "/"], [390, "/reservations"], [320, "/settings"]]) {
+  for (const [width, route] of [[1440, "/"], [390, "/reservations"], [320, "/settings"], [305, "/settings"]]) {
     await searchPage.setViewportSize({width, height: 900});
     await searchPage.goto(`${base}${route}?user=keyword-search-${width}`);
+    await searchPage.evaluate(() => document.fonts.ready);
     await searchPage.getByRole("button", {name: "Find a workspace", exact: true}).click();
     await expect(searchDialog).toBeVisible();
     await searchDialog.getByRole("textbox", {name: "Search workspaces"}).fill("move out");
@@ -227,7 +228,7 @@ try {
   await searchPage.close();
   guideAccessDenied = false;
   guidePersona = [{facilityId: null, role: {name: "Organisation owner", permissions: ["*"]}}];
-  results.push("Keyword search on dashboard/reservations/settings at 1440/390/320; open page without guide progress; Ctrl+K; walkthrough; empty state; permissions and revoked access");
+  results.push("Keyword search on dashboard/reservations/settings at 1440/390/320/305; open page without guide progress; Ctrl+K; walkthrough; empty state; permissions and revoked access");
 
   await page.setViewportSize({width: 1440, height: 1000});
   await page.goto(`${base}/?user=catalogue-reader`);
