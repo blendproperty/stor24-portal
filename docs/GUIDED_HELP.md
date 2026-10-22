@@ -22,6 +22,12 @@ The server returns `private, no-store` responses; the service worker never cache
 
 This change controls tutorials. It does not modify staff roles, sidebar visibility or the existing server enforcement of operational actions. Personal password/MFA controls continue to follow the application's existing rules.
 
+## Keyword task search (22 October 2026)
+
+The shared staff header's search control (or Ctrl/Cmd+K) searches authorised pages and workflow titles, descriptions, step text, screen names and routes. Spaces and punctuation are treated alike, so `move out` also finds `move-out`. Each matching task offers **Open page** and **Guide me**. Opening a page does not start a guide or change reading progress; Guide me opens the walkthrough, whose existing screen and highlight controls take the user through the task. Save unfinished work before changing screens. Customer and unit records still use the workspace's own filters.
+
+Guide me also puts keyword search before contextual help and offers an Open page link for each workflow. Search and guides share the same freshly authorised private catalogue, including permission refresh on opening, navigation, focus and every 30 seconds while either is open. Failed authentication or refresh removes task results; ordinary page links remain subject to existing navigation permissions and server route guards. No new role grants, business actions, configuration or dependencies are introduced. These controls cover authenticated pages using AppShell; standalone offline and public/authentication pages retain their existing help.
+
 ## Coverage
 
 45 authored tutorials contain 212 reading steps (the owner catalogue) across every current staff page and the standalone offline workspace:
