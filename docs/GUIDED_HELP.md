@@ -30,7 +30,7 @@ Guide me also puts keyword search before contextual help and offers an Open page
 
 ## Coverage
 
-45 authored tutorials contain 212 reading steps (the owner catalogue) across every current staff page and the standalone offline workspace:
+As verified on 22 October 2026, the owner catalogue contains 80 authored tutorials and 339 reading steps. The work areas below describe the core coverage; automated checks keep current staff routes and guide access policies aligned.
 
 | Work area | Tutorials |
 | --- | --- |
@@ -41,7 +41,7 @@ Guide me also puts keyword search before contextual help and offers an Open page
 | Administration | Store setup/public visibility; tenant defaults; all 18 Program defaults groups; employees/invitations/permissions; settings/password/MFA/recovery; communications; integration health and signing reconciliation; HikCentral; Netcash test configuration; phone integration |
 | Offline work | Device-readiness register; preparation/unlock/capture/unit requests/sync/conflicts/refresh/erasure |
 
-All 36 staff Next pages (including the dynamic account statement) and `/offline-workspace.html` have contextual help. Authentication and customer-facing pages are not staff tutorial surfaces; sign-in/recovery and staff handling of customer portal invitations are explained from the appropriate staff guide.
+Automated coverage checks require contextual help for every current staff Next page (including the dynamic account statement) and `/offline-workspace.html`. Authentication and customer-facing pages are not staff tutorial surfaces; sign-in/recovery and staff handling of customer portal invitations are explained from the appropriate staff guide.
 
 The content distinguishes implemented controls from unfinished screens: Collections queue selection without contact, controlled Adjustments and externally completed refunds, the Phone configuration shell and saved-but-unverified automation/defaults are explicitly explained. The calculator's fixed 31-day assumption is stated. Test payments, mandates, internal ledger matching, insurer records and saved access configuration are not represented as real settlement, completed handover, accepted insurance or working doors.
 
