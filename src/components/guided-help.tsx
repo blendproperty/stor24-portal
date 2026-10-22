@@ -161,8 +161,8 @@ export function GuidedHelp({ userId, searchItems, access }: { userId: string; se
     if (!open) return;
     document.body.classList.add("guided-help-open");
     const escape = (event: KeyboardEvent) => {
-      // A business modal owns Escape while it is open; never dismiss it from a guide.
-      if (event.key !== "Escape" || document.querySelector(".modal-backdrop")) return;
+      // A modal owns Escape while it is open; never dismiss it from a guide.
+      if (event.key !== "Escape" || document.querySelector(".modal-backdrop, dialog[open]")) return;
       setOpen(false); trigger.current?.focus();
     };
     document.addEventListener("keydown", escape);

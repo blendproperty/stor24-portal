@@ -204,6 +204,11 @@ try {
     await task.getByRole("button", {name: "Guide me", exact: true}).click();
     await expect(searchDialog).not.toBeVisible();
     await expect(searchPage.locator(".guide-step h3")).toHaveText(workflowGuides.find(g => g.id === "move-out").steps[0].title);
+    await searchPage.keyboard.press("Control+k");
+    await expect(task).toBeVisible();
+    await searchPage.keyboard.press("Escape");
+    await expect(searchDialog).not.toBeVisible();
+    await expect(searchPage.locator(".guide-step h3")).toHaveText(workflowGuides.find(g => g.id === "move-out").steps[0].title);
     await searchPage.getByRole("button", {name: "Close guided help"}).click();
     await searchPage.locator(".guide-trigger").click();
     await searchPage.getByLabel("Search guides").fill("statement");
