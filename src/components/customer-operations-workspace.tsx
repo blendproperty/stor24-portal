@@ -8,6 +8,7 @@ import { Download, Pencil, Plus, Search, UserRound, X } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { StaffFollowups } from "@/components/staff-followups";
+import { TestCustomerCleanup } from "@/components/test-customer-cleanup";
 import { CustomerHistory } from "@/components/customer-history";
 
 type Contact = Record<string, string>;
@@ -31,7 +32,7 @@ const SOUTH_AFRICAN_LOCATIONS = {
 } satisfies Record<string, [string, string][]>;
 const RELATIONSHIPS = ["Spouse", "Partner", "Parent", "Child", "Sibling", "Relative", "Friend", "Colleague", "Employer", "Employee", "Guardian", "Other"];
 
-export function CustomerOperationsWorkspace({ initialCustomerId = "", initialFollowups = false }: { initialCustomerId?: string; initialFollowups?: boolean }) {
+export function CustomerOperationsWorkspace({ initialCustomerId = "", initialFollowups = false, canDeleteTests = false }: { initialCustomerId?: string; initialFollowups?: boolean; canDeleteTests?: boolean }) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [search, setSearch] = useState("");
@@ -108,7 +109,7 @@ export function CustomerOperationsWorkspace({ initialCustomerId = "", initialFol
     finally { clearTimeout(timer); saveRequest.current = null; setBusy(false); }
   }
 
-  return <div className="page-stack customers-workspace customer-workspace"><PageHeader eyebrow="Operations centre" title="Customers & tenants" description="A complete customer picture: contact details, current space, enquiries and account activity." action={<div className="form-actions"><button className="button button-secondary customer-refresh" aria-label={readBusy ? "Loading customer records…" : "Reload customer records"} disabled={readBusy || busy} onClick={() => void load()}>Refresh</button><Link href="/operations/accounts/training" className="button button-secondary">Training balances</Link><Link href="/operations/move-in" className="button button-secondary">Move in</Link><button className="button button-primary" disabled={readBusy || !!readError || busy} onClick={() => { setEditing("new"); setError(""); }}><Plus size={16}/>Add customer</button></div>}/>
+  return <div className="page-stack customers-workspace customer-workspace"><PageHeader eyebrow="Operations centre" title="Customers & tenants" description="A complete customer picture: contact details, current space, enquiries and account activity." action={<div className="form-actions"><button className="button button-secondary customer-refresh" aria-label={readBusy ? "Loading customer records…" : "Reload customer records"} disabled={readBusy || busy} onClick={() => void load()}>Refresh</button>{canDeleteTests ? <TestCustomerCleanup customers={customers.map(c => ({ id: c.id, name: nameOf(c), contact: c.email || c.phone || "" }))} disabled={readBusy || !!readError || busy} onDeleted={load}/> : null}<Link href="/operations/accounts/training" className="button button-secondary">Training balances</Link><Link href="/operations/move-in" className="button button-secondary">Move in</Link><button className="button button-primary" disabled={readBusy || !!readError || busy} onClick={() => { setEditing("new"); setError(""); }}><Plus size={16}/>Add customer</button></div>}/>
     {error && !editing ? <p className="form-error">{error}</p> : null}{notice ? <p className="form-success">{notice}</p> : null}
     {readError ? <div role="alert"><p>{readError}</p>{readAccess === "signed-out" ? <Link className="button button-primary" href="/login?next=%2Ftenants">Sign in again</Link> : null}</div> : null}
     {!readBusy && !readError ? <><section className="summary-strip">{[["Customers", customers.length], ["Active tenants", activeTenants], ["Reservations", customers.reduce((sum, item) => sum + item.reservations.filter((reservation) => reservation.status === "ACTIVE").length, 0)], ["Leads", customers.reduce((sum, item) => sum + item.leads.length, 0)]].map(([label, count]) => <div className="summary-cell" key={label}><span>{label}</span><strong>{count}</strong></div>)}</section>

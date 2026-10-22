@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 
@@ -26,9 +27,9 @@ export type UatResetPreview = {
   debitInstructions: number;
 };
 
-async function preview(tx: Tx, organisationId: string): Promise<UatResetPreview> {
+async function preview(tx: Tx, organisationId: string, ids?: string[]): Promise<UatResetPreview> {
   const customers = await tx.customer.findMany({
-    where: { organisationId },
+    where: { organisationId, ...(ids ? { id: { in: ids } } : {}) },
     select: { id: true, accounts: { select: { id: true } }, tenancies: { select: { id: true } } },
   });
   const customerIds = customers.map((customer) => customer.id);
@@ -96,6 +97,29 @@ async function preview(tx: Tx, organisationId: string): Promise<UatResetPreview>
   };
 }
 
+export async function getTestCustomerCleanupPreview(organisationId: string, ids: string[], tx: Tx = db) {
+  if (!ids.length || ids.length > 100 || new Set(ids).size !== ids.length) throw new Error("CONFLICT");
+  const customers = await tx.customer.findMany({
+    where: { organisationId, id: { in: ids } }, orderBy: { id: "asc" },
+    include: {
+      leads: true, reservations: { include: { publicLease: true, publicPaymentSessions: true } },
+      tenancies: { include: { mandateSession: true, documents: true, insuranceEnrollment: true, occupancies: true } },
+      accounts: { include: { payments: true, debitInstructions: true, ledgerEntries: true, adjustments: true, merchandiseOrders: { include: { items: true } }, collectionCase: { include: { activities: true, promises: true } } } },
+      biometricEnrollments: true, integrationIdentityLink: true, staffNotes: true,
+      communications: { where: { status: { in: ["PENDING", "PROCESSING"] } } },
+    },
+  });
+  if (customers.length !== ids.length) throw new Error("NOT_FOUND");
+  if (customers.some(c => c.leads.some(l => l.source === "Staff training only") ||
+    c.accounts.some(a => a.payments.length || a.debitInstructions.length) ||
+    c.reservations.some(r => r.publicLease || r.publicPaymentSessions.length) ||
+    c.tenancies.some(t => t.mandateSession || t.documents.length || t.insuranceEnrollment) ||
+    c.biometricEnrollments.length || c.integrationIdentityLink || c.communications.length)) throw new Error("TEST_CUSTOMER_REVIEW_REQUIRED");
+  const counts = await preview(tx, organisationId, ids);
+  const fingerprint = createHash("sha256").update(JSON.stringify({ customers, counts })).digest("hex");
+  return { customers: customers.map(c => ({ id: c.id, name: c.companyName || [c.firstName, c.lastName].filter(Boolean).join(" ") || "Unnamed customer" })), counts, fingerprint };
+}
+
 export function getUatResetPreview(organisationId: string) {
   return preview(db, organisationId);
 }
@@ -103,11 +127,16 @@ export function getUatResetPreview(organisationId: string) {
 export async function resetUatCustomerData(input: {
   organisationId: string;
   actorId: string;
+  selection?: { ids: string[]; fingerprint: string };
 }) {
   return db.$transaction(async (tx) => {
-    const counts = await preview(tx, input.organisationId);
+    if (input.selection) {
+      const review = await getTestCustomerCleanupPreview(input.organisationId, input.selection.ids, tx);
+      if (review.fingerprint !== input.selection.fingerprint) throw new Error("CONFLICT");
+    }
+    const counts = await preview(tx, input.organisationId, input.selection?.ids);
     const customers = await tx.customer.findMany({
-      where: { organisationId: input.organisationId },
+      where: { organisationId: input.organisationId, ...(input.selection ? { id: { in: input.selection.ids } } : {}) },
       select: { id: true, accounts: { select: { id: true } }, tenancies: { select: { id: true } } },
     });
     const customerIds = customers.map((customer) => customer.id);
@@ -193,7 +222,7 @@ export async function resetUatCustomerData(input: {
         action: "uat.customer_data_reset",
         entityType: "Organisation",
         entityId: input.organisationId,
-        after: counts as unknown as Prisma.InputJsonValue,
+        after: { ...counts, ...(input.selection ? { customerIds, reason: "SELECTED_TEST_CUSTOMERS" } : {}) } as unknown as Prisma.InputJsonValue,
       },
     });
     return counts;

@@ -740,3 +740,40 @@ test("owner delegation and revocation are transactional, audited and invalidate 
     assert.ok(f.writes.some(w => w.model === "user" && w.where.id === "delegate" && w.data.sessionVersion.increment === 1));
   }
 });
+
+
+test("selected customer cleanup rejects staff, cross-origin, empty and duplicate requests before mutation", async () => {
+  const state = fixture(); state.grant("leasing.manage");
+  const api = await load("./src/app/api/v1/admin/test-customers/route.ts", state);
+  const call = (body: Row, origin = "https://example.invalid") => api.POST(new Request("https://example.invalid/api/v1/admin/test-customers", { method: "POST", headers: { origin, "content-type": "application/json" }, body: JSON.stringify(body) }));
+  assert.equal((await call({ action: "preview", ids: ["customer-a"] })).status, 403);
+  state.grant("*", null, "Organisation owner");
+  assert.equal((await call({ action: "preview", ids: ["customer-a"] }, "https://foreign.invalid")).status, 403);
+  for (const ids of [[], ["customer-a", "customer-a"], Array.from({length:101}, (_,i) => `id-${i}`)]) assert.equal((await call({ action: "preview", ids })).status, 422);
+  assert.equal((await call({ action: "delete", ids: ["customer-a"], fingerprint: "a".repeat(64), confirmation: "yes" })).status, 422);
+  assert.deepEqual(state.writes, []);
+});
+
+
+test("selected cleanup refuses protected records and foreign customers without deleting anything", async () => {
+  const state = fixture();
+  const service = await load("./src/lib/uat-reset-service.ts", state);
+  const clean = { id: "selected", organisationId: "org", leads: [], reservations: [], tenancies: [], accounts: [], biometricEnrollments: [], integrationIdentityLink: null, communications: [] };
+  for (const protection of [
+    { leads: [{ source: "Staff training only" }] },
+    { accounts: [{ payments: [{}], debitInstructions: [] }] },
+    { accounts: [{ payments: [], debitInstructions: [{}] }] },
+    { reservations: [{ publicLease: {}, publicPaymentSessions: [] }] },
+    { reservations: [{ publicLease: null, publicPaymentSessions: [{}] }] },
+    { tenancies: [{ mandateSession: {}, documents: [], insuranceEnrollment: null }] },
+    { tenancies: [{ mandateSession: null, documents: [{}], insuranceEnrollment: null }] },
+    { tenancies: [{ mandateSession: null, documents: [], insuranceEnrollment: {} }] },
+    { biometricEnrollments: [{}] }, { integrationIdentityLink: {} }, { communications: [{}] },
+  ]) {
+    state.tables.customer.splice(0, state.tables.customer.length, { ...clean, ...protection });
+    await assert.rejects(service.getTestCustomerCleanupPreview("org", ["selected"]), /TEST_CUSTOMER_REVIEW_REQUIRED/);
+  }
+  state.tables.customer.splice(0, state.tables.customer.length, { ...clean, organisationId: "foreign" });
+  await assert.rejects(service.getTestCustomerCleanupPreview("org", ["selected"]), /NOT_FOUND/);
+  assert.deepEqual(state.writes, []);
+});
