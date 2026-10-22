@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
 import { db } from "../../src/lib/db";
-import { getUatResetPreview, resetUatCustomerData } from "../../src/lib/uat-reset-service";
+import { getUatResetPreview, getTestCustomerCleanupPreview, resetUatCustomerData } from "../../src/lib/uat-reset-service";
 
 test("isolated PostgreSQL customer reset handles restrictive workflow records atomically", async t => {
   assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci");
@@ -44,6 +44,46 @@ test("isolated PostgreSQL customer reset handles restrictive workflow records at
     };
   }
   try {
+    await t.test("selected cleanup preserves unselected customers, rejects stale/outside selections and audits exact ids", async () => {
+      const f = await fixture();
+      const chosen = await db.customer.create({ data: { organisationId: f.org.id, firstName: "Selected synthetic test" } });
+      const second = await db.customer.create({ data: { organisationId: f.org.id, firstName: "Second selected test" } });
+      const localAccount = await db.account.create({ data: { customerId: chosen.id, accountNumber: randomUUID() } });
+      const localUnit = await db.unit.create({ data: { facilityId: f.facility.id, unitTypeId: f.type.id, number: randomUUID(), monthlyRate: 100, status: "OCCUPIED" } });
+      await db.tenancy.create({ data: { facilityId: f.facility.id, customerId: chosen.id, accountId: localAccount.id, startDate: new Date(), occupancies: { create: { unitId: localUnit.id, startDate: new Date(), monthlyRate: 100, status: "ACTIVE" } } } });
+      await db.ledgerEntry.create({ data: { accountId: localAccount.id, type: "CHARGE", amount: 100, description: "Synthetic selected test charge", effectiveAt: new Date() } });
+      await db.reservation.create({ data: { facilityId: f.facility.id, customerId: second.id, unitId: localUnit.id, quotedRate: 100 } });
+      await db.lead.create({ data: { facilityId: f.facility.id, customerId: second.id, source: "Synthetic cleanup test" } });
+      const ids = [chosen.id, second.id];
+      await assert.rejects(getTestCustomerCleanupPreview(f.org.id, []), /CONFLICT/);
+      await assert.rejects(getTestCustomerCleanupPreview(f.org.id, [chosen.id, chosen.id]), /CONFLICT/);
+      await assert.rejects(getTestCustomerCleanupPreview(f.org.id, [chosen.id, "foreign"]), /NOT_FOUND/);
+      await assert.rejects(getTestCustomerCleanupPreview(f.org.id, [f.customer.id]), /TEST_CUSTOMER_REVIEW_REQUIRED/);
+      let review = await getTestCustomerCleanupPreview(f.org.id, ids);
+      const before = await snapshot(f);
+      await db.customer.update({ where: { id: chosen.id }, data: { lastName: "Changed" } });
+      await assert.rejects(resetUatCustomerData({ ...f.input, selection: { ids, fingerprint: review.fingerprint } }), /CONFLICT/);
+      assert.equal(await db.customer.count({ where: { id: { in: ids } } }), 2);
+      review = await getTestCustomerCleanupPreview(f.org.id, ids);
+      await db.$executeRawUnsafe(`ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_selected_audit_failure CHECK (action <> 'uat.customer_data_reset') NOT VALID`);
+      try {
+        await assert.rejects(resetUatCustomerData({ ...f.input, selection: { ids, fingerprint: review.fingerprint } }));
+        assert.equal(await db.customer.count({ where: { id: { in: ids } } }), 2);
+      } finally { await db.$executeRawUnsafe(`ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_selected_audit_failure`); }
+      const result = await resetUatCustomerData({ ...f.input, selection: { ids, fingerprint: review.fingerprint } });
+      assert.equal(result.customers, 2);
+      assert.equal(await db.account.count({ where: { id: localAccount.id } }), 0);
+      assert.equal(await db.ledgerEntry.count({ where: { accountId: localAccount.id } }), 0);
+      assert.equal((await db.unit.findUniqueOrThrow({ where: { id: localUnit.id } })).status, "AVAILABLE");
+      assert.equal(await db.reservation.count({ where: { customerId: second.id } }), 0);
+      assert.equal(await db.lead.count({ where: { customerId: second.id } }), 0);
+      assert.equal(await db.customer.count({ where: { id: { in: ids } } }), 0);
+      const after = await snapshot(f);
+      assert.deepEqual({ ...after, preview: null, audits: 0 }, { ...before, preview: null, audits: 0 });
+      const audit = await db.auditEvent.findFirstOrThrow({ where: { organisationId: f.org.id, action: "uat.customer_data_reset" } });
+      assert.deepEqual((audit.after as { customerIds: string[] }).customerIds.sort(), ids.sort());
+      await assert.rejects(resetUatCustomerData({ ...f.input, selection: { ids, fingerprint: review.fingerprint } }), /NOT_FOUND/);
+    });
     await t.test("payment-linked orders, collections, adjustments, requests and debit batches reset; other organisation and catalogue survive", async () => {
       const f = await fixture(), other = await fixture();
       const otherBefore = await snapshot(other);
