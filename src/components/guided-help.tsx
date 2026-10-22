@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
+import { WorkspaceFinder, type Destination } from "@/components/workspace-finder";
+import type { NavigationAccess } from "@/lib/navigation-access";
 import { usePathname, useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, BookOpen, Check, CheckCircle2, Compass, LocateFixed, Pause, RotateCcw, X } from "lucide-react";
 import { filterGuides, guideStorageKey, helpForPath, parseGuidePreferences, reviewGuideStep, stepMatchesPath, type GuideCatalogue, type WorkflowGuide, type GuidePreferences, type GuideStep } from "@/lib/guided-help-state";
@@ -71,7 +74,7 @@ function GuideHighlight({ step }: { step: GuideStep }) {
   return rectangle ? <div className="guide-highlight" style={rectangle} aria-hidden="true" /> : null;
 }
 
-export function GuidedHelp({ userId }: { userId: string }) {
+export function GuidedHelp({ userId, searchItems, access }: { userId: string; searchItems: Destination[]; access: NavigationAccess }) {
   const pathname = usePathname();
   const router = useRouter();
   const [catalogue, setCatalogue] = useState<GuideCatalogue | null>(null);
@@ -92,6 +95,7 @@ export function GuidedHelp({ userId }: { userId: string }) {
   }, []);
   const cancelLoad = useCallback(() => { requestId.current++; }, []);
   const [open, setOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [view, setView] = useState<"library" | "guide" | "finished">("library");
   const [saveFailed, setSaveFailed] = useState(false);
   const [locateMessage, setLocateMessage] = useState("");
@@ -143,7 +147,7 @@ export function GuidedHelp({ userId }: { userId: string }) {
   }
 
   useEffect(() => {
-    if (!open) return;
+    if (!open && !searchOpen) return;
     const refresh = () => { setCatalogue(null); setLoadFailed(false); void loadCatalogue(); };
     // Recheck fresh database permissions on navigation, focus and while help stays open.
     // Failure closes access to previously loaded guides; private responses are never cached.
@@ -151,14 +155,14 @@ export function GuidedHelp({ userId }: { userId: string }) {
     window.addEventListener("focus", refresh);
     void loadCatalogue();
     return () => { clearInterval(timer); window.removeEventListener("focus", refresh); cancelLoad(); };
-  }, [open, pathname, userId, loadCatalogue, cancelLoad]);
+  }, [open, searchOpen, pathname, userId, loadCatalogue, cancelLoad]);
 
   useEffect(() => {
     if (!open) return;
     document.body.classList.add("guided-help-open");
     const escape = (event: KeyboardEvent) => {
-      // A business modal owns Escape while it is open; never dismiss it from a guide.
-      if (event.key !== "Escape" || document.querySelector(".modal-backdrop")) return;
+      // A modal owns Escape while it is open; never dismiss it from a guide.
+      if (event.key !== "Escape" || document.querySelector(".modal-backdrop, dialog[open]")) return;
       setOpen(false); trigger.current?.focus();
     };
     document.addEventListener("keydown", escape);
@@ -168,6 +172,7 @@ export function GuidedHelp({ userId }: { userId: string }) {
   useEffect(() => { if (open) heading.current?.focus(); }, [open, view, index, guide?.id]);
 
   return <>
+    <WorkspaceFinder items={searchItems} access={access} guides={workflowGuides} loading={!catalogue && !loadFailed} loadFailed={loadFailed} onOpen={() => { setCatalogue(null); setLoadFailed(false); setSearchOpen(true); }} onClose={() => setSearchOpen(false)} onGuide={id => start(id)} />
     <button ref={trigger} type="button" className={`guide-trigger ${preferences.enabled ? "is-enabled" : ""}`} aria-expanded={open} aria-controls={open ? "guided-help-panel" : undefined} title="Tutorials and help with this page" onClick={() => open ? close() : showLibrary()}>
       <Compass size={18} aria-hidden="true" /><span>Guide me</span>{preferences.enabled && <span className="guide-enabled-dot" aria-label="Guide mode on" />}
     </button>
@@ -177,22 +182,22 @@ export function GuidedHelp({ userId }: { userId: string }) {
         <div className="guide-panel-header"><span><Compass size={19} aria-hidden="true" /> YOUR WORKFLOW COMPANION</span><button type="button" className="guide-icon" aria-label="Close guided help" onClick={close}><X size={20} /></button></div>
         <div className="guide-panel-scroll">
           <div className="guide-intro"><p className="guide-eyebrow">STOR24 · LEARN AS YOU GO</p><h2 ref={heading} tabIndex={-1}>{screenView === "library" ? "A little guidance.\nA clearer next step." : screenView === "finished" ? "Reading complete." : guide?.title ?? "Your workflow guides"}</h2>
-            {screenView === "library" && <p>Guides matched to your current permissions and the tasks available to you.</p>}
+            {screenView === "library" && <p>Find a task by keyword, open its page, or follow a step-by-step guide. Results match your current permissions.</p>}
           </div>
           <div className="guide-mode"><div><strong>Guide mode</strong><small>{preferences.enabled ? "On · highlights available" : "Off · work without highlights"}</small></div><button type="button" role="switch" disabled={!catalogue} aria-checked={preferences.enabled} aria-label="Guide mode" className="guide-switch" onClick={() => { persist({ ...preferences, enabled: !preferences.enabled }); setView("library"); setLocateMessage(""); }}><span /></button></div>
           {saveFailed && <p role="status" className="guide-notice">Browser storage is unavailable. You can still use the guides, but your preference and progress may be lost when you leave.</p>}
 
           {!catalogue && <p role="status" className="guide-notice">{loadFailed ? "We could not confirm your tutorial access. Reopen Guide me when you are signed in and online." : "Checking the guides available to your account…"}</p>}
           {catalogue && screenView === "library" && <>
+            <div className="guide-library-filters"><label>Search guides<input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="What do you want to do? Try refund or move out"/></label><label>Work area<select value={category} onChange={event => setCategory(event.target.value)}>{["All", ...new Set(workflowGuides.map(item => item.category ?? "Customer journey"))].map(item => <option key={item}>{item}</option>)}</select></label><p role="status">{visibleGuides.length} of {workflowGuides.length} guides</p>{(query || category !== "All") && <button className="guide-text-action" type="button" onClick={() => { setQuery(""); setCategory("All"); }}>Clear filters</button>}</div>
             <section className="guide-page-help"><span className="guide-eyebrow">HELP WITH THIS PAGE</span><h3>{help.title}</h3><p>{help.body}</p>{"guideId" in help && help.guideId && <button type="button" className="guide-text-action" onClick={() => start(help.guideId!)}>Guide me through this <ArrowRight size={16} /></button>}</section>
             {relatedGuides.length > 0 && <div className="guide-related"><strong>Also on this screen</strong>{relatedGuides.map(item => <button key={item.id} type="button" className="guide-text-action" onClick={() => start(item.id)}>{item.title}<ArrowRight size={14}/></button>)}</div>}
             {guide && progress && progress.reviewed.length < guide.steps.length && <button type="button" className="guide-resume" onClick={() => start(guide.id)}><span><strong>Continue where you left off</strong><small>{guide.title} · step {index + 1} of {guide.steps.length}</small></span><ArrowRight size={18} /></button>}
             <div className="guide-section-label"><BookOpen size={16} /><h3>Choose a workflow</h3></div>
-            <div className="guide-library-filters"><label>Search guides<input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Try move-out, stock or refunds"/></label><label>Work area<select value={category} onChange={event => setCategory(event.target.value)}>{["All", ...new Set(workflowGuides.map(item => item.category ?? "Customer journey"))].map(item => <option key={item}>{item}</option>)}</select></label><p role="status">{visibleGuides.length} of {workflowGuides.length} guides</p>{(query || category !== "All") && <button className="guide-text-action" type="button" onClick={() => { setQuery(""); setCategory("All"); }}>Clear filters</button>}</div>
             <div className="guide-library">{visibleGuides.map((item) => {
               const number = workflowGuides.indexOf(item);
               const reviewed = preferences.progress[item.id]?.reviewed.length ?? 0;
-              return <button type="button" key={item.id} className="guide-card" onClick={() => start(item.id)}><span className="guide-card-number">{reviewed === item.steps.length ? <Check size={18} /> : String(number + 1).padStart(2, "0")}</span><span><strong>{item.title}</strong><span className="guide-card-description">{item.description}</span><small>{item.category ?? "Customer journey"} · {item.duration} · {item.steps.length} steps{reviewed > 0 ? ` · ${reviewed} read` : ""}</small></span><ArrowRight size={17} /></button>;
+              return <div key={item.id} className="guide-task-result"><button type="button" className="guide-card" onClick={() => start(item.id)}><span className="guide-card-number">{reviewed === item.steps.length ? <Check size={18} /> : String(number + 1).padStart(2, "0")}</span><span><strong>{item.title}</strong><span className="guide-card-description">{item.description}</span><small>{item.category ?? "Customer journey"} · {item.duration} · {item.steps.length} steps{reviewed > 0 ? ` · ${reviewed} read` : ""}</small><span className="guide-card-description">Start walkthrough</span></span><ArrowRight size={17} /></button><Link className="guide-text-action guide-open-page" href={item.steps[0].route} onClick={close}>Open page <ArrowRight size={16} /></Link></div>;
             })}</div>
             {visibleGuides.length === 0 && <p className="guide-notice">No matching guides. Try a different term or clear the filters to see your available workflows.</p>}
             <p className="guide-footnote">Starting a guide turns Guide mode on. Settings and reading progress are saved for your sign-in on this browser.</p>

@@ -20,6 +20,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - run: node scripts/test-restricted-navigation.mjs
+      - run: node scripts/test-premium-workspace.mjs
       - run: node scripts/test-leads-workspace.mjs
       - run: node scripts/test-marketing.mjs
       - run: npm run test:guides
@@ -116,8 +118,6 @@ jobs:
       - run: node scripts/test-walk-in-starter.mjs
       - run: node scripts/test-move-in-training.mjs
       - run: node scripts/test-training-debtor.mjs
-      - run: node scripts/test-restricted-navigation.mjs
-      - run: node scripts/test-premium-workspace.mjs
       - run: node scripts/test-screen-design.mjs
       - run: node scripts/test-floor-availability.mjs
       - run: node scripts/test-tenant-login.mjs

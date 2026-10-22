@@ -72,6 +72,7 @@ if (process.env.PREVIEW_ONLY) {
    await page.goto(base + '/');
    await expect(page.getByRole('img',{name:/Physical occupancy 64.0 percent/})).toBeVisible();
    await expect(page.getByRole('link',{name:/Explore inventory/})).toHaveAttribute('href','/units');
+   await page.evaluate(() => document.fonts.ready);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth),true,`portfolio overflow ${width}`);
    await page.screenshot({path:`output/premium-workspace/portfolio-${width}.png`,fullPage:true});
    await page.goto(base + '/settings');

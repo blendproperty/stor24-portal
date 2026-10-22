@@ -18,7 +18,7 @@ const subscribe = cb => { window.addEventListener('popstate', cb); return () => 
 const read = () => window.location.pathname + window.location.search;
 export const usePathname = () => useSyncExternalStore(subscribe, read, () => '/').split('?')[0];
 export const useRouter = () => ({push(href) { history.pushState(null, '', href); window.dispatchEvent(new PopStateEvent('popstate')); }, replace(href) { history.replaceState(null, '', href); window.dispatchEvent(new PopStateEvent('popstate')); }, refresh() {}});
-export const Link = ({href, children, ...props}) => React.createElement('a', {...props, href, onClick: e => {e.preventDefault(); history.pushState(null, '', href); window.dispatchEvent(new PopStateEvent('popstate'));}}, children);
+export const Link = ({href, children, ...props}) => React.createElement('a', {...props, href, onClick: e => {e.preventDefault(); props.onClick?.(e); history.pushState(null, '', href); window.dispatchEvent(new PopStateEvent('popstate'));}}, children);
 export const Image = ({unoptimized, priority, ...props}) => React.createElement('img', props);`;
 const bundle = await build({ absWorkingDir: root, entryPoints: ["tests/browser/guided-help-fixture.jsx"], bundle: true, write: false, format: "esm", jsx: "automatic", plugins: [{ name: "isolated-fixture", setup(b) {
   b.onResolve({filter: /^next\/(navigation|link|image)$/}, args => ({path: args.path, namespace: "fixture"}));
@@ -178,6 +178,62 @@ try {
   await expect(deniedPage.getByRole("heading", {name: "Work through what needs attention"})).toBeVisible();
   await denied.close();
   results.push("Storage denial leaves guidance functional with an honest persistence notice");
+
+  const searchPage = await context.newPage();
+  const searchDialog = searchPage.getByRole("dialog", {name: "Find a workspace", exact: true});
+  for (const [width, route] of [[1440, "/"], [390, "/reservations"], [320, "/settings"], [305, "/settings"]]) {
+    await searchPage.setViewportSize({width, height: 900});
+    await searchPage.goto(`${base}${route}?user=keyword-search-${width}`);
+    await searchPage.evaluate(() => document.fonts.ready);
+    await searchPage.getByRole("button", {name: "Find a workspace", exact: true}).click();
+    await expect(searchDialog).toBeVisible();
+    await searchDialog.getByRole("textbox", {name: "Search workspaces"}).fill("move out");
+    const task = searchDialog.locator(".workspace-task-result").filter({has: searchPage.getByText("Complete a move-out", {exact: true})});
+    await expect(task).toBeVisible();
+    await expect(task.getByRole("link", {name: "Open page"})).toHaveAttribute("href", "/operations/accounts");
+    await searchPage.screenshot({path: `output/guided-help/keyword-search-${width}.png`});
+    assert.equal(await searchPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `search overflow at ${width}`);
+    const savedProgress = await searchPage.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter(k => k.startsWith("stor24:guided-help:")).map(k => [k, localStorage.getItem(k)])));
+    await task.getByRole("link", {name: "Open page"}).click();
+    await expect(searchDialog).not.toBeVisible();
+    await expect(searchPage).toHaveURL(/\/operations\/accounts$/);
+    await expect(searchPage.locator("#guided-help-panel")).toHaveCount(0);
+    assert.deepEqual(await searchPage.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter(k => k.startsWith("stor24:guided-help:")).map(k => [k, localStorage.getItem(k)]))), savedProgress);
+    await searchPage.keyboard.press("Control+k");
+    await searchDialog.getByRole("textbox", {name: "Search workspaces"}).fill("move-out");
+    await task.getByRole("button", {name: "Guide me", exact: true}).click();
+    await expect(searchDialog).not.toBeVisible();
+    await expect(searchPage.locator(".guide-step h3")).toHaveText(workflowGuides.find(g => g.id === "move-out").steps[0].title);
+    await searchPage.keyboard.press("Control+k");
+    await expect(task).toBeVisible();
+    await searchPage.keyboard.press("Escape");
+    await expect(searchDialog).not.toBeVisible();
+    await expect(searchPage.locator(".guide-step h3")).toHaveText(workflowGuides.find(g => g.id === "move-out").steps[0].title);
+    await searchPage.getByRole("button", {name: "Close guided help"}).click();
+    await searchPage.locator(".guide-trigger").click();
+    await searchPage.getByLabel("Search guides").fill("statement");
+    await expect(searchPage.locator(".guide-open-page").first()).toBeVisible();
+    await searchPage.getByRole("button", {name: "Close guided help"}).click();
+    await searchPage.keyboard.press("Control+k");
+    await searchDialog.getByRole("textbox", {name: "Search workspaces"}).fill("no-such-task-xyz");
+    await expect(searchDialog.getByText("No matching workspace or task", {exact: true})).toBeVisible();
+    await searchPage.keyboard.press("Escape");
+    await expect(searchPage.getByRole("button", {name: "Find a workspace", exact: true})).toBeFocused();
+  }
+  guidePersona = [{facilityId: "store-a", role: {name: "Custom role", permissions: ["ledger.view"]}}];
+  await searchPage.keyboard.press("Control+k");
+  await searchDialog.getByRole("textbox", {name: "Search workspaces"}).fill("App Secret");
+  await expect(searchDialog.locator(".workspace-task-result")).toHaveCount(0);
+  await searchDialog.getByRole("textbox", {name: "Search workspaces"}).fill("statement");
+  await expect(searchDialog.locator(".workspace-task-result")).not.toHaveCount(0);
+  guideAccessDenied = true;
+  await searchPage.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(searchDialog.locator(".workspace-task-result")).toHaveCount(0);
+  await expect(searchDialog.getByRole("status")).toContainText("Guides unavailable");
+  await searchPage.close();
+  guideAccessDenied = false;
+  guidePersona = [{facilityId: null, role: {name: "Organisation owner", permissions: ["*"]}}];
+  results.push("Keyword search on dashboard/reservations/settings at 1440/390/320/305; open page without guide progress; Ctrl+K; walkthrough; empty state; permissions and revoked access");
 
   await page.setViewportSize({width: 1440, height: 1000});
   await page.goto(`${base}/?user=catalogue-reader`);

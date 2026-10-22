@@ -3,6 +3,15 @@ import test from "node:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { emptyGuidePreferences, filterGuides, guideStorageKey, helpForPath, pageHelp, parseGuidePreferences, reviewGuideStep, stepMatchesPath, workflowGuides } from "../src/lib/guided-help";
 
+test("keyword search matches spaced, hyphenated and screen-route task names", () => {
+  assert.deepEqual(filterGuides("move out").map(g => g.id), filterGuides("MOVE-OUT").map(g => g.id));
+  assert.ok(filterGuides("move out").some(g => g.id === "move-out"));
+  assert.equal(filterGuides("move out")[0].id, "move-out");
+  assert.ok(filterGuides("deposit refund").some(g => g.id === "move-out"));
+  assert.ok(filterGuides("operations/accounts").some(g => g.id === "accounts"));
+  assert.equal(filterGuides("not-a-real-task-xyz").length, 0);
+});
+
 test("tutorial state safely recovers from unavailable, corrupt and obsolete browser storage", () => {
   for (const raw of [null, "{broken", "null", "[]", '{"version":99,"enabled":true}']) {
     assert.deepEqual(parseGuidePreferences(raw), emptyGuidePreferences);

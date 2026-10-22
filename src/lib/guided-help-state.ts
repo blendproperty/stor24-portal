@@ -36,10 +36,16 @@ export function stepMatchesPath(step: GuideStep, pathname: string) {
   return step.routePattern ? new RegExp(step.routePattern).test(pathname) : step.route === pathname;
 }
 
+export function taskSearchText(value: string) {
+  return value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+
 export function filterGuides(query: string, category: string, workflowGuides: WorkflowGuide[]) {
-  const words = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  const words = taskSearchText(query).split(/\s+/).filter(Boolean);
+  const titleMatches = (guide: WorkflowGuide) => words.filter(word => taskSearchText(guide.title).includes(word)).length;
   return workflowGuides.filter(guide => (category === "All" || (guide.category ?? "Customer journey") === category) && words.every(word =>
-    [guide.title, guide.description, guide.category, ...guide.steps.map(step => `${step.title} ${step.body}`)].join(" ").toLowerCase().includes(word)));
+    taskSearchText([guide.title, guide.description, guide.category, ...guide.steps.map(step => `${step.title} ${step.body} ${step.screen} ${step.route}`)].join(" ")).includes(word)))
+    .sort((a, b) => titleMatches(b) - titleMatches(a));
 }
 
 export type GuideProgress = { step: number; reviewed: string[] };

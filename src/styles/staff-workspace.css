@@ -283,6 +283,10 @@
 .workspace-finder-results strong { font-size:13px; font-weight:600; }
 .workspace-finder-results small { font-size:11px; color:#657468; margin-top:2px; }
 .workspace-finder footer { padding:14px 24px; border-top:1px solid #dce3d7; font-size:11px; color:#657468; }
+.workspace-task-result { padding:12px; border-bottom:1px solid #dce3d7; }
+.workspace-task-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+.workspace-task-actions a, .workspace-task-actions button { display:inline-flex; align-items:center; gap:7px; min-height:40px; padding:8px 12px; border:1px solid #c9d5d0; border-radius:9px; background:#edf3e5; color:#183b2c; font:inherit; font-size:12px; cursor:pointer; }
+.workspace-task-actions button:focus-visible { outline:3px solid #e25a0b; outline-offset:2px; }
 .app-shell .metric-card { padding:20px 22px; }
 .app-shell .metric-value { font-weight:650; font-variant-numeric:tabular-nums; }
 .app-shell .metric-label { font-size:12px; font-weight:600; }
@@ -297,7 +301,7 @@
 @media(max-width:760px) { .app-shell .topbar { gap:8px; } .workspace-finder-trigger { width:36px; min-height:36px; padding:8px; justify-content:center; border:0; flex-shrink:0; } .workspace-finder-trigger span,.workspace-finder-trigger kbd { display:none; } .skip-to-workspace { left:12px; } }
 @media(prefers-reduced-motion:reduce) { .app-shell *, .app-shell *::before, .app-shell *::after { scroll-behavior:auto !important; transition:none !important; animation:none !important; } }
 
-@media(max-width:400px) { .app-shell .top-actions [aria-label="Scheduled work"] { display:none; } .workspace-finder-trigger { width:32px; min-height:32px; padding:6px; } }
+@media(max-width:400px) { .app-shell .topbar { gap:4px; } .app-shell .top-actions [aria-label="Scheduled work"] { display:none; } .workspace-finder-trigger { width:32px; min-height:32px; padding:6px; } }
 
 .app-shell .content :where(input:not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=range]):not([type=color]):not([type=file]), select) { height:46px; }
 .app-shell .content textarea { min-height:96px; resize:vertical; }
