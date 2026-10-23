@@ -73,7 +73,8 @@ jobs:
         run: node scripts/check-production-readiness.mjs --resolve
 
   backup:
-    runs-on: ubuntu-latest
+    # Keep credentialed VPS connections off the repeatedly failing Azure egress path.
+    runs-on: macos-latest
     timeout-minutes: 4
     environment: production
     steps:
@@ -94,7 +95,7 @@ jobs:
   alerts:
     if: always()
     needs: [readiness, backup]
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     timeout-minutes: 8
     environment: production
     steps:
