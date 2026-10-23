@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -27,6 +27,7 @@ printf 403
       encoding: 'utf8', timeout: 30000,
     });
     assert.equal(result.error, undefined);
+    assert.ok(existsSync(join(root, 'count')), `Probe fixture did not run: ${result.status} ${result.stderr} ${result.stdout}`);
     return { ...result, calls: Number(readFileSync(join(root, 'count'), 'utf8')) };
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
@@ -50,7 +51,7 @@ test('unexpected HTTP responses and certificate failures are never retried or ac
 });
 
 test('the actual workflow health validator names each failed condition and never logs the response', () => {
-  const workflow = readFileSync(resolve('.github/workflows/monitor-production.yml'), 'utf8');
+  const workflow = readFileSync(resolve('scripts/public-readiness.sh'), 'utf8');
   const script = workflow.match(/node -e '([\s\S]*?)' "\$response"/)[1];
   const healthy = { service: 'stor24-crm', status: 'ok', database: 'ok', merchandiseExpiry: { enabled: true, status: 'ok' } };
   for (const [response, expected] of [
@@ -59,7 +60,11 @@ test('the actual workflow health validator names each failed condition and never
     [JSON.stringify({ ...healthy, merchandiseExpiry: { enabled: false } }), ['expiry-worker']],
     ['PRIVATE_INVALID_JSON', ['json']],
   ]) {
-    const result = spawnSync(process.execPath, ['-e', script, response], { env: { ...process.env, EXPECT_MERCHANDISE_WORKER: 'true' }, encoding: 'utf8' });
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'stor24-health-'));
+    const fixture = join(fixtureRoot, 'health.json');
+    writeFileSync(fixture, response, { flag: 'wx', mode: 0o600 });
+    const result = spawnSync(process.execPath, ['-e', script, fixture], { env: { ...process.env, EXPECT_MERCHANDISE_WORKER: 'true' }, encoding: 'utf8' });
+    rmSync(fixtureRoot, { recursive: true });
     assert.equal(result.status, expected.length ? 1 : 0);
     for (const check of expected) assert.match(result.stderr, new RegExp(`STOR24_PUBLIC_FAILED check=${check}`));
     assert.doesNotMatch(result.stdout + result.stderr, /PRIVATE/);

@@ -18,8 +18,10 @@ test("externally scheduled production monitoring verifies readiness without a du
   assert.doesNotMatch(monitor, /^\s+schedule:/m);
   const worker = JSON.parse(readFileSync(new URL("../wrangler.monitor.json", import.meta.url), "utf8"));
   assert.deepEqual(worker.triggers.crons, ["3,13,23,33,43,53 * * * *"]);
-  assert.match(monitor, /status !== "ok"/);
-  assert.match(monitor, /database !== "ok"/);
+  assert.match(monitor, /node scripts\/check-production-readiness.mjs/);
+  const probe = readFileSync(new URL("../scripts/public-readiness.sh", import.meta.url), "utf8");
+  assert.match(probe, /status !== "ok"/);
+  assert.match(probe, /database !== "ok"/);
 });
 
 test("the container healthcheck consumes the readiness endpoint", () => {
