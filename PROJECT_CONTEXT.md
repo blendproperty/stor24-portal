@@ -1,3 +1,8 @@
+## Unit pricing final evidence integration - 23 October 2026
+
+- **Implementation:** normal merge of incoming main19860e25/PR623 retains the separate monitor/SMTP repair and its complete canonical history. All six unit-pricing runtime/guide/CSS files remain byte-identical to deployed and live-verified3b8f9d5a. This PR remains documentation-only relative to current main; no new pricing, provider, configuration, grant or financial action.
+- **Testing and publication:** original final-evidence head28a14242 passed10 checks/1 optional pilot skip. New integrated head requires renewed protected checks. Prior pricing implementation/merge/deployment/live-preview proof and preserved gates below remain scoped to their exact recorded heads. Source main19860e25's independent email/monitor rollout is not claimed as unit-pricing work.
+
 ## Size-based unit price adjustment - 23 October 2026, released and live previews verified
 
 - **Implementation:** Units & rates > Adjust prices by size supports exact area at the selected store, increase/reduce in rand or percentage, per-unit current/new price preview and separate confirmation. Includes all matching unit types/floors/statuses and excludes combined components, explicitly independent of table filters. Current inventory.manage and organisation/facility scope are enforced. Decimal calculations, drift fingerprint, Serializable updates/audit, replay rejection and unknown-save lock remain as tested. Native dialog is now fixed to the viewport, resolving the initially observed live scroll clipping. Existing tenancy rents, reservation quotes/initial snapshots, tax, identities and availability are unchanged by this workflow except the deliberately confirmed standard-rate updates.
