@@ -50,7 +50,7 @@ test('unexpected HTTP responses and certificate failures are never retried or ac
 });
 
 test('the actual workflow health validator names each failed condition and never logs the response', () => {
-  const workflow = readFileSync(resolve('.github/workflows/monitor-production.yml'), 'utf8');
+  const workflow = readFileSync(resolve('scripts/public-readiness.sh'), 'utf8');
   const script = workflow.match(/node -e '([\s\S]*?)' "\$response"/)[1];
   const healthy = { service: 'stor24-crm', status: 'ok', database: 'ok', merchandiseExpiry: { enabled: true, status: 'ok' } };
   for (const [response, expected] of [
@@ -59,7 +59,10 @@ test('the actual workflow health validator names each failed condition and never
     [JSON.stringify({ ...healthy, merchandiseExpiry: { enabled: false } }), ['expiry-worker']],
     ['PRIVATE_INVALID_JSON', ['json']],
   ]) {
-    const result = spawnSync(process.execPath, ['-e', script, response], { env: { ...process.env, EXPECT_MERCHANDISE_WORKER: 'true' }, encoding: 'utf8' });
+    const fixture = join(tmpdir(), `stor24-health-${process.pid}.json`);
+    writeFileSync(fixture, response);
+    const result = spawnSync(process.execPath, ['-e', script, fixture], { env: { ...process.env, EXPECT_MERCHANDISE_WORKER: 'true' }, encoding: 'utf8' });
+    rmSync(fixture);
     assert.equal(result.status, expected.length ? 1 : 0);
     for (const check of expected) assert.match(result.stderr, new RegExp(`STOR24_PUBLIC_FAILED check=${check}`));
     assert.doesNotMatch(result.stdout + result.stderr, /PRIVATE/);
