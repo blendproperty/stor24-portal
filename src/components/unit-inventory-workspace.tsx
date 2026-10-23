@@ -1,6 +1,7 @@
 "use client";
 import { UnitFacilityMap } from "@/components/unit-facility-map";
 import { BulkUnitPricingDialog } from "@/components/bulk-unit-pricing-dialog";
+import { UnitRateAdjustmentDialog } from "@/components/unit-rate-adjustment-dialog";
 
 import { FloorAvailabilityControls } from "@/components/floor-availability-controls";
 import { unitSupportsProduct } from "@/lib/product-line";
@@ -131,6 +132,7 @@ export function UnitInventoryWorkspace({
   useEffect(() => () => { saveRequest.current?.abort(); saveRequest.current = null; }, []);
   const [forceDeleteCount, setForceDeleteCount] = useState(0);
   const [renumberDialog, setRenumberDialog] = useState(false);
+  const [rateAdjustmentDialog, setRateAdjustmentDialog] = useState(false);
   const [renumberUndo, setRenumberUndo] = useState<{ facilityId: string; changes: Array<{ unitId: string; newNumber: string }> } | null>(null);
   const [confirmingRelease, setConfirmingRelease] = useState(false);
   const [uatResetPreview, setUatResetPreview] = useState<UatResetPreview | null>(null);
@@ -311,6 +313,7 @@ export function UnitInventoryWorkspace({
     setReadError("");
     setDialog(null);
     setRenumberDialog(false);
+    setRateAdjustmentDialog(false);
     setUatResetPreview(null);
     setUatResetConfirmation("");
     setConfirmingRelease(false);
@@ -515,6 +518,13 @@ export function UnitInventoryWorkspace({
             >
               <ShieldCheck size={15} />
               {confirmingRelease ? "Confirm safe release" : "Release cancelled holds"}
+            </button>
+            <button
+              className="button button-primary"
+              onClick={() => setRateAdjustmentDialog(true)}
+              disabled={!selectedFacility?.units.length || busy || saveBlocked}
+            >
+              <BadgeDollarSign size={15} /> Adjust prices by size
             </button>
             <button
               className="button button-secondary"
@@ -848,6 +858,24 @@ export function UnitInventoryWorkspace({
           review={() => void refresh()}
         />
       ) : null}
+      {rateAdjustmentDialog && selectedFacility && <UnitRateAdjustmentDialog
+        facility={selectedFacility}
+        initialArea={String(Number(selectedFacility.unitTypes.find(type => type.id === typeId)?.areaSqMetres) || "")}
+        requestRef={saveRequest} blocked={saveBlocked} uncertain={() => setSaveBlocked(true)}
+        review={() => void refresh()} close={() => setRateAdjustmentDialog(false)}
+        denied={status => {
+          setFacilities([]); setRateAdjustmentDialog(false); setNotice("");
+          setReadDenied(true); setReadError(status === 401 ? "Sign in again to view inventory." : "You do not have access to adjust these prices. Please contact your administrator.");
+        }}
+        applied={async plan => {
+          setFacilities(current => current.map(facility => facility.id === plan.facilityId ? { ...facility, units: facility.units.map(unit => {
+            const row = plan.changes.find(change => change.unitId === unit.id);
+            return row ? { ...unit, monthlyRate: row.newRate } : unit;
+          }) } : facility));
+          setNotice(`${plan.updated} unit prices updated for ${plan.areaSqMetres} m² units at ${selectedFacility.name}. Existing tenancy rents and reservation quotes are unchanged.`);
+          await refresh();
+        }}
+      />}
       {renumberDialog && selectedFacility ? (
         <RenumberUnitsDialog
           facility={selectedFacility}

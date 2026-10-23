@@ -58,7 +58,7 @@ test("isolated PostgreSQL customer reset handles restrictive workflow records at
       await assert.rejects(getTestCustomerCleanupPreview(f.org.id, []), /CONFLICT/);
       await assert.rejects(getTestCustomerCleanupPreview(f.org.id, [chosen.id, chosen.id]), /CONFLICT/);
       await assert.rejects(getTestCustomerCleanupPreview(f.org.id, [chosen.id, "foreign"]), /NOT_FOUND/);
-      await assert.rejects(getTestCustomerCleanupPreview(f.org.id, [f.customer.id]), /TEST_CUSTOMER_REVIEW_REQUIRED/);
+      assert.equal((await getTestCustomerCleanupPreview(f.org.id, [f.customer.id])).counts.payments, 1);
       let review = await getTestCustomerCleanupPreview(f.org.id, ids);
       const before = await snapshot(f);
       await db.customer.update({ where: { id: chosen.id }, data: { lastName: "Changed" } });
@@ -83,6 +83,95 @@ test("isolated PostgreSQL customer reset handles restrictive workflow records at
       const audit = await db.auditEvent.findFirstOrThrow({ where: { organisationId: f.org.id, action: "uat.customer_data_reset" } });
       assert.deepEqual((audit.after as { customerIds: string[] }).customerIds.sort(), ids.sort());
       await assert.rejects(resetUatCustomerData({ ...f.input, selection: { ids, fingerprint: review.fingerprint } }), /NOT_FOUND/);
+    });
+    await t.test("selected cleanup includes old agreements, payments, mandates, local access, insurance and training; shared records survive", async () => {
+      const f = await fixture(), other = await fixture();
+      const otherBefore = await snapshot(other);
+      const key = randomUUID();
+      const control = await db.customer.create({ data: { organisationId: f.org.id, firstName: "Preserved customer" } });
+      const controlAccount = await db.account.create({ data: { customerId: control.id, accountNumber: key, balance: 99 } });
+      const controlBefore = await db.account.findUniqueOrThrow({ where: { id: controlAccount.id } });
+      const controlInstruction = await db.debitOrderInstruction.create({ data: { runId: f.run.id, accountId: controlAccount.id, period: "2099-02", invoiceId: "ci", mandateId: "ci", reference: "ci", amount: 1 } });
+      const reservation = await db.reservation.findFirstOrThrow({ where: { customerId: f.customer.id } });
+      const occupancy = await db.occupancy.findFirstOrThrow({ where: { tenancyId: f.tenancy.id } });
+      const lease = await db.publicReservationLease.create({ data: { reservationId: reservation.id, status: "SIGNED", version: "CI", paymentMethod: "TEST", content: "CI", clauses: [], sha256: "a".repeat(64), signingToken: key, expiresAt: new Date("2099-01-01") } });
+      await db.publicDebitMandate.create({ data: { leaseId: lease.id, reference: key, correlation: key, terms: {}, status: "SIGNED" } });
+      const document = await db.document.create({ data: { tenancyId: f.tenancy.id, type: "LEASE_AGREEMENT", storageKey: "ci", content: "CI" } });
+      await db.debitMandateSession.create({ data: { tenancyId: f.tenancy.id, documentId: document.id, signingToken: key, expiresAt: new Date("2099-01-01"), monthlyRate: 100, source: {} } });
+      await db.insuranceEnrollment.create({ data: { organisationId: f.org.id, facilityId: f.facility.id, tenancyId: f.tenancy.id, status: "ACTIVE", acknowledgedAt: new Date() } });
+      await db.biometricEnrollment.create({ data: { organisationId: f.org.id, facilityId: f.facility.id, customerId: f.customer.id, occupancyId: occupancy.id, consentPolicy: "CI", consentAt: new Date(), faceImageSha256: "a".repeat(64), status: "PROVISIONED" } });
+      await db.integrationIdentityLink.create({ data: { organisationId: f.org.id, customerId: f.customer.id, hikCentralPersonId: "synthetic-provider-person" } });
+      await db.accessDecision.create({ data: { organisationId: f.org.id, facilityId: f.facility.id, occupancyId: occupancy.id, action: "ACTIVATE", source: "CI", reason: "CI", correlationId: key } });
+      await db.lead.create({ data: { facilityId: f.facility.id, customerId: f.customer.id, source: "Staff training only" } });
+      const log = await db.communicationLog.create({ data: { organisationId: f.org.id, customerId: f.customer.id, channel: "EMAIL", recipientHash: "ci", idempotencyKey: key, status: "PENDING", nextRetryAt: new Date() } });
+      const job = await db.webhookOutbox.create({ data: { organisationId: f.org.id, aggregateType: "Payment", aggregateId: f.payment.id, eventType: "booking.payment_confirmation", destination: "email://synthetic", payload: {}, idempotencyKey: key } });
+      const config = await db.configurationProfile.create({ data: { organisationId: f.org.id, domain: "CARD_AUTOPAY_REQUEST", name: f.account.id, config: { accountId: f.account.id, revision: 1 } } });
+      const preservedConfig = await db.configurationProfile.create({ data: { organisationId: f.org.id, domain: "CARD_AUTOPAY_REQUEST", name: controlAccount.id, config: { accountId: controlAccount.id } } });
+      await db.tenantPortalSession.create({ data: { organisationId: f.org.id, email: "ci@example.invalid", tokenHash: key, customerIds: [f.customer.id, control.id], expiresAt: new Date("2099-01-01") } });
+      const ids = [f.customer.id];
+      const stale = await getTestCustomerCleanupPreview(f.org.id, ids);
+      assert.equal(stale.counts.agreements, 1); assert.equal(stale.counts.mandates, 2);
+      assert.equal(stale.counts.payments, 1); assert.equal(stale.counts.insuranceEnrollments, 1);
+      assert.equal(stale.counts.biometricEnrollments, 1); assert.equal(stale.counts.identityLinks, 1);
+      assert.equal(stale.counts.queuedJobsCancelled, 1); assert.equal(stale.counts.pendingCommunicationsCancelled, 1);
+      await db.configurationProfile.update({ where: { id: config.id }, data: { config: { accountId: f.account.id, revision: 2 } } });
+      await assert.rejects(resetUatCustomerData({ ...f.input, selection: { ids, fingerprint: stale.fingerprint } }), /CONFLICT/);
+      const review = await getTestCustomerCleanupPreview(f.org.id, ids);
+      await db.$executeRawUnsafe(`ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_complete_cleanup_audit CHECK (action <> 'uat.customer_data_reset') NOT VALID`);
+      try {
+        await assert.rejects(resetUatCustomerData({ ...f.input, selection: { ids, fingerprint: review.fingerprint } }));
+        assert.equal(await db.customer.count({ where: { id: f.customer.id } }), 1);
+        assert.equal(await db.configurationProfile.count({ where: { id: config.id } }), 1);
+        assert.equal((await db.webhookOutbox.findUniqueOrThrow({ where: { id: job.id } })).status, "PENDING");
+        assert.equal((await db.tenantPortalSession.findUniqueOrThrow({ where: { tokenHash: key } })).revokedAt, null);
+      } finally { await db.$executeRawUnsafe(`ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_complete_cleanup_audit`); }
+      await resetUatCustomerData({ ...f.input, selection: { ids, fingerprint: review.fingerprint } });
+      const cleanupAudit = await db.auditEvent.findFirstOrThrow({ where: { organisationId: f.org.id, action: "uat.customer_data_reset" } });
+      assert.ok(JSON.stringify(cleanupAudit.before).includes("synthetic-provider-person"));
+      assert.equal(await db.customer.count({ where: { id: f.customer.id } }), 0);
+      assert.deepEqual(await Promise.all([
+        db.publicReservationLease.count({ where: { id: lease.id } }), db.publicDebitMandate.count({ where: { leaseId: lease.id } }),
+        db.debitMandateSession.count({ where: { tenancyId: f.tenancy.id } }), db.insuranceEnrollment.count({ where: { tenancyId: f.tenancy.id } }),
+        db.biometricEnrollment.count({ where: { customerId: f.customer.id } }), db.integrationIdentityLink.count({ where: { customerId: f.customer.id } }),
+        db.accessDecision.count({ where: { occupancyId: occupancy.id } }),
+      ]), [0, 0, 0, 0, 0, 0, 0]);
+      assert.equal(await db.configurationProfile.count({ where: { id: config.id } }), 0);
+      assert.equal(await db.configurationProfile.count({ where: { id: preservedConfig.id } }), 1);
+      assert.equal((await db.communicationLog.findUniqueOrThrow({ where: { id: log.id } })).status, "DEAD_LETTER");
+      assert.equal((await db.communicationLog.findUniqueOrThrow({ where: { id: log.id } })).customerId, null);
+      assert.equal((await db.webhookOutbox.findUniqueOrThrow({ where: { id: job.id } })).status, "DEAD_LETTER");
+      assert.ok((await db.tenantPortalSession.findUniqueOrThrow({ where: { tokenHash: key } })).revokedAt);
+      assert.equal(await db.debitOrderInstruction.count({ where: { id: controlInstruction.id } }), 1);
+      assert.equal(await db.debitOrderRun.count({ where: { id: f.run.id } }), 1);
+      assert.deepEqual(await db.account.findUniqueOrThrow({ where: { id: controlAccount.id } }), controlBefore);
+      assert.deepEqual(await snapshot(other), otherBefore);
+    });
+    await t.test("selected cleanup removes restrictive receipt links and undo chains without changing the preserved customer's money", async () => {
+      const f = await fixture(), key = randomUUID();
+      const control = await db.customer.create({ data: { organisationId: f.org.id, firstName: "Preserved receipt customer" } });
+      const controlAccount = await db.account.create({ data: { customerId: control.id, accountNumber: key, balance: 44 } });
+      const preserved = await db.account.findUniqueOrThrow({ where: { id: controlAccount.id } });
+      const entry = await db.ledgerEntry.findFirstOrThrow({ where: { accountId: f.account.id } });
+      const document = await db.document.create({ data: { tenancyId: f.tenancy.id, type: "RECEIPT", storageKey: "ci" } });
+      const intake = await db.unidentifiedReceiptIntake.create({ data: { organisationId: f.org.id, facilityId: f.facility.id, sourceType: "MANUAL", sourceIdentity: key, sourceFingerprint: key, evidenceEncrypted: "synthetic", sourceEnvironment: "sandbox", receiptDate: "2099-01-01", amount: 20, requestKey: key, requestHash: key, capturedById: f.user.id } });
+      const proposal = await db.unidentifiedReceiptMatchProposal.create({ data: { intakeId: intake.id, accountId: f.account.id, accountFingerprint: key, sourceFingerprint: key, detailsEncrypted: "synthetic", proposedById: f.user.id } });
+      const statement = await db.settlementStatement.create({ data: { organisationId: f.org.id, connectionId: "ci", merchantKey: key, merchantLabel: "CI", environment: "sandbox", date: "2099-01-01", source: "CI", sourceReference: key, rawEncrypted: "synthetic", sha256: "a".repeat(64), opening: 0, closing: 20, importedById: f.user.id, editedById: f.user.id } });
+      const line = await db.settlementLine.create({ data: { statementId: statement.id, merchantKey: key, transactionId: key, date: "2099-01-01", code: "CI", description: "Synthetic source", amount: 20, vat: 0, extras: {}, kind: "RECEIPT" } });
+      const posting = await db.receiptImportPosting.create({ data: { organisationId: f.org.id, facilityId: f.facility.id, intakeId: intake.id, proposalId: proposal.id, accountId: f.account.id, paymentId: f.payment.id, ledgerEntryId: entry.id, documentId: document.id, sourceIdentity: key, sourceFingerprint: key, amount: 20, originalReceiptDate: "2099-01-01", snapshot: {}, snapshotHash: "a".repeat(64), netcashLineId: line.id, requestKey: key, requestHash: key, postedById: f.user.id, approvalReference: key } });
+      const reviewer = await db.user.create({ data: { organisationId: f.org.id, name: "CI reviewer", email: key + "@example.invalid" } });
+      const controlTenancy = await db.tenancy.create({ data: { customerId: control.id, accountId: controlAccount.id, facilityId: f.facility.id, startDate: new Date() } });
+      const targetDocument = await db.document.create({ data: { tenancyId: controlTenancy.id, type: "RECEIPT", storageKey: "ci" } });
+      const outgoing = await db.ledgerEntry.create({ data: { accountId: f.account.id, type: "CHARGE", amount: 1, description: "CI reallocation", effectiveAt: new Date() } });
+      const incoming = await db.ledgerEntry.create({ data: { accountId: controlAccount.id, type: "CHARGE", amount: -1, description: "CI reallocation", effectiveAt: new Date() } });
+      const transfer = await db.receiptReallocation.create({ data: { organisationId: f.org.id, facilityId: f.facility.id, sourceAccountId: f.account.id, targetAccountId: controlAccount.id, sourceEntryId: entry.id, paymentId: f.payment.id, requestKey: key, requestHash: key, amount: 1, reason: "CI", evidenceReference: key, snapshot: {}, fingerprint: key, requestedById: f.user.id, status: "POSTED", reviewedById: reviewer.id, reviewReference: key, reviewedAt: new Date(), postedById: reviewer.id, postedAt: new Date(), sourceLedgerEntryId: outgoing.id, targetLedgerEntryId: incoming.id, sourceDocumentId: document.id, targetDocumentId: targetDocument.id } });
+      await db.receiptReallocation.create({ data: { organisationId: f.org.id, facilityId: f.facility.id, sourceAccountId: controlAccount.id, targetAccountId: f.account.id, sourceEntryId: entry.id, paymentId: f.payment.id, reversesId: transfer.id, operation: "UNDO", requestKey: randomUUID(), requestHash: key, amount: 1, reason: "CI", evidenceReference: key, snapshot: {}, fingerprint: key, requestedById: f.user.id } });
+      const ids = [f.customer.id], review = await getTestCustomerCleanupPreview(f.org.id, ids);
+      assert.equal(review.counts.receiptReallocations, 2); assert.equal(review.counts.importedReceipts, 1);
+      await resetUatCustomerData({ ...f.input, selection: { ids, fingerprint: review.fingerprint } });
+      assert.equal(await db.receiptImportPosting.count({ where: { id: posting.id } }), 0);
+      assert.equal(await db.receiptReallocation.count({ where: { organisationId: f.org.id } }), 0);
+      assert.equal(await db.customer.count({ where: { id: f.customer.id } }), 0);
+      assert.deepEqual(await db.account.findUniqueOrThrow({ where: { id: controlAccount.id } }), preserved);
     });
     await t.test("payment-linked orders, collections, adjustments, requests and debit batches reset; other organisation and catalogue survive", async () => {
       const f = await fixture(), other = await fixture();

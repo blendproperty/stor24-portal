@@ -1,21 +1,7 @@
-import nodemailer from "nodemailer";
 import type { EmailMessage, EmailProvider } from "@/lib/email";
 
-export const HOSTINGER_EMAIL_ADDRESS = "bookings@stor24.co.za";
-
-/** Separate credentials; constructing/verifying this transport never changes EMAIL_PROVIDER. */
-export function hostingerTransport() {
-  const password = process.env.HOSTINGER_SMTP_PASSWORD;
-  if (!password) throw new Error("Hostinger SMTP credential is not configured.");
-  return nodemailer.createTransport({
-    host: "smtp.hostinger.com", port: 465, secure: true,
-    auth: { user: HOSTINGER_EMAIL_ADDRESS, pass: password },
-    tls: { servername: "smtp.hostinger.com", minVersion: "TLSv1.2", rejectUnauthorized: true },
-    connectionTimeout: 10_000, greetingTimeout: 10_000, socketTimeout: 15_000,
-    dnsTimeout: 8_000, pool: false, logger: false, debug: false,
-    disableFileAccess: true, disableUrlAccess: true,
-  });
-}
+import { HOSTINGER_EMAIL_ADDRESS, hostingerTransport } from "./hostinger-transport.mjs";
+export { HOSTINGER_EMAIL_ADDRESS, hostingerTransport } from "./hostinger-transport.mjs";
 
 export class HostingerEmailProvider implements EmailProvider {
   async send(message: EmailMessage) {

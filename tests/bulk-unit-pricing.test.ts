@@ -7,8 +7,8 @@ test("unit rate adjustments use decimal cents and reject negative or overflowing
   assert.equal(adjustedUnitRate("100.00", "PERCENT", -10), "90.00");
   assert.equal(adjustedUnitRate("100.01", "AMOUNT", -0.01), "100.00");
   assert.equal(adjustedUnitRate("0.10", "PERCENT", 5), "0.11");
-  assert.equal(adjustedUnitRate("100", "SET", 0), "0.00");
-  assert.equal(adjustedUnitRate("100", "PERCENT", -100), "0.00");
+  assert.throws(() => adjustedUnitRate("100", "SET", 0), /RATE_OUT_OF_RANGE/);
+  assert.throws(() => adjustedUnitRate("100", "PERCENT", -100), /RATE_OUT_OF_RANGE/);
   assert.throws(() => adjustedUnitRate("100", "PERCENT", -101), /RATE_OUT_OF_RANGE/);
   assert.throws(() => adjustedUnitRate("1", "SET", -1), /RATE_OUT_OF_RANGE/);
   assert.throws(() => adjustedUnitRate("10000000", "AMOUNT", 1), /RATE_OUT_OF_RANGE/);

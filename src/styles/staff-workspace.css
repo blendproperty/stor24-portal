@@ -805,7 +805,8 @@
 }
 
 /* Selected unit prices and scheduled work share the staff form controls. */
-.app-shell .bulk-price-dialog { width:min(760px,100%); padding:24px; }
+.app-shell .bulk-price-dialog { position:fixed; inset:0; margin:auto; border:0; width:min(760px,calc(100vw - 32px)); max-height:calc(100dvh - 40px); padding:24px; }
+.bulk-price-dialog::backdrop { background:#0a12229e; backdrop-filter:blur(6px); }
 .app-shell .bulk-price-dialog h2 { font-size:24px; line-height:1.2; }
 .app-shell .bulk-price-dialog p,.app-shell .scheduled-work-editor p { margin:12px 0; color:var(--muted); line-height:1.6; font-size:13px; }
 .app-shell .bulk-price-dialog fieldset,.app-shell .scheduled-work-editor fieldset { min-width:0; border:0; padding:0; margin:16px 0; }

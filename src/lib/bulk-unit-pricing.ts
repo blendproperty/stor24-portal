@@ -18,7 +18,7 @@ export function adjustedUnitRate(current: string, mode: BulkUnitPricingInput["mo
   const amount = new Prisma.Decimal(value);
   const next = (mode === "SET" ? amount : mode === "AMOUNT" ? old.add(amount) : old.mul(amount.div(100).add(1)))
     .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
-  if (next.isNegative() || next.greaterThan(10_000_000)) throw new Error("RATE_OUT_OF_RANGE");
+  if (next.lte(0) || next.greaterThan(10_000_000)) throw new Error("RATE_OUT_OF_RANGE");
   return next.toFixed(2);
 }
 

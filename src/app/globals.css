@@ -2352,6 +2352,17 @@ a.module-card:focus-visible {
   .netcash-payments-panel .data-table td { padding: 16px; }
 }
 .inventory-modal { width: min(720px,calc(100vw - 30px)); }
+.rate-adjustment-dialog { position: fixed; inset: 0; width: min(820px,calc(100vw - 30px)); max-height: calc(100dvh - 30px); overflow-y: auto; margin: auto; color: var(--ink); border: 0; }
+.rate-adjustment-dialog::backdrop { background: rgb(0 0 0 / 55%); }
+.rate-adjustment-dialog p { font-size: 13px; line-height: 1.5; }
+.rate-adjustment-dialog .inventory-form label { display: grid; gap: 6px; min-width: 0; font-size: 13px; }
+.rate-adjustment-dialog select, .rate-adjustment-dialog input { width: 100%; min-height: 42px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--ink); font: inherit; }
+.rate-adjustment-dialog .form-actions { flex-wrap: wrap; margin-top: 18px; }
+.rate-adjustment-list { list-style: none; padding: 0; max-height: 36vh; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; }
+.rate-adjustment-list li { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 16px; padding: 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.rate-adjustment-list li:last-child { border-bottom: 0; }
+.rate-adjustment-list small { display: block; color: var(--muted); margin-top: 4px; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .rate-adjustment-list li { grid-template-columns: 1fr 1fr; gap: 10px; } .rate-adjustment-list li > div:first-child { grid-column: 1 / -1; } .rate-adjustment-dialog { padding: 18px; } }
 .inventory-dialog-error { margin: 12px 0 0; }
 .inventory-modal .form-actions, .unit-inventory-workspace > .page-header > .form-actions { flex-wrap: wrap; }
 .unit-inventory-workspace, .unit-inventory-workspace .inventory-layout > * { min-width: 0; }

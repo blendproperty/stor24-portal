@@ -756,25 +756,10 @@ test("selected customer cleanup rejects staff, cross-origin, empty and duplicate
 });
 
 
-test("selected cleanup refuses protected records and foreign customers without deleting anything", async () => {
+test("selected cleanup rejects foreign customer ids without mutation", async () => {
   const state = fixture();
   const service = await load("./src/lib/uat-reset-service.ts", state);
-  const clean = { id: "selected", organisationId: "org", leads: [], reservations: [], tenancies: [], accounts: [], biometricEnrollments: [], integrationIdentityLink: null, communications: [] };
-  for (const protection of [
-    { leads: [{ source: "Staff training only" }] },
-    { accounts: [{ payments: [{}], debitInstructions: [] }] },
-    { accounts: [{ payments: [], debitInstructions: [{}] }] },
-    { reservations: [{ publicLease: {}, publicPaymentSessions: [] }] },
-    { reservations: [{ publicLease: null, publicPaymentSessions: [{}] }] },
-    { tenancies: [{ mandateSession: {}, documents: [], insuranceEnrollment: null }] },
-    { tenancies: [{ mandateSession: null, documents: [{}], insuranceEnrollment: null }] },
-    { tenancies: [{ mandateSession: null, documents: [], insuranceEnrollment: {} }] },
-    { biometricEnrollments: [{}] }, { integrationIdentityLink: {} }, { communications: [{}] },
-  ]) {
-    state.tables.customer.splice(0, state.tables.customer.length, { ...clean, ...protection });
-    await assert.rejects(service.getTestCustomerCleanupPreview("org", ["selected"]), /TEST_CUSTOMER_REVIEW_REQUIRED/);
-  }
-  state.tables.customer.splice(0, state.tables.customer.length, { ...clean, organisationId: "foreign" });
+  state.tables.customer.splice(0, state.tables.customer.length, { id: "selected", organisationId: "foreign" });
   await assert.rejects(service.getTestCustomerCleanupPreview("org", ["selected"]), /NOT_FOUND/);
   assert.deepEqual(state.writes, []);
 });

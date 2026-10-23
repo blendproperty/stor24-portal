@@ -26,6 +26,7 @@ export function TestCustomerCleanup({ customers, disabled, onDeleted }: { custom
   async function submit(action: "preview" | "delete") {
     if (request.current || blocked) return;
     request.current = true; setBusy(true); setError("");
+    if (action === "preview") dialog.current?.querySelector(".test-cleanup-body")?.scrollTo(0, 0);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 30_000);
     try {
@@ -60,7 +61,7 @@ export function TestCustomerCleanup({ customers, disabled, onDeleted }: { custom
       <header className="test-cleanup-header"><p className="eyebrow">Customer cleanup</p><h2 id="test-cleanup-title">Delete selected test customers</h2><p>Select only customers you created for testing.</p></header>
       <div className="test-cleanup-body">
       <div className="test-cleanup-warning"><strong>Permanent deletion</strong><p>Selected customers and their linked test records will be removed. Customer and reporting totals will change.</p>
-        <details><summary>What gets removed or protected?</summary><p>Linked enquiries, bookings, test accounts and occupancy records are removed. Units are released when unused. Audit history and communication logs are retained. Payment, agreement, mandate, access, insurance, integration, queued communication and shared training records require review and cannot be deleted here.</p></details>
+        <details><summary>What gets removed?</summary><p>Linked enquiries, bookings, accounts, payments, agreements, mandates, documents, local access and insurance records are removed. Pending local jobs are cancelled and unused units released. Audit and communication history remain. This removes CRM records; it does not undo payments or cancel services already held by external providers.</p></details>
       </div>
       {error ? <p className="form-error" role="alert">{error}</p> : null}
       {!review ? <><label className="test-cleanup-search">Find test customers<input placeholder="Search name, email, phone or reference" value={search} disabled={busy || blocked} onChange={e => setSearch(e.target.value)}/></label>

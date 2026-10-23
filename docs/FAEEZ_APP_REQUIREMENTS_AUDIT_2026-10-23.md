@@ -43,3 +43,8 @@ Brett/commercial owner decision, separate from Faeez's documents: this branch ad
 ## Release boundary
 
 This is branch implementation and isolated validation. Commit/push, protected CI, merge, deployment/configuration and live production verification must be recorded separately in `PROJECT_CONTEXT.md`. No production records, outbound customer/staff messages or real access commands were changed as part of this task. No external project tracker is in scope. Existing Faeez/manager UAT, device, data, provider, finance/legal, training and approval gates remain open unless separately evidenced or already explicitly accepted by Brett.
+
+
+## Release integration - 23 October 2026
+
+Main advanced to `0c2be6a1` while PR620 awaited review. PR621/622/624 independently released **Adjust prices by size** and its viewport-safe preview. Both paths are retained: that existing control adjusts all units of a size, while **Adjust selected unit prices** adds explicit individual/range selection and set-rate support. Help distinguishes their scope. Selected pricing now also requires rates above zero, and uses the same native-dialog top layer to remain inside the viewport when the underlying page scrolls. Main's customer-cleanup and monitor releases and full canonical history are preserved. Fresh integrated-head CI is required before merge; the original green head is not substituted for it.

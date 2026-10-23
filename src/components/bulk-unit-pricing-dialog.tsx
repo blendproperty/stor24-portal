@@ -27,8 +27,8 @@ export function BulkUnitPricingDialog({ facility, close, applied, uncertain, den
   const [busy, setBusy] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const pending = useRef(false);
-  const card = useRef<HTMLDivElement>(null);
-  useEffect(() => { const previous = document.activeElement as HTMLElement | null; card.current?.focus(); return () => previous?.focus(); }, []);
+  const card = useRef<HTMLDialogElement>(null);
+  useEffect(() => { const dialog = card.current!; dialog.showModal(); return () => dialog.close(); }, []);
   const units = facility.units.filter(u => !u.combinedIntoUnitId);
   const matches = units.filter(u => (!area || Number(u.unitType.areaSqMetres) === Number(area)) && (!from || compare(u.number, from.trim()) >= 0) && (!to || compare(u.number, to.trim()) <= 0)).sort((a, b) => compare(a.number, b.number));
   const reset = () => { setPreview(null); setSelected([]); setError(""); };
@@ -56,15 +56,7 @@ export function BulkUnitPricingDialog({ facility, close, applied, uncertain, den
       setError(action === "apply" ? "We could not confirm whether the adjustment completed. Close and review inventory before reloading. Do not repeat the adjustment." : "The preview could not be loaded. Try previewing again; no rates were changed.");
     } finally { clearTimeout(timer); pending.current = false; setBusy(false); }
   }
-  return <div className="modal-backdrop"><div className="modal-card bulk-price-dialog" role="dialog" aria-modal="true" aria-labelledby="bulk-price-title" tabIndex={-1} ref={card} onKeyDown={event => {
-    if (event.key === "Escape" && !busy) close();
-    if (event.key === "Tab") {
-      const controls = Array.from(card.current!.querySelectorAll<HTMLElement>("button:not(:disabled), input:not(:disabled), select:not(:disabled)"));
-      const first = controls[0], last = controls.at(-1);
-      if (event.shiftKey && (document.activeElement === first || document.activeElement === card.current)) { event.preventDefault(); last?.focus(); }
-      else if (!event.shiftKey && (document.activeElement === last || document.activeElement === card.current)) { event.preventDefault(); first?.focus(); }
-    }
-  }}>
+  return <dialog className="modal-card bulk-price-dialog" aria-labelledby="bulk-price-title" ref={card} onCancel={event => { event.preventDefault(); if (!busy) close(); }}>
     <h2 id="bulk-price-title">Adjust unit prices · {facility.name}</h2>
     <p>Changes standard unit rates only. Existing tenancy rents, signed contracts and reservation quotes stay unchanged. Tax settings stay unchanged.</p>
     <fieldset disabled={busy || blocked}>
@@ -82,5 +74,5 @@ export function BulkUnitPricingDialog({ facility, close, applied, uncertain, den
     {error && <p role="alert">{error}</p>}
     {preview && <section aria-label="Price adjustment preview"><h3>Review {preview.changes.length} selected units</h3><div className="table-scroll" style={{ maxHeight: "25vh", overflow: "auto" }}><table className="data-table"><thead><tr><th>Unit</th><th>Current</th><th>Proposed</th></tr></thead><tbody>{preview.changes.map(c => <tr key={c.unitId}><td>{c.number}</td><td>{money(c.currentRate)}</td><td>{money(c.proposedRate)}</td></tr>)}</tbody></table></div></section>}
     <div className="form-actions"><button className="button button-secondary" disabled={busy} onClick={close}>Close</button><button className="button button-secondary" disabled={busy || blocked || !selected.length || selected.length > 1000 || !value.trim() || !Number.isFinite(Number(value))} onClick={() => void submit("preview")}>Preview prices</button>{preview && <button className="button button-primary" disabled={busy || blocked} onClick={() => void submit("apply")}>Confirm {preview.changes.length} price changes</button>}</div>
-  </div></div>;
+  </dialog>;
 }
