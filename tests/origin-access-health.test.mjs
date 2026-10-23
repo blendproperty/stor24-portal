@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -27,6 +27,7 @@ printf 403
       encoding: 'utf8', timeout: 30000,
     });
     assert.equal(result.error, undefined);
+    assert.ok(existsSync(join(root, 'count')), `Probe fixture did not run: ${result.status} ${result.stderr} ${result.stdout}`);
     return { ...result, calls: Number(readFileSync(join(root, 'count'), 'utf8')) };
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
