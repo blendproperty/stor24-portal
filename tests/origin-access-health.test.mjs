@@ -17,6 +17,7 @@ case "$MODE" in
   timeout) exit 28 ;;
   tls) exit 60 ;;
   bypass) printf 200; exit 0 ;;
+  partial-bypass) printf 200; exit 28 ;;
   forbidden500) printf 500; exit 0 ;;
 esac
 printf 403
@@ -41,6 +42,12 @@ test('exhausted connection attempts remain unverified and fail closed', () => {
   const result = probe('timeout');
   assert.equal(result.status, 28); assert.equal(result.calls, 3);
   assert.match(result.stderr, /STOR24_ORIGIN_UNVERIFIED host=stor24.co.za probe=plain curl=28 attempts=3/);
+});
+test('an observed origin HTTP 200 fails immediately even when curl times out reading its body', () => {
+  const result = probe('partial-bypass');
+  assert.equal(result.status, 1); assert.equal(result.calls, 1);
+  assert.match(result.stderr, /STOR24_ORIGIN_FAILED host=stor24.co.za probe=plain http=200/);
+  assert.doesNotMatch(result.stderr, /STOR24_ORIGIN_UNVERIFIED/);
 });
 test('unexpected HTTP responses and certificate failures are never retried or accepted', () => {
   for (const mode of ['bypass', 'forbidden500', 'tls']) {
