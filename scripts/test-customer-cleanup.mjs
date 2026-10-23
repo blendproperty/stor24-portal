@@ -3,15 +3,16 @@ import { chromium, expect } from '@playwright/test';
 import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
-const bundle = await build({ stdin: { contents: `import React from 'react';import {createRoot} from 'react-dom/client';import {TestCustomerCleanup} from './src/components/test-customer-cleanup';createRoot(document.getElementById('root')).render(<TestCustomerCleanup customers={[{id:'test-one',name:'Synthetic One',contact:'one@example.invalid'},{id:'test-two',name:'Synthetic Two',contact:'two@example.invalid'},{id:'control',name:'Real Control',contact:''}]} disabled={false} onDeleted={async()=>{window.refreshed=true}}/>);`, resolveDir: process.cwd(), loader: 'jsx' }, bundle:true, write:false, format:'esm', jsx:'automatic' });
-const css=(await Promise.all(['src/app/globals.css','src/styles/stor24-brand.css','src/styles/staff-workspace.css'].map(p=>readFile(p,'utf8')))).join('\n').replace('@import "tailwindcss";','');
-const server=createServer((req,res)=>{res.setHeader('content-type',req.url==='/app.js'?'text/javascript; charset=utf-8':'text/html; charset=utf-8');res.end(req.url==='/app.js'?bundle.outputFiles[0].text:`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div id="root"></div><script type="module" src="/app.js"></script></body></html>`);});
+const bundle = await build({ stdin: { contents: `import React from 'react';import {createRoot} from 'react-dom/client';import {TestCustomerCleanup} from './src/components/test-customer-cleanup';createRoot(document.getElementById('root')).render(<TestCustomerCleanup customers={[{id:'test-one',name:'Synthetic One',contact:'one@example.invalid'},{id:'test-two',name:'Synthetic Two',contact:'two@example.invalid'},{id:'control',name:'Real Control',contact:''},...Array.from({length:23},(_,i)=>({id:'fixture-'+i,name:'Customer with a longer name '+i,contact:'long.customer.email.address@example.invalid'}))]} disabled={false} onDeleted={async()=>{window.refreshed=true}}/>);`, resolveDir: process.cwd(), loader: 'jsx' }, bundle:true, write:false, format:'esm', jsx:'automatic' });
+const css=(await Promise.all(['node_modules/tailwindcss/preflight.css','src/app/globals.css','src/styles/stor24-brand.css','src/styles/staff-workspace.css'].map(p=>readFile(p,'utf8')))).join('\n').replace('@import "tailwindcss";','');
+const server=createServer((req,res)=>{res.setHeader('content-type',req.url==='/app.js'?'text/javascript; charset=utf-8':'text/html; charset=utf-8');res.end(req.url==='/app.js'?bundle.outputFiles[0].text:`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body style="--font-satoshi:Arial"><main class="app-shell"><div class="content" id="root"></div></main><script type="module" src="/app.js"></script></body></html>`);});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const browser=await chromium.launch();
 await mkdir('output/customer-cleanup',{recursive:true});
 try {
  for (const width of [1440,390,320]) {
-  const page=await browser.newPage({viewport:{width,height:1000}});let mode='ok';const calls=[];const errors=[];
+  const height=width===1440?900:740;
+  const page=await browser.newPage({viewport:{width,height}});let mode='ok';const calls=[];const errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   await page.route('**/api/v1/admin/test-customers',async route=>{
    const input=route.request().postDataJSON();calls.push(input);
@@ -24,7 +25,20 @@ try {
   });
   await page.goto(`http://127.0.0.1:${server.address().port}`);
   const open=page.getByRole('button',{name:'Delete test customers',exact:true});await open.click();
-  const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();await dialog.getByLabel('Find test customers').fill('Synthetic');
+  const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('checkbox')).toHaveCount(26);
+  assert.equal(await dialog.getByRole('checkbox').evaluateAll(nodes=>nodes.filter(n=>n.checked).length),0);
+  const footer=dialog.locator('footer');
+  const before=await footer.boundingBox(); const box=await dialog.boundingBox();
+  assert.ok(Math.abs(box.x+box.width/2-width/2)<2,'Dialog horizontally centered');
+  assert.ok(box.y>=0 && box.y+box.height<=height,'Dialog bounded by viewport');
+  assert.ok(await dialog.locator('.test-cleanup-body').evaluate(el=>el.scrollHeight>el.clientHeight),'Long list scrolls inside dialog');
+  await dialog.locator('.test-cleanup-body').evaluate(el=>el.scrollTop=el.scrollHeight);
+  assert.deepEqual(await footer.boundingBox(),before,'Actions stay fixed while scrolling');
+  assert.ok(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1),'No horizontal overflow');
+  await dialog.locator('.test-cleanup-body').evaluate(el=>el.scrollTop=0);
+  await page.screenshot({path:`output/customer-cleanup/selection-${width}.png`});
+  await dialog.getByLabel('Find test customers').fill('Synthetic');
   await dialog.getByRole('button',{name:'Select all matching (2)',exact:true}).click();assert.equal(calls.length,0);
   mode='denied';await dialog.getByRole('button',{name:'Review 2 selected',exact:true}).click();await expect(dialog.getByRole('alert')).toContainText('Owner required');
   mode='ok';await dialog.getByRole('button',{name:'Review 2 selected',exact:true}).click();
