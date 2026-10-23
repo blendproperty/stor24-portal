@@ -71,6 +71,7 @@ jobs:
       - run: node scripts/test-renumber-preview-recovery.mjs
       - run: node scripts/test-renumber-save-recovery.mjs
       - run: node scripts/test-inventory-rate-recovery.mjs
+      - run: node scripts/test-faeez-workflows.mjs
       - run: node scripts/test-unit-rate-adjustment.mjs
       - run: node scripts/test-hold-release-recovery.mjs
       - run: node scripts/test-uat-reset.mjs

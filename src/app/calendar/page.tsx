@@ -2,7 +2,8 @@ import Link from "next/link";
 import { CalendarDays, Clock3 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { getOperationsCalendar } from "@/lib/calendar-service";
-import { requireScope } from "@/lib/scope";
+import { requirePermissionScope } from "@/lib/scope";
+import { ScheduledWork } from "@/components/scheduled-work";
 import { SOUTH_AFRICA_TIME_ZONE } from "@/lib/south-africa-time";
 
 export const metadata = { title: "Calendar" };
@@ -11,10 +12,11 @@ const dayLabel = (key: string) => new Intl.DateTimeFormat("en-ZA", { timeZone: S
 const timeLabel = (value: Date) => new Intl.DateTimeFormat("en-ZA", { timeZone: SOUTH_AFRICA_TIME_ZONE, hour: "2-digit", minute: "2-digit", hour12: false }).format(value);
 
 export default async function CalendarPage() {
-  const days = await getOperationsCalendar(await requireScope());
+  const days = await getOperationsCalendar(await requirePermissionScope("operations.view"));
   return <div className="page-stack schedule-workspace">
     <PageHeader eyebrow="Work scheduling" title="Calendar" description="Live facility-scoped tasks, lead follow-ups, viewings, expected rental arrivals and scheduled move-outs in South African time."/>
     <section className="schedule-overview" aria-label="Schedule summary"><div><span>Scheduled work</span><strong>{days.reduce((sum, day) => sum + day.items.length, 0)}</strong><p>Across the displayed days</p></div><div><span>Days with activity</span><strong>{days.filter(day => day.items.length > 0).length}<small> / {days.length}</small></strong><p>Tasks, follow-ups and customer appointments</p></div><div className="schedule-timezone"><Clock3 size={22}/><strong>South Africa</strong><p>All times shown in SAST</p></div></section>
+    <ScheduledWork />
     <section className="calendar-grid">
       {days.map((day) => <article className="calendar-day" key={day.key}>
         <div><CalendarDays size={18}/><strong>{dayLabel(day.key)}</strong><span>{day.items.length} {day.items.length === 1 ? "item" : "items"}</span></div>

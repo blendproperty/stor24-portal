@@ -12,7 +12,7 @@ test("task status and audit roll back together and allow a verified retry", asyn
   const database = {...client(state),$transaction:async (fn:(tx:ReturnType<typeof client>)=>Promise<unknown>)=>{const pending=structuredClone(state);const result=await fn(client(pending));state.task=pending.task;state.audits=pending.audits;return result;}};
   const output=await build({entryPoints:["src/app/api/v1/operations/tasks/[id]/route.ts"],bundle:true,write:false,platform:"node",format:"cjs",packages:"external",plugins:[{name:"fixture",setup(b){
     b.onResolve({filter:/^@\/lib\/(db|auth-guards)$/},a=>({path:a.path,namespace:"fixture"}));
-    b.onLoad({filter:/.*/,namespace:"fixture"},a=>({contents:a.path.endsWith('/db')?'export const db=__db;':"export const requirePermission=async()=>({organisationId:'org',user:{id:'actor'}});export const authErrorResponse=e=>Response.json({error:e.message},{status:500});"}));
+    b.onLoad({filter:/.*/,namespace:"fixture"},a=>({contents:a.path.endsWith('/db')?'export const db=__db;':"export const requirePermission=async()=>({organisationId:'org',user:{id:'actor'}});export const requireSession=async()=>{throw Error('Unexpected session read in fixture')};export const authErrorResponse=e=>Response.json({error:e.message},{status:500});"}));
   }}]});
   const loaded={exports:{} as {PATCH:(r:Request,c:{params:Promise<{id:string}>})=>Promise<Response>}};
   new Function('require','module','exports','__db',output.outputFiles[0].text)(createRequire(import.meta.url),loaded,loaded.exports,database);

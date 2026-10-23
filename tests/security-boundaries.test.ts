@@ -32,7 +32,7 @@ function fixture() {
       { id: "new-other", organisationId: "org", leads: [], reservations: [], tenancies: [] },
     ],
     auditEvent: [{ id: "audit", organisationId: "org", actorId: "staff", entityType: "Customer", entityId: "new-own", action: "customer.created" }],
-    lead: [{ id: "lead-a", facilityId: "a" }], reservation: [], unit: [], integrationIdentityLink: [], accessDecision: [], receiptReallocation: [],
+    lead: [{ id: "lead-a", facilityId: "a" }], reservation: [], occupancy: [], unit: [], integrationIdentityLink: [], accessDecision: [], receiptReallocation: [],
   };
   const writes: Row[] = [], queries: Row[] = [], sends: unknown[][] = [];
   const db: Row = {};
@@ -40,6 +40,7 @@ function fixture() {
   for (const [model, rows] of Object.entries(tables)) db[model] = {
     findFirst: async (args: Row) => { queries.push({ model, ...args }); return rows.find(row => matches(row, args.where)) ?? null; },
     findUnique: async (args: Row) => rows.find(row => matches(row, args.where)) ?? null,
+    count: async (args: Row) => rows.filter(row => matches(row, args.where)).length,
     findMany: async (args: Row) => { queries.push({ model, ...args }); return rows.filter(row => matches(row, args.where)); },
     create: async ({ data }: Row) => { writes.push({ model, data }); return { id: "created", ...data }; },
     update: async ({ where, data }: Row) => { writes.push({ model, where, data }); return { ...rows.find(row => matches(row, where)), ...data }; },

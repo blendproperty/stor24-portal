@@ -1,4 +1,5 @@
 export function apiError(error: unknown) {
+  if (error instanceof Error && error.message === "UNIT_STRUCTURE_PROTECTED") return Response.json({ error: { code: error.message, message: "This unit has a live booking or occupancy. Its physical details and availability require an approved operational workflow." } }, { status: 409 });
   const message = error instanceof Error ? error.message : "INTERNAL_ERROR";
   if (message === "PRICE_GOVERNED_WORKFLOW_REQUIRED") return Response.json({ error: { code: message, message: "Saved online booking particulars require the booking price review workflow. Signed or paid bookings need finance review." } }, { status: 409 });
   if (message === "UAT_RESET_STOCK_REVIEW_REQUIRED") return Response.json({ error: { code: message, message: "Nothing was cleared. Merchandise stock reservations do not match the orders. Review the stock holds before resetting." } }, { status: 409 });
