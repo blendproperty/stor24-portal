@@ -1,3 +1,11 @@
+## Unit-size pricing user acceptance and next register check - 23 October 2026
+
+- **Implementation:** no application changes; existing released size-based price adjustment retained.
+- **Testing and acceptance:** Brett says he has checked this and requests the next item. Record user-reported acceptance of the exercised pricing feature. No actual production price application, amount or changed-unit count is inferred. Prior automated and live-preview evidence retains its original scope.
+- **Commit and push:** documentation-only acceptance published on codex/unit-pricing-user-acceptance-20261023 from remote main0c2be6a1; verify remote canonical before handoff. **Merge:** not yet promoted to main.
+- **Deployment and configuration:** none changed or required. **Live production verification:** no new agent production check or financial mutation; user acceptance is distinct from earlier read-only previews.
+- **Next item:** original21 laptop/phone and offline readiness. Prior Android installation/sign-in/Midpoint acceptance remains; current snapshot/offline/reconnect/conflict/deduplication and further device scopes remain unverified. Preserve user-confirmed19/20/22 scopes and all independent finance/provider/data/device/training/legal/approval gates. Original23 hands-on closure remains open. No tracker in scope.
+
 ## Unit pricing final evidence integration - 23 October 2026
 
 - **Implementation:** normal merge of incoming main19860e25/PR623 retains the separate monitor/SMTP repair and its complete canonical history. All six unit-pricing runtime/guide/CSS files remain byte-identical to deployed and live-verified3b8f9d5a. This PR remains documentation-only relative to current main; no new pricing, provider, configuration, grant or financial action.
