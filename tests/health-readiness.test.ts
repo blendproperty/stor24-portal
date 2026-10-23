@@ -37,3 +37,16 @@ test("monitor retries connection establishment, retains fail-closed checks and u
   assert.doesNotMatch(monitor, /SENDGRID_API_KEY|STOR24_ALERT_EMAIL_FROM/);
   assert.match(monitor, /npm ci --omit=dev --ignore-scripts/);
 });
+
+
+test("both SSH-bearing monitor jobs use the independent macOS network", () => {
+  const workflow = monitor.replaceAll("\r\n", "\n");
+  for (const name of ["backup", "alerts"]) {
+    const job = workflow.split(`  ${name}:\n`)[1]?.split(/\n  [a-z][a-z-]*:\n/)[0];
+    assert.ok(job, `${name} job is required`);
+    assert.match(job, /runs-on: macos-latest/);
+    assert.match(job, /StrictHostKeyChecking=yes/);
+    assert.match(job, /ConnectionAttempts=3/);
+  }
+  assert.match(workflow, /readiness-primary:\n    runs-on: ubuntu-latest/);
+});
