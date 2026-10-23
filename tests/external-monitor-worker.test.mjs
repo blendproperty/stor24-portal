@@ -8,7 +8,7 @@ test('independent trigger dispatches only the fixed main monitor with no test al
   t.mock.method(console, 'info', (...args) => calls.push(args));
   t.mock.method(globalThis, 'fetch', async (url, options) => {
     assert.equal(url, 'https://api.github.com/repos/blendproperty/stor24-portal/actions/workflows/monitor-production.yml/dispatches');
-    assert.equal(options.method, 'POST'); assert.equal(options.redirect, 'error');
+    assert.equal(options.method, 'POST'); assert.equal(options.redirect, 'manual');
     assert.equal(options.headers.Authorization, 'Bearer synthetic-test-token');
     assert.deepEqual(JSON.parse(options.body), { ref: 'main', inputs: { test_alert: false } });
     assert.ok(options.signal instanceof AbortSignal);
@@ -25,9 +25,12 @@ test('missing credentials, HTTP rejection and uncertain requests fail without re
   assert.equal(fetch.mock.callCount(), 0);
   await assert.rejects(worker.scheduled({}, { GITHUB_MONITOR_TOKEN: 'synthetic-test-token' }), { message: 'GitHub monitor dispatch failed: HTTP 403' });
   assert.equal(fetch.mock.callCount(), 1);
+  fetch.mock.mockImplementation(async () => new Response(null, { status: 302, headers: { Location: 'https://unrelated.example/' } }));
+  await assert.rejects(worker.scheduled({}, { GITHUB_MONITOR_TOKEN: 'synthetic-test-token' }), { message: 'GitHub monitor dispatch failed: HTTP 302' });
+  assert.equal(fetch.mock.callCount(), 2);
   fetch.mock.mockImplementation(async () => { throw new Error('synthetic-test-token'); });
   await assert.rejects(worker.scheduled({}, { GITHUB_MONITOR_TOKEN: 'synthetic-test-token' }), { message: 'GitHub monitor dispatch request failed; no automatic replay' });
-  assert.equal(fetch.mock.callCount(), 2);
+  assert.equal(fetch.mock.callCount(), 3);
 });
 
 test('worker is cron-only with six ten-minute slots and no credential in its configuration', () => {
