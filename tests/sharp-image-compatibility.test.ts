@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import sharp from "sharp";
-import { detectContentType, optimizeImage } from "next/dist/server/image-optimizer";
+import { detectContentType } from "next/dist/server/image-optimizer/detect-content-type";
+import { optimizeImage } from "next/dist/server/image-optimizer/transform";
 import { normaliseFacialPhoto } from "../src/lib/facial-photo-security";
 import { normaliseIdentityPage } from "../src/lib/identity-document-security";
 import { trainingSample, validateTrainingSample } from "../src/lib/move-in-training";
