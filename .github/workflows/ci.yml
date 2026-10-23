@@ -71,6 +71,7 @@ jobs:
       - run: node scripts/test-renumber-preview-recovery.mjs
       - run: node scripts/test-renumber-save-recovery.mjs
       - run: node scripts/test-inventory-rate-recovery.mjs
+      - run: node scripts/test-unit-rate-adjustment.mjs
       - run: node scripts/test-hold-release-recovery.mjs
       - run: node scripts/test-uat-reset.mjs
       - run: node scripts/test-customer-cleanup.mjs
@@ -144,6 +145,7 @@ jobs:
             output/reservation-lifecycle-recovery/
             output/unit-inventory-read-recovery/
             output/inventory-save-recovery/
+            output/unit-rate-adjustment/
             output/inventory-removal-recovery/
             output/merchandise-supply-confirmation/
             output/daily-close-form/
