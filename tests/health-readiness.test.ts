@@ -13,8 +13,11 @@ test("production health performs a database readiness check", () => {
   assert.doesNotMatch(healthRoute, /force-static/);
 });
 
-test("scheduled production monitoring verifies application and database health", () => {
-  assert.match(monitor, /cron: "3-59\/10 \* \* \* \*"/);
+test("externally scheduled production monitoring verifies readiness without a duplicate GitHub cron", () => {
+  assert.match(monitor, /workflow_dispatch:/);
+  assert.doesNotMatch(monitor, /^\s+schedule:/m);
+  const worker = JSON.parse(readFileSync(new URL("../wrangler.monitor.json", import.meta.url), "utf8"));
+  assert.deepEqual(worker.triggers.crons, ["3,13,23,33,43,53 * * * *"]);
   assert.match(monitor, /status !== "ok"/);
   assert.match(monitor, /database !== "ok"/);
 });
