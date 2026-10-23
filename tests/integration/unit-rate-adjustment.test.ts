@@ -9,7 +9,7 @@ import { Prisma } from "../../src/generated/prisma/client";
 test("size price adjustment authorisation, exact preview, atomic writes and replay safety in isolated PostgreSQL", async t => {
   assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci");
   assert.equal(new URL(process.env.DATABASE_URL!).hostname, "localhost");
-  assert.match(new URL(process.env.DATABASE_URL!).pathname, /^\/(merchandise_ci|unit_rate_adjustment_20261023)$/);
+  assert.match(new URL(process.env.DATABASE_URL!).pathname, /^\/(merchandise_ci|unit_rate_adjustment_20261023(?:_migrated)?)$/);
   const key = randomUUID();
   const org = await db.organisation.create({ data: { name: "Size pricing test", slug: key } });
   const foreignOrg = await db.organisation.create({ data: { name: "Other test", slug: `${key}-other` } });
@@ -24,7 +24,7 @@ test("size price adjustment authorisation, exact preview, atomic writes and repl
   const large = await db.unitType.create({ data: { facilityId: facility.id, name: "Large", areaSqMetres: 12 } });
   const create = (number: string, unitTypeId = type.id, monthlyRate = 100) => db.unit.create({ data: { facilityId: facility.id, unitTypeId, number, monthlyRate, taxRate: "0.15" } });
   const a = await create("A"), b = await create("B", sameSize.id, 200), untouched = await create("L", large.id);
-  const component = await db.unit.create({ data: { facilityId: facility.id, unitTypeId: type.id, number: "Component", monthlyRate: 10, combinedIntoUnitId: a.id } });
+  const component = await db.unit.create({ data: { facilityId: facility.id, unitTypeId: type.id, number: "Component", status: "UNAVAILABLE", monthlyRate: 10, combinedIntoUnitId: a.id } });
   const customer = await db.customer.create({ data: { organisationId: org.id, firstName: "Synthetic" } });
   const reservation = await db.reservation.create({ data: { facilityId: facility.id, customerId: customer.id, unitId: a.id, quotedRate: 80, initialRentSnapshot: { amount: "80.00" } } });
   const account = await db.account.create({ data: { customerId: customer.id, accountNumber: key } });
