@@ -1,4 +1,5 @@
 import { requireEditableCombinationUnit, requireEditableCombinationUnitType } from "@/lib/unit-combination-service";
+import { protectUnitStructure, protectUnitTypeStructure } from "@/lib/inventory-structure-service";
 import { requireOperationalUnit } from "@/lib/floor-availability-service";
 import { apiError, jsonBody } from "@/lib/api";
 import { db } from "@/lib/db";
@@ -313,6 +314,7 @@ export async function PATCH(
         auditAfter = { number: nextNumber, mapLabelSynchronized: true };
         entity = await db.$transaction(async (tx) => {
           await requireEditableCombinationUnit(tx,current.facilityId,current.id);
+          await protectUnitStructure(tx, current.facilityId, current.id, data);
           const updated = await tx.unit.update({
             where: { id: current.id },
             data,
@@ -328,6 +330,7 @@ export async function PATCH(
       } else if (resource === "unit-types") {
         const updated = await db.$transaction(async tx => {
           await requireEditableCombinationUnitType(tx,current.facilityId,current.id);
+          await protectUnitTypeStructure(tx, current.facilityId, current.id, data);
           const saved = await tx.unitType.update({ where: { id: current.id }, data });
           await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "unit-types.updated", entityType: "unit-types", entityId: current.id, before: { useTypes: current.useTypes, businessAttributes: JSON.stringify(current.businessAttributes ?? null) }, after: { useTypes: saved.useTypes, businessAttributes: JSON.stringify(saved.businessAttributes) } } });
           return saved;
@@ -359,6 +362,7 @@ export async function PATCH(
       } else {
         entity = await db.$transaction(async tx => {
           await requireEditableCombinationUnit(tx,current.facilityId,current.id);
+          await protectUnitStructure(tx, current.facilityId, current.id, data);
           const saved = await tx.unit.update({ where: { id: current.id }, data });
           await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "units.updated", entityType: "units", entityId: current.id, before: { useTypesOverride: current.useTypesOverride, businessAttributesOverride: JSON.stringify(current.businessAttributesOverride ?? null) }, after: { useTypesOverride: saved.useTypesOverride, businessAttributesOverride: JSON.stringify(saved.businessAttributesOverride) } } });
           return saved;

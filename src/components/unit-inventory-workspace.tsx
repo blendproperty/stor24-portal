@@ -1,5 +1,6 @@
 "use client";
 import { UnitFacilityMap } from "@/components/unit-facility-map";
+import { BulkUnitPricingDialog } from "@/components/bulk-unit-pricing-dialog";
 
 import { FloorAvailabilityControls } from "@/components/floor-availability-controls";
 import { unitSupportsProduct } from "@/lib/product-line";
@@ -121,6 +122,7 @@ export function UnitInventoryWorkspace({
   const [query, setQuery] = useState("");
   const [display, setDisplay] = useState<"size" | "area">("area");
   const [dialog, setDialog] = useState<DialogState | null>(null);
+  const [pricingFacility, setPricingFacility] = useState<Facility | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -522,6 +524,9 @@ export function UnitInventoryWorkspace({
               <BadgeDollarSign size={15} />
               Apply Midrand rates
             </button>
+            <button className="button button-primary" disabled={!selectedFacility?.units.length || busy || saveBlocked} onClick={() => setPricingFacility(selectedFacility!)}>
+              <BadgeDollarSign size={15} />Adjust selected unit prices
+            </button>
             <button
               className="button button-secondary"
               onClick={() => {
@@ -823,6 +828,9 @@ export function UnitInventoryWorkspace({
           )}
         </aside>
       </section>
+      {pricingFacility && <BulkUnitPricingDialog facility={pricingFacility} close={() => setPricingFacility(null)} uncertain={() => setSaveBlocked(true)}
+        denied={status => { setPricingFacility(null); setFacilities([]); setReadDenied(true); setReadError(status === 401 ? "Sign in again to view inventory." : "You do not have access to change these unit rates. Please contact your administrator."); }}
+        applied={async count => { setPricingFacility(null); setNotice(`${count} selected unit rates updated. Existing tenancy rents and reservation quotes were preserved.`); await refresh(); }} />}
       {dialog ? (
         <InventoryDialog
           state={dialog}

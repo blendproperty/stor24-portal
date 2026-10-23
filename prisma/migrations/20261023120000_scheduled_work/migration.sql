@@ -1,0 +1,5 @@
+ALTER TABLE "Task" ADD COLUMN "startAt" TIMESTAMP(3),
+  ADD COLUMN "endAt" TIMESTAMP(3), ADD COLUMN "unitId" TEXT;
+ALTER TABLE "Task" ADD CONSTRAINT "Task_unitId_fkey"
+  FOREIGN KEY ("unitId") REFERENCES "Unit"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+CREATE INDEX "Task_unitId_idx" ON "Task"("unitId");
