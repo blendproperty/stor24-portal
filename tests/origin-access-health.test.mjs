@@ -60,10 +60,11 @@ test('the actual workflow health validator names each failed condition and never
     [JSON.stringify({ ...healthy, merchandiseExpiry: { enabled: false } }), ['expiry-worker']],
     ['PRIVATE_INVALID_JSON', ['json']],
   ]) {
-    const fixture = join(tmpdir(), `stor24-health-${process.pid}.json`);
-    writeFileSync(fixture, response);
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'stor24-health-'));
+    const fixture = join(fixtureRoot, 'health.json');
+    writeFileSync(fixture, response, { flag: 'wx', mode: 0o600 });
     const result = spawnSync(process.execPath, ['-e', script, fixture], { env: { ...process.env, EXPECT_MERCHANDISE_WORKER: 'true' }, encoding: 'utf8' });
-    rmSync(fixture);
+    rmSync(fixtureRoot, { recursive: true });
     assert.equal(result.status, expected.length ? 1 : 0);
     for (const check of expected) assert.match(result.stderr, new RegExp(`STOR24_PUBLIC_FAILED check=${check}`));
     assert.doesNotMatch(result.stdout + result.stderr, /PRIVATE/);
