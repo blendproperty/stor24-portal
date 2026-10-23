@@ -360,6 +360,7 @@ model Unit {
   occupancies         Occupancy[]
   notes               UnitNote[]
   maintenanceRequests MaintenanceRequest[]
+  scheduledTasks      Task[]
   mapElements         MapElement[]
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
@@ -1393,6 +1394,10 @@ model RoleAssignment {
 }
 
 model Task {
+  startAt        DateTime?
+  endAt          DateTime?
+  unitId         String?
+  unit           Unit?        @relation(fields: [unitId], references: [id], onDelete: SetNull)
   id             String       @id @default(cuid())
   organisationId String
   organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
@@ -1422,6 +1427,7 @@ model Task {
 
   @@index([organisationId, status, dueAt])
   @@index([assigneeId, status, dueAt])
+  @@index([unitId])
   @@index([organisationId, facilityId, purpose, status, dueAt])
 }
 

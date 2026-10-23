@@ -803,3 +803,30 @@
  .app-shell .test-cleanup-actions .button { flex:1; padding:9px 10px; font-size:12px; }
  .test-cleanup-counts { grid-template-columns:1fr; }
 }
+
+/* Selected unit prices and scheduled work share the staff form controls. */
+.app-shell .bulk-price-dialog { position:fixed; inset:0; margin:auto; border:0; width:min(760px,calc(100vw - 32px)); max-height:calc(100dvh - 40px); padding:24px; }
+.bulk-price-dialog::backdrop { background:#0a12229e; backdrop-filter:blur(6px); }
+.app-shell .bulk-price-dialog h2 { font-size:24px; line-height:1.2; }
+.app-shell .bulk-price-dialog p,.app-shell .scheduled-work-editor p { margin:12px 0; color:var(--muted); line-height:1.6; font-size:13px; }
+.app-shell .bulk-price-dialog fieldset,.app-shell .scheduled-work-editor fieldset { min-width:0; border:0; padding:0; margin:16px 0; }
+.app-shell .bulk-price-dialog .form-grid,.app-shell .scheduled-work .form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin:14px 0; }
+.app-shell .bulk-price-dialog label,.app-shell .scheduled-work label { display:grid; gap:6px; min-width:0; font-size:12px; font-weight:700; }
+.app-shell .bulk-price-dialog input:not([type=checkbox]),.app-shell .bulk-price-dialog select,.app-shell .scheduled-work input,.app-shell .scheduled-work select,.app-shell .scheduled-work textarea { display:block; width:100%; min-width:0; min-height:44px; padding:10px 12px; border:1px solid var(--line); border-radius:9px; background:#fff; color:var(--ink); font:inherit; font-size:14px; }
+.app-shell .bulk-price-dialog input[type=checkbox] { width:20px; height:20px; }
+.app-shell .bulk-price-dialog .table-scroll { margin:14px 0; }
+.app-shell .bulk-price-dialog .data-table { min-width:0; width:100%; }
+.app-shell .bulk-price-dialog .data-table th,.app-shell .bulk-price-dialog .data-table td { padding:10px 8px; }
+.app-shell .bulk-price-dialog .form-actions { position:static; display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 0; }
+.app-shell .scheduled-work-editor { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; margin-top:20px; padding-top:20px; border-top:1px solid var(--line); }
+.app-shell .scheduled-work .work-row { grid-template-columns:minmax(0,1fr) auto; gap:18px; }
+.app-shell .scheduled-work .work-copy { min-width:0; overflow-wrap:anywhere; }
+.app-shell .scheduled-work .work-copy small { margin-top:4px; }
+.app-shell .scheduled-work [role=alert],.app-shell .bulk-price-dialog [role=alert] { color:#9f2b22; }
+@media(max-width:640px) {
+ .app-shell .bulk-price-dialog { padding:18px; }
+ .app-shell .bulk-price-dialog .form-grid,.app-shell .scheduled-work .form-grid,.app-shell .scheduled-work .work-row { grid-template-columns:minmax(0,1fr); }
+ .app-shell .bulk-price-dialog h2 { font-size:21px; }
+ .app-shell .bulk-price-dialog .button,.app-shell .scheduled-work .form-actions .button { white-space:normal; }
+ .app-shell .scheduled-work .work-row .button { justify-self:start; }
+}
