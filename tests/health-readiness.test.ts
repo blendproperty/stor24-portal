@@ -25,3 +25,13 @@ test("externally scheduled production monitoring verifies readiness without a du
 test("the container healthcheck consumes the readiness endpoint", () => {
   assert.match(compose, /healthcheck:[\s\S]*\/api\/health/);
 });
+
+
+test("monitor retries connection establishment, retains fail-closed checks and uses authenticated SMTP", () => {
+  assert.equal((monitor.match(/ConnectionAttempts=3/g) || []).length, 2);
+  assert.match(monitor, /StrictHostKeyChecking=yes/);
+  assert.match(monitor, /chmod 600/);
+  assert.match(monitor, /STOR24_ALERT_HOSTINGER_SMTP_PASSWORD/);
+  assert.doesNotMatch(monitor, /SENDGRID_API_KEY|STOR24_ALERT_EMAIL_FROM/);
+  assert.match(monitor, /npm ci --omit=dev --ignore-scripts/);
+});

@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { validateAlertRecipients } from '../src/lib/operations-alert-policy.mjs';
 import { loadAlertRecipients } from './load-alert-recipients.mjs';
+import { HOSTINGER_EMAIL_ADDRESS, hostingerTransport } from '../src/lib/hostinger-transport.mjs';
 import { alertDetails } from './production-alert-details.mjs';
 
 const SUCCESS = 'success';
@@ -36,7 +37,6 @@ async function deliverDestinations(env, kind, fetcher) {
   const request = async (channel, url, options) => {
     try {
       const response = await fetcher(url, { ...options, signal: AbortSignal.timeout(15000) });
-      if (channel === 'EMAIL') return { channel, accepted: response.status === 202, httpStatus: response.status };
       const data = await response.json();
       return { channel, accepted: response.ok, httpStatus: response.status, status: data.status, code: data.code, reference: response.ok ? data.sid : undefined };
     } catch {
@@ -46,15 +46,26 @@ async function deliverDestinations(env, kind, fetcher) {
   };
   const emails = (env.ALERT_EMAIL_TO || '').split(',').map(x => x.trim()).filter(Boolean);
   if (allowed.includes('EMAIL')) {
-  if (!emails.length || !env.SENDGRID_API_KEY || !env.EMAIL_FROM) results.push({ channel: 'EMAIL', accepted: false, status: 'CONFIG_REQUIRED' });
-  else {
-    const match = env.EMAIL_FROM.match(/^(.*)<([^<>]+)>$/);
-    const from = match ? { email: match[2].trim(), name: match[1].trim().replace(/^"|"$/g, '') } : { email: env.EMAIL_FROM.trim() };
-    for (const email of emails) results.push(await request('EMAIL', 'https://api.sendgrid.com/v3/mail/send', {
-      method: 'POST', headers: { Authorization: `Bearer ${env.SENDGRID_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ personalizations: [{ to: [{ email }] }], from, subject: `STOR24 ${kind} ALERT — ${detail.severity}`, content: [{ type: 'text/plain', value: text }, { type: 'text/html', value: detail.html }] }),
-    }));
-  }
+    if (!emails.length || !env.HOSTINGER_SMTP_PASSWORD) results.push({ channel: 'EMAIL', accepted: false, status: 'CONFIG_REQUIRED' });
+    else for (const email of emails) {
+      if (!/^[^\s<>@,;]+@[^\s<>@,;]+\.[^\s<>@,;]+$/.test(email)) {
+        results.push({ channel: 'EMAIL', accepted: false, status: 'INVALID_RECIPIENT' }); continue;
+      }
+      let transport;
+      try {
+        transport = hostingerTransport(env);
+        const result = await transport.sendMail({
+          from: { name: 'Stor24', address: HOSTINGER_EMAIL_ADDRESS },
+          envelope: { from: HOSTINGER_EMAIL_ADDRESS, to: [email] }, to: email,
+          subject: `STOR24 ${kind} ALERT - ${detail.severity}`, text, html: detail.html,
+          disableFileAccess: true, disableUrlAccess: true,
+        });
+        results.push({ channel: 'EMAIL', accepted: result.accepted?.length === 1 && !result.rejected?.length, status: 'SMTP_RESPONSE' });
+      } catch (error) {
+        // Authentication rejection is definite; all other send errors may follow acceptance. Never replay.
+        results.push({ channel: 'EMAIL', accepted: false, status: error?.code === 'EAUTH' ? 'AUTHENTICATION_FAILED' : 'UNCERTAIN', automaticRetry: false });
+      } finally { transport?.close(); }
+    }
   }
   const auth = `Basic ${Buffer.from(`${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`).toString('base64')}`;
   for (const channel of ['SMS', 'WHATSAPP']) {
@@ -106,17 +117,21 @@ export async function run(env, fetcher = fetch) {
       if (jobs.jobs?.some(j => j.name === 'alerts' && j.status === 'completed' && j.conclusion !== 'skipped')) return { status: 'SUPPRESSED', cooldownMinutes: 30 };
     }
   }
-  // Log access is best-effort; a log retrieval failure must not prevent alert delivery.
-  let backupLog = '';
+  // Only fixed check names and allowlisted evidence are rendered, never raw logs.
+  const enriched = { ...env };
   try {
     const jobs = await get(`${api}/actions/runs/${env.GITHUB_RUN_ID}/jobs?per_page=100`);
-    const backupJob = jobs.jobs?.find(j => j.name === 'backup');
-    if (backupJob && /^\d+$/.test(String(backupJob.id))) {
-      const response = await fetcher(`${api}/actions/jobs/${backupJob.id}/logs`, { headers, signal: AbortSignal.timeout(15000) });
-      if (response.ok) backupLog = (await response.text()).slice(0, 200000);
+    for (const name of ['readiness', 'backup']) {
+      const job = jobs.jobs?.find(j => j.name === name);
+      if (!job) continue;
+      if (name === 'readiness') enriched.READINESS_STEPS = job.steps;
+      if (!/^\d+$/.test(String(job.id))) continue;
+      try {
+        const response = await fetcher(`${api}/actions/jobs/${job.id}/logs`, { headers, redirect: 'follow', signal: AbortSignal.timeout(15000) });
+        if (response.ok) enriched[name === 'backup' ? 'BACKUP_LOG' : 'READINESS_LOG'] = (await response.text()).slice(0, 200000);
+      } catch { /* Step metadata still identifies the check when logs are unavailable. */ }
     }
-  } catch { /* Keep generic, honest details when evidence is unavailable. */ }
-  const enriched = { ...env, BACKUP_LOG: backupLog };
+  } catch { /* Keep honest unknown details when GitHub evidence is unavailable. */ }
   return { status: 'ATTEMPTED', kind, severity: alertDetails(enriched, kind).severity, results: await deliverAlert(enriched, kind, fetcher) };
 }
 
