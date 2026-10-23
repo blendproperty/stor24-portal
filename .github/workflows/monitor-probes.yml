@@ -28,7 +28,13 @@ jobs:
           node-version: 22
       - run: node --test tests/origin-access-health.test.mjs tests/production-readiness.test.mjs tests/production-alert-details.test.mjs
       - name: Verify actual external read-only probes from this network
+        id: probe
         env:
           HEALTH_URL: https://portal.stor24.co.za/api/health
           EXPECT_MERCHANDISE_WORKER: 'true'
         run: node scripts/check-production-readiness.mjs
+      - name: Resolve actual network evidence against an isolated primary-timeout fixture
+        env:
+          PRIMARY_FINDING: '{"state":"unverified","markers":["STOR24_ORIGIN_UNVERIFIED host=stor24.co.za probe=plain curl=28 attempts=3"]}'
+          CONFIRMATION_FINDING: ${{ steps.probe.outputs.finding }}
+        run: node scripts/check-production-readiness.mjs --resolve
