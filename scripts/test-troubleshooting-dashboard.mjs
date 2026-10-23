@@ -26,6 +26,11 @@ try {
     await page.route('**/api/v1/operations/diagnostics?export=json', async route => { assert.equal(route.request().method(), 'GET'); return route.fulfill({ contentType: 'application/json', body: JSON.stringify(data) }); });
     await page.goto(`http://127.0.0.1:${server.address().port}`); await expect(page.getByRole('alert')).toContainText('could not refresh');
     fail = false; await page.getByRole('button', { name: 'Refresh checks' }).click(); await expect(page.getByText('88% used')).toBeVisible(); await expect(page.getByText('Evidence is stale', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Health status colour key')).toBeVisible();
+    for (const [state, tone, background] of [['good', 'rgb(22, 101, 52)', 'rgb(240, 253, 244)'], ['warning', 'rgb(146, 64, 14)', 'rgb(255, 251, 235)'], ['unknown', 'rgb(146, 64, 14)', 'rgb(255, 251, 235)'], ['critical', 'rgb(185, 28, 28)', 'rgb(254, 242, 242)']]) {
+      const card = page.getByRole('article').and(page.locator(`.diagnostic-${state}`)).first();
+      await expect(card).toHaveCSS('background-color', background); await expect(card).toHaveCSS('border-top-color', tone); await expect(card.locator('.diagnostic-value')).toHaveCSS('color', tone);
+    }
     await expect(page.getByText('Uploaded · cloud readback verified', { exact: true })).toBeVisible(); await expect(page.getByText('Still open · independent recovery keys and host-loss test', { exact: true })).toBeVisible();
     for (const [state, message] of [['failed', 'Latest upload failed · investigate'], ['overdue', 'Overdue · no verified upload within 26 hours'], ['unknown', 'No verified upload evidence']]) {
       data.host.cloudBackup.state = state; await page.getByRole('button', { name: 'Refresh checks' }).click(); await expect(page.getByText(message, { exact: true })).toBeVisible();
