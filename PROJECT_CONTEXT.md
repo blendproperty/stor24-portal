@@ -1,3 +1,9 @@
+## Unit-size pricing integrated validation checkpoint - 23 October 2026
+
+- **Implementation:** unchanged price-adjustment runtime. Normally merged incoming documentation-only mainf544ec47 (PR619), preserving both histories and unrelated customer-picker deployment evidence. No conflict markers or unrelated source changes.
+- **Testing:** production build completes successfully; corrected new policy/real-route suite7/7 passes against a separate database bootstrapped through the full historical migrations (including SQL-only combined-component constraint), rather than schema push alone. Full project typecheck and lint pass with7 inherited warnings; 1020-test broad Windows run retained1018 pass/1 skip/1 deployment Bash timeout, resolved by isolated deployment rerun10/10. Actual-component new/old inventory recovery and guided-help evidence above remains valid: incoming main changed documentation only. New integrated exact-head protected checks remain required.
+- **Commit/push:** source, correction, normal integration and this canonical evidence are being published to PR621; remote verification follows. **Merge:** PR621 not yet merged. **Deployment/configuration:** not deployed, no configuration required. **Live production verification:** pending deployed UI preview; no production rate mutation. All prior acceptance and operational/provider/data/training/approval gates remain open.
+
 ## Unit-size pricing protected-check correction - 23 October 2026
 
 - **Implementation:** runtime unchanged from7cf485c4. The new combined-component test fixture now uses UNAVAILABLE as required by the existing SQL constraint. Initial protected transaction run39935703324 correctly rejected the invalid Available fixture before exercising the new route; no protection was weakened. Local db-push omitted SQL-only constraints, so renewed verification uses a separate newly created migrated synthetic database.
