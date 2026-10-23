@@ -14,7 +14,7 @@ test("production health performs a database readiness check", () => {
 });
 
 test("scheduled production monitoring verifies application and database health", () => {
-  assert.match(monitor, /cron: "\*\/10 \* \* \* \*"/);
+  assert.match(monitor, /cron: "3-59\/10 \* \* \* \*"/);
   assert.match(monitor, /status !== "ok"/);
   assert.match(monitor, /database !== "ok"/);
 });

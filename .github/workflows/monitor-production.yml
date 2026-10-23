@@ -2,7 +2,8 @@ name: Monitor production
 
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    # GitHub may delay/drop scheduled events; avoid the busy hour/ten-minute boundaries.
+    - cron: "3-59/10 * * * *"
   workflow_dispatch:
     inputs:
       test_alert:
