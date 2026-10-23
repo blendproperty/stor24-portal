@@ -36,8 +36,8 @@ export async function createTrainingDebtor(userId: string, raw: unknown) {
     if (!access.owner || access.organisationId !== before.organisationId || !access.facilities.some(f => f.id === input.facilityId)) throw new Error("FORBIDDEN");
     const facility = await tx.facility.findFirst({ where: { id: input.facilityId, organisationId: access.organisationId, active: true } });
     if (!facility) throw new Error("FORBIDDEN");
-    const existing = await tx.auditEvent.findFirst({ where: { organisationId: access.organisationId, facilityId: facility.id, entityType, action } });
-    if (existing) return;
+    const existing = await tx.auditEvent.findMany({ where: { organisationId: access.organisationId, facilityId: facility.id, entityType, action }, select: { entityId: true } });
+    if (await tx.customer.count({ where: { organisationId: access.organisationId, id: { in: existing.map(event => event.entityId) } } })) return;
     const customer = await tx.customer.create({ data: {
       organisationId: access.organisationId, firstName: "TEST", lastName: "Faeez debtor training",
       notes: "TRAINING ONLY: TRAINING-DEBTOR-001. R1,000 illustrative charge less R400 illustrative payment = R600 training amount due. Open Training balances from Customers & tenants. Not a real debt, receipt, agreement, reservation or access authorisation. No customer contact details or communication consent.",

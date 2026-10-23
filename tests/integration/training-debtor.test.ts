@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { db } from "../../src/lib/db";
+import { getTestCustomerCleanupPreview, resetUatCustomerData } from "../../src/lib/uat-reset-service";
 import { createTrainingDebtor, trainingDebtors } from "../../src/lib/training-debtor-service";
 
 test("shared persisted training debtor stays isolated from finances and other stores", async t => {
@@ -54,6 +55,17 @@ test("shared persisted training debtor stays isolated from finances and other st
       finally { await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT "training_debtor_ci_failure"'); }
       assert.equal(await db.customer.count({ where: { organisationId: org.id } }), 1);
       assert.equal(await db.lead.count({ where: { facilityId: other.id } }), 0);
+    });
+    await t.test("owner cleanup retains history and allows one replacement training example", async () => {
+      const removedId = customerId, ids = [removedId];
+      const review = await getTestCustomerCleanupPreview(org.id, ids);
+      await resetUatCustomerData({ organisationId: org.id, actorId: owner.id, selection: { ids, fingerprint: review.fingerprint } });
+      assert.equal((await trainingDebtors(owner.id)).rows.length, 0);
+      const results = await Promise.all([createTrainingDebtor(owner.id, { facilityId: store.id }), createTrainingDebtor(owner.id, { facilityId: store.id })]);
+      customerId = results[0].rows[0].customerId;
+      assert.notEqual(customerId, removedId); assert.equal(results[1].rows[0].customerId, customerId);
+      assert.equal(await db.customer.count({ where: { organisationId: org.id } }), 1);
+      assert.equal(await db.auditEvent.count({ where: { organisationId: org.id, action: "training.debtor_created" } }), 2);
     });
     await t.test("no financial, reservation, access or communication records created", async () => {
       const counts = await Promise.all([

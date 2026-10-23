@@ -23,7 +23,6 @@ export async function POST(request: Request) {
       : await resetUatCustomerData({ organisationId, actorId: auth.user.id, selection: { ids: input.ids, fingerprint: input.fingerprint } });
     return Response.json({ data });
   } catch (error) {
-    if (error instanceof Error && error.message === "TEST_CUSTOMER_REVIEW_REQUIRED") return Response.json({ error: { message: "Nothing deleted. Selection includes payment, agreement, mandate, access, insurance, integration, queued communication or shared training records. Review these records before cleanup." } }, { status: 409 });
     return apiError(error);
   }
 }

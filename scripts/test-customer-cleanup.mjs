@@ -18,7 +18,7 @@ try {
    const input=route.request().postDataJSON();calls.push(input);
    assert.deepEqual([...input.ids].sort(),['test-one','test-two']);
    if(mode==='denied') return route.fulfill({status:403,json:{error:{message:'Owner required'}}});
-   if(input.action==='preview')return route.fulfill({json:{data:{customers:[{id:'test-one',name:'Synthetic One'},{id:'test-two',name:'Synthetic Two'}],counts:{customers:2,leads:3},fingerprint:'a'.repeat(64)}}});
+   if(input.action==='preview')return route.fulfill({json:{data:{customers:[{id:'test-one',name:'Synthetic One'},{id:'test-two',name:'Synthetic Two'}],counts:{customers:2,leads:3,payments:1,agreements:1,mandates:1,insuranceEnrollments:1,biometricEnrollments:1,identityLinks:1},fingerprint:'a'.repeat(64)}}});
    assert.equal(input.confirmation,'DELETE SELECTED TEST CUSTOMERS');assert.equal(input.fingerprint,'a'.repeat(64));
    if(mode==='uncertain')return route.abort();
    return route.fulfill({json:{data:{customers:2}}});
@@ -43,6 +43,8 @@ try {
   mode='denied';await dialog.getByRole('button',{name:'Review 2 selected',exact:true}).click();await expect(dialog.getByRole('alert')).toContainText('Owner required');
   mode='ok';await dialog.getByRole('button',{name:'Review 2 selected',exact:true}).click();
   await expect(dialog.getByRole('heading',{name:'Review 2 selected customers'})).toBeVisible();
+  await expect(dialog.getByText('payments',{exact:true})).toBeVisible();
+  await expect(dialog.getByText('agreements',{exact:true})).toBeVisible();
   const remove=dialog.getByRole('button',{name:'Permanently delete selected tests',exact:true});await expect(remove).toBeDisabled();
   await expect(dialog.getByText('Real Control')).toHaveCount(0);
   await dialog.getByRole('button',{name:'Keep customers'}).click();assert.equal(calls.filter(c=>c.action==='delete').length,0);
