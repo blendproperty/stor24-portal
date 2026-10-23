@@ -34,7 +34,7 @@ export function resolveReadiness(primary, confirmation) {
   // A received bad health/HTTP/certificate result must never be voted away.
   if (first.state !== 'unverified') return first;
   const second = checked(confirmation);
-  return second.state === 'unverified' ? { state: 'unverified', markers: [...new Set([...first.markers, ...second.markers])] } : second;
+  return second;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
