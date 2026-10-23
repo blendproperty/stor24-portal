@@ -4,7 +4,7 @@ import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { build } from 'esbuild';
-import { recent, safeHostStatus, safeMonitorEntry } from '../src/lib/operations-status-policy.mjs';
+import { recent, safeHostStatus, safeMonitorEntry, safeCloudBackup } from '../src/lib/operations-status-policy.mjs';
 import { collect } from '../scripts/collect-operations-status.mjs';
 import { saveMonitor } from '../scripts/write-monitor-status.mjs';
 
@@ -81,4 +81,24 @@ test('diagnostic download audits owner-scoped content and blocks release on audi
     f.guardState.fail=true;const denied=await f.GET(request());assert.equal(denied.status,500);assert.doesNotMatch(await denied.text(),/cards|AUDIT_DOWN/);
     f.guardState.fail=false;
   } finally { if(prior===undefined)delete process.env.STOR24_ALERT_ORGANISATION_ID;else process.env.STOR24_ALERT_ORGANISATION_ID=prior; }
+});
+
+
+test('OneDrive proof distinguishes verified, overdue, failed, missing and invalid evidence', async () => {
+  const checkedAt = new Date().toISOString();
+  const lastSuccess = { status: 'uploaded-and-readback-verified', checkedAt, archive: 'stor24-20261023T010403Z.dump.gpg', sha256: 'a'.repeat(64), token: 'private-secret' };
+  assert.equal(safeCloudBackup({ lastSuccess }).state, 'verified');
+  assert.equal(safeCloudBackup({ lastSuccess: { ...lastSuccess, checkedAt: new Date(Date.now() - 27 * 3600_000).toISOString() } }).state, 'overdue');
+  assert.equal(safeCloudBackup({ lastSuccess, lastAttempt: { status: 'failed', checkedAt } }).state, 'failed');
+  assert.equal(safeCloudBackup({ lastSuccess, lastAttempt: { status: 'failed', checkedAt: new Date(Date.now() - 3600_000).toISOString() } }).state, 'verified');
+  for (const value of [null, {}, { lastSuccess: { ...lastSuccess, sha256: 'invalid' } }, { lastSuccess: { ...lastSuccess, status: 'uploaded' } }]) assert.equal(safeCloudBackup(value).state, 'unknown');
+  const root = await mkdtemp(path.join(tmpdir(), 'stor24-cloud-proof-'));
+  try {
+    const row = await collect({ root, run: () => ({ status: 1 }), disk: () => { throw Error(); }, read: filename => filename.endsWith('last-success.json') ? JSON.stringify(lastSuccess) : filename.endsWith('last-attempt.json') ? JSON.stringify({status:'failed',checkedAt}) : '' });
+    const publicStatus = safeHostStatus(row);
+    assert.equal(publicStatus.cloudBackup.state, 'failed');
+    assert.equal(publicStatus.cloudBackup.verifiedAt, checkedAt);
+    assert.ok(!JSON.stringify(row).includes('private-secret'));
+    assert.ok(!JSON.stringify(publicStatus).includes(lastSuccess.sha256));
+  } finally { await rm(root, { recursive: true }); }
 });

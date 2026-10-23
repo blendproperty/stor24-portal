@@ -4,6 +4,7 @@ import { mkdir, writeFile, rename, unlink } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
+import { safeCloudBackup } from '../src/lib/operations-status-policy.mjs';
 export async function collect({ run = spawnSync, read = readFileSync, disk = statfsSync, root = '/opt/backups/stor24-dlp/status' } = {}) {
   const result = { checkedAt: new Date().toISOString(), diskUsedPercent: null, memoryAvailablePercent: null, databaseConnections: null, databaseLimit: null, appHealth: 'unknown', oomKilled: null, image: null };
   try { const s = disk('/'); result.diskUsedPercent = Math.round((1 - s.bavail / s.blocks) * 100); } catch {}
@@ -11,6 +12,13 @@ export async function collect({ run = spawnSync, read = readFileSync, disk = sta
   const command = args => { const r = run('docker', args, { encoding: 'utf8', timeout: 5000, maxBuffer: 4096 }); if (r.status !== 0) throw new Error('PROBE_UNAVAILABLE'); return r.stdout.trim(); };
   try { const a = JSON.parse(command(['inspect', '--format', '{"health":{{json .State.Health.Status}},"oom":{{json .State.OOMKilled}},"image":{{json .Config.Image}}}', 'stor24-crm-app-1'])); result.appHealth = a.health ?? 'unknown'; result.oomKilled = a.oom ?? null; result.image = a.image ?? null; } catch {}
   try { const n = command(['exec', 'stor24-crm-postgres-1', 'psql', '-U', 'stor24', '-d', 'stor24_crm', '-Atc', "SELECT count(*)::text || '/' || current_setting('max_connections') FROM pg_stat_activity;"]).split('/').map(Number); if (n.length === 2 && n.every(Number.isFinite)) [result.databaseConnections, result.databaseLimit] = n; } catch {}
+  const cloud = {};
+  for (const [key, name] of [['lastSuccess', 'last-success'], ['lastAttempt', 'last-attempt']]) {
+    try { cloud[key] = JSON.parse(read(`/opt/stor24-backup-cloud/status/${name}.json`, 'utf8')); } catch {}
+  }
+  // Publish allowlisted backup proof only; cloud credentials stay on the host.
+  const cloudStatus = safeCloudBackup(cloud);
+  result.cloudBackup = { lastSuccess: cloudStatus.verifiedAt ? { status: 'uploaded-and-readback-verified', checkedAt: cloudStatus.verifiedAt, archive: cloud.lastSuccess.archive, sha256: cloud.lastSuccess.sha256 } : null, lastAttempt: cloud.lastAttempt?.status === 'failed' ? { status: 'failed', checkedAt: cloudStatus.attemptAt } : null };
   await mkdir(root, { recursive: true });
   const temporary = path.join(root, `.operations-${randomUUID()}.tmp`);
   try { await writeFile(temporary, JSON.stringify(result), { flag: 'wx', mode: 0o644 }); await rename(temporary, path.join(root, 'operations.json')); }
