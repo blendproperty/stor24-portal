@@ -55,6 +55,8 @@ try {
     await expect(confirm()).toBeVisible(); assert.equal(writes, before);
     await expect(dialog.getByText("Unit A01", { exact: true })).toBeVisible();
     await expect(dialog.getByText("Unit A02", { exact: true })).toBeVisible();
+    await page.evaluate(() => { document.body.style.minHeight = "3000px"; window.scrollTo(0, 250); });
+    assert.equal(await dialog.evaluate(element => { const bounds = element.getBoundingClientRect(); return bounds.top >= 0 && bounds.bottom <= innerHeight; }), true);
     await page.screenshot({ path: `output/unit-rate-adjustment/preview-${width}.png`, fullPage: true });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     assert.equal(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth), true);
