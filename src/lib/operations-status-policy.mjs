@@ -12,7 +12,17 @@ export function safeHostStatus(value) {
     databaseConnections: number(value.databaseConnections, 1_000_000), databaseLimit: number(value.databaseLimit, 1_000_000),
     appHealth: ['healthy', 'unhealthy', 'starting'].includes(value.appHealth) ? value.appHealth : 'unknown',
     oomKilled: typeof value.oomKilled === 'boolean' ? value.oomKilled : null,
-    image: typeof value.image === 'string' && /^stor24-crm:[a-f0-9]{7,40}$/.test(value.image) ? value.image : null };
+    image: typeof value.image === 'string' && /^stor24-crm:[a-f0-9]{7,40}$/.test(value.image) ? value.image : null,
+    cloudBackup: safeCloudBackup(value.cloudBackup) };
+}
+export function safeCloudBackup(value) {
+  const timestamp = v => typeof v === 'string' && Number.isFinite(Date.parse(v)) ? v : null;
+  const success = value?.lastSuccess;
+  const verifiedAt = success?.status === 'uploaded-and-readback-verified' && /^stor24-\d{8}T\d{6}Z\.dump\.gpg$/.test(success.archive) && /^[a-f0-9]{64}$/.test(success.sha256) ? timestamp(success.checkedAt) : null;
+  const attempt = value?.lastAttempt;
+  const attemptAt = timestamp(attempt?.checkedAt);
+  const failed = attempt?.status === 'failed' && attemptAt && (!verifiedAt || Date.parse(attemptAt) >= Date.parse(verifiedAt));
+  return { state: failed ? 'failed' : verifiedAt && recent(verifiedAt, 26 * 3600_000) ? 'verified' : verifiedAt ? 'overdue' : 'unknown', verifiedAt, attemptAt };
 }
 export function safeMonitorEntry(value) {
   if (!value || typeof value !== 'object' || !/^\d{1,20}$/.test(String(value.runId)) || !recent(value.checkedAt, 30 * 24 * 3600_000)) return null;
