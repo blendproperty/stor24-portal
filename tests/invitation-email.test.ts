@@ -21,6 +21,32 @@ test('invitation email is branded, escaped and has matching HTML and plain text 
   assert.throws(() => invitationEmail({ ...sample, inviteUrl: 'javascript:alert(1)' }));
 });
 
+test('invitation explains the complete activation sequence in HTML and plain text', () => {
+  const email = invitationEmail(sample);
+  for (const content of [email.html, email.text]) {
+    const steps = ['Create and confirm your password', 'Accept invitation', 'Account activated', 'Open Stor24 CRM'];
+    let previous = -1;
+    for (const step of steps) {
+      const position = content.indexOf(step);
+      assert.ok(position > previous, `${step} must appear in activation order`);
+      previous = position;
+    }
+    assert.match(content, /uppercase and lowercase letters, a number and a symbol/);
+    assert.match(content, /Opening the email link alone does not activate your account/);
+    assert.match(content, /link has expired or does not work/);
+    assert.match(content, /do not forward/);
+  }
+  assert.match(email.subject, /activate your account/);
+  assert.match(email.html, /<ol[\s>]/);
+  assert.equal((email.html.match(/<li[\s>]/g) ?? []).length, 4);
+  assert.match(email.html, /<table role="presentation"[^>]+width="100%"/);
+  assert.match(email.html, /<td[^>]+bgcolor="#ff5a0a"/);
+  assert.match(email.html, /<v:rect[^>]+href="https:\/\/stor24.example\/invite\/sample\?x=1&amp;y=2"/);
+  assert.match(email.html, /Set up my account/);
+  assert.match(email.text, /12-128 characters/);
+  assert.match(email.html, /12&ndash;128 characters/);
+});
+
 test('revocation origin guard accepts the configured public origin behind a proxy and rejects untrusted origins', () => {
   const original = process.env.APP_URL;
   process.env.APP_URL = 'https://stor24.example';
