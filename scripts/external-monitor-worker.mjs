@@ -5,7 +5,7 @@ const monitorTrigger = {
     let response;
     try {
       response = await fetch('https://api.github.com/repos/blendproperty/stor24-portal/actions/workflows/monitor-production.yml/dispatches', {
-        method: 'POST', redirect: 'error', signal: AbortSignal.timeout(20_000),
+        method: 'POST', redirect: 'manual', signal: AbortSignal.timeout(20_000),
         headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2026-03-10', 'User-Agent': 'STOR24-independent-monitor' },
         body: JSON.stringify({ ref: 'main', inputs: { test_alert: false } }),
       });
