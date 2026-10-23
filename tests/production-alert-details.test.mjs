@@ -37,3 +37,27 @@ test('test notifications cannot falsely declare that no outage exists', () => {
   assert.equal(d.severity, 'INFO');
   assert.match(d.text, /does not establish service health/);
 });
+
+
+test('origin transport failure is unverified; unexpected HTTP is a distinct urgent finding', () => {
+  const failed = { ...env, READINESS_RESULT: 'failure', BACKUP_RESULT: 'success' };
+  const transport = alertDetails({ ...failed, READINESS_LOG: '2026-10-23T11:03:52Z STOR24_ORIGIN_UNVERIFIED host=stor24.co.za probe=forged curl=28 attempts=3\nPRIVATE_TOKEN' }, 'FAILURE');
+  assert.equal(transport.severity, 'WARNING'); assert.match(transport.text, /stor24.co.za.*forged.*curl 28.*3 attempt/);
+  assert.match(transport.text, /no successful bypass/); assert.doesNotMatch(transport.text, /PRIVATE_TOKEN/);
+  const bypass = alertDetails({ ...failed, READINESS_LOG: 'STOR24_ORIGIN_FAILED host=portal.stor24.co.za probe=plain http=200\n' }, 'FAILURE');
+  assert.equal(bypass.severity, 'HIGH'); assert.match(bypass.text, /portal.stor24.co.za.*HTTP 200.*expected 403/);
+});
+
+test('all failed validations and simultaneous backup failures are reported without raw logs', () => {
+  const detail = alertDetails({ ...env, READINESS_RESULT: 'failure', READINESS_LOG: 'STOR24_PUBLIC_FAILED check=application\nSTOR24_PUBLIC_FAILED check=database\n', BACKUP_LOG: 'STOR24_BACKUP_FAILED\nPRIVATE_HOST' }, 'FAILURE');
+  assert.match(detail.text, /application, database/); assert.match(detail.text, /Encrypted backup verification failed/);
+  assert.doesNotMatch(detail.text, /PRIVATE_HOST/); assert.equal(detail.severity, 'HIGH');
+});
+
+test('metadata identifies the failed step without logs; shell source is never backup evidence', () => {
+  const detail = alertDetails({ ...env, READINESS_RESULT: 'failure', BACKUP_RESULT: 'success', READINESS_STEPS: [{ name: 'Verify public application and database readiness', conclusion: 'success' }, { name: 'Verify Cloudflare origin protection cannot be bypassed directly', conclusion: 'failure' }] }, 'FAILURE');
+  assert.match(detail.text, /Public application\/database readiness passed/);
+  assert.equal(detail.severity, 'WARNING');
+  assert.equal(backupEvidence("command '/bin/bash check || { echo STOR24_BACKUP_FAILED; exit 1; }'"), null);
+  assert.match(backupEvidence('STOR24_RESOURCES_FAILED\n').failure, /resource/);
+});
