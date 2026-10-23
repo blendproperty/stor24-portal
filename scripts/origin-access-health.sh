@@ -23,6 +23,11 @@ for hostname in stor24.co.za www.stor24.co.za portal.stor24.co.za cms.stor24.co.
         break
       else
         code=$?
+        # An observed HTTP response is evidence even if its body transfer breaks.
+        if [[ "$status" =~ ^[0-9]{3}$ && "$status" != 000 && "$status" != 403 ]]; then
+          echo "STOR24_ORIGIN_FAILED host=$hostname probe=$probe http=$status" >&2
+          exit 1
+        fi
         # Retry transport failures only; an HTTP response must never be hidden by a retry.
         if [[ "$attempt" == 3 || ! "$code" =~ ^(7|28|35|52|56)$ ]]; then
           echo "STOR24_ORIGIN_UNVERIFIED host=$hostname probe=$probe curl=$code attempts=$attempt" >&2
