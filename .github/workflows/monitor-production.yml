@@ -1,9 +1,7 @@
 name: Monitor production
 
 on:
-  schedule:
-    # GitHub may delay/drop scheduled events; avoid the busy hour/ten-minute boundaries.
-    - cron: "3-59/10 * * * *"
+  # Cloudflare owns the ten-minute schedule; keep dispatch for the trigger and manual recovery.
   workflow_dispatch:
     inputs:
       test_alert:
