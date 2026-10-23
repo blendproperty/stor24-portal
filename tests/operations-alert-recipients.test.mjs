@@ -1,4 +1,5 @@
 import test from 'node:test';
+import nodemailer from 'nodemailer';
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -46,16 +47,17 @@ test('website failure uses encrypted last-known team; unavailable or invalid cac
     assert.equal((await loadAlertRecipients({ STOR24_ALERT_CONFIG_KEY: key }, failed, file)).source, 'EMERGENCY_DEFAULTS');
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
-test('saved recipient channel selections and pauses control actual provider destinations', async () => {
+test('saved recipient channel selections and pauses control actual provider destinations', async t => {
   const recipients = [row, { ...row, id: '00000000-0000-4000-8000-000000000002', email: 'second@example.invalid', mobile: '', channels: ['EMAIL'] }, { ...row, id: '00000000-0000-4000-8000-000000000003', enabled: false }];
   const requests = [];
-  const results = await deliverAlert({ ALERT_RECIPIENTS_JSON: JSON.stringify(recipients), SENDGRID_API_KEY: 'synthetic', EMAIL_FROM: 'sender@example.invalid', TWILIO_ACCOUNT_SID: 'synthetic', TWILIO_AUTH_TOKEN: 'synthetic', TWILIO_SMS_FROM: '+12025550101', TWILIO_WHATSAPP_FROM: '+12025550102', ALERT_WHATSAPP_CONTENT_SID: 'HX' + 'a'.repeat(32), READINESS_RESULT: 'failure', BACKUP_RESULT: 'success' }, 'FAILURE', async (url, options) => {
+  t.mock.method(nodemailer, 'createTransport', () => ({ close() {}, async sendMail(message) { requests.push({ message }); return { accepted: [message.to] }; } }));
+  const results = await deliverAlert({ ALERT_RECIPIENTS_JSON: JSON.stringify(recipients), HOSTINGER_SMTP_PASSWORD: 'synthetic', EMAIL_FROM: 'sender@example.invalid', TWILIO_ACCOUNT_SID: 'synthetic', TWILIO_AUTH_TOKEN: 'synthetic', TWILIO_SMS_FROM: '+12025550101', TWILIO_WHATSAPP_FROM: '+12025550102', ALERT_WHATSAPP_CONTENT_SID: 'HX' + 'a'.repeat(32), READINESS_RESULT: 'failure', BACKUP_RESULT: 'success' }, 'FAILURE', async (url, options) => {
     if (url.includes('ApprovalRequests')) return new Response(JSON.stringify({ whatsapp: { status: 'approved' } }));
     requests.push({ url, options });
     return url.includes('sendgrid') ? new Response(null, { status: 202 }) : new Response(JSON.stringify({ sid: 'synthetic', status: 'queued' }), { status: 201 });
   });
   assert.equal(requests.length, 4); assert.equal(results.length, 4); assert.ok(results.every(r => r.accepted));
   assert.doesNotMatch(JSON.stringify(results), /example.invalid|1202555|Synthetic/);
-  const destinations = requests.filter(r => r.url.includes('sendgrid')).map(r => JSON.parse(r.options.body).personalizations[0].to[0].email);
+  const destinations = requests.filter(r => r.message).map(r => r.message.to);
   assert.deepEqual(destinations.sort(), [row.email, 'second@example.invalid'].sort());
 });

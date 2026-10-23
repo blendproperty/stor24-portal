@@ -20,7 +20,7 @@ concurrency:
 jobs:
   readiness:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Verify public application and database readiness
@@ -28,16 +28,21 @@ jobs:
           HEALTH_URL: https://portal.stor24.co.za/api/health
           EXPECT_MERCHANDISE_WORKER: ${{ vars.MERCHANDISE_EXPIRY_WORKER_ENABLED }}
         run: |
-          response="$(curl --fail --silent --show-error --max-time 35 --connect-timeout 10 --retry 3 --retry-delay 5 --retry-all-errors -A 'stor24-production-monitor/1.1 (+github-actions)' "$HEALTH_URL")"
+          if ! response="$(curl --fail --silent --show-error --max-time 35 --connect-timeout 10 --retry 3 --retry-delay 5 --retry-all-errors -A 'stor24-production-monitor/1.1 (+github-actions)' "$HEALTH_URL")"; then
+            echo STOR24_PUBLIC_UNAVAILABLE
+            exit 1
+          fi
           node -e '
-            const value = JSON.parse(process.argv[1]);
+            let value;
+            try { value = JSON.parse(process.argv[1]); } catch { console.error("STOR24_PUBLIC_FAILED check=json"); process.exit(1); }
+            const failed = [];
+            if (value?.service !== "stor24-crm") failed.push("service");
+            if (value?.status !== "ok") failed.push("application");
+            if (value?.database !== "ok") failed.push("database");
             if (process.env.EXPECT_MERCHANDISE_WORKER === "true" &&
-                (value.merchandiseExpiry?.enabled !== true || value.merchandiseExpiry?.status !== "ok")) {
-              throw new Error("Merchandise expiry scheduler unavailable or stale");
-            }
-            if (value.service !== "stor24-crm" || value.status !== "ok" || value.database !== "ok") {
-              throw new Error(`Unhealthy STOR24 response: ${JSON.stringify(value)}`);
-            }
+                (value?.merchandiseExpiry?.enabled !== true || value?.merchandiseExpiry?.status !== "ok")) failed.push("expiry-worker");
+            for (const check of failed) console.error(`STOR24_PUBLIC_FAILED check=${check}`);
+            if (failed.length) process.exit(1);
           ' "$response"
       - name: Verify Cloudflare origin protection cannot be bypassed directly
         run: bash scripts/origin-access-health.sh
@@ -58,7 +63,8 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
           printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/stor24_crm
-          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" '/bin/bash /opt/stor24-crm/scripts/dlp-backup-health.sh && /bin/bash /opt/stor24-crm/scripts/production-resource-health.sh'
+          chmod 600 ~/.ssh/known_hosts ~/.ssh/stor24_crm
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 -o ServerAliveInterval=15 -o ServerAliveCountMax=2 -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" '/bin/bash /opt/stor24-crm/scripts/dlp-backup-health.sh || { echo STOR24_BACKUP_FAILED; exit 1; }; /bin/bash /opt/stor24-crm/scripts/production-resource-health.sh || { echo STOR24_RESOURCES_FAILED; exit 1; }'
 
   alerts:
     if: always()
@@ -71,6 +77,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Install locked email transport
+        run: npm ci --omit=dev --ignore-scripts --no-audit --no-fund
       - name: Restore encrypted last-known recipients
         uses: actions/cache@v4
         with:
@@ -88,8 +96,7 @@ jobs:
           ALERT_SMS_TO: ${{ vars.STOR24_ALERT_MOBILE }}
           ALERT_WHATSAPP_TO: ${{ vars.STOR24_ALERT_MOBILE }}
           ALERT_WHATSAPP_CONTENT_SID: ${{ vars.STOR24_ALERT_WHATSAPP_CONTENT_SID }}
-          EMAIL_FROM: ${{ secrets.STOR24_ALERT_EMAIL_FROM }}
-          SENDGRID_API_KEY: ${{ secrets.STOR24_ALERT_SENDGRID_API_KEY }}
+          HOSTINGER_SMTP_PASSWORD: ${{ secrets.STOR24_ALERT_HOSTINGER_SMTP_PASSWORD }}
           TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
           TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
           TWILIO_SMS_FROM: ${{ secrets.TWILIO_SMS_FROM }}
@@ -117,7 +124,7 @@ jobs:
             const entry = safeMonitorEntry({...report, checkedAt: new Date().toISOString(), runId: process.env.GITHUB_RUN_ID, readiness: process.env.READINESS_RESULT, backup: process.env.BACKUP_RESULT});
             if (!entry) throw new Error("Invalid dashboard evidence");
             process.stdout.write(JSON.stringify(entry));
-          ' | ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" 'cd /opt/stor24-crm && node scripts/write-monitor-status.mjs'
+          ' | ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 -o ServerAliveInterval=15 -o ServerAliveCountMax=2 -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" 'cd /opt/stor24-crm && node scripts/write-monitor-status.mjs'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
