@@ -198,6 +198,7 @@ export async function listNetcashConfiguration(scope: RequestScope) {
   };
 }
 export async function validateAndSaveNetcashConfiguration(scope: RequestScope, input: unknown) {
+  if (!scope.unrestrictedFacilities) throw new Error("FORBIDDEN");
   if (!integrationEncryptionConfigured()) throw new Error("CONFIG_REQUIRED:INTEGRATION_CONFIG_ENCRYPTION_KEY");
   const parsed = configurationSchema.parse(input);
   const existing = await netcashConnection(scope.organisationId);
@@ -287,6 +288,7 @@ export async function validateAndSaveNetcashConfiguration(scope: RequestScope, i
   return validation;
 }
 export async function setNetcashTransactionProcessing(scope: RequestScope, input: unknown) {
+  if (!scope.unrestrictedFacilities) throw new Error("FORBIDDEN");
   const parsed = netcashTransactionProcessingSchema.parse(input);
   const connection = await netcashConnection(scope.organisationId);
   if (!connection) throw new Error("CONFIG_REQUIRED:NETCASH_TEST_CREDENTIALS");

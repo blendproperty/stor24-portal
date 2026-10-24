@@ -39,7 +39,7 @@ test("isolated governed price amendments preserve original quotes, consent, sour
     const welcomeId=createHash("sha256").update(`${org.id}\0${customer.email}`).digest("hex");
     await db.tenantPortalWelcome.create({data:{id:welcomeId,organisationId:org.id,email:customer.email!,sentAt:new Date()}});
     const scope={organisationId:org.id,userId:proposer.id,facilityIds:[facility.id],unrestrictedFacilities:false};
-    return {org,facility,customer,proposer,reviewer,unit,booking,scope};
+    return {org,facility,customer,proposer,reviewer,unit,booking,scope,access};
   }
   type Fixture=Awaited<ReturnType<typeof fixture>>;
   const propose=(f:Fixture)=>({reservationId:f.booking.id,facilityId:f.facility.id,requestKey:randomUUID(),monthlyRate:"900.25",reason:"Synthetic agreed negotiation for independent review"});
@@ -136,7 +136,7 @@ test("isolated governed price amendments preserve original quotes, consent, sour
       const f=await fixture();await db.reservation.update({where:{id:f.booking.id},data:{source:"PUBLIC_WEBSITE"}});
       const previous=process.env.PUBLIC_PAYMENT_SIMULATOR_ENABLED;process.env.PUBLIC_PAYMENT_SIMULATOR_ENABLED="true";
       try{
-        const started=await startSimulatedPayment(f.booking.publicReference!,randomUUID());assert.ok(started.ok);
+        const started=await startSimulatedPayment(f.booking.publicReference!,randomUUID(),f.access.token);assert.ok(started.ok);
         if(!started.ok)throw Error("Synthetic checkout failed");assert.equal(started.amountZar,publicCheckoutTotal(f.booking));
         await assert.rejects(proposeReservationPrice(f.scope,propose(f)),/REVIEW_REQUIRED/);
       }finally{if(previous===undefined)delete process.env.PUBLIC_PAYMENT_SIMULATOR_ENABLED;else process.env.PUBLIC_PAYMENT_SIMULATOR_ENABLED=previous;}

@@ -29,7 +29,7 @@ async function fixture(existing: boolean) {
   } };
   const output = await build({ entryPoints: ["src/app/api/v1/configuration/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "synthetic-configuration", setup(b) {
     b.onResolve({ filter: /^@\/lib\/(db|auth-guards)$/ }, a => ({ path: a.path, namespace: "fixture" }));
-    b.onLoad({ filter: /.*/, namespace: "fixture" }, a => ({ contents: a.path.endsWith("/db") ? "export const db=__db;" : "export const requirePermission=async()=>{if(!__state.allowed)throw Error('FORBIDDEN');return {organisationId:'org',user:{id:'actor'},allowedFacilityIds:null}}; export const authErrorResponse=e=>Response.json({error:e.message},{status:e.message==='FORBIDDEN'?403:500});" }));
+    b.onLoad({ filter: /.*/, namespace: "fixture" }, a => ({ contents: a.path.endsWith("/db") ? "export const db=__db;" : "export const requireSession=async()=>{throw Error('Unexpected fixture session read')};export const requirePermission=async()=>{if(!__state.allowed)throw Error('FORBIDDEN');return {organisationId:'org',user:{id:'actor'},allowedFacilityIds:null}}; export const authErrorResponse=e=>Response.json({error:e.message},{status:e.message==='FORBIDDEN'?403:500});" }));
   } }] });
   const loaded = { exports: {} as { PUT: (request: Request) => Promise<Response> } };
   new Function("require", "module", "exports", "__db", "__state", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, database, state);

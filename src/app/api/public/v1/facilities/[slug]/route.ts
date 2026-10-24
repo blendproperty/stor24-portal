@@ -46,6 +46,7 @@ export async function GET(
   const facility = await db.facility.findFirst({
     where: { publicSlug: slug.toLowerCase(), active: true, publicBookingEnabled: true },
     select: {
+      organisationId: true,
       name: true,
       closedFloors: true,
       publicSlug: true,
@@ -53,8 +54,7 @@ export async function GET(
       address: true,
       configurationProfiles: {
         where: { domain: "STORE_INFORMATION", name: "Default", status: "READY" },
-        select: { config: true },
-        take: 1,
+        select: { organisationId: true, config: true },
       },
       units: {
         select: {
@@ -127,7 +127,7 @@ export async function GET(
     timezone: facility.timezone,
     address: facility.address,
     comingSoonFloors: facilityFloorKeys(facility).filter(floor => !floorIsOperational(floor, facility.closedFloors)).map(floorLabel),
-    storeInformation: safeStoreInformation(facility.configurationProfiles[0]?.config),
+    storeInformation: safeStoreInformation(facility.configurationProfiles.find(profile => profile.organisationId === facility.organisationId)?.config),
     storagePackages: facility.storagePackages.map((pack) => ({
       id: pack.id,
       code: pack.code,

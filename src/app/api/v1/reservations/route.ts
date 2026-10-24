@@ -7,9 +7,10 @@ import {
   createReservation,
   expireReservation,
   extendReservation,
+  leasingCustomerWhere,
 } from "@/lib/leasing-service";
 import { sameOrigin } from "@/lib/request-security";
-import { requireScope } from "@/lib/scope";
+import { requireScope, requirePermissionScope } from "@/lib/scope";
 import {
   reservationLifecycleSchema,
   reservationSchema,
@@ -18,6 +19,8 @@ import {
 export async function GET() {
   try {
     const auth = await requirePermission("reservations.manage");
+    const scope = { organisationId: auth.organisationId, userId: auth.user.id, facilityIds: auth.allowedFacilityIds ?? [], unrestrictedFacilities: auth.allowedFacilityIds === null };
+    const created = scope.unrestrictedFacilities ? [] : await db.auditEvent.findMany({ where: { organisationId: scope.organisationId, actorId: scope.userId, entityType: "Customer", action: "customer.created" }, select: { entityId: true } });
     const facilityWhere = {
       organisationId: auth.organisationId,
       active: true,
@@ -39,7 +42,8 @@ export async function GET() {
         orderBy: { name: "asc" },
       }),
       db.customer.findMany({
-        where: { organisationId: auth.organisationId },
+        where: { organisationId: scope.organisationId, OR: [leasingCustomerWhere(scope, scope.facilityIds), { id: { in: created.map(item => item.entityId) }, leads: { none: {} }, reservations: { none: {} }, tenancies: { none: {} } }] },
+        select: { id: true, type: true, firstName: true, lastName: true, companyName: true, email: true, phone: true },
         orderBy: { updatedAt: "desc" },
       }),
       db.reservation.findMany({
@@ -78,8 +82,8 @@ export async function POST(request: Request) {
         },
         { status: 422 },
       );
-    await requirePermission("reservations.manage", parsed.data.facilityId);
-    const data = await createReservation(await requireScope(), parsed.data);
+    const scope = await requirePermissionScope("reservations.manage", parsed.data.facilityId);
+    const data = await createReservation(scope, parsed.data);
     return Response.json({ data }, { status: 201 });
   } catch (error) {
     return apiError(error);

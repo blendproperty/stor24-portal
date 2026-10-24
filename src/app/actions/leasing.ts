@@ -37,7 +37,7 @@ export async function addUnitAction(data: FormData) {
 }
 export async function reserveAction(data: FormData) {
   const parsed = reservationSchema.parse({ facilityId: text(data, "facilityId"), customerId: text(data, "customerId"), leadId: text(data, "leadId"), unitId: text(data, "unitId"), quotedRate: number(data, "quotedRate"), holdExpiresAt: text(data, "holdExpiresAt"), intendedMoveIn: text(data, "intendedMoveIn") });
-  await createReservation(await requireScope(), parsed); revalidatePath("/leads");
+  await createReservation(await requirePermissionScope("reservations.manage", parsed.facilityId), parsed); revalidatePath("/leads");
 }
 
 /**
