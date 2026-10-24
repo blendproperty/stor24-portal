@@ -32,3 +32,19 @@ description = "Netcash's published default software vendor identifier (NetConnec
 condition = "AND"
 paths = ['''(^|/)src/lib/integrations/netcash-configuration\.ts$''']
 regexes = ['''^24ade73c-98cf-47b3-99be-cc7b867b3080$''']
+
+[[rules]]
+id = "cms-signing-secret"
+description = "Literal CMS signing secrets must never appear in tracked source or documentation"
+regex = '''(?i)PAYLOAD_SECRET\s*[:=]\s*["']?([a-f0-9]{32,})'''
+secretGroup = 1
+
+[[rules]]
+id = "documented-database-password"
+description = "Database passwords in infrastructure and project documentation"
+path = '''(^|/)(INFRASTRUCTURE|PROJECT_CONTEXT)\.md$'''
+regex = '''(?i)postgres(?:ql)?://[^\s:/]+:([^\s@]+)@'''
+secretGroup = 1
+[[rules.allowlists]]
+regexTarget = "secret"
+regexes = ['''^\$\{[A-Z_]+\}$''', '''^<[^>]+>$''', '''^\[REDACTED: rotate exposed credential\]$''']

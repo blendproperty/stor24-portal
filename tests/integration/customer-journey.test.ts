@@ -96,7 +96,7 @@ test("isolated PostgreSQL connected customer journey", async t => {
     const identityInput = { expectedVersion: 0, policyHash: identityPolicy(org.id)!.hash, acknowledged: true, documentType: "ID_CARD", pages: [image, image] };
     let documentId = "";
     await t.test("J02/J08 rejected identity replacement requires fresh page reviews", async () => {
-      assert.equal((await preparePublicReservationLease(reference, "EFT")).ok, false);
+      assert.equal((await preparePublicReservationLease(reference, "EFT", identityToken)).ok, false);
       const first = await submitIdentity(reference, identityToken, identityInput);
       documentId = first.id;
       await assert.rejects(reviewIdentity(scope, first.id, 1, "ACCEPT"), /ID_PREVIEW_REQUIRED/);
@@ -119,9 +119,9 @@ test("isolated PostgreSQL connected customer journey", async t => {
     });
     let signedHash = "";
     await t.test("J03/J15 interrupted and repeated signing preserves one signed PDF", async () => {
-      const prepared = await preparePublicReservationLease(reference, "EFT");
+      const prepared = await preparePublicReservationLease(reference, "EFT", identityToken);
       assert.ok(prepared.ok);
-      const resumed = await preparePublicReservationLease(reference, "EFT");
+      const resumed = await preparePublicReservationLease(reference, "EFT", identityToken);
       assert.ok(resumed.ok);
       assert.equal(resumed.token, prepared.token);
       const view = await getPublicReservationLease(prepared.token); assert.ok(view);
@@ -130,7 +130,7 @@ test("isolated PostgreSQL connected customer journey", async t => {
       const completions = await Promise.all([
         completePublicReservationLease(prepared.token, signing),
         completePublicReservationLease(prepared.token, signing),
-        preparePublicReservationLease(reference, "EFT"),
+        preparePublicReservationLease(reference, "EFT", identityToken),
       ]);
       assert.equal(completions[0].status, "SIGNED");
       assert.equal(completions[1].status, "SIGNED");
@@ -294,8 +294,9 @@ test("isolated PostgreSQL connected customer journey", async t => {
       const nextReference = next.reference!;
       assert.equal((await verifyPublicReservation(nextReference, smsCode)).ok, true);
       await startPublicEmailVerification(nextReference);
-      assert.equal((await verifyPublicReservationEmail(nextReference, emailCode)).ok, true);
-      const prepared = await preparePublicReservationLease(nextReference, "EFT"); assert.ok(prepared.ok);
+      const nextVerified = await verifyPublicReservationEmail(nextReference, emailCode);
+      assert.ok(nextVerified.ok && "identityAccessToken" in nextVerified);
+      const prepared = await preparePublicReservationLease(nextReference, "EFT", nextVerified.identityAccessToken); assert.ok(prepared.ok);
       const view = await getPublicReservationLease(prepared.token); assert.ok(view);
       await Promise.allSettled([
         completePublicReservationLease(prepared.token, { signerName: "Synthetic race signer", initials: LEASE_CLAUSE_KEYS, signerIp: null, signerUserAgent: "CI", termsAccepted: true, acceptedSha256: view.sha256 }),

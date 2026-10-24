@@ -23,6 +23,7 @@ test("isolated governed price amendments preserve original quotes, consent, sour
   process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY=randomBytes(32).toString("hex");process.env.APP_URL="https://fixture.invalid";
   const organisations:string[]=[];
   async function fixture(){
+    const access=newIdentityAccess();
     const org=await db.organisation.create({data:{name:"Synthetic governed quote",slug:randomUUID()}});organisations.push(org.id);
     const facility=await db.facility.create({data:{organisationId:org.id,name:"Synthetic quote store",code:randomUUID()}});
     const customer=await db.customer.create({data:{organisationId:org.id,firstName:"Synthetic",lastName:"Customer",email:randomUUID()+"@example.invalid",emailVerifiedAt:new Date(Date.now()-3600000)}});
@@ -31,8 +32,8 @@ test("isolated governed price amendments preserve original quotes, consent, sour
     await db.roleAssignment.createMany({data:[{userId:proposer.id,roleId:role.id,facilityId:facility.id},{userId:reviewer.id,roleId:role.id,facilityId:facility.id}]});
     const type=await db.unitType.create({data:{facilityId:facility.id,name:"Synthetic quote unit"}}),unit=await db.unit.create({data:{facilityId:facility.id,unitTypeId:type.id,number:"QUOTE-CI",floor:"Ground Floor",status:"RESERVED",monthlyRate:2000}});
     const moveIn=new Date(Date.now()+2*86400000),holdExpiresAt=new Date(Date.now()+86400000);
-    const booking=await db.reservation.create({data:{facilityId:facility.id,customerId:customer.id,unitId:unit.id,status:"ACTIVE",journey:"RENTAL",source:"PUBLIC_VIEWING",publicReference:randomUUID(),quotedRate:1000,initialRentSnapshot:newPublicInitialRent(1000,moveIn),intendedMoveIn:moveIn,holdExpiresAt,contactVerifiedAt:new Date()}});
-    const prepared=await preparePublicReservationLease(booking.publicReference!,"CARD");assert.ok(prepared.ok);
+    const booking=await db.reservation.create({data:{facilityId:facility.id,customerId:customer.id,unitId:unit.id,status:"ACTIVE",journey:"RENTAL",source:"PUBLIC_VIEWING",publicReference:randomUUID(),quotedRate:1000,initialRentSnapshot:newPublicInitialRent(1000,moveIn),intendedMoveIn:moveIn,holdExpiresAt,contactVerifiedAt:new Date(),identityAccessHash:access.identityAccessHash,identityAccessExpiresAt:access.identityAccessExpiresAt}});
+    const prepared=await preparePublicReservationLease(booking.publicReference!,"CARD",access.token);assert.ok(prepared.ok);
     // Suppress lifecycle delivery deliberately in this synthetic fixture. This is
     // not delivery evidence and never invokes an external email provider.
     const welcomeId=createHash("sha256").update(`${org.id}\0${customer.email}`).digest("hex");
@@ -191,7 +192,7 @@ test("isolated governed price amendments preserve original quotes, consent, sour
         if(!verified.ok||!("identityAccessToken" in verified))throw Error("Synthetic verification failed");
         const view=await previewCustomerReservationPrice(prepared.publicReference!,verified.identityAccessToken,proposal.id);assert.equal(view.monthlyRate,"900.00");
         await acceptCustomerReservationPrice({reference:prepared.publicReference!,id:proposal.id,identityAccessToken:verified.identityAccessToken,quoteFingerprint:view.quoteFingerprint,accepted:true,understandsNewAgreementRequired:true});
-        const agreement=await preparePublicReservationLease(prepared.publicReference!,"EFT");assert.ok(agreement.ok);
+        const agreement=await preparePublicReservationLease(prepared.publicReference!,"EFT",verified.identityAccessToken);assert.ok(agreement.ok);
         const lease=await db.publicReservationLease.findUniqueOrThrow({where:{reservationId:f.booking.id}});assert.equal(lease.status,"READY");assert.equal(lease.signedAt,null);assert.match(lease.content,/900/);
         assert.deepEqual(await financial(f),baseline);
       }finally{if(oldEnabled===undefined)delete process.env.PUBLIC_RESERVATION_VERIFICATION_ENABLED;else process.env.PUBLIC_RESERVATION_VERIFICATION_ENABLED=oldEnabled;if(oldPublicKey===undefined)delete process.env.PUBLIC_BOOKING_API_KEY;else process.env.PUBLIC_BOOKING_API_KEY=oldPublicKey;}
@@ -226,7 +227,7 @@ test("isolated governed price amendments preserve original quotes, consent, sour
       await appliedCustomerReservationPrice(f.booking.publicReference!,acceptance.identityAccessToken,proposal.id);
       const original=await db.reservationPriceAmendment.findUniqueOrThrow({where:{id:proposal.id}});assert.equal(JSON.parse(decryptIntegrationSecret(original.originalEncrypted)).quotedRate,"1000.00");
       await assert.rejects(db.reservationPriceAmendment.update({where:{id:proposal.id},data:{status:"WITHDRAWN"}}));
-      const regenerated=await preparePublicReservationLease(f.booking.publicReference!,"EFT");assert.ok(regenerated.ok);const newLease=await db.publicReservationLease.findUniqueOrThrow({where:{reservationId:f.booking.id}});assert.equal(newLease.status,"READY");assert.equal(newLease.paymentMethod,"EFT");assert.notEqual(newLease.sha256,oldLease.sha256);assert.equal(newLease.signedAt,null);
+      const regenerated=await preparePublicReservationLease(f.booking.publicReference!,"EFT",acceptance.identityAccessToken);assert.ok(regenerated.ok);const newLease=await db.publicReservationLease.findUniqueOrThrow({where:{reservationId:f.booking.id}});assert.equal(newLease.status,"READY");assert.equal(newLease.paymentMethod,"EFT");assert.notEqual(newLease.sha256,oldLease.sha256);assert.equal(newLease.signedAt,null);
     });
     await t.test("native cohort source retains the first original across two real accepted quotes and holds broken consent evidence",async()=>{
       const f=await fixture(),yesterday=southAfricaDateKey(new Date(Date.now()-86400000)),today=southAfricaDateKey(new Date());

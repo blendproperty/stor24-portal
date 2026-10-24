@@ -12,6 +12,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const input = updateTaskSchema.parse(await request.json());
     const before = await db.task.findFirst({ where: { id, organisationId } });
     if (!before) return Response.json({ error: { code: "NOT_FOUND", message: "Task not found." } }, { status: 404 });
+    if (!before.facilityId && allowedFacilityIds !== null) throw new Error("FORBIDDEN");
     if (before.facilityId) await requirePermission("operations.manage", before.facilityId);
     if (before.purpose === "AGREED_FOLLOWUP") return Response.json({ error: { code: "CONFLICT", message: "Open Follow-ups & handovers to update this appointment using its current version." } }, { status: 409 });
     if (scheduledWorkPurposes.some(purpose => purpose === before.purpose)) {
@@ -24,6 +25,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return Response.json({ data: task });
     }
     const task = await db.$transaction(async tx => {
+      const current = await tx.task.findFirst({ where: { id, organisationId, ...(allowedFacilityIds === null ? {} : { facilityId: { in: allowedFacilityIds } }) } });
+      if (!current) throw new Error("FORBIDDEN");
       const updated = await tx.task.update({ where: { id }, data: { status: input.status, completedAt: input.status === "COMPLETED" ? new Date() : null } });
       await tx.auditEvent.create({ data: { organisationId, actorId: user.id, action: "task.status.change", entityType: "task", entityId: id, before, after: updated } });
       return updated;

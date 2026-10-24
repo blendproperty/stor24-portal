@@ -1,4 +1,5 @@
 import {publicInitialRent,publicCheckoutTotal} from "./public-initial-rent";
+import { reservationAccessMatches } from "./booking-access";
 import { identityGate } from "@/lib/identity-document-service";
 import { createHash, randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
@@ -24,7 +25,8 @@ function publicLeaseExpiry(holdExpiresAt: Date | null, now = new Date()) {
   return holdExpiresAt && holdExpiresAt < maximum ? holdExpiresAt : maximum;
 }
 
-export async function preparePublicReservationLease(reference: string, paymentMethod: PublicLeasePaymentMethod) {
+export async function preparePublicReservationLease(reference: string, paymentMethod: PublicLeasePaymentMethod, accessToken = "") {
+  if (!accessToken) return { ok: false as const, code: "ID_SESSION_REQUIRED" };
   return db.$transaction(async tx => {
     const target = await tx.reservation.findUnique({ where: { publicReference: reference }, select: { id: true } });
     if (!target) return { ok: false as const, code: "RESERVATION_UNAVAILABLE" };
@@ -33,7 +35,8 @@ export async function preparePublicReservationLease(reference: string, paymentMe
       where: { publicReference: reference },
       include: { customer: true, facility: true, unit: { include: { unitType: true } }, publicLease: true, packageSelection: true },
     });
-    if (!reservation || reservation.status !== "ACTIVE" || reservation.journey !== "RENTAL" || !reservation.contactVerifiedAt || !reservation.customer.emailVerifiedAt) {
+    if (!reservation || !reservationAccessMatches(accessToken, reservation)) return { ok: false as const, code: "ID_SESSION_REQUIRED" };
+    if (reservation.status !== "ACTIVE" || reservation.journey !== "RENTAL" || !reservation.contactVerifiedAt || !reservation.customer.emailVerifiedAt) {
       return { ok: false as const, code: "RESERVATION_UNAVAILABLE" };
     }
     if (!(await identityGate(tx, reservation.customer.organisationId, reservation.id, reservation.createdAt, "SIGN"))) return { ok: false as const, code: "IDENTITY_REQUIRED" };

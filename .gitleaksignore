@@ -1,0 +1,2 @@
+# Historical false positive: assignment reads an environment variable, contains no credential.
+ff172d651a6c829501058d6a6cbe98c9bbc6cdb5:scripts/host-heartbeat-policy.mjs:generic-api-key:21
