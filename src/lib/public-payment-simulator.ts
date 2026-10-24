@@ -2,6 +2,7 @@ import {publicCheckoutTotal} from "./public-initial-rent";
 import { createHash, randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
 import { runSimulatedPaymentFollowUp } from "@/lib/public-payment-follow-up";
+import { reservationAccessMatches } from "@/lib/booking-access";
 
 export type SimulatedPaymentOutcome = "SUCCESS" | "DECLINED" | "CANCELLED" | "TIMEOUT";
 
@@ -13,7 +14,7 @@ function tokenHash(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
-export async function startSimulatedPayment(reference: string, idempotencyKey: string) {
+export async function startSimulatedPayment(reference: string, idempotencyKey: string, accessToken = "") {
   if (!publicPaymentSimulatorEnabled()) return { ok: false as const, code: "DISABLED" };
   return db.$transaction(async tx => {
     const target = await tx.reservation.findUnique({ where: { publicReference: reference }, select: { id: true } });
@@ -21,8 +22,9 @@ export async function startSimulatedPayment(reference: string, idempotencyKey: s
     await tx.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id" = ${target.id} FOR UPDATE`;
     const reservation = await tx.reservation.findUnique({
       where: { publicReference: reference },
-      include: { facility: true, unit: true, customer: true, packageSelection: true, publicPaymentSessions: { orderBy: { createdAt: "desc" }, take: 1 } },
+      include: { facility: true, unit: true, customer: true, publicLease: true, packageSelection: true, publicPaymentSessions: { orderBy: { createdAt: "desc" }, take: 1 } },
     });
+    if (!reservation || !reservationAccessMatches(accessToken, reservation)) return { ok: false as const, code: "ID_SESSION_REQUIRED" };
     if (!reservation || reservation.status !== "ACTIVE" || !reservation.contactVerifiedAt || !reservation.customer.emailVerifiedAt || reservation.journey !== "RENTAL")
       return { ok: false as const, code: "RESERVATION_UNAVAILABLE" };
 
@@ -41,33 +43,38 @@ export async function startSimulatedPayment(reference: string, idempotencyKey: s
   });
 }
 
-export async function completeSimulatedPayment(sessionId: string, checkoutToken: string, outcome: SimulatedPaymentOutcome, paymentMethod?: "DEBIT_ORDER" | "CARD" | "EFT") {
+export async function completeSimulatedPayment(sessionId: string, checkoutToken: string, outcome: SimulatedPaymentOutcome, paymentMethod?: "DEBIT_ORDER" | "CARD" | "EFT", accessToken = "") {
   if (!publicPaymentSimulatorEnabled()) return { ok: false as const, code: "DISABLED" };
-  const session = await db.publicPaymentSession.findUnique({ where: { id: sessionId }, include: { reservation: { include: { customer: true, unit: true, facility: true } } } });
-  if (!session || tokenHash(checkoutToken) !== session.checkoutTokenHash) return { ok: false as const, code: "NOT_FOUND" };
-  if (session.status !== "PENDING") {
-    if (!session.paymentMethod) await db.publicPaymentSession.update({ where: { id: session.id }, data: { paymentMethod } });
-    const followUp = session.status === "SUCCEEDED" ? await runSimulatedPaymentFollowUp(session.id) : null;
-    return { ok: true as const, status: session.status, idempotent: true, followUpStatus: followUp?.status, signingUrl: followUp && "signingUrl" in followUp ? followUp.signingUrl : undefined, leaseInvitationSent: followUp && "leaseInvitationSent" in followUp ? followUp.leaseInvitationSent : false, whatsappConfirmationSent: followUp && "whatsappConfirmationSent" in followUp ? followUp.whatsappConfirmationSent : false, reference: session.reservation.publicReference, providerReference: session.providerReference };
-  }
-  if (!paymentMethod) return { ok: false as const, code: "PAYMENT_METHOD_REQUIRED" };
-  const effectiveOutcome: SimulatedPaymentOutcome = session.expiresAt <= new Date() ? "TIMEOUT" : outcome;
-  const status = effectiveOutcome === "SUCCESS" ? "SUCCEEDED" : effectiveOutcome;
-  const now = new Date();
-  await db.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id" = ${session.reservationId} FOR UPDATE`;
-    const current = await tx.publicPaymentSession.findUniqueOrThrow({ where: { id: session.id } });
-    if (current.status !== "PENDING") throw new Error("PAYMENT_STATE_CHANGED");
+  const target = await db.publicPaymentSession.findUnique({ where: { id: sessionId }, select: { reservationId: true, checkoutTokenHash: true } });
+  if (!target || tokenHash(checkoutToken) !== target.checkoutTokenHash) return { ok: false as const, code: "NOT_FOUND" };
+  const result = await db.$transaction(async tx => {
+    await tx.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id" = ${target.reservationId} FOR UPDATE`;
+    const session = await tx.publicPaymentSession.findUnique({ where: { id: sessionId }, include: { reservation: { include: { customer: true, unit: true, facility: true, publicLease: true } } } });
+    if (!session || tokenHash(checkoutToken) !== session.checkoutTokenHash) return { ok: false as const, code: "NOT_FOUND" };
+    const reservation = session.reservation;
+    if (!reservationAccessMatches(accessToken, reservation)) return { ok: false as const, code: "ID_SESSION_REQUIRED" };
+    if (!reservation.contactVerifiedAt || !reservation.customer.emailVerifiedAt || reservation.journey !== "RENTAL" || (session.status === "PENDING" && reservation.status !== "ACTIVE") || (session.status === "SUCCEEDED" && !["ACTIVE", "CONVERTED"].includes(reservation.status))) return { ok: false as const, code: "RESERVATION_UNAVAILABLE" };
+    if (session.status !== "PENDING") {
+      if (!session.paymentMethod && paymentMethod) await tx.publicPaymentSession.update({ where: { id: session.id }, data: { paymentMethod } });
+      return { ok: true as const, status: session.status, idempotent: true, session };
+    }
+    if (!paymentMethod) return { ok: false as const, code: "PAYMENT_METHOD_REQUIRED" };
+    const effectiveOutcome: SimulatedPaymentOutcome = session.expiresAt <= new Date() ? "TIMEOUT" : outcome;
+    const status = effectiveOutcome === "SUCCESS" ? "SUCCEEDED" : effectiveOutcome;
+    const now = new Date();
     await tx.publicPaymentSession.update({ where: { id: session.id }, data: { status, paymentMethod, failureCode: effectiveOutcome === "SUCCESS" ? null : effectiveOutcome, processedAt: now } });
     if (effectiveOutcome === "SUCCESS") {
       await tx.reservation.update({ where: { id: session.reservationId }, data: { holdExpiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000) } });
-      if (session.reservation.leadId) await tx.lead.update({ where: { id: session.reservation.leadId }, data: { stage: "QUALIFIED" } });
+      if (reservation.leadId) await tx.lead.update({ where: { id: reservation.leadId }, data: { stage: "QUALIFIED" } });
     } else {
       const cancelled = await tx.reservation.updateMany({ where: { id: session.reservationId, status: "ACTIVE" }, data: { status: "CANCELLED" } });
-      if (cancelled.count) await tx.unit.updateMany({ where: { id: session.reservation.unitId, status: "RESERVED" }, data: { status: "AVAILABLE" } });
+      if (cancelled.count) await tx.unit.updateMany({ where: { id: reservation.unitId, status: "RESERVED" }, data: { status: "AVAILABLE" } });
     }
-    await tx.auditEvent.create({ data: { organisationId: session.reservation.customer.organisationId, facilityId: session.reservation.facilityId, action: `public_payment.simulator_${status.toLowerCase()}`, entityType: "PublicPaymentSession", entityId: session.id, requestId: session.idempotencyKey, after: { status, paymentMethod, simulated: true } } });
+    await tx.auditEvent.create({ data: { organisationId: reservation.customer.organisationId, facilityId: reservation.facilityId, action: `public_payment.simulator_${status.toLowerCase()}`, entityType: "PublicPaymentSession", entityId: session.id, requestId: session.idempotencyKey, after: { status, paymentMethod, simulated: true } } });
+    return { ok: true as const, status, idempotent: false, session };
   });
+  if (!result.ok) return result;
+  const { session, status, idempotent } = result;
   const followUp = status === "SUCCEEDED" ? await runSimulatedPaymentFollowUp(session.id) : null;
-  return { ok: true as const, status, idempotent: false, followUpStatus: followUp?.status, signingUrl: followUp && "signingUrl" in followUp ? followUp.signingUrl : undefined, leaseInvitationSent: followUp && "leaseInvitationSent" in followUp ? followUp.leaseInvitationSent : false, whatsappConfirmationSent: followUp && "whatsappConfirmationSent" in followUp ? followUp.whatsappConfirmationSent : false, reference: session.reservation.publicReference, providerReference: session.providerReference };
+  return { ok: true as const, status, idempotent, followUpStatus: followUp?.status, signingUrl: followUp && "signingUrl" in followUp ? followUp.signingUrl : undefined, leaseInvitationSent: followUp && "leaseInvitationSent" in followUp ? followUp.leaseInvitationSent : false, whatsappConfirmationSent: followUp && "whatsappConfirmationSent" in followUp ? followUp.whatsappConfirmationSent : false, reference: session.reservation.publicReference, providerReference: session.providerReference };
 }

@@ -17,9 +17,10 @@ test('lead updates are scoped, concurrent-safe, auditable and cannot fabricate a
  const customerBefore=await db.customer.update({where:{id:captured.customerId!},data:{billingAddress:{city:"Verified billing city",postalCode:"9999"}}});
  const originalPublicCustomer=await db.customer.update({where:{id:attributed!.customer!.id},data:{billingAddress:{city:"Original billing location",postalCode:"1000"}}});
  const publicExisting=await createPublicLead({firstName:"Anonymous",lastName:"Visitor",email:`visitor-${key}@example.invalid`,phone:"+27000000000",facilitySlug:`fixture-${key}`,enquiryLocation:{city:"Cape Town",postalCode:"0001"}},"fixture-ip-hash");
- assert.equal((await db.lead.findUniqueOrThrow({where:{id:publicExisting.id}})).customerId,attributed!.customer!.id);
+  assert.notEqual((await db.lead.findUniqueOrThrow({where:{id:publicExisting.id}})).customerId,attributed!.customer!.id);
  const publicCustomer=await db.customer.findUniqueOrThrow({where:{id:attributed!.customer!.id}});
  assert.deepEqual(publicCustomer.billingAddress,originalPublicCustomer.billingAddress);
+  assert.deepEqual(publicCustomer,originalPublicCustomer);
  const amendment={updatedAt:captured.updatedAt.toISOString(),stage:captured.stage,nextActionAt:null,assignedToId:user.id,notes:captured.notes||"",enquiryLocation:{city:"Durban",postalCode:"0400"}};
  await assert.rejects(updateLead({...scope,facilityIds:[other.id]},captured.id,amendment),/NOT_FOUND/);
  await updateLead(scope,captured.id,amendment);

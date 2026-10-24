@@ -17,6 +17,7 @@ export function HikvisionIntegrationWorkspace() {
   const [configuration, setConfiguration] = useState<Configuration | null>(null);
   const [facilityId, setFacilityId] = useState("");
   const [canManage, setCanManage] = useState(false);
+  const [canManageCompany, setCanManageCompany] = useState(false);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -28,7 +29,7 @@ export function HikvisionIntegrationWorkspace() {
       .then(({ response, payload }) => {
         if (cancelled) return;
         if (!response.ok) { setError(payload.error?.message ?? "Hikvision configuration could not be loaded."); return; }
-        setConfiguration(payload.data); setCanManage(payload.meta.canManage); setFacilityId(payload.data.facilities[0]?.id || ""); setError("");
+        setConfiguration(payload.data); setCanManage(payload.meta.canManage); setCanManageCompany(payload.meta.canManageCompany === true); setFacilityId(payload.data.facilities[0]?.id || ""); setError("");
       });
     return () => { cancelled = true; };
   }, []);
@@ -68,16 +69,16 @@ export function HikvisionIntegrationWorkspace() {
       <form action={saveCredentials} className="panel panel-spacious company-form">
         <div className="panel-heading"><div><p className="eyebrow">Company connection</p><h2>HikCentral OpenAPI credentials</h2><p className="panel-subtitle">Secrets are encrypted before storage and are never returned to this page.</p></div><KeyRound className="positive-icon"/></div>
         <div className="field-grid">
-          <label>HikCentral server address<input name="endpoint" type="url" required placeholder="https://hikcentral.example.co.za" defaultValue={configuration?.company.endpoint ?? ""} disabled={!canManage}/></label>
-          <label>App Key<input name="appKey" type="password" autoComplete="new-password" placeholder={configuration?.company.appKeyConfigured ? "Saved — leave blank to keep" : "Enter App Key"} disabled={!canManage}/></label>
-          <label>App Secret<input name="appSecret" type="password" autoComplete="new-password" placeholder={configuration?.company.appSecretConfigured ? "Saved — leave blank to keep" : "Enter App Secret"} disabled={!canManage}/></label>
-          <label>TLS certificate pin (SHA-256 fingerprint) — optional<input name="pinnedCertSha256Fingerprint" type="text" spellCheck={false} placeholder="AA:BB:CC:...(32 byte pairs)" defaultValue={configuration?.company.pinnedCertSha256Fingerprint ?? ""} disabled={!canManage}/></label>
-          <label>HikCentral region index code — optional<input name="regionIndexCode" type="text" spellCheck={false} placeholder="Defaults to root000000" defaultValue={configuration?.company.regionIndexCode ?? ""} disabled={!canManage}/></label>
+          <label>HikCentral server address<input name="endpoint" type="url" required placeholder="https://hikcentral.example.co.za" defaultValue={configuration?.company.endpoint ?? ""} disabled={!canManageCompany}/></label>
+          <label>App Key<input name="appKey" type="password" autoComplete="new-password" placeholder={configuration?.company.appKeyConfigured ? "Saved — leave blank to keep" : "Enter App Key"} disabled={!canManageCompany}/></label>
+          <label>App Secret<input name="appSecret" type="password" autoComplete="new-password" placeholder={configuration?.company.appSecretConfigured ? "Saved — leave blank to keep" : "Enter App Secret"} disabled={!canManageCompany}/></label>
+          <label>TLS certificate pin (SHA-256 fingerprint) — optional<input name="pinnedCertSha256Fingerprint" type="text" spellCheck={false} placeholder="AA:BB:CC:...(32 byte pairs)" defaultValue={configuration?.company.pinnedCertSha256Fingerprint ?? ""} disabled={!canManageCompany}/></label>
+          <label>HikCentral region index code — optional<input name="regionIndexCode" type="text" spellCheck={false} placeholder="Defaults to root000000" defaultValue={configuration?.company.regionIndexCode ?? ""} disabled={!canManageCompany}/></label>
         </div>
         <p className="safe-config-note"><ShieldCheck size={17}/>Saving replacement credentials automatically removes the previous usable values. Audit records contain only the endpoint and whether credentials are configured.</p>
         <p className="field-help">Only needed when the HikCentral server uses a self-signed certificate that can&apos;t be validated normally (for example, issued to an internal address rather than its public one). Enter the exact SHA-256 fingerprint of that certificate, confirmed from a trusted source such as the server itself — this pins the connection to that specific certificate instead of doing normal hostname validation. It is not a secret. Leave blank if the server has a certificate from a recognised authority.</p>
         <p className="field-help">HikCentral&apos;s door search requires a region index code to scope the query. Leave blank to search from the root of the region tree (the default for most installations) — only set this if your HikCentral console shows a different region you need to scope to. It is not a secret.</p>
-        <div className="form-footer"><button className="button button-primary" disabled={!canManage || !configuration?.encryptionReady || busy === "save-credentials"}>{busy === "save-credentials" ? "Saving…" : "Save credentials"}</button></div>
+        <div className="form-footer"><button className="button button-primary" disabled={!canManageCompany || !configuration?.encryptionReady || busy === "save-credentials"}>{busy === "save-credentials" ? "Saving…" : "Save credentials"}</button></div>
       </form>
       <form action={saveMapping} className="panel panel-spacious company-form" key={facility?.id ?? "none"}>
         <div className="panel-heading"><div><p className="eyebrow">Facility mapping</p><h2>Organisation and doors</h2><p className="panel-subtitle">Only the doors listed here will be granted to customers at the selected facility.</p></div><Link2 className="positive-icon"/></div>

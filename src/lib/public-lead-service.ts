@@ -13,7 +13,7 @@ export class PublicLeadError extends Error {
 }
 
 /**
- * Creates (or updates) a Customer and a NEW-stage Lead from a public quote
+ * Creates an unverified prospect and a NEW-stage Lead from a public quote
  * form submission. No unit is claimed and no Reservation is created — that
  * only happens once a customer picks a specific unit through the booking
  * flow (see public-booking-service.ts).
@@ -50,34 +50,20 @@ export async function createPublicLead(input: PublicLeadInput, ipHash: string) {
 
   const preferenceEvidence = { ...bookingPreferenceRecord({}, input.privacyNoticeVersion, "PUBLIC_QUOTE_FORM"), purpose: "RESPOND_TO_ENQUIRY", preferredContact: input.contactMethod ?? null };
   return db.$transaction(async (tx) => {
-    let customer = await tx.customer.findFirst({
-      where: { organisationId: facility.organisationId, email: { equals: input.email, mode: "insensitive" } },
-      orderBy: { updatedAt: "desc" },
+    // Anonymous email matching cannot establish ownership of an existing customer.
+    const customer = await tx.customer.create({
+      data: {
+        organisationId: facility.organisationId,
+        type: input.productLine === "MICRO_WAREHOUSE" ? "BUSINESS" : "INDIVIDUAL",
+        companyName: input.businessDetails?.companyName,
+        taxNumber: input.businessDetails?.taxNumber,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        email: input.email,
+        phone: input.phone,
+        communicationConsent: preferenceEvidence,
+      },
     });
-    if (!customer) {
-      customer = await tx.customer.create({
-        data: {
-          organisationId: facility.organisationId,
-          type: input.productLine === "MICRO_WAREHOUSE" ? "BUSINESS" : "INDIVIDUAL",
-          companyName: input.businessDetails?.companyName,
-          taxNumber: input.businessDetails?.taxNumber,
-          firstName: input.firstName,
-          lastName: input.lastName,
-          email: input.email,
-          phone: input.phone,
-          communicationConsent: preferenceEvidence,
-        },
-      });
-    } else {
-      customer = await tx.customer.update({
-        where: { id: customer.id },
-        data: {
-          firstName: customer.firstName || input.firstName,
-          lastName: customer.lastName || input.lastName,
-          phone: customer.phone || input.phone,
-        },
-      });
-    }
 
     const lead = await tx.lead.create({
       data: {

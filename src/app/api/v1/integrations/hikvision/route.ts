@@ -25,8 +25,9 @@ export async function GET() {
   try {
     const viewScope = await requirePermissionScope("integrations.view");
     let canManage = true;
-    try { await requirePermissionScope("integrations.manage"); } catch { canManage = false; }
-    return Response.json({ data: await listHikCentralConfiguration(viewScope), meta: { canManage } });
+    let canManageCompany = false;
+    try { canManageCompany = (await requirePermissionScope("integrations.manage")).unrestrictedFacilities; } catch { canManage = false; }
+    return Response.json({ data: await listHikCentralConfiguration(viewScope), meta: { canManage, canManageCompany } });
   } catch (error) { return configurationError(error); }
 }
 

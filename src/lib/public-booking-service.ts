@@ -231,11 +231,11 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
     where: { publicSlug: input.facilitySlug, publicBookingEnabled: true, active: true },
     select: {
       id: true, organisationId: true, name: true, timezone: true,
-      configurationProfiles: { where: { domain: "STORE_INFORMATION", name: "Default", status: "READY" }, select: { config: true }, take: 1 },
+      configurationProfiles: { where: { domain: "STORE_INFORMATION", name: "Default", status: "READY" }, select: { organisationId: true, config: true } },
     },
   });
   if (!facility) throw new PublicBookingError("FACILITY_NOT_FOUND", 404);
-  if (input.journey === "VIEWING" && (!input.viewingAt || !viewingSlotAllowed(input.viewingAt, facility.timezone, facility.configurationProfiles[0]?.config))) {
+  if (input.journey === "VIEWING" && (!input.viewingAt || !viewingSlotAllowed(input.viewingAt, facility.timezone, facility.configurationProfiles.find(profile => profile.organisationId === facility.organisationId)?.config))) {
     throw new PublicBookingError("VIEWING_SLOT_UNAVAILABLE", 422);
   }
   const verificationCode = verificationEnabled ? randomInt(0, 1_000_000).toString().padStart(6, "0") : "";
@@ -409,10 +409,11 @@ export async function verifyPublicReservation(reference: string, code: string) {
   const reservation = await db.reservation.findUnique({ where: { publicReference: reference }, include: { ...reservationInclude, customer: true } });
   if (!reservation || reservation.status !== "ACTIVE" || reservation.contactVerifiedAt) return { ok: false as const, code: "NOT_FOUND" };
   if (!reservation.verificationExpiresAt || reservation.verificationExpiresAt < new Date() || reservation.verificationAttempts >= 5) return { ok: false as const, code: "EXPIRED" };
+  const attempt = await db.reservation.updateMany({ where: { id: reservation.id, status: "ACTIVE", contactVerifiedAt: null, verificationCodeHash: reservation.verificationCodeHash, verificationExpiresAt: { gt: new Date() }, verificationAttempts: { lt: 5 } }, data: { verificationAttempts: { increment: 1 } } });
+  if (attempt.count !== 1) return { ok: false as const, code: "EXPIRED" };
   const expected = Buffer.from(reservation.verificationCodeHash ?? "", "hex");
   const actual = Buffer.from(verificationHash(reservation.id, code), "hex");
   if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
-    await db.reservation.update({ where: { id: reservation.id }, data: { verificationAttempts: { increment: 1 } } });
     return { ok: false as const, code: "INVALID_CODE" };
   }
   const verifiedAt = new Date();
@@ -470,10 +471,11 @@ export async function verifyPublicReservationEmail(reference: string, code: stri
   const reservation = await db.reservation.findUnique({ where: { publicReference: reference }, include: { customer: true } });
   if (!reservation || (!reservation.contactVerifiedAt&&!await approvedStaffPriceEmail(reservation,staffPriceId))) return { ok: false as const, code: "NOT_FOUND" };
   if (!reservation.verificationExpiresAt || reservation.verificationExpiresAt < new Date() || reservation.verificationAttempts >= 10) return { ok: false as const, code: "EXPIRED" };
+  const attempt = await db.reservation.updateMany({ where: { id: reservation.id, verificationCodeHash: reservation.verificationCodeHash, verificationExpiresAt: { gt: new Date() }, verificationAttempts: { lt: 10 } }, data: { verificationAttempts: { increment: 1 } } });
+  if (attempt.count !== 1) return { ok: false as const, code: "EXPIRED" };
   const expected = Buffer.from(reservation.verificationCodeHash ?? "", "hex");
   const actual = Buffer.from(emailVerificationHash(reservation.id, code), "hex");
   if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
-    await db.reservation.update({ where: { id: reservation.id }, data: { verificationAttempts: { increment: 1 } } });
     return { ok: false as const, code: "INVALID_CODE" };
   }
   const verifiedAt = new Date(), identityAccess = newIdentityAccess();

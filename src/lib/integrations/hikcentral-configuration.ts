@@ -88,6 +88,7 @@ export async function listHikCentralConfiguration(scope: RequestScope) {
 }
 
 export async function saveHikCentralCredentials(scope: RequestScope, input: unknown) {
+  if (!scope.unrestrictedFacilities) throw new Error("FORBIDDEN");
   if (!integrationEncryptionConfigured()) throw new Error("CONFIG_REQUIRED:INTEGRATION_CONFIG_ENCRYPTION_KEY");
   const parsed = credentialsSchema.parse(input);
   const existing = await companyConnection(scope.organisationId);
