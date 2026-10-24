@@ -13,7 +13,7 @@ const start = workflow.indexOf('"set -o pipefail && umask 077');
 assert.ok(start > 0);
 const remote = workflow.slice(start + 1).trim().replace(/"$/, '')
   .replace(/\\\r?\n\s*/g, ' ').replace(/\\\$/g, '$').replace(/\\"/g, '"')
-  .replace('cd /opt/stor24-crm', 'cd "$FIXTURE_ROOT"').replaceAll('$DEPLOY_REF', sha);
+  .replace('/etc/stor24-monitor.env', '"$FIXTURE_ROOT/monitor.env"').replace('cd /opt/stor24-crm', 'cd "$FIXTURE_ROOT"').replaceAll('$DEPLOY_REF', sha);
 
 function run(fail = '', mode = '') {
   const root = mkdtempSync(join(tmpdir(), 'stor24-deploy-diagnostic-'));
@@ -22,6 +22,8 @@ function run(fail = '', mode = '') {
     copyFileSync(resolve('scripts/deployment-phase-evidence.sh'), join(root, 'scripts/deployment-phase-evidence.sh'));
     writeFileSync(join(root, '.env'), 'INTEGRATION_CONFIG_ENCRYPTION_KEY=fixture-only\nLEAD_SLA_WORKER_KEY=fixture-only\n');
     writeFileSync(join(root, 'scripts/dlp-backup.sh'), 'exit 0\n');
+    writeFileSync(join(root, 'scripts/install-host-heartbeat.sh'), 'exit 0\n');
+    writeFileSync(join(root, 'monitor.env'), 'STOR24_HEARTBEAT_KEY=' + 'a'.repeat(64) + '\n');
     const writeStub = (name, code) => writeFileSync(join(root, 'bin', name), '#!/usr/bin/env bash\n' + code, { mode: 0o755 });
     writeStub('git', '[[ "$1" == rev-parse ]] && echo aaaaaaaa; exit 0\n');
     for (const name of ['systemctl', 'install', 'sleep']) writeStub(name, 'exit 0\n');

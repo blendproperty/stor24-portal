@@ -33,11 +33,11 @@ test('missing credentials, HTTP rejection and uncertain requests fail without re
   assert.equal(fetch.mock.callCount(), 3);
 });
 
-test('worker is cron-only with six ten-minute slots and no credential in its configuration', () => {
+test('worker exposes only the protected monitoring route and retains six ten-minute slots', () => {
   const config = JSON.parse(readFileSync(new URL('../wrangler.monitor.json', import.meta.url), 'utf8'));
   assert.equal(config.workers_dev, false); assert.equal(config.preview_urls, false);
   assert.equal(config.observability.enabled, true);
-  assert.equal(worker.fetch, undefined); assert.equal(config.routes, undefined); assert.equal(config.vars, undefined);
+  assert.equal(typeof worker.fetch, 'function'); assert.deepEqual(config.routes, [{ pattern: 'https://portal.stor24.co.za/_operations/monitor/*', zone_name: 'stor24.co.za' }]); assert.equal(config.vars, undefined); assert.equal(config.kv_namespaces[0].binding, 'MONITOR_EVIDENCE');
   assert.deepEqual(config.triggers.crons, ['3,13,23,33,43,53 * * * *']);
   assert.equal(config.main, 'scripts/external-monitor-worker.mjs');
 });

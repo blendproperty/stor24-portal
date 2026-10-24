@@ -79,11 +79,13 @@ jobs:
                sla_key=\$(openssl rand -hex 32); \
                printf 'LEAD_SLA_WORKER_KEY=%s\n' \"\$sla_key\" >> .env; \
              fi && \
+             test -s /etc/stor24-monitor.env && \
              /bin/bash scripts/dlp-backup.sh && \
              install -m 644 docs/stor24-dlp-backup.service docs/stor24-dlp-backup.timer /etc/systemd/system/ && \
              systemctl daemon-reload && systemctl enable --now stor24-dlp-backup.timer && \
              install -m 644 docs/stor24-operations-status.service docs/stor24-operations-status.timer /etc/systemd/system/ && \
              systemctl daemon-reload && systemctl enable --now stor24-operations-status.timer && \
+             /bin/bash scripts/install-host-heartbeat.sh && \
              deployment_phase pre-build && \
              IMAGE_TAG=\$(git rev-parse --short HEAD) docker compose --env-file .env -f compose.prod.yml build app migrate && \
              deployment_phase post-build && \
