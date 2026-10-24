@@ -15,6 +15,7 @@ import {previewAdjustment,requestAdjustment,decideAdjustment,recordRefundPayout}
 import {netCollectionTotal} from "../../src/lib/finance/collection-total";
 import {southAfricaDateKey} from "../../src/lib/south-africa-time";
 import {customerHistory} from "../../src/lib/customer-history-service";
+import {inspectReportExport} from "../../src/lib/dlp-policy";
 import {receiptCorrectionWorkspace,receiptCorrectionPreview,receiptCorrectionDocument} from "../../src/lib/receipt-reallocation-workspace";
 import type {ReceiptReallocationInput} from "../../src/lib/receipt-reallocation-policy";
 
@@ -28,7 +29,10 @@ test("isolated receipt correction producers retain cash, approval, undo and sour
     const accounts=[];
     for(let n=0;n<3;n++){
       const customer=await db.customer.create({data:{organisationId:org.id,firstName:"PRIVATE-SYNTHETIC-CUSTOMER-"+n}});
-      const account=await db.account.create({data:{customerId:customer.id,accountNumber:"SYNTHETIC-ACCOUNT-"+randomUUID(),balance:n===0?-200:n===1?450:0}});
+      // Random digit runs in UUID labels can legitimately trigger the real card-number DLP policy.
+      const accountNumber="SYNTHETIC-ACCOUNT-"+randomUUID().replace(/\d/g,"x");
+      assert.equal(inspectReportExport("rent-roll",[{customer:accountNumber}]).allowed,true);
+      const account=await db.account.create({data:{customerId:customer.id,accountNumber,balance:n===0?-200:n===1?450:0}});
       await db.tenancy.create({data:{facilityId:facility.id,customerId:customer.id,accountId:account.id,startDate:new Date("2026-01-01"),status:"ACTIVE"}});accounts.push(account);
       if(n===1)await db.ledgerEntry.create({data:{accountId:account.id,type:"CHARGE",amount:450,description:"Synthetic original charge",effectiveAt:new Date("2026-01-01")}});
     }
