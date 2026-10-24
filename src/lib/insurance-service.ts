@@ -37,6 +37,7 @@ export async function listInsuranceOperations(scope: RequestScope) {
 
 export async function createInsurancePlan(scope: RequestScope, raw: unknown) {
   const input = insurancePlanSchema.parse(raw);
+  if (!input.facilityId && !scope.unrestrictedFacilities) throw new Error("FACILITY_FORBIDDEN");
   if (input.facilityId) await requireFacility(scope, input.facilityId);
   const duplicate = await db.insurancePlan.findFirst({ where: { organisationId: scope.organisationId, facilityId: input.facilityId ?? null, code: input.code } });
   if (duplicate) throw new Error("INSURANCE_PLAN_EXISTS");

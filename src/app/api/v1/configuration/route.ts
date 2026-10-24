@@ -23,7 +23,9 @@ export async function GET() {
 export async function PUT(request: Request) {
   try {
     const body = await request.json() as { kind?: string; payload?: unknown };
-    const { organisationId, user } = await requirePermission("configuration.manage");
+    const { organisationId, user, allowedFacilityIds } = await requirePermission("configuration.manage");
+    const facilityId = body.payload && typeof body.payload === "object" && "facilityId" in body.payload ? body.payload.facilityId : null;
+    if (["profile", "integration", "charge", "discount"].includes(body.kind ?? "") && allowedFacilityIds !== null && (!facilityId || ["charge", "discount"].includes(body.kind!))) throw new Error("FORBIDDEN");
     if (body.kind === "profile") {
       if (body.payload && typeof body.payload === 'object' && 'domain' in body.payload && ['STAFF_PRICE_APPROVAL_WHATSAPP','NETCASH_PROVIDER_REFUND','NETCASH_DEBICHECK_BANK_CONSENT','COLLECTION_SCHEDULE_PLAN','COLLECTION_SCHEDULE_RUN','ARREARS_ACCESS_REVIEW_SCHEDULE','ARREARS_ACCESS_REVIEW_CURSOR','STAFF_EVENT_EMAIL_POLICY','STAFF_EVENT_EMAIL_OUTBOX','ADVERTISING_CONNECTION','OPERATIONS_ALERTS','OCCUPANCY_RENT_SCHEDULE','LEAD_SLA','LEAD_SLA_ESCALATION','MRI_JOURNAL_MAPPING','MRI_SANDBOX_JOURNAL_MAPPING','MRI_SANDBOX_BATCH','MRI_SANDBOX_SOURCE','COLLECTION_EMAIL_NOTICE','COLLECTION_PHONE_NOTICE','MONTHLY_BILLING','MONTHLY_BILLING_VERSION','NETCASH_PAYMENT_EVIDENCE','CARD_AUTOPAY_REQUEST','CARD_AUTOPAY_REQUEST_HISTORY','CARD_AUTOPAY_SUBSCRIPTION','CARD_AUTOPAY_EVENT','CARD_AUTOPAY_PROVIDER_ACTION','NETCASH_PAYMENT_REQUEST','NETCASH_DEBICHECK_TEMPLATE','NETCASH_DEBICHECK_REQUEST','NETCASH_DEBICHECK_ATTEMPT','NETCASH_DEBICHECK_STATUS_OBSERVATION'].includes(String(body.payload.domain))) return Response.json({ error: { code: "DEDICATED_CONFIGURATION_REQUIRED", message: "Use the dedicated owner workflow for this configuration." } }, { status: 400 });
       const input = configurationSchema.parse(body.payload);

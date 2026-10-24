@@ -34,14 +34,14 @@ test("isolated PostgreSQL private identity workflow", async t => {
     await t.test("identity return recovers only a current agreement after a quote change", async () => {
       const f = await fixture();
       await submitIdentity(f.reference, f.token, f.input);
-      const prepared = await preparePublicReservationLease(f.reference, "CARD"); assert.ok(prepared.ok);
+      const prepared = await preparePublicReservationLease(f.reference, "CARD", f.token); assert.ok(prepared.ok);
       if (!prepared.ok) return;
       assert.equal((await identityStatus(f.reference, f.token)).agreementToken, prepared.token);
       await db.publicReservationLease.update({ where: { reservationId: f.booking.id }, data: { status: "REQUOTE_REQUIRED" } });
       assert.equal((await identityStatus(f.reference, f.token)).agreementToken, null);
       await db.publicReservationLease.update({ where: { reservationId: f.booking.id }, data: { status: "READY", expiresAt: new Date(0) } });
       assert.equal((await identityStatus(f.reference, f.token)).agreementToken, null);
-      const renewed = await preparePublicReservationLease(f.reference, "EFT"); assert.ok(renewed.ok);
+      const renewed = await preparePublicReservationLease(f.reference, "EFT", f.token); assert.ok(renewed.ok);
       if (!renewed.ok) return;
       assert.notEqual(renewed.token, prepared.token);
       assert.equal((await identityStatus(f.reference, f.token)).agreementToken, renewed.token);
@@ -83,9 +83,9 @@ test("isolated PostgreSQL private identity workflow", async t => {
       await db.customer.update({ where: { id: next.customer.id }, data: { emailVerifiedAt: new Date() } });
       const input = { ...f.input, policyHash: identityPolicy(f.org.id)!.hash };
       await assert.rejects(submitIdentity(other.reference, other.token, input), /ID_POLICY_UNAVAILABLE/);
-      assert.equal((await preparePublicReservationLease(next.reference, "CARD")).ok, false);
+      assert.equal((await preparePublicReservationLease(next.reference, "CARD", next.token)).ok, false);
       await submitIdentity(next.reference, next.token, input);
-      const prepared = await preparePublicReservationLease(next.reference, "CARD"); assert.ok(prepared.ok); if (!prepared.ok) return;
+      const prepared = await preparePublicReservationLease(next.reference, "CARD", next.token); assert.ok(prepared.ok); if (!prepared.ok) return;
       assert.equal(await publicReservationHasSignedLease(next.reference), null);
       const lease = await db.publicReservationLease.findUniqueOrThrow({ where: { reservationId: next.booking.id } });
       const appUrl = process.env.APP_URL; delete process.env.APP_URL; // Prevent any welcome-email provider call from a synthetic signature.
@@ -132,10 +132,10 @@ test("isolated PostgreSQL private identity workflow", async t => {
         f.input.policyHash = identityPolicy(f.org.id)!.hash;
       }
       assert.equal(await identityGate(db, f.org.id, f.booking.id, f.booking.createdAt, "SIGN"), false);
-      const blocked = await preparePublicReservationLease(f.reference, "EFT");
+      const blocked = await preparePublicReservationLease(f.reference, "EFT", f.token);
       assert.equal(blocked.ok, false); if (!blocked.ok) assert.equal(blocked.code, "IDENTITY_REQUIRED");
       const document = await submitIdentity(f.reference, f.token, f.input);
-      const prepared = await preparePublicReservationLease(f.reference, "EFT"); assert.equal(prepared.ok, true);
+      const prepared = await preparePublicReservationLease(f.reference, "EFT", f.token); assert.equal(prepared.ok, true);
       const content = "Synthetic signed agreement", pdf = Buffer.from("synthetic-pdf");
       await db.publicReservationLease.update({ where: { reservationId: f.booking.id }, data: { status: "SIGNED", content, sha256: createHash("sha256").update(content).digest("hex"), signedAt: new Date(), signedPdf: pdf, signedPdfSha256: createHash("sha256").update(pdf).digest("hex") } });
       await db.reservation.update({ where: { id: f.booking.id }, data: { holdExpiresAt: new Date(0) } });
@@ -199,7 +199,7 @@ test("isolated PostgreSQL private identity workflow", async t => {
     });
     await t.test("an already prepared signing link cannot bypass a withdrawn ID", async () => {
       const f = await fixture(); await submitIdentity(f.reference, f.token, f.input);
-      const prepared = await preparePublicReservationLease(f.reference, "EFT"); assert.ok(prepared.ok); if (!prepared.ok) return;
+      const prepared = await preparePublicReservationLease(f.reference, "EFT", f.token); assert.ok(prepared.ok); if (!prepared.ok) return;
       const lease = await db.publicReservationLease.findUniqueOrThrow({ where: { reservationId: f.booking.id } });
       await withdrawIdentity(f.reference, f.token, 1);
       await assert.rejects(completePublicReservationLease(prepared.token, { signerName: "Synthetic Customer", initials: [...LEASE_CLAUSE_KEYS], signerIp: null, signerUserAgent: null, termsAccepted: true, acceptedSha256: lease.sha256 }), /IDENTITY_REQUIRED/);

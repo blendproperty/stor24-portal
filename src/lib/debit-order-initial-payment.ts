@@ -32,7 +32,7 @@ export async function startDebitOrderInitialPayment(token: string) {
   const lease = await findMandateLease(token);
   if (lease.sourceSessionId || lease.expiresAt <= new Date() || lease.reservation.status !== "ACTIVE") throw new Error("INITIAL_PAYMENT_REVIEW_REQUIRED");
   if (!debitOrderSchedule(lease.reservation, null, new Date().toISOString().slice(0, 10)).initialPayment) throw new Error("INITIAL_PAYMENT_REVIEW_REQUIRED");
-  const same = await preparePublicReservationLease(lease.reservation.publicReference!, "DEBIT_ORDER");
+  const same = await preparePublicReservationLease(lease.reservation.publicReference!, "DEBIT_ORDER", lease.signingToken);
   if (!same.ok || same.status !== "SIGNED") throw new Error("MANDATE_AGREEMENT_CHANGED");
   return db.$transaction(async tx => {
     // Cross-device concurrent requests must not issue two checkout forms.
@@ -42,7 +42,7 @@ export async function startDebitOrderInitialPayment(token: string) {
     if (current.id !== lease.id || current.expiresAt <= new Date() || JSON.stringify(current.reservation) !== JSON.stringify(lease.reservation)) throw new Error("MANDATE_AGREEMENT_CHANGED");
     const state = await debitOrderInitialPaymentStatus(token);
     if (state.status !== "NOT_STARTED") throw new Error("INITIAL_PAYMENT_ALREADY_STARTED");
-    const result = await startPublicNetcashSandboxPayment(lease.reservation.publicReference!, randomUUID(), true);
+    const result = await startPublicNetcashSandboxPayment(lease.reservation.publicReference!, randomUUID(), true, lease.signingToken);
     if (!result.ok) throw new Error(result.code);
     return result;
   }, { timeout: 30_000 });

@@ -6,7 +6,7 @@ test("batch endpoints and generic configuration cannot bypass finance and downlo
     const mocks:Record<string,string>={
       fixture:'export const state={auth:true,manage:true,org:true,limited:false,dlpFailure:false,calls:[],guards:0};',
       "@/lib/scope":'import{state}from"fixture";export async function requirePermissionScope(p){if(!state.auth)throw Error("UNAUTHENTICATED");if(p==="mri.manage"&&!state.manage)throw Error("FORBIDDEN");return{organisationId:"ci",userId:"ci",unrestrictedFacilities:state.org,facilityIds:[]}}',
-      "@/lib/auth-guards":'export const requirePermission=async()=>({organisationId:"ci",user:{id:"ci"}});export const authErrorResponse=()=>Response.json({error:"fixture failure"},{status:500});',
+      "@/lib/auth-guards":'export const requirePermission=async()=>({organisationId:"ci",user:{id:"ci"},allowedFacilityIds:null});export const authErrorResponse=()=>Response.json({error:"fixture failure"},{status:500});',
       "@/lib/db":'export const db=new Proxy({}, {get(){throw Error("generic DB write must not be reached")}});',
       "@/lib/request-security":'import{state}from"fixture";export const sameOrigin=r=>r.headers.get("origin")===new URL(r.url).origin;export const rateLimit=async()=>state.limited;',
       "@/lib/mri-batch-service":'import{state}from"fixture";const guard=s=>{if(!s.unrestrictedFacilities)throw Error("MRI_ORG_PERMISSION")};export const mriBatchReview=async(s,p)=>{guard(s);return{period:p}};export const saveMriBatch=async(s,c)=>{state.calls.push(c);return c};export const transitionMriBatch=async(s,c)=>{state.calls.push(c);return c};export const mriBatchCsv=async(s,p,r)=>{guard(s);return "SANDBOX REVIEW ONLY"};',

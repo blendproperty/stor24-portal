@@ -1,4 +1,5 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from "node:crypto";
+export { identityAccessMatches, newIdentityAccess } from "./booking-access";
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import sharp from "sharp";
 import { z } from "zod";
 
@@ -36,13 +37,6 @@ export function identityRequired(organisationId: string, createdAt: Date, reserv
     if (!email || !policy.customerEmailHashes.includes(createHash("sha256").update(email).digest("hex"))) return null;
   }
   return policy;
-}
-export function newIdentityAccess() {
-  const token = randomBytes(32).toString("base64url");
-  return { token, identityAccessHash: createHash("sha256").update(token).digest("hex"), identityAccessExpiresAt: new Date(Date.now() + 60 * 60 * 1000) };
-}
-export function identityAccessMatches(token: string, hash: string | null, expiresAt: Date | null) {
-  return /^[A-Za-z0-9_-]{43}$/.test(token) && Boolean(hash && /^[a-f0-9]{64}$/.test(hash) && expiresAt && expiresAt > new Date() && timingSafeEqual(createHash("sha256").update(token).digest(), Buffer.from(hash, "hex")));
 }
 function key() {
   const secret = process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY;

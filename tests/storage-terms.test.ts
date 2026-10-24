@@ -99,13 +99,13 @@ test("the previous signed review edition resumes unchanged and rejects repricing
   const previousContext = { ...context, storagePackage: null };
   const reservation = { status: "ACTIVE", journey: "RENTAL", contactVerifiedAt: new Date(), intendedMoveIn: context.startDate, quotedRate: context.monthlyRate,
     customer: { companyName: context.customerName, emailVerifiedAt: new Date() }, facility: { name: context.facilityName }, unit: { number: context.unitNumber, unitType: { name: context.unitTypeName } },
-    publicLease: { status: "SIGNED", version: PREVIOUS_STORAGE_TERMS_VERSION, signingToken: "previous-token", sha256: createHash("sha256").update(renderPreviousEdition(previousContext)).digest("hex") } };
+    publicLease: { status: "SIGNED", version: PREVIOUS_STORAGE_TERMS_VERSION, signingToken: "p".repeat(43), sha256: createHash("sha256").update(renderPreviousEdition(previousContext)).digest("hex") } };
   const tx = { $queryRaw: async () => [], reservation: { findUnique: async () => reservation } };
   Reflect.set(db, "$transaction", async (callback: (value: typeof tx) => unknown) => callback(tx));
   try {
-    assert.equal((await preparePublicReservationLease("SAMPLE", "DEBIT_ORDER")).ok, true);
+    assert.equal((await preparePublicReservationLease("SAMPLE", "DEBIT_ORDER", reservation.publicLease.signingToken)).ok, true);
     reservation.quotedRate = 1600;
-    assert.deepEqual(await preparePublicReservationLease("SAMPLE", "DEBIT_ORDER"), { ok: false, code: "SIGNED_LEASE_CHANGED" });
+    assert.deepEqual(await preparePublicReservationLease("SAMPLE", "DEBIT_ORDER", reservation.publicLease.signingToken), { ok: false, code: "SIGNED_LEASE_CHANGED" });
     assert.equal(reservation.publicLease.version, PREVIOUS_STORAGE_TERMS_VERSION);
   } finally { Reflect.set(db, "$transaction", original); }
 });
@@ -115,13 +115,13 @@ test("historical signed reservation can resume but changed commercial terms cann
   const legacyContext = { ...context, storagePackage: null };
   const reservation = { status: "ACTIVE", journey: "RENTAL", contactVerifiedAt: new Date(), intendedMoveIn: context.startDate, quotedRate: context.monthlyRate,
     customer: { companyName: context.customerName, emailVerifiedAt: new Date() }, facility: { name: context.facilityName }, unit: { number: context.unitNumber, unitType: { name: context.unitTypeName } },
-    publicLease: { status: "SIGNED", version: LEASE_VERSION, signingToken: "old-token", sha256: createHash("sha256").update(renderLeaseDocument(legacyContext)).digest("hex") } };
+    publicLease: { status: "SIGNED", version: LEASE_VERSION, signingToken: "o".repeat(43), sha256: createHash("sha256").update(renderLeaseDocument(legacyContext)).digest("hex") } };
   const tx = { $queryRaw: async () => [], reservation: { findUnique: async () => reservation } };
   Reflect.set(db, "$transaction", async (callback: (value: typeof tx) => unknown) => callback(tx));
   try {
-    assert.equal((await preparePublicReservationLease("SAMPLE", "DEBIT_ORDER")).ok, true);
+    assert.equal((await preparePublicReservationLease("SAMPLE", "DEBIT_ORDER", reservation.publicLease.signingToken)).ok, true);
     reservation.quotedRate = 1600;
-    assert.deepEqual(await preparePublicReservationLease("SAMPLE", "DEBIT_ORDER"), { ok: false, code: "SIGNED_LEASE_CHANGED" });
+    assert.deepEqual(await preparePublicReservationLease("SAMPLE", "DEBIT_ORDER", reservation.publicLease.signingToken), { ok: false, code: "SIGNED_LEASE_CHANGED" });
   } finally { Reflect.set(db, "$transaction", original); }
 });
 

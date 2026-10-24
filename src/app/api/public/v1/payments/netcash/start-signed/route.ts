@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   if (!lease) return Response.json({ error: { code: "LEASE_SIGNATURE_REQUIRED", message: "Sign the lease before starting payment." } }, { status: 409 });
   if (lease.paymentMethod === "DEBIT_ORDER") return Response.json({ error: { code: "DEBIT_ORDER_PAYMENT_JOURNEY_REQUIRED", message: "Open your secure debit-order setup page to review the initial payment and recurring mandate separately." } }, { status: 409 });
   try {
-    const result = await startPublicNetcashSandboxPayment(parsed.data.reference, parsed.data.idempotencyKey);
+    const result = await startPublicNetcashSandboxPayment(parsed.data.reference, parsed.data.idempotencyKey, false, request.headers.get("x-stor24-identity-access") ?? "");
     if (!result.ok) return Response.json({ error: { code: result.code, message: "This reservation is not available for payment." } }, { status: 409 });
     return Response.json({ data: { ...result, lease: { id: lease.id, version: lease.version, sha256: lease.sha256, signedAt: lease.signedAt?.toISOString() ?? null } } }, { status: 201, headers: { "cache-control": "no-store" } });
   } catch (error) {

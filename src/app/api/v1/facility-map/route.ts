@@ -14,16 +14,16 @@ const elementSchema = z.object({
   mirrored: z.boolean().default(false),
   flippedVertical: z.boolean().default(false),
   unit: z.object({ unitTypeId: z.string().min(1), number: z.string().trim().min(1).max(40), floor: z.string().trim().max(40).optional(), zone: z.string().trim().max(40).optional(), monthlyRate: z.coerce.number().min(0), taxRate: z.coerce.number().min(0).max(1).default(.15) }).optional(),
-});
+}).refine(element => element.type === "UNIT" || (element.unitId === undefined && element.unit === undefined), { message: "Only unit elements may reference a unit." });
 const mapSchema = z.object({ facilityId: z.string().min(1), name: z.string().trim().min(1).max(80), width: z.number().int().min(400).max(5000), height: z.number().int().min(300).max(5000), backgroundUrl: z.string().trim().max(500).nullable().optional(), elements: z.array(elementSchema).max(1500) });
 
 export async function GET(request: Request) {
   try {
-    const auth = await requirePermission("facility_map.view"); const scope = await requireScope();
     const facilityId = new URL(request.url).searchParams.get("facilityId");
+    const auth = await requirePermission("facility_map.view", facilityId ?? undefined); const scope = await requireScope();
     if (facilityId) await requireFacility(scope, facilityId);
     const facilities = await db.facility.findMany({ where: { organisationId: auth.organisationId, active: true, ...(auth.allowedFacilityIds ? { id: { in: auth.allowedFacilityIds } } : {}), ...(facilityId ? { id: facilityId } : {}) }, include: { unitTypes: { orderBy: { name: "asc" } }, units: { include: { unitType: true }, orderBy: { number: "asc" } }, maps: { include: { elements: { include: { unit: { include: { unitType: true } } }, orderBy: { sortOrder: "asc" } } }, orderBy: { name: "asc" } } }, orderBy: { name: "asc" } });
-    return Response.json({ data: facilities.map(facility => ({ ...facility, maps: facility.maps.map(map => ({ ...map, elements: map.elements.map(element => ({ ...element, unit: element.unit ? { ...element.unit, floorOperational: floorIsOperational(element.unit.floor, facility.closedFloors) && floorIsOperational(map.name, facility.closedFloors) } : null })) })) })) });
+    return Response.json({ data: facilities.map(facility => ({ ...facility, maps: facility.maps.map(map => ({ ...map, elements: map.elements.map(element => ({ ...element, unitId: element.type === "UNIT" && element.unit?.facilityId === facility.id ? element.unitId : null, unit: element.type === "UNIT" && element.unit?.facilityId === facility.id ? { ...element.unit, floorOperational: floorIsOperational(element.unit.floor, facility.closedFloors) && floorIsOperational(map.name, facility.closedFloors) } : null })) })) })) });
   } catch (error) { return apiError(error); }
 }
 
