@@ -29,24 +29,12 @@ test("the container healthcheck consumes the readiness endpoint", () => {
 });
 
 
-test("monitor retries connection establishment, retains fail-closed checks and uses authenticated SMTP", () => {
-  assert.equal((monitor.match(/ConnectionAttempts=3/g) || []).length, 2);
-  assert.match(monitor, /StrictHostKeyChecking=yes/);
-  assert.match(monitor, /chmod 600/);
+test("routine monitor uses bounded HTTPS reports with no SSH keys or connections", () => {
+  assert.doesNotMatch(monitor, /VPS_SSH_KEY|VPS_HOST|StrictHostKeyChecking|ConnectionAttempts|\bssh\b/);
+  assert.match(monitor, /node scripts\/check-host-heartbeat.mjs/);
+  assert.match(monitor, /node scripts\/publish-monitor-evidence.mjs/);
+  assert.match(monitor, /STOR24_HEARTBEAT_KEY/);
   assert.match(monitor, /STOR24_ALERT_HOSTINGER_SMTP_PASSWORD/);
   assert.doesNotMatch(monitor, /SENDGRID_API_KEY|STOR24_ALERT_EMAIL_FROM/);
-  assert.match(monitor, /npm ci --omit=dev --ignore-scripts/);
-});
-
-
-test("both SSH-bearing monitor jobs use the independent macOS network", () => {
-  const workflow = monitor.replaceAll("\r\n", "\n");
-  for (const name of ["backup", "alerts"]) {
-    const job = workflow.split(`  ${name}:\n`)[1]?.split(/\n  [a-z][a-z-]*:\n/)[0];
-    assert.ok(job, `${name} job is required`);
-    assert.match(job, /runs-on: macos-latest/);
-    assert.match(job, /StrictHostKeyChecking=yes/);
-    assert.match(job, /ConnectionAttempts=3/);
-  }
-  assert.match(workflow, /readiness-primary:\n    runs-on: ubuntu-latest/);
+  assert.match(monitor, /readiness-confirmation:[\s\S]*?runs-on: macos-latest/);
 });
