@@ -28,7 +28,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - run: node --test tests/origin-access-health.test.mjs tests/production-readiness.test.mjs tests/production-alert-details.test.mjs tests/host-heartbeat.test.mjs tests/external-monitor-worker.test.mjs
