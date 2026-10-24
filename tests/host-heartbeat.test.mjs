@@ -89,6 +89,8 @@ test('deployment installs a local bounded timer and routine workflow contains no
   assert.match(read('../docs/stor24-host-heartbeat.timer'), /OnBootSec=45s/);
   assert.match(read('../docs/stor24-host-heartbeat.timer'), /OnUnitActiveSec=5min/);
   assert.match(read('../docs/stor24-host-heartbeat.service'), /TimeoutStartSec=130/);
+  assert.match(read('../docs/stor24-host-heartbeat.service'), /EnvironmentFile=\/etc\/stor24-monitor.env/);
+  assert.doesNotMatch(read('../scripts/host-heartbeat.mjs'), /readFile/);
   assert.match(read('../.github/workflows/deploy-vps.yml'), /scripts\/install-host-heartbeat.sh/);
   assert.match(read('../scripts/install-host-heartbeat.sh'), /systemctl start stor24-host-heartbeat.service/);
 });

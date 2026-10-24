@@ -1,5 +1,4 @@
 import { spawnSync } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { safeHeartbeat, monitorRequest } from './host-heartbeat-policy.mjs';
 import { safeMonitorEntry } from '../src/lib/operations-status-policy.mjs';
@@ -35,8 +34,6 @@ export async function publishHostHeartbeat(env, { run, fetcher, save = saveMonit
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    const configuration = await readFile('/etc/stor24-monitor.env', 'utf8');
-    const key = configuration.match(/^STOR24_HEARTBEAT_KEY=([a-f0-9]{64})\r?$/m)?.[1];
-    await publishHostHeartbeat({ STOR24_HEARTBEAT_KEY: key });
+    await publishHostHeartbeat(process.env);
   } catch { console.error('STOR24_HOST_HEARTBEAT_PUBLISH_FAILED'); process.exitCode = 1; }
 }

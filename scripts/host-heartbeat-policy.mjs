@@ -18,13 +18,13 @@ export function freshHeartbeat(record, now = Date.now()) {
   return report;
 }
 export async function monitorRequest(env, suffix, { method = 'GET', body, fetcher = fetch } = {}) {
-  const key = env.STOR24_HEARTBEAT_KEY;
-  if (!/^[a-f0-9]{64}$/.test(key || '')) throw new Error('MONITOR_AUTH_CONFIGURATION');
+  const value = env.STOR24_HEARTBEAT_KEY;
+  if (!/^[a-f0-9]{64}$/.test(value || '')) throw new Error('MONITOR_AUTH_CONFIGURATION');
   let response;
   // Only these idempotent evidence reads/writes retry; provider notification sends never do.
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      response = await fetcher(`${HEARTBEAT_URL}/${suffix}`, { method, redirect: 'error', signal: AbortSignal.timeout(15_000), headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'User-Agent': 'STOR24-independent-monitor' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+      response = await fetcher(`${HEARTBEAT_URL}/${suffix}`, { method, redirect: 'error', signal: AbortSignal.timeout(15_000), headers: { Authorization: `Bearer ${value}`, 'Content-Type': 'application/json', 'User-Agent': 'STOR24-independent-monitor' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
       if (response.status < 500 && response.status !== 429) break;
     } catch { if (attempt === 1) throw new Error('MONITOR_REPORT_TRANSPORT'); }
   }

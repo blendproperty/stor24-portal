@@ -4,6 +4,7 @@ After=docker.service network-online.target
 Wants=network-online.target
 
 [Service]
+EnvironmentFile=/etc/stor24-monitor.env
 Type=oneshot
 WorkingDirectory=/opt/stor24-monitor/current
 ExecStart=/usr/bin/node /opt/stor24-monitor/current/scripts/host-heartbeat.mjs
