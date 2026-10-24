@@ -129,7 +129,7 @@ jobs:
           READINESS_RESULT: ${{ needs.readiness.result }}
           BACKUP_RESULT: ${{ needs.backup.result }}
         run: node scripts/publish-monitor-evidence.mjs
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: production-alert-result
