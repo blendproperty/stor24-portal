@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { mkdtemp, stat, rm } from 'node:fs/promises';
+import { mkdtemp, stat, rm, symlink } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { saveMonitor } from '../scripts/write-monitor-status.mjs';
@@ -120,4 +122,16 @@ test('local service writes sanitized dashboard evidence readable by the non-root
     await saveMonitor({ runId: '12345', checkedAt: new Date().toISOString(), readiness: 'success', backup: 'success', status: 'HEALTHY_NO_NOTIFICATION' }, root);
     assert.equal((await stat(join(root, 'monitor.json'))).mode & 0o777, 0o644);
   } finally { process.umask(previous); await rm(root, { recursive: true, force: true }); }
+});
+
+test('versioned symlink launches the reporter instead of silently succeeding', { skip: process.platform === 'win32' }, async () => {
+  const root = await mkdtemp(join(tmpdir(), 'stor24-heartbeat-entry-'));
+  try {
+    const entry = join(root, 'reporter.mjs');
+    await symlink(fileURLToPath(new URL('../scripts/host-heartbeat.mjs', import.meta.url)), entry);
+    // Empty credentials and PATH prevent network publication or real host commands.
+    const child = spawnSync(process.execPath, [entry], { env: { ...process.env, STOR24_HEARTBEAT_KEY: '', PATH: '' }, encoding: 'utf8', timeout: 5000 });
+    assert.equal(child.status, 1);
+    assert.match(child.stderr, /STOR24_HOST_HEARTBEAT_PUBLISH_FAILED/);
+  } finally { await rm(root, { recursive: true, force: true }); }
 });

@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
+import { realpathSync } from 'node:fs';
 import { safeHeartbeat, monitorRequest } from './host-heartbeat-policy.mjs';
 import { safeMonitorEntry } from '../src/lib/operations-status-policy.mjs';
 import { saveMonitor } from './write-monitor-status.mjs';
@@ -32,7 +33,7 @@ export async function publishHostHeartbeat(env, { run, fetcher, save = saveMonit
   }
   return report;
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   try {
     await publishHostHeartbeat(process.env);
   } catch { console.error('STOR24_HOST_HEARTBEAT_PUBLISH_FAILED'); process.exitCode = 1; }
