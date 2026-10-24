@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { mkdtemp, stat, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { saveMonitor } from '../scripts/write-monitor-status.mjs';
 import worker from '../scripts/external-monitor-worker.mjs';
 import { safeHeartbeat, freshHeartbeat, monitorRequest, HEARTBEAT_URL } from '../scripts/host-heartbeat-policy.mjs';
 import { collectHostHeartbeat, publishHostHeartbeat } from '../scripts/host-heartbeat.mjs';
@@ -106,4 +110,14 @@ test('safe evidence requests retry transient failure twice at most and never ret
   calls = 0;
   await assert.rejects(monitorRequest(f.env, 'host', { fetcher: async () => { calls++; return Response.json({}, { status: 503 }); } }));
   assert.equal(calls, 2);
+});
+
+test('local service writes sanitized dashboard evidence readable by the non-root app container', { skip: process.platform === 'win32' }, async () => {
+  const service = readFileSync(new URL('../docs/stor24-host-heartbeat.service', import.meta.url), 'utf8');
+  const root = await mkdtemp(join(tmpdir(), 'stor24-heartbeat-'));
+  const previous = process.umask(parseInt(service.match(/^UMask=([0-7]+)$/m)[1], 8));
+  try {
+    await saveMonitor({ runId: '12345', checkedAt: new Date().toISOString(), readiness: 'success', backup: 'success', status: 'HEALTHY_NO_NOTIFICATION' }, root);
+    assert.equal((await stat(join(root, 'monitor.json'))).mode & 0o777, 0o644);
+  } finally { process.umask(previous); await rm(root, { recursive: true, force: true }); }
 });

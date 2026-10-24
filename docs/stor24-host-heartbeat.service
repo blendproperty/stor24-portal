@@ -9,4 +9,4 @@ Type=oneshot
 WorkingDirectory=/opt/stor24-monitor/current
 ExecStart=/usr/bin/node /opt/stor24-monitor/current/scripts/host-heartbeat.mjs
 TimeoutStartSec=130
-UMask=0077
+UMask=0022
