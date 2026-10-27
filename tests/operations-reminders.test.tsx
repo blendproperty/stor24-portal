@@ -76,7 +76,7 @@ test("synthetic reminder panel fits desktop and narrow mobile widths", { skip: p
       await page.setViewportSize({ width, height: 900 });
       await page.setContent(`<style>${css}</style><main style="padding:16px;max-width:1000px;margin:auto">${html}</main>`);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-      assert.equal(await page.getByRole("region", { name: "Operations reminders" }).getByRole("link").count(), 8);
+      assert.equal(await page.getByRole("region", { name: "Operations reminders" }).getByRole("link").count(), 9);
       await page.screenshot({ path: `output/operations-reminders/reminders-${width}.png`, fullPage: true });
     }
   } finally { await browser.close(); }

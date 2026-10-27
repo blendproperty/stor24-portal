@@ -1,3 +1,4 @@
+import { reservationAccessMatches } from "./booking-access";
 import {publicCheckoutTotal} from "./public-initial-rent";
 import { isTestPayment } from "@/lib/payments/payment-evidence";
 import { db } from "@/lib/db";
@@ -13,11 +14,11 @@ export function publicNetcashPaymentStatus(status: string, failureCode: string |
   return status;
 }
 
-export async function startPublicNetcashSandboxPayment(reference: string, idempotencyKey: string, debitOrderJourney = false) {
+export async function startPublicNetcashSandboxPayment(reference: string, idempotencyKey: string, debitOrderJourney = false, accessToken = "") {
   const reservation = await db.reservation.findUnique({
     where: { publicReference: reference },
     include: {
-      publicLease: { select: { paymentMethod: true } },
+      publicLease: { select: { paymentMethod: true, signingToken: true, status: true, expiresAt: true } },
       facility: { select: { name: true } },
       unit: { select: { number: true } },
       customer: true,
@@ -33,6 +34,7 @@ export async function startPublicNetcashSandboxPayment(reference: string, idempo
   ) {
     return { ok: false as const, code: "RESERVATION_UNAVAILABLE" };
   }
+  if (!reservationAccessMatches(accessToken, reservation)) return { ok: false as const, code: "ID_SESSION_REQUIRED" };
   if (reservation.publicLease?.paymentMethod === "DEBIT_ORDER" && !debitOrderJourney) return { ok: false as const, code: "DEBIT_ORDER_PAYMENT_JOURNEY_REQUIRED" };
 
   // This sends the reservation's real quoted rate to Netcash so a completed
@@ -74,7 +76,8 @@ export async function startPublicNetcashSandboxPayment(reference: string, idempo
   const checkout = await db.$transaction(async tx => {
     // Serialise checkout creation with quote acceptance; never charge a stale quote.
     await tx.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id" = ${reservation.id} FOR UPDATE`;
-    const current = await tx.reservation.findUniqueOrThrow({ where: { id: reservation.id }, include: { packageSelection: true } });
+    const current = await tx.reservation.findUniqueOrThrow({ where: { id: reservation.id }, include: { packageSelection: true, publicLease: true } });
+    if (!reservationAccessMatches(accessToken, current)) throw new Error("ID_SESSION_REQUIRED");
     if (current.status !== "ACTIVE" || !current.holdExpiresAt || current.holdExpiresAt <= new Date() || publicCheckoutTotal(current) !== amount) throw new Error("BOOKING_QUOTE_CHANGED");
     return createOnceOffCheckout(
       reservation.customer.organisationId,

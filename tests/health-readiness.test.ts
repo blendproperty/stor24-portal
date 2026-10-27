@@ -18,8 +18,10 @@ test("externally scheduled production monitoring verifies readiness without a du
   assert.doesNotMatch(monitor, /^\s+schedule:/m);
   const worker = JSON.parse(readFileSync(new URL("../wrangler.monitor.json", import.meta.url), "utf8"));
   assert.deepEqual(worker.triggers.crons, ["3,13,23,33,43,53 * * * *"]);
-  assert.match(monitor, /status !== "ok"/);
-  assert.match(monitor, /database !== "ok"/);
+  assert.match(monitor, /node scripts\/check-production-readiness.mjs/);
+  const probe = readFileSync(new URL("../scripts/public-readiness.sh", import.meta.url), "utf8");
+  assert.match(probe, /status !== "ok"/);
+  assert.match(probe, /database !== "ok"/);
 });
 
 test("the container healthcheck consumes the readiness endpoint", () => {
@@ -27,11 +29,12 @@ test("the container healthcheck consumes the readiness endpoint", () => {
 });
 
 
-test("monitor retries connection establishment, retains fail-closed checks and uses authenticated SMTP", () => {
-  assert.equal((monitor.match(/ConnectionAttempts=3/g) || []).length, 2);
-  assert.match(monitor, /StrictHostKeyChecking=yes/);
-  assert.match(monitor, /chmod 600/);
+test("routine monitor uses bounded HTTPS reports with no SSH keys or connections", () => {
+  assert.doesNotMatch(monitor, /VPS_SSH_KEY|VPS_HOST|StrictHostKeyChecking|ConnectionAttempts|\bssh\b/);
+  assert.match(monitor, /node scripts\/check-host-heartbeat.mjs/);
+  assert.match(monitor, /node scripts\/publish-monitor-evidence.mjs/);
+  assert.match(monitor, /STOR24_HEARTBEAT_KEY/);
   assert.match(monitor, /STOR24_ALERT_HOSTINGER_SMTP_PASSWORD/);
   assert.doesNotMatch(monitor, /SENDGRID_API_KEY|STOR24_ALERT_EMAIL_FROM/);
-  assert.match(monitor, /npm ci --omit=dev --ignore-scripts/);
+  assert.match(monitor, /readiness-confirmation:[\s\S]*?runs-on: macos-latest/);
 });

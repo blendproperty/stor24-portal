@@ -645,9 +645,7 @@ export async function moveIn(
       },
       include: { unitType: true },
     });
-    const customer = await tx.customer.findFirst({
-      where: { id: input.customerId, organisationId: scope.organisationId },
-    });
+    const customer = await requireLeasingCustomer(scope, input.customerId, tx);
     const facility = await tx.facility.findFirst({
       where: { id: input.facilityId },
     });

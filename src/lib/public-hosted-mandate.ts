@@ -62,7 +62,7 @@ export async function startHostedMandate(token: string) {
     return safeView(saved, saved.mandate!);
   } // One provider request per signed lease, even after ambiguous timeout.
   if (!lease.sourceSessionId) {
-    const same = await preparePublicReservationLease(lease.reservation.publicReference!, lease.paymentMethod as "CARD" | "EFT" | "DEBIT_ORDER");
+    const same = await preparePublicReservationLease(lease.reservation.publicReference!, lease.paymentMethod as "CARD" | "EFT" | "DEBIT_ORDER", lease.signingToken);
     if (!same.ok || same.status !== "SIGNED") throw new Error("MANDATE_AGREEMENT_CHANGED");
   }
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Johannesburg", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());

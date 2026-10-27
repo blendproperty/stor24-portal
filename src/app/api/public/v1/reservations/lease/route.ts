@@ -11,7 +11,8 @@ export async function POST(request: Request) {
   if (!publicApiAuthorized(request)) return Response.json({ error: { message: "Request rejected." } }, { status: 401 });
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: { message: "Invalid reservation reference." } }, { status: 422 });
-  const result = await preparePublicReservationLease(parsed.data.reference, parsed.data.paymentMethod);
+  const result = await preparePublicReservationLease(parsed.data.reference, parsed.data.paymentMethod, request.headers.get("x-stor24-identity-access") ?? "");
+  if (!result.ok && result.code === "ID_SESSION_REQUIRED") return Response.json({ error: { code: result.code, message: "Verify your email again to securely reopen your agreement." } }, { status: 401, headers: { "cache-control": "no-store" } });
   if (!result.ok) return Response.json({ error: { code: result.code, message: result.code === "IDENTITY_REQUIRED" ? "Upload your identity document before reviewing your agreement." : result.code === "MOVE_IN_DATE_REQUIRED" ? "Choose a move-in date before reviewing the lease." : "The lease cannot be prepared for this reservation." } }, { status: 409 });
   return Response.json({ data: result }, { status: result.status === "SIGNED" ? 200 : 201, headers: { "cache-control": "no-store" } });
 }

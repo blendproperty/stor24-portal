@@ -14,10 +14,10 @@ test("isolated PostgreSQL configuration and audit commit together", async t => {
   const user = await db.user.create({ data: { organisationId: org.id, name: "Synthetic configurator", email: `${key}@example.invalid` } });
   const output = await build({ entryPoints: ["src/app/api/v1/configuration/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "isolated-configuration", setup(b) {
     b.onResolve({ filter: /^@\/lib\/(db|auth-guards)$/ }, a => ({ path: a.path, namespace: "fixture" }));
-    b.onLoad({ filter: /.*/, namespace: "fixture" }, a => ({ contents: a.path.endsWith("/db") ? "export const db=__db;" : "export const requirePermission=async()=>__auth; export const authErrorResponse=()=>Response.json({error:'synthetic failure'},{status:500});" }));
+    b.onLoad({ filter: /.*/, namespace: "fixture" }, a => ({ contents: a.path.endsWith("/db") ? "export const db=__db;" : "export const requireSession=async()=>{throw Error('Unexpected fixture session read')}; export const requirePermission=async()=>__auth; export const authErrorResponse=()=>Response.json({error:'synthetic failure'},{status:500});" }));
   } }] });
   const loaded = { exports: {} as { PUT: (r: Request) => Promise<Response> } };
-  new Function("require", "module", "exports", "__db", "__auth", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { organisationId: org.id, user: { id: user.id } });
+  new Function("require", "module", "exports", "__db", "__auth", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { organisationId: org.id, user: { id: user.id }, allowedFacilityIds: null });
   const send = (kind: string, payload: unknown) => loaded.exports.PUT(new Request("https://example.invalid/api/v1/configuration", { method: "PUT", body: JSON.stringify({ kind, payload }) }));
   let constraint = false;
   const rejectAudit = async () => {

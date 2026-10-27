@@ -18,7 +18,7 @@ test("isolated PostgreSQL task status and audit commit together", async t => {
     b.onLoad({filter:/.*/,namespace:"fixture"},a=>({contents:a.path.endsWith('/db')?'export const db=__db;':"export const requirePermission=async()=>__auth;export const requireSession=async()=>{throw Error('Unexpected session read in fixture')};export const authErrorResponse=()=>Response.json({error:'synthetic failure'},{status:500});"}));
   }}]});
   const loaded={exports:{} as {PATCH:(r:Request,c:{params:Promise<{id:string}>})=>Promise<Response>}};
-  new Function('require','module','exports','__db','__auth',output.outputFiles[0].text)(createRequire(import.meta.url),loaded,loaded.exports,db,{organisationId:org.id,user:{id:user.id}});
+  new Function('require','module','exports','__db','__auth',output.outputFiles[0].text)(createRequire(import.meta.url),loaded,loaded.exports,db,{organisationId:org.id,user:{id:user.id},allowedFacilityIds:null});
   const send=(status:string)=>loaded.exports.PATCH(new Request('https://example.invalid/task',{method:'PATCH',body:JSON.stringify({status})}),{params:Promise.resolve({id:task.id})});
   let constrained=false;
   try {

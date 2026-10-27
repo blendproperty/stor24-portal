@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     return Response.json({ error: { message: "Invalid payment request." } }, { status: 422 });
   }
   try {
-    const result = await startPublicNetcashSandboxPayment(parsed.data.reference, parsed.data.idempotencyKey);
+    const result = await startPublicNetcashSandboxPayment(parsed.data.reference, parsed.data.idempotencyKey, false, request.headers.get("x-stor24-identity-access") ?? "");
     if (!result.ok) {
       return Response.json({ error: { code: result.code, message: "This reservation is not available for payment." } }, { status: 409 });
     }

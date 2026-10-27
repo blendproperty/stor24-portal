@@ -10,6 +10,12 @@ function load(path, mocks) {
     {module:fixtureModule,exports:fixtureModule.exports,Response,Date,require:name=>{if (!(name in mocks)) throw new Error(`Unexpected import ${name}`);return mocks[name];}});
   return fixtureModule.exports;
 }
+test('server action modules expose only the three active guarded workflow actions', () => {
+  const inertImports = new Proxy({}, {has:()=>true,get:()=>({})});
+  assert.deepEqual(Object.keys(load('src/app/actions/leasing.ts',inertImports)).sort(), ['confirmReservationMoveInAction','moveInAction']);
+  assert.deepEqual(Object.keys(load('src/app/actions/reservation-payment.ts',inertImports)), ['recordReservationPaymentAction']);
+});
+
 test('assisted move-in keeps its saved lease on dispatch failure and scopes creation to the chosen facility', async () => {
   let dispatchFails = false, mode, permission, redirected;
   const parsed={facilityId:'store',paymentMethod:'EFT',startDate:new Date()};

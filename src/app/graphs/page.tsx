@@ -2,7 +2,7 @@ import { Activity, BarChart3, DoorOpen, TrendingUp, Users, Wallet } from "lucide
 import "./dashboard.css";
 import { PageHeader } from "@/components/page-header";
 import { MetricCard } from "@/components/metric-card";
-import { requireScope } from "@/lib/scope";
+import { requirePermissionScope } from "@/lib/scope";
 import {
   getDashboardKpis,
   getLeadsLast7Days,
@@ -58,7 +58,7 @@ function LineChart({ points, formatValue }: { points: { label: string; value: nu
 }
 
 export default async function GraphsPage() {
-  const scope = await requireScope();
+  const scope = await requirePermissionScope("reports.view");
   const [kpis, pipeline, leadsWeek, occupancyTrend, revenueTrend, unitStats] = await Promise.all([
     getDashboardKpis(scope),
     getPipelineByStage(scope),

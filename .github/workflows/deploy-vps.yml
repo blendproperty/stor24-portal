@@ -28,10 +28,10 @@ jobs:
     environment: production
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: main
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
       - name: Require exact main release evidence
@@ -79,11 +79,13 @@ jobs:
                sla_key=\$(openssl rand -hex 32); \
                printf 'LEAD_SLA_WORKER_KEY=%s\n' \"\$sla_key\" >> .env; \
              fi && \
+             test -s /etc/stor24-monitor.env && \
              /bin/bash scripts/dlp-backup.sh && \
              install -m 644 docs/stor24-dlp-backup.service docs/stor24-dlp-backup.timer /etc/systemd/system/ && \
              systemctl daemon-reload && systemctl enable --now stor24-dlp-backup.timer && \
              install -m 644 docs/stor24-operations-status.service docs/stor24-operations-status.timer /etc/systemd/system/ && \
              systemctl daemon-reload && systemctl enable --now stor24-operations-status.timer && \
+             /bin/bash scripts/install-host-heartbeat.sh && \
              deployment_phase pre-build && \
              IMAGE_TAG=\$(git rev-parse --short HEAD) docker compose --env-file .env -f compose.prod.yml build app migrate && \
              deployment_phase post-build && \

@@ -1,5 +1,6 @@
 import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
+import { requireFacility } from "@/lib/scope";
 import { chargeDefinitionSchema, configurationSchema, discountPlanSchema, integrationSchema } from "@/lib/validators";
 
 export async function GET() {
@@ -23,11 +24,13 @@ export async function GET() {
 export async function PUT(request: Request) {
   try {
     const body = await request.json() as { kind?: string; payload?: unknown };
-    const { organisationId, user } = await requirePermission("configuration.manage");
+    const { organisationId, user, allowedFacilityIds } = await requirePermission("configuration.manage");
+    const facilityId = body.payload && typeof body.payload === "object" && "facilityId" in body.payload ? body.payload.facilityId : null;
+    if (["profile", "integration", "charge", "discount"].includes(body.kind ?? "") && allowedFacilityIds !== null && (!facilityId || ["charge", "discount"].includes(body.kind!))) throw new Error("FORBIDDEN");
     if (body.kind === "profile") {
       if (body.payload && typeof body.payload === 'object' && 'domain' in body.payload && ['STAFF_PRICE_APPROVAL_WHATSAPP','NETCASH_PROVIDER_REFUND','NETCASH_DEBICHECK_BANK_CONSENT','COLLECTION_SCHEDULE_PLAN','COLLECTION_SCHEDULE_RUN','ARREARS_ACCESS_REVIEW_SCHEDULE','ARREARS_ACCESS_REVIEW_CURSOR','STAFF_EVENT_EMAIL_POLICY','STAFF_EVENT_EMAIL_OUTBOX','ADVERTISING_CONNECTION','OPERATIONS_ALERTS','OCCUPANCY_RENT_SCHEDULE','LEAD_SLA','LEAD_SLA_ESCALATION','MRI_JOURNAL_MAPPING','MRI_SANDBOX_JOURNAL_MAPPING','MRI_SANDBOX_BATCH','MRI_SANDBOX_SOURCE','COLLECTION_EMAIL_NOTICE','COLLECTION_PHONE_NOTICE','MONTHLY_BILLING','MONTHLY_BILLING_VERSION','NETCASH_PAYMENT_EVIDENCE','CARD_AUTOPAY_REQUEST','CARD_AUTOPAY_REQUEST_HISTORY','CARD_AUTOPAY_SUBSCRIPTION','CARD_AUTOPAY_EVENT','CARD_AUTOPAY_PROVIDER_ACTION','NETCASH_PAYMENT_REQUEST','NETCASH_DEBICHECK_TEMPLATE','NETCASH_DEBICHECK_REQUEST','NETCASH_DEBICHECK_ATTEMPT','NETCASH_DEBICHECK_STATUS_OBSERVATION'].includes(String(body.payload.domain))) return Response.json({ error: { code: "DEDICATED_CONFIGURATION_REQUIRED", message: "Use the dedicated owner workflow for this configuration." } }, { status: 400 });
       const input = configurationSchema.parse(body.payload);
-      if (input.facilityId) await requirePermission("configuration.manage", input.facilityId);
+      if (input.facilityId) await requireFacility({ organisationId, facilityIds: allowedFacilityIds ?? [], unrestrictedFacilities: allowedFacilityIds === null }, input.facilityId);
       const profile = await db.$transaction(async tx => {
         const existing = await tx.configurationProfile.findFirst({ where: { organisationId, facilityId: input.facilityId ?? null, domain: input.domain, name: input.name } });
         const profile = existing
@@ -42,7 +45,7 @@ export async function PUT(request: Request) {
       const input = integrationSchema.parse(body.payload);
       if (input.category === "ACCOUNTING" && ["MRI", "MRI_SANDBOX"].includes(input.provider)) return Response.json({ error: { code: "DEDICATED_CONFIGURATION_REQUIRED", message: "Use MRI accounting or sandbox testing for this connection." } }, { status: 400 });
       if (input.category === "ACCESS_CONTROL" && input.provider === "HIKCENTRAL") return Response.json({ error: { code: "DEDICATED_CONFIGURATION_REQUIRED", message: "Configure Hikvision from the secure Hikvision integration page." } }, { status: 400 });
-      if (input.facilityId) await requirePermission("configuration.manage", input.facilityId);
+      if (input.facilityId) await requireFacility({ organisationId, facilityIds: allowedFacilityIds ?? [], unrestrictedFacilities: allowedFacilityIds === null }, input.facilityId);
       const connection = await db.$transaction(async tx => {
         const existing = await tx.integrationConnection.findFirst({ where: { organisationId, facilityId: input.facilityId ?? null, category: input.category, provider: input.provider } });
         const connection = existing
@@ -73,5 +76,8 @@ export async function PUT(request: Request) {
       return Response.json({ data: discount });
     }
     return Response.json({ error: { code: "UNKNOWN_CONFIGURATION", message: "Unsupported configuration type." } }, { status: 400 });
-  } catch (error) { return authErrorResponse(error); }
+  } catch (error) {
+    if (error instanceof Error && error.message === "FACILITY_FORBIDDEN") return authErrorResponse(new Error("FORBIDDEN"));
+    return authErrorResponse(error);
+  }
 }

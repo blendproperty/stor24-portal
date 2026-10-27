@@ -5,7 +5,7 @@ import { hasPermission } from "@/lib/permissions";
 import { moveInAction } from "@/app/actions/leasing";
 import { MoveInWorkspace } from "@/components/move-in-workspace";
 import { listLeasing } from "@/lib/leasing-service";
-import { requireScope } from "@/lib/scope";
+import { requirePermissionScope } from "@/lib/scope";
 import { southAfricaDateKey } from "@/lib/south-africa-time";
 import { getReservationMoveInReadiness } from "@/lib/reservation-move-in";
 
@@ -13,7 +13,7 @@ export const metadata = { title: "Move in" };
 
 export default async function MoveInPage({ searchParams }: { searchParams: Promise<{ reservation?: string }> }) {
   const { reservation: initialReservationId } = await searchParams;
-  const scope = await requireScope();
+  const scope = await requirePermissionScope("move_in.create");
   const data = await listLeasing(scope);
   const auth = await requireSession();
   const reservations = await Promise.all(data.reservations.filter(reservation => reservation.status === "ACTIVE" || (reservation.id === initialReservationId && reservation.status === "CONVERTED")).map(async reservation => ({

@@ -44,7 +44,7 @@ export async function GET() {
   try {
     const scope = await requirePermissionScope("integrations.view");
     let canManage = true;
-    try { await requirePermissionScope("integrations.manage"); } catch { canManage = false; }
+    try { canManage = (await requirePermissionScope("integrations.manage")).unrestrictedFacilities; } catch { canManage = false; }
     return Response.json({ data: await listNetcashConfiguration(scope), meta: { canManage } });
   } catch (error) { return netcashError(error); }
 }

@@ -60,4 +60,8 @@ test('metadata identifies the failed step without logs; shell source is never ba
   assert.equal(detail.severity, 'WARNING');
   assert.equal(backupEvidence("command '/bin/bash check || { echo STOR24_BACKUP_FAILED; exit 1; }'"), null);
   assert.match(backupEvidence('STOR24_RESOURCES_FAILED\n').failure, /resource/);
+  const command = 'command check || { echo STOR24_BACKUP_FAILED; }; resources || { echo STOR24_RESOURCES_FAILED; }';
+  assert.equal(backupEvidence(command), null);
+  assert.equal(backupEvidence(command + '\nssh: connect to host PRIVATE_HOST port 22: Connection timed out').severity, 'WARNING');
+  assert.match(backupEvidence('2026-10-24T05:00:00Z STOR24_BACKUP_FAILED\n2026-10-24T05:00:01Z STOR24_RESOURCES_FAILED\n').failure, /backup and server resource/);
 });

@@ -1,0 +1,11 @@
+[Unit]
+Description=Check STOR24 locally and report outward every five minutes
+
+[Timer]
+OnBootSec=45s
+OnUnitActiveSec=5min
+AccuracySec=10s
+Unit=stor24-host-heartbeat.service
+
+[Install]
+WantedBy=timers.target
