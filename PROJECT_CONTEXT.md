@@ -1,3 +1,13 @@
+## 2026-10-27 - Node.js 24.22.1 production upgrade verified (stor24-portal)
+
+- **Implementation:** the application Docker build and runtime now use Node.js 24.22.1 Alpine, pinned to the verified OCI image digest; relevant CI and regression checks run on Node 24. The source migration changes only the runtime, validation configuration and evidence, not business logic or provider permissions.
+- **Testing:** source PR 648 at add5d3a57e6f345d351170400f9b33aaff32c16b passed all applicable Node 24 regression, integration, security and production-image checks; image reports v24.22.1. Existing optional CRM next-workload pilot may be skipped and is not acceptance evidence. Exact merged revision also passed normal release checks. 
+- **Commit and push:** Node 24 candidate was committed and pushed on codex/node24-upgrade-20261027. This documentation follow-up records release evidence without replacing prior context.
+- **Merge:** PR 648 was normally checked and squash merged as 1aa9d49131f749dd4631387112bb835b75c768ee. Documentation-only follow-up promotion must pass normal checks and remote readback.
+- **Deployment and configuration:** guarded deployment https://github.com/blendproperty/stor24-portal/actions/runs/40498824291 succeeded for the exact merged revision. Running image sha256:8096152aeb27999944e7b0987ce689af4a952511ec8e59e90d387fb768901c75; Node v24.22.1; zero observed container restarts at verification. No new schema migrations were included; pre-deployment ledger showed existing migrations already applied. Existing backup/rollback and provider settings are retained.
+- **Live production verification:** 2026-10-27T11:52:48.675913+00:00: Docker health healthy; portal health reports database ok; after all three releases, all 19 HTTPS checks passed including website dependencies, CRM login, CMS data and anonymous CMS access denial. Authenticated staff workflows and real provider transactions were not repeated after this upgrade.. These are scoped technical checks, not business, customer, source-data or staff acceptance.
+- **Retained gates:** all existing real customer/staff/device/payment/OTP/signature/provider-delivery/settlement, data, legal/privacy, training, physical access, offline unsynced work, full recovery and approval/UAT gates remain open. No real customer transaction, outbound message or external tracker change was made as a test.
+
 ## 2026-10-27 - Node.js 24.22.1 upgrade candidate (crm)
 
 - **Implementation:** candidate pins the application Docker base to the verified Node 24.22.1 Alpine image digest and runs relevant CI checks on Node 24.22.1. No business feature, provider, permission or source-data change is intended.
