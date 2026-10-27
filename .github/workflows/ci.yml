@@ -9,6 +9,15 @@ permissions:
   contents: read
 
 jobs:
+  node24-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Build production image and verify Node version
+        run: |
+          docker build -t stor24-node24-crm:test .
+          test "$(docker run --rm --entrypoint node stor24-node24-crm:test --version)" = v24.22.1
   guided-help:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -16,7 +25,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: 22.23.4
+          node-version: 24.22.1
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
@@ -208,7 +217,7 @@ jobs:
           fetch-depth: 2
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: 22.23.4
+          node-version: 24.22.1
           cache: npm
       - run: node scripts/verify-project-context.mjs --base HEAD^1
       - run: npm ci
