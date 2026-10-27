@@ -1,3 +1,7 @@
+## 2026-10-27 - Stable browser validation runner
+
+- **Testing/configuration:** observed the moving ubuntu-latest image select Ubuntu26.04 and stall Playwright system-dependency downloads for more than seven minutes. Pin only the website/CRM browser jobs to maintained ubuntu-24.04 and their Node setup to production22.23.4. No tests, assertions, security scans or required merge gates removed. Hosted reruns required; production configuration unchanged.
+
 ## 2026-10-27 - Serialize Prisma transaction queries; validation pending
 
 - **Implementation:** use a PrismaPg subclass that queues queryRaw and executeRaw per transaction-owned connection and queues commit/rollback behind pending queries. Pool-level queries and independent transactions retain concurrency; isolation levels, scoped SQL, result/error identities, savepoint methods and rollback behavior are retained. This addresses Prisma's concurrent adapter calls on a single pg Client rather than suppressing the pg warning or globally limiting database work. All db consumers continue through the existing singleton and bounded database configuration.
