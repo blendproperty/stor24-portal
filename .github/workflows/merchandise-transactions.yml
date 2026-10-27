@@ -35,8 +35,8 @@ jobs:
       TENANT_MERCHANDISE_CHECKOUT_ENABLED: 'true'
       ALLOW_EMPTY_DATABASE_BOOTSTRAP: 'true'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
           cache: npm
@@ -149,13 +149,13 @@ jobs:
         run: npx tsx scripts/test-synthetic-restore.ts
         env:
           POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: synthetic-restore-evidence
           path: output/recovery/synthetic-restore.json
           if-no-files-found: ignore
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: readiness-capacity-evidence
@@ -177,18 +177,18 @@ jobs:
         run: |
           [[ "$REVIEWED_SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]]
           [[ "$REVIEWED_SOURCE_SHA" == "$WORKFLOW_SOURCE_SHA" ]]
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ inputs.workload_source_sha }}
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
       - name: One isolated synthetic HTTP workload
         env:
           STOR24_NEXT_WORKLOAD_EXECUTION: approved-isolated
         run: node scripts/test-next-representative-workload.mjs --run --source "$REVIEWED_SOURCE_SHA"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: isolated-next-workload-evidence
