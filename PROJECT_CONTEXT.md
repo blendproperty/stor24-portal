@@ -1,3 +1,12 @@
+## 2026-10-27 - Node.js 24.22.1 upgrade candidate (crm)
+
+- **Implementation:** candidate pins the application Docker base to the verified Node 24.22.1 Alpine image digest and runs relevant CI checks on Node 24.22.1. No business feature, provider, permission or source-data change is intended.
+- **Testing:** Node 24 CI, production image build, regression and integration gates are pending; no success is claimed before checks complete.
+- **Commit and push:** candidate implementation and this context are prepared on an isolated branch; publication evidence pending.
+- **Merge:** pending passing required checks and review of current default branch.
+- **Deployment and configuration:** no deployment yet; normal guarded production release and rollback controls must pass.
+- **Live production verification:** Node 24 runtime and website, CRM and CMS behavior must be checked after deployment. Existing provider, finance, staff, customer, device, legal, data, training, physical-access, offline and recovery acceptance gates remain open.
+
 ## 2026-10-27 - Cloudflare beacon conflict resolved; scoped temporary cleanup
 
 - **Implementation:** no application code or CSP allowlist change. The remaining browser warning came from Cloudflare edge-injected Web Analytics, independently of application consent-managed GA4/Clarity. Removed the conflict through the provider's native RUM Disable setting for stor24.co.za; optional Cloudflare browser analytics collection is now disabled. No WAF, security monitoring, DNS, authentication or customer-data change.
