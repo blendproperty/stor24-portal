@@ -11,6 +11,9 @@ import { databaseConfig } from '../src/lib/database-limits.ts';
 const compiled = ts.transpileModule(readFileSync(new URL('../src/lib/db.ts', import.meta.url), 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText;
+const compiledAdapter = ts.transpileModule(readFileSync(new URL('../src/lib/sequential-prisma-pg.ts', import.meta.url), 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText;
 const config = databaseConfig('postgresql://fixture:synthetic@127.0.0.1:5432/isolated', {});
 function evaluateInFreshProcess() {
   const script = `
@@ -26,6 +29,11 @@ function evaluateInFreshProcess() {
       const requireFixture = name => {
         if (name === '@/generated/prisma/client') return { PrismaClient: Client };
         if (name === '@prisma/adapter-pg') return { PrismaPg: Driver };
+        if (name === '@/lib/sequential-prisma-pg') {
+          const adapterModule = { exports: {} };
+          vm.runInContext('(function(require,module,exports){' + ${JSON.stringify(compiledAdapter)} + '\\n})', context)(requireFixture, adapterModule, adapterModule.exports);
+          return adapterModule.exports;
+        }
         if (name === '@/lib/database-limits') return { databaseConfig: () => (${JSON.stringify(config)}) };
         throw Error('UNEXPECTED_DB_MODULE_DEPENDENCY');
       };
