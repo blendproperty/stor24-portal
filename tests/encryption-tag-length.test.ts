@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { randomBytes } from "node:crypto";
 import { encryptPhoto, decryptPhoto } from "../src/lib/facial-photo-security";
 import { encryptIdentity, decryptIdentity } from "../src/lib/identity-document-security";
 import { encryptIntegrationSecret, decryptIntegrationSecret } from "../src/lib/integrations/integration-secret-vault";
@@ -40,8 +41,8 @@ test("encrypted records preserve full-tag compatibility and reject shortened or 
 
 test("sensitive ciphertext resists record substitution and wrong or missing keys", () => {
   const oldKey = process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY, oldAuth = process.env.AUTH_SECRET;
-  const key = "synthetic-boundary-encryption-key-01234567890123456789";
-  const auth = "synthetic-boundary-authentication-key-01234567890123456789";
+  const key = randomBytes(32).toString("hex");
+  const auth = randomBytes(32).toString("hex");
   process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY = key; process.env.AUTH_SECRET = auth;
   try {
     const value = "synthetic sensitive record";
