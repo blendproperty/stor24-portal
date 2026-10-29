@@ -1,15 +1,24 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
+import { get } from 'node:http';
 import { chromium, expect } from '@playwright/test';
 
 const origin = 'http://127.0.0.1:3109';
+function localResponse(path) {
+  const url = new URL(path, origin); assert.equal(url.origin, origin);
+  return new Promise((resolve, reject) => {
+    const request = get(url, response => { const chunks = []; response.on('data', chunk => chunks.push(chunk)); response.on('end', () => resolve({ status: response.statusCode, policy: response.headers['content-security-policy'], text: Buffer.concat(chunks).toString() })); });
+    request.setTimeout(5000, () => request.destroy(new Error('Loopback test server timed out.')));
+    request.on('error', reject);
+  });
+}
 const server = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', '3109'], { env: { ...process.env, NODE_ENV: 'production', AUTH_SECRET: randomBytes(32).toString('hex'), DATABASE_URL: 'postgresql://synthetic:synthetic@127.0.0.1:1/xss_ci' }, stdio: ['ignore', 'pipe', 'pipe'] });
 let logs = ''; server.stdout.on('data', chunk => logs += chunk); server.stderr.on('data', chunk => logs += chunk);
 let browser;
 try {
   let ready = false;
-  for (let i = 0; i < 80; i++) { try { if ((await fetch(origin + '/login')).ok) { ready = true; break; } } catch {} await new Promise(resolve => setTimeout(resolve, 250)); }
+  for (let i = 0; i < 80; i++) { try { if ((await localResponse('/login')).status === 200) { ready = true; break; } } catch {} await new Promise(resolve => setTimeout(resolve, 250)); }
   assert.ok(ready, logs);
   browser = await chromium.launch();
   for (const width of [1440, 390]) {
@@ -56,10 +65,10 @@ try {
     assert.equal(await offlinePage.evaluate(() => globalThis.xssExecuted || false), false);
     await offlinePage.close();
   }
-  const first = await fetch(origin + '/login'), second = await fetch(origin + '/login');
-  assert.notEqual(first.headers.get('content-security-policy'), second.headers.get('content-security-policy'));
-  const offline = await fetch(origin + '/offline.html');
-  const html = await offline.text(); assert.doesNotMatch(html, /onclick=|<script>/);
-  assert.equal((await fetch(origin + '/offline-recovery.js')).status, 200);
+  const first = await localResponse('/login'), second = await localResponse('/login');
+  assert.notEqual(first.policy, second.policy);
+  const offline = await localResponse('/offline.html');
+  assert.doesNotMatch(offline.text, /onclick=|<script>/);
+  assert.equal((await localResponse('/offline-recovery.js')).status, 200);
   console.log('PASS CRM production stored encrypted-offline/reflected/DOM XSS, nonce freshness, hydrated login/navigation and external offline recovery at 1440/390');
 } finally { await browser?.close(); server.kill(); }
