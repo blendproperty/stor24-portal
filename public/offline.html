@@ -16,8 +16,8 @@
       <h1>You&apos;re offline.</h1>
       <p>The secure STOR 24 operations system needs a live connection. Reconnect to sign in and work with current facility information.</p>
       <div class="notice">If this device was prepared while online, its encrypted read-only facility snapshot remains available. Customer identities, contact details, payments, documents and biometrics are excluded.</div>
-      <div class="actions"><a class="offline-link" href="/offline-workspace.html">Open offline workspace</a><button type="button" onclick="location.replace('/')">Try live portal</button></div>
+      <div class="actions"><a class="offline-link" href="/offline-workspace.html">Open offline workspace</a><button id="try-live-portal" type="button">Try live portal</button></div>
     </main>
-    <script>addEventListener("online",()=>location.replace("/"))</script>
+    <script src="/offline-recovery.js" defer></script>
   </body>
 </html>

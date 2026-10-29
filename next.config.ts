@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { contentSecurityPolicy } from "./src/lib/content-security-policy";
 
 const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
@@ -8,19 +9,7 @@ const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
   {
     key: "Content-Security-Policy",
-    value: [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
-      "style-src 'self' 'unsafe-inline'",
-      // Client navigation retains the first document's CSP, including entry from any staff screen.
-      // Authenticated private previews are short-lived local blobs; scripts/connect remain self-only.
-      "img-src 'self' blob: data: https:",
-      "font-src 'self' data:",
-      "connect-src 'self'",
-      "frame-ancestors 'none'",
-      "base-uri 'self'",
-      "form-action 'self' https://paynow.netcash.co.za",
-    ].join("; "),
+    value: contentSecurityPolicy(),
   },
 ];
 

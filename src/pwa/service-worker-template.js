@@ -3,6 +3,7 @@
 const CACHE_VERSION = "stor24-shell-__BUILD_VERSION__";
 const SHELL_ASSETS = [
   "/offline.html",
+  "/offline-recovery.js",
   "/offline-workspace.html",
   "/offline-workspace.css",
   "/offline-workspace.js",

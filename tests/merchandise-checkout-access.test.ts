@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import { merchandiseCheckoutEnabled, merchandiseCheckoutTestMode } from "../src/lib/merchandise-checkout-access";
+import { contentSecurityPolicy } from "../src/lib/content-security-policy";
 
 const session = { organisationId: "org-test", email: "tester@example.com" };
 test("CSP permits the fixed Netcash form destination without allowing arbitrary hosts", () => {
-  const config = readFileSync("next.config.ts", "utf8");
-  assert.ok(config.includes("form-action 'self' https://paynow.netcash.co.za"));
-  assert.equal(config.includes("form-action *"), false);
+  assert.equal(contentSecurityPolicy().split("; ").find(directive => directive.startsWith("form-action ")), "form-action 'self' https://paynow.netcash.co.za");
+  assert.ok(readFileSync("next.config.ts", "utf8").includes("value: contentSecurityPolicy()"));
 });
 const now = Date.parse("2026-09-11T13:00:00Z");
 const config = {
