@@ -1,3 +1,5 @@
+> 29 October rollout authorization: Brett explicitly approved publishing, normal merging and deploying this simple monitoring patch at11:12UTC. The earlier preparation/publication blocker below is historical and resolved for one push retry. Current main efaff34 was integrated; protected exact-head checks and production verification remain mandatory. The shadow observer/SQLite candidate is excluded. No labelled live delivery test or approval review on the user's behalf is included.
+
 # Monitoring resource reduction — 29 October 2026
 
 ## Scope and design
