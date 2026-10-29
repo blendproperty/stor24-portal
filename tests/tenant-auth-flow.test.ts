@@ -18,6 +18,8 @@ test("OTP verification consumes once, rejects expired/exhausted and changed owne
     assert.deepEqual(query.where, { organisationId: "org", id: { in: ["own"] }, email: { equals: "test@example.invalid", mode: "insensitive" }, emailVerifiedAt: { not: null } });
     return eligible ? [{ id: "own" }] : [];
   } }, $transaction: async (work: (tx: unknown) => Promise<void>) => work({
+    $executeRaw: async () => 1,
+    customer: { findMany: async () => eligible ? [{ id: "own" }] : [] },
     tenantPortalChallenge: { updateMany: async () => { if (consumed) return { count: 0 }; consumed = true; return { count: 1 }; } },
     tenantPortalSession: { create: async ({ data }: { data: { tokenHash: string; customerIds: string[] } }) => { sessions.push(data); } },
     auditEvent: { create: async () => ({}) },

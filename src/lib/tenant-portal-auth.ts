@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
+import { lockCustomerContact } from "@/lib/customer-contact-lock";
 import { emailProvider, escapeEmailHtml } from "@/lib/email";
 import { tenantCode, tenantCodeHash, tenantCustomerScope, tenantToken, tenantTokenHash, TENANT_CHALLENGE_COOKIE, TENANT_CODE_MS, TENANT_SESSION_COOKIE, TENANT_SESSION_MS } from "@/lib/tenant-portal-security";
 
@@ -31,12 +32,17 @@ export async function startTenantChallenge(organisationSlug: string, email: stri
   const code = tenantCode();
   const codeHash = tenantCodeHash(id, code);
   const organisation = await db.organisation.findUnique({ where: { slug: organisationSlug }, select: { id: true } });
-  const customers = organisation ? await db.customer.findMany({
+  const candidates = organisation ? await db.customer.findMany({
     where: { organisationId: organisation.id, email: { equals: email, mode: "insensitive" }, emailVerifiedAt: { not: null }, OR: [{ accounts: { some: {} } }, { reservations: { some: { publicLease: { status: "SIGNED" } } } }] },
     select: { id: true },
   }) : [];
-  // Inert challenges keep responses indistinguishable for unregistered emails.
-  await db.tenantPortalChallenge.create({ data: { id, organisationId: organisation?.id ?? "unmatched", email, codeHash, customerIds: customers.map(customer => customer.id), expiresAt: new Date(Date.now() + TENANT_CODE_MS) } });
+  // Lock and recheck before recording IDs so a concurrent contact change cannot revive an old challenge.
+  const customers = await db.$transaction(async tx => {
+    for (const candidate of [...candidates].sort((a, b) => a.id.localeCompare(b.id))) await lockCustomerContact(tx, candidate.id);
+    const eligible = organisation ? await tx.customer.findMany({ where: { organisationId: organisation.id, id: { in: candidates.map(customer => customer.id) }, email: { equals: email, mode: "insensitive" }, emailVerifiedAt: { not: null }, OR: [{ accounts: { some: {} } }, { reservations: { some: { publicLease: { status: "SIGNED" } } } }] }, select: { id: true } }) : [];
+    await tx.tenantPortalChallenge.create({ data: { id, organisationId: organisation?.id ?? "unmatched", email, codeHash, customerIds: eligible.map(customer => customer.id), expiresAt: new Date(Date.now() + TENANT_CODE_MS) } });
+    return eligible;
+  });
   if (customers.length && organisation) {
     try {
       await emailProvider().send({ to: email, dlp: { organisationId: organisation.id, resourceId: id, approvedRecipient: email }, subject: "Your My STOR24 sign-in code", text: `Your My STOR24 code is ${code}. It expires in 10 minutes. Never share this code. If you did not request it, ignore this email.`, html: tenantEmailHtml("Your space. Your account.", `<p>Use this code to sign in to My STOR24.</p><p style="background:#071411;color:white;padding:24px;font-size:32px;letter-spacing:8px;text-align:center">${code}</p><p>Expires in 10 minutes. Never share this code, including with the STOR24 team. If you did not request it, ignore this email.</p>`) });
@@ -56,10 +62,11 @@ export async function verifyTenantChallenge(id: string, code: string, database =
   if (attempt.count !== 1) throw new Error("TENANT_INVALID_CODE");
   const challenge = await database.tenantPortalChallenge.findUnique({ where: { id } });
   if (!challenge || challenge.customerIds.length === 0 || !timingSafeEqual(Buffer.from(challenge.codeHash, "hex"), Buffer.from(tenantCodeHash(id, code), "hex"))) throw new Error("TENANT_INVALID_CODE");
-  const customers = await database.customer.findMany({ where: tenantCustomerScope(challenge), select: { id: true } });
-  if (!customers.length) throw new Error("TENANT_INVALID_CODE");
   const token = tenantToken();
   await database.$transaction(async tx => {
+    for (const customerId of [...challenge.customerIds].sort()) await lockCustomerContact(tx, customerId);
+    const customers = await tx.customer.findMany({ where: tenantCustomerScope(challenge), select: { id: true } });
+    if (!customers.length) throw new Error("TENANT_INVALID_CODE");
     const consumed = await tx.tenantPortalChallenge.updateMany({ where: { id, consumedAt: null, expiresAt: { gt: new Date() } }, data: { consumedAt: new Date() } });
     if (consumed.count !== 1) throw new Error("TENANT_INVALID_CODE");
     await tx.tenantPortalSession.create({ data: { tokenHash: tenantTokenHash(token), organisationId: challenge.organisationId, email: challenge.email, customerIds: customers.map(customer => customer.id), expiresAt: new Date(Date.now() + TENANT_SESSION_MS) } });

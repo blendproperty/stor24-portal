@@ -1,6 +1,7 @@
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { lockCustomerContact } from "@/lib/customer-contact-lock";
 import { publicReservationVerificationEnabled } from "@/lib/public-booking-contract";
 import { normalizeTwilioRecipient } from "@/lib/integrations/twilio-provider";
 import { deliverEmailVerificationCode, deliverVerificationCode, emailVerificationHash, verificationHash } from "@/lib/public-booking-service";
@@ -21,13 +22,16 @@ function sameKey(saved: string | null, supplied: string) {
 
 export async function correctPublicBookingContact(input: Correction) {
   if (!publicReservationVerificationEnabled()) return { ok: false as const, code: "UNAVAILABLE" };
+  const original = await db.reservation.findUnique({ where: { publicReference: input.reference }, select: { customerId: true } });
+  if (!original) return { ok: false as const, code: "UNAVAILABLE" };
   const code = randomInt(0, 1_000_000).toString().padStart(6, "0");
   const changed = await db.$transaction(async tx => {
+    await lockCustomerContact(tx, original.customerId);
     // Serialise edits with challenge consumption and re-read all eligibility.
     await tx.$queryRaw`SELECT "id" FROM "Reservation" WHERE "publicReference" = ${input.reference} FOR UPDATE`;
     const reservation = await tx.reservation.findUnique({ where: { publicReference: input.reference }, include: { customer: { include: { _count: { select: { reservations: true, tenancies: true } } } }, publicLease: true } });
     const now = new Date();
-    if (!reservation || !sameKey(reservation.idempotencyKey, input.bookingKey) || reservation.status !== "ACTIVE" || !reservation.holdExpiresAt || reservation.holdExpiresAt <= now || reservation.publicLease || reservation.customer._count.reservations !== 1 || reservation.customer._count.tenancies !== 0 || reservation.customer.emailVerifiedAt || !["PUBLIC_WEBSITE", "PUBLIC_VIEWING", "PUBLIC_WALK_IN"].includes(reservation.source)) return null;
+    if (!reservation || reservation.customerId !== original.customerId || !sameKey(reservation.idempotencyKey, input.bookingKey) || reservation.status !== "ACTIVE" || !reservation.holdExpiresAt || reservation.holdExpiresAt <= now || reservation.publicLease || reservation.customer._count.reservations !== 1 || reservation.customer._count.tenancies !== 0 || reservation.customer.emailVerifiedAt || !["PUBLIC_WEBSITE", "PUBLIC_VIEWING", "PUBLIC_WALK_IN"].includes(reservation.source)) return null;
     const mobile = input.channel === "MOBILE";
     if (mobile ? Boolean(reservation.contactVerifiedAt || reservation.customer.phoneVerifiedAt || reservation.verificationAttempts >= 4) : (!reservation.contactVerifiedAt || reservation.journey !== "RENTAL" || reservation.verificationAttempts >= 9)) return null;
     // Corrections share the existing attempt budget and never extend the hold.

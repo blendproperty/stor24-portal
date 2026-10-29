@@ -3,6 +3,7 @@ import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { operationsTaskPage } from "@/lib/operations-task-service";
 import { currentRoleAccess } from "@/lib/current-role-access";
+import { requireLeasingCustomer } from "@/lib/leasing-customer-scope";
 import type { Prisma } from "@/generated/prisma/client";
 import { recordDailyClose } from "@/lib/daily-close-service";
 import { createTaskSchema, dailyCloseSchema, maintenanceSchema, productSchema, stockMovementSchema, storagePackageSchema, unitNoteSchema } from "@/lib/validators";
@@ -66,7 +67,16 @@ export async function POST(request: Request) {
         return Response.json({ error: { code: "FACILITY_REQUIRED", message: "Choose a permitted facility for this task." } }, { status: 400 });
       }
       if (input.facilityId) await ensureFacility(input.facilityId);
-      result = await createAudited(tx => tx.task.create({ data: { organisationId, createdById: user.id, ...input, dueAt: input.dueAt ? new Date(input.dueAt) : undefined } }));
+      result = await createAudited(async tx => {
+        if (input.customerId) await requireLeasingCustomer({ organisationId, userId: user.id, facilityIds: allowedFacilityIds ?? [], unrestrictedFacilities: allowedFacilityIds === null }, input.customerId, tx);
+        if (input.assigneeId) {
+          const assignee = await tx.user.findFirst({ where: { id: input.assigneeId, organisationId, active: true }, include: { roleAssignments: { include: { role: true } } } });
+          if (!assignee) throw new Error("FORBIDDEN");
+          const access = currentRoleAccess(assignee.roleAssignments, "operations.view", input.facilityId);
+          if (!access.allowed || (!input.facilityId && access.allowedFacilityIds !== null)) throw new Error("FORBIDDEN");
+        }
+        return tx.task.create({ data: { organisationId, createdById: user.id, ...input, dueAt: input.dueAt ? new Date(input.dueAt) : undefined } });
+      });
     } else if (body.kind === "unitNote") {
       const input = unitNoteSchema.parse(body.payload);
       await ensureFacility(input.facilityId);

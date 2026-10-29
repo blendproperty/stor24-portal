@@ -1,3 +1,5 @@
+import { leasingCustomerWhere, requireLeasingCustomer } from "./leasing-customer-scope";
+export { leasingCustomerWhere, requireLeasingCustomer } from "./leasing-customer-scope";
 import {publicInitialRent} from "./public-initial-rent";
 import { unitSupportsProduct } from "@/lib/product-line";
 import { releaseLeadBookingStage } from "@/lib/lead-booking-stage";
@@ -71,45 +73,6 @@ function completeMoveInCharge(tx: Tx, accountId: string) {
 
 export function hashDocument(content: string) {
   return createHash("sha256").update(content, "utf8").digest("hex");
-}
-
-export function leasingCustomerWhere(
-  scope: RequestScope,
-  facilityIds: string[],
-): Prisma.CustomerWhereInput {
-  const organisation = { organisationId: scope.organisationId };
-  if (scope.unrestrictedFacilities) return organisation;
-  return {
-    ...organisation,
-    OR: [
-      { leads: { some: { facilityId: { in: facilityIds } } } },
-      { reservations: { some: { facilityId: { in: facilityIds } } } },
-      { tenancies: { some: { facilityId: { in: facilityIds } } } },
-    ],
-  };
-}
-
-/** Linked customers follow facility scope. A new unlinked record remains usable
- * only by its creator until it is linked; organisation owners retain full access. */
-export async function requireLeasingCustomer(scope: RequestScope, customerId: string, client: Tx = db) {
-  const customer = await client.customer.findFirst({
-    where: { id: customerId, ...leasingCustomerWhere(scope, scope.facilityIds) },
-  });
-  if (customer) return customer;
-  if (!scope.unrestrictedFacilities) {
-    const created = await client.auditEvent.findFirst({ where: {
-      organisationId: scope.organisationId, actorId: scope.userId,
-      entityType: "Customer", entityId: customerId, action: "customer.created",
-    }, select: { id: true } });
-    if (created) {
-      const unlinked = await client.customer.findFirst({ where: {
-        id: customerId, organisationId: scope.organisationId,
-        leads: { none: {} }, reservations: { none: {} }, tenancies: { none: {} },
-      } });
-      if (unlinked) return unlinked;
-    }
-  }
-  throw new Error("FORBIDDEN");
 }
 
 export function moveInReservationWhere(input: {

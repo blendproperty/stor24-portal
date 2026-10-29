@@ -1,4 +1,5 @@
 import { requireEditableCombinationUnit, requireEditableCombinationUnitType } from "@/lib/unit-combination-service";
+import { randomBytes } from "node:crypto";
 import { protectUnitStructure, protectUnitTypeStructure } from "@/lib/inventory-structure-service";
 import { requireOperationalUnit } from "@/lib/floor-availability-service";
 import { apiError, jsonBody } from "@/lib/api";
@@ -26,6 +27,7 @@ import {
 import { requireOwner, requirePermission } from "@/lib/auth-guards";
 import { leasingResourcePermissions } from "@/lib/leasing-resource-permissions";
 import { sameOrigin } from "@/lib/request-security";
+import { lockCustomerContact } from "@/lib/customer-contact-lock";
 import { assertReservationQuotePatch } from "@/lib/reservation-price-policy";
 
 const schemas = {
@@ -199,10 +201,22 @@ export async function PATCH(
     } else if (resource === "customers") {
       const customerId = body.id;
       return await db.$transaction(async tx => {
+        await lockCustomerContact(tx, customerId);
         const current = await requireLeasingCustomer(scope, customerId, tx);
         const next = { ...current, ...(data as Record<string, unknown>) };
         if (!next.companyName && !(next.firstName && next.lastName)) return Response.json({ error: { code: "VALIDATION_ERROR", message: "Provide a person or company name." } }, { status: 422 });
-        const updated = await tx.customer.update({ where: { id: current.id }, data });
+        const changes = data as { email?: string; phone?: string };
+        const emailChanged = changes.email !== undefined && changes.email.toLowerCase() !== (current.email ?? "").toLowerCase();
+        const phoneChanged = changes.phone !== undefined && changes.phone !== current.phone;
+        if (emailChanged || phoneChanged) {
+          await tx.reservation.updateMany({ where: { customerId: current.id }, data: { verificationCodeHash: null, verificationExpiresAt: null, identityAccessHash: null, identityAccessExpiresAt: null } });
+          if (phoneChanged) await tx.reservation.updateMany({ where: { customerId: current.id, status: "ACTIVE", OR: [{ publicLease: { is: null } }, { publicLease: { is: { status: "READY", signedAt: null } } }] }, data: { contactVerifiedAt: null } });
+          const leases = await tx.publicReservationLease.findMany({ where: { reservation: { customerId: current.id } }, select: { id: true, status: true, signedAt: true } });
+          for (const lease of leases) await tx.publicReservationLease.update({ where: { id: lease.id }, data: { signingToken: randomBytes(32).toString("base64url"), ...(lease.status === "READY" && !lease.signedAt ? { expiresAt: new Date(0) } : {}) } });
+          await tx.tenantPortalChallenge.updateMany({ where: { organisationId: scope.organisationId, customerIds: { has: current.id }, consumedAt: null }, data: { consumedAt: new Date() } });
+          await tx.tenantPortalSession.updateMany({ where: { organisationId: scope.organisationId, customerIds: { has: current.id }, revokedAt: null }, data: { revokedAt: new Date() } });
+        }
+        const updated = await tx.customer.update({ where: { id: current.id }, data: { ...changes, ...(emailChanged ? { emailVerifiedAt: null } : {}), ...(phoneChanged ? { phoneVerifiedAt: null } : {}) } });
         await tx.auditEvent.create({ data: { organisationId: scope.organisationId, actorId: scope.userId, action: "customers.updated", entityType: "customers", entityId: current.id } });
         return Response.json({ data: updated });
       });
