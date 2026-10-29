@@ -12,6 +12,37 @@ concurrency:
   group: security-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  isolated-database-role-rls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: synthetic-ci-only
+          POSTGRES_DB: postgres
+        ports: [5432:5432]
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.22.1
+          cache: npm
+      - run: npm ci
+      - name: Create disposable non-superuser roles and database
+        env:
+          PGPASSWORD: synthetic-ci-only
+        run: |
+          psql -h localhost -U ci -d postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE synthetic_migrator LOGIN PASSWORD 'synthetic-migrator-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS" -c "CREATE ROLE synthetic_runtime LOGIN PASSWORD 'synthetic-runtime-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS" -c "CREATE DATABASE rls_probe_ci OWNER synthetic_migrator"
+          psql -h localhost -U ci -d rls_probe_ci -v ON_ERROR_STOP=1 -c "REVOKE CREATE ON SCHEMA public FROM PUBLIC" -c "GRANT USAGE ON SCHEMA public TO synthetic_runtime"
+      - name: Verify role isolation and RLS trust boundary
+        run: node --test tests/integration/database-role-rls.test.mjs tests/migration-connection.test.mjs
+        env:
+          DB_ROLE_TEST: isolated-ci
+          DATABASE_URL: postgresql://synthetic_runtime:synthetic-runtime-only@localhost:5432/rls_probe_ci
+          MIGRATION_DATABASE_URL: postgresql://synthetic_migrator:synthetic-migrator-only@localhost:5432/rls_probe_ci
   dependencies:
     runs-on: ubuntu-latest
     timeout-minutes: 10
