@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { hash } from "bcryptjs";
 import { mfaLoginFixture } from "./helpers/mfa-login-fixture";
-import { mfaRequest } from "./helpers/mfa-routes-fixture";
+import { mfaRequest, mfaRoutesFixture } from "./helpers/mfa-routes-fixture";
 import { acceptInvitationSchema, changePasswordSchema, loginSchema, ownerSetupSchema, resetPasswordSchema } from "../src/lib/validators";
 
 test("passwordless accounts never receive a staff session or MFA challenge", async () => {
@@ -68,4 +68,15 @@ test("all new-password paths reject bcrypt truncation including UTF-8 boundaries
     assert.equal(parse("A1!" + "😀".repeat(18)).success, false);
   }
   assert.equal(loginSchema.safeParse({ email: "staff@example.invalid", password: "a".repeat(100) }).success, true);
+});
+
+test("previously issued MFA challenges and setup cookies cannot revive a passwordless user", async () => {
+  let sessions = 0, clears = 0;
+  const user = { id: "synthetic", organisationId: "org", active: true, passwordHash: null, sessionVersion: 1, roleAssignments: [], mfaCredential: { enabledAt: new Date(), secretEncrypted: "must-not-be-decrypted", recoveryCodeHashes: [] } };
+  const tx = { user: { findUnique: async () => user }, $queryRaw: async () => [{ id: user.id }] };
+  const db = { ...tx, $transaction: async <T>(operation: (client: typeof tx) => Promise<T>) => operation(tx) };
+  const routes = await mfaRoutesFixture(db, { getSession: async () => ({ userId: user.id, sessionVersion: 1, mfaVerified: true }), setSession: async () => { sessions++; }, getChallenge: async () => ({ userId: user.id, sessionVersion: 1 }), clearChallenge: async () => { clears++; } });
+  assert.equal((await routes.verify(mfaRequest({ code: "123456" }))).status, 401);
+  assert.equal((await routes.manage(mfaRequest({ action: "begin" }))).status, 401);
+  assert.equal(sessions, 0); assert.equal(clears, 0);
 });

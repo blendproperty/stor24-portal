@@ -4,7 +4,7 @@ import { build } from "esbuild";
 import { createRequire } from "node:module";
 
 async function fixture(concurrentReads = false) {
-  let user = { id: "synthetic", organisationId: "org", active: true, sessionVersion: 1, roleAssignments: [] };
+  let user = { id: "synthetic", organisationId: "org", active: true, passwordHash: "synthetic-not-a-real-password-hash", sessionVersion: 1, roleAssignments: [] };
   const values = new Map<string, string>();
   const jar = { get: (name: string) => values.has(name) ? { value: values.get(name) } : undefined, set: (name: string, value: string) => { values.set(name, value); }, delete: (name: string) => { values.delete(name); } };
   let audits = 0, failAudit = false, reads = 0, revokeBeforeTransaction = false;
@@ -55,6 +55,8 @@ test("staff logout revokes copied cookies on every device and removes pending MF
     assert.equal(f.user().sessionVersion, 2); assert.equal(f.audits(), 1);
     const current = await f.createSessionToken({ userId: "synthetic", name: "Synthetic", email: "staff@example.invalid", role: "Unassigned", sessionVersion: 2, mfaVerified: true });
     f.jar.set("stor24_session", current); await f.requireSession();
+    f.user().passwordHash = "";
+    await assert.rejects(f.requireSession(), /UNAUTHENTICATED/);
   } finally { if (previous === undefined) delete process.env.AUTH_SECRET; else process.env.AUTH_SECRET = previous; }
 });
 

@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     if (await rateLimit(`mfa-settings:${auth.user.id}`, 8, 15 * 60 * 1000)) return Response.json({ error: "Too many attempts. Try again in 15 minutes." }, { status: 429 });
     const response = await withMfaUserLock(auth.user.id, async tx => {
       const currentUser = await tx.user.findUnique({ where: { id: auth.user.id } });
-      if (!currentUser?.active || currentUser.sessionVersion !== auth.user.sessionVersion || currentUser.organisationId !== auth.user.organisationId) throw new Error("UNAUTHENTICATED");
+      if (!currentUser?.active || !currentUser.passwordHash || currentUser.sessionVersion !== auth.user.sessionVersion || currentUser.organisationId !== auth.user.organisationId) throw new Error("UNAUTHENTICATED");
       const existingCredential = await tx.mfaCredential.findUnique({ where: { userId: currentUser.id }, select: { enabledAt: true } });
       if (existingCredential?.enabledAt && auth.mfaVerified !== true) throw new Error("MFA_REQUIRED");
       if (body.action === "begin") {

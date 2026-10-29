@@ -25,7 +25,7 @@ test("restricted direct navigation redirects before rendering; APIs and current 
   let grants = ["operations.view"];
   let active = true;
   // JWT intentionally says owner; navigation must use the current database assignments.
-  db.user.findUnique = (async () => ({active,sessionVersion:1,roleAssignments:[{facilityId:"store",role:{name:"Facility manager",permissions:grants}}]})) as unknown as typeof original;
+  db.user.findUnique = (async () => ({active,passwordHash:"synthetic-not-a-real-password-hash",sessionVersion:1,roleAssignments:[{facilityId:"store",role:{name:"Facility manager",permissions:grants}}]})) as unknown as typeof original;
   const request = (path:string) => new NextRequest(`https://example.invalid${path}`,{headers:{cookie:`${sessionCookieName}=${token}`}});
   try {
     const denied = await proxy(request("/billing"));

@@ -10,7 +10,7 @@ test("staff logout revocation is atomic under real PostgreSQL races and failures
   assert.equal(new URL(process.env.DATABASE_URL!).hostname, "localhost");
   const key = randomUUID();
   const org = await db.organisation.create({ data: { name: "Synthetic logout CI", slug: key } });
-  const user = await db.user.create({ data: { organisationId: org.id, name: "Synthetic", email: `${key}@example.invalid` } });
+  const user = await db.user.create({ data: { organisationId: org.id, name: "Synthetic", email: `${key}@example.invalid`, passwordHash: "synthetic-not-a-real-password-hash" } });
   const session = { userId: user.id, sessionVersion: 0, mfaVerified: true };
   try {
     await t.test("audit failure rolls back revocation and does not report signed out", async () => {

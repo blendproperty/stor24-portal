@@ -9,7 +9,7 @@ test("actual MFA routes serialize one-time recovery and roll back audit failures
   let credential: { enabledAt: Date | null; secretEncrypted: string; recoveryCodeHashes: string[] } | null = null;
   let version = 0, failAudit = false, sessions = 0, cleared = 0;
   let audits: string[] = [], tail = Promise.resolve();
-  const user = () => ({ id: "synthetic", organisationId: "org", active: true, name: "Synthetic", email: "synthetic@example.invalid", passwordHash: null, sessionVersion: version, roleAssignments: [], mfaCredential: structuredClone(credential) });
+  const user = () => ({ id: "synthetic", organisationId: "org", active: true, name: "Synthetic", email: "synthetic@example.invalid", passwordHash: "synthetic-not-a-real-password-hash", sessionVersion: version, roleAssignments: [], mfaCredential: structuredClone(credential) });
   const tx = {
     $queryRaw: async (strings: TemplateStringsArray) => { assert.match(strings.join("?"), /User.*FOR UPDATE/); return [{ id: "synthetic" }]; },
     user: { findUnique: async () => user(), update: async () => { version++; return user(); } },

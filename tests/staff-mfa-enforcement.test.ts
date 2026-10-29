@@ -10,7 +10,7 @@ import { createInvitationSchema, updateUserSchema } from "../src/lib/validators"
 import { hasPermission } from "../src/lib/permissions";
 
 test("password-only and historical cookies cannot access staff pages or API guards, including owners", async () => {
-  const state = { session: { userId: "staff", sessionVersion: 0, mfaVerified: false }, user: { id: "staff", active: true, sessionVersion: 0, mfaCredential: null as null | { enabledAt: Date }, roleAssignments: [{ facilityId: null, role: { name: "Organisation owner", permissions: ["*"] } }] } };
+  const state = { session: { userId: "staff", sessionVersion: 0, mfaVerified: false }, user: { id: "staff", active: true, passwordHash: "synthetic-not-a-real-password-hash" as string | null, sessionVersion: 0, mfaCredential: null as null | { enabledAt: Date }, roleAssignments: [{ facilityId: null, role: { name: "Organisation owner", permissions: ["*"] } }] } };
   const result = await build({ stdin: { contents: 'export {proxy} from "./src/proxy";export {requireSession,requireOwner} from "./src/lib/auth-guards";', resolveDir: process.cwd(), loader: "ts" }, bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "enforcement", setup(b) {
     b.onResolve({ filter: /^@\/lib\/(db|session)$/ }, a => ({ path: a.path, namespace: "fixture" }));
     b.onLoad({ filter: /.*/, namespace: "fixture" }, a => ({ contents: a.path.endsWith("/db") ? "export const db={user:{findUnique:async()=>__state.user}};" : "export const sessionCookieName='stor24_session';export const getSession=async()=>__state.session;export const verifySessionToken=async()=>__state.session;" }));
@@ -30,6 +30,15 @@ test("password-only and historical cookies cannot access staff pages or API guar
   state.session.mfaVerified = true;
   await f.requireOwner();
   assert.equal((await visit("/operations")).headers.get("x-middleware-next"), "1");
+  for (const passwordHash of [null, ""]) {
+    state.user.passwordHash = passwordHash;
+    await assert.rejects(f.requireSession(), /UNAUTHENTICATED/);
+    await assert.rejects(f.requireSession({ allowMfaSetup: true }), /UNAUTHENTICATED/);
+    assert.equal((await visit("/api/v1/users")).status, 401);
+    assert.equal(new URL((await visit("/mfa-setup")).headers.get("location")!).pathname, "/login");
+    assert.equal((await visit("/login")).headers.get("x-middleware-next"), "1");
+  }
+  state.user.passwordHash = "synthetic-not-a-real-password-hash";
   state.user.sessionVersion++;
   await assert.rejects(f.requireSession(), /UNAUTHENTICATED/);
   assert.equal((await visit("/api/v1/users")).status, 401);
@@ -71,7 +80,7 @@ test("enrolment verifies TOTP, revokes other password sessions and issues a veri
   let version = 0;
   let credential: { enabledAt: Date | null; secretEncrypted: string; recoveryCodeHashes: string[] } | null = null;
   const issued: { sessionVersion: number; mfaVerified?: boolean }[] = [];
-  const user = () => ({ id: "staff", organisationId: "org", name: "Synthetic", email: "staff@example.invalid", active: true, sessionVersion: version, roleAssignments: [] });
+  const user = () => ({ id: "staff", organisationId: "org", name: "Synthetic", email: "staff@example.invalid", active: true, passwordHash: "synthetic-not-a-real-password-hash", sessionVersion: version, roleAssignments: [] });
   const tx = {
     $queryRaw: async () => [{ id: "staff" }],
     user: { findUnique: async () => user(), update: async () => { version++; return user(); } },

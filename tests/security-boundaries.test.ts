@@ -23,7 +23,7 @@ function matches(row: Row, where: Row = {}): boolean {
 function fixture() {
   const tables: Record<string, Row[]> = {
     facility: [{ id: "a", organisationId: "org" }, { id: "b", organisationId: "org" }, { id: "foreign", organisationId: "other" }],
-    user: [{ id: "staff", organisationId: "org", active: true, sessionVersion: 1, roleAssignments: [] }],
+    user: [{ id: "staff", organisationId: "org", active: true, passwordHash: "synthetic-not-a-real-password-hash", sessionVersion: 1, roleAssignments: [] }],
     unitType: [{ id: "type-a", facilityId: "a", name: "Small" }, { id: "type-b", facilityId: "b", name: "Other" }],
     customer: [
       { id: "customer-a", organisationId: "org", leads: [{ facilityId: "a" }], reservations: [], tenancies: [] },

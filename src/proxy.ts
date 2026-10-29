@@ -35,8 +35,8 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isPublic = isPublicPathname(pathname);
   const session = await verifySessionToken(request.cookies.get(sessionCookieName)?.value);
-  const user = session ? await db.user.findUnique({ where: { id: session.userId }, select: { active: true, sessionVersion: true, mfaCredential: { select: { enabledAt: true } }, roleAssignments: { include: { role: true } } } }) : null;
-  const validSession = Boolean(session && user?.active && user.sessionVersion === session.sessionVersion);
+  const user = session ? await db.user.findUnique({ where: { id: session.userId }, select: { active: true, passwordHash: true, sessionVersion: true, mfaCredential: { select: { enabledAt: true } }, roleAssignments: { include: { role: true } } } }) : null;
+  const validSession = Boolean(session && user?.active && user.passwordHash && user.sessionVersion === session.sessionVersion);
 
   if (pathname === "/login" && validSession && session?.mfaVerified === true) {
     return NextResponse.redirect(new URL("/", request.url));
