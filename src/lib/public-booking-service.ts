@@ -19,6 +19,7 @@ import {
 } from "@/lib/public-booking-contract";
 import { notifyReservationConfirmed, notifyViewingBooked } from "@/lib/notifications";
 import { createHash, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
+import { lockCustomerContact } from "./customer-contact-lock";
 import { TwilioSmsProvider, TwilioWhatsAppProvider, normalizeTwilioRecipient } from "@/lib/integrations/twilio-provider";
 import { emailProvider, stor24EmailVerificationHtml } from "@/lib/email";
 import {preparePublicVerificationCode} from "./public-verification-renewal";
@@ -420,6 +421,7 @@ export async function verifyPublicReservation(reference: string, code: string) {
   const identityAccess = newIdentityAccess();
   const holdExpiresAt = confirmedPublicHoldExpiry(verifiedAt, reservation.journey, reservation.viewingAt);
   const updated = await db.$transaction(async (tx) => {
+    await lockCustomerContact(tx, reservation.customerId);
     const consumed = await tx.reservation.updateMany({ where: { id: reservation.id, contactVerifiedAt: null, verificationCodeHash: reservation.verificationCodeHash, verificationExpiresAt: { gt: verifiedAt } }, data: { verificationCodeHash: null } });
     if (consumed.count !== 1) throw new Error("VERIFICATION_EXPIRED");
     const item = await tx.reservation.update({ where: { id: reservation.id }, data: { contactVerifiedAt: verifiedAt, holdExpiresAt, verificationCodeHash: null, verificationExpiresAt: null, identityAccessHash: identityAccess.identityAccessHash, identityAccessExpiresAt: identityAccess.identityAccessExpiresAt }, include: reservationInclude });
@@ -481,6 +483,7 @@ export async function verifyPublicReservationEmail(reference: string, code: stri
   const verifiedAt = new Date(), identityAccess = newIdentityAccess();
   // Consume exactly the verified challenge; concurrent retries cannot mint another grant.
   await db.$transaction(async tx => {
+    await lockCustomerContact(tx, reservation.customerId);
     const consumed = await tx.reservation.updateMany({ where: { id: reservation.id, verificationCodeHash: reservation.verificationCodeHash, verificationExpiresAt: { gt: verifiedAt } }, data: { verificationCodeHash: null, verificationExpiresAt: null, identityAccessHash: identityAccess.identityAccessHash, identityAccessExpiresAt: identityAccess.identityAccessExpiresAt, ...(!reservation.contactVerifiedAt?{contactVerifiedAt:verifiedAt}:{}) } });
     if (consumed.count !== 1) throw new Error("VERIFICATION_EXPIRED");
     await tx.customer.update({ where: { id: reservation.customerId }, data: { emailVerifiedAt: verifiedAt } });

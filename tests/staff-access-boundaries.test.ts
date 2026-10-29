@@ -8,6 +8,29 @@ import { securityPermissionKeys } from "../src/lib/security-permissions";
 const grants = ["facility.*", "facility_map.view", "leads.*", "move_in.create", "operations.view", "reports.view", "reservations.*", "operations.manage", "inventory.view", "ledger.view", "payments.view", "payments.manage", "collections.view", "collections.manage", "collections.export", "adjustments.view", "adjustments.request", "billing.view", "billing.documents.send", "reports.financial", "reports.sales", "reports.collections", "reports.export", "communications.view", "identity.review", "access.view"];
 const held = ["adjustments.approve", "adjustments.record_refund", "settlements.approve", "settlements.manage", "billing.manage", "debit_orders.manage", "debit_orders.submit", "collections.policy", "mri.manage", "users.manage", "configuration.manage", "access.manage", "access.suspend", "access.restore", "data.personal_export", "ledger.manage"];
 
+test("facility-scoped user managers cannot change global or other-store accounts", async () => {
+  const role = { name: "Store employee", permissions: [] as string[] };
+  let assignments = [{ facilityId: "store-b" as string | null, role }];
+  let writes = 0;
+  const db = { user: { findFirst: async () => ({ id: "target", organisationId: "org", active: true, roleAssignments: assignments }) }, role: {}, facility: {}, $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn({ user: { update: async () => { writes++; } }, auditEvent: { create: async () => {} } }) };
+  const actor = { allowedFacilityIds: ["store-a"], user: { id: "actor", organisationId: "org", roleAssignments: [{ facilityId: "store-a", role: { name: "Manager", permissions: ["users.manage"] } }] } };
+  const bundle = await build({ entryPoints: ["src/app/api/v1/users/[id]/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "user-scope-fixture", setup(b) {
+    b.onResolve({ filter: /^@\/lib\/(db|auth-guards|request-security)$/ }, a => ({ path: a.path, namespace: "fixture" }));
+    b.onLoad({ filter: /.*/, namespace: "fixture" }, a => ({ contents: a.path.endsWith("/db") ? "export const db=__db;" : a.path.endsWith("/request-security") ? "export const sameOrigin=()=>true;" : "export const requirePermission=async()=>__actor;" }));
+  } }] });
+  const loaded = { exports: {} as { PATCH: (request: Request, context: { params: Promise<{ id: string }> }) => Promise<Response> } };
+  new Function("require", "module", "exports", "__db", "__actor", bundle.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, actor);
+  const request = () => new Request("https://example.invalid/api/v1/users/target", { method: "PATCH", body: JSON.stringify({ active: false }) });
+  for (const facilities of [["store-b"], ["store-a", "store-b"], [null]] as (string | null)[][]) {
+    assignments = facilities.map(facilityId => ({ facilityId, role }));
+    assert.equal((await loaded.exports.PATCH(request(), { params: Promise.resolve({ id: "target" }) })).status, 403);
+    assert.equal(writes, 0);
+  }
+  assignments = [{ facilityId: "store-a", role }];
+  assert.equal((await loaded.exports.PATCH(request(), { params: Promise.resolve({ id: "target" }) })).status, 200);
+  assert.equal(writes, 1);
+});
+
 test("a saved store workflow role allows casework and requests without financial approval or cross-store authority", () => {
   const assignments = [{ facilityId: "store-a", role: { name: "Custom access · staff", permissions: grants } }];
   for (const permission of ["leads.view", "reservations.manage", "move_in.create", "operations.manage", "inventory.view", "ledger.view", "payments.manage", "payments.view", "collections.view", "collections.manage", "adjustments.request", "billing.documents.send", "reports.export", "identity.review"]) {

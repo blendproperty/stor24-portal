@@ -14,6 +14,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const { id } = await context.params;
   const target = await db.user.findFirst({ where: { id, organisationId: actor.user.organisationId }, include: { roleAssignments: { include: { role: true } } } });
   if (!target) return Response.json({ error: { message: "User not found." } }, { status: 404 });
+  if (actor.allowedFacilityIds !== null && (!target.roleAssignments.length || target.roleAssignments.some(assignment => !assignment.facilityId || !actor.allowedFacilityIds!.includes(assignment.facilityId)))) return Response.json({ error: { message: "User is outside your permitted facilities." } }, { status: 403 });
   if (!owner && currentRoleAccess(target.roleAssignments, "data.personal_export").allowed) return Response.json({ error: { message: "Only a Super Admin may change access for a personal-data export administrator." } }, { status: 403 });
   if (target.id === actor.user.id && parsed.data.active === false) return Response.json({ error: { message: "You cannot deactivate your own account." } }, { status: 409 });
   if (target.id === actor.user.id && parsed.data.roleName && parsed.data.roleName !== "Organisation owner") return Response.json({ error: { message: "You cannot remove your own owner role." } }, { status: 409 });
@@ -24,6 +25,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
   const role = parsed.data.roleName ? await db.role.findUnique({ where: { organisationId_name: { organisationId: target.organisationId, name: parsed.data.roleName } } }) : null;
   const facility = parsed.data.facilityCode ? await db.facility.findUnique({ where: { organisationId_code: { organisationId: target.organisationId, code: parsed.data.facilityCode } } }) : null;
+  if (parsed.data.facilityCode && !facility) return Response.json({ error: { message: "Choose a valid facility." } }, { status: 422 });
   await db.$transaction(async (tx) => {
     if (parsed.data.active !== undefined) await tx.user.update({ where: { id }, data: { active: parsed.data.active, sessionVersion: { increment: 1 } } });
     if (role) { await tx.roleAssignment.deleteMany({ where: { userId: id } }); await tx.roleAssignment.create({ data: { userId: id, roleId: role.id, facilityId: facility?.id } }); await tx.user.update({ where: { id }, data: { sessionVersion: { increment: 1 } } }); }
