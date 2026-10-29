@@ -22,7 +22,7 @@ test("representative isolated workload:180 customers,150 tenancies and25 scoped 
   const store = await db.facility.create({ data: { organisationId: org.id, name: "Synthetic Midpoint workload", code: "A" } });
   const foreign = await db.facility.create({ data: { organisationId: org.id, name: "Private other store", code: "B" } });
   const role = await db.role.create({ data: { organisationId: org.id, name: "Synthetic scoped staff", permissions: ["operations.view", "operations.manage", "communications.view", "reservations.manage", "reports.view", "leads.create"] } });
-  const users = await Promise.all(Array.from({ length: 25 }, (_, i) => db.user.create({ data: { organisationId: org.id, name: `Fixture staff ${i}`, email: `${run}-${i}@example.invalid`, roleAssignments: { create: { roleId: role.id, facilityId: store.id } } } })));
+  const users = await Promise.all(Array.from({ length: 25 }, (_, i) => db.user.create({ data: { passwordHash: "synthetic-not-a-real-password-hash", organisationId: org.id, name: `Fixture staff ${i}`, email: `${run}-${i}@example.invalid`, roleAssignments: { create: { roleId: role.id, facilityId: store.id } } } })));
   const customers = await Promise.all(Array.from({ length: 180 }, (_, i) => db.customer.create({ data: { organisationId: org.id, firstName: `Synthetic ${String(i).padStart(3, "0")}`, lastName: "Workload", leads: { create: { facilityId: store.id, source: "OTHER" } } } })));
   const hidden = await db.customer.create({ data: { organisationId: org.id, firstName: "PRIVATE-OTHER-STORE", leads: { create: { facilityId: foreign.id, source: "OTHER" } } } });
   const type = await db.unitType.create({ data: { facilityId: store.id, name: "Workload storage", features: [] } });

@@ -15,7 +15,7 @@ test("real route guards reject CSO writes, revoked grants, foreign stores and cr
     const other = await db.facility.create({ data: { organisationId: org.id, name: "B", code: "B" } });
     const foreignStore = await db.facility.create({ data: { organisationId: foreign.id, name: "Private", code: "P" } });
     const role = await db.role.create({ data: { organisationId: org.id, name: "Limited CSO", permissions: ["operations.view", "inventory.view"] } });
-    const user = await db.user.create({ data: { organisationId: org.id, name: "CI", email: `${randomUUID()}@example.invalid`, roleAssignments: { create: { roleId: role.id, facilityId: store.id } } } });
+    const user = await db.user.create({ data: { passwordHash: "synthetic-not-a-real-password-hash", organisationId: org.id, name: "CI", email: `${randomUUID()}@example.invalid`, roleAssignments: { create: { roleId: role.id, facilityId: store.id } } } });
     const type = await db.unitType.create({ data: { facilityId: store.id, name: "5sqm", areaSqMetres: 5 } });
     const unit = await db.unit.create({ data: { facilityId: store.id, unitTypeId: type.id, number: "G01", monthlyRate: 100 } });
     const session = { userId: user.id, sessionVersion: user.sessionVersion, mfaVerified: true };

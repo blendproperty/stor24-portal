@@ -14,7 +14,7 @@ test("isolated PostgreSQL account receipt retry and notification recovery", asyn
   const org = await db.organisation.create({ data: { name: "Receipt CI", slug: key } });
   const facility = await db.facility.create({ data: { organisationId: org.id, code: key, name: "Synthetic" } });
   const role = await db.role.create({ data: { organisationId: org.id, name: "Finance fixture", permissions: ["payments.manage"] } });
-  const user = await db.user.create({ data: { organisationId: org.id, name: "Synthetic", email: `${key}@example.invalid`, roleAssignments: { create: { roleId: role.id, facilityId: facility.id } } } });
+  const user = await db.user.create({ data: { passwordHash: "synthetic-not-a-real-password-hash", organisationId: org.id, name: "Synthetic", email: `${key}@example.invalid`, roleAssignments: { create: { roleId: role.id, facilityId: facility.id } } } });
   const state = { db, session: { userId: user.id, sessionVersion: user.sessionVersion, mfaVerified: true }, notify: async () => { notifications++; if (failNotification) throw new Error("SYNTHETIC_NOTIFICATION_FAILURE"); return { ok: true }; } };
   const output = await build({ entryPoints: ["src/app/api/v1/accounts/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "real-db-fake-notification", setup(b) {
     b.onResolve({ filter: /^@\/lib\/(db|session|whatsapp)$/ }, a => ({ path: a.path, namespace: "fixture" }));

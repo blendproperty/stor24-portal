@@ -7,7 +7,7 @@ export async function requireSession(options: { allowMfaSetup?: boolean } = {}) 
   const session = await getSession();
   if (!session) throw new Error("UNAUTHENTICATED");
   const user = await db.user.findUnique({ where: { id: session.userId }, include: { roleAssignments: { include: { role: true, facility: true } } } });
-  if (!user?.active || user.sessionVersion !== session.sessionVersion) throw new Error("UNAUTHENTICATED");
+  if (!user?.active || !user.passwordHash || user.sessionVersion !== session.sessionVersion) throw new Error("UNAUTHENTICATED");
   if (!options.allowMfaSetup && session.mfaVerified !== true) throw new Error("MFA_REQUIRED");
   const current = currentRoleAccess(user.roleAssignments);
   return { ...session, role: current.owner ? "Organisation owner" : user.roleAssignments[0]?.role.name ?? "", user, permissions: user.roleAssignments.flatMap((assignment) => assignment.role.permissions) };

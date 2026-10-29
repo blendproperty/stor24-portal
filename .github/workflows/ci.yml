@@ -31,6 +31,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: node scripts/test-restricted-navigation.mjs
       - run: node scripts/test-premium-workspace.mjs
+      - run: node scripts/test-staff-signout.mjs
       - run: node scripts/test-leads-workspace.mjs
       - run: node scripts/test-marketing.mjs
       - run: npm run test:guides

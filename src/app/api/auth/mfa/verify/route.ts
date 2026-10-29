@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   const code = typeof body.code === "string" ? body.code.trim() : "";
   const result = await withMfaUserLock(userId, async tx => {
     const user = await tx.user.findUnique({ where: { id: userId }, include: { roleAssignments: { include: { role: true } }, mfaCredential: true } });
-    if (!user?.active || user.sessionVersion !== challenge.sessionVersion || !user.mfaCredential?.enabledAt) return { ok: false as const, response: Response.json({ error: "Your verification session is no longer valid." }, { status: 401 }) };
+    if (!user?.active || !user.passwordHash || user.sessionVersion !== challenge.sessionVersion || !user.mfaCredential?.enabledAt) return { ok: false as const, response: Response.json({ error: "Your verification session is no longer valid." }, { status: 401 }) };
     const recoveryHashes = Array.isArray(user.mfaCredential.recoveryCodeHashes) ? user.mfaCredential.recoveryCodeHashes.filter((value): value is string => typeof value === "string") : [];
     const remaining = consumeRecoveryCode(recoveryHashes, code);
     const validTotp = verifyTotp(decryptMfaSecret(user.mfaCredential.secretEncrypted), code);

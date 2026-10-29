@@ -307,6 +307,7 @@ const strongPasswordSchema = z
   .string()
   .min(12, "Use at least 12 characters.")
   .max(128)
+  .refine(value => new TextEncoder().encode(value).length <= 72, "Use a password of at most 72 UTF-8 bytes so every character is protected.")
   .regex(/[a-z]/, "Add a lowercase letter.")
   .regex(/[A-Z]/, "Add an uppercase letter.")
   .regex(/[0-9]/, "Add a number.")
