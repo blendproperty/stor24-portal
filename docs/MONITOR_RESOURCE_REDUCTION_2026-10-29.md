@@ -34,3 +34,5 @@ Before merge, close the draft or discard this isolated branch; current monitorin
 ## Remaining limits
 
 No merge, deployment, cron change, live alert send, provider acceptance, real recipient delivery or live reduced-run observation has occurred during preparation. All existing production, recovery, provider, staff/device, finance/data, legal/privacy, training and approval gates remain at their recorded scope.
+
+Publication checkpoint: implementation committed locally as `218b57807b1e82ce884eff35f2493aa515eab4f5`. Automatic approval review denied the public branch push before execution, requiring explicit user permission for public publication and draft-PR creation. No alternate route was used; no remote feature head, PR, merge or deployment exists from this task. A local review patch is retained in the task workspace.
