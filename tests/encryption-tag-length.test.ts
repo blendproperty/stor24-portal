@@ -4,6 +4,7 @@ import { encryptPhoto, decryptPhoto } from "../src/lib/facial-photo-security";
 import { encryptIdentity, decryptIdentity } from "../src/lib/identity-document-security";
 import { encryptIntegrationSecret, decryptIntegrationSecret } from "../src/lib/integrations/integration-secret-vault";
 import { encryptMfaSecret, decryptMfaSecret } from "../src/lib/mfa";
+import { encryptReportArtifact, decryptReportArtifact } from "../src/lib/visual-report-security";
 
 test("encrypted records preserve full-tag compatibility and reject shortened or changed tags", () => {
   const previous = process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY;
@@ -34,5 +35,43 @@ test("encrypted records preserve full-tag compatibility and reject shortened or 
   } finally {
     if (previous === undefined) delete process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY; else process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY = previous;
     if (previousAuth === undefined) delete process.env.AUTH_SECRET; else process.env.AUTH_SECRET = previousAuth;
+  }
+});
+
+test("sensitive ciphertext resists record substitution and wrong or missing keys", () => {
+  const oldKey = process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY, oldAuth = process.env.AUTH_SECRET;
+  const key = "synthetic-boundary-encryption-key-01234567890123456789";
+  const auth = "synthetic-boundary-authentication-key-01234567890123456789";
+  process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY = key; process.env.AUTH_SECRET = auth;
+  try {
+    const value = "synthetic sensitive record";
+    const bound = [
+      { encrypt: (binding: string) => encryptPhoto(Buffer.from(value), binding), decrypt: (ciphertext: string, binding: string) => decryptPhoto(ciphertext, binding).toString() },
+      { encrypt: (binding: string) => encryptIdentity(Buffer.from(value), binding), decrypt: (ciphertext: string, binding: string) => decryptIdentity(ciphertext, binding).toString() },
+      { encrypt: (binding: string) => encryptReportArtifact(value, binding), decrypt: decryptReportArtifact },
+    ];
+    const cases = [
+      ...bound.map(codec => ({ encrypt: () => codec.encrypt("record:one:v1"), decrypt: (ciphertext: string) => codec.decrypt(ciphertext, "record:one:v1") })),
+      { encrypt: () => encryptIntegrationSecret(value), decrypt: decryptIntegrationSecret },
+      { encrypt: () => encryptMfaSecret(value), decrypt: decryptMfaSecret },
+    ];
+    for (const codec of bound) {
+      const ciphertext = codec.encrypt("record:one:v1");
+      for (const binding of ["record:two:v1", "record:one:v2"]) assert.throws(() => codec.decrypt(ciphertext, binding));
+    }
+    for (const codec of cases) {
+      const ciphertext = codec.encrypt(), second = codec.encrypt();
+      assert.notEqual(ciphertext, second); assert.equal(codec.decrypt(ciphertext), value);
+      assert.equal(ciphertext.includes(value), false);
+      process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY = key + "wrong"; process.env.AUTH_SECRET = auth + "wrong";
+      assert.throws(() => codec.decrypt(ciphertext));
+      delete process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY; delete process.env.AUTH_SECRET;
+      assert.throws(codec.encrypt); assert.throws(() => codec.decrypt(ciphertext));
+      process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY = key; process.env.AUTH_SECRET = auth;
+      assert.equal(codec.decrypt(ciphertext), value);
+    }
+  } finally {
+    if (oldKey === undefined) delete process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY; else process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY = oldKey;
+    if (oldAuth === undefined) delete process.env.AUTH_SECRET; else process.env.AUTH_SECRET = oldAuth;
   }
 });

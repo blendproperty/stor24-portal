@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   });
   const comparisonHash = user?.passwordHash ?? await hash("constant-time-invalid-password", 12);
   const valid = await compare(parsed.data.password, comparisonHash);
-  if (!user || !valid) {
+  if (!user?.passwordHash || !valid) {
     if (user) await db.auditEvent.create({ data: { organisationId: user.organisationId, actorId: user.id, action: "user.login.failed", entityType: "User", entityId: user.id, ipHash: privacyHash(ip) } });
     return Response.json({ error: "Email or password is incorrect." }, { status: 401 });
   }

@@ -43,6 +43,7 @@ export async function PUT(request: Request) {
     }
     if (body.kind === "integration") {
       const input = integrationSchema.parse(body.payload);
+      if (input.category === "PAYMENTS" && input.provider === "NETCASH") return Response.json({ error: { code: "DEDICATED_CONFIGURATION_REQUIRED", message: "Configure Netcash from the secure Netcash integration page." } }, { status: 400 });
       if (input.category === "ACCOUNTING" && ["MRI", "MRI_SANDBOX"].includes(input.provider)) return Response.json({ error: { code: "DEDICATED_CONFIGURATION_REQUIRED", message: "Use MRI accounting or sandbox testing for this connection." } }, { status: 400 });
       if (input.category === "ACCESS_CONTROL" && input.provider === "HIKCENTRAL") return Response.json({ error: { code: "DEDICATED_CONFIGURATION_REQUIRED", message: "Configure Hikvision from the secure Hikvision integration page." } }, { status: 400 });
       if (input.facilityId) await requireFacility({ organisationId, facilityIds: allowedFacilityIds ?? [], unrestrictedFacilities: allowedFacilityIds === null }, input.facilityId);

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
@@ -97,13 +97,18 @@ export function AppShell({ children, session, facilityLabel = "Your facilities",
   const sidebarHidden = useSyncExternalStore(subscribeSidebarPreference, sidebarHiddenSnapshot, () => false);
   const pathname = usePathname();
   const router = useRouter();
+  const [signOutError, setSignOutError] = useState("");
   const publicPage = pathname === "/mfa-setup" || pathname === "/login" || pathname === "/forgot-password" || pathname.startsWith("/reset-password/") || pathname.startsWith("/invite/") || pathname.startsWith("/setup/");
   if (publicPage || pathname === "/booking-price-review" || pathname === "/privacy" || pathname === "/paia" || pathname === "/my" || pathname.startsWith("/my/")) return children;
 
   async function signOut() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.replace("/login");
-    router.refresh();
+    setSignOutError("");
+    try {
+      const response = await fetch("/api/auth/logout", { method: "POST" });
+      if (!response.ok && response.status !== 401) throw new Error("Sign-out failed");
+      router.replace("/login");
+      router.refresh();
+    } catch { setSignOutError("Could not sign out. Please try again."); }
   }
 
   const initials = session?.name
@@ -192,12 +197,12 @@ export function AppShell({ children, session, facilityLabel = "Your facilities",
                 <small>{session?.role ?? "Secure workspace"}</small>
               </div>
             </div>
-            <button className="icon-button" type="button" aria-label="Sign out" title="Sign out" onClick={signOut}>
+            <button className="icon-button" type="button" aria-label="Sign out on all devices" title="Sign out on all devices" onClick={signOut}>
               <LogOut size={18} />
             </button>
           </div>
         </header>
-        <main className="content" id="workspace-content" tabIndex={-1}>{children}</main>
+        <main className="content" id="workspace-content" tabIndex={-1}>{signOutError && <p className="form-error" role="alert">{signOutError}</p>}{children}</main>
         <BrandCorner key={pathname} pathname={pathname} />
       </div>
     </div>

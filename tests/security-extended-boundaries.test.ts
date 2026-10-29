@@ -164,3 +164,26 @@ test("global configuration authority cannot attach profiles or integrations to a
   for (const facilityId of [own, null]) assert.equal((await route.PUT(request({ kind: "profile", payload: { facilityId, domain: "STORE_INFORMATION", name: "Default", status: "READY", config: {} } }))).status, 200);
   assert.equal(writes.length, 2);
 });
+
+test("generic settings cannot overwrite or shadow dedicated Netcash connections", async () => {
+  for (const scope of [globalScope, restricted]) {
+    const writes: Bag[] = [];
+    const existing = { id: "protected", config: { payNowServiceKeyEncrypted: "synthetic-existing-ciphertext" } };
+    const db: Bag = {
+      facility: { findFirst: async () => ({ id: own }) },
+      integrationConnection: { findFirst: async () => existing, update: async ({ data }: Bag) => { writes.push(data); return { ...existing, ...data }; } },
+      auditEvent: { create: async () => ({}) },
+    };
+    db.$transaction = async (fn: any) => fn(db);
+    const route = await load("src/app/api/v1/configuration/route.ts", db, scope);
+    for (const facilityId of scope.unrestrictedFacilities ? [null, own] : [own]) for (const provider of ["NETCASH", " NETCASH "]) {
+      const response = await route.PUT(new Request("https://fixture.invalid/api", { method: "PUT", body: JSON.stringify({ kind: "integration", payload: { facilityId, category: "PAYMENTS", provider, status: "DISABLED", config: {} } }) }));
+      assert.equal(response.status, 400);
+      assert.equal((await response.json()).error.code, "DEDICATED_CONFIGURATION_REQUIRED");
+    }
+    assert.equal(writes.length, 0);
+    assert.equal(existing.config.payNowServiceKeyEncrypted, "synthetic-existing-ciphertext");
+    const ordinary = await route.PUT(new Request("https://fixture.invalid/api", { method: "PUT", body: JSON.stringify({ kind: "integration", payload: { facilityId: own, category: "PHONE", provider: "Synthetic", status: "CONFIGURED", config: { notes: "Synthetic connection" } } }) }));
+    assert.equal(ordinary.status, 200); assert.equal(writes.length, 1);
+  }
+});
