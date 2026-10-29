@@ -68,7 +68,7 @@ try {
   const first = await localResponse('/login'), second = await localResponse('/login');
   assert.notEqual(first.policy, second.policy);
   const offline = await localResponse('/offline.html');
-  assert.doesNotMatch(offline.text, /onclick=|<script>/);
+  assert.doesNotMatch(offline.text, /onclick=|<script>/i);
   assert.equal((await localResponse('/offline-recovery.js')).status, 200);
   console.log('PASS CRM production stored encrypted-offline/reflected/DOM XSS, nonce freshness, hydrated login/navigation and external offline recovery at 1440/390');
 } finally { await browser?.close(); server.kill(); }

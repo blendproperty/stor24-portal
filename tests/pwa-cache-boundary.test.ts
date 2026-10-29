@@ -68,7 +68,7 @@ test("offline shell returns to the live portal after manual or automatic reconne
   assert.match(source, /<script src="\/offline-recovery\.js" defer>/);
   assert.match(recovery, /addEventListener\("click", \(\) => location\.replace\("\/"\)\)/);
   assert.match(recovery, /addEventListener\("online", \(\) => location\.replace\("\/"\)\)/);
-  assert.doesNotMatch(source, /onclick=|<script>/);
+  assert.doesNotMatch(source, /onclick=|<script>/i);
   assert.doesNotMatch(source, /location\.reload\(\)/);
 });
 
