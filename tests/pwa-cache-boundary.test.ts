@@ -61,10 +61,14 @@ test("offline readiness is permission-scoped and derives device state from audit
 
 test("offline shell returns to the live portal after manual or automatic reconnection", async () => {
   const source = await readFile(offlineShellPath, "utf8");
+  const recovery = await readFile(new URL("../public/offline-recovery.js", import.meta.url), "utf8");
 
-  assert.match(source, /onclick="location\.replace\('\/'\)"/);
+  assert.match(source, /id="try-live-portal"/);
   assert.match(source, /href="\/offline-workspace\.html"/);
-  assert.match(source, /addEventListener\("online",\(\)=>location\.replace\("\/"\)\)/);
+  assert.match(source, /<script src="\/offline-recovery\.js" defer>/);
+  assert.match(recovery, /addEventListener\("click", \(\) => location\.replace\("\/"\)\)/);
+  assert.match(recovery, /addEventListener\("online", \(\) => location\.replace\("\/"\)\)/);
+  assert.doesNotMatch(source, /onclick=|<script>/);
   assert.doesNotMatch(source, /location\.reload\(\)/);
 });
 

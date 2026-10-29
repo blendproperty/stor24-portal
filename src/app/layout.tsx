@@ -12,6 +12,8 @@ import "../styles/staff-workspace.css";
 import "../styles/marketing.css";
 import "../styles/workspace-insights.css";
 
+export const dynamic = "force-dynamic";
+
 const satoshi = localFont({
   src: "../../public/brand/Satoshi-Variable.ttf",
   variable: "--font-satoshi",

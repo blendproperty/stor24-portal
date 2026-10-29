@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { sessionCookieName, verifySessionToken } from "@/lib/session";
 import { canVisit } from "@/lib/navigation-access";
 import { db } from "@/lib/db";
+import { pageSecurityHeaders } from "@/lib/content-security-policy";
 
 const publicPagePrefixes = ["/login", "/forgot-password", "/reset-password/", "/invite/", "/setup/", "/brand/", "/icons/", "/sign/", "/offline.html", "/offline-workspace.html", "/offline-workspace.css", "/offline-workspace.js", "/manifest.webmanifest", "/sw.js"];
 const publicApiPrefixes = ["/api/health", "/api/auth/login", "/api/auth/mfa/verify", "/api/auth/setup", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/public/v1/", "/api/webhooks/blendsign", "/api/webhooks/netcash", "/api/webhooks/twilio/", "/api/v1/invitations/accept", "/api/v1/webhooks/inbound/", "/api/v1/billing/run-monthly"];
@@ -12,7 +13,7 @@ export function isPublicPathname(pathname: string) {
   if (pathname === "/booking-price-review" || pathname === "/my/booking-price-review" || pathname === "/api/booking-price-review") return true;
   if (pathname === "/privacy" || pathname === "/paia") return true;
   // Static instructions contain no business data and must load after session expiry.
-  if (pathname === "/offline-guided-help.js" || pathname === "/offline-guided-help.css") return true;
+  if (pathname === "/offline-guided-help.js" || pathname === "/offline-guided-help.css" || pathname === "/offline-recovery.js") return true;
   // This exact endpoint authenticates its dedicated worker credential in the handler.
   // Do not exempt the surrounding staff operations routes or arbitrary descendants.
   if (pathname === "/api/v1/operations/merchandise-orders/expire") return true;
@@ -31,7 +32,7 @@ export function isPublicPathname(pathname: string) {
     publicApiPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix));
 }
 
-export async function proxy(request: NextRequest) {
+async function authorize(request: NextRequest, next: () => NextResponse) {
   const { pathname } = request.nextUrl;
   const isPublic = isPublicPathname(pathname);
   const session = await verifySessionToken(request.cookies.get(sessionCookieName)?.value);
@@ -41,7 +42,7 @@ export async function proxy(request: NextRequest) {
   if (pathname === "/login" && validSession && session?.mfaVerified === true) {
     return NextResponse.redirect(new URL("/", request.url));
   }
-  if (isPublic) return NextResponse.next();
+  if (isPublic) return next();
   if (!validSession && pathname.startsWith("/api/")) {
     return Response.json({ error: { code: "UNAUTHENTICATED", message: "Please sign in." } }, { status: 401 });
   }
@@ -62,7 +63,18 @@ export async function proxy(request: NextRequest) {
     owner: user.roleAssignments.some(a => a.facilityId === null && a.role.name === "Organisation owner"),
     permissions: user.roleAssignments.flatMap(a => a.role.permissions),
   })) return NextResponse.redirect(new URL("/access-restricted", request.url));
-  return NextResponse.next();
+  return next();
+}
+
+export async function proxy(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+  // Issued HTML/API documents keep their own stricter CSP and immutable bytes.
+  if (path.startsWith("/api/") || /\.(?:html|js|css|svg|png|webmanifest)$/.test(path) || path.startsWith("/brand/") || path.startsWith("/icons/")) return authorize(request, () => NextResponse.next());
+  const { requestHeaders, policy } = pageSecurityHeaders(request.headers);
+  const response = await authorize(request, () => NextResponse.next({ request: { headers: requestHeaders } }));
+  response.headers.set("content-security-policy", policy);
+  response.headers.set("cache-control", "private, no-store");
+  return response;
 }
 
 export const config = {
