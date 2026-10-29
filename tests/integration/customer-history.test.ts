@@ -19,8 +19,8 @@ test("isolated PostgreSQL shared customer notebook and scoped history", async t 
   const other = await db.organisation.create({ data: { name: "Other synthetic org", slug: randomUUID() } });
   const a = await db.facility.create({ data: { organisationId: org.id, code: "A", name: "Midpoint fixture" } });
   const b = await db.facility.create({ data: { organisationId: org.id, code: "B", name: "Other store fixture" } });
-  const staff = await db.user.create({ data: { organisationId: org.id, name: "Faeez fixture", email: `staff-${key}@example.invalid` } });
-  const cover = await db.user.create({ data: { organisationId: org.id, name: "Covering staff fixture", email: `cover-${key}@example.invalid` } });
+  const staff = await db.user.create({ data: { passwordHash: "synthetic-not-a-real-password-hash", organisationId: org.id, name: "Faeez fixture", email: `staff-${key}@example.invalid` } });
+  const cover = await db.user.create({ data: { passwordHash: "synthetic-not-a-real-password-hash", organisationId: org.id, name: "Covering staff fixture", email: `cover-${key}@example.invalid` } });
   const customer = await db.customer.create({ data: { organisationId: org.id, firstName: "Synthetic", notes: "Original undated summary" } });
   await db.lead.createMany({ data: [a, b].map(f => ({ facilityId: f.id, customerId: customer.id, source: "OTHER" })) });
   const account = await db.account.create({ data: { customerId: customer.id, accountNumber: key } });
@@ -198,7 +198,7 @@ test("isolated PostgreSQL shared customer notebook and scoped history", async t 
       const tenancy = await db.tenancy.findUniqueOrThrow({ where: { accountId: account.id } });
       const document = await db.document.create({ data: { tenancyId: tenancy.id, type: "LEASE", storageKey: "NEVER-RETURN", signingToken: `private-${key}`, content: "NEVER-RETURN" } });
       await db.publicReservationLease.create({ data: { reservationId: reservation.id, version: "fixture", paymentMethod: "CARD", content: "NEVER-RETURN", clauses: {}, sha256: "fixture", signingToken: `lease-${key}`, expiresAt: new Date(Date.now() + 86400000), signedAt: new Date(), status: "SIGNED" } });
-      const foreignActor = await db.user.create({ data: { organisationId: other.id, name: "FOREIGN-STAFF-DO-NOT-RETURN", email: `${randomUUID()}@example.invalid` } });
+      const foreignActor = await db.user.create({ data: { passwordHash: "synthetic-not-a-real-password-hash", organisationId: other.id, name: "FOREIGN-STAFF-DO-NOT-RETURN", email: `${randomUUID()}@example.invalid` } });
       const ledger = await db.ledgerEntry.create({ data: { accountId: account.id, createdById: foreignActor.id, type: "CHARGE", amount: 100, description: "Synthetic charge", effectiveAt: new Date(), metadata: { secret: "NEVER-RETURN" } } });
       await db.auditEvent.create({ data: { organisationId: org.id, facilityId: a.id, actorId: foreignActor.id, entityType: "Task", entityId: "fixture-task", action: "staff_followup.handover", after: { customerId: customer.id, title: "Weekend customer appointment", description: "Cover to confirm arrival", requestHash: "NEVER-RETURN" } } });
       await db.auditEvent.createMany({ data: [

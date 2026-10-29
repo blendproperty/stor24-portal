@@ -22,7 +22,7 @@ test("receipt copy uses real scoped ledger evidence and denies revoked, foreign,
   try{
     const store=await db.facility.create({data:{organisationId:org.id,name:"Synthetic store",code:randomUUID()}}),other=await db.facility.create({data:{organisationId:org.id,name:"Excluded store",code:randomUUID()}});
     const role=await db.role.create({data:{organisationId:org.id,name:"Synthetic ledger reader",permissions:["ledger.view"]}});
-    const user=await db.user.create({data:{organisationId:org.id,name:"Synthetic reader",email:randomUUID()+"@example.invalid",roleAssignments:{create:{roleId:role.id,facilityId:store.id}}}});state.session={ userId: user.id, sessionVersion: user.sessionVersion, mfaVerified: true };
+    const user=await db.user.create({data:{ passwordHash: "synthetic-not-a-real-password-hash",organisationId:org.id,name:"Synthetic reader",email:randomUUID()+"@example.invalid",roleAssignments:{create:{roleId:role.id,facilityId:store.id}}}});state.session={ userId: user.id, sessionVersion: user.sessionVersion, mfaVerified: true };
     async function fixture(facilityId=store.id){
       const customer=await db.customer.create({data:{organisationId:org.id,firstName:"Synthetic <customer>"}});
       const account=await db.account.create({data:{customerId:customer.id,accountNumber:randomUUID(),balance:60}});

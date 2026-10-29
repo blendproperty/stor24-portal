@@ -26,7 +26,7 @@ function matches(row:Row,where:Row={}):boolean {
 }
 async function fixture():Promise<Row> {
   const facility={id:"a",organisationId:"org",name:"Fixture store",closedFloors:[]};
-  const user={id:"staff",organisationId:"org",active:true,sessionVersion:1,name:"Fixture employee",roleAssignments:[{facilityId:"a",role:{name:"Staff",permissions:["reports.view","reports.export"]}}]};
+  const user={id:"staff",organisationId:"org",active:true,passwordHash:"synthetic-not-a-real-password-hash",sessionVersion:1,name:"Fixture employee",roleAssignments:[{facilityId:"a",role:{name:"Staff",permissions:["reports.view","reports.export"]}}]};
   const tables:Record<string,Row[]>={user:[user],organisation:[{id:"org",currency:"ZAR"}],facility:[facility],unit:[{id:"unit-a",facilityId:"a",facility,number:"A1",floor:"G",unitType:{name:"Small",areaSqMetres:new Prisma.Decimal(4)},monthlyRate:new Prisma.Decimal(100),status:"AVAILABLE",combinedIntoUnitId:null,useTypes:["STORAGE"],attributes:{}}],savedReport:[],reportHistoryImport:[],reportSchedule:[],reportRun:[],auditEvent:[],lead:[]};
   const state:Row={tables,user,Prisma,authenticated:true,queries:[],failAudit:false,authReads:0,changedOnRead:0};
   const db:Row={};

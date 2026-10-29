@@ -25,7 +25,7 @@ test("isolated receipt correction producers retain cash, approval, undo and sour
   async function fixture(){
     const org=await db.organisation.create({data:{name:"Synthetic receipt workflow",slug:randomUUID()}});organisations.push(org.id);
     const facility=await db.facility.create({data:{organisationId:org.id,name:"Synthetic correction store",code:randomUUID()}});
-    const requester=await db.user.create({data:{organisationId:org.id,name:"Synthetic requester",email:randomUUID()+"@example.invalid"}}),reviewer=await db.user.create({data:{organisationId:org.id,name:"Synthetic reviewer",email:randomUUID()+"@example.invalid"}});
+    const requester=await db.user.create({data:{ passwordHash: "synthetic-not-a-real-password-hash",organisationId:org.id,name:"Synthetic requester",email:randomUUID()+"@example.invalid"}}),reviewer=await db.user.create({data:{ passwordHash: "synthetic-not-a-real-password-hash",organisationId:org.id,name:"Synthetic reviewer",email:randomUUID()+"@example.invalid"}});
     const accounts=[];
     for(let n=0;n<3;n++){
       const customer=await db.customer.create({data:{organisationId:org.id,firstName:"PRIVATE-SYNTHETIC-CUSTOMER-"+n}});
@@ -51,7 +51,7 @@ test("isolated receipt correction producers retain cash, approval, undo and sour
   try{
     await t.test("actual HTTP handlers and database roles separate requester, independent approver and foreign-store receipt access",async()=>{
       const f=await fixture(),foreign=await db.facility.create({data:{organisationId:f.org.id,name:"Synthetic private other store",code:randomUUID()}});
-      const viewer=await db.user.create({data:{organisationId:f.org.id,name:"Synthetic foreign reviewer",email:randomUUID()+"@example.invalid"}});
+      const viewer=await db.user.create({data:{ passwordHash: "synthetic-not-a-real-password-hash",organisationId:f.org.id,name:"Synthetic foreign reviewer",email:randomUUID()+"@example.invalid"}});
       for(const [user,store,extra] of [[f.requester,f.facility,["adjustments.request"]],[f.reviewer,f.facility,["adjustments.approve"]],[viewer,foreign,["adjustments.approve"]]] as const){
         const role=await db.role.create({data:{organisationId:f.org.id,name:"Synthetic receipt HTTP "+randomUUID(),permissions:["adjustments.view","billing.view",...extra]}});
         await db.roleAssignment.create({data:{userId:user.id,roleId:role.id,facilityId:store.id}});

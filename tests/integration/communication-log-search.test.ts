@@ -15,7 +15,7 @@ test("isolated actual communication lookup, scope, dates, keyset and current-rol
   const a = await db.facility.create({ data: { organisationId: org.id, name: "Synthetic Midpoint", code: randomUUID() } });
   const b = await db.facility.create({ data: { organisationId: org.id, name: "Other synthetic store", code: randomUUID() } });
   const foreignStore = await db.facility.create({ data: { organisationId: foreignOrg.id, name: "PRIVATE-FOREIGN-STORE", code: randomUUID() } });
-  const staff = await db.user.create({ data: { organisationId: org.id, name: "Synthetic log reader", email: randomUUID() + "@example.invalid" } });
+  const staff = await db.user.create({ data: { passwordHash: "synthetic-not-a-real-password-hash", organisationId: org.id, name: "Synthetic log reader", email: randomUUID() + "@example.invalid" } });
   const role = await db.role.create({ data: { organisationId: org.id, name: "Scoped logs only", permissions: ["operations.view"] } });
   await db.roleAssignment.create({ data: { userId: staff.id, roleId: role.id, facilityId: a.id } });
   const makeCustomer = (name: string, organisationId = org.id, facilityId = a.id) => db.customer.create({ data: { organisationId, firstName: name, email: randomUUID() + "@example.invalid", phone: "+27820000000", leads: { create: { facilityId, source: "SYNTHETIC" } } } });
@@ -74,6 +74,9 @@ test("isolated actual communication lookup, scope, dates, keyset and current-rol
       const get = (query = "") => loaded.exports.GET(new Request("https://example.invalid/api/v1/communications/logs?" + query));
       session = null; assert.equal((await loaded.exports.GET(Object.defineProperty({}, "url", { get() { throw Error("QUERY_READ_BEFORE_AUTH"); } }) as Request)).status, 401);
       session = { userId: staff.id, sessionVersion: staff.sessionVersion, mfaVerified: true };
+      await db.user.update({ where: { id: staff.id }, data: { passwordHash: null } });
+      assert.equal((await loaded.exports.GET(Object.defineProperty({}, "url", { get() { throw Error("QUERY_READ_BEFORE_AUTH"); } }) as Request)).status, 401);
+      await db.user.update({ where: { id: staff.id }, data: { passwordHash: "synthetic-not-a-real-password-hash" } });
       const before = await db.communicationLog.count({ where: { organisationId: org.id } });
       const result = await get("search=Search&channel=SMS"); assert.equal(result.status, 200); assert.match(result.headers.get("cache-control")!, /private, no-store/);
       const json = await result.json(); assert.equal(communicationLogReadSchema.safeParse(json).success, true);
