@@ -73,8 +73,13 @@ jobs:
         run: node scripts/check-production-readiness.mjs --resolve
 
   backup:
+    # Reuse the independent host-evidence runner for the dependency-free delivery decision.
+    if: always()
+    needs: readiness
+    outputs:
+      notify: ${{ job.status != 'success' || steps.plan.outcome != 'success' || steps.plan.outputs.notify != 'false' || steps.publish.outcome == 'failure' }}
     runs-on: macos-latest
-    timeout-minutes: 2
+    timeout-minutes: 5
     environment: production
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -82,12 +87,49 @@ jobs:
         with:
           node-version: 22
       - name: Verify fresh independent host heartbeat
+        id: heartbeat
         env:
           STOR24_HEARTBEAT_KEY: ${{ secrets.STOR24_HEARTBEAT_KEY }}
-        run: node scripts/check-host-heartbeat.mjs
+        run: node scripts/check-host-heartbeat.mjs --record-outcome
+      - name: Restore encrypted last-known recipients
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: .operations-alert-config.enc
+          key: operations-alert-recipients-v1-${{ github.run_id }}
+          restore-keys: operations-alert-recipients-v1-
+      - name: Decide whether notification delivery is required
+        id: plan
+        if: always()
+        env:
+          STOR24_ALERT_CONFIG_KEY: ${{ secrets.STOR24_ALERT_CONFIG_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+          READINESS_RESULT: ${{ needs.readiness.result }}
+          BACKUP_RESULT: ${{ steps.heartbeat.outputs.result }}
+          ALERT_TEST: ${{ inputs.test_alert || false }}
+        run: node scripts/plan-production-alert.mjs
+      - name: Publish no-delivery dashboard evidence over HTTPS
+        id: publish
+        if: ${{ always() && steps.plan.outputs.notify == 'false' }}
+        env:
+          STOR24_HEARTBEAT_KEY: ${{ secrets.STOR24_HEARTBEAT_KEY }}
+          READINESS_RESULT: ${{ needs.readiness.result }}
+          BACKUP_RESULT: ${{ steps.heartbeat.outputs.result }}
+        run: node scripts/publish-monitor-evidence.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ always() && steps.plan.outputs.notify == 'false' }}
+        with:
+          name: production-alert-result
+          path: production-alert-result.json
+          retention-days: 14
+      - name: Preserve the actual host check conclusion
+        if: always()
+        env:
+          HOST_RESULT: ${{ steps.heartbeat.outputs.result }}
+        run: node -e "if (process.env.HOST_RESULT !== 'success') process.exit(1)"
 
   alerts:
-    if: always()
+    # Missing/failed preflight always falls back to the original sender.
+    if: ${{ always() && needs.backup.outputs.notify != 'false' }}
     needs: [readiness, backup]
     runs-on: macos-latest
     timeout-minutes: 8

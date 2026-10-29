@@ -1,3 +1,4 @@
+import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { freshHeartbeat, monitorRequest } from './host-heartbeat-policy.mjs';
 export async function checkHostHeartbeat(env, fetcher = fetch) {
@@ -12,5 +13,8 @@ export async function checkHostHeartbeat(env, fetcher = fetch) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const result = await checkHostHeartbeat(process.env);
   result.markers.forEach(marker => console.log(marker));
-  if (!result.ok) process.exitCode = 1;
+  if (process.argv.includes('--record-outcome') && process.env.GITHUB_OUTPUT) {
+    // The workflow restores this result as the job conclusion after planning/publication.
+    appendFileSync(process.env.GITHUB_OUTPUT, `result=${result.ok ? 'success' : 'failure'}\n`);
+  } else if (!result.ok) process.exitCode = 1;
 }
