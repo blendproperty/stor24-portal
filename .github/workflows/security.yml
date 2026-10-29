@@ -12,6 +12,48 @@ concurrency:
   group: security-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  real-customer-rls-staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: synthetic-ci-only
+          POSTGRES_DB: postgres
+        ports: [55481:5432]
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.22.1
+          cache: npm
+      - run: npm ci
+      - name: Create synthetic roles and staging database
+        env:
+          PGPASSWORD: synthetic-ci-only
+        run: |
+          psql -h localhost -p 55481 -U ci -d postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE stage_owner LOGIN PASSWORD 'synthetic-owner-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS" -c "CREATE ROLE stage_runtime LOGIN PASSWORD 'synthetic-runtime-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS" -c "CREATE ROLE stage_tenant_a LOGIN PASSWORD 'synthetic-tenant-a' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS" -c "CREATE ROLE stage_tenant_b LOGIN PASSWORD 'synthetic-tenant-b' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS" -c "CREATE DATABASE crm_stage_ci OWNER stage_owner"
+      - name: Bootstrap isolated CRM schema
+        env:
+          DATABASE_URL: postgresql://stage_owner:synthetic-owner-only@localhost:55481/crm_stage_ci
+          ALLOW_EMPTY_DATABASE_BOOTSTRAP: 'true'
+        run: node scripts/bootstrap-empty-database.mjs
+      - name: Grant disposable runtime privileges
+        env:
+          PGPASSWORD: synthetic-ci-only
+        run: |
+          psql -h localhost -p 55481 -U ci -d crm_stage_ci -v ON_ERROR_STOP=1 -c 'REVOKE CREATE ON SCHEMA public FROM PUBLIC' -c 'GRANT USAGE ON SCHEMA public TO stage_runtime' -c 'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO stage_runtime' -c 'GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO stage_runtime' -c 'REVOKE ALL ON TABLE "_prisma_migrations" FROM stage_runtime'
+      - name: Test role-bound RLS on actual customer table
+        env:
+          DB_ROLE_TEST: isolated-ci
+          DATABASE_URL: postgresql://stage_runtime:synthetic-runtime-only@localhost:55481/crm_stage_ci
+          MIGRATION_DATABASE_URL: postgresql://stage_owner:synthetic-owner-only@localhost:55481/crm_stage_ci
+          TENANT_A_URL: postgresql://stage_tenant_a:synthetic-tenant-a@localhost:55481/crm_stage_ci
+          TENANT_B_URL: postgresql://stage_tenant_b:synthetic-tenant-b@localhost:55481/crm_stage_ci
+        run: node --test tests/integration/customer-rls-stage.test.mjs
   isolated-database-role-rls:
     runs-on: ubuntu-latest
     timeout-minutes: 10
