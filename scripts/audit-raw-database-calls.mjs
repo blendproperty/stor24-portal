@@ -24,13 +24,16 @@ function walk(dir) {
         (ts.isCallExpression(node) && node.expression.getText(source).match(/\.\$(?:queryRaw|executeRaw)(?:Unsafe)?$/));
       if (raw) {
         const text=node.getText(source), tables=new Map();
+        const rowLock=/\bFOR\s+(?:(?:NO\s+KEY|KEY)\s+)?(?:UPDATE|SHARE)\b/i.test(text);
         for (const m of text.matchAll(/\b(DELETE\s+FROM|INSERT\s+INTO|UPDATE|FROM|JOIN)\s+(?:"?public"?\s*\.\s*)?"?([A-Za-z_][A-Za-z_0-9]*)"?/gi)) {
           const table=names.get(m[2].toLowerCase()); if (!table) continue;
           const verb=m[1].toUpperCase(); const op=verb==='FROM'||verb==='JOIN'?'SELECT':verb.startsWith('DELETE')?'DELETE':verb.startsWith('INSERT')?'INSERT':'UPDATE';
           if(!tables.has(table)) tables.set(table,new Set()); tables.get(table).add(op);
+          // PostgreSQL row-locking SELECTs also require UPDATE privilege; joins may overstate the affected tables.
+          if (rowLock && op === 'SELECT') tables.get(table).add('UPDATE');
         }
         const functions=[...new Set([...text.matchAll(/\b(pg_advisory_xact_lock|hashtextextended|pg_try_advisory_xact_lock|pg_advisory_lock|pg_advisory_unlock)\s*\(/gi)].map(m=>m[1].toLowerCase()))].sort();
-        found.push({line:source.getLineAndCharacterOfPosition(node.getStart(source)).line+1,method:raw[0].slice(1),interpolated:ts.isTaggedTemplateExpression(node) ? ts.isTemplateExpression(node.template) : node.arguments.some(a=>!ts.isStringLiteralLike(a)),tables:[...tables.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([table,ops])=>({table,operations:[...ops].sort()})),functions});
+        found.push({line:source.getLineAndCharacterOfPosition(node.getStart(source)).line+1,method:raw[0].slice(1),interpolated:ts.isTaggedTemplateExpression(node) ? ts.isTemplateExpression(node.template) : node.arguments.some(a=>!ts.isStringLiteralLike(a)),rowLock,tables:[...tables.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([table,ops])=>({table,operations:[...ops].sort()})),functions});
       }
       ts.forEachChild(node,visit);
     }

@@ -99,6 +99,8 @@ These are static-review leads, **not approved or complete grants**. They combine
 | `WebhookOutbox` | `WebhookOutbox` | `INSERT`, `SELECT`, `UPDATE` |
 | `_prisma_migrations` | Migration history | Migration identity only; restricted runtime denied in selected tests |
 
+Row-locking `SELECT ... FOR UPDATE/SHARE` requires UPDATE on at least one column of each locked table as well as SELECT. The AST inventory conservatively flags UPDATE on every recognized table in such a query; manually verify `OF` clauses, joins and column-specific privileges. [PostgreSQL SELECT documentation](https://www.postgresql.org/docs/17/sql-select.html).
+
 ## CMS actual tables
 
 CMS Payload generates database queries from collection, auth, upload, global and relationship behavior. Table presence and selected compatibility do not establish exact per-table required privileges. Treat the list below as the complete *observed staging table list*, not a completed grant assignment.

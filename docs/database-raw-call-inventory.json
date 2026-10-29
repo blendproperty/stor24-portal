@@ -12,6 +12,7 @@
           "line": 10,
           "method": "$queryRaw",
           "interpolated": false,
+          "rowLock": false,
           "tables": [],
           "functions": []
         }
@@ -24,11 +25,13 @@
           "line": 37,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -43,11 +46,13 @@
           "line": 48,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Facility",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -62,11 +67,13 @@
           "line": 367,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Reservation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -81,6 +88,7 @@
           "line": 120,
           "method": "$executeRaw",
           "interpolated": true,
+          "rowLock": false,
           "tables": [],
           "functions": [
             "hashtextextended",
@@ -96,6 +104,7 @@
           "line": 27,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": false,
           "tables": [],
           "functions": [
             "hashtextextended",
@@ -111,11 +120,13 @@
           "line": 20,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "CommunicationLog",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -130,11 +141,13 @@
           "line": 107,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -144,11 +157,13 @@
           "line": 127,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -163,11 +178,13 @@
           "line": 14,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Organisation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -182,11 +199,13 @@
           "line": 13,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Task",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -201,6 +220,7 @@
           "line": 20,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": false,
           "tables": [
             {
               "table": "AuditEvent",
@@ -215,11 +235,13 @@
           "line": 49,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Organisation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -234,11 +256,13 @@
           "line": 36,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Organisation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -253,11 +277,13 @@
           "line": 18,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Lead",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -272,11 +298,13 @@
           "line": 12,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Facility",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -286,11 +314,13 @@
           "line": 13,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Unit",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -305,11 +335,13 @@
           "line": 99,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -324,11 +356,13 @@
           "line": 100,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -343,6 +377,7 @@
           "line": 45,
           "method": "$executeRaw",
           "interpolated": true,
+          "rowLock": false,
           "tables": [],
           "functions": [
             "hashtextextended",
@@ -358,11 +393,13 @@
           "line": 244,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -372,6 +409,7 @@
           "line": 325,
           "method": "$executeRaw",
           "interpolated": false,
+          "rowLock": false,
           "tables": [],
           "functions": []
         },
@@ -379,6 +417,7 @@
           "line": 326,
           "method": "$executeRaw",
           "interpolated": true,
+          "rowLock": false,
           "tables": [],
           "functions": [
             "hashtextextended",
@@ -389,6 +428,7 @@
           "line": 363,
           "method": "$executeRaw",
           "interpolated": false,
+          "rowLock": false,
           "tables": [],
           "functions": []
         },
@@ -396,11 +436,13 @@
           "line": 365,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -415,11 +457,13 @@
           "line": 16,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Facility",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -429,11 +473,13 @@
           "line": 19,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Unit",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -448,6 +494,7 @@
           "line": 5,
           "method": "$executeRaw",
           "interpolated": true,
+          "rowLock": false,
           "tables": [],
           "functions": [
             "hashtextextended",
@@ -463,11 +510,13 @@
           "line": 32,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Customer",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -482,11 +531,13 @@
           "line": 27,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Tenancy",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -501,6 +552,7 @@
           "line": 39,
           "method": "$executeRaw",
           "interpolated": true,
+          "rowLock": false,
           "tables": [],
           "functions": [
             "hashtextextended",
@@ -511,11 +563,13 @@
           "line": 40,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Reservation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -530,11 +584,13 @@
           "line": 78,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -544,11 +600,13 @@
           "line": 149,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Facility",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -558,11 +616,13 @@
           "line": 171,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "DebitOrderRun",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -572,11 +632,13 @@
           "line": 195,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "DebitOrderRun",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -586,11 +648,13 @@
           "line": 198,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -605,11 +669,13 @@
           "line": 45,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Organisation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -624,11 +690,13 @@
           "line": 24,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Reservation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -638,11 +706,13 @@
           "line": 26,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -652,11 +722,13 @@
           "line": 60,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Organisation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -671,11 +743,13 @@
           "line": 111,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Organisation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -690,11 +764,13 @@
           "line": 11,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Facility",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -704,11 +780,13 @@
           "line": 12,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Unit",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -718,11 +796,13 @@
           "line": 22,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Facility",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -737,11 +817,13 @@
           "line": 15,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Reservation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -756,11 +838,13 @@
           "line": 6,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Lead",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -775,6 +859,7 @@
           "line": 10,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": false,
           "tables": [
             {
               "table": "AuditEvent",
@@ -789,11 +874,13 @@
           "line": 14,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Facility",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -803,11 +890,13 @@
           "line": 15,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Lead",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -822,11 +911,13 @@
           "line": 59,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Lead",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -841,11 +932,13 @@
           "line": 277,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Lead",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -855,11 +948,13 @@
           "line": 597,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Unit",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -874,6 +969,7 @@
           "line": 14,
           "method": "$executeRaw",
           "interpolated": true,
+          "rowLock": false,
           "tables": [],
           "functions": [
             "hashtextextended",
@@ -889,6 +985,7 @@
           "line": 144,
           "method": "$executeRaw",
           "interpolated": true,
+          "rowLock": false,
           "tables": [],
           "functions": [
             "hashtextextended",
@@ -904,11 +1001,13 @@
           "line": 7,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "MerchandiseOrder",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -923,11 +1022,13 @@
           "line": 28,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -937,6 +1038,7 @@
           "line": 42,
           "method": "$executeRaw",
           "interpolated": true,
+          "rowLock": false,
           "tables": [
             {
               "table": "Product",
@@ -951,11 +1053,13 @@
           "line": 56,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "MerchandiseOrder",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -970,11 +1074,13 @@
           "line": 10,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "MerchandiseOrder",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -984,11 +1090,13 @@
           "line": 60,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "MerchandiseOrder",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1003,11 +1111,13 @@
           "line": 7,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "User",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1022,11 +1132,13 @@
           "line": 39,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1036,11 +1148,13 @@
           "line": 87,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1055,11 +1169,13 @@
           "line": 37,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Organisation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1074,6 +1190,7 @@
           "line": 20,
           "method": "$queryRaw",
           "interpolated": false,
+          "rowLock": false,
           "tables": [],
           "functions": []
         }
@@ -1086,11 +1203,13 @@
           "line": 11,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Reservation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1100,11 +1219,13 @@
           "line": 12,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1119,11 +1240,13 @@
           "line": 66,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1133,11 +1256,13 @@
           "line": 99,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1147,11 +1272,13 @@
           "line": 148,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1161,11 +1288,13 @@
           "line": 224,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1180,11 +1309,13 @@
           "line": 58,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1194,11 +1325,13 @@
           "line": 74,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1213,23 +1346,27 @@
           "line": 19,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             },
             {
               "table": "Customer",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             },
             {
               "table": "Tenancy",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1239,11 +1376,13 @@
           "line": 42,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "ConfigurationProfile",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1253,11 +1392,13 @@
           "line": 60,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "ConfigurationProfile",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1272,11 +1413,13 @@
           "line": 53,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1286,11 +1429,13 @@
           "line": 74,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1300,11 +1445,13 @@
           "line": 87,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1319,11 +1466,13 @@
           "line": 82,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1333,11 +1482,13 @@
           "line": 109,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1347,11 +1498,13 @@
           "line": 141,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1366,11 +1519,13 @@
           "line": 49,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "ConfigurationProfile",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1385,23 +1540,27 @@
           "line": 34,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             },
             {
               "table": "Customer",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             },
             {
               "table": "Tenancy",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1416,11 +1575,13 @@
           "line": 36,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Payment",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1435,11 +1596,13 @@
           "line": 63,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1454,23 +1617,27 @@
           "line": 19,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             },
             {
               "table": "Customer",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             },
             {
               "table": "Tenancy",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1485,11 +1652,13 @@
           "line": 42,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "MerchandiseOrder",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1504,11 +1673,13 @@
           "line": 24,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "User",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1518,11 +1689,13 @@
           "line": 33,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "User",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1532,11 +1705,13 @@
           "line": 52,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "PriceApprovalChallenge",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1551,11 +1726,13 @@
           "line": 31,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Reservation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1570,11 +1747,13 @@
           "line": 187,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Unit",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1584,11 +1763,13 @@
           "line": 188,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Reservation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1598,11 +1779,13 @@
           "line": 247,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "WalkInVisit",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1617,11 +1800,13 @@
           "line": 86,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Reservation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1636,11 +1821,13 @@
           "line": 33,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Reservation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1650,11 +1837,13 @@
           "line": 132,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Reservation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1669,11 +1858,13 @@
           "line": 78,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Reservation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1688,11 +1879,13 @@
           "line": 22,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Reservation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1702,11 +1895,13 @@
           "line": 51,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Reservation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1721,11 +1916,13 @@
           "line": 41,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Reservation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1740,11 +1937,13 @@
           "line": 17,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Unit",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1754,11 +1953,13 @@
           "line": 19,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Reservation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1768,6 +1969,7 @@
           "line": 42,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": false,
           "tables": [
             {
               "table": "Product",
@@ -1787,11 +1989,13 @@
           "line": 17,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Organisation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1806,11 +2010,13 @@
           "line": 55,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Organisation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1825,11 +2031,13 @@
           "line": 35,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1839,11 +2047,13 @@
           "line": 100,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Organisation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1858,11 +2068,13 @@
           "line": 37,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1872,11 +2084,13 @@
           "line": 53,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Payment",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1886,11 +2100,13 @@
           "line": 85,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Payment",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1905,11 +2121,13 @@
           "line": 30,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Facility",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1924,6 +2142,7 @@
           "line": 40,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": false,
           "tables": [
             {
               "table": "RateLimitBucket",
@@ -1943,11 +2162,13 @@
           "line": 93,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Unit",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1957,11 +2178,13 @@
           "line": 94,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Reservation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1971,11 +2194,13 @@
           "line": 102,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -1990,11 +2215,13 @@
           "line": 19,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Reservation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -2004,11 +2231,13 @@
           "line": 25,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -2023,11 +2252,13 @@
           "line": 34,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Reservation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -2037,11 +2268,13 @@
           "line": 39,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -2051,17 +2284,20 @@
           "line": 40,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             },
             {
               "table": "Payment",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -2071,11 +2307,13 @@
           "line": 41,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "PublicPaymentSession",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -2085,11 +2323,13 @@
           "line": 154,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Reservation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -2099,11 +2339,13 @@
           "line": 156,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Customer",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -2118,6 +2360,7 @@
           "line": 22,
           "method": "$executeRaw",
           "interpolated": true,
+          "rowLock": false,
           "tables": [],
           "functions": [
             "hashtextextended",
@@ -2133,11 +2376,13 @@
           "line": 37,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Organisation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -2152,6 +2397,7 @@
           "line": 55,
           "method": "$executeRaw",
           "interpolated": true,
+          "rowLock": false,
           "tables": [],
           "functions": [
             "hashtextextended",
@@ -2167,6 +2413,7 @@
           "line": 92,
           "method": "$executeRaw",
           "interpolated": true,
+          "rowLock": false,
           "tables": [],
           "functions": [
             "hashtextextended",
@@ -2182,6 +2429,7 @@
           "line": 50,
           "method": "$executeRaw",
           "interpolated": true,
+          "rowLock": false,
           "tables": [],
           "functions": [
             "hashtextextended",
@@ -2197,6 +2445,7 @@
           "line": 81,
           "method": "$executeRaw",
           "interpolated": true,
+          "rowLock": false,
           "tables": [],
           "functions": [
             "hashtextextended",
@@ -2212,6 +2461,7 @@
           "line": 11,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": false,
           "tables": [
             {
               "table": "RateLimitBucket",
@@ -2231,11 +2481,13 @@
           "line": 34,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Organisation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -2250,11 +2502,13 @@
           "line": 15,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Organisation",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -2264,11 +2518,13 @@
           "line": 61,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Account",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -2283,11 +2539,13 @@
           "line": 8,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Facility",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -2297,11 +2555,13 @@
           "line": 9,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Unit",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -2311,11 +2571,13 @@
           "line": 24,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "Facility",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -2330,6 +2592,7 @@
           "line": 81,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": false,
           "tables": [],
           "functions": [
             "hashtextextended",
@@ -2340,6 +2603,7 @@
           "line": 98,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": false,
           "tables": [],
           "functions": [
             "hashtextextended",
@@ -2355,11 +2619,13 @@
           "line": 25,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "WalkInVisit",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -2369,11 +2635,13 @@
           "line": 26,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "WalkInVisit",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -2383,11 +2651,13 @@
           "line": 46,
           "method": "$queryRaw",
           "interpolated": true,
+          "rowLock": true,
           "tables": [
             {
               "table": "WalkInVisit",
               "operations": [
-                "SELECT"
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -2402,6 +2672,7 @@
           "line": 25,
           "method": "$executeRaw",
           "interpolated": true,
+          "rowLock": false,
           "tables": [],
           "functions": [
             "hashtextextended",
