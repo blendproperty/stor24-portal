@@ -135,3 +135,11 @@ jobs:
           name: production-alert-result
           path: production-alert-result.json
           retention-days: 14
+      - name: Check in with the independent monitor watchdog
+        if: always()
+        env:
+          STOR24_WATCHDOG_PING_URL: ${{ secrets.STOR24_WATCHDOG_PING_URL }}
+          READINESS_RESULT: ${{ needs.readiness.result }}
+          BACKUP_RESULT: ${{ needs.backup.result }}
+          MONITOR_JOB_RESULT: ${{ job.status }}
+        run: node scripts/ping-monitor-watchdog.mjs
