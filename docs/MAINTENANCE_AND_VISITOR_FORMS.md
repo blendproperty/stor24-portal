@@ -1,0 +1,25 @@
+# Maintenance and visitor forms
+
+Implemented source candidate, 30 October 2026. Publication, checks, merge, deployment and live verification are recorded separately in PROJECT_CONTEXT.md. This document does not certify business acceptance.
+
+## Attachment mapping and reuse
+
+The maintenance workbook supplies priority, issue, discovery date, area, action required, reported date, outcome, resolution date, notes, picture references, quote decisions/costs and certificate descriptions/dates. These are structured extensions of existing MaintenanceRequest records. Create the request in the existing maintenance queue, then open its maintenance report. Existing unit holds, completion and release checks continue to apply. No historical defects, costs or people from the example workbook are imported into STOR24.
+
+An absent date or quote remains unknown. Completed legacy requests can receive metadata without invented resolution history. Once structured resolution is recorded, completing a structured request requires an outcome and resolution date. Metadata cannot silently erase a known completed resolution. Concurrent changes require reload. Saved encrypted report versions retain actor/time; opening an individual report shows the latest 20 versions. Lists paginate 50 rows at a time and support issue-title search.
+
+Picture and certificate references are bounded text references. They are not uploads or fetched links. Quotes record external decisions and references; they do not approve spending or create procurement/payment instructions. Certificate expiry is a recorded date, not a validity assertion. Explicitly confirmed certificate review creates or opens one finite existing Task for that request/expiry. It sends no automatic reminders and performs no renewal. A changed expiry requires the prior task to be completed or cancelled; repeating the same expiry opens its original task rather than creating another.
+
+The Visitor Entry Register maps date, visitor name, time in, unit number, contact and signature. It has no time-out field. The client Attendence Form maps date, name, signature, time in and time out; it is client attendance, not a staff payroll register. These are distinct register types with explicit store/day filters and 50-row pagination. Attendance does not collect visitor-only contact/unit fields. Store-local dates and times use SAST (+02:00); original visit time and actual recording time remain separate.
+
+Entries require a typed client acknowledgement and policy reference. Staff record the acknowledgement with the client; this is not a drawn signature, witnessed electronic signing service, identity verification or proof that the person personally used the device. Attendance checkout retains the original entry and requires its own typed acknowledgement. Corrections void an entry with a retained reason and original content rather than overwriting its identity/signature. The interface holds writes after an uncertain response until staff reload and explicitly confirm that they inspected the register; it does not blindly retry.
+
+## Access and data boundaries
+
+The existing operations.view/manage permissions and current active store scope apply on every request. View-only staff can inspect reports but cannot save. ConfigurationProfile sidecars reuse the existing encryption vault; visitor names, contact details and typed acknowledgements are encrypted. Audits retain encrypted maintenance snapshots and visitor metadata/hashes rather than plaintext visitor signatures/contact details. Reads are private/no-store; the forms do not cache private records in local storage or IndexedDB. Origin checks, bounded input, rate limits, revision checks and serializable transactions protect writes. Failed/revoked reads clear displayed records.
+
+No new schema, dependency, role grant, RLS activation, customer/lead, financial record, access decision or outbound message is introduced. Existing report exports are unchanged; this slice does not add attachment-format form exports. Integration tests use disposable local records and an injected synthetic session, not genuine staff logins or production data. Restricted-role tests use broad synthetic staging DML permissions and do not establish approved production least privilege.
+
+## Open acceptance gates
+
+Faeez/business approval of field mapping, priorities, quote authority, certificate interpretation and process remains open. Confirm client-facing wording, lawful purpose, privacy notice/policy reference, consent/acknowledgement method, retention/erasure, evidence storage and actual signature requirements before operational adoption. A recorded policy reference is not that approval. Real staff roles, training, client assistance, tablets/devices, accessibility, printing and normal-day acceptance remain open. Photo uploads, procurement/approval, legal/emergency forms and other attachment/report gaps retain their own outstanding scope. Provider, data, security/recovery and other existing gates remain open. No project tracker is in scope.

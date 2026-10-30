@@ -55,6 +55,6 @@ jobs:
           if PGPASSWORD=synthetic-runtime-only psql -h localhost -U stage_runtime -d merchandise_ci -v ON_ERROR_STOP=1 -c 'SELECT 1 FROM "_prisma_migrations" LIMIT 1' >/dev/null 2>&1; then exit 1; fi
       - name: Exercise synthetic business and security workflows
         run: |
-          for test in extended-security public-booking-origin staff-logout-revocation daily-close floor-availability unit-combination merchandise-transactions adjustments initial-rent monthly-billing posted-recurring-charge-report settlements reservation-move-in booking-contact-correction; do
+          for test in extended-security public-booking-origin staff-logout-revocation daily-close floor-availability unit-combination merchandise-transactions adjustments initial-rent monthly-billing posted-recurring-charge-report settlements reservation-move-in booking-contact-correction operational-forms; do
             npx tsx --test "tests/integration/${test}.test.ts"
           done

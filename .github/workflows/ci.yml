@@ -122,6 +122,7 @@ jobs:
       - run: node scripts/test-mri.mjs
       - run: node scripts/test-collection-notices.mjs
       - run: node scripts/test-operational-notices.mjs
+      - run: node scripts/test-operational-forms.mjs
       - run: node scripts/test-collection-phone.mjs
       - run: node scripts/test-mri-mapping.mjs
       - run: node scripts/test-mri-sandbox.mjs
@@ -167,6 +168,7 @@ jobs:
             output/recurring-charges/
             output/collection-notices/
             output/operational-notices/browser/
+            output/operational-forms/browser/
             output/collection-phone/
             output/mri-mapping/
             output/mri-sandbox/
