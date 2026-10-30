@@ -25,7 +25,7 @@ jobs:
       - run: node scripts/test-synthetic-rls-backup.mjs
   real-customer-rls-staging:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:16-alpine
@@ -67,6 +67,24 @@ jobs:
           TENANT_B_URL: postgresql://stage_tenant_b:synthetic-tenant-b@localhost:55481/crm_stage_ci
           BACKUP_ROLE_URL: postgresql://stage_backup:synthetic-backup-only@localhost:55481/crm_stage_ci
         run: npx tsx --test tests/integration/customer-rls-stage.test.mjs
+      - name: Create read-limited synthetic identity lookup role
+        env:
+          PGPASSWORD: synthetic-ci-only
+        run: psql -h localhost -p 55481 -U ci -d postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE stage_auth LOGIN PASSWORD 'synthetic-auth-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS"
+      - name: Build CRM for isolated authenticated routing rehearsal
+        env:
+          AUTH_SECRET: synthetic-auth-secret-at-least-32-characters-only
+          DATABASE_URL: postgresql://stage_runtime:synthetic-runtime-only@localhost:55481/crm_stage_ci
+        run: npm run build
+      - name: Exercise signed-session routing and RLS through real CRM API
+        env:
+          DB_ROLE_TEST: isolated-ci
+          AUTH_SECRET: synthetic-auth-secret-at-least-32-characters-only
+          MIGRATION_DATABASE_URL: postgresql://stage_owner:synthetic-owner-only@localhost:55481/crm_stage_ci
+          TENANT_A_URL: postgresql://stage_tenant_a:synthetic-tenant-a@localhost:55481/crm_stage_ci
+          TENANT_B_URL: postgresql://stage_tenant_b:synthetic-tenant-b@localhost:55481/crm_stage_ci
+          AUTH_ROLE_URL: postgresql://stage_auth:synthetic-auth-only@localhost:55481/crm_stage_ci
+        run: node scripts/test-session-rls-stage.mjs
       - name: Prepare full database RLS recovery rehearsal
         env:
           PGPASSWORD: synthetic-ci-only

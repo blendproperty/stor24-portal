@@ -30,6 +30,14 @@ const [owner,runtime,backup,restore] = clients;
 const token = randomUUID(), ids = [`rls-a-${token}`,`rls-b-${token}`], orgs = [`org-a-${token}`,`org-b-${token}`];
 const relation = kind === 'crm' ? '"Customer"' : 'posts';
 let enabled = false, fixture = false, policyCreated = false;
+const extraRlsTables = [];
+const cmsPolicies = [
+  ['posts_tags', "EXISTS (SELECT 1 FROM posts p WHERE p.id = posts_tags._parent_id AND p.status = 'published')"],
+  ['storage_insights', "status = 'published'"],
+  ...['storage_insights_faqs','storage_insights_internal_links','storage_insights_secondary_keywords'].map(table => [table, `EXISTS (SELECT 1 FROM storage_insights p WHERE p.id = ${table}._parent_id AND p.status = 'published')`]),
+  ['storage_insights_schema_types', "EXISTS (SELECT 1 FROM storage_insights p WHERE p.id = storage_insights_schema_types.parent_id AND p.status = 'published')"],
+  ['micro_warehousing','published IS TRUE'],
+];
 const queryFixtures = kind === 'crm'
   ? `SELECT id,"organisationId" AS scope,"firstName" AS label FROM "Customer" WHERE id=ANY($1::text[]) ORDER BY id`
   : `SELECT slug AS id,status AS scope,title AS label FROM posts WHERE slug=ANY($1::text[]) ORDER BY slug`;
@@ -50,6 +58,13 @@ try {
   await owner.query(`CREATE POLICY synthetic_backup_test ON ${relation} FOR SELECT TO stage_runtime USING (${predicate})`); policyCreated=true;
   await owner.query(`ALTER TABLE ${relation} ENABLE ROW LEVEL SECURITY`); enabled=true;
   await owner.query(`ALTER TABLE ${relation} FORCE ROW LEVEL SECURITY`);
+  if (kind === 'cms') for (const [table,condition] of cmsPolicies) {
+    assert.equal((await owner.query('SELECT relrowsecurity FROM pg_class WHERE oid=$1::regclass',[`public.${table}`])).rows[0].relrowsecurity,false);
+    await owner.query(`CREATE POLICY synthetic_backup_test ON "${table}" FOR SELECT TO stage_runtime USING (${condition})`);
+    extraRlsTables.push(table);
+    await owner.query(`ALTER TABLE "${table}" ENABLE ROW LEVEL SECURITY`);
+    await owner.query(`ALTER TABLE "${table}" FORCE ROW LEVEL SECURITY`);
+  }
   assert.equal((await runtime.query(queryFixtures,[ids])).rowCount,1,'runtime must see only permitted synthetic row');
   assert.equal((await backup.query(queryFixtures,[ids])).rowCount,2,'backup bypass must include both synthetic rows');
   await assert.rejects(backup.query(`DELETE FROM ${relation} WHERE false`),e=>e.code==='42501');
@@ -61,6 +76,10 @@ try {
   assert.deepEqual((await restore.query(catalog)).rows,sourceCatalog,'tables, indexes, constraints, sequences and policies must survive restore');
   const state=(await restore.query(`SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='public.${relation}'::regclass`)).rows[0];
   assert.deepEqual(state,{relrowsecurity:true,relforcerowsecurity:true});
+  for (const table of extraRlsTables) {
+    const restoredState=(await restore.query('SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid=$1::regclass',[`public.${table}`])).rows[0];
+    assert.deepEqual(restoredState,{relrowsecurity:true,relforcerowsecurity:true},`RLS state restored: ${table}`);
+  }
   // Owner is subject to forced RLS: inspect via backup identity and confirm restored runtime policy separately.
   const restoredBackup=new pg.Client({connectionString:backupUrl.replace(`/${sourceName}`,`/${restoreName}`)});
   const restoredRuntime=new pg.Client({connectionString:runtimeUrl.replace(`/${sourceName}`,`/${restoreName}`)});
@@ -78,8 +97,13 @@ try {
     await restore.query(`GRANT SELECT ON ${relation} TO stage_runtime`);
     assert.equal((await restoredRuntime.query(queryFixtures,[ids])).rowCount,1,'restored RLS policy must still filter');
   } finally { await restoredBackup.end(); await restoredRuntime.end(); }
-  console.log(JSON.stringify({application:kind,fullDatabaseDump:true,syntheticRows:sourceRows.length,catalogEntries:sourceCatalog.length,forcedRlsRestored:true,privilegesRestored:false}));
+  console.log(JSON.stringify({application:kind,fullDatabaseDump:true,syntheticRows:sourceRows.length,catalogEntries:sourceCatalog.length,forcedRlsRestored:true,rlsTables:1+extraRlsTables.length,privilegesRestored:false}));
 } finally {
+  for (const table of extraRlsTables) {
+    await owner.query(`ALTER TABLE "${table}" NO FORCE ROW LEVEL SECURITY`);
+    await owner.query(`ALTER TABLE "${table}" DISABLE ROW LEVEL SECURITY`);
+    await owner.query(`DROP POLICY IF EXISTS synthetic_backup_test ON "${table}"`);
+  }
   if (enabled) { await owner.query(`ALTER TABLE ${relation} NO FORCE ROW LEVEL SECURITY`); await owner.query(`ALTER TABLE ${relation} DISABLE ROW LEVEL SECURITY`); }
   if (policyCreated) await owner.query(`DROP POLICY IF EXISTS synthetic_backup_test ON ${relation}`);
   if (fixture) {
