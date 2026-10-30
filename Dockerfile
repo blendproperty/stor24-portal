@@ -27,7 +27,9 @@ RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/private/staff-training ./private/staff-training
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/check-runtime-db-credential-isolation.mjs ./scripts/check-runtime-db-credential-isolation.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/check-runtime-database-role.mjs ./scripts/check-runtime-database-role.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+RUN node --input-type=module -e "await import('pg')"
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 USER nextjs
 EXPOSE 3000
