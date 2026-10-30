@@ -245,3 +245,17 @@ The raw-call audit now flags row-locking SELECT statements as requiring candidat
 ## 2026-10-30 refreshed source snapshot
 
 After merging newer main into the draft, the AST inventory contains 148 raw calls across 86 files, 84 with interpolated or nonliteral expressions. The additional operational-checklist and rent-review row locks were inspected. Static enumeration remains incomplete for dynamic queries, nested ORM operations, role-specific business paths, background jobs and external clients; earlier counts refer to the preceding snapshot.
+
+## 2026-10-30 CMS application access review
+
+The active `payload.config.ts` registers seven collections and two globals, all using one `DATABASE_URI` adapter. This is an application-permission inventory, not proof of database role isolation or a complete Payload SQL/object grant map.
+
+| Surface | Anonymous application access | Authenticated application access |
+| --- | --- | --- |
+| `users`, `content-ideas` | No read or mutation | Read and CRUD |
+| `posts`, `storage-insights` | Published records only | Read all and CRUD |
+| `media`, `faqs`, `areas` | Read | Read and CRUD |
+| `homepage-hero` | Read | Read and update |
+| `micro-warehousing` | Read only when its published after-read check permits it | Read and update |
+
+The functions called `adminOnly`, `authenticated` and `editorsOnly` in these paths all check whether a user exists, not a separate administrator/editor role. Payload authentication and internal operations may require additional database access regardless of these HTTP rules. The standalone `src/collections/Media.ts` is not the media collection registered by the inspected config; use the inline media definition for the active access review. Confirm extensions, plugins, local API overrides, Payload internals, scheduled and external consumers before assigning database privileges. No database grants or production settings were changed.

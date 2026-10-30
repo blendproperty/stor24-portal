@@ -9,7 +9,7 @@ try {
   assert.match(id, /^[a-f0-9]{64}$/);
   let ready = false;
   for (let i = 0; i < 60; i++) {
-    try { docker(['exec', id, 'pg_isready', '-U', 'postgres']); ready = true; break; }
+    try { docker(['exec', id, 'pg_isready', '-h', '127.0.0.1', '-U', 'postgres']); ready = true; break; }
     catch { await new Promise(resolve => setTimeout(resolve, 1000)); }
   }
   assert.ok(ready, 'synthetic database must start');

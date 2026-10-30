@@ -6764,3 +6764,7 @@ Main advanced to ae6448b0 (PR565 Price review icon) while this PR was running. I
 - Outstanding: design and validate complete least-privilege grants, backup credential custody and access, real-user identity routing and RLS coverage, CRM privileged-environment removal, production-compatible backup/restore including media/ACL/configuration, recovery and staff UAT, and the reviewed production cutover. Preserve provider, data, training and approval gates. No production privileges or data were changed.
 
 - 2026-10-30 raw statement triage: the Product UPDATE paths read columns in expressions and filters; the static scanner now conservatively includes SELECT for UPDATE/DELETE as a candidate and has a regression check. Full feature, nested ORM and external-consumer access review remains outstanding.
+
+- Hosted test correction 2026-10-30: the CMS synthetic-backup job initially failed because socket readiness detected PostgreSQL temporary initialization before the final server started. The readiness probe now checks TCP; this is test infrastructure, not a production change. Re-run hosted checks to validate.
+
+- 2026-10-30 CMS application access review: inventoried the seven registered Payload collections and two globals, including anonymous published-only checks. Current write predicates check for an authenticated user rather than a separate administrator/editor role. This describes application rules, not complete database grants or role separation; Payload internals and other consumers remain to be reviewed.
