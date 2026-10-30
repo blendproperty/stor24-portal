@@ -31,6 +31,8 @@ function walk(dir) {
           if(!tables.has(table)) tables.set(table,new Set()); tables.get(table).add(op);
           // PostgreSQL row-locking SELECTs also require UPDATE privilege; joins may overstate the affected tables.
           if (rowLock && op === 'SELECT') tables.get(table).add('UPDATE');
+          // WHERE and computed values may read target columns; keep SELECT as a conservative lead.
+          if (op === 'UPDATE' || op === 'DELETE') tables.get(table).add('SELECT');
           // Conflict updates and RETURNING require additional privileges on the target.
           if (op === 'INSERT' && /\bON\s+CONFLICT\b[\s\S]*\bDO\s+UPDATE\b/i.test(text)) { tables.get(table).add('UPDATE'); tables.get(table).add('SELECT'); }
           if (['INSERT','UPDATE','DELETE'].includes(op) && /\bRETURNING\b/i.test(text)) tables.get(table).add('SELECT');

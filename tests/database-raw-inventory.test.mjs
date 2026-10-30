@@ -14,6 +14,8 @@ test('raw SQL inventory excludes generated code and identifies real health and l
     const row=inventory.results.find(entry=>entry.file===file);
     assert.ok(row?.calls.some(call=>call.tables.some(table=>table.table==='RateLimitBucket' && ['INSERT','SELECT','UPDATE'].every(op=>table.operations.includes(op)))));
   }
+  const merchandise=inventory.results.find(row=>row.file==='src/lib/merchandise-order-service.ts');
+  assert.ok(merchandise?.calls.some(call=>call.tables.some(table=>table.table==='Product' && ['SELECT','UPDATE'].every(op=>table.operations.includes(op)))));
   const collections=inventory.results.find(row=>row.file==='src/lib/collections-service.ts');
   assert.ok(health?.calls.some(call=>call.method==='$queryRaw' && !call.interpolated && !call.tables.length));
   assert.ok(lock?.calls.some(call=>call.functions.includes('pg_advisory_xact_lock')));

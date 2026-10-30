@@ -99,3 +99,5 @@ The 15 rows without recognized relation names were manually checked at their raw
 ## 2026-10-30 refreshed main-branch review
 
 The refreshed AST scan finds 148 calls in 86 files. `operational-checklist-service.ts` adds an advisory transaction lock and a Task row lock; the extra `rent-review-service.ts` call adds a second Facility row lock. Row locks require candidate SELECT and UPDATE privileges; ORM writes and the remainder of these features require separate review. Counts in older entries describe the previous snapshot.
+
+The 2026-10-30 raw-statement triage separately identified two AuditEvent reads, two Product updates and two RateLimitBucket upserts outside the lock/probe patterns. The Product updates read columns in expressions and filters, so candidate privileges include SELECT as well as UPDATE; INSERT conflict updates and RETURNING also require additional access. This statement triage is not a review of the surrounding feature, nested ORM activity, dynamic SQL or external consumers.
