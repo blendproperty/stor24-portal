@@ -46,7 +46,7 @@ These are static-review leads, **not approved or complete grants**. They combine
 | `MarketingCampaign` | `MarketingCampaign` | `INSERT`, `SELECT`, `UPDATE` |
 | `MarketingLink` | `MarketingLink` | `INSERT` |
 | `MerchandiseOrder` | `MerchandiseOrder` | `DELETE`, `INSERT`, `SELECT`, `UPDATE` |
-| `MerchandiseOrderItem` | `MerchandiseOrderItem` | `DELETE`, `SELECT` |
+| `MerchandiseOrderItem` | `MerchandiseOrderItem` | `DELETE`, `INSERT`, `SELECT` |
 | `MfaCredential` | `MfaCredential` | `INSERT`, `SELECT`, `UPDATE` |
 | `MoveInTrainingControl` | `MoveInTrainingControl` | `INSERT`, `SELECT`, `UPDATE` |
 | `MoveInTrainingRun` | `MoveInTrainingRun` | `INSERT`, `SELECT`, `UPDATE` |
@@ -73,9 +73,9 @@ These are static-review leads, **not approved or complete grants**. They combine
 | `RoleAssignment` | `RoleAssignment` | `DELETE`, `INSERT`, `SELECT` |
 | `SavedReport` | `SavedReport` | `INSERT`, `SELECT`, `UPDATE` |
 | `SettlementBalanceObservation` | `SettlementBalanceObservation` | `INSERT`, `SELECT` |
-| `SettlementBankEntry` | `SettlementBankEntry` | `SELECT`, `UPDATE` |
+| `SettlementBankEntry` | `SettlementBankEntry` | `INSERT`, `SELECT`, `UPDATE` |
 | `SettlementBankImport` | `SettlementBankImport` | `INSERT`, `SELECT`, `UPDATE` |
-| `SettlementLine` | `SettlementLine` | `SELECT`, `UPDATE` |
+| `SettlementLine` | `SettlementLine` | `INSERT`, `SELECT`, `UPDATE` |
 | `SettlementStatement` | `SettlementStatement` | `INSERT`, `SELECT`, `UPDATE` |
 | `StaffOperationalAcknowledgement` | `StaffOperationalAcknowledgement` | `INSERT`, `SELECT`, `UPDATE` |
 | `StockMovement` | `StockMovement` | `INSERT`, `SELECT` |
@@ -133,3 +133,7 @@ CMS Payload generates database queries from collection, auth, upload, global and
 ## Acceptance before applying any grants
 
 Trace all 70 raw-SQL files with table leads and the 15 reviewed raw-function-only files; check the full server, background tasks, uploads, retries, finance/provider operations, exports, backup, monitoring, migrations and every external consumer. Exercise positive and negative queries, pooled connection reuse, fresh migrations and future-object privileges against a staging environment representative of production. Keep backup capabilities separate and verify behavior with RLS enabled. Do not grant or revoke based on this document alone.
+
+2026-10-30 isolated narrow-grant review: Prisma nested writes in `src/lib/merchandise-order-service.ts` and `src/lib/settlement-service.ts` require candidate INSERT on MerchandiseOrderItem, SettlementLine and SettlementBankEntry. These were confirmed by PostgreSQL 42501 statements against synthetic fixtures. RoleAssignment UPDATE and AuditEvent/Organisation/Facility/PublicReservationLease DELETE denials were traced to test setup or cleanup and are not automatically added as production privileges. Remaining nested writes, test-only operations and consumers require review.
+
+A clean synthetic rerun of 13 CRM integration files passed with the corrected candidate table grants and broad staging sequence access, plus explicit fixture-only UPDATE on RoleAssignment and DELETE on AuditEvent, Organisation, Facility and PublicReservationLease. Those extra privileges are needed by existing test setup/cleanup and are not justified as production application grants by this experiment. The test does not prove the full candidate matrix, RLS, external consumers or minimum column privileges.
