@@ -41,3 +41,8 @@ All 16 non-signature attachments were downloaded and reviewed for requirements. 
 ## Validation and publication boundary
 
 Review only. No runtime code, configuration, prices, tenant records, permissions, messages, financial/legal actions or physical-access commands were changed. No new authenticated production workflow test was performed. Existing source/release evidence is distinguished from fresh verification and human acceptance. No tracker is in scope. The associated `PROJECT_CONTEXT.md` entry records publication, merge and deployment status separately.
+
+
+## Checklist implementation follow-up on 30 October
+
+The authorized checklist/padlock slice is implemented for source validation on `codex/faeez-checklists-20261030`. See [workflow and attachment mapping](OPERATIONAL_CHECKLISTS.md). This supersedes the assessment-only boundary for that slice; it does not imply a merge, deployment, production schedules, messages or staff acceptance. The canonical context retains exact testing/publication and outstanding gates. Other notice/rate/report/laptop/Outlook/finance/legal/provider work in this assessment is unchanged.
