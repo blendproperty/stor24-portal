@@ -6934,6 +6934,11 @@ Commit/push, merge, deployment/configuration and live verification: pending for 
 - Hosted CRM CodeQL on head `dd7d8842124ba8b25de628e9446d71380fdefb43` flagged a user-controlled URL branch selecting between the prototype's two authentication paths. Although both branches authenticated in the isolated test, the rehearsal was revised to use separate fixed staff and customer router listeners, avoiding the conditional security boundary. Final hosted checks must be rerun; no alert or protection was waived.
 
 
+### 2026-10-30 — customer portal RLS rehearsal merged
+
+Implementation and testing: CRM PR #674 added the synthetic staff/customer routing and three-table SELECT RLS rehearsal documented above. Its final head `71b13d4ce18b52663135ee9ce0c1f2c2ba6c100f` passed the real-customer staging job, static and CodeQL security checks, transaction and full application checks. The earlier CodeQL alert on the URL-selected prototype was resolved by separate listeners, with no waiver. Commit/push and merge: the tested branch was pushed and squash-merged as `9e8866b451b845d4e23ff6deff5645f658210be8`. Deployment/configuration and live verification: the merge changed tests and documentation only and used `[skip ci]`; it did not change the production image, database roles, credentials, RLS, or routing, so no new production behavior was claimed or verified. Remaining: trusted production staff/customer/worker routing, complete per-user privileges and RLS, login/logout/write paths, protected identity and network boundaries, FORCE RLS and backup/migration compatibility, full recovery and staff/customer/editor/provider acceptance. Preserve all prior privacy, data and training gates.
+
+
 ## 2026-10-30 — launch campaign attribution audit; remediation OPEN
 
 - **Implementation:** audit only; no application fix or ad/provider edit. Evidence and concrete remediation are recorded in docs/marketing/launch-tracking-audit-20261030.md. Website source 493b65165dd740b583c652a71875ce502d683193 and CRM source 4b8c661073eb0627c1f4644fc7d256400f45796d were checked from isolated branches, preserving unrelated work. Existing ad UTMs do not match the internal campaign/link ID contract; CRM excludes micro-warehousing journey routes and catches invalid attribution as undefined. Launch campaign attribution remains NOT READY.
