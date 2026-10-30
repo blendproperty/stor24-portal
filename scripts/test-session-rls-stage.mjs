@@ -25,7 +25,7 @@ function start(port,url) {
   for(const key of ['MIGRATION_DATABASE_URL','TENANT_A_URL','TENANT_B_URL','BACKUP_ROLE_URL','AUTH_ROLE_URL'])delete env[key];
   const child=spawn(process.execPath,['node_modules/next/dist/bin/next','start','--hostname','127.0.0.1','--port',String(port)],{env,stdio:'ignore'});servers.push(child);return child;
 }
-async function request(port,token) { return fetch(`http://127.0.0.1:${port}/api/v1/leasing/customers`,{headers:token?{cookie:`stor24_session=${token}`}:{}}); }
+async function request(port,token,headers={}) { return fetch(`http://127.0.0.1:${port}/api/v1/leasing/customers`,{headers:{...headers,...(token?{cookie:`stor24_session=${token}`}:{})}}); }
 async function ready(port,child) {
   for(let i=0;i<150;i++){if(child.exitCode!==null)throw new Error('Synthetic CRM server exited');try{if((await request(port)).status===401)return;}catch{}await new Promise(resolve=>setTimeout(resolve,300));}
   throw new Error('Synthetic CRM server was not ready');
@@ -87,7 +87,7 @@ try {
   assert.equal((await request(3100,await token(0,{sessionVersion:99}))).status,401);
   assert.equal((await request(3100,await token(0,{mfaVerified:false}))).status,401);
   const forgedClaim=await request(3100,await token(0,{organisationId:orgs[1]}));assert.equal(forgedClaim.status,200);assert.deepEqual((await forgedClaim.json()).data.map(row=>row.id),[customers[0]],'routing ignores an organisation claim in the token');
-  const forgedHeaders=await fetch('http://127.0.0.1:3100/api/v1/leasing/customers',{headers:{cookie:`stor24_session=${tokens[0]}`,'x-organisation-id':orgs[1],'x-forwarded-user':users[1]}});
+  const forgedHeaders=await request(3100,tokens[0],{'x-organisation-id':orgs[1],'x-forwarded-user':users[1]});
   assert.equal(forgedHeaders.status,200);
   assert.deepEqual((await forgedHeaders.json()).data.map(row=>row.id),[customers[0]],'caller-supplied identity headers must not choose the role');
   assert.equal((await request(3100,await token(0,{userId:`unknown-${suffix}`}))).status,401,'an unknown signed user must not be routed');
