@@ -24,6 +24,7 @@ async function main() {
   for (const file of ["launch-advertising.json", "advertising-attribution.ts"]) assert.equal(await readFile(path.join(web,"app/lib",file),"utf8"),await readFile(path.join("src/lib",file),"utf8"));
   assert.equal(await db.facility.count({where:{active:true,publicBookingEnabled:true}}),0,"Use an empty isolated database");
   const org=await db.organisation.create({data:{name:"Synthetic launch tracking",slug:randomUUID()}});
+  const fixtureIp="2001:db8:"+randomUUID().replaceAll("-","").match(/.{4}/g)!.slice(0,4).join(":")+"::1";
   const facility=await db.facility.create({data:{organisationId:org.id,name:"Synthetic launch store",code:randomUUID(),publicSlug:"fixture",publicBookingEnabled:true}});
   const excluded=await db.facility.create({data:{organisationId:org.id,name:"Excluded store",code:randomUUID()}});
   const scope={organisationId:org.id,userId:"synthetic-launch-reporter",facilityIds:[facility.id],unrestrictedFacilities:false};
@@ -43,7 +44,7 @@ async function main() {
       for await(const chunk of req)chunks.push(Buffer.from(chunk));
       const request=new Request(`http://127.0.0.1:${(server.address() as {port:number}).port}${req.url}`,{method:req.method,headers:req.headers as Record<string,string>,...(chunks.length?{body:new Uint8Array(Buffer.concat(chunks))}:{})});
       let response:Response;
-      if(url.pathname==="/crm/api/public/v1/leads")response=blocked?Response.json({error:"Synthetic unavailable CRM"},{status:503}):await crmLead(request);
+      if(url.pathname==="/crm/api/public/v1/leads"){if(!blocked)assert.equal(request.headers.get("x-stor24-client-ip"),fixtureIp,"Each public enquiry proxy must preserve the visitor's rate-limit address");response=blocked?Response.json({error:"Synthetic unavailable CRM"},{status:503}):await crmLead(request);}
       else if(url.pathname==="/crm/api/public/v1/facilities")response=await crmFacilities(request);
       else if(url.pathname==="/api/quote"||url.pathname==="/api/micro-warehousing/enquiry"){
         response=await(url.pathname==="/api/quote"?quote:micro)(request);
@@ -90,7 +91,7 @@ async function main() {
     ] as const;
     await mkdir("output/launch-tracking",{recursive:true});
     for(const [pathname,source,medium,campaign,content,term,consent] of cases){
-      const context=await browser.newContext({viewport:{width:390,height:1000}}),page=await context.newPage();
+      const context=await browser.newContext({viewport:{width:390,height:1000},extraHTTPHeaders:{"x-forwarded-for":fixtureIp}}),page=await context.newPage();
       const meta: string[]=[];
       const errors:string[]=[];page.on("pageerror",e=>errors.push(e.message));
       await page.route("**/*",r=>{const url=r.request().url();if(url.startsWith("https://www.facebook.com/"))meta.push(url);return url.startsWith(base)?r.continue():r.fulfill({contentType:"application/javascript",body:"/* external analytics transport isolated */"});});
