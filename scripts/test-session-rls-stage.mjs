@@ -15,7 +15,7 @@ for (const [key,user] of [['MIGRATION_DATABASE_URL','stage_owner'],['TENANT_A_UR
 const owner=new pg.Client({connectionString:process.env.MIGRATION_DATABASE_URL});
 const dbs=[process.env.TENANT_A_URL,process.env.TENANT_B_URL].map(connectionString=>new pg.Client({connectionString}));
 const authDb=new pg.Pool({connectionString:process.env.AUTH_ROLE_URL,max:4});
-let router;
+let router,tenantRouter;
 const suffix=randomBytes(8).toString('hex');
 const orgs=[`stage-org-a-${suffix}`,`stage-org-b-${suffix}`], users=[`stage-user-a-${suffix}`,`stage-user-b-${suffix}`], roles=[`stage-role-a-${suffix}`,`stage-role-b-${suffix}`], customers=[`stage-customer-a-${suffix}`,`stage-customer-b-${suffix}`];
 const policies=[`stage_a_${suffix}`,`stage_b_${suffix}`], authView=`stage_auth_users_${suffix}`, tenantAuthFunction=`stage_auth_tenant_${suffix}`, servers=[];
@@ -93,9 +93,8 @@ try {
   }
   const a=start(3101,process.env.TENANT_A_URL),b=start(3102,process.env.TENANT_B_URL);
   await Promise.all([ready(3101,a),ready(3102,b)]);
-  router=createServer(async (req,res)=>{
+  tenantRouter=createServer(async (req,res)=>{
     try {
-      if(req.url==='/api/tenant/accounts'){
         const cookie=(req.headers.cookie||'').split(';').map(v=>v.trim()).find(v=>v.startsWith('stor24_tenant_session='));
         const token=cookie?.slice('stor24_tenant_session='.length);
         if(!token||!/^[a-f0-9]{64}$/.test(token))throw new Error('tenant session');
@@ -107,8 +106,11 @@ try {
         for(const name of ['cache-control','x-content-type-options','referrer-policy']){
           const value=downstream.headers.get(name);if(value)responseHeaders[name]=value;
         }
-        res.writeHead(downstream.status,responseHeaders);res.end(await downstream.text());return;
-      }
+        res.writeHead(downstream.status,responseHeaders);res.end(await downstream.text());
+    } catch { res.writeHead(401,{'cache-control':'private, no-store, max-age=0'});res.end(); }
+  });
+  router=createServer(async (req,res)=>{
+    try {
       const cookie=(req.headers.cookie||'').split(';').map(v=>v.trim()).find(v=>v.startsWith('stor24_session='));
       if(!cookie)throw new Error('session');
       const {payload}=await jwtVerify(cookie.slice('stor24_session='.length),new TextEncoder().encode(process.env.AUTH_SECRET),{algorithms:['HS256']});
@@ -121,6 +123,7 @@ try {
     } catch { res.writeHead(401,{'cache-control':'private, no-store, max-age=0'});res.end(); }
   });
   await new Promise((resolve,reject)=>router.listen(3100,'127.0.0.1',resolve).once('error',reject));
+  await new Promise((resolve,reject)=>tenantRouter.listen(3103,'127.0.0.1',resolve).once('error',reject));
   const tokens=await Promise.all([token(0),token(1)]);
   for(let i=0;i<2;i++){
     const response=await request(3101+i,tokens[i]);assert.equal(response.status,200);
@@ -151,15 +154,15 @@ try {
   await owner.query('INSERT INTO "Account" (id,"customerId","accountNumber","updatedAt") VALUES ($1,$2,$1,now())',[sameOrgAccount,sameOrgCustomer]);
   const tenantRequest=(port,session)=>fetch(`http://127.0.0.1:${port}/api/tenant/accounts`,{headers:{cookie:`stor24_tenant_session=${session}`}});
   assert.equal((await authDb.query(`SELECT * FROM public.\"${tenantAuthFunction}\"($1)`,['0'.repeat(64)])).rowCount,0,'unknown hashes do not resolve');
-  const malformedTenant=await tenantRequest(3100,'invalid');
+  const malformedTenant=await tenantRequest(3103,'invalid');
   assert.equal(malformedTenant.status,401,'malformed portal tokens cannot be routed');
   assert.match(malformedTenant.headers.get('cache-control')||'',/no-store/,'rejected private responses must not be cached');
-  assert.equal((await tenantRequest(3100,'0'.repeat(64))).status,401,'unknown portal tokens cannot be routed');
+  assert.equal((await tenantRequest(3103,'0'.repeat(64))).status,401,'unknown portal tokens cannot be routed');
   for(let i=0;i<2;i++){
     const tenantResponse=await tenantRequest(3101+i,tenantTokens[i]);
     assert.equal(tenantResponse.status,200,'customer session works through its organisation database role');
     assert.deepEqual((await tenantResponse.json()).data.accounts.map(row=>row.id),[accounts[i]],'customer sees only their own account');
-    const routedTenant=await tenantRequest(3100,tenantTokens[i]);
+    const routedTenant=await tenantRequest(3103,tenantTokens[i]);
     assert.equal(routedTenant.status,200,'the verified customer session selects its organisation role');
     assert.match(routedTenant.headers.get('cache-control')||'',/no-store/,'the router preserves downstream private cache controls');
     assert.equal(routedTenant.headers.get('x-content-type-options'),'nosniff');
@@ -172,12 +175,12 @@ try {
     assert.deepEqual((await dbs[i].query('SELECT "tokenHash" FROM "TenantPortalSession" WHERE "tokenHash"=ANY($1::text[])',[tenantHashes])).rows.map(row=>row.tokenHash),[tenantHashes[i]],'session RLS exposes only its own organisation');
     await owner.query('UPDATE "TenantPortalSession" SET "expiresAt"=now()-interval \'1 minute\' WHERE "tokenHash"=$1',[tenantHashes[i]]);
     assert.equal((await authDb.query(`SELECT * FROM public.\"${tenantAuthFunction}\"($1)`,[tenantHashes[i]])).rowCount,0,'expired hashes do not resolve');
-    assert.equal((await tenantRequest(3100,tenantTokens[i])).status,401,'expired customer session cannot be routed');
+    assert.equal((await tenantRequest(3103,tenantTokens[i])).status,401,'expired customer session cannot be routed');
     await owner.query('UPDATE "TenantPortalSession" SET "expiresAt"=now()+interval \'10 minutes\' WHERE "tokenHash"=$1',[tenantHashes[i]]);
     await owner.query('UPDATE "TenantPortalSession" SET "revokedAt"=now() WHERE "tokenHash"=$1',[tenantHashes[i]]);
     assert.equal((await authDb.query(`SELECT * FROM public.\"${tenantAuthFunction}\"($1)`,[tenantHashes[i]])).rowCount,0,'revoked hashes do not resolve');
     assert.equal((await tenantRequest(3101+i,tenantTokens[i])).status,401,'revoked customer session cannot read accounts');
-    assert.equal((await tenantRequest(3100,tenantTokens[i])).status,401,'revoked customer session cannot be routed');
+    assert.equal((await tenantRequest(3103,tenantTokens[i])).status,401,'revoked customer session cannot be routed');
   }
   const concurrent=await Promise.all(Array.from({length:20},(_,i)=>request(3100,tokens[i%2])));
   for(let i=0;i<concurrent.length;i++){
@@ -207,6 +210,7 @@ try {
   const cleanupErrors=[];
   const clean=async action=>{try{await action();}catch(error){cleanupErrors.push(error);}};
   if(router)await new Promise(resolve=>router.close(resolve));
+  if(tenantRouter)await new Promise(resolve=>tenantRouter.close(resolve));
   for(const child of servers)child.kill('SIGTERM');
   await Promise.all(servers.map(child=>new Promise(resolve=>{if(child.exitCode!==null)return resolve();child.once('exit',resolve);setTimeout(resolve,5000).unref();})));
   for(const table of protectedPortalTables){
