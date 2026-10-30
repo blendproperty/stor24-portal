@@ -33,6 +33,7 @@ Static keyword matches are restricted to table names present in the disposable 8
 | `src/lib/finance/billing-documents-service.ts` | `Organisation` read |
 | `src/lib/floor-availability-service.ts` | `Facility` read, `Unit` read |
 | `src/lib/identity-document-service.ts` | `Reservation` read |
+| `src/lib/operational-notice-service.ts` | Parameterised `Facility` and `ConfigurationProfile` row locks; SELECT and UPDATE privilege leads, with organisation/store/current-role checks before use. No production grant or RLS activation. |
 | `src/lib/lead-booking-stage.ts` | `Lead` read |
 | `src/lib/lead-sla-service.ts` | `AuditEvent` read, `Facility` read, `Lead` read |
 | `src/lib/leads-workspace-service.ts` | `Lead` read |

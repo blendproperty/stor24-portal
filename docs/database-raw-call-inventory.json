@@ -1,9 +1,9 @@
 {
   "source": "non-generated src; static syntax inventory only",
   "modelTables": 92,
-  "files": 86,
-  "calls": 148,
-  "filesWithInterpolationOrNonliteral": 84,
+  "files": 87,
+  "calls": 150,
+  "filesWithInterpolationOrNonliteral": 85,
   "results": [
     {
       "file": "src/app/api/health/route.ts",
@@ -1206,6 +1206,43 @@
           "tables": [
             {
               "table": "Task",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/operational-notice-service.ts",
+      "calls": [
+        {
+          "line": 31,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "ConfigurationProfile",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 75,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Facility",
               "operations": [
                 "SELECT",
                 "UPDATE"
