@@ -5,6 +5,8 @@ import {createRequire} from "node:module";
 import {randomUUID,createHash} from "node:crypto";
 import {Prisma} from "../src/generated/prisma/client";
 import {defaultVisualQuery} from "../src/lib/visual-report-engine";
+import {encryptReportArtifact} from "../src/lib/visual-report-security";
+import {WORD_REPORT_TYPE} from "../src/lib/report-word";
 type Row=Record<string,any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 function matches(row:Row,where:Row={}):boolean {
   return Object.entries(where).every(([key,value])=>{
@@ -27,12 +29,12 @@ function matches(row:Row,where:Row={}):boolean {
 async function fixture():Promise<Row> {
   const facility={id:"a",organisationId:"org",name:"Fixture store",closedFloors:[]};
   const user={id:"staff",organisationId:"org",active:true,passwordHash:"synthetic-not-a-real-password-hash",sessionVersion:1,name:"Fixture employee",roleAssignments:[{facilityId:"a",role:{name:"Staff",permissions:["reports.view","reports.export"]}}]};
-  const tables:Record<string,Row[]>={user:[user],organisation:[{id:"org",currency:"ZAR"}],facility:[facility],unit:[{id:"unit-a",facilityId:"a",facility,number:"A1",floor:"G",unitType:{name:"Small",areaSqMetres:new Prisma.Decimal(4)},monthlyRate:new Prisma.Decimal(100),status:"AVAILABLE",combinedIntoUnitId:null,useTypes:["STORAGE"],attributes:{}}],savedReport:[],reportHistoryImport:[],reportSchedule:[],reportRun:[],auditEvent:[],lead:[]};
+  const tables:Record<string,Row[]>={user:[user],organisation:[{id:"org",currency:"ZAR"}],facility:[facility],unit:[{id:"unit-a",facilityId:"a",facility,number:"A1",floor:"G",unitType:{name:"Small",areaSqMetres:new Prisma.Decimal(4)},monthlyRate:new Prisma.Decimal(100),status:"AVAILABLE",combinedIntoUnitId:null,reservations:[],useTypes:["STORAGE"],attributes:{}}],savedReport:[],reportHistoryImport:[],reportSchedule:[],reportRun:[],auditEvent:[],lead:[]};
   const state:Row={tables,user,Prisma,authenticated:true,queries:[],failAudit:false,authReads:0,changedOnRead:0};
   const db:Row={};
   for(const [model,rows] of Object.entries(tables)){
     db[model]={
-      findUnique:async({where}:Row)=>{if(model==="user"){state.authReads++;if(state.changedOnRead===state.authReads)user.roleAssignments=[];}return rows.find(r=>matches(r,where))??null;},
+      findUnique:async({where}:Row)=>{if(model==="user"){state.authReads++;if(state.changedOnRead===state.authReads)user.roleAssignments=state.changedAssignments??[];}return rows.find(r=>matches(r,where))??null;},
       findUniqueOrThrow:async({where}:Row)=>{const row=rows.find(r=>matches(r,where));if(!row)throw Error("NOT_FOUND");return row;},
       findFirst:async(args:Row)=>rows.find(r=>matches(r,args.where))??null,
       findMany:async(args:Row)=>{state.queries.push({model,...args});return rows.filter(r=>matches(r,args.where)).slice(0,args.take??rows.length);},
@@ -45,7 +47,7 @@ async function fixture():Promise<Row> {
   db.$queryRaw=async()=>[{count:1}];
   db.$transaction=async(fn:(db:Row)=>Promise<unknown>)=>{const copies=Object.fromEntries(Object.entries(tables).map(([model,rows])=>[model,[...rows]]));try{return await fn(db);}catch(error){for(const [model,copy]of Object.entries(copies))tables[model].splice(0,tables[model].length,...copy);throw error;}};
   state.db=db;(globalThis as Row).__reportFixture=state;
-  const result=await build({stdin:{contents:`export * as builder from './src/app/api/v1/reports/builder/route';export * as history from './src/app/api/v1/reports/history/route';export * as batch from './src/app/api/v1/reports/batch/route';export * as worker from './src/lib/visual-report-worker';export * as workerRoute from './src/app/api/v1/reports/worker/route';`,resolveDir:process.cwd(),loader:"ts"},bundle:true,write:false,format:"cjs",platform:"node",packages:"external",plugins:[{name:"report-fixture",setup(b){b.onResolve({filter:/^(?:@\/lib\/db|\.\/db)$/},()=>({path:"db",namespace:"report-fixture"}));b.onResolve({filter:/generated\/prisma\/client$/},()=>({path:"prisma",namespace:"report-fixture"}));b.onResolve({filter:/^(?:@\/lib\/session|\.\/session)$/},()=>({path:"session",namespace:"report-fixture"}));b.onLoad({filter:/.*/,namespace:"report-fixture"},args=>({contents:args.path==="db"?"export const db=globalThis.__reportFixture.db;":args.path==="prisma"?"export const Prisma=globalThis.__reportFixture.Prisma;":"export async function getSession(){return globalThis.__reportFixture.authenticated?{userId:'staff',organisationId:'org',sessionVersion:1,mfaVerified:true}:null;}"}));}}]});
+  const result=await build({stdin:{contents:`export * as builder from './src/app/api/v1/reports/builder/route';export * as history from './src/app/api/v1/reports/history/route';export * as batch from './src/app/api/v1/reports/batch/route';export * as runs from './src/app/api/v1/reports/runs/[id]/route';export * as fixed from './src/app/api/v1/reports/export/route';export * as worker from './src/lib/visual-report-worker';export * as workerRoute from './src/app/api/v1/reports/worker/route';`,resolveDir:process.cwd(),loader:"ts"},bundle:true,write:false,format:"cjs",platform:"node",packages:"external",plugins:[{name:"report-fixture",setup(b){b.onResolve({filter:/^(?:@\/lib\/db|\.\/db)$/},()=>({path:"db",namespace:"report-fixture"}));b.onResolve({filter:/generated\/prisma\/client$/},()=>({path:"prisma",namespace:"report-fixture"}));b.onResolve({filter:/^(?:@\/lib\/session|\.\/session)$/},()=>({path:"session",namespace:"report-fixture"}));b.onLoad({filter:/.*/,namespace:"report-fixture"},args=>({contents:args.path==="db"?"export const db=globalThis.__reportFixture.db;":args.path==="prisma"?"export const Prisma=globalThis.__reportFixture.Prisma;":"export async function getSession(){return globalThis.__reportFixture.authenticated?{userId:'staff',organisationId:'org',sessionVersion:1,mfaVerified:true}:null;}"}));}}]});
   const fixtureModule={exports:{} as Row};new Function("require","module","exports",result.outputFiles[0].text)(createRequire(import.meta.url),fixtureModule,fixtureModule.exports);
   return {...state,api:fixtureModule.exports};
 }
@@ -60,6 +62,32 @@ test("real builder routes enforce authentication, origin, field validation and f
   const read=f.queries.find((q:Row)=>q.model==="unit");assert.equal(read.where.facility.organisationId,"org");assert.deepEqual(read.where.facility.id,{in:["a"]});assert.equal(read.take,5001);
 });
 test("permission revocation between query and release blocks rows",async()=>{const f=await fixture();(globalThis as Row).__reportFixture.changedOnRead=2;const response=await f.api.builder.POST(request({kind:"preview",query:query()}));assert.equal(response.status,403);assert.equal((await response.json()).data,undefined);});
+
+test('Word downloads use actual builder, fixed, bundle and retained-snapshot routes with the same protection',async()=>{
+  const f=await fixture(),JSZip=createRequire(import.meta.url)('jszip');
+  const download=await f.api.builder.POST(request({kind:'export',query:query(),format:'DOCX'}));assert.equal(download.status,200);assert.equal(download.headers.get('content-type'),WORD_REPORT_TYPE);assert.match(download.headers.get('content-disposition'),/\.docx/);assert.match(download.headers.get('cache-control'),/no-store/);
+  const word=await JSZip.loadAsync(Buffer.from(await download.arrayBuffer()),{checkCRC32:true});assert.ok((await word.file('word/document.xml').async('string')).includes('A1'));assert.equal(f.tables.reportRun[0].format,'DOCX');assert.ok(f.tables.auditEvent.some((r:Row)=>r.after.format==='DOCX'));
+  const fixed=await f.api.fixed.GET(new Request('https://fixture.invalid/api/v1/reports/export?reportKey=unit-availability&from=2026-10-01&to=2026-10-31&format=DOCX&facilityId=a'));assert.equal(fixed.status,200);assert.equal(fixed.headers.get('content-type'),WORD_REPORT_TYPE);assert.ok((await (await JSZip.loadAsync(Buffer.from(await fixed.arrayBuffer()))).file('word/document.xml').async('string')).includes('Current snapshot'));
+  f.tables.savedReport.push({id:'saved-word',organisationId:'org',ownerId:'staff',archived:false,visibility:'PRIVATE',definition:query()});
+  const bundled=await f.api.batch.POST(request({ids:['saved-word'],format:'DOCX'}));assert.equal(bundled.status,200);const zip=await JSZip.loadAsync(Buffer.from(await bundled.arrayBuffer()),{checkCRC32:true});const name=Object.keys(zip.files).find(n=>n.endsWith('.docx'));assert.ok(name);assert.ok((await JSZip.loadAsync(await zip.file(name).async('uint8array'))).file('word/document.xml'));assert.ok(zip.file('manifest.json'));
+  const previous=process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY;process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY='synthetic-word-snapshot-key-at-least-32-characters';
+  try{
+    const artifact={version:1,query:query(),generatedAt:'2026-10-01T08:00:00.000Z',basis:'Retained source snapshot evidence',rows:[{facility:'Fixture store',unit:'ORIGINAL',monthlyRate:100}],scope:{userId:'staff',organisationId:'org',facilityIds:['a'],unrestrictedFacilities:false}};
+    f.tables.reportRun.push({id:'word-snapshot',organisationId:'org',requestedById:'staff',reportKey:'scheduled-visual-report',status:'SUCCEEDED',expiresAt:new Date(Date.now()+60000),encryptedResult:encryptReportArtifact(JSON.stringify(artifact),'org:staff:word-snapshot')});
+    const retained=await f.api.runs.GET(new Request('https://fixture.invalid/api/v1/reports/runs/word-snapshot?format=DOCX'),{params:Promise.resolve({id:'word-snapshot'})});assert.equal(retained.status,200);const xml=await (await JSZip.loadAsync(Buffer.from(await retained.arrayBuffer()))).file('word/document.xml').async('string');assert.ok(xml.includes('ORIGINAL'));assert.ok(xml.includes('Retained source snapshot evidence'));assert.ok(xml.includes(artifact.generatedAt));
+    f.user.roleAssignments=[];assert.equal((await f.api.runs.GET(new Request('https://fixture.invalid/api/v1/reports/runs/word-snapshot?format=DOCX'),{params:Promise.resolve({id:'word-snapshot'})})).status,403);
+  }finally{if(previous===undefined)delete process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY;else process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY=previous;}
+});
+test('Word never bypasses personal-data scope, current revocation, secret filtering, audit failure or output limits',async()=>{
+  let f=await fixture();f.user.roleAssignments=[{facilityId:'a',role:{name:'Synthetic reporter',permissions:['reports.sales','reports.export']}}];f.tables.lead.push({id:'lead',facility:{id:'a',organisationId:'org',name:'Fixture store'},customer:{companyName:null,firstName:'Synthetic',lastName:'Customer'},source:'Recorded',stage:'NEW',createdAt:new Date('2026-10-02')});
+  assert.equal((await f.api.builder.POST(request({kind:'export',query:{...defaultVisualQuery('leads','2026-10-01','2026-10-31'),columns:['customer']},format:'DOCX'}))).status,403);
+  f=await fixture();assert.equal((await f.api.builder.POST(request({kind:'export',query:{...query(),facilityId:'excluded'},format:'DOCX'}))).status,403);
+  f=await fixture();(globalThis as Row).__reportFixture.changedOnRead=2;assert.equal((await f.api.builder.POST(request({kind:'export',query:query(),format:'DOCX'}))).status,403);
+  f=await fixture();(globalThis as Row).__reportFixture.changedOnRead=3;(globalThis as Row).__reportFixture.changedAssignments=[{facilityId:'excluded',role:{name:'Moved reporter',permissions:['reports.view','reports.export']}}];assert.equal((await f.api.fixed.GET(new Request('https://fixture.invalid/api/v1/reports/export?reportKey=unit-availability&from=2026-10-01&to=2026-10-31&format=DOCX&facilityId=a'))).status,403);
+  f=await fixture();f.tables.unit[0].number='Bearer '+'A'.repeat(24);assert.equal((await f.api.builder.POST(request({kind:'export',query:query(),format:'DOCX'}))).status,422);
+  f=await fixture();(globalThis as Row).__reportFixture.failAudit=true;assert.equal((await f.api.builder.POST(request({kind:'export',query:query(),format:'DOCX'}))).status,500);
+  f=await fixture();f.tables.unit[0].number='&'.repeat(1100000);const limit=await f.api.builder.POST(request({kind:'export',query:query(),format:'DOCX'}));assert.equal(limit.status,422);assert.equal((await limit.json()).error.code,'REPORT_LIMIT');
+});
 test("save is idempotent and audit failures roll back definition changes",async()=>{
   const f=await fixture(),body={kind:"save",query:query(),requestKey:randomUUID()};
   const first=await f.api.builder.POST(request(body));assert.equal(first.status,201);const saved=(await first.json()).data;

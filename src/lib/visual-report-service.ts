@@ -6,6 +6,7 @@ import { currentRoleAccess } from "@/lib/current-role-access";
 import { guardReportExport } from "@/lib/dlp-export-service";
 import { dlpPrivateHeaders, DLP_MAX_BYTES } from "@/lib/dlp-policy";
 import { reportExcel, reportPdf } from "@/lib/report-documents";
+import { reportWord, WORD_REPORT_TYPE } from "@/lib/report-word";
 import { toCsv } from "@/lib/reporting";
 import { reportFieldLabel, visualReportDatasets, visualReportSchema, type VisualReportQuery, type VisualReportRow } from "@/lib/visual-report-contract";
 import { visualReportSource } from "@/lib/visual-report-data";
@@ -14,7 +15,7 @@ import { personalReportAccess, visualReportScope } from "@/lib/visual-report-sec
 import type { Prisma } from "@/generated/prisma/client";
 import type { RequestScope } from "@/lib/scope";
 
-export const visualFormatSchema=z.enum(["CSV","XLSX","PDF","JSON"]);
+export const visualFormatSchema=z.enum(["CSV","XLSX","PDF","DOCX","JSON"]);
 type Actor=Awaited<ReturnType<typeof requireSession>>;
 export const reportWriteSchema=z.discriminatedUnion("kind",[
   z.object({kind:z.literal("preview"),query:visualReportSchema}).strict(),
@@ -60,8 +61,8 @@ export async function visualExportResponse(query:VisualReportQuery,rows:VisualRe
     const csv=labelled.length?toCsv(labelled):toCsv([Object.fromEntries(keys.map(k=>[reportFieldLabel(dataset,k),null]))]).split("\r\n")[0];
     return new Response(csv,{headers:{...exportHeaders,"content-type":"text/csv; charset=utf-8"}});
   }
-  const bytes=format==="XLSX"?await reportExcel(query.name,"visual-report",labelled,period):await reportPdf(query.name,"visual-report",labelled,period);
-  return new Response(Buffer.from(bytes),{headers:{...exportHeaders,"content-type":format==="XLSX"?"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":"application/pdf"}});
+  const bytes=format==="DOCX"?reportWord(query.name,labelled,period,keys.map(key=>reportFieldLabel(dataset,key)),generatedAt):format==="XLSX"?await reportExcel(query.name,"visual-report",labelled,period):await reportPdf(query.name,"visual-report",labelled,period);
+  return new Response(Buffer.from(bytes),{headers:{...exportHeaders,"content-type":format==="DOCX"?WORD_REPORT_TYPE:format==="XLSX"?"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":"application/pdf"}});
 }
 const json=(v:unknown)=>JSON.parse(JSON.stringify(v)) as Prisma.InputJsonValue;
 export async function saveVisualReport(actor:Actor,body:Extract<z.infer<typeof reportWriteSchema>,{kind:"save"}>) {

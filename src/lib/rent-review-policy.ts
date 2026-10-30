@@ -4,8 +4,11 @@ export const rentReviewInput = z.object({
   facilityId: z.string().min(1).max(100), minimumMonths: z.number().int().min(0).max(1200),
   basis: z.enum(['TIME_IN_UNIT', 'TIME_SINCE_CHANGE']), type: z.enum(['PERCENTAGE', 'AMOUNT']),
   value: z.number().finite().positive().max(1000000), effectivePeriod: z.string().regex(/^20\d{2}-(0[1-9]|1[0-2])$/),
+  selectedOccupancyIds: z.array(z.string().min(1).max(100)).max(1000).refine(ids=>new Set(ids).size===ids.length, 'Select each occupancy once.').default([]).transform(ids=>ids.sort()),
 }).strict().superRefine((v, ctx) => { if (v.type === 'AMOUNT' && Math.abs(v.value * 100 - Math.round(v.value * 100)) > 0.000001) ctx.addIssue({code:'custom',message:'Rand amounts must use whole cents.'}); if (v.type === 'PERCENTAGE' && v.value > 100) ctx.addIssue({ code: 'custom', message: 'Percentage must not exceed 100.' }); });
 export type RentReviewInput = z.infer<typeof rentReviewInput>;
+export const rentReviewStateSchema = z.object({version:z.literal(1),status:z.enum(['PENDING','DISMISSED']),reason:z.string().trim().min(5).max(500)}).strict();
+export const rentReviewStateInput = z.object({facilityId:z.string().min(1).max(100),occupancyId:z.string().min(1).max(100),status:z.enum(['PENDING','DISMISSED']),reason:z.string().trim().min(5).max(500),expectedUpdatedAt:z.iso.datetime().nullable()}).strict();
 export const rentScheduleSchema = z.object({ baseline: z.number().finite().min(0).max(10000000), changes: z.array(z.object({ period: z.string().regex(/^20\d{2}-(0[1-9]|1[0-2])$/), rate: z.number().finite().min(0).max(10000000), approvedAt: z.string().datetime(), approvalReference: z.string().min(5).max(250), batchId: z.string().uuid() }).strict()).max(100) }).strict().superRefine((v,c)=>{ if(new Set(v.changes.map(x=>x.period)).size!==v.changes.length)c.addIssue({code:'custom',message:'Duplicate effective period'}); });
 export type RentSchedule = z.infer<typeof rentScheduleSchema>;
 export function daysBetween(start: string, end: string) { return Math.max(0, Math.floor((Date.parse(end+'T00:00:00Z')-Date.parse(start+'T00:00:00Z'))/86400000)); }

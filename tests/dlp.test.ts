@@ -30,7 +30,7 @@ async function fixture() {
     builder.onResolve({ filter: /^@\/lib\/(db|auth-guards|scope|report-data-service)$/ }, args => ({ path: args.path, namespace: "fixture" }));
     builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents:
       args.path.endsWith("/db") ? "export const db={$queryRaw:async()=>[{count:1}],auditEvent:{create:async({data})=>{if(__state.failAudit)throw Error('AUDIT_DOWN');__state.audits.push(data);return data;}}};" :
-      args.path.endsWith("/scope") ? "export const requirePermissionScope=async()=>({organisationId:'org-a',facilityIds:['facility-a'],unrestrictedFacilities:false});" :
+      args.path.endsWith("/scope") ? "export const requirePermissionScope=async()=>({userId:'actor-a',organisationId:'org-a',facilityIds:['facility-a'],unrestrictedFacilities:false});" :
       args.path.endsWith("/report-data-service") ? "export const buildReportRows=async()=>__state.rows;" :
       "export const requirePermission=async()=>{if(!__state.allowed)throw Error('FORBIDDEN');return {organisationId:'org-a',user:{id:'actor-a',roleAssignments:[{facilityId:'facility-a',role:{name:'Custom access · actor-a',permissions:__state.personalPermissions}}]},permissions:['*'],allowedFacilityIds:['facility-a']};};export const authErrorResponse=e=>Response.json({error:{code:e.message==='FORBIDDEN'?'FORBIDDEN':'INTERNAL_ERROR'}},{status:e.message==='FORBIDDEN'?403:500});"
     }));
@@ -42,14 +42,14 @@ async function fixture() {
 }
 test("CSV and JSON pass the same audited policy boundary and private response headers", async () => {
   const f = await fixture();
-  for (const format of ["CSV", "JSON", "XLSX", "PDF"]) {
+  for (const format of ["CSV", "JSON", "XLSX", "PDF", "DOCX"]) {
     const response = await f.get(format);
     assert.equal(response.status, 200);
     assert.match(response.headers.get("cache-control")!, /no-store/);
     assert.equal(response.headers.get("x-stor24-data-classification"), "restricted");
     assert.ok(response.headers.get("x-request-id"));
   }
-  assert.equal(f.state.audits.length, 4);
+  assert.equal(f.state.audits.length, 5);
   assert.equal(f.state.audits[0].organisationId, "org-a");
   assert.equal(f.state.audits[0].actorId, "actor-a");
   assert.doesNotMatch(JSON.stringify(f.state.audits), /Synthetic customer/);
@@ -76,12 +76,12 @@ test("DLP does not grant report access to an unauthorised actor", async () => {
 
 test("all download formats deny personal rows without explicit authorisation and audit before release", async () => {
   const f = await fixture(); f.state.personalPermissions = ["*", "data.*", "reports.*"];
-  for (const format of ["CSV", "JSON", "XLSX", "PDF"]) {
+  for (const format of ["CSV", "JSON", "XLSX", "PDF", "DOCX"]) {
     const response = await f.get(format);
     assert.equal(response.status, 403);
     assert.doesNotMatch(await response.text(), /Synthetic customer/);
   }
-  assert.equal(f.state.audits.length, 4);
+  assert.equal(f.state.audits.length, 5);
   assert.ok(f.state.audits.every(a => a.action === "dlp.export.blocked"));
   f.state.rows = [{ facility: "Test store", totalUnits: 10 }];
   assert.equal((await f.get()).status, 200);
