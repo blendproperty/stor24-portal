@@ -16,13 +16,14 @@ await new Promise(r=>server.listen(0,'127.0.0.1',r));await mkdir('output/forms-b
 const [store,cso,manager,run]=Array.from({length:4},(_,i)=>`cm0000000000000000000000${i}`);
 const photograph=await sharp({create:{width:40,height:30,channels:3,background:'#d0d5d8'}}).png().toBuffer();
 try{for(const width of [1440,390,320]){
- const page=await browser.newPage({viewport:{width,height:1000}}),errors=[],createKeys=[];page.on('pageerror',e=>errors.push(e.message));let actor=cso,mode='ok',writes=0,version=0;
+ const page=await browser.newPage({viewport:{width,height:1000}}),errors=[],createKeys=[];page.on('pageerror',e=>errors.push(e.message));let actor=cso,mode='ok',writes=0,version=0,holdRead=false,releaseRead=null;
  let record={version:1,kind:'MAINTENANCE',values:{},photos:[],reviewerId:null,submittedAt:null,reviewedAt:null,reviewedBy:null,reviewNote:''};
  let task={id:run,title:'Maintenance and marketing issue',facilityId:store,createdById:cso,status:'OPEN',createdAt:'2026-10-30T08:00:00.000Z',updatedAt:'2026-10-30T08:00:00.000Z',facility:{name:'Synthetic Midpoint'},assignee:{name:'Synthetic CSO'}};
  const meta=()=>({actorId:actor,facilities:[{id:store,name:'Synthetic Midpoint'}],managerFacilityIds:actor===manager?[store]:[],reviewers:actor===cso?[{id:manager,name:'Synthetic manager',facilityIds:[store]}]:[]});
- await page.route('**/api/v1/operations/forms*',route=>{
+ await page.route('**/api/v1/operations/forms*',async route=>{
   const req=route.request(),url=new URL(req.url());
   if(req.method()==='GET'){
+   if(holdRead)await new Promise(resolve=>{releaseRead=resolve;});
    if(mode==='denied')return route.fulfill({status:403,json:{error:{message:'Access revoked'}}});
    return route.fulfill({json:{data:{...meta(),...(url.searchParams.has('id')?{task:{...task,operationalForm:record}}:{tasks:[task],nextCursor:null})}}});
   }
@@ -46,7 +47,9 @@ try{for(const width of [1440,390,320]){
  await page.getByRole('button',{name:'Save draft',exact:true}).click();await expect(page.getByRole('textbox',{name:'Issue *',exact:true})).toHaveValue('Synthetic damaged latch');await expect(page.getByRole('img',{name:'synthetic-equipment.png'})).toBeVisible();
  await page.getByRole('button',{name:'Submit for review',exact:true}).click();await expect(page.getByRole('button',{name:'Save draft',exact:true})).toHaveCount(0);
  actor=manager;await page.getByRole('button',{name:'Reload saved forms'}).click();await page.getByLabel('Review / cancellation note').fill('Please confirm photograph reference');await page.getByRole('button',{name:'Return for correction'}).click();
- actor=cso;await page.getByRole('button',{name:'Reload saved forms'}).click();await page.getByRole('button',{name:'Submit for review',exact:true}).click();actor=manager;await page.getByRole('button',{name:'Reload saved forms'}).click();await page.getByLabel('Review / cancellation note').fill('Reviewed; repairs and spending remain separate');await page.getByRole('button',{name:'Record manager review'}).click();await expect(page.getByRole('textbox',{name:'Issue *',exact:true})).toBeDisabled();
+ actor=cso;await page.getByRole('button',{name:'Reload saved forms'}).click();await page.getByRole('button',{name:'Submit for review',exact:true}).click();actor=manager;await page.getByRole('button',{name:'Reload saved forms'}).click();await page.getByLabel('Review / cancellation note').fill('Reviewed; repairs and spending remain separate');
+ holdRead=true;await page.getByRole('button',{name:'Reload saved forms'}).click();await expect.poll(()=>releaseRead!==null).toBe(true);await expect(page.getByLabel('Review / cancellation note')).toBeDisabled();holdRead=false;releaseRead();releaseRead=null;
+ await page.getByLabel('Review / cancellation note').fill('Reviewed; repairs and spending remain separate');await page.getByRole('button',{name:'Record manager review'}).click();await expect(page.getByRole('textbox',{name:'Issue *',exact:true})).toBeDisabled();
  await page.screenshot({path:`output/forms-browser/reviewed-${width}.png`,fullPage:true});
  actor=manager;task={...task,status:'OPEN',createdById:manager,title:'Supplier service and cost review',assignee:{name:'Synthetic manager'}};record={...record,kind:'ADJUDICATION',values:{supplier:'Synthetic contractor',cost:'1200.50'},reviewedAt:null,reviewedBy:null};await page.getByRole('button',{name:'Reload saved forms'}).click();await expect(page.getByRole('button',{name:'Submit for review',exact:true})).toBeDisabled();await expect(page.getByLabel('Quoted cost (ZAR)')).toHaveValue('1200.50');
  await page.screenshot({path:`output/forms-browser/held-${width}.png`,fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
