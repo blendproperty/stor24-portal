@@ -91,8 +91,9 @@ async function main() {
     await mkdir("output/launch-tracking",{recursive:true});
     for(const [pathname,source,medium,campaign,content,term,consent] of cases){
       const context=await browser.newContext({viewport:{width:390,height:1000}}),page=await context.newPage();
+      const meta: string[]=[];
       const errors:string[]=[];page.on("pageerror",e=>errors.push(e.message));
-      await page.route("**/*",r=>r.request().url().startsWith(base)?r.continue():r.fulfill({contentType:"application/javascript",body:"/* external analytics transport isolated */"}));
+      await page.route("**/*",r=>{const url=r.request().url();if(url.startsWith("https://www.facebook.com/"))meta.push(url);return url.startsWith(base)?r.continue():r.fulfill({contentType:"application/javascript",body:"/* external analytics transport isolated */"});});
       const query=new URLSearchParams({utm_source:source,utm_medium:medium,utm_campaign:campaign,utm_content:content,utm_term:term,email:"private-tag@example.invalid"});
       await page.goto(base+pathname+"?"+query);
       await page.getByRole("button",{name:consent?"Accept analytics":"Reject analytics",exact:true}).click();
@@ -113,6 +114,7 @@ async function main() {
       assert.equal(last.attribution?.conversionPage,consent?pathname:undefined);
       const events=await page.evaluate(()=>JSON.parse(sessionStorage.getItem("launch-events")||"[]"));
       const saved=events.filter((e:unknown[])=>e[1]==="generate_lead");assert.equal(saved.length,consent?1:0);
+      assert.equal(meta.filter(url=>new URL(url).searchParams.get("ev")==="Lead").length,consent?1:0);
       if(consent){assert.equal(saved[0][2].campaign_name,campaign);assert.equal(saved[0][2].campaign_content,content);assert.equal(JSON.stringify(saved).includes("private-tag"),false);}
       assert.deepEqual(errors,[]);await context.close();
     }
