@@ -18,7 +18,7 @@ const authDb=new pg.Pool({connectionString:process.env.AUTH_ROLE_URL,max:4});
 let router;
 const suffix=randomBytes(8).toString('hex');
 const orgs=[`stage-org-a-${suffix}`,`stage-org-b-${suffix}`], users=[`stage-user-a-${suffix}`,`stage-user-b-${suffix}`], roles=[`stage-role-a-${suffix}`,`stage-role-b-${suffix}`], customers=[`stage-customer-a-${suffix}`,`stage-customer-b-${suffix}`];
-const policies=[`stage_a_${suffix}`,`stage_b_${suffix}`], authView=`stage_auth_users_${suffix}`, servers=[];
+const policies=[`stage_a_${suffix}`,`stage_b_${suffix}`], authView=`stage_auth_users_${suffix}`, tenantAuthView=`stage_auth_tenant_${suffix}`, servers=[];
 const tenantTokens=[randomBytes(32).toString('hex'),randomBytes(32).toString('hex')];
 const tenantHashes=tenantTokens.map(value=>createHash('sha256').update(value).digest('hex'));
 const accounts=[`stage-account-a-${suffix}`,`stage-account-b-${suffix}`];
@@ -55,9 +55,13 @@ try {
   granted=true;
   await owner.query(`CREATE VIEW \"${authView}\" AS SELECT id,\"organisationId\",active,\"sessionVersion\",(\"passwordHash\" IS NOT NULL) AS password_set FROM \"User\"`);
   await owner.query(`GRANT SELECT ON \"${authView}\" TO stage_auth`);
+  await owner.query(`CREATE VIEW \"${tenantAuthView}\" AS SELECT \"tokenHash\",\"organisationId\",\"expiresAt\",\"revokedAt\" FROM \"TenantPortalSession\"`);
+  await owner.query(`GRANT SELECT ON \"${tenantAuthView}\" TO stage_auth`);
   await assert.rejects(authDb.query('SELECT \"passwordHash\" FROM \"User\"'),error=>error.code==='42501');
   await assert.rejects(authDb.query('SELECT id FROM \"Customer\"'),error=>error.code==='42501');
+  await assert.rejects(authDb.query('SELECT \"tokenHash\" FROM \"TenantPortalSession\"'),error=>error.code==='42501');
   await owner.query('GRANT SELECT ON ALL TABLES IN SCHEMA public TO stage_tenant_a,stage_tenant_b');
+  await owner.query(`REVOKE ALL ON \"${authView}\", \"${tenantAuthView}\" FROM stage_tenant_a,stage_tenant_b`);
   await owner.query('GRANT INSERT ON "AuditEvent" TO stage_tenant_a,stage_tenant_b');
   await owner.query('REVOKE ALL ON "_prisma_migrations" FROM stage_tenant_a,stage_tenant_b');
   for(let i=0;i<2;i++){
@@ -65,6 +69,10 @@ try {
     await owner.query(`CREATE POLICY "${policies[i]}" ON "Customer" FOR SELECT TO ${role} USING ("organisationId"='${orgs[i]}')`);
   }
   await owner.query('ALTER TABLE "Customer" ENABLE ROW LEVEL SECURITY');enabled=true;
+  for(const db of dbs){
+    await assert.rejects(db.query(`SELECT * FROM \"${tenantAuthView}\"`),error=>error.code==='42501');
+    await assert.rejects(db.query(`SELECT * FROM \"${authView}\"`),error=>error.code==='42501');
+  }
   for(const [table,predicate] of [['Account',`EXISTS (SELECT 1 FROM "Customer" c WHERE c.id="Account"."customerId")`],['TenantPortalSession',null]]){
     protectedPortalTables.push(table);
     for(let i=0;i<2;i++){
@@ -78,6 +86,20 @@ try {
   await Promise.all([ready(3101,a),ready(3102,b)]);
   router=createServer(async (req,res)=>{
     try {
+      if(req.url==='/api/tenant/accounts'){
+        const cookie=(req.headers.cookie||'').split(';').map(v=>v.trim()).find(v=>v.startsWith('stor24_tenant_session='));
+        const token=cookie?.slice('stor24_tenant_session='.length);
+        if(!token||!/^[a-f0-9]{64}$/.test(token))throw new Error('tenant session');
+        const digest=createHash('sha256').update(token).digest('hex');
+        const row=(await authDb.query(`SELECT \"organisationId\" FROM \"${tenantAuthView}\" WHERE \"tokenHash\"=$1 AND \"revokedAt\" IS NULL AND \"expiresAt\">now()`,[digest])).rows[0];
+        const index=orgs.indexOf(row?.organisationId);if(index<0)throw new Error('tenant routing');
+        const downstream=await fetch(`http://127.0.0.1:${3101+index}/api/tenant/accounts`,{headers:{cookie:`stor24_tenant_session=${token}`}});
+        const responseHeaders={'content-type':'application/json'};
+        for(const name of ['cache-control','x-content-type-options','referrer-policy']){
+          const value=downstream.headers.get(name);if(value)responseHeaders[name]=value;
+        }
+        res.writeHead(downstream.status,responseHeaders);res.end(await downstream.text());return;
+      }
       const cookie=(req.headers.cookie||'').split(';').map(v=>v.trim()).find(v=>v.startsWith('stor24_session='));
       if(!cookie)throw new Error('session');
       const {payload}=await jwtVerify(cookie.slice('stor24_session='.length),new TextEncoder().encode(process.env.AUTH_SECRET),{algorithms:['HS256']});
@@ -87,7 +109,7 @@ try {
       const index=orgs.indexOf(row.organisationId);if(index<0)throw new Error('routing');
       const downstream=await request(3101+index,cookie.slice('stor24_session='.length));
       res.writeHead(downstream.status,{'content-type':'application/json'});res.end(await downstream.text());
-    } catch { res.writeHead(401);res.end(); }
+    } catch { res.writeHead(401,{'cache-control':'private, no-store, max-age=0'});res.end(); }
   });
   await new Promise((resolve,reject)=>router.listen(3100,'127.0.0.1',resolve).once('error',reject));
   const tokens=await Promise.all([token(0),token(1)]);
@@ -118,17 +140,31 @@ try {
   }
   await owner.query('INSERT INTO "Customer" (id,"organisationId",email,"emailVerifiedAt","updatedAt") VALUES ($1,$2,$3,now(),now())',[sameOrgCustomer,orgs[0],`tenant-0-${suffix}@example.invalid`]);
   await owner.query('INSERT INTO "Account" (id,"customerId","accountNumber","updatedAt") VALUES ($1,$2,$1,now())',[sameOrgAccount,sameOrgCustomer]);
+  const tenantRequest=(port,session)=>fetch(`http://127.0.0.1:${port}/api/tenant/accounts`,{headers:{cookie:`stor24_tenant_session=${session}`}});
+  const malformedTenant=await tenantRequest(3100,'invalid');
+  assert.equal(malformedTenant.status,401,'malformed portal tokens cannot be routed');
+  assert.match(malformedTenant.headers.get('cache-control')||'',/no-store/,'rejected private responses must not be cached');
+  assert.equal((await tenantRequest(3100,'0'.repeat(64))).status,401,'unknown portal tokens cannot be routed');
   for(let i=0;i<2;i++){
-    const tenantRequest=(port,session)=>fetch(`http://127.0.0.1:${port}/api/tenant/accounts`,{headers:{cookie:`stor24_tenant_session=${session}`}});
     const tenantResponse=await tenantRequest(3101+i,tenantTokens[i]);
     assert.equal(tenantResponse.status,200,'customer session works through its organisation database role');
     assert.deepEqual((await tenantResponse.json()).data.accounts.map(row=>row.id),[accounts[i]],'customer sees only their own account');
+    const routedTenant=await tenantRequest(3100,tenantTokens[i]);
+    assert.equal(routedTenant.status,200,'the verified customer session selects its organisation role');
+    assert.match(routedTenant.headers.get('cache-control')||'',/no-store/,'the router preserves downstream private cache controls');
+    assert.equal(routedTenant.headers.get('x-content-type-options'),'nosniff');
+    assert.equal(routedTenant.headers.get('referrer-policy'),tenantResponse.headers.get('referrer-policy'),'the router preserves the actual downstream referrer policy');
+    assert.deepEqual((await routedTenant.json()).data.accounts.map(row=>row.id),[accounts[i]]);
     assert.equal((await tenantRequest(3102-i,tenantTokens[i])).status,401,'customer session on the other role cannot read its customer');
     const visibleAccounts=i?[accounts[1]]:[accounts[0],sameOrgAccount].sort();
     assert.deepEqual((await dbs[i].query('SELECT id FROM "Account" WHERE id=ANY($1::text[])',[[...accounts,sameOrgAccount]])).rows.map(row=>row.id).sort(),visibleAccounts,'account RLS is organisation-scoped, while the portal applies customer scope');
     assert.deepEqual((await dbs[i].query('SELECT "tokenHash" FROM "TenantPortalSession" WHERE "tokenHash"=ANY($1::text[])',[tenantHashes])).rows.map(row=>row.tokenHash),[tenantHashes[i]],'session RLS exposes only its own organisation');
+    await owner.query('UPDATE "TenantPortalSession" SET "expiresAt"=now()-interval \'1 minute\' WHERE "tokenHash"=$1',[tenantHashes[i]]);
+    assert.equal((await tenantRequest(3100,tenantTokens[i])).status,401,'expired customer session cannot be routed');
+    await owner.query('UPDATE "TenantPortalSession" SET "expiresAt"=now()+interval \'10 minutes\' WHERE "tokenHash"=$1',[tenantHashes[i]]);
     await owner.query('UPDATE "TenantPortalSession" SET "revokedAt"=now() WHERE "tokenHash"=$1',[tenantHashes[i]]);
     assert.equal((await tenantRequest(3101+i,tenantTokens[i])).status,401,'revoked customer session cannot read accounts');
+    assert.equal((await tenantRequest(3100,tenantTokens[i])).status,401,'revoked customer session cannot be routed');
   }
   const concurrent=await Promise.all(Array.from({length:20},(_,i)=>request(3100,tokens[i%2])));
   for(let i=0;i<concurrent.length;i++){
@@ -167,6 +203,7 @@ try {
   for(const policy of policies)await owner.query(`DROP POLICY IF EXISTS "${policy}" ON "Customer"`).catch(()=>{});
   if(granted)await owner.query('REVOKE ALL ON ALL TABLES IN SCHEMA public FROM stage_tenant_a,stage_tenant_b').catch(()=>{});
   await owner.query(`DROP VIEW IF EXISTS \"${authView}\"`).catch(()=>{});
+  await owner.query(`DROP VIEW IF EXISTS \"${tenantAuthView}\"`).catch(()=>{});
   if(granted)await owner.query('REVOKE USAGE ON SCHEMA public FROM stage_tenant_a,stage_tenant_b,stage_auth').catch(()=>{});
   await owner.query('DELETE FROM "TenantPortalSession" WHERE "tokenHash"=ANY($1::text[])',[tenantHashes]).catch(()=>{});
   await owner.query('DELETE FROM "Account" WHERE id=ANY($1::text[])',[[...accounts,sameOrgAccount]]).catch(()=>{});
