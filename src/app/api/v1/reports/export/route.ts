@@ -1,5 +1,6 @@
 import { currentRoleAccess } from "@/lib/current-role-access";
 import { reportExcel, reportPdf } from "@/lib/report-documents";
+import { reportWord, WORD_REPORT_TYPE } from "@/lib/report-word";
 import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
 import { buildReportRows } from "@/lib/report-data-service";
 import { findPermittedReport, isCurrentSnapshotReport, reportParametersSchema, toCsv } from "@/lib/reporting";
@@ -35,6 +36,11 @@ export async function GET(request: Request) {
     const isSnapshot = isCurrentSnapshotReport(definition.key);
     const rows = await buildReportRows(scope, parsed.data);
     const currentActor = await requirePermission("reports.export");
+    const currentReportScope = await requirePermissionScope(definition.permission);
+    const releasedFacilities = parsed.data.facilityId ? [parsed.data.facilityId] : scope.unrestrictedFacilities ? null : scope.facilityIds;
+    if(currentActor.user.id!==session.user.id||currentActor.organisationId!==session.organisationId||currentReportScope.userId!==session.user.id||currentReportScope.organisationId!==session.organisationId||
+      (currentActor.allowedFacilityIds!==null&&(releasedFacilities===null||releasedFacilities.some(id=>!currentActor.allowedFacilityIds!.includes(id))))||
+      (!currentReportScope.unrestrictedFacilities&&(releasedFacilities===null||releasedFacilities.some(id=>!currentReportScope.facilityIds.includes(id)))))throw new Error('FORBIDDEN');
     const personalAccess = currentRoleAccess(currentActor.user.roleAssignments, "data.personal_export");
     const personalFacilityIds = parsed.data.facilityId ? [parsed.data.facilityId] : scope.facilityIds;
     const personalDataAllowed = personalAccess.allowed && (personalAccess.allowedFacilityIds === null ||
@@ -45,6 +51,10 @@ export async function GET(request: Request) {
     if (!decision.allowed) return Response.json({ error: { code: "DLP_EXPORT_BLOCKED", message: "Data protection blocked this export. Contact your administrator with the request reference.", requestId: decision.requestId } }, { status: 422, headers });
     if (parsed.data.format === "JSON") {
       return Response.json({ data: rows, meta: { parameters: parsed.data, currentSnapshot: isSnapshot, source: "stor24-production-database", classification: decision.classification, policyVersion: decision.policyVersion, requestId: decision.requestId } }, { headers });
+    }
+    if (parsed.data.format === "DOCX") {
+      const period=isSnapshot?'Current snapshot':`${parsed.data.from} to ${parsed.data.to} SAST`;
+      return new Response(reportWord(definition.name,rows,period),{headers:{...headers,'content-type':WORD_REPORT_TYPE,'content-disposition':`attachment; filename="${definition.key}.docx"`}});
     }
     if (parsed.data.format === "XLSX" || parsed.data.format === "PDF") {
       const excel = parsed.data.format === "XLSX";
@@ -60,6 +70,7 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
+    if(error instanceof Error&&error.message==='REPORT_LIMIT')return Response.json({error:{code:'REPORT_LIMIT',message:'Choose a smaller report scope for Word export.'}},{status:422,headers:dlpPrivateHeaders});
     if(error instanceof Error&&error.message.startsWith("POSTED_REPORT_"))return Response.json({error:{code:error.message,message:"Choose a valid date range of at most sixty months and a smaller store scope, or review duplicate/invalid posting evidence."}},{status:422,headers:dlpPrivateHeaders});
     if (error instanceof Error && /^RECURRING_/.test(error.message)) return Response.json({ error: { code: error.message, message: error.message === "RECURRING_PERIOD_INVALID" ? "Choose one complete month from this month through the next twelve months. This is a current-plan projection." : "The recurring-charge source needs review or a smaller facility scope." } }, { status: 422, headers: dlpPrivateHeaders });
     if (error instanceof Error && error.message === "COLLECTION_DATE") return Response.json({ error: { code: "VALIDATION_ERROR", message: "Choose an ageing date on or before today in South Africa." } }, { status: 422 });

@@ -1,0 +1,12 @@
+.workspace { min-width: 0; }
+.workspace fieldset { min-width: 0; border: 1px solid var(--border, #d7dde1); border-radius: 10px; padding: 1rem; margin: 1rem 0; }
+.workspace legend { font-weight: 650; padding: 0 .35rem; overflow-wrap: anywhere; }
+.workspace textarea { width: 100%; min-height: 70px; resize: vertical; }
+.workspace input, .workspace select, .workspace textarea { max-width: 100%; }
+.workspace p { overflow-wrap: anywhere; }
+.workspace label { display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
+.workspace label:has(input[type="checkbox"]) { flex-direction: row; align-items: center; }
+.rows { display: grid; gap: .5rem; }
+.row { background: var(--surface, #fff); }
+.run { flex-wrap: wrap; justify-content: space-between; }
+@media (max-width: 600px) { .workspace fieldset { padding: .65rem; } .workspace :global(.form-grid) { grid-template-columns: minmax(0, 1fr); } .workspace :global(.button-row) { flex-wrap: wrap; } }

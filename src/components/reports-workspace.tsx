@@ -9,7 +9,7 @@ import { isCurrentSnapshotReport, type ReportDefinition } from "@/lib/reporting"
 export function ReportsWorkspace({ reports, facilities, initialFrom, initialTo, canExport, initialReportKey, canReviewNetcash = false }: { reports: readonly ReportDefinition[]; facilities: { id: string; name: string }[]; initialFrom: string; initialTo: string; canExport: boolean; initialReportKey?: string; canReviewNetcash?: boolean }) {
   const [previewRun,setPreviewRun] = useState(0);
   const [previewQuery, setPreviewQuery] = useState("");
-  const [format, setFormat] = useState<"CSV" | "XLSX" | "PDF">("CSV");
+  const [format, setFormat] = useState<"CSV" | "XLSX" | "PDF" | "DOCX">("CSV");
   const [group, setGroup] = useState("All");
   const [reportKey, setReportKey] = useState(reports.find(r=>r.key===initialReportKey)?.key ?? reports[0]?.key ?? "");
   const [from, setFrom] = useState(initialFrom);
@@ -61,7 +61,7 @@ export function ReportsWorkspace({ reports, facilities, initialFrom, initialTo, 
         }
         setFailed(true); setMessage(response.status === 422 && typeof payload.error?.message === "string" ? payload.error.message : "The report could not be prepared. Your selections are retained; please try again."); return;
       }
-      if (response.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== ({CSV:"text/csv",XLSX:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",PDF:"application/pdf"}[selectedFormat])) throw new Error("INVALID_EXPORT");
+      if (response.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== ({CSV:"text/csv",XLSX:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",PDF:"application/pdf",DOCX:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"}[selectedFormat])) throw new Error("INVALID_EXPORT");
       const blob = await response.blob();
       if (controller.signal.aborted) throw new Error("EXPORT_ABORTED");
       if (!blob.size) { setMessage("No rows matched these report parameters. Review the report, dates and facility."); return; }
@@ -96,7 +96,7 @@ export function ReportsWorkspace({ reports, facilities, initialFrom, initialTo, 
           <label>Account, tenant or unit<input disabled={busy} maxLength={100} value={recurringSearch} onChange={e=>setRecurringSearch(e.target.value)}/></label></> : null}
           <label>Facility<select aria-label="Facility" disabled={busy} value={facilityId} onChange={(event) => setFacilityId(event.target.value)}><option value="">All permitted facilities</option>{facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}</select></label>
         </div>
-        <div className="report-actions"><button className="button button-secondary" disabled={busy || !reportKey || !!access} onClick={() => {if (!isRecurring && !isSnapshot && (!to || (!isAgeing && (!from || from > to)))) {setFailed(true);setMessage("Choose a valid reporting period.");return;}setPreviewQuery(exportHref.split("?")[1]);setPreviewRun(v=>v+1);}}>View report</button><label>{isRecurring ? "Backup format" : "Download format"}<select value={selectedFormat} onChange={e=>setFormat(e.target.value as "CSV" | "XLSX" | "PDF")}><option value="CSV">CSV</option>{!isRecurring ? <><option value="XLSX">Excel (.xlsx)</option><option value="PDF">PDF</option></> : null}</select></label>
+        <div className="report-actions"><button className="button button-secondary" disabled={busy || !reportKey || !!access} onClick={() => {if (!isRecurring && !isSnapshot && (!to || (!isAgeing && (!from || from > to)))) {setFailed(true);setMessage("Choose a valid reporting period.");return;}setPreviewQuery(exportHref.split("?")[1]);setPreviewRun(v=>v+1);}}>View report</button><label>{isRecurring ? "Backup format" : "Download format"}<select value={selectedFormat} onChange={e=>setFormat(e.target.value as "CSV" | "XLSX" | "PDF" | "DOCX")}><option value="CSV">CSV</option>{!isRecurring ? <><option value="XLSX">Excel (.xlsx)</option><option value="PDF">PDF</option><option value="DOCX">Word (.docx)</option></> : null}</select></label>
           <button className={isRecurring ? "button button-secondary" : "button button-primary"} disabled={busy || !canExport || !reportKey || !!access} onClick={() => void exportCsv()}><Download size={16}/>{busy ? `Preparing ${selectedFormat}…` : isRecurring ? "Download CSV backup" : `Export ${selectedFormat}`}</button>
           {!canExport ? <span className="permission-note"><LockKeyhole size={15}/> Export access is unavailable. Please contact your administrator if you require access.</span> : null}
         </div>

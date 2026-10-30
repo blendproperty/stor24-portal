@@ -17,6 +17,6 @@ export async function GET(request:Request,context:{params:Promise<{id:string}>})
     if(!run.encryptedResult||!run.expiresAt||run.expiresAt<=new Date())throw new ReportError("REPORT_EXPIRED");
     const artifact=artifactSchema.parse(JSON.parse(decryptReportArtifact(run.encryptedResult,`${actor.user.organisationId}:${actor.user.id}:${id}`)));
     const headers=await authoriseReportResult(actor,artifact.query,artifact.rows,true,format,artifact.scope);
-    return visualExportResponse(artifact.query,artifact.rows,format,headers,artifact.generatedAt,artifact.basis);
+    return await visualExportResponse(artifact.query,artifact.rows,format,headers,artifact.generatedAt,artifact.basis);
   }catch(error){return visualReportErrorResponse(error);}
 }

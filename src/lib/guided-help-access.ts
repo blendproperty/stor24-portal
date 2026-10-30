@@ -23,6 +23,7 @@ export const guideAccessRules: Record<string, Rule> = {
   "staff-arrivals": rule("operations.view", ["", "", "operations.manage", ""]),
   "staff-payment-review": rule("payments.view", ["", "", "", ""]),
   "staff-followups": rule("operations.view", ["", "operations.manage", "operations.manage", "", ""]),
+  "operational-checklists": rule("operations.view", ["", "operations.manage", "", "operations.manage"]),
   advertising: rule("@owner", ["", "", ""], true),
   "rent-reviews": rule("@owner", ["", "", ""], true),
   "lead-sla": rule("@owner", ["", "", ""], true),

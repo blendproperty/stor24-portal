@@ -6,3 +6,11 @@ test('future changes preserve historic billing rate and reject baseline drift',(
 test('increase validation refuses negative, unbounded and unknown inputs',()=>{const request={facilityId:'fixture',minimumMonths:12,basis:'TIME_IN_UNIT',type:'PERCENTAGE',value:5,effectivePeriod:'2026-12'};assert.ok(rentReviewInput.safeParse(request).success);assert.ok(!rentReviewInput.safeParse({...request,value:101}).success);assert.ok(!rentReviewInput.safeParse({...request,minimumMonths:-1}).success);assert.ok(!rentReviewInput.safeParse({...request,other:true}).success);});
 
 test("billing refuses invalid existing rates instead of posting negative or non-finite rent",()=>{assert.throws(()=>rateForPeriod(-1,null,"2026-10"),/RATE_INVALID/);assert.throws(()=>rateForPeriod(Number.NaN,null,"2026-10"),/RATE_INVALID/);assert.throws(()=>rateForPeriod(Number.POSITIVE_INFINITY,null,"2026-10"),/RATE_INVALID/);});
+
+test('rent review selections are explicit, bounded and unique',()=>{
+ const request={facilityId:'fixture',minimumMonths:12,basis:'TIME_IN_UNIT',type:'PERCENTAGE',value:5,effectivePeriod:'2026-12'};
+ assert.deepEqual(rentReviewInput.parse(request).selectedOccupancyIds,[]);
+ assert.deepEqual(rentReviewInput.parse({...request,selectedOccupancyIds:['b','a']}).selectedOccupancyIds,['a','b']);
+ assert.ok(!rentReviewInput.safeParse({...request,selectedOccupancyIds:['a','a']}).success);
+ assert.ok(!rentReviewInput.safeParse({...request,selectedOccupancyIds:Array.from({length:1001},(_,i)=>String(i))}).success);
+});
