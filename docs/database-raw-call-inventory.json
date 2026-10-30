@@ -1,0 +1,2739 @@
+{
+  "source": "non-generated src; static syntax inventory only",
+  "modelTables": 92,
+  "files": 86,
+  "calls": 148,
+  "filesWithInterpolationOrNonliteral": 84,
+  "results": [
+    {
+      "file": "src/app/api/health/route.ts",
+      "calls": [
+        {
+          "line": 10,
+          "method": "$queryRaw",
+          "interpolated": false,
+          "rowLock": false,
+          "tables": [],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/app/api/v1/accounts/route.ts",
+      "calls": [
+        {
+          "line": 37,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/app/api/v1/facility-map/route.ts",
+      "calls": [
+        {
+          "line": 48,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Facility",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/app/api/v1/leasing/[resource]/route.ts",
+      "calls": [
+        {
+          "line": 367,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Reservation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/app/api/v1/operations/route.ts",
+      "calls": [
+        {
+          "line": 120,
+          "method": "$executeRaw",
+          "interpolated": true,
+          "rowLock": false,
+          "tables": [],
+          "functions": [
+            "hashtextextended",
+            "pg_advisory_xact_lock"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "src/app/api/v1/reports/history/route.ts",
+      "calls": [
+        {
+          "line": 27,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": false,
+          "tables": [],
+          "functions": [
+            "hashtextextended",
+            "pg_advisory_xact_lock"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "src/app/api/webhooks/twilio/status/route.ts",
+      "calls": [
+        {
+          "line": 20,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "CommunicationLog",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/adjustment-service.ts",
+      "calls": [
+        {
+          "line": 107,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 127,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/advertising-connection.ts",
+      "calls": [
+        {
+          "line": 14,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Organisation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/arrears-review-task-service.ts",
+      "calls": [
+        {
+          "line": 13,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Task",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/booking-move-in-training.ts",
+      "calls": [
+        {
+          "line": 20,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": false,
+          "tables": [
+            {
+              "table": "AuditEvent",
+              "operations": [
+                "SELECT"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 49,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Organisation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/booking-test-payment.ts",
+      "calls": [
+        {
+          "line": 36,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Organisation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/bulk-lead-cancel-service.ts",
+      "calls": [
+        {
+          "line": 18,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Lead",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/bulk-unit-pricing-service.ts",
+      "calls": [
+        {
+          "line": 12,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Facility",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 13,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Unit",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/collection-notice-service.ts",
+      "calls": [
+        {
+          "line": 99,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/collection-phone-service.ts",
+      "calls": [
+        {
+          "line": 100,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/collection-schedule-service.ts",
+      "calls": [
+        {
+          "line": 45,
+          "method": "$executeRaw",
+          "interpolated": true,
+          "rowLock": false,
+          "tables": [],
+          "functions": [
+            "hashtextextended",
+            "pg_advisory_xact_lock"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "src/lib/collections-service.ts",
+      "calls": [
+        {
+          "line": 244,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 325,
+          "method": "$executeRaw",
+          "interpolated": false,
+          "rowLock": false,
+          "tables": [],
+          "functions": []
+        },
+        {
+          "line": 326,
+          "method": "$executeRaw",
+          "interpolated": true,
+          "rowLock": false,
+          "tables": [],
+          "functions": [
+            "hashtextextended",
+            "pg_advisory_xact_lock"
+          ]
+        },
+        {
+          "line": 363,
+          "method": "$executeRaw",
+          "interpolated": false,
+          "rowLock": false,
+          "tables": [],
+          "functions": []
+        },
+        {
+          "line": 365,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/combine-units-service.ts",
+      "calls": [
+        {
+          "line": 16,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Facility",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 19,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Unit",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/customer-contact-lock.ts",
+      "calls": [
+        {
+          "line": 5,
+          "method": "$executeRaw",
+          "interpolated": true,
+          "rowLock": false,
+          "tables": [],
+          "functions": [
+            "hashtextextended",
+            "pg_advisory_xact_lock"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "src/lib/customer-history-service.ts",
+      "calls": [
+        {
+          "line": 32,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Customer",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/debit-mandate-session.ts",
+      "calls": [
+        {
+          "line": 27,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Tenancy",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/debit-order-initial-payment.ts",
+      "calls": [
+        {
+          "line": 39,
+          "method": "$executeRaw",
+          "interpolated": true,
+          "rowLock": false,
+          "tables": [],
+          "functions": [
+            "hashtextextended",
+            "pg_advisory_xact_lock"
+          ]
+        },
+        {
+          "line": 40,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Reservation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/debit-order-service.ts",
+      "calls": [
+        {
+          "line": 78,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 149,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Facility",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 171,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "DebitOrderRun",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 195,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "DebitOrderRun",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 198,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/facial-photo-control.ts",
+      "calls": [
+        {
+          "line": 45,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Organisation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/facial-photo-service.ts",
+      "calls": [
+        {
+          "line": 24,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Reservation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 26,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 60,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Organisation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/finance/billing-documents-service.ts",
+      "calls": [
+        {
+          "line": 111,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Organisation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/floor-availability-service.ts",
+      "calls": [
+        {
+          "line": 11,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Facility",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 12,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Unit",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 22,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Facility",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/identity-document-service.ts",
+      "calls": [
+        {
+          "line": 15,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Reservation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/lead-booking-stage.ts",
+      "calls": [
+        {
+          "line": 6,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Lead",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/lead-sla-service.ts",
+      "calls": [
+        {
+          "line": 10,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": false,
+          "tables": [
+            {
+              "table": "AuditEvent",
+              "operations": [
+                "SELECT"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 14,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Facility",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 15,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Lead",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/leads-workspace-service.ts",
+      "calls": [
+        {
+          "line": 59,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Lead",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/leasing-service.ts",
+      "calls": [
+        {
+          "line": 277,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Lead",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 597,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Unit",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/manual-lead-service.ts",
+      "calls": [
+        {
+          "line": 14,
+          "method": "$executeRaw",
+          "interpolated": true,
+          "rowLock": false,
+          "tables": [],
+          "functions": [
+            "hashtextextended",
+            "pg_advisory_xact_lock"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "src/lib/marketing-service.ts",
+      "calls": [
+        {
+          "line": 144,
+          "method": "$executeRaw",
+          "interpolated": true,
+          "rowLock": false,
+          "tables": [],
+          "functions": [
+            "hashtextextended",
+            "pg_advisory_xact_lock"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "src/lib/merchandise-order-fulfilment.ts",
+      "calls": [
+        {
+          "line": 7,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "MerchandiseOrder",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/merchandise-order-service.ts",
+      "calls": [
+        {
+          "line": 28,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 42,
+          "method": "$executeRaw",
+          "interpolated": true,
+          "rowLock": false,
+          "tables": [
+            {
+              "table": "Product",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 56,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "MerchandiseOrder",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/merchandise-order-settlement.ts",
+      "calls": [
+        {
+          "line": 10,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "MerchandiseOrder",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 60,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "MerchandiseOrder",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/mfa-credential-lock.ts",
+      "calls": [
+        {
+          "line": 7,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "User",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/monthly-billing-service.ts",
+      "calls": [
+        {
+          "line": 39,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 87,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/move-in-training.ts",
+      "calls": [
+        {
+          "line": 37,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Organisation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/operational-checklist-service.ts",
+      "calls": [
+        {
+          "line": 43,
+          "method": "$executeRaw",
+          "interpolated": true,
+          "rowLock": false,
+          "tables": [],
+          "functions": [
+            "hashtextextended",
+            "pg_advisory_xact_lock"
+          ]
+        },
+        {
+          "line": 63,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Task",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/operations-diagnostics.ts",
+      "calls": [
+        {
+          "line": 20,
+          "method": "$queryRaw",
+          "interpolated": false,
+          "rowLock": false,
+          "tables": [],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/payments/booking-payment-settlement.ts",
+      "calls": [
+        {
+          "line": 11,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Reservation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 12,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/payments/card-autopay-enrollment-service.ts",
+      "calls": [
+        {
+          "line": 66,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 99,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 148,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 224,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/payments/card-autopay-service.ts",
+      "calls": [
+        {
+          "line": 58,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 74,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/payments/netcash-debicheck-attempt-journal.ts",
+      "calls": [
+        {
+          "line": 19,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            },
+            {
+              "table": "Customer",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            },
+            {
+              "table": "Tenancy",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 42,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "ConfigurationProfile",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 60,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "ConfigurationProfile",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/payments/netcash-debicheck-bank-consent-service.ts",
+      "calls": [
+        {
+          "line": 53,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 74,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 87,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/payments/netcash-debicheck-request-service.ts",
+      "calls": [
+        {
+          "line": 82,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 109,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 141,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/payments/netcash-debicheck-template-service.ts",
+      "calls": [
+        {
+          "line": 49,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "ConfigurationProfile",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/payments/netcash-debicheck-test-worker.ts",
+      "calls": [
+        {
+          "line": 34,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            },
+            {
+              "table": "Customer",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            },
+            {
+              "table": "Tenancy",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/payments/netcash-payment-evidence.ts",
+      "calls": [
+        {
+          "line": 36,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Payment",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/payments/netcash-payment-request-service.ts",
+      "calls": [
+        {
+          "line": 63,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/payments/netcash-refund-service.ts",
+      "calls": [
+        {
+          "line": 19,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            },
+            {
+              "table": "Customer",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            },
+            {
+              "table": "Tenancy",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/payments/netcash-service.ts",
+      "calls": [
+        {
+          "line": 42,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "MerchandiseOrder",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/price-manager-service.ts",
+      "calls": [
+        {
+          "line": 24,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "User",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 33,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "User",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 52,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "PriceApprovalChallenge",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/public-booking-contact.ts",
+      "calls": [
+        {
+          "line": 31,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Reservation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/public-booking-service.ts",
+      "calls": [
+        {
+          "line": 187,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Unit",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 188,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Reservation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 247,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "WalkInVisit",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/public-hosted-mandate.ts",
+      "calls": [
+        {
+          "line": 86,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Reservation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/public-lease-workflow.ts",
+      "calls": [
+        {
+          "line": 33,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Reservation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 132,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Reservation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/public-netcash-payment.ts",
+      "calls": [
+        {
+          "line": 78,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Reservation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/public-payment-simulator.ts",
+      "calls": [
+        {
+          "line": 22,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Reservation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 51,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Reservation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/public-recurring-payments.ts",
+      "calls": [
+        {
+          "line": 41,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Reservation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/public-verification-renewal.ts",
+      "calls": [
+        {
+          "line": 17,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Unit",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 19,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Reservation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 42,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": false,
+          "tables": [
+            {
+              "table": "Product",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/receipt-bank-source-service.ts",
+      "calls": [
+        {
+          "line": 17,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Organisation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/receipt-correction-training-service.ts",
+      "calls": [
+        {
+          "line": 55,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Organisation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/receipt-import-service.ts",
+      "calls": [
+        {
+          "line": 35,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 100,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Organisation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/receipt-reallocation-service.ts",
+      "calls": [
+        {
+          "line": 37,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 53,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Payment",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 85,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Payment",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/rent-review-service.ts",
+      "calls": [
+        {
+          "line": 46,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Facility",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 55,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Facility",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/request-security.ts",
+      "calls": [
+        {
+          "line": 40,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": false,
+          "tables": [
+            {
+              "table": "RateLimitBucket",
+              "operations": [
+                "INSERT",
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/reservation-move-in.ts",
+      "calls": [
+        {
+          "line": 93,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Unit",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 94,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Reservation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 102,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/reservation-payment.ts",
+      "calls": [
+        {
+          "line": 19,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Reservation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 25,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/reservation-price-service.ts",
+      "calls": [
+        {
+          "line": 34,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Reservation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 39,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 40,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            },
+            {
+              "table": "Payment",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 41,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "PublicPaymentSession",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 154,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Reservation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 156,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Customer",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/scheduled-work-service.ts",
+      "calls": [
+        {
+          "line": 22,
+          "method": "$executeRaw",
+          "interpolated": true,
+          "rowLock": false,
+          "tables": [],
+          "functions": [
+            "hashtextextended",
+            "pg_advisory_xact_lock"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "src/lib/settlement-service.ts",
+      "calls": [
+        {
+          "line": 37,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Organisation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/staff-arrivals-service.ts",
+      "calls": [
+        {
+          "line": 55,
+          "method": "$executeRaw",
+          "interpolated": true,
+          "rowLock": false,
+          "tables": [],
+          "functions": [
+            "hashtextextended",
+            "pg_advisory_xact_lock"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "src/lib/staff-event-email-source.ts",
+      "calls": [
+        {
+          "line": 92,
+          "method": "$executeRaw",
+          "interpolated": true,
+          "rowLock": false,
+          "tables": [],
+          "functions": [
+            "hashtextextended",
+            "pg_advisory_xact_lock"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "src/lib/staff-followup-service.ts",
+      "calls": [
+        {
+          "line": 50,
+          "method": "$executeRaw",
+          "interpolated": true,
+          "rowLock": false,
+          "tables": [],
+          "functions": [
+            "hashtextextended",
+            "pg_advisory_xact_lock"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "src/lib/staff-operational-events.ts",
+      "calls": [
+        {
+          "line": 81,
+          "method": "$executeRaw",
+          "interpolated": true,
+          "rowLock": false,
+          "tables": [],
+          "functions": [
+            "hashtextextended",
+            "pg_advisory_xact_lock"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "src/lib/tenant-portal-auth.ts",
+      "calls": [
+        {
+          "line": 11,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": false,
+          "tables": [
+            {
+              "table": "RateLimitBucket",
+              "operations": [
+                "INSERT",
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/training-debtor-service.ts",
+      "calls": [
+        {
+          "line": 34,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Organisation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/unidentified-receipt-service.ts",
+      "calls": [
+        {
+          "line": 15,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Organisation",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 61,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Account",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/unit-combination-service.ts",
+      "calls": [
+        {
+          "line": 8,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Facility",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 9,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Unit",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 24,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Facility",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/visual-report-service.ts",
+      "calls": [
+        {
+          "line": 82,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": false,
+          "tables": [],
+          "functions": [
+            "hashtextextended",
+            "pg_advisory_xact_lock"
+          ]
+        },
+        {
+          "line": 99,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": false,
+          "tables": [],
+          "functions": [
+            "hashtextextended",
+            "pg_advisory_xact_lock"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "src/lib/walk-in-service.ts",
+      "calls": [
+        {
+          "line": 25,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "WalkInVisit",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 26,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "WalkInVisit",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 46,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "WalkInVisit",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
+      "file": "src/lib/whatchimp-enquiry-service.ts",
+      "calls": [
+        {
+          "line": 25,
+          "method": "$executeRaw",
+          "interpolated": true,
+          "rowLock": false,
+          "tables": [],
+          "functions": [
+            "hashtextextended",
+            "pg_advisory_xact_lock"
+          ]
+        }
+      ]
+    }
+  ]
+}
