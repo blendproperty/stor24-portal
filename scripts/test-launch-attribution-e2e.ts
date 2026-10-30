@@ -34,6 +34,7 @@ async function main() {
   process.env.STOR24_PUBLIC_BOOKING_API_KEY=process.env.PUBLIC_BOOKING_API_KEY;
   process.env.RECAPTCHA_SECRET_KEY="synthetic-provider-boundary-only";
   let quote: (request: Request)=>Promise<Response>, micro: (request: Request)=>Promise<Response>;
+  const staffCss=(await Promise.all(["src/app/globals.css","src/styles/stor24-brand.css","src/styles/staff-workspace.css","src/styles/marketing.css","src/styles/workspace-insights.css"].map(file=>readFile(file,"utf8")))).join("\n").replace('@import "tailwindcss";',"")+"\nbody{font-family:Arial,sans-serif;background:#f1f5f8;padding:20px}.marketing-cell-note{display:block}";
   let browserBundle="", staffBundle="", blocked=false;
   const captured: {route:string;response:unknown}[]=[];
   const server=createServer(async(req,res)=>{
@@ -49,8 +50,9 @@ async function main() {
         captured.push({route:url.pathname,response:await response.clone().json()});
       } else if(url.pathname==="/n8n-fixture")response=Response.json({accepted:true});
       else if(url.pathname==="/fixture.js"||url.pathname==="/staff.js")response=new Response(url.pathname==="/staff.js"?staffBundle:browserBundle,{headers:{"content-type":"text/javascript"}});
+      else if(url.pathname==="/staff.css")response=new Response(staffCss,{headers:{"content-type":"text/css"}});
       else if(url.pathname==="/workspace.json")response=Response.json(await marketingWorkspace(scope));
-      else response=new Response(`<html><head><meta name="viewport" content="width=device-width"><style>body{margin:20px}table{border-collapse:collapse}td,th{padding:6px;overflow-wrap:anywhere}input,textarea{max-width:100%}</style></head><body><div id="root"></div><script type="module" src="${url.pathname==="/staff"?"/staff.js":"/fixture.js"}"></script></body></html>`,{headers:{"content-type":"text/html"}});
+      else response=new Response(`<html><head><meta name="viewport" content="width=device-width">${url.pathname==="/staff"?'<link rel="stylesheet" href="/staff.css">':""}<style>body{margin:20px}table{border-collapse:collapse}td,th{padding:6px;overflow-wrap:anywhere}input,textarea{max-width:100%}</style></head><body><div id="root"></div><script type="module" src="${url.pathname==="/staff"?"/staff.js":"/fixture.js"}"></script></body></html>`,{headers:{"content-type":"text/html"}});
       res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));
     }catch(error){console.error(error);res.writeHead(500);res.end("Synthetic fixture failure");}
   });
@@ -120,7 +122,8 @@ async function main() {
     const page=await browser.newPage({viewport:{width:1440,height:1000}});await page.goto(base+"/staff");
     await expect(page.getByRole("heading",{name:"Ad campaign attribution"})).toBeVisible();
     await expect(page.getByRole("cell",{name:"micro-carousel-4",exact:true})).toBeVisible();
-    await page.screenshot({path:"output/launch-tracking/database-backed-report.png",fullPage:true});await page.close();
+    await page.screenshot({path:"output/launch-tracking/database-backed-report.png",fullPage:true});
+    for(const width of [390,320]){await page.setViewportSize({width,height:1000});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.screenshot({path:`output/launch-tracking/database-backed-report-${width}.png`,fullPage:true});}await page.close();
     // A failed CRM save must never turn into a successful-lead event.
     blocked=true;const before=await db.lead.count({where:{facilityId:facility.id}});
     const response=await micro(new Request(`http://127.0.0.1:${port}/api/micro-warehousing/enquiry`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({recaptchaToken:"synthetic-captcha",facilitySlug:"fixture",firstName:"Synthetic",lastName:"Failure",email:randomUUID()+"@example.invalid",phone:"0000000000",businessDetails:{companyName:"Synthetic"}})}));assert.equal(response.status,503);assert.equal(await db.lead.count({where:{facilityId:facility.id}}),before);
