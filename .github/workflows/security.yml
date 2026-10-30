@@ -135,6 +135,7 @@ jobs:
           DB_ROLE_TEST: isolated-ci
           DATABASE_URL: postgresql://synthetic_runtime:synthetic-runtime-only@localhost:5432/rls_probe_ci
           MIGRATION_DATABASE_URL: postgresql://synthetic_migrator:synthetic-migrator-only@localhost:5432/rls_probe_ci
+          ROLE_TEST_ADMIN_URL: postgresql://ci:synthetic-ci-only@localhost:5432/rls_probe_ci
   dependencies:
     runs-on: ubuntu-latest
     timeout-minutes: 10
