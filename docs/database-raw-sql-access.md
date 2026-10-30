@@ -95,3 +95,7 @@ The 15 rows without recognized relation names were manually checked at their raw
 ## 2026-10-30 targeted manual review
 
 `request-security.ts` and `tenant-portal-auth.ts` use `RateLimitBucket` INSERT ON CONFLICT DO UPDATE with RETURNING: candidate privileges include INSERT, UPDATE and SELECT, subject to column-level review. `collections-service.ts` locks Account rows and uses advisory locks; `merchandise-order-service.ts` locks Account and MerchandiseOrder rows and updates Product. This is a partial review of four files, not a full access or grant approval. ORM calls, other statements and application authorization still need review.
+
+## 2026-10-30 refreshed main-branch review
+
+The refreshed AST scan finds 148 calls in 86 files. `operational-checklist-service.ts` adds an advisory transaction lock and a Task row lock; the extra `rent-review-service.ts` call adds a second Facility row lock. Row locks require candidate SELECT and UPDATE privileges; ORM writes and the remainder of these features require separate review. Counts in older entries describe the previous snapshot.

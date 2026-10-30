@@ -67,6 +67,25 @@ jobs:
           TENANT_B_URL: postgresql://stage_tenant_b:synthetic-tenant-b@localhost:55481/crm_stage_ci
           BACKUP_ROLE_URL: postgresql://stage_backup:synthetic-backup-only@localhost:55481/crm_stage_ci
         run: npx tsx --test tests/integration/customer-rls-stage.test.mjs
+      - name: Prepare full database RLS recovery rehearsal
+        env:
+          PGPASSWORD: synthetic-ci-only
+        run: |
+          psql -h localhost -p 55481 -U ci -d postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE stage_backup_restore LOGIN PASSWORD 'synthetic-backup-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION BYPASSRLS" -c 'GRANT pg_read_all_data TO stage_backup_restore' -c 'CREATE DATABASE crm_rls_restore_ci OWNER stage_owner'
+      - name: Restore complete CRM schema with forced RLS
+        env:
+          DB_ROLE_TEST: isolated-ci
+          RLS_RECOVERY_APP: crm
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+          DATABASE_URL: postgresql://stage_runtime:synthetic-runtime-only@localhost:55481/crm_stage_ci
+          MIGRATION_DATABASE_URL: postgresql://stage_owner:synthetic-owner-only@localhost:55481/crm_stage_ci
+          RLS_BACKUP_URL: postgresql://stage_backup_restore:synthetic-backup-only@localhost:55481/crm_stage_ci
+          RLS_RESTORE_URL: postgresql://stage_owner:synthetic-owner-only@localhost:55481/crm_rls_restore_ci
+        run: node scripts/test-full-rls-recovery.mjs
+      - name: Verify CRM migration history after RLS restore
+        env:
+          DATABASE_URL: postgresql://stage_owner:synthetic-owner-only@localhost:55481/crm_rls_restore_ci
+        run: node node_modules/prisma/build/index.js migrate status
   isolated-database-role-rls:
     runs-on: ubuntu-latest
     timeout-minutes: 10

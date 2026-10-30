@@ -1,9 +1,9 @@
 {
   "source": "non-generated src; static syntax inventory only",
   "modelTables": 92,
-  "files": 85,
-  "calls": 145,
-  "filesWithInterpolationOrNonliteral": 83,
+  "files": 86,
+  "calls": 148,
+  "filesWithInterpolationOrNonliteral": 84,
   "results": [
     {
       "file": "src/app/api/health/route.ts",
@@ -1184,6 +1184,38 @@
       ]
     },
     {
+      "file": "src/lib/operational-checklist-service.ts",
+      "calls": [
+        {
+          "line": 43,
+          "method": "$executeRaw",
+          "interpolated": true,
+          "rowLock": false,
+          "tables": [],
+          "functions": [
+            "hashtextextended",
+            "pg_advisory_xact_lock"
+          ]
+        },
+        {
+          "line": 63,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Task",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        }
+      ]
+    },
+    {
       "file": "src/lib/operations-diagnostics.ts",
       "calls": [
         {
@@ -2119,7 +2151,23 @@
       "file": "src/lib/rent-review-service.ts",
       "calls": [
         {
-          "line": 30,
+          "line": 46,
+          "method": "$queryRaw",
+          "interpolated": true,
+          "rowLock": true,
+          "tables": [
+            {
+              "table": "Facility",
+              "operations": [
+                "SELECT",
+                "UPDATE"
+              ]
+            }
+          ],
+          "functions": []
+        },
+        {
+          "line": 55,
           "method": "$queryRaw",
           "interpolated": true,
           "rowLock": true,
@@ -2594,7 +2642,7 @@
       "file": "src/lib/visual-report-service.ts",
       "calls": [
         {
-          "line": 81,
+          "line": 82,
           "method": "$queryRaw",
           "interpolated": true,
           "rowLock": false,
@@ -2605,7 +2653,7 @@
           ]
         },
         {
-          "line": 98,
+          "line": 99,
           "method": "$queryRaw",
           "interpolated": true,
           "rowLock": false,
