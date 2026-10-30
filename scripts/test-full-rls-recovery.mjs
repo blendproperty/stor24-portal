@@ -30,6 +30,8 @@ const [owner,runtime,backup,restore] = clients;
 const token = randomUUID(), ids = [`rls-a-${token}`,`rls-b-${token}`], orgs = [`org-a-${token}`,`org-b-${token}`];
 const relation = kind === 'crm' ? '"Customer"' : 'posts';
 let enabled = false, fixture = false, policyCreated = false;
+const probe=`backup_privilege_${token.replaceAll('-','')}`;
+let probeTable=false,probeSequence=false,probeView=false,probeSchema=false,probeSchemaTable=false;
 const extraRlsTables = [];
 const cmsPolicies = [
   ['posts_tags', "EXISTS (SELECT 1 FROM posts p WHERE p.id = posts_tags._parent_id AND p.status = 'published')"],
@@ -47,6 +49,60 @@ try {
   assert.equal((await restore.query("SELECT count(*)::int AS n FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p')")).rows[0].n,0,'restore target must be empty');
   const flags=(await backup.query('SELECT rolsuper,rolcreatedb,rolcreaterole,rolreplication,rolbypassrls FROM pg_roles WHERE rolname=current_user')).rows[0];
   assert.deepEqual(Object.values(flags),[false,false,false,false,true]);
+  const writableObjects=async()=> (await backup.query(`
+    SELECT 'table:'||n.nspname||'.'||c.relname AS object FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+    WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%' AND c.relkind IN ('r','p','v','m','f') AND (
+      has_table_privilege(current_user,c.oid,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') OR
+      has_any_column_privilege(current_user,c.oid,'INSERT,UPDATE,REFERENCES'))
+    UNION ALL SELECT 'sequence:'||n.nspname||'.'||c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+    WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%' AND c.relkind='S' AND has_sequence_privilege(current_user,c.oid,'USAGE,UPDATE') ORDER BY object`)).rows.map(row=>row.object);
+  assert.deepEqual(await writableObjects(),[], 'backup role must not have effective write privileges on any existing application table, view or sequence');
+  assert.equal((await backup.query("SELECT has_schema_privilege(current_user,'public','CREATE') AS allowed")).rows[0].allowed,false);
+  assert.equal((await backup.query("SELECT has_database_privilege(current_user,current_database(),'CREATE') AS allowed")).rows[0].allowed,false);
+  const unapprovedMemberships=async()=> (await backup.query("SELECT r.rolname FROM pg_roles r WHERE r.rolname <> current_user AND r.rolname <> 'pg_read_all_data' AND pg_has_role(current_user,r.oid,'MEMBER') ORDER BY r.rolname")).rows.map(row=>row.rolname);
+  assert.deepEqual(await unapprovedMemberships(),[], 'backup may not inherit or assume any unapproved role, including NOINHERIT memberships');
+  const admin=(inspect.Config.Env.find(v=>v.startsWith('POSTGRES_USER=')) || 'POSTGRES_USER=postgres').slice('POSTGRES_USER='.length);
+  assert.match(admin,/^[a-zA-Z_][a-zA-Z_0-9]*$/);
+  const roleGrant=sql=>execFileSync('docker',['exec',container,'psql','-X','-v','ON_ERROR_STOP=1','-U',admin,'-d',sourceName,'-c',sql],{stdio:'ignore'});
+  try {
+    roleGrant('GRANT stage_runtime TO stage_backup_restore WITH INHERIT FALSE, SET TRUE');
+    assert.ok((await unapprovedMemberships()).includes('stage_runtime'),'audit must catch an assumable NOINHERIT role');
+  } finally { roleGrant('REVOKE stage_runtime FROM stage_backup_restore'); }
+  assert.deepEqual(await unapprovedMemberships(),[]);
+  for (const role of ['stage_owner','stage_runtime','stage_tenant_a','stage_tenant_b']) {
+    assert.equal((await backup.query('SELECT pg_has_role(current_user,$1,$2) AS allowed',[role,'MEMBER'])).rows[0].allowed,false,`backup membership: ${role}`);
+    await assert.rejects(backup.query(`SET ROLE "${role}"`),error=>error.code==='42501');
+  }
+  await assert.rejects(backup.query('CREATE TABLE public.synthetic_backup_forbidden (id integer)'),error=>error.code==='42501');
+  // pg_read_all_data intentionally exposes future objects cluster-wide; detect writes rather than treating it as least privilege.
+  await owner.query(`CREATE TABLE "${probe}" (id integer)`);probeTable=true;
+  await owner.query(`CREATE SEQUENCE "${probe}_seq"`);probeSequence=true;
+  await owner.query(`CREATE VIEW "${probe}_view" AS SELECT id FROM "${probe}"`);probeView=true;
+  await owner.query(`CREATE SCHEMA "${probe}_schema"`);probeSchema=true;
+  await owner.query(`CREATE TABLE "${probe}_schema".probe (id integer)`);probeSchemaTable=true;
+  await owner.query(`INSERT INTO "${probe}_schema".probe VALUES (99)`);
+  await owner.query(`INSERT INTO "${probe}" VALUES (42)`);
+  await owner.query(`SELECT setval('public."${probe}_seq"',42,true)`);
+  assert.equal((await backup.query(`SELECT id FROM "${probe}"`)).rows[0].id,42,'built-in read role covers future owner-created data');
+  await assert.rejects(backup.query(`SELECT nextval('public."${probe}_seq"')`),error=>error.code==='42501');
+  try {
+    await owner.query(`GRANT UPDATE ON "${probe}" TO stage_backup_restore`);
+    await owner.query(`GRANT USAGE ON SEQUENCE "${probe}_seq" TO stage_backup_restore`);
+    await owner.query(`GRANT UPDATE ON "${probe}_view" TO stage_backup_restore`);
+    await owner.query(`GRANT UPDATE ON "${probe}_schema".probe TO stage_backup_restore`);
+    const detected=await writableObjects();
+    assert.ok(detected.includes(`table:public.${probe}`),'audit must catch a table write grant');
+    assert.ok(detected.includes(`sequence:public.${probe}_seq`),'audit must catch a sequence write grant');
+    assert.ok(detected.includes(`table:public.${probe}_view`),'audit must catch an updatable view grant');
+    assert.ok(detected.includes(`table:${probe}_schema.probe`),'audit must catch writes in another schema');
+  } finally {
+    await owner.query(`REVOKE UPDATE ON "${probe}" FROM stage_backup_restore`);
+    await owner.query(`REVOKE USAGE ON SEQUENCE "${probe}_seq" FROM stage_backup_restore`);
+    await owner.query(`REVOKE UPDATE ON "${probe}_view" FROM stage_backup_restore`);
+    await owner.query(`REVOKE UPDATE ON "${probe}_schema".probe FROM stage_backup_restore`);
+  }
+  assert.deepEqual(await writableObjects(),[], 'backup role must remain read-only after the probe');
+
   assert.equal((await owner.query(`SELECT relrowsecurity FROM pg_class WHERE oid='public.${relation}'::regclass`)).rows[0].relrowsecurity,false,'source RLS state must be pristine');
   if (kind === 'crm') {
     await owner.query('INSERT INTO "Organisation" (id,name,slug,"updatedAt") VALUES ($1,$1,$1,now()),($2,$2,$2,now())',orgs); fixture=true;
@@ -86,6 +142,10 @@ try {
   try {
     await restoredBackup.connect(); await restoredRuntime.connect();
     assert.deepEqual((await restoredBackup.query(queryFixtures,[ids])).rows,sourceRows);
+    assert.deepEqual((await restoredBackup.query(`SELECT id FROM "${probe}"`)).rows,[{id:42}],'future table data survives full backup');
+    assert.deepEqual((await restoredBackup.query(`SELECT id FROM "${probe}_view"`)).rows,[{id:42}],'future view survives full backup');
+    assert.deepEqual((await restoredBackup.query(`SELECT id FROM "${probe}_schema".probe`)).rows,[{id:99}],'future schema data survives full backup');
+    assert.deepEqual((await restoredBackup.query(`SELECT last_value,is_called FROM "${probe}_seq"`)).rows,(await backup.query(`SELECT last_value,is_called FROM "${probe}_seq"`)).rows,'future sequence state survives full backup');
     const tableNames=(await backup.query("SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p') ORDER BY c.relname")).rows.map(r=>r.relname);
     for (const name of tableNames) {
       const quoted='"'+name.replaceAll('"','""')+'"';
@@ -99,6 +159,11 @@ try {
   } finally { await restoredBackup.end(); await restoredRuntime.end(); }
   console.log(JSON.stringify({application:kind,fullDatabaseDump:true,syntheticRows:sourceRows.length,catalogEntries:sourceCatalog.length,forcedRlsRestored:true,rlsTables:1+extraRlsTables.length,privilegesRestored:false}));
 } finally {
+  if(probeView) await owner.query(`DROP VIEW "${probe}_view"`);
+  if(probeSchemaTable) await owner.query(`DROP TABLE "${probe}_schema".probe`);
+  if(probeSchema) await owner.query(`DROP SCHEMA "${probe}_schema"`);
+  if(probeSequence) await owner.query(`DROP SEQUENCE "${probe}_seq"`);
+  if(probeTable) await owner.query(`DROP TABLE "${probe}"`);
   for (const table of extraRlsTables) {
     await owner.query(`ALTER TABLE "${table}" NO FORCE ROW LEVEL SECURITY`);
     await owner.query(`ALTER TABLE "${table}" DISABLE ROW LEVEL SECURITY`);
