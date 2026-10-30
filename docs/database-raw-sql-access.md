@@ -1,4 +1,4 @@
-# CRM raw SQL source audit leads — 2026-10-29
+# CRM raw SQL source audit leads â€” 2026-10-29
 
 Static keyword matches are restricted to table names present in the disposable 84-migration CRM schema. This is a navigation aid, not a definitive SQL parser or approved grant matrix: matches may include comments, examples or CTE context, and dynamic SQL, aliases, interpolations, indirect database calls, nested operations, views and future changes may be missed. Manually review every listed file, including entries with no recognized tables. No customer data is included.
 
@@ -72,7 +72,7 @@ Static keyword matches are restricted to table names present in the disposable 8
 | `src/lib/receipt-import-service.ts` | `Account` read, `Organisation` read |
 | `src/lib/receipt-reallocation-service.ts` | `Account` read, `Payment` read |
 | `src/lib/rent-review-service.ts` | `Facility` read |
-| `src/lib/request-security.ts` | `RateLimitBucket` insert |
+| `src/lib/request-security.ts` | `RateLimitBucket` insert, select, update |
 | `src/lib/reservation-move-in.ts` | `Account` read, `Reservation` read, `Unit` read |
 | `src/lib/reservation-payment.ts` | `Account` read, `Reservation` read |
 | `src/lib/reservation-price-service.ts` | `Account` read, `Customer` read, `Payment` read, `PublicPaymentSession` read, `Reservation` read |
@@ -82,7 +82,7 @@ Static keyword matches are restricted to table names present in the disposable 8
 | `src/lib/staff-event-email-source.ts` | `pg_advisory_xact_lock` and `hashtextextended`; no raw table reference found |
 | `src/lib/staff-followup-service.ts` | `pg_advisory_xact_lock` and `hashtextextended`; no raw table reference found |
 | `src/lib/staff-operational-events.ts` | `pg_advisory_xact_lock` and `hashtextextended`; no raw table reference found |
-| `src/lib/tenant-portal-auth.ts` | `RateLimitBucket` insert |
+| `src/lib/tenant-portal-auth.ts` | `RateLimitBucket` insert, select, update |
 | `src/lib/training-debtor-service.ts` | `Organisation` read |
 | `src/lib/unidentified-receipt-service.ts` | `Account` read, `Organisation` read |
 | `src/lib/unit-combination-service.ts` | `Facility` read, `Unit` read |
@@ -91,3 +91,7 @@ Static keyword matches are restricted to table names present in the disposable 8
 | `src/lib/whatchimp-enquiry-service.ts` | `pg_advisory_xact_lock` and `hashtextextended`; no raw table reference found |
 
 The 15 rows without recognized relation names were manually checked at their raw-query call sites: two are `SELECT 1` health probes and thirteen use transaction advisory locks via `pg_advisory_xact_lock` and `hashtextextended`. Other ORM calls in those files remain represented in the model leads. Remaining 70 files have keyword-based relation leads and still require manual confirmation, including aliases and dynamic fragments.
+
+## 2026-10-30 targeted manual review
+
+`request-security.ts` and `tenant-portal-auth.ts` use `RateLimitBucket` INSERT ON CONFLICT DO UPDATE with RETURNING: candidate privileges include INSERT, UPDATE and SELECT, subject to column-level review. `collections-service.ts` locks Account rows and uses advisory locks; `merchandise-order-service.ts` locks Account and MerchandiseOrder rows and updates Product. This is a partial review of four files, not a full access or grant approval. ORM calls, other statements and application authorization still need review.

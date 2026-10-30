@@ -10,6 +10,10 @@ test('raw SQL inventory excludes generated code and identifies real health and l
   assert.ok(inventory.results.every(row=>!row.file.startsWith('src/generated/')));
   const health=inventory.results.find(row=>row.file==='src/app/api/health/route.ts');
   const lock=inventory.results.find(row=>row.file==='src/lib/customer-contact-lock.ts');
+  for (const file of ['src/lib/request-security.ts','src/lib/tenant-portal-auth.ts']) {
+    const row=inventory.results.find(entry=>entry.file===file);
+    assert.ok(row?.calls.some(call=>call.tables.some(table=>table.table==='RateLimitBucket' && ['INSERT','SELECT','UPDATE'].every(op=>table.operations.includes(op)))));
+  }
   const collections=inventory.results.find(row=>row.file==='src/lib/collections-service.ts');
   assert.ok(health?.calls.some(call=>call.method==='$queryRaw' && !call.interpolated && !call.tables.length));
   assert.ok(lock?.calls.some(call=>call.functions.includes('pg_advisory_xact_lock')));

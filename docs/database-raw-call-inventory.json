@@ -1974,6 +1974,7 @@
             {
               "table": "Product",
               "operations": [
+                "SELECT",
                 "UPDATE"
               ]
             }
@@ -2147,7 +2148,9 @@
             {
               "table": "RateLimitBucket",
               "operations": [
-                "INSERT"
+                "INSERT",
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],
@@ -2466,7 +2469,9 @@
             {
               "table": "RateLimitBucket",
               "operations": [
-                "INSERT"
+                "INSERT",
+                "SELECT",
+                "UPDATE"
               ]
             }
           ],

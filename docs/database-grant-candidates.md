@@ -1,4 +1,4 @@
-# Database object grant candidates — 2026-10-29
+# Database object grant candidates â€” 2026-10-29
 
 These are static-review leads, **not approved or complete grants**. They combine non-generated direct Prisma calls with keyword-matched raw SQL. They do not resolve nested ORM writes, aliases, dynamic SQL, triggers, foreign-key side effects, functions, sequences, migrations, backups, reporting or access through untraced clients. `No direct match` means investigate; it does not mean deny. A successful synthetic subset is not proof the proposed privilege matrix is complete.
 
@@ -59,7 +59,7 @@ These are static-review leads, **not approved or complete grants**. They combine
 | `PublicDebitMandate` | `PublicDebitMandate` | `INSERT`, `SELECT`, `UPDATE` |
 | `PublicPaymentSession` | `PublicPaymentSession` | `INSERT`, `SELECT`, `UPDATE` |
 | `PublicReservationLease` | `PublicReservationLease` | `INSERT`, `SELECT`, `UPDATE` |
-| `RateLimitBucket` | `RateLimitBucket` | `INSERT` |
+| `RateLimitBucket` | `RateLimitBucket` | `INSERT`, `SELECT`, `UPDATE` |
 | `ReceiptBankSourceProfile` | `ReceiptBankSourceProfile` | `INSERT`, `SELECT`, `UPDATE` |
 | `ReceiptImportPosting` | `ReceiptImportPosting` | `DELETE`, `INSERT`, `SELECT` |
 | `ReceiptReallocation` | `ReceiptReallocation` | `DELETE`, `INSERT`, `SELECT`, `UPDATE` |
@@ -117,7 +117,7 @@ CMS Payload generates database queries from collection, auth, upload, global and
 - `payload_kv`
 - `payload_locked_documents`
 - `payload_locked_documents_rels`
-- `payload_migrations` — migration history; runtime denied in selected tests.
+- `payload_migrations` â€” migration history; runtime denied in selected tests.
 - `payload_preferences`
 - `payload_preferences_rels`
 - `posts`

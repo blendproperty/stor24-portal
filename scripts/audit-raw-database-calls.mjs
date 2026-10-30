@@ -31,6 +31,9 @@ function walk(dir) {
           if(!tables.has(table)) tables.set(table,new Set()); tables.get(table).add(op);
           // PostgreSQL row-locking SELECTs also require UPDATE privilege; joins may overstate the affected tables.
           if (rowLock && op === 'SELECT') tables.get(table).add('UPDATE');
+          // Conflict updates and RETURNING require additional privileges on the target.
+          if (op === 'INSERT' && /\bON\s+CONFLICT\b[\s\S]*\bDO\s+UPDATE\b/i.test(text)) { tables.get(table).add('UPDATE'); tables.get(table).add('SELECT'); }
+          if (['INSERT','UPDATE','DELETE'].includes(op) && /\bRETURNING\b/i.test(text)) tables.get(table).add('SELECT');
         }
         const functions=[...new Set([...text.matchAll(/\b(pg_advisory_xact_lock|hashtextextended|pg_try_advisory_xact_lock|pg_advisory_lock|pg_advisory_unlock)\s*\(/gi)].map(m=>m[1].toLowerCase()))].sort();
         found.push({line:source.getLineAndCharacterOfPosition(node.getStart(source)).line+1,method:raw[0].slice(1),interpolated:ts.isTaggedTemplateExpression(node) ? ts.isTemplateExpression(node.template) : node.arguments.some(a=>!ts.isStringLiteralLike(a)),rowLock,tables:[...tables.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([table,ops])=>({table,operations:[...ops].sort()})),functions});
