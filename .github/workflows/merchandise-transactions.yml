@@ -104,6 +104,7 @@ jobs:
       - run: npx tsx --test tests/integration/floor-availability.test.ts
       - run: npx tsx --test tests/integration/unit-combination.test.ts
       - run: npx tsx --test tests/integration/bulk-unit-pricing.test.ts
+      - run: npx tsx --test tests/integration/operational-checklists.test.ts
       - run: npx tsx --test tests/integration/scheduled-work.test.ts
       - run: npx tsx --test tests/integration/faeez-workflow-permissions.test.ts
       - run: npx tsx --test tests/integration/micro-warehousing.test.ts

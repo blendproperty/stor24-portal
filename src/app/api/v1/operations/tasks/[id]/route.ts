@@ -14,6 +14,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (!before) return Response.json({ error: { code: "NOT_FOUND", message: "Task not found." } }, { status: 404 });
     if (!before.facilityId && allowedFacilityIds !== null) throw new Error("FORBIDDEN");
     if (before.facilityId) await requirePermission("operations.manage", before.facilityId);
+    if (before.purpose === "OPERATIONAL_CHECKLIST") return Response.json({ error: { code: "CONFLICT", message: "Open Checklists & padlocks to record results and obtain manager review." } }, { status: 409 });
     if (before.purpose === "AGREED_FOLLOWUP") return Response.json({ error: { code: "CONFLICT", message: "Open Follow-ups & handovers to update this appointment using its current version." } }, { status: 409 });
     if (scheduledWorkPurposes.some(purpose => purpose === before.purpose)) {
       const details = scheduledWorkSchema.parse({ ...Object.fromEntries(["facilityId", "unitId", "assigneeId", "purpose", "title", "description"].map(key => [key, before[key as keyof typeof before]])), description: before.description ?? "", startAt: before.startAt?.toISOString(), endAt: before.endAt?.toISOString() });

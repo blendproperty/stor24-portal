@@ -13,7 +13,7 @@ export async function GET() {
     const { organisationId, allowedFacilityIds, user } = await requirePermission("operations.view");
     const facilityScope = allowedFacilityIds ? { in: allowedFacilityIds } : undefined;
     const [tasks, notes, maintenance, products, storagePackages, dailyCloses, facilities, taskPage] = await Promise.all([
-      db.task.findMany({ where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { facility: true, assignee: { select: { id: true, name: true } } }, orderBy: [{ status: "asc" }, { dueAt: "asc" }], take: 100 }),
+      db.task.findMany({ omit: { operationalChecklist: true }, where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { facility: true, assignee: { select: { id: true, name: true } } }, orderBy: [{ status: "asc" }, { dueAt: "asc" }], take: 100 }),
       db.unitNote.findMany({ where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { unit: true, author: { select: { id: true, name: true } } }, orderBy: { createdAt: "desc" }, take: 30 }),
       db.maintenanceRequest.findMany({ where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { facility: true, unit: true, assignedTo: { select: { id: true, name: true } } }, orderBy: [{ status: "asc" }, { dueAt: "asc" }], take: 100 }),
       db.product.findMany({ where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { facility: true }, orderBy: { name: "asc" } }),
