@@ -1,3 +1,4 @@
+import type { AdvertisingAttribution } from "./advertising-attribution";
 import type {LeadMarketProfile} from "./lead-market-profile";
 export type MarketingLead = {
   marketProfile?:LeadMarketProfile|null;
@@ -9,6 +10,7 @@ export type MarketingLead = {
   attribution: {
     source: string;
     medium: string;
+    advertising?: AdvertisingAttribution;
     campaignId?: string | null;
     linkId?: string | null;
     landingPage: string;
@@ -81,6 +83,15 @@ export function marketingReport(
     if (l.won) row.won++;
     channels.set(label, row);
   }
+  const advertising = new Map<string, {campaign:string; campaignId:string; source:string; medium:string; content:string; adId:string; adGroupId:string; adSetId:string; term:string; leads:number; won:number}>();
+  for (const lead of selected) {
+    const ad = lead.attribution?.advertising;
+    if (!ad) continue;
+    const key = JSON.stringify([ad.campaign, ad.content ?? "", ad.term ?? ""]);
+    const row = advertising.get(key) ?? {campaign:ad.campaign,campaignId:ad.campaignId,source:lead.attribution!.source,medium:lead.attribution!.medium,content:ad.content??"Unknown",adId:ad.adId??"Unknown",adGroupId:ad.adGroupId??"Unknown",adSetId:ad.adSetId??"Unknown",term:ad.term??"Unknown",leads:0,won:0};
+    row.leads++; if(lead.won)row.won++;
+    advertising.set(key,row);
+  }
   const days = Math.min(366, Math.max(1, Math.ceil((end - start) / 86400000))),
     bucketDays = days > 90 ? 7 : 1;
   const trend = Array.from({ length: Math.ceil(days / bucketDays) }, (_, i) => {
@@ -119,6 +130,7 @@ export function marketingReport(
     spend: campaignRows.reduce((n, c) => n + c.spend, 0),
     clicks: campaignRows.reduce((n, c) => n + c.clicks, 0),
     impressions: campaignRows.reduce((n, c) => n + c.impressions, 0),
+    advertising: [...advertising.values()].sort((a,b)=>b.leads-a.leads),
     campaigns: campaignRows,
     channels: [...channels.values()].sort((a, b) => b.leads - a.leads),
     trend,
