@@ -1,7 +1,8 @@
+import { advertisingMatches, validAdvertising, type AdvertisingAttribution } from "./advertising-attribution";
 import { z } from "zod";
 
 // Only public, non-identifying paths may be attached to an enquiry. Never store URL queries or signing/account routes.
-export const publicJourneyPath = z.string().max(120).refine(value => /^\/(?:|book|contact|personal-storage|business-storage|student-storage|moving-storage|storage-unit-sizes|faq|terms|paia|privacy|space-guide|storage\/(?:midpoint|melrose)|blog(?:\/[a-z0-9-]+)?|storage-insights(?:\/[a-z0-9-]+)?)$/.test(value), "Public page required");
+export const publicJourneyPath = z.string().max(120).refine(value => /^\/(?:|book|contact|personal-storage|business-storage|student-storage|moving-storage|storage-unit-sizes|faq|terms|paia|privacy|space-guide|micro-warehousing(?:\/(?:midpoint|book))?|storage\/(?:midpoint|melrose)|blog(?:\/[a-z0-9-]+)?|storage-insights(?:\/[a-z0-9-]+)?)$/.test(value), "Public page required");
 export const leadAttributionSchema = z.object({
   version: z.literal(1), consent: z.literal("granted"),
   landingPage: publicJourneyPath, conversionPage: publicJourneyPath,
@@ -11,5 +12,6 @@ export const leadAttributionSchema = z.object({
   method: z.enum(["utm", "referrer", "direct"]).optional(),
   campaignId: z.string().regex(/^c[a-z0-9]{24,32}$/).optional(),
   linkId: z.string().regex(/^c[a-z0-9]{24,32}$/).optional(),
-}).strict();
+  advertising: z.custom<AdvertisingAttribution>(validAdvertising).optional(),
+}).strict().refine(value => !value.advertising || advertisingMatches(value.advertising, value.source, value.medium), "Advertising source mismatch");
 export type LeadAttribution = z.infer<typeof leadAttributionSchema>;

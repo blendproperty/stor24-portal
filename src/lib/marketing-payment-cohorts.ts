@@ -46,7 +46,7 @@ export function marketingPaymentCohortRows(leads: CohortLead[], evidence: Cohort
     const unique = new Set(valid.map(v => JSON.stringify(v.parsed.data)));
     const attribution = unique.size === 1 && valid.length === attributions.length ? valid[0] : undefined;
     const acquisition = attribution?.parsed.success ? attribution.parsed.data : null;
-    const campaign = acquisition?.campaignId && attribution?.e.campaign?.id === acquisition.campaignId && attribution.e.campaign.facilityId === lead.facilityId ? attribution.e.campaign.name : "Unknown";
+    const campaign = acquisition?.campaignId && attribution?.e.campaign?.id === acquisition.campaignId && attribution.e.campaign.facilityId === lead.facilityId ? attribution.e.campaign.name : !acquisition?.campaignId ? acquisition?.advertising?.campaign ?? "Unknown" : "Unknown";
     const converted = lead.bookings.filter(b => b.status === "CONVERTED");
     const booking = lead.bookings.length === 1 ? lead.bookings[0] : null;
     const linked = booking && booking.facilityId === lead.facilityId && lead.customerId && booking.customerId === lead.customerId;

@@ -109,6 +109,7 @@ export async function marketingWorkspace(scope: RequestScope) {
               medium: a.medium,
               landingPage: a.landingPage,
               conversionPage: a.conversionPage,
+              ...(a.advertising ? {advertising:a.advertising} : {}),
               campaignId: valid ? c.id : null,
               linkId:
                 valid && c.links.some((link) => link.id === a.linkId)

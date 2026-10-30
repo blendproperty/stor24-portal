@@ -1,0 +1,156 @@
+{
+  "stor24_midrand_brand": {
+    "id": "24315692802",
+    "name": "STOR24 | Brand | Midrand",
+    "source": "google",
+    "medium": "cpc",
+    "ads": {
+      "ad_827046321560_ag_202354531602": {
+        "adId": "827046321560",
+        "adGroupId": "202354531602"
+      }
+    },
+    "keywords": [
+      "stor24",
+      "stor 24",
+      "stor24 halfway house",
+      "stor24 midpoint",
+      "stor24 midrand"
+    ]
+  },
+  "stor24_midrand_search": {
+    "id": "24315694704",
+    "name": "STOR24 | Search | Midrand",
+    "source": "google",
+    "medium": "cpc",
+    "ads": {
+      "ad_827046392096_ag_205962089692": {
+        "adId": "827046392096",
+        "adGroupId": "205962089692"
+      },
+      "ad_826923892509_ag_201418428952": {
+        "adId": "826923892509",
+        "adGroupId": "201418428952"
+      },
+      "ad_826923528231_ag_205962251012": {
+        "adId": "826923528231",
+        "adGroupId": "205962251012"
+      },
+      "ad_826965873775_ag_207571021104": {
+        "adId": "826965873775",
+        "adGroupId": "207571021104"
+      }
+    },
+    "keywords": [
+      "business storage midrand",
+      "document storage midrand",
+      "small business storage midrand",
+      "stock storage midrand",
+      "stor24",
+      "stor 24",
+      "stor24 halfway house",
+      "stor24 midpoint",
+      "stor24 midrand",
+      "storage units midrand",
+      "self storage midrand",
+      "self storage near me",
+      "storage halfway house",
+      "moving storage midrand",
+      "personal storage midrand",
+      "furniture storage midrand",
+      "household storage midrand"
+    ]
+  },
+  "stor24_micro_warehouse": {
+    "id": "24352709658",
+    "name": "STOR24 | Micro-Warehouse",
+    "source": "google",
+    "medium": "cpc",
+    "ads": {
+      "828126323236": {
+        "adId": "828126323236",
+        "adGroupId": "206836243411"
+      }
+    },
+    "keywords": [
+      "small warehouse to rent midrand",
+      "warehouse space to rent midrand",
+      "business storage midrand",
+      "mini warehouse midrand",
+      "stock storage midrand",
+      "micro warehouse midrand",
+      "micro warehousing midrand",
+      "warehouse storage midrand"
+    ]
+  },
+  "stor24_self_storage_round2_20261015": {
+    "id": "120253973217080268",
+    "name": "STOR24 | Self storage | Round 2",
+    "source": "facebook",
+    "medium": "paid_social",
+    "ads": {
+      "self-carousel-1": {
+        "adId": "120253973423350268",
+        "adSetId": "120253973240280268"
+      },
+      "self-carousel-2": {
+        "adId": "120253973423350268",
+        "adSetId": "120253973240280268"
+      },
+      "self-carousel-3": {
+        "adId": "120253973423350268",
+        "adSetId": "120253973240280268"
+      },
+      "self-carousel-4": {
+        "adId": "120253973423350268",
+        "adSetId": "120253973240280268"
+      },
+      "self-carousel-5": {
+        "adId": "120253973423350268",
+        "adSetId": "120253973240280268"
+      },
+      "self-image": {
+        "adId": "120253973304300268",
+        "adSetId": "120253973303220268"
+      }
+    },
+    "keywords": []
+  },
+  "stor24_micro_warehousing_round2_20261015": {
+    "id": "120253973217080268",
+    "name": "STOR24 | Micro warehousing | Round 2",
+    "source": "facebook",
+    "medium": "paid_social",
+    "ads": {
+      "micro-carousel-1": {
+        "adId": "120253973424890268",
+        "adSetId": "120253973301040268"
+      },
+      "micro-carousel-2": {
+        "adId": "120253973424890268",
+        "adSetId": "120253973301040268"
+      },
+      "micro-carousel-3": {
+        "adId": "120253973424890268",
+        "adSetId": "120253973301040268"
+      },
+      "micro-carousel-4": {
+        "adId": "120253973424890268",
+        "adSetId": "120253973301040268"
+      },
+      "micro-carousel-5": {
+        "adId": "120253973424890268",
+        "adSetId": "120253973301040268"
+      },
+      "micro-carousel-6": {
+        "adId": "120253973424890268",
+        "adSetId": "120253973301040268"
+      },
+      "micro-image": {
+        "adId": "120253973306780268",
+        "adSetId": "120253973305590268"
+      }
+    },
+    "keywords": []
+  }
+}
