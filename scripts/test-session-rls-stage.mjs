@@ -14,7 +14,7 @@ for (const [key,user] of [['MIGRATION_DATABASE_URL','stage_owner'],['TENANT_A_UR
 }
 const owner=new pg.Client({connectionString:process.env.MIGRATION_DATABASE_URL});
 const dbs=[process.env.TENANT_A_URL,process.env.TENANT_B_URL].map(connectionString=>new pg.Client({connectionString}));
-const authDb=new pg.Client({connectionString:process.env.AUTH_ROLE_URL});
+const authDb=new pg.Pool({connectionString:process.env.AUTH_ROLE_URL,max:4});
 let router;
 const suffix=randomBytes(8).toString('hex');
 const orgs=[`stage-org-a-${suffix}`,`stage-org-b-${suffix}`], users=[`stage-user-a-${suffix}`,`stage-user-b-${suffix}`], roles=[`stage-role-a-${suffix}`,`stage-role-b-${suffix}`], customers=[`stage-customer-a-${suffix}`,`stage-customer-b-${suffix}`];
@@ -25,7 +25,7 @@ function start(port,url) {
   for(const key of ['MIGRATION_DATABASE_URL','TENANT_A_URL','TENANT_B_URL','BACKUP_ROLE_URL','AUTH_ROLE_URL'])delete env[key];
   const child=spawn(process.execPath,['node_modules/next/dist/bin/next','start','--hostname','127.0.0.1','--port',String(port)],{env,stdio:'ignore'});servers.push(child);return child;
 }
-async function request(port,token) { return fetch(`http://127.0.0.1:${port}/api/v1/leasing/customers`,{headers:token?{cookie:`stor24_session=${token}`}:{}}); }
+async function request(port,token,headers={}) { return fetch(`http://127.0.0.1:${port}/api/v1/leasing/customers`,{headers:{...headers,...(token?{cookie:`stor24_session=${token}`}:{})}}); }
 async function ready(port,child) {
   for(let i=0;i<150;i++){if(child.exitCode!==null)throw new Error('Synthetic CRM server exited');try{if((await request(port)).status===401)return;}catch{}await new Promise(resolve=>setTimeout(resolve,300));}
   throw new Error('Synthetic CRM server was not ready');
@@ -34,7 +34,7 @@ async function token(i,extra={}) {
   return new SignJWT({userId:users[i],name:'Synthetic',email:`stage-${i}-${suffix}@example.invalid`,role:'Synthetic staff',sessionVersion:0,mfaVerified:true,...extra}).setProtectedHeader({alg:'HS256'}).setIssuedAt().setExpirationTime('10m').sign(new TextEncoder().encode(process.env.AUTH_SECRET));
 }
 try {
-  await owner.connect();for(const db of dbs)await db.connect();await authDb.connect();
+  await owner.connect();for(const db of dbs)await db.connect();
   assert.equal((await owner.query(`SELECT relrowsecurity FROM pg_class WHERE oid='public."Customer"'::regclass`)).rows[0].relrowsecurity,false);
   await owner.query('INSERT INTO "Organisation" (id,name,slug,"updatedAt") VALUES ($1,$1,$1,now()),($2,$2,$2,now())',orgs);fixtures=true;
   for(let i=0;i<2;i++){
@@ -87,11 +87,34 @@ try {
   assert.equal((await request(3100,await token(0,{sessionVersion:99}))).status,401);
   assert.equal((await request(3100,await token(0,{mfaVerified:false}))).status,401);
   const forgedClaim=await request(3100,await token(0,{organisationId:orgs[1]}));assert.equal(forgedClaim.status,200);assert.deepEqual((await forgedClaim.json()).data.map(row=>row.id),[customers[0]],'routing ignores an organisation claim in the token');
+  const forgedHeaders=await request(3100,tokens[0],{'x-organisation-id':orgs[1],'x-forwarded-user':users[1]});
+  assert.equal(forgedHeaders.status,200);
+  assert.deepEqual((await forgedHeaders.json()).data.map(row=>row.id),[customers[0]],'caller-supplied identity headers must not choose the role');
+  assert.equal((await request(3100,await token(0,{userId:`unknown-${suffix}`}))).status,401,'an unknown signed user must not be routed');
+  const concurrent=await Promise.all(Array.from({length:20},(_,i)=>request(3100,tokens[i%2])));
+  for(let i=0;i<concurrent.length;i++){
+    assert.equal(concurrent[i].status,200);
+    assert.deepEqual((await concurrent[i].json()).data.map(row=>row.id),[customers[i%2]],'concurrent sessions must retain their own database role');
+  }
+  await owner.query('UPDATE "User" SET "sessionVersion"="sessionVersion"+1 WHERE id=$1',[users[0]]);
+  assert.equal((await request(3100,tokens[0])).status,401,'session revocation must immediately block routing');
+  const renewed=await token(0,{sessionVersion:1});
+  assert.deepEqual((await (await request(3100,renewed)).json()).data.map(row=>row.id),[customers[0]]);
+  await owner.query('UPDATE "User" SET "organisationId"=$1 WHERE id=$2',[orgs[1],users[0]]);
+  await owner.query('UPDATE "RoleAssignment" SET "roleId"=$1 WHERE "userId"=$2',[roles[1],users[0]]);
+  const moved=await request(3100,renewed);
+  assert.equal(moved.status,200);
+  assert.deepEqual((await moved.json()).data.map(row=>row.id),[customers[1]],'routing must use the current user organisation after a move');
+  const oldRole=await request(3101,renewed);
+  assert.equal(oldRole.status,200);
+  assert.deepEqual((await oldRole.json()).data,[],'the application must not expose old-organisation records after the user moves');
+  assert.deepEqual((await dbs[0].query('SELECT id FROM "Customer" WHERE id=ANY($1::text[])', [customers])).rows.map(row=>row.id),[customers[0]],'the old role can read only its own organisation');
+  assert.deepEqual((await dbs[1].query('SELECT id FROM "Customer" WHERE id=ANY($1::text[])', [customers])).rows.map(row=>row.id),[customers[1]],'the new role can read only its own organisation');
   await owner.query('DELETE FROM "RoleAssignment" WHERE "userId"=$1',[users[0]]);
-  assert.equal((await request(3100,tokens[0])).status,403,'current permission revocation must apply to existing sessions');
+  assert.equal((await request(3100,renewed)).status,403,'current permission revocation must apply to existing sessions');
   await owner.query('UPDATE "User" SET active=false WHERE id=$1',[users[1]]);
   assert.equal((await request(3100,tokens[1])).status,401,'disabled user must not be routed');
-  console.log(JSON.stringify({crmAuthenticatedRlsHttpChecks:16,scope:'synthetic sessions and two separately configured local processes',productionIntegrated:false}));
+  console.log(JSON.stringify({crmAuthenticatedRlsRehearsal:'passed',concurrentRequests:20,scope:'synthetic sessions and two separately configured local processes',productionIntegrated:false}));
 } finally {
   if(router)await new Promise(resolve=>router.close(resolve));
   for(const child of servers)child.kill('SIGTERM');
