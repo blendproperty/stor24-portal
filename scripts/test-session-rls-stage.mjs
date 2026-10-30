@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import pg from 'pg';
 import { SignJWT, jwtVerify } from 'jose';
 
@@ -19,7 +19,12 @@ let router;
 const suffix=randomBytes(8).toString('hex');
 const orgs=[`stage-org-a-${suffix}`,`stage-org-b-${suffix}`], users=[`stage-user-a-${suffix}`,`stage-user-b-${suffix}`], roles=[`stage-role-a-${suffix}`,`stage-role-b-${suffix}`], customers=[`stage-customer-a-${suffix}`,`stage-customer-b-${suffix}`];
 const policies=[`stage_a_${suffix}`,`stage_b_${suffix}`], authView=`stage_auth_users_${suffix}`, servers=[];
-let fixtures=false, enabled=false;
+const tenantTokens=[randomBytes(32).toString('hex'),randomBytes(32).toString('hex')];
+const tenantHashes=tenantTokens.map(value=>createHash('sha256').update(value).digest('hex'));
+const accounts=[`stage-account-a-${suffix}`,`stage-account-b-${suffix}`];
+const sameOrgCustomer=`stage-customer-extra-${suffix}`, sameOrgAccount=`stage-account-extra-${suffix}`;
+let fixtures=false, enabled=false, granted=false;
+const protectedPortalTables=[];
 function start(port,url) {
   const env={...process.env,DATABASE_URL:url,NODE_ENV:'production'};
   for(const key of ['MIGRATION_DATABASE_URL','TENANT_A_URL','TENANT_B_URL','BACKUP_ROLE_URL','AUTH_ROLE_URL'])delete env[key];
@@ -35,7 +40,10 @@ async function token(i,extra={}) {
 }
 try {
   await owner.connect();for(const db of dbs)await db.connect();
-  assert.equal((await owner.query(`SELECT relrowsecurity FROM pg_class WHERE oid='public."Customer"'::regclass`)).rows[0].relrowsecurity,false);
+  for(const table of ['Customer','Account','TenantPortalSession']){
+    const state=await owner.query('SELECT relrowsecurity, (SELECT count(*)::int FROM pg_policy WHERE polrelid=c.oid) AS policies FROM pg_class c WHERE oid=$1::regclass',[`public."${table}"`]);
+    assert.deepEqual(state.rows,[{relrowsecurity:false,policies:0}],`refuse existing RLS or policies on ${table}`);
+  }
   await owner.query('INSERT INTO "Organisation" (id,name,slug,"updatedAt") VALUES ($1,$1,$1,now()),($2,$2,$2,now())',orgs);fixtures=true;
   for(let i=0;i<2;i++){
     await owner.query('INSERT INTO "Customer" (id,"organisationId","firstName","updatedAt") VALUES ($1,$2,$3,now())',[customers[i],orgs[i],`Synthetic ${i}`]);
@@ -44,17 +52,28 @@ try {
     await owner.query('INSERT INTO "RoleAssignment" (id,"userId","roleId") VALUES ($1,$2,$3)',[`stage-assignment-${i}-${suffix}`,users[i],roles[i]]);
   }
   await owner.query('GRANT USAGE ON SCHEMA public TO stage_tenant_a,stage_tenant_b,stage_auth');
+  granted=true;
   await owner.query(`CREATE VIEW \"${authView}\" AS SELECT id,\"organisationId\",active,\"sessionVersion\",(\"passwordHash\" IS NOT NULL) AS password_set FROM \"User\"`);
   await owner.query(`GRANT SELECT ON \"${authView}\" TO stage_auth`);
   await assert.rejects(authDb.query('SELECT \"passwordHash\" FROM \"User\"'),error=>error.code==='42501');
   await assert.rejects(authDb.query('SELECT id FROM \"Customer\"'),error=>error.code==='42501');
   await owner.query('GRANT SELECT ON ALL TABLES IN SCHEMA public TO stage_tenant_a,stage_tenant_b');
+  await owner.query('GRANT INSERT ON "AuditEvent" TO stage_tenant_a,stage_tenant_b');
   await owner.query('REVOKE ALL ON "_prisma_migrations" FROM stage_tenant_a,stage_tenant_b');
   for(let i=0;i<2;i++){
     const role=i===0?'stage_tenant_a':'stage_tenant_b';
     await owner.query(`CREATE POLICY "${policies[i]}" ON "Customer" FOR SELECT TO ${role} USING ("organisationId"='${orgs[i]}')`);
   }
   await owner.query('ALTER TABLE "Customer" ENABLE ROW LEVEL SECURITY');enabled=true;
+  for(const [table,predicate] of [['Account',`EXISTS (SELECT 1 FROM "Customer" c WHERE c.id="Account"."customerId")`],['TenantPortalSession',null]]){
+    protectedPortalTables.push(table);
+    for(let i=0;i<2;i++){
+      const role=i===0?'stage_tenant_a':'stage_tenant_b';
+      const condition=predicate ?? `"organisationId"='${orgs[i]}'`;
+      await owner.query(`CREATE POLICY "${policies[i]}" ON "${table}" FOR SELECT TO ${role} USING (${condition})`);
+    }
+    await owner.query(`ALTER TABLE "${table}" ENABLE ROW LEVEL SECURITY`);
+  }
   const a=start(3101,process.env.TENANT_A_URL),b=start(3102,process.env.TENANT_B_URL);
   await Promise.all([ready(3101,a),ready(3102,b)]);
   router=createServer(async (req,res)=>{
@@ -91,15 +110,36 @@ try {
   assert.equal(forgedHeaders.status,200);
   assert.deepEqual((await forgedHeaders.json()).data.map(row=>row.id),[customers[0]],'caller-supplied identity headers must not choose the role');
   assert.equal((await request(3100,await token(0,{userId:`unknown-${suffix}`}))).status,401,'an unknown signed user must not be routed');
+  for(let i=0;i<2;i++){
+    const email=`tenant-${i}-${suffix}@example.invalid`;
+    await owner.query('UPDATE "Customer" SET email=$1,"emailVerifiedAt"=now() WHERE id=$2',[email,customers[i]]);
+    await owner.query('INSERT INTO "Account" (id,"customerId","accountNumber","updatedAt") VALUES ($1,$2,$1,now())',[accounts[i],customers[i]]);
+    await owner.query('INSERT INTO "TenantPortalSession" ("tokenHash","organisationId",email,"customerIds","expiresAt") VALUES ($1,$2,$3,$4,now()+interval \'10 minutes\')',[tenantHashes[i],orgs[i],email,[customers[i]]]);
+  }
+  await owner.query('INSERT INTO "Customer" (id,"organisationId",email,"emailVerifiedAt","updatedAt") VALUES ($1,$2,$3,now(),now())',[sameOrgCustomer,orgs[0],`tenant-0-${suffix}@example.invalid`]);
+  await owner.query('INSERT INTO "Account" (id,"customerId","accountNumber","updatedAt") VALUES ($1,$2,$1,now())',[sameOrgAccount,sameOrgCustomer]);
+  for(let i=0;i<2;i++){
+    const tenantRequest=(port,session)=>fetch(`http://127.0.0.1:${port}/api/tenant/accounts`,{headers:{cookie:`stor24_tenant_session=${session}`}});
+    const tenantResponse=await tenantRequest(3101+i,tenantTokens[i]);
+    assert.equal(tenantResponse.status,200,'customer session works through its organisation database role');
+    assert.deepEqual((await tenantResponse.json()).data.accounts.map(row=>row.id),[accounts[i]],'customer sees only their own account');
+    assert.equal((await tenantRequest(3102-i,tenantTokens[i])).status,401,'customer session on the other role cannot read its customer');
+    const visibleAccounts=i?[accounts[1]]:[accounts[0],sameOrgAccount].sort();
+    assert.deepEqual((await dbs[i].query('SELECT id FROM "Account" WHERE id=ANY($1::text[])',[[...accounts,sameOrgAccount]])).rows.map(row=>row.id).sort(),visibleAccounts,'account RLS is organisation-scoped, while the portal applies customer scope');
+    assert.deepEqual((await dbs[i].query('SELECT "tokenHash" FROM "TenantPortalSession" WHERE "tokenHash"=ANY($1::text[])',[tenantHashes])).rows.map(row=>row.tokenHash),[tenantHashes[i]],'session RLS exposes only its own organisation');
+    await owner.query('UPDATE "TenantPortalSession" SET "revokedAt"=now() WHERE "tokenHash"=$1',[tenantHashes[i]]);
+    assert.equal((await tenantRequest(3101+i,tenantTokens[i])).status,401,'revoked customer session cannot read accounts');
+  }
   const concurrent=await Promise.all(Array.from({length:20},(_,i)=>request(3100,tokens[i%2])));
   for(let i=0;i<concurrent.length;i++){
     assert.equal(concurrent[i].status,200);
-    assert.deepEqual((await concurrent[i].json()).data.map(row=>row.id),[customers[i%2]],'concurrent sessions must retain their own database role');
+    const expected=i%2?[customers[1]]:[customers[0],sameOrgCustomer].sort();
+    assert.deepEqual((await concurrent[i].json()).data.map(row=>row.id).sort(),expected,'concurrent sessions must retain their own database role');
   }
   await owner.query('UPDATE "User" SET "sessionVersion"="sessionVersion"+1 WHERE id=$1',[users[0]]);
   assert.equal((await request(3100,tokens[0])).status,401,'session revocation must immediately block routing');
   const renewed=await token(0,{sessionVersion:1});
-  assert.deepEqual((await (await request(3100,renewed)).json()).data.map(row=>row.id),[customers[0]]);
+  assert.deepEqual((await (await request(3100,renewed)).json()).data.map(row=>row.id).sort(),[customers[0],sameOrgCustomer].sort());
   await owner.query('UPDATE "User" SET "organisationId"=$1 WHERE id=$2',[orgs[1],users[0]]);
   await owner.query('UPDATE "RoleAssignment" SET "roleId"=$1 WHERE "userId"=$2',[roles[1],users[0]]);
   const moved=await request(3100,renewed);
@@ -114,16 +154,22 @@ try {
   assert.equal((await request(3100,renewed)).status,403,'current permission revocation must apply to existing sessions');
   await owner.query('UPDATE "User" SET active=false WHERE id=$1',[users[1]]);
   assert.equal((await request(3100,tokens[1])).status,401,'disabled user must not be routed');
-  console.log(JSON.stringify({crmAuthenticatedRlsRehearsal:'passed',concurrentRequests:20,scope:'synthetic sessions and two separately configured local processes',productionIntegrated:false}));
+  console.log(JSON.stringify({crmAuthenticatedRlsRehearsal:'passed',concurrentRequests:20,roleBoundTables:['Customer','Account','TenantPortalSession'],scope:'synthetic sessions and two separately configured local processes',productionIntegrated:false}));
 } finally {
   if(router)await new Promise(resolve=>router.close(resolve));
   for(const child of servers)child.kill('SIGTERM');
   await Promise.all(servers.map(child=>new Promise(resolve=>{if(child.exitCode!==null)return resolve();child.once('exit',resolve);setTimeout(resolve,5000).unref();})));
+  for(const table of protectedPortalTables){
+    await owner.query(`ALTER TABLE "${table}" DISABLE ROW LEVEL SECURITY`);
+    for(const policy of policies)await owner.query(`DROP POLICY IF EXISTS "${policy}" ON "${table}"`);
+  }
   if(enabled)await owner.query('ALTER TABLE "Customer" DISABLE ROW LEVEL SECURITY');
   for(const policy of policies)await owner.query(`DROP POLICY IF EXISTS "${policy}" ON "Customer"`).catch(()=>{});
-  await owner.query('REVOKE ALL ON ALL TABLES IN SCHEMA public FROM stage_tenant_a,stage_tenant_b').catch(()=>{});
+  if(granted)await owner.query('REVOKE ALL ON ALL TABLES IN SCHEMA public FROM stage_tenant_a,stage_tenant_b').catch(()=>{});
   await owner.query(`DROP VIEW IF EXISTS \"${authView}\"`).catch(()=>{});
-  await owner.query('REVOKE USAGE ON SCHEMA public FROM stage_tenant_a,stage_tenant_b,stage_auth').catch(()=>{});
+  if(granted)await owner.query('REVOKE USAGE ON SCHEMA public FROM stage_tenant_a,stage_tenant_b,stage_auth').catch(()=>{});
+  await owner.query('DELETE FROM "TenantPortalSession" WHERE "tokenHash"=ANY($1::text[])',[tenantHashes]).catch(()=>{});
+  await owner.query('DELETE FROM "Account" WHERE id=ANY($1::text[])',[[...accounts,sameOrgAccount]]).catch(()=>{});
   if(fixtures)await owner.query('DELETE FROM "Organisation" WHERE id=ANY($1::text[])',[orgs]);
   for(const db of dbs)await db.end().catch(()=>{});await authDb.end().catch(()=>{});await owner.end().catch(()=>{});
 }
