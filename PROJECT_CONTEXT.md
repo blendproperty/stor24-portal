@@ -6870,3 +6870,8 @@ Main advanced to ae6448b0 (PR565 Price review icon) while this PR was running. I
 ### 2026-10-30 — CRM preflight merged; release pending
 
 CRM PR #668 merged as `09d12e134e63ea6f6c978d1fec07d1d382334136` after its PR checks passed. Its opt-in catalog preflight identifies excessive runtime-role privileges; it does not itself remove them or enforce RLS. Main-branch checks and deployment/live verification were pending at the time of this entry. CMS PR #56 merged as `ecedc14aafcf3f9934a5843739b919df07fe0f61`, recording the nested-grant review and actual isolated backup restore evidence on CMS main. Production role separation, real-user database routing, RLS policies, complete consumer/grant review, recovery and application acceptance remain outstanding.
+
+
+### 2026-10-30 — scheduled billing consumer and isolated role test
+
+Read-only host inspection confirmed seven STOR24 systemd timers active and found an active root cron entry calling the CRM `/api/v1/billing/run-monthly` HTTP endpoint. The 20 inspected cron files were searched by name/content patterns; the review does not exclude other user, host, remote or dynamically invoked consumers. A synthetic `monthly-billing.test.ts` run passed 7 tests with a separate non-owner non-superuser runtime account and broad staging table/sequence grants; it covers synthetic cron-service behavior, concurrency and rollback, not the real schedule, least privilege, RLS or production financial records. The first setup attempt lacked the `pg` dependency and stopped; the prepared checkout completed bootstrap including its scripted historical migration-order recovery, and the temporary PostgreSQL container was removed. The test was added to the restricted-role CI workflow. Production grants and data were not changed.
