@@ -6768,3 +6768,5 @@ Main advanced to ae6448b0 (PR565 Price review icon) while this PR was running. I
 - Hosted test correction 2026-10-30: the CMS synthetic-backup job initially failed because socket readiness detected PostgreSQL temporary initialization before the final server started. The readiness probe now checks TCP; this is test infrastructure, not a production change. Re-run hosted checks to validate.
 
 - 2026-10-30 CMS application access review: inventoried the seven registered Payload collections and two globals, including anonymous published-only checks. Current write predicates check for an authenticated user rather than a separate administrator/editor role. This describes application rules, not complete database grants or role separation; Payload internals and other consumers remain to be reviewed.
+
+- 2026-10-30 source statement triage categorized all 148 detected raw call sites (121 row locks, 17 advisory locks, 2 health, 2 local settings, 2 audit reads, 2 Product updates and 2 upserts). This is syntactic coverage only; full role-by-role permissions, nested operations and external consumers remain unverified.
