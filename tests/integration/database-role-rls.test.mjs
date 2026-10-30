@@ -25,8 +25,9 @@ test('isolated database role limits and RLS identity trust boundary', async () =
   const runtime = new pg.Client({ connectionString: runtimeUrl });
   const owner = new pg.Client({ connectionString: migrationUrl });
   const table = 'rls_probe_' + randomBytes(8).toString('hex');
-  let created = false, memberCreated = false, memberGranted = false;
+  let created = false, memberCreated = false, memberGranted = false, functionCreated = false;
   const member = 'role_probe_' + randomBytes(8).toString('hex');
+  const definer = 'definer_probe_' + randomBytes(8).toString('hex');
   try {
     await owner.connect(); await runtime.connect(); await admin.connect();
     const role = (await runtime.query(`SELECT rolsuper, rolbypassrls, rolcreatedb, rolcreaterole, rolreplication,
@@ -48,6 +49,14 @@ test('isolated database role limits and RLS identity trust boundary', async () =
     await admin.query(`REVOKE "${member}" FROM synthetic_runtime`); memberGranted=false;
 
     assert.ok((await runtimeRoleViolations(owner)).includes('owns_database'), 'database owner must fail the runtime role preflight');
+    await owner.query(`CREATE FUNCTION public."${definer}"() RETURNS integer LANGUAGE SQL SECURITY DEFINER AS 'SELECT 1'`); functionCreated=true;
+    assert.ok((await runtimeRoleViolations(runtime)).includes('security_definer_execute'), 'public EXECUTE on a SECURITY DEFINER function must fail the preflight');
+    await owner.query(`REVOKE EXECUTE ON FUNCTION public."${definer}"() FROM PUBLIC`);
+    assert.ok(!(await runtimeRoleViolations(runtime)).includes('security_definer_execute'), 'revoking public EXECUTE removes the flag');
+    await owner.query(`GRANT EXECUTE ON FUNCTION public."${definer}"() TO synthetic_runtime`);
+    assert.ok((await runtimeRoleViolations(runtime)).includes('security_definer_execute'), 'explicit EXECUTE must fail the preflight');
+    await owner.query(`DROP FUNCTION public."${definer}"()`); functionCreated=false;
+
     await owner.query('GRANT CREATE ON SCHEMA public TO synthetic_runtime');
     try { assert.ok((await runtimeRoleViolations(runtime)).includes('schema_create'), 'schema CREATE must fail the runtime preflight'); }
     finally { await owner.query('REVOKE CREATE ON SCHEMA public FROM synthetic_runtime'); }
@@ -74,6 +83,7 @@ test('isolated database role limits and RLS identity trust boundary', async () =
     await owner.query(`ALTER TABLE public."${table}" FORCE ROW LEVEL SECURITY`);
     assert.equal((await owner.query(`SELECT * FROM public."${table}"`)).rowCount, 0, 'force subjects a non-superuser owner to RLS');
   } finally {
+    if(functionCreated) await owner.query(`DROP FUNCTION public."${definer}"()`);
     if(memberGranted) await admin.query(`REVOKE "${member}" FROM synthetic_runtime`);
     if(memberCreated) await admin.query(`DROP ROLE "${member}"`);
     await admin.end().catch(() => {});

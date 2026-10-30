@@ -23,6 +23,8 @@ export async function runtimeRoleViolations(client) {
   if(ownership.rows[0].owned) issues.push('owned_objects');
   const schemas=await client.query(`SELECT 1 FROM pg_namespace n WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%' AND has_schema_privilege(current_user,n.oid,'CREATE') LIMIT 1`);
   if(schemas.rowCount) issues.push('schema_create');
+  const definer=await client.query(`SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%' AND p.prosecdef AND has_function_privilege(current_user,p.oid,'EXECUTE') LIMIT 1`);
+  if(definer.rowCount) issues.push('security_definer_execute');
   return issues;
 }
 
@@ -34,7 +36,7 @@ if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
     try {
       await client.connect(); const issues=await runtimeRoleViolations(client);
       if(issues.length) { console.error(JSON.stringify({catalogPreflightPassed:false,issues}));process.exitCode=1; }
-      else console.log(JSON.stringify({catalogPreflightPassed:true,scope:'catalog flags, ownership, memberships and CREATE only; not a complete access or RLS audit'}));
+      else console.log(JSON.stringify({catalogPreflightPassed:true,scope:'catalog flags, ownership, memberships, CREATE and SECURITY DEFINER EXECUTE only; not a complete access or RLS audit'}));
     } catch { console.error('Database role preflight could not complete');process.exitCode=1; }
     finally { await client.end().catch(()=>{}); }
   }
