@@ -1,5 +1,21 @@
 // Only allowlisted aggregate evidence reaches recipients; never forward raw job logs.
+function securityEvidence(log = '') {
+  const securityMarkers = [...log.matchAll(/(?:^|\n)(?:\d{4}-[^ ]+ )?(STOR24_ACCOUNTS_CHANGED|STOR24_SSH_KEYS_CHANGED|STOR24_SECURITY_SETTINGS_CHANGED)\r?(?=\n|$)/g)].map(match => match[1]);
+  if (securityMarkers.length) {
+    const names = { STOR24_ACCOUNTS_CHANGED: 'VPS account/group files', STOR24_SSH_KEYS_CHANGED: 'authorised SSH keys', STOR24_SECURITY_SETTINGS_CHANGED: 'host security settings' };
+    return { severity: 'HIGH', failure: 'Security baseline changed', details: `Changed: ${[...new Set(securityMarkers)].map(marker => names[marker]).join(', ')}. Compare the protected baseline with approved maintenance; no account names, keys or file contents are included.`, impact: 'Potential unauthorised access change or legitimate maintenance. Investigate promptly; this is not proof of an intrusion and does not automatically lock the site.' };
+  }
+  if (/(?:^|\n)(?:\d{4}-[^ ]+ )?STOR24_SECURITY_CHECK_UNAVAILABLE\r?(?=\n|$)/.test(log)) return { severity: 'WARNING', failure: 'Security change detection unavailable', details: 'The required security report, protected baseline or an inventory read is missing, invalid or unavailable.', impact: 'Account, SSH-key and selected host-setting changes are unverified. Do not silently create or replace a baseline.' };
+  return null;
+}
 export function backupEvidence(log = '') {
+  const findings = [securityEvidence(log), backupResourceEvidence(log)].filter(Boolean);
+  if (!findings.length) return null;
+  const failures = findings.filter(finding => finding.severity !== 'INFO');
+  if (!failures.length) return findings[0];
+  return { severity: failures.some(finding => finding.severity === 'HIGH') ? 'HIGH' : 'WARNING', ...Object.fromEntries(['failure', 'details', 'impact'].map(field => [field, failures.map(finding => finding[field]).join('; ')])) };
+}
+function backupResourceEvidence(log = '') {
   const backupFailed = /(?:^|\n)(?:\d{4}-[^ ]+ )?STOR24_BACKUP_FAILED\r?(?:\n|$)/.test(log);
   const resourcesFailed = /(?:^|\n)(?:\d{4}-[^ ]+ )?STOR24_RESOURCES_FAILED\r?(?:\n|$)/.test(log);
   if (backupFailed && resourcesFailed) return { severity: 'HIGH', failure: 'Encrypted backup and server resource checks failed', details: `Both local checks failed.${/HOST_DISK_THRESHOLD/.test(log) ? ' Disk usage is at least 85%.' : ''}${/HOST_MEMORY_THRESHOLD/.test(log) ? ' Available memory is 10% or less.' : ''}${/DATABASE_CONNECTION_THRESHOLD/.test(log) ? ' Database connections are at least 80% of capacity.' : ''}`, impact: 'Backup freshness and server/container health both require investigation.' };

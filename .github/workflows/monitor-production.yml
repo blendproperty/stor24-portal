@@ -84,6 +84,7 @@ jobs:
       - name: Verify fresh independent host heartbeat
         env:
           STOR24_HEARTBEAT_KEY: ${{ secrets.STOR24_HEARTBEAT_KEY }}
+          STOR24_SECURITY_CHANGES_REQUIRED: ${{ vars.STOR24_SECURITY_CHANGES_REQUIRED }}
         run: node scripts/check-host-heartbeat.mjs
 
   alerts:
