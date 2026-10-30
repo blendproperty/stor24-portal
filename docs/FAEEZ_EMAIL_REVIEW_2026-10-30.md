@@ -46,3 +46,17 @@ Review only. No runtime code, configuration, prices, tenant records, permissions
 ## Checklist implementation follow-up on 30 October
 
 The authorized checklist/padlock slice is implemented for source validation on `codex/faeez-checklists-20261030`. See [workflow and attachment mapping](OPERATIONAL_CHECKLISTS.md). This supersedes the assessment-only boundary for that slice; it does not imply a merge, deployment, production schedules, messages or staff acceptance. The canonical context retains exact testing/publication and outstanding gates. Other notice/rate/report/laptop/Outlook/finance/legal/provider work in this assessment is unchanged.
+
+
+## Follow-on implementation update 30 October 2026
+
+The reviewed email remains the latest Faeez message in a fresh mailbox lookup. PR #663 checklist/padlock software was subsequently merged and live-verified at application revision 37f6d95b; the canonical release evidence reached main a755304f through PR #664. That software verification did not close any Faeez/staff/device or physical-store acceptance gate.
+
+The next implementation candidate, `codex/faeez-next-20261030` from main a755304f, covers these two source gaps:
+
+- **Tenant rate management:** extends the existing owner review with recorded size, current standard rent, same-area current unit-state occupancy and current-versus-standard variance. Suggestions retain the entered percentage/rand rule. Explicit tenant selection, fresh selection previews and persisted pending/dismissed/restore controls with reasons and audit are implemented. Missing dates/areas and zero-standard percentage variance remain unknown. Size denominator, data correctness, caps/exceptions, pricing policy, tax interpretation and required real tenant approval/notices remain business gates. See [the runbook](RENT_REVIEW_AND_WORD_EXPORTS.md) for definitions and API compatibility.
+- **Word reports:** adds actual editable DOCX to the existing supported fixed reports, visual builder/online reports, saved bundles and retained snapshots. It reuses report permissions, personal-data export authorization, audit/DLP and source/date definitions. The existing recurring-charge CSV/JSON backup restriction remains. Source/financial/history/projection gaps do not disappear with a new file format.
+
+This candidate is separate from PR #663's release; exact commit/push, hosted checks, merge, deployment and fresh live verification must be read from its dated PROJECT_CONTEXT.md entry and Git/PR receipts. No real tenant rate, message, finance/provider/permission or physical action was performed for development. Staff/device normal-day UAT and actual Word opening/printing remain open.
+
+**Next outstanding tranche:** editable trading-hours, immediate-closure and maintenance notices with store scope, variables, versions, preview, exact recipient approval, guarded channel delivery and retained outcomes. Wording/channel/provider and release decisions remain open. Existing batch pricing still requires Faeez acceptance; priority missing report definitions/data, maintenance/visitor/procurement/quote/legal/emergency forms, staff activation, laptop/Outlook and training retain their earlier bounded outstanding status. No tracker is in scope for this candidate.

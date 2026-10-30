@@ -9,7 +9,7 @@ import { visualReportErrorResponse } from "@/lib/visual-report-errors";
 import { authoriseReportResult,runVisualReport,visualExportResponse } from "@/lib/visual-report-service";
 import { reportRequestBody } from "@/lib/report-request-body";
 export const dynamic="force-dynamic";
-const schema=z.object({ids:z.array(z.string().min(1).max(100)).min(1).max(5).refine(ids=>new Set(ids).size===ids.length),format:z.enum(["CSV","XLSX","PDF"])}).strict();
+const schema=z.object({ids:z.array(z.string().min(1).max(100)).min(1).max(5).refine(ids=>new Set(ids).size===ids.length),format:z.enum(["CSV","XLSX","PDF","DOCX"])}).strict();
 export async function POST(request:Request) {
   try {
     if(!sameOrigin(request))throw new ReportError("FORBIDDEN");const actor=await requireSession();

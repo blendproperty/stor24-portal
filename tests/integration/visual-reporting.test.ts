@@ -111,7 +111,7 @@ test("isolated PostgreSQL reporting persistence, claims, expiry and history scop
       const occupancy=await db.occupancy.create({data:{tenancyId:tenancy.id,unitId:unit.id,status:"ACTIVE",startDate:new Date("2026-01-01"),monthlyRate:100}});
       let auditId:string|undefined;
       try{
-        const now=new Date(),effectivePeriod=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()+2,1)).toISOString().slice(0,7),input={facilityId:facility.id,minimumMonths:0,basis:"TIME_IN_UNIT",type:"AMOUNT",value:12.34,effectivePeriod};
+        const now=new Date(),effectivePeriod=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()+2,1)).toISOString().slice(0,7),input={selectedOccupancyIds:[occupancy.id],facilityId:facility.id,minimumMonths:0,basis:"TIME_IN_UNIT",type:"AMOUNT",value:12.34,effectivePeriod};
         const preview=await previewRentReview(org.id,input);await approveRentReview(org.id,user.id,input,preview.fingerprint,"Synthetic rate history approval");
         const audit=await db.auditEvent.findFirstOrThrow({where:{organisationId:org.id,action:"rent.group_increase.approved",entityId:facility.id},orderBy:{occurredAt:"desc"}});auditId=audit.id;
         await db.auditEvent.update({where:{id:audit.id},data:{occurredAt:new Date("2026-10-04T22:30:00Z")}});await db.unit.update({where:{id:unit.id},data:{number:"CURRENT-RENAMED-RENT-UNIT"}});

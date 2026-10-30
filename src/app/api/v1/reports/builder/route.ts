@@ -35,7 +35,7 @@ export async function POST(request:Request) {
       const format=body.kind==="export"?body.format:"JSON";
       const headers=await authoriseReportResult(actor,result.query,result.rows,body.kind==="export",format,result.scope);
       await recordInteractiveRun(actor,result.query,result.rows.length,body.kind==="preview"?"PREVIEW":format);
-      if(body.kind==="export")return visualExportResponse(result.query,result.rows,format,headers,result.generatedAt,result.dataset.basis);
+      if(body.kind==="export")return await visualExportResponse(result.query,result.rows,format,headers,result.generatedAt,result.dataset.basis);
       return Response.json({data:result.rows,meta:{matchedRows:result.matchedRows,generatedAt:result.generatedAt,basis:result.dataset.basis,grain:result.dataset.grain,query:result.query}},{headers});
     }
     if(body.kind==="save")return Response.json({data:await saveVisualReport(actor,body)},{status:body.id?200:201,headers:dlpPrivateHeaders});
