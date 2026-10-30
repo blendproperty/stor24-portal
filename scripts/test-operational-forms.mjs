@@ -16,7 +16,7 @@ await new Promise(r=>server.listen(0,'127.0.0.1',r));await mkdir('output/forms-b
 const [store,cso,manager,run]=Array.from({length:4},(_,i)=>`cm0000000000000000000000${i}`);
 const photograph=await sharp({create:{width:40,height:30,channels:3,background:'#d0d5d8'}}).png().toBuffer();
 try{for(const width of [1440,390,320]){
- const page=await browser.newPage({viewport:{width,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));let actor=cso,mode='ok',writes=0,version=0;
+ const page=await browser.newPage({viewport:{width,height:1000}}),errors=[],createKeys=[];page.on('pageerror',e=>errors.push(e.message));let actor=cso,mode='ok',writes=0,version=0;
  let record={version:1,kind:'MAINTENANCE',values:{},photos:[],reviewerId:null,submittedAt:null,reviewedAt:null,reviewedBy:null,reviewNote:''};
  let task={id:run,title:'Maintenance and marketing issue',facilityId:store,createdById:cso,status:'OPEN',createdAt:'2026-10-30T08:00:00.000Z',updatedAt:'2026-10-30T08:00:00.000Z',facility:{name:'Synthetic Midpoint'},assignee:{name:'Synthetic CSO'}};
  const meta=()=>({actorId:actor,facilities:[{id:store,name:'Synthetic Midpoint'}],managerFacilityIds:actor===manager?[store]:[],reviewers:actor===cso?[{id:manager,name:'Synthetic manager',facilityIds:[store]}]:[]});
@@ -26,7 +26,7 @@ try{for(const width of [1440,390,320]){
    if(mode==='denied')return route.fulfill({status:403,json:{error:{message:'Access revoked'}}});
    return route.fulfill({json:{data:{...meta(),...(url.searchParams.has('id')?{task:{...task,operationalForm:record}}:{tasks:[task],nextCursor:null})}}});
   }
-  writes++;if(mode==='lost')return route.abort();if(mode==='stale')return route.fulfill({status:409,json:{error:{message:'Record changed. Reload before acting.'}}});
+  writes++;if(req.method()==='POST')createKeys.push(req.postDataJSON().requestKey);if(mode==='lost')return route.abort();if(mode==='stale')return route.fulfill({status:409,json:{error:{message:'Record changed. Reload before acting.'}}});
   const body=req.postDataJSON();
   if(req.method()==='POST'){assert.equal(body.kind,'MAINTENANCE');assert.equal(body.facilityId,store);}
   else {
@@ -39,7 +39,8 @@ try{for(const width of [1440,390,320]){
  });
  await page.goto(`http://127.0.0.1:${server.address().port}`);await page.getByRole('combobox',{name:'Store',exact:true}).selectOption(store);
  await page.getByRole('combobox',{name:'Form',exact:true}).selectOption('VISITOR');await expect(page.getByRole('button',{name:'Capture awaiting agreed rules'})).toBeDisabled();assert.equal(writes,0);
- await page.getByRole('combobox',{name:'Form',exact:true}).selectOption('MAINTENANCE');await page.getByRole('button',{name:'Create draft',exact:true}).click();
+ await page.getByRole('combobox',{name:'Form',exact:true}).selectOption('MAINTENANCE');mode='lost';await page.getByRole('button',{name:'Create draft',exact:true}).click();await expect(page.getByRole('alert')).toContainText('could not be confirmed');await expect(page.getByRole('button',{name:'Create draft',exact:true})).toBeDisabled();assert.equal(writes,1);
+ mode='ok';await page.getByRole('button',{name:'Reload saved forms'}).click();await expect(page.getByRole('button',{name:'Create draft',exact:true})).toBeEnabled();await page.getByRole('button',{name:'Create draft',exact:true}).click();assert.equal(createKeys.length,2);assert.notEqual(createKeys[0],createKeys[1]);
  await page.getByLabel('Priority *',{exact:true}).fill('1');await page.getByLabel('Date discovered').fill('2026-10-30');await page.getByLabel('Area / unit reference').fill('Reception');await page.getByRole('textbox',{name:'Issue *',exact:true}).fill('Synthetic damaged latch');await page.getByLabel('Action required').fill('Inspect and quote');await page.getByRole('combobox',{name:'Separate manager reviewer',exact:true}).selectOption(manager);
  await page.locator('input[type=file]').setInputFiles({name:'synthetic-equipment.png',mimeType:'image/png',buffer:photograph});await expect(page.getByRole('img',{name:'synthetic-equipment.png'})).toBeVisible();
  await page.getByRole('button',{name:'Save draft',exact:true}).click();await expect(page.getByRole('textbox',{name:'Issue *',exact:true})).toHaveValue('Synthetic damaged latch');await expect(page.getByRole('img',{name:'synthetic-equipment.png'})).toBeVisible();

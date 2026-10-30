@@ -28,7 +28,7 @@ export function OperationalForms() {
       if ([401,403].includes(response.status)) { setData(null);setTasks([]);setTask(null);setRecord(null);throw Error("Sign in again or ask your administrator to check your current access."); }
       const payload = await response.json();if (!response.ok) throw Error(payload.error?.message ?? "Could not read forms.");
       const next = pageSchema.parse(payload.data);if (reader.current !== controller) return;
-      setData(next);if (next.tasks) setTasks(previous => query.cursor ? [...previous,...next.tasks!] : next.tasks!);
+      key.current = "";setData(next);if (next.tasks) setTasks(previous => query.cursor ? [...previous,...next.tasks!] : next.tasks!);
       setTask(next.task ?? null);setRecord(next.task?.operationalForm ?? null);setNote("");setDirty(false);setBlocked(false);setMessage("");
     } catch (e) { if (reader.current === controller) setMessage(e instanceof Error ? e.message : "Read failed. Reload before acting."); }
     finally { clearTimeout(timer);if (reader.current === controller) { reader.current = null;setReading(false); } }
