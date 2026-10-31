@@ -34,3 +34,12 @@ Use a synthetic DATABASE_URL supplied separately; never use production credentia
 ## Open release gates
 
 Normal final checks, CRM-first merge/deployment, website deployment, exact image/source/health readback, real Meta PageView and Lead ingestion, GA ingestion and a controlled real-provider/CAPTCHA submission. Platform-paid click attribution cannot be proven with fabricated UTMs while ads are paused. Business/device UAT, all previous privacy/legal/provider/data/training/payment/access/recovery gates and separate launch/spend approval remain open. See each canonical PROJECT_CONTEXT.md for promotion receipts. No external project tracker is in scope.
+
+
+## 31 October real saved-enquiry and cleanup receipt
+
+Following direct owner approval, three genuine CAPTCHA-protected browser submissions saved in production on CRM448094d6 after its05:14:57Z container start: Facebook05:15:41Z, Google micro05:16:34Z, and Google storage-to-micro journey05:16:56Z. Exact source/campaign/ad/group-or-set/card/keyword and the complete4page journey passed read-only PostgreSQL assertions and are visible in normal staff UI. Google realtime records exactly3generate_lead key events. Enabled custom goal6459477840 selects only STOR24 action7847049246 for all3Google campaigns.
+
+The exact3synthetic records were closed Lost at05:19:10Z through normal owner UI; source/audit history is retained and SQL readback confirms all3closures with one cancellation audit each. No reservation/lease/payment/unit hold, permanent deletion or real customer contact. Treat the3controlled Lead events/retained QA cohort as test baseline when reviewing campaign outcomes. Earlier CAPTCHA-pending receipts are superseded by this explicit approval and successful submission evidence.
+
+Normal website17c1cec deployment41170369721 and CRM448094d6 deployment41171582853 are successful and owning image/source/health are independently verified. Meta PageViews are received; the saved-test Lead receipt is still awaiting provider processing and is not yet claimed. Normal evidence-PR promotion/default-branch context readback, genuine paid-click matching after separately approved ad activation, storage-booking OTP/provider and previous staff/device/privacy/legal/business acceptance gates remain distinct. Ads remain paused.
