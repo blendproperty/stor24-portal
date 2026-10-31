@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync, chownSync, symlinkSync, unlinkSync, rmSync, statSync, openSync, fstatSync, closeSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readSync, chmodSync, chownSync, symlinkSync, unlinkSync, rmSync, statSync, openSync, fstatSync, closeSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -49,12 +49,13 @@ test('trusted baseline is exclusive/root-only and unchanged files pass', { skip:
   assert.equal(statSync(join(f.root, 'var/lib/stor24-security')).mode & 0o777, 0o700);
   const path = join(f.root, 'var/lib/stor24-security/baseline.json');
   const fd = openSync(path, 'r');
-  let before;
-  try { assert.equal(fstatSync(fd).mode & 0o777, 0o600); before = readFileSync(fd); } finally { closeSync(fd); }
-  assert.deepEqual(checkHostSecurity(f.root), { security: 'success', markers: [] });
-  assert.throws(() => initializeSecurityBaseline(f.root), /EEXIST/);
-  const verification = openSync(path, 'r');
-  try { assert.deepEqual(readFileSync(verification), before); } finally { closeSync(verification); }
+  try {
+    assert.equal(fstatSync(fd).mode & 0o777, 0o600); const before = readFileSync(fd);
+    assert.deepEqual(checkHostSecurity(f.root), { security: 'success', markers: [] });
+    assert.throws(() => initializeSecurityBaseline(f.root), /EEXIST/);
+    const after = Buffer.alloc(before.length + 1); const size = readSync(fd, after, 0, after.length, 0);
+    assert.equal(size, before.length); assert.deepEqual(after.subarray(0, size), before);
+  } finally { closeSync(fd); }
 });
 
 test('account creation/group changes, default/custom keys and security settings each produce their own finding', { skip: !linuxRoot }, async t => {
@@ -154,7 +155,7 @@ test('actual collector -> authenticated Worker -> external check -> alert preser
   await monitorRequest(env, 'host', { method: 'POST', body: old, fetcher });
   assert.deepEqual(await checkHostHeartbeat(env, fetcher), { ok: false, markers: ['STOR24_SSH_KEYS_CHANGED', 'STOR24_SECURITY_CHECK_UNAVAILABLE'] });
   assert.equal((await checkHostHeartbeat({ ...env, STOR24_SECURITY_CHANGES_REQUIRED: 'false' }, fetcher)).ok, false);
-  data.delete('security-findings'); // Simulates separate, trusted provider-owner acknowledgement.
+  for (const key of data.keys()) if (key.startsWith('security-findings')) data.delete(key); // Separate, trusted provider-owner acknowledgement.
   assert.equal((await checkHostHeartbeat({ ...env, STOR24_SECURITY_CHANGES_REQUIRED: 'false' }, fetcher)).ok, true);
 });
 
@@ -165,14 +166,14 @@ test('actual file change stays visible outside the host after restoration, and h
   const env = { STOR24_HEARTBEAT_KEY: key, STOR24_SECURITY_CHANGES_ENABLED: 'true', STOR24_SECURITY_CHANGES_REQUIRED: 'true', MONITOR_EVIDENCE: { get: async name => data.has(name) ? JSON.parse(data.get(name)) : null, put: async (name, value) => data.set(name, value) } };
   const fetcher = (url, options) => worker.fetch(new Request(url, options), env);
   const dependencies = { run: () => ({ status: 0, stdout: '' }), fetcher, securityCheck: () => checkHostSecurity(f.root) };
-  await publishHostHeartbeat(env, dependencies); const retained = data.get('security-findings'); assert.ok(retained);
+  await publishHostHeartbeat(env, dependencies); const retained = data.get('security-findings:STOR24_SSH_KEYS_CHANGED'); assert.ok(retained);
   f.put('root/.ssh/authorized_keys', 'ssh-ed25519 PRIVATE_PUBLIC_KEY_LABEL\n');
   assert.equal(checkHostSecurity(f.root).security, 'success');
   await new Promise(resolve => setTimeout(resolve, 5));
   await publishHostHeartbeat(env, dependencies);
   assert.equal(JSON.parse(data.get('host')).report.security, 'success');
   assert.deepEqual(await checkHostHeartbeat(env, fetcher), { ok: false, markers: ['STOR24_SSH_KEYS_CHANGED'] });
-  assert.equal(data.get('security-findings'), retained);
+  assert.equal(data.get('security-findings:STOR24_SSH_KEYS_CHANGED'), retained);
   assert.equal((await fetcher(`${HEARTBEAT_URL}/host`, { method: 'DELETE', headers: { Authorization: `Bearer ${key}` } })).status, 405);
   assert.doesNotMatch(JSON.stringify([...data.values()]), /ADDED_UNTRUSTED_KEY|PRIVATE_PUBLIC_KEY_LABEL/);
 });
@@ -182,6 +183,28 @@ test('malformed retained findings and misspelled enablement never produce a heal
   const env = { STOR24_HEARTBEAT_KEY: 'a'.repeat(64), STOR24_SECURITY_CHANGES_REQUIRED: 'TRUE' };
   assert.deepEqual(await checkHostHeartbeat(env, () => assert.fail('no read')), { ok: false, markers: ['STOR24_SECURITY_CHECK_UNAVAILABLE'] });
   await assert.rejects(publishHostHeartbeat({ STOR24_SECURITY_CHANGES_ENABLED: 'TRUE' }, { fetcher: () => assert.fail('no upload') }), /CONFIGURATION/);
+});
+
+test('concurrent findings and stale KV reads cannot overwrite another security category', async () => {
+  const data = new Map(); const puts = []; let staleReads = false;
+  const key = 'a'.repeat(64);
+  const env = { STOR24_HEARTBEAT_KEY: key, STOR24_SECURITY_CHANGES_REQUIRED: 'true', MONITOR_EVIDENCE: {
+    get: async name => staleReads || !data.has(name) ? null : JSON.parse(data.get(name)),
+    put: async (name, value, options) => { puts.push({ name, options }); data.set(name, value); },
+  } };
+  const upload = marker => worker.fetch(new Request(`${HEARTBEAT_URL}/host`, { method: 'POST', headers: { Authorization: `Bearer ${key}` }, body: JSON.stringify({ version: 1, checkedAt: new Date().toISOString(), backup: 'success', resources: 'success', security: 'failure', markers: [marker] }) }), env);
+  staleReads = true; // Both writes can observe an empty previous host/latch, as under replication delay.
+  const replies = await Promise.all([upload('STOR24_ACCOUNTS_CHANGED'), upload('STOR24_SSH_KEYS_CHANGED')]);
+  assert.deepEqual(replies.map(reply => reply.status), [200, 200]);
+  assert.equal((await upload('STOR24_SECURITY_SETTINGS_CHANGED')).status, 200);
+  staleReads = false;
+  const result = await checkHostHeartbeat(env, (url, options) => worker.fetch(new Request(url, options), env));
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.markers.sort(), ['STOR24_ACCOUNTS_CHANGED', 'STOR24_SECURITY_SETTINGS_CHANGED', 'STOR24_SSH_KEYS_CHANGED'].sort());
+  assert.equal(puts.filter(put => put.name.startsWith('security-findings:')).length, 3);
+  assert.ok(puts.filter(put => put.name.startsWith('security-findings:')).every(put => put.options === undefined));
+  data.set('security-findings:STOR24_ACCOUNTS_CHANGED', JSON.stringify({ firstSeenAt: new Date().toISOString(), markers: ['STOR24_SSH_KEYS_CHANGED'] }));
+  assert.equal((await worker.fetch(new Request(`${HEARTBEAT_URL}/host`, { headers: { Authorization: `Bearer ${key}` } }), env)).status, 503);
 });
 
 test('security findings never hide or downgrade simultaneous backup/resource failures, and echoed source is not a finding', () => {

@@ -1,6 +1,22 @@
 import { safeHeartbeat, safeSecurityFindings } from './host-heartbeat-policy.mjs';
 import { safeMonitorEntry } from '../src/lib/operations-status-policy.mjs';
 
+const securityMarkers = ['STOR24_ACCOUNTS_CHANGED', 'STOR24_SSH_KEYS_CHANGED', 'STOR24_SECURITY_SETTINGS_CHANGED'];
+async function categoryFinding(storage, marker) {
+  const raw = await storage.get(`security-findings:${marker}`, 'json');
+  if (!raw) return null;
+  const finding = safeSecurityFindings(raw);
+  if (!finding || finding.markers.length !== 1 || finding.markers[0] !== marker) throw Error('INVALID_RETAINED_FINDING');
+  return finding;
+}
+async function retainedFindings(storage) {
+  const legacy = await storage.get('security-findings', 'json');
+  const previous = legacy ? safeSecurityFindings(legacy) : null;
+  if (legacy && !previous) throw Error('INVALID_RETAINED_FINDING');
+  const findings = [previous, ...await Promise.all(securityMarkers.map(marker => categoryFinding(storage, marker)))].filter(Boolean);
+  return findings.length ? safeSecurityFindings({ firstSeenAt: findings.map(value => value.firstSeenAt).sort()[0], markers: [...new Set(findings.flatMap(value => value.markers))] }) : null;
+}
+
 function authenticated(request, key) {
   const supplied = request.headers.get('authorization') || '';
   if (!/^[a-f0-9]{64}$/.test(key || '') || !/^Bearer [a-f0-9]{64}$/.test(supplied)) return false;
@@ -32,9 +48,7 @@ const monitorTrigger = {
       if (request.method === 'GET') {
         const record = await env.MONITOR_EVIDENCE.get(type, 'json') || (type === 'host' ? { report: null } : { entry: null });
         if (type !== 'host') return reply(record);
-        const retained = await env.MONITOR_EVIDENCE.get('security-findings', 'json');
-        const securityFindings = retained ? safeSecurityFindings(retained) : null;
-        if (retained && !securityFindings) return reply({ error: 'Unavailable' }, 503);
+        const securityFindings = await retainedFindings(env.MONITOR_EVIDENCE);
         return reply({ ...record, securityFindings });
       }
       if (request.method !== 'POST') return reply({ error: 'Method not allowed' }, 405);
@@ -47,13 +61,11 @@ const monitorTrigger = {
       // Retried uploads are idempotent; older observations cannot refresh their age.
       if (prior && Date.parse(prior.checkedAt) >= Date.parse(value.checkedAt)) return reply({ accepted: JSON.stringify(prior) === JSON.stringify(value) }, JSON.stringify(prior) === JSON.stringify(value) ? 200 : 409);
       if (type === 'host' && value.security === 'failure') {
-        const retained = await env.MONITOR_EVIDENCE.get('security-findings', 'json');
-        const previousFindings = retained ? safeSecurityFindings(retained) : null;
-        if (retained && !previousFindings) return reply({ error: 'Unavailable' }, 503);
-        const next = safeSecurityFindings({ firstSeenAt: previousFindings?.firstSeenAt || new Date().toISOString(), markers: [...new Set([...(previousFindings?.markers || []), ...value.markers.filter(marker => ['STOR24_ACCOUNTS_CHANGED', 'STOR24_SSH_KEYS_CHANGED', 'STOR24_SECURITY_SETTINGS_CHANGED'].includes(marker))])] });
-        if (!next) return reply({ error: 'Invalid report' }, 400);
-        // Retained findings have no TTL; healthy uploads cannot acknowledge them.
-        if (JSON.stringify(next) !== JSON.stringify(previousFindings)) await env.MONITOR_EVIDENCE.put('security-findings', JSON.stringify(next));
+        for (const marker of securityMarkers.filter(marker => value.markers.includes(marker))) {
+          // Independent category keys prevent concurrent/stale reads erasing another category.
+          // No TTL or producer acknowledgement; receipt times are approximate under KV replication.
+          if (!await categoryFinding(env.MONITOR_EVIDENCE, marker)) await env.MONITOR_EVIDENCE.put(`security-findings:${marker}`, JSON.stringify({ firstSeenAt: new Date().toISOString(), markers: [marker] }));
+        }
       }
       await env.MONITOR_EVIDENCE.put(type, JSON.stringify(type === 'host' ? { receivedAt: new Date().toISOString(), report: value } : { entry: value }), { expirationTtl: type === 'host' ? 86400 : 30 * 86400 });
       return reply({ accepted: true });
