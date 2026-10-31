@@ -5,6 +5,7 @@ import { db } from "../../src/lib/db";
 import { actPhoneNotice, previewPhoneNotice, COLLECTION_PHONE_DOMAIN } from "../../src/lib/collection-phone-service";
 import { smsPayload } from "../../src/lib/collection-phone-policy";
 import { historyEvidence } from "../../src/lib/customer-history-message-policy";
+import { phoneNoticeAccountNumber } from "../phone-notice-fixture";
 
 test("isolated phone notices: real claims, authority, consent and immutable reviewed bodies", async t => {
   assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci"); assert.equal(new URL(process.env.DATABASE_URL!).hostname, "localhost");
@@ -33,7 +34,7 @@ test("isolated phone notices: real claims, authority, consent and immutable revi
     const role = await db.role.create({ data: { organisationId: org.id, name: "Phone reviewer", permissions: ["collections.view", "collections.manage", "billing.documents.send", "communications.view", "customer_history.export"] } });
     await db.roleAssignment.createMany({ data: users.map(u => ({ roleId: role.id, userId: u.id, facilityId: facility.id })) });
     const customer = await db.customer.create({ data: { organisationId: org.id, firstName: "Phone CI", phone: "+27821234567", phoneVerifiedAt: new Date(), communicationConsent: { sms: true, whatsapp: true } } });
-    const account = await db.account.create({ data: { customerId: customer.id, accountNumber: "PHONE-CI-" + key, balance: 100 } });
+    const account = await db.account.create({ data: { customerId: customer.id, accountNumber: phoneNoticeAccountNumber(key), balance: 100 } });
     await db.tenancy.create({ data: { customerId: customer.id, accountId: account.id, facilityId: facility.id, status: "ACTIVE", paymentMethod: "EFT", startDate: new Date("2026-01-01") } });
     await db.ledgerEntry.create({ data: { accountId: account.id, type: "CHARGE", amount: 100, description: "CI original rent", effectiveAt: new Date("2026-01-01") } });
     await db.collectionCase.create({ data: { accountId: account.id, terms: { dueDays: 0, allocation: "OLDEST_DUE_FIRST", approvalReference: "CI original approved terms", overrides: [] } } });
@@ -53,10 +54,30 @@ test("isolated phone notices: real claims, authority, consent and immutable revi
   }
   const send = (f: Fixture, n: NonNullable<Awaited<ReturnType<typeof previewPhoneNotice>>["notice"]>, channel: "SMS" | "WHATSAPP" = "SMS") => actPhoneNotice(f.a, { action: "send", accountId: f.account.id, channel, id: n.id, revision: n.revision, confirm: true });
   try {
+    await t.test("a UUID-shaped account with a card-like digit run stays DLP-held without provider replay", async () => {
+      const f = await fixture(), count = sends;
+      await db.account.update({ where: { id: f.account.id }, data: { accountNumber: `PHONE-CI-aaaaaaaa-aaaa-4aaa-8111-111111111112-${f.account.accountNumber}` } });
+      const ready = (await approve(f)).notice!;
+      assert.equal((await send(f, ready)).notice!.status, "REVIEW_REQUIRED");
+      assert.equal(sends, count);
+      const audit = await db.auditEvent.findFirstOrThrow({ where: { organisationId: f.org.id, action: "dlp.transfer.blocked" }, select: { after: true } });
+      assert.ok((audit.after as { reasons: string[] }).reasons.includes("PAYMENT_CARD_PATTERN"));
+      await send(f, ready);
+      assert.equal(sends, count);
+      assert.equal(await db.communicationLog.count({ where: { organisationId: f.org.id } }), 1);
+    });
     await t.test("two overlapping staff sends produce one durable log and one provider request; money unchanged", async () => {
       const f = await fixture(), ready = (await approve(f)).notice!, beforeLedger = await db.ledgerEntry.findMany({ where: { accountId: f.account.id } }), count = sends;
       const results = await Promise.allSettled([send(f, ready), send(f, ready)]); assert.ok(results.some(r => r.status === "fulfilled"));
-      assert.equal(sends - count, 1); assert.equal((await previewPhoneNotice(f.a, f.account.id, "SMS")).notice!.status, "ACCEPTED");
+      let failureDetails: string | undefined;
+      if (sends - count !== 1) {
+        const audits = await db.auditEvent.findMany({ where: { organisationId: f.org.id, entityType: "DlpTransfer" }, select: { after: true } });
+        failureDetails = JSON.stringify({ noticeStates: results.map(r => r.status === "fulfilled" ? r.value.notice?.status : "REJECTED"), dlpReasons: audits.flatMap(a => {
+          const reasons = (a.after as { reasons?: unknown } | null)?.reasons;
+          return Array.isArray(reasons) ? reasons.filter((reason): reason is string => typeof reason === "string" && /^[A-Z_]+$/.test(reason)) : [];
+        }) });
+      }
+      assert.equal(sends - count, 1, failureDetails); assert.equal((await previewPhoneNotice(f.a, f.account.id, "SMS")).notice!.status, "ACCEPTED");
       const logs = await db.communicationLog.findMany({ where: { organisationId: f.org.id } }); assert.equal(logs.length, 1); assert.equal(logs[0].messageType, "COLLECTION_REMINDER"); assert.equal(logs[0].status, "PROCESSING"); assert.equal(logs[0].nextRetryAt, null); assert.deepEqual((logs[0].metadata as { historyEvidence: unknown }).historyEvidence, historyEvidence(ready));
       await send(f, ready); assert.equal(sends - count, 1); assert.equal((await db.account.findUniqueOrThrow({ where: { id: f.account.id } })).balance.toString(), "100"); assert.deepEqual(await db.ledgerEntry.findMany({ where: { accountId: f.account.id } }), beforeLedger); assert.equal(await db.payment.count({ where: { accountId: f.account.id } }), 0);
       assert.equal(await db.auditEvent.count({ where: { organisationId: f.org.id, action: "collection.phone.send_claimed" } }), 1);
