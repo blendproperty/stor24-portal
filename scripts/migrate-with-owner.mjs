@@ -1,9 +1,30 @@
 import { spawnSync } from 'node:child_process';
+import { constants, openSync, closeSync, fstatSync, readSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
-export function migrationEnvironment(env) {
+const secretPath = '/run/secrets/stor24_migration_url';
+
+export function readProtectedMigrationUrl(path) {
+  let fd;
+  try {
+    if (process.platform === 'win32' || constants.O_NOFOLLOW === undefined || constants.O_NONBLOCK === undefined) throw new Error();
+    fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    const info = fstatSync(fd);
+    if (!info.isFile() || info.size < 1 || info.size > 8192 || (info.mode & 0o077) || info.uid !== process.geteuid()) throw new Error();
+    const buffer = Buffer.alloc(info.size + 1);
+    if (readSync(fd, buffer, 0, buffer.length, 0) !== info.size) throw new Error();
+    const value = buffer.subarray(0, info.size).toString('utf8').replace(/\n$/, '');
+    if (!value || /[\r\n\0\uFFFD]/.test(value)) throw new Error();
+    return value;
+  } catch { throw new Error('Migration secret file is unavailable or unsafe'); }
+  finally { if (fd !== undefined) closeSync(fd); }
+}
+
+export function migrationEnvironment(env, readSecret = readProtectedMigrationUrl) {
   if (env.PGOPTIONS) throw new Error('PGOPTIONS is not permitted for isolated migrations');
-  const migration = env.MIGRATION_DATABASE_URL;
+  if (env.MIGRATION_DATABASE_URL && env.MIGRATION_DATABASE_URL_FILE) throw new Error('Choose one migration credential source');
+  if (env.MIGRATION_DATABASE_URL_FILE && env.MIGRATION_DATABASE_URL_FILE !== secretPath) throw new Error('Invalid migration secret path');
+  const migration = env.MIGRATION_DATABASE_URL_FILE ? readSecret(secretPath) : env.MIGRATION_DATABASE_URL;
   const runtime = env.DATABASE_URL;
   if (!migration || !runtime) throw new Error('Both runtime and migration database URLs are required');
   let source, target;
@@ -16,6 +37,7 @@ export function migrationEnvironment(env) {
   if (!source.username || !target.username || decodeURIComponent(source.username) === decodeURIComponent(target.username)) throw new Error('Runtime and migration roles must be distinct');
   const child = { ...env, DATABASE_URL: migration };
   delete child.MIGRATION_DATABASE_URL;
+  delete child.MIGRATION_DATABASE_URL_FILE;
   return child;
 }
 
