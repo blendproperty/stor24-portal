@@ -12,6 +12,7 @@ import {decryptReportArtifact,encryptReportArtifact,visualReportScope} from "../
 import {transfer} from "../../src/lib/leasing-service";
 import {evaluateVisualReport} from "../../src/lib/visual-report-engine";
 import {previewRentReview,approveRentReview} from "../../src/lib/rent-review-service";
+import {addCustomerNote} from "../../src/lib/customer-history-service";
 
 test("isolated PostgreSQL reporting persistence, claims, expiry and history scope",async t=>{
   assert.equal(process.env.MERCHANDISE_DB_TEST,"isolated-ci");
@@ -57,6 +58,31 @@ test("isolated PostgreSQL reporting persistence, claims, expiry and history scop
         const rows=await visualReportSource(scope,defaultVisualQuery(dataset.key,"2026-10-01",["unpaid-native","marketing-payment-cohorts"].includes(dataset.key)?"2026-10-01":"2026-10-31"));
         if(dataset.key==="audit"){assert.equal(rows.length,5);assert.ok(rows.every(row=>row.actor==="Synthetic employee"&&row.facility==="Reporting fixture store"));}else assert.deepEqual(rows,[],dataset.key);
       }
+    });
+    await t.test("native staff-note reporting reads actual retained producers without duplicating stores or changing source",async()=>{
+      const customer=await db.customer.create({data:{organisationId:org.id,firstName:"Synthetic notes customer"}});
+      const scope={organisationId:org.id,userId:user.id,unrestrictedFacilities:true,facilityIds:[]};
+      try{
+        await db.lead.create({data:{facilityId:facility.id,customerId:customer.id,source:"Synthetic note fixture"}});
+        await db.lead.create({data:{facilityId:other.id,customerId:customer.id,source:"Synthetic note fixture"}});
+        const first=await addCustomerNote(scope,customer.id,{facilityId:facility.id,requestKey:randomUUID(),category:"HANDOVER",body:"Synthetic original handover"});
+        const second=await addCustomerNote(scope,customer.id,{facilityId:other.id,requestKey:randomUUID(),category:"GENERAL",body:"Other store note"});
+        await db.customerNote.update({where:{id:first.id},data:{createdAt:new Date("2026-09-30T22:00:00Z")}});
+        await db.customerNote.update({where:{id:second.id},data:{createdAt:new Date("2026-10-01T08:00:00Z")}});
+        const before=await db.customerNote.findMany({where:{customerId:customer.id},orderBy:{id:"asc"}}),auditCount=await db.auditEvent.count({where:{organisationId:org.id}});
+        const q={...defaultVisualQuery("customer-notes-native","2026-10-01","2026-10-01"),dateField:"date"};
+        const scoped={...scope,unrestrictedFacilities:false,facilityIds:[facility.id]},rows=await visualReportSource(scoped,q);
+        assert.equal(rows.length,1);assert.equal(rows[0].noteId,first.id);assert.equal(rows[0].author,"Synthetic employee");assert.equal(rows[0].note,"Synthetic original handover");assert.equal(rows[0].customer,"Synthetic notes customer");
+        assert.equal((await visualReportSource(scope,q)).length,2);
+        assert.deepEqual(await visualReportSource(scoped,{...q,from:"2026-09-30",to:"2026-09-30"}),[]);
+        await assert.rejects(visualReportSource(scoped,{...q,facilityId:other.id}),/FORBIDDEN/);
+        await assert.rejects(visualReportSource(scoped,{...q,historyImportId:"unrecorded-history"}),/REPORT_NOTE_SOURCE/);
+        assert.deepEqual(await db.customerNote.findMany({where:{customerId:customer.id},orderBy:{id:"asc"}}),before);
+        assert.equal(await db.auditEvent.count({where:{organisationId:org.id}}),auditCount);
+        await db.lead.deleteMany({where:{customerId:customer.id}});
+        assert.deepEqual(await visualReportSource(scoped,q),[]);
+        assert.equal((await visualReportSource(scope,q)).length,2);
+      }finally{await db.lead.deleteMany({where:{customerId:customer.id}});await db.customer.delete({where:{id:customer.id}});}
     });
     await t.test("native transfer pairs use the actual producer and retain original links, scope, date basis and read-only baselines",async()=>{
       const customer=await db.customer.create({data:{organisationId:org.id,firstName:"Synthetic transfer"}}),type=await db.unitType.create({data:{facilityId:facility.id,name:"Synthetic transfer units"}});
