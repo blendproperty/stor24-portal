@@ -1,6 +1,6 @@
 # STOR24 launch tracking verification - 31 October 2026
 
-**Ads remain paused.** Website/CRM attribution and Google saved-lead receipt pass real production tests. Meta independently processed a Lead from a fourth real saved-enquiry diagnostic test. All four synthetic records are closed Lost. Actual paid-click matching and advertising activation remain separate owner approval gates.
+**Ads remain paused.** Website/CRM attribution and Google saved-lead receipt pass real production tests. Meta ordinary reporting independently records three browser Leads for the three original saved tests; a fourth real saved-enquiry diagnostic test was also independently processed. All four synthetic records are closed Lost. Actual paid-click matching and advertising activation remain separate owner approval gates.
 
 ## Current verification
 
@@ -12,7 +12,7 @@
 | Cross-page attribution | Google storage landing -> contact -> home -> micro enquiry; campaign/ad/group/keyword and four paths retained | Pass |
 | Staff campaign report | Three approved campaign rows, each with one enquiry and the correct creative/ad/keyword | Pass |
 | Google Analytics | Exactly three real generate_lead key events for the three successful saves | Pass |
-| Meta website events | Actual fourth saved enquiry independently received as Lead / Processed / Browser at 07:47:48 SAST in Meta Test events | Live diagnostic receipt passes; ordinary aggregate counts remain separate |
+| Meta website events | Ordinary WEB_ONLY reporting shows 3 Lead events in the 05:00Z hour, matching the original three saves; a fourth real save separately passes Test events | Ordinary and live diagnostic receipts pass |
 | Test cleanup | Exact three synthetic enquiries closed Lost at 05:19:10Z, with original attribution/history and one cancellation audit each retained | Pass |
 
 The four synthetic records are **QA baseline, not acquired customers**. The three original tagged campaign cases and their three observed Google key events are separate from the fourth Meta diagnostic test. The closed CRM records and provider events remain auditable. Exclude this cohort or account for the baseline when interpreting launch results.
@@ -29,7 +29,7 @@ All records belong to Store 1 - Midpoint and MICRO_WAREHOUSE. Reserved example.i
 
 The owner approved these actual CAPTCHA submissions and test closure. Initial older-widget timeouts resolved after normal reload; verification stayed enabled and no fake token or production security bypass was used. All three saves happened after the final CRM448094d6 container started at 05:14:57.879515949Z.
 
-The additional Meta diagnostic save is cmvvzc6as000301o1bfvqxtyy at 05:47:48.580Z, reserved stor24-launch-20261031-meta-retest@example.invalid. Meta Test events shows standard Lead / Processed / Browser / Manual setup, event ID 494617367-192556471-2850128950-577672526 at 07:47:48 SAST. Its clean Meta-launched page correctly retains facebook/social/referrer, with no advertising campaign claim. Actual CAPTCHA and normal saved acknowledgement were used. It is independently confirmed Lost with one cancellation audit. Original three ordinary aggregate Lead totals remain unconfirmed; this diagnostic receipt does not prove paid attribution.
+The additional Meta diagnostic save is cmvvzc6as000301o1bfvqxtyy at 05:47:48.580Z, reserved stor24-launch-20261031-meta-retest@example.invalid. Meta Test events shows standard Lead / Processed / Browser / Manual setup, event ID 494617367-192556471-2850128950-577672526 at 07:47:48 SAST. Its clean Meta-launched page correctly retains facebook/social/referrer, with no advertising campaign claim. Actual CAPTCHA and normal saved acknowledgement were used. It is independently confirmed Lost with one cancellation audit. At 06:00:17Z, ordinary Meta WEB_ONLY reporting independently shows 3 Leads for the original three cases, closing their delayed reconciliation. The fourth diagnostic receipt remains separate from that ordinary total. Neither fabricated tags nor test receipts prove paid attribution.
 
 ## Release evidence
 
@@ -66,6 +66,6 @@ The minimatch release blocker is repaired by the documented upstream 77a0f5c bac
 
 ## Remaining launch and acceptance gates
 
-Meta website saved-Lead receipt is independently verified by the fourth real diagnostic save. Normal aggregate reconciliation for the original three cases is not claimed complete. A genuine Google/Meta paid click and advertising-platform attribution can only be verified after separate owner launch approval; fabricated tags while paused do not prove paid matching. Keep every STOR24 ad paused until that approval.
+Meta website saved-Lead receipt is independently verified by the fourth real diagnostic save. Ordinary WEB_ONLY Meta reporting now reconciles all three original cases (3 Leads in the 05:00Z hour, observed 06:00:17Z); the redacted provider receipt is launch-tracking-provider-receipt-20261031.json. A genuine Google/Meta paid click and advertising-platform attribution can only be verified after separate owner launch approval; fabricated tags while paused do not prove paid matching. Keep every STOR24 ad paused until that approval.
 
 Actual storage-booking OTP/provider/device and staff/customer UAT remain separate from automated acknowledged-producer tests. All earlier privacy/legal/provider/data/training/payment/access/recovery/business acceptance gates remain in the canonical contexts. No other project tracker or correspondence is in scope.
