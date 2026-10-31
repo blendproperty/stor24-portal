@@ -57,7 +57,7 @@
     "tailwindcss": "^4",
     "tsx": "^4.20.6",
     "typescript": "^5",
-    "minimatch": "file:vendor/minimatch"
+    "minimatch": "file:vendor/minimatch-compat"
   },
   "overrides": {
     "postcss": "8.5.25",

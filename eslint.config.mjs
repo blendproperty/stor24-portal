@@ -9,8 +9,8 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    "vendor/minimatch-compat/**", // Upstream security backport; consumer and bounded-process tests remain checked.
     "vendor/braces/**", // MIT-licensed third-party fork; security regression tests remain checked.
-    "vendor/minimatch/dist/**", // Licensed upstream source; adapter and security regressions remain checked.
     "out/**",
     "build/**",
     "output/**",

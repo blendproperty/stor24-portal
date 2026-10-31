@@ -482,7 +482,7 @@ class Minimatch {
                         !p2 ||
                         p2 === '.' ||
                         p2 === '..' ||
-                    globParts.length >= braceExpandMax) {
+                        globParts.length >= braceExpandMax) {
                         continue;
                     }
                     didSomething = true;
@@ -776,7 +776,7 @@ class Minimatch {
     }
     // return false for "nope, not matching"
     // return null for "not matching, cannot keep trying"
-    #matchGlobStarBodySections(file,
+    #matchGlobStarBodySections(file, 
     // pattern section, last possible position for it
     bodySegments, fileIndex, bodyIndex, partial, globStarDepth, sawTail) {
         // take the first body segment, and walk from fileIndex to its "after"
