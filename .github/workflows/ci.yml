@@ -18,7 +18,8 @@ jobs:
         run: |
           docker build -t stor24-node24-crm:test .
           test "$(docker run --rm --entrypoint node stor24-node24-crm:test --version)" = v24.22.1
-          docker run --rm --entrypoint node stor24-node24-crm:test -e 'const ExcelJS=require("exceljs"); (async()=>{const book=new ExcelJS.Workbook();book.addWorksheet("Synthetic").addRow(["Report",123.45]);const saved=await book.xlsx.writeBuffer();const read=new ExcelJS.Workbook();await read.xlsx.load(saved);if(read.worksheets[0].getCell("B1").value!==123.45)throw Error("Report roundtrip failed");console.log("Standalone XLSX dependency roundtrip passed");})().catch(error=>{console.error(error);process.exitCode=1;});'
+          docker build --target dependencies -t stor24-report-deps:test .
+          docker run --rm --entrypoint node stor24-report-deps:test -e 'const ExcelJS=require("exceljs"); (async()=>{const book=new ExcelJS.Workbook();book.addWorksheet("Synthetic").addRow(["Report",123.45]);const saved=await book.xlsx.writeBuffer();const read=new ExcelJS.Workbook();await read.xlsx.load(saved);if(read.worksheets[0].getCell("B1").value!==123.45)throw Error("Report roundtrip failed");console.log("Alpine XLSX dependency roundtrip passed");})().catch(error=>{console.error(error);process.exitCode=1;});'
   guided-help:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
