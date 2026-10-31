@@ -8,6 +8,7 @@ import {db} from "../../src/lib/db";
 import {createPublicLead} from "../../src/lib/public-lead-service";
 import {publicLeadSchema} from "../../src/lib/public-lead-contract";
 import {publicReservationSchema} from "../../src/lib/public-booking-contract";
+import {advertisingFromSearch} from "../../src/lib/advertising-attribution";
 import type * as PublicBooking from "../../src/lib/public-booking-service";
 
 test("actual public rental and viewing producers retain explicit origin without inferring or rewriting it",async t=>{
@@ -30,9 +31,11 @@ test("actual public rental and viewing producers retain explicit origin without 
     const baseline=await Promise.all([db.payment.count(),db.ledgerEntry.count()]);
     for(const [index,journey,productLine,origin] of [[0,"RENTAL","STORAGE",{city:"Pretoria",province:"Gauteng",postalCode:"0081",country:"South Africa"}],[1,"VIEWING","STORAGE",undefined],[2,"RENTAL","MICRO_WAREHOUSE",{city:"Johannesburg",postalCode:"0012"}],[3,"VIEWING","MICRO_WAREHOUSE",{city:"Durban",postalCode:"0400"}]] as const){
       const unit=await db.unit.create({data:{facilityId:facility.id,unitTypeId:type.id,number:"ORIGIN-"+index,floor:"Ground Floor",monthlyRate:1000,status:"AVAILABLE"}}),key=randomUUID();
-      const input=publicReservationSchema.parse({facilitySlug:slug,unitId:unit.id,firstName:"Synthetic",lastName:"Origin",email:randomUUID()+"@example.invalid",phone:"+27810000000",journey,productLine,businessDetails:productLine==="MICRO_WAREHOUSE"?{companyName:"Synthetic business"}:undefined,intendedMoveIn:journey==="RENTAL"?new Date(Date.now()+86400000):undefined,viewingAt:journey==="VIEWING"?new Date(Date.now()+2*3600000):undefined,enquiryLocation:origin,idempotencyKey:key,communicationConsent:{email:false,sms:false,phone:false,whatsapp:false}});
+      const route=productLine==="MICRO_WAREHOUSE"?"/micro-warehousing/book":"/book",advertising=advertisingFromSearch("utm_source=google&utm_medium=cpc&utm_campaign=stor24_midrand_search&utm_content=ad_826923892509_ag_201418428952&utm_term=business+storage+midrand");
+      const input=publicReservationSchema.parse({attribution:{version:1,consent:"granted",landingPage:route,conversionPage:route,pages:[route],source:"google",medium:"cpc",method:"utm",advertising},facilitySlug:slug,unitId:unit.id,firstName:"Synthetic",lastName:"Origin",email:randomUUID()+"@example.invalid",phone:"+27810000000",journey,productLine,businessDetails:productLine==="MICRO_WAREHOUSE"?{companyName:"Synthetic business"}:undefined,intendedMoveIn:journey==="RENTAL"?new Date(Date.now()+86400000):undefined,viewingAt:journey==="VIEWING"?new Date(Date.now()+2*3600000):undefined,enquiryLocation:origin,idempotencyKey:key,communicationConsent:{email:false,sms:false,phone:false,whatsapp:false}});
       await loaded.exports.createPublicReservation(input,"synthetic-private-ip-hash");
       const booking=await db.reservation.findUniqueOrThrow({where:{idempotencyKey:key},include:{lead:true,customer:true}});assert.ok(booking.lead);
+      const acquisition=await db.auditEvent.findFirstOrThrow({where:{entityId:booking.leadId!,action:"lead.attribution.captured"}});assert.deepEqual((acquisition.after as {attribution:unknown}).attribution,input.attribution);
       const location=booking.lead!.enquiryLocation as {city?:string;postalCode?:string;source?:string;capturedAt?:string}|null;
       if(origin){assert.equal(location?.city,origin.city);assert.equal(location?.postalCode,origin.postalCode);assert.equal(location?.source,"PUBLIC_SELF_REPORTED");assert.ok(location?.capturedAt);}
       else assert.equal(location,null);

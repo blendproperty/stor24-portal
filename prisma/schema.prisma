@@ -1394,6 +1394,7 @@ model RoleAssignment {
 }
 
 model Task {
+  operationalForm Json?
   operationalChecklist Json?
   startAt        DateTime?
   endAt          DateTime?

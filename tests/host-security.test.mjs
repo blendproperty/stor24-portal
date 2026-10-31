@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync, chownSync, symlinkSync, unlinkSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync, chownSync, symlinkSync, unlinkSync, rmSync, statSync, openSync, fstatSync, closeSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -48,7 +48,8 @@ test('trusted baseline is exclusive/root-only and unchanged files pass', { skip:
   const f = fixture(t); initializeSecurityBaseline(f.root);
   assert.equal(statSync(join(f.root, 'var/lib/stor24-security')).mode & 0o777, 0o700);
   const path = join(f.root, 'var/lib/stor24-security/baseline.json');
-  assert.equal(statSync(path).mode & 0o777, 0o600);
+  const fd = openSync(path, 'r');
+  try { assert.equal(fstatSync(fd).mode & 0o777, 0o600); } finally { closeSync(fd); }
   assert.deepEqual(checkHostSecurity(f.root), { security: 'success', markers: [] });
   const before = readFileSync(path); assert.throws(() => initializeSecurityBaseline(f.root), /EEXIST/); assert.deepEqual(readFileSync(path), before);
 });

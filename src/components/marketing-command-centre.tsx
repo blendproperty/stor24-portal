@@ -318,6 +318,9 @@ export function MarketingCommandCentre({
           )}
         </section>
         <section className="marketing-card">
+          <h2>Ad campaign attribution</h2>
+          <p className="marketing-caption">Consented website enquiries by approved campaign, creative and keyword. These are visitor-supplied tags, not verified platform clicks. Missing values stay unknown; registered campaign spend is reported separately.</p>
+          <div className="marketing-table-scroll"><table><thead><tr>{["Campaign / platform ID","Source / medium","Creative / card","Ad / group / set","Keyword","Enquiries","Move-ins"].map(label=><th key={label}>{label}</th>)}</tr></thead><tbody>{current.advertising.map((ad,i)=><tr key={i}><td>{ad.campaign}<small className="marketing-cell-note">{ad.campaignId}</small></td><td>{ad.source} / {ad.medium}</td><td>{ad.content}</td><td>{ad.adId}<small className="marketing-cell-note">{ad.adGroupId !== "Unknown" ? ad.adGroupId : ad.adSetId}</small></td><td>{ad.term}</td><td>{ad.leads}</td><td>{ad.won}</td></tr>)}</tbody></table>{!current.advertising.length&&<p>No consented ad campaign enquiries in this selection.</p>}</div>
           <h2>Campaign analysis</h2>
           <p>Select a campaign to inspect its results, placements and spend.</p>
           <label className="marketing-analysis-filter">
