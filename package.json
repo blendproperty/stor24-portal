@@ -51,7 +51,7 @@
     "@types/react-dom": "^19",
     "braces": "file:vendor/braces",
     "esbuild": "^0.28.2",
-    "eslint": "^9",
+    "eslint": "^10",
     "eslint-config-next": "16.4.2",
     "prisma": "^7.9.1",
     "tailwindcss": "^4",
