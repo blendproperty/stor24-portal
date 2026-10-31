@@ -49,9 +49,12 @@ test('trusted baseline is exclusive/root-only and unchanged files pass', { skip:
   assert.equal(statSync(join(f.root, 'var/lib/stor24-security')).mode & 0o777, 0o700);
   const path = join(f.root, 'var/lib/stor24-security/baseline.json');
   const fd = openSync(path, 'r');
-  try { assert.equal(fstatSync(fd).mode & 0o777, 0o600); } finally { closeSync(fd); }
+  let before;
+  try { assert.equal(fstatSync(fd).mode & 0o777, 0o600); before = readFileSync(fd); } finally { closeSync(fd); }
   assert.deepEqual(checkHostSecurity(f.root), { security: 'success', markers: [] });
-  const before = readFileSync(path); assert.throws(() => initializeSecurityBaseline(f.root), /EEXIST/); assert.deepEqual(readFileSync(path), before);
+  assert.throws(() => initializeSecurityBaseline(f.root), /EEXIST/);
+  const verification = openSync(path, 'r');
+  try { assert.deepEqual(readFileSync(verification), before); } finally { closeSync(verification); }
 });
 
 test('account creation/group changes, default/custom keys and security settings each produce their own finding', { skip: !linuxRoot }, async t => {
