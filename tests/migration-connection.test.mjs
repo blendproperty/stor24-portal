@@ -17,3 +17,11 @@ test('missing, malformed, wrong target and same-role migration credentials fail 
     assert.throws(() => migrationEnvironment({ DATABASE_URL: runtime, MIGRATION_DATABASE_URL: value }));
   }
 });
+test('connection query parameters cannot override either role or password', () => {
+  for (const query of ['user=runtime', '%75ser=runtime', 'USER=runtime', 'password=other', 'options=-c%20role%3Druntime']) {
+    assert.throws(() => migrationEnvironment({ DATABASE_URL: runtime, MIGRATION_DATABASE_URL: `${migration}?${query}` }));
+    assert.throws(() => migrationEnvironment({ DATABASE_URL: `${runtime}?${query}`, MIGRATION_DATABASE_URL: migration }));
+  }
+  assert.equal(migrationEnvironment({ DATABASE_URL: `${runtime}?sslmode=require`, MIGRATION_DATABASE_URL: `${migration}?sslmode=require` }).DATABASE_URL, `${migration}?sslmode=require`);
+  assert.throws(() => migrationEnvironment({ DATABASE_URL: runtime, MIGRATION_DATABASE_URL: migration, PGOPTIONS: '-c role=runtime' }), /PGOPTIONS/);
+});
