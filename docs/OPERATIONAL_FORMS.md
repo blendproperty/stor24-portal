@@ -61,3 +61,10 @@ Release status (30 October 2026): PR #677 merged as `e17172e9`; deployment [4105
 | Legal Letter 3.docx | 1092388 | 95c5a7c1ac2b058e92f2d5569fd8b967e12f06f77ac6b05c6e23ff0c3eaf4285 |
 | Visitor Entry Register.pdf | 16553 | 53672d72028f1f3aa4d9b06bedb9f33af100d81fbfd266017cb410208c965adb |
 | Storesmart Debit order form.pdf | 1774237 | eeb5803079947c8b27f24d0e3dfcad30a103998ce68d2900442315ce5ab818f9 |
+
+
+## 31 October reconciliation of the earlier candidate
+
+PR #675 is closed unmerged as superseded by the deployed PR #677 implementation described here. The earlier candidate used ConfigurationProfile/MaintenanceRequest sidecars, encrypted visitor typed acknowledgements and per-expiry certificate tasks; those source-only features were not deployed or imported into this Task-based architecture. Its passing tests do not activate visitor capture or establish business approval. Preserve the current server-enforced visitor/client/debit capture holds and all other approval boundaries. Any approved later extension must reuse this deployed engine rather than merge the conflicting forms route/service.
+
+Fresh 31 October checks confirmed the current application image includes #677, public health is good, anonymous forms access is denied and the production monitor passes without notification. Policy tests and responsive browser workflows passed again. The previous owner browser session is now at sign-in; no fresh signed-in staff/device acceptance is claimed. Exact release/verification evidence and remaining gates are recorded in PROJECT_CONTEXT.md.
