@@ -7096,3 +7096,12 @@ Commit/push: this recovery and dated evidence are being committed normally to th
 ### 2026-10-31 - Preserve concurrent CRM source and canonical evidence
 
 - During documentation reconciliation, independent main a0cbf46f7373982baa30a3f8ead4cdac81ef26fc added staff-note reporting and Faeez delivery records. A normal merge preserves that complete source and canonical context before this tracking receipt. Tracking's real saved-lead/image/health evidence above is specifically448094d6, not unverified evidence for the independent report change. That release retains its own normal checks/deployment/UAT gates. No unrelated work was dropped; this PR remains documentation-only against current main.
+
+
+### 2026-10-31 - Live staff campaign report and retained QA audit
+
+- **Implementation/configuration:** no further application or advertising change. The existing Channels > Ad campaign attribution staff report was read through the authenticated owner interface with Store 1 - Midpoint selected.
+- **Testing/live verification:** its three advertising campaign rows each show one enquiry and zero move-ins, with the expected Facebook micro-image/ad/set and both Google ad/group/keyword values. The selected reporting window is 30 days, not an asserted Today filter. This independently confirms the retained fields after test closure. A second scoped production SQL read at05:41Z passes all original attribution/journey and three Lost/cancellation-audit assertions.
+- **Commit/push/merge:** documentation-only runbook refreshed to current verified state; these receipt branches still require normal exact-head checks, merge and remote canonical-context readback.
+- **Deployment:** no new deployment is required for this evidence-only edit. Concurrent unrelated default-branch releases are preserved and remain separately verified.
+- **Outstanding:** Google records three saved Lead events; Meta Lead processing remains unresolved pending direct provider receipt. All earlier activation, actual paid-click, provider, OTP/device, staff/customer UAT and business acceptance gates remain. All STOR24 ads stay paused.
