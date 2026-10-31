@@ -37,6 +37,10 @@ Each save uses the current record version under a row lock. Replayed creation ke
 
 Approve client/visitor privacy notice, visibility, retention and signature capture before collecting those records. Agree supplier/GM spending thresholds and actual signature authority; commercial quotation wording/entity/hours/dimensions/insurance; legal clauses/timing/fees/restoration/disposal; debit mandate/provider requirements; site-specific emergency contacts/assembly/escape instructions. Those holds are retained in the UI and backend. Staff/device UAT, production deployment and live verification remain separate from isolated tests. Existing checklist scheduling and separate approvals are unchanged.
 
+## Release verification
+
+Release status (30 October 2026): PR #677 merged as `e17172e9`; deployment [41059264772](https://github.com/blendproperty/stor24-portal/actions/runs/41059264772) applied the additive migration and passed health checks. The signed-in owner verified the live catalogue, Midpoint draft availability and retained approval holds without creating production records. Full evidence is in `PROJECT_CONTEXT.md`. Real staff/device UAT and the decisions above remain outstanding.
+
 ## Materialized source fingerprints
 
 | File | Bytes | SHA-256 |
