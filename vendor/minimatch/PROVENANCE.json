@@ -1,0 +1,13 @@
+{
+  "upstream": "minimatch@10.2.6",
+  "tarball": "https://registry.npmjs.org/minimatch/-/minimatch-10.2.6.tgz",
+  "integrity": "sha512-vpLQEs+VLCr1nU0BXS07maYoFwlDAH0gngQuuttxIwutDFEMHq2blX+8vpgxDdK3J1PwjCJiep77OitTZ4Ll1A==",
+  "backport": "https://github.com/isaacs/minimatch/commit/77a0f5c",
+  "advisory": "https://github.com/advisories/GHSA-g3hv-75wg-m249",
+  "patches": [
+    "cap first-phase globparts growth at braceExpandMax",
+    "skip quadratic deduplication above 1000 patterns",
+    "callable CommonJS entry with all upstream named exports",
+    "trim two trailing-whitespace lines in compiled source"
+  ]
+}

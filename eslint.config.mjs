@@ -10,6 +10,7 @@ const eslintConfig = defineConfig([
     // Default ignores of eslint-config-next:
     ".next/**",
     "vendor/braces/**", // MIT-licensed third-party fork; security regression tests remain checked.
+    "vendor/minimatch/dist/**", // Licensed upstream source; adapter and security regressions remain checked.
     "out/**",
     "build/**",
     "output/**",
