@@ -6,6 +6,46 @@ import { loadAlertRecipients } from './load-alert-recipients.mjs';
 import { HOSTINGER_EMAIL_ADDRESS, hostingerTransport } from '../src/lib/hostinger-transport.mjs';
 import { alertDetails } from './production-alert-details.mjs';
 
+const stages = new Set(['RUNS', 'JOBS']);
+const historyCodes = new Set(['TRANSPORT', 'HTTP', 'INVALID_JSON']);
+export class MonitorHistoryError extends Error {
+  constructor(stage, code, attempts, httpStatus) {
+    super('Monitor history unavailable');
+    this.stage = stages.has(stage) ? `HISTORY_${stage}` : 'HISTORY';
+    this.code = historyCodes.has(code) ? code : 'UNEXPECTED';
+    this.attempts = attempts === 1 || attempts === 2 ? attempts : 0;
+    if (Number.isInteger(httpStatus) && httpStatus >= 100 && httpStatus <= 599) this.httpStatus = httpStatus;
+  }
+}
+
+// Only read-only GitHub history requests enter this function. Notification sends never do.
+export async function readMonitorHistory(url, headers, fetcher = fetch, { stage = 'RUNS', wait = ms => new Promise(resolve => setTimeout(resolve, ms)) } = {}) {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    let response;
+    try { response = await fetcher(url, { method: 'GET', headers, signal: AbortSignal.timeout(15_000) }); }
+    catch {
+      if (attempt === 2) throw new MonitorHistoryError(stage, 'TRANSPORT', attempt);
+      await wait(500); continue;
+    }
+    if (!response.ok) {
+      const status = response.status;
+      if (attempt < 2 && (status === 429 || status >= 500)) { await response.body?.cancel().catch(() => {}); await wait(500); continue; }
+      throw new MonitorHistoryError(stage, 'HTTP', attempt, status);
+    }
+    try { return await response.json(); }
+    catch (error) {
+      if (error instanceof SyntaxError) throw new MonitorHistoryError(stage, 'INVALID_JSON', attempt);
+      if (attempt === 2) throw new MonitorHistoryError(stage, 'TRANSPORT', attempt);
+      await wait(500);
+    }
+  }
+}
+
+export function safeAlertFailure(error, stage) {
+  return error instanceof MonitorHistoryError ? { stage: error.stage, code: error.code, attempts: error.attempts, ...(error.httpStatus === undefined ? {} : { httpStatus: error.httpStatus }) }
+    : { stage: ['RECIPIENTS', 'DISPATCH', 'REPORT'].includes(stage) ? stage : 'DISPATCH', code: 'UNEXPECTED' };
+}
+
 const SUCCESS = 'success';
 export function notificationKind(current, previous, test = false) {
   if (test) return 'TEST';
@@ -99,7 +139,7 @@ export async function run(env, fetcher = fetch) {
   const current = { readiness: env.READINESS_RESULT, backup: env.BACKUP_RESULT };
   const headers = { Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' };
   const api = `https://api.github.com/repos/${env.GITHUB_REPOSITORY}`;
-  const get = async url => { const r = await fetcher(url, { headers, signal: AbortSignal.timeout(15000) }); if (!r.ok) throw new Error('Monitor history unavailable'); return r.json(); };
+  const get = url => readMonitorHistory(url, headers, fetcher, { stage: url.includes('/workflows/') ? 'RUNS' : 'JOBS' });
   const history = await get(`${api}/actions/workflows/monitor-production.yml/runs?status=completed&per_page=10`);
   const previousRun = history.workflow_runs?.find(r => String(r.id) !== env.GITHUB_RUN_ID);
   let previous;
@@ -135,15 +175,30 @@ export async function run(env, fetcher = fetch) {
   return { status: 'ATTEMPTED', kind, severity: alertDetails(enriched, kind).severity, results: await deliverAlert(enriched, kind, fetcher) };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+export async function executeProductionAlert(env, { fetcher = fetch, recipientLoader = loadAlertRecipients,
+  writeReport = report => writeFile('production-alert-result.json', JSON.stringify(report, null, 2), { flag: 'wx', mode: 0o600 }) } = {}) {
+  let stage = 'RECIPIENTS', configuration, report;
   try {
-    const configuration = await loadAlertRecipients(process.env);
-    const env = configuration.recipients ? { ...process.env, ALERT_RECIPIENTS_JSON: JSON.stringify(configuration.recipients) } : process.env;
-    const report = { verifiedAt: new Date().toISOString(), recipientSource: configuration.source, ...(await run(env)) };
-    await writeFile('production-alert-result.json', JSON.stringify(report, null, 2), { flag: 'wx', mode: 0o600 });
-    console.log(JSON.stringify(report));
-    if (report.results?.some(r => !r.accepted)) process.exitCode = 1;
-  } catch {
-    console.error('Alert dispatch failed; inspect monitor history/configuration. No automatic message replay.'); process.exitCode = 1;
+    configuration = await recipientLoader(env, fetcher);
+    const configured = configuration.recipients ? { ...env, ALERT_RECIPIENTS_JSON: JSON.stringify(configuration.recipients) } : env;
+    stage = 'DISPATCH';
+    report = { verifiedAt: new Date().toISOString(), recipientSource: configuration.source, ...(await run(configured, fetcher)) };
+    stage = 'REPORT';
+    await writeReport(report);
+    return { report, persisted: true, exitCode: report.results?.some(result => !result.accepted) ? 1 : 0 };
+  } catch (error) {
+    const failure = { verifiedAt: new Date().toISOString(), recipientSource: configuration?.source || null, status: 'UNAVAILABLE',
+      diagnostic: safeAlertFailure(error, stage), automaticReplay: false,
+      deliveryState: error instanceof MonitorHistoryError || stage === 'RECIPIENTS' ? 'NOT_ATTEMPTED' : 'MAY_HAVE_OCCURRED' };
+    // Preserve observable failure evidence. Never retry the sender/provider path here.
+    try { await writeReport(failure); return { report: failure, persisted: true, exitCode: 1 }; }
+    catch { return { report: failure, persisted: false, exitCode: 1 }; }
   }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const result = await executeProductionAlert(process.env);
+  console.log(JSON.stringify(result.report));
+  if (!result.persisted) console.error('STOR24_ALERT_RESULT_WRITE_FAILED');
+  if (result.exitCode) process.exitCode = result.exitCode;
 }
