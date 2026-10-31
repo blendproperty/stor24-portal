@@ -1,0 +1,11 @@
+{
+  "name": "minimatch",
+  "version": "11.0.3-stor24.1",
+  "private": true,
+  "description": "Legacy callable API backed by patched upstream minimatch",
+  "main": "index.cjs",
+  "license": "ISC",
+  "dependencies": {
+    "minimatch-core": "npm:minimatch@11.0.3"
+  }
+}
