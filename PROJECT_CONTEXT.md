@@ -7080,6 +7080,15 @@ Commit/push: this recovery and dated evidence are being committed normally to th
 - **Integration checkpoint31October:** normally integrated actual main448094d6 with its existing matcher backport and attribution release evidence. Both complete canonical histories are preserved, with current main retained as prefix. No competing matcher fork is carried by this task; PR682 owner retains any separate packaged-XLSX qualification and forms reconciliation. Fresh source checks are required after this merge.
 
 
+## 2026-10-31 - Private portal search-index exclusion candidate
+
+- Evidence: the existing authorised Search Console domain property (last updated23October) lists portal.stor24.co.za/login and/login?next=/ as its two duplicate-without-canonical examples. A current read-only/login response is200 with no robots or canonical directive; one separate?next=/ request returned502 and is not a sustained-outage or diagnosed application-failure claim.
+- Implementation: inherited noindex,nofollow metadata at this operational/customer portal's root layout. The public marketing website stays separately indexable at stor24.co.za. No authentication, permission, session, data, provider, pricing or booking logic changes. Search exclusion is not access protection.
+- Testing: one existing typed metadata object gains the standard Next.js robots property; no new runtime logic or dependency. Required exact-head hosted type/build/unit/security/transaction/browser checks remain mandatory. No production mutation or live candidate claim.
+- Commit/push: isolated codex/private-portal-noindex-20261031 from current remote main, initially draft PR. Sourceafd77de adds the single metadata property. This receipt appends bytes without re-encoding the legacy mixed-encoding canonical record.
+- Merge/deployment/configuration/live candidate verification: NONE. Actual Google recrawl/index removal, separate?next=/ health diagnosis and prior provider/staff/customer/device/privacy/legal/training/recovery gates remain separate. No ads activation or security permission change.
+
+
 ### 2026-10-31 - Maintenance/visitor candidate reconciliation and current production verification
 
 - **Implementation:** continuation of the maintenance/visitor request found that the wider attachment-mapped Task-based forms release in PR677 had already superseded the older ConfigurationProfile/MaintenanceRequest-sidecar candidate in PR675. Closed PR675 as superseded, without merging/deleting its source branch or migrating any data. Its four exact-head hosted workflows (CI41049051228, security41049051424, transactions41049051457, restricted runtime41049051226) passed at bf1a56f31fde163c41969547c80874b70bc080a3; that is source evidence, NOT deployment of that earlier candidate. Preserved the deployed /operations/forms architecture, independent review, photo handling and server-enforced approval holds. No duplicate engine, new grant, configuration, capture activation or runtime change. See the reconciliation in docs/OPERATIONAL_FORMS.md.
