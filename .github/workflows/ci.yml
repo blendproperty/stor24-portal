@@ -12,6 +12,19 @@ jobs:
   node24-image:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: image_reports
+        ports: [5432:5432]
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/image_reports
+      MERCHANDISE_DB_TEST: isolated-ci
+      AUTH_SECRET: synthetic-auth-secret-at-least-32-characters-only
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Build production image and verify Node version
@@ -20,6 +33,13 @@ jobs:
           test "$(docker run --rm --entrypoint node stor24-node24-crm:test --version)" = v24.22.1
           docker build --target dependencies -t stor24-report-deps:test .
           docker run --rm --entrypoint node stor24-report-deps:test -e 'const ExcelJS=require("exceljs"); (async()=>{const book=new ExcelJS.Workbook();book.addWorksheet("Synthetic").addRow(["Report",123.45]);const saved=await book.xlsx.writeBuffer();const read=new ExcelJS.Workbook();await read.xlsx.load(saved);if(read.worksheets[0].getCell("B1").value!==123.45)throw Error("Report roundtrip failed");console.log("Alpine XLSX dependency roundtrip passed");})().catch(error=>{console.error(error);process.exitCode=1;});'
+      - name: Exercise compiled report export using disposable records
+        run: |
+          docker build --target builder -t stor24-report-builder:test .
+          docker run --rm --network host -e DATABASE_URL -e ALLOW_EMPTY_DATABASE_BOOTSTRAP=true stor24-report-builder:test node scripts/bootstrap-empty-database.mjs
+          docker run -d --name stor24-report-runtime --network host -e DATABASE_URL -e AUTH_SECRET -e PORT=3197 -e HOSTNAME=127.0.0.1 stor24-node24-crm:test
+          trap 'docker logs --tail 40 stor24-report-runtime; docker rm -f stor24-report-runtime >/dev/null' EXIT
+          docker run --rm --network host -e DATABASE_URL -e AUTH_SECRET -e MERCHANDISE_DB_TEST -e REPORT_IMAGE_TEST_ORIGIN=http://127.0.0.1:3197 stor24-report-builder:test ./node_modules/.bin/tsx scripts/test-report-image.ts
   guided-help:
     runs-on: ubuntu-24.04
     timeout-minutes: 30

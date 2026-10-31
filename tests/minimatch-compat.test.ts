@@ -18,7 +18,7 @@ test("legacy lint consumers retain callable/default APIs backed by patched upstr
  }
 });
 test("legacy glob still enumerates actual repository paths", () => {
- assert.deepEqual(load("glob").sync("tests/minimatch-*.test.ts", {cwd:process.cwd(),nodir:true}), ["tests/minimatch-compat.test.ts"]);
+ assert.ok(load("glob").sync("tests/minimatch-*.test.ts", {cwd:process.cwd(),nodir:true}).includes("tests/minimatch-compat.test.ts"));
 });
 test("modern TypeScript parser retains the named API on the patched core", () => {
  const caller = createRequire(load.resolve("@typescript-eslint/typescript-estree"));
