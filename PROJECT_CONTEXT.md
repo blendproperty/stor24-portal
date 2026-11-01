@@ -7231,3 +7231,12 @@ Commit/push: this recovery and dated evidence are being committed normally to th
 - Deployment/configuration/live candidate: NOT YET; normal promotion/deployment and authenticated link readback required. No database/role/credential, ad activation, budget or provider configuration change.
 - Related SEO: public frontend/CMS already supply metadata, canonical/index/social settings, validated redirects, published sitemap, factual schema and content planning; fresh public21page metadata/schema checks pass. Website follow-up corrects embedded headings and14guide anchor targets. Eight published-guide404 links and its test excerpt still need authenticated CMS content repair. Both CMS and CRM are at normal login; owner sign-in requested without passwords in chat.
 - Remaining: genuine paid-click matching after explicit activation, production editor/reporting acceptance, Google recrawl/index/rank, field CWV and all earlier real provider/OTP/device/staff/customer/privacy/legal/recovery/training/business gates remain. All STOR24 advertising stays paused. No external tracker or correspondence.
+
+
+## 2026-11-01 - SEO release checks: calendar-stable reporting fixture
+
+- Exact candidate cfc1bf41 transactions run41277828413 failed visual-reporting.test.ts:59: actual audit rows0 vs expected5. Actual producers used1November while the synthetic report queried1-31October. This is a reproduced fixed-date test fixture defect, not a claimed production report failure. No blind rerun, waived check, date-filter weakening or runtime change.
+- Test repair: pin only the disposable organisation audit fixtures to15October; assert the dated count remains5 and retain the existing scoped PostgreSQL reporting assertions. Full fresh exact-head hosted qualification remains required before CRM promotion.
+- Live independent provider verification:1November05:42:43Z existing configured STOR24 Google Search Console read-only service account returned HTTP200 and10page rows for1-30October. No new grant or secret; authenticated CRM UI acceptance remains pending normal login.
+
+- Local fixture validation: actual PostgreSQL16 on task-owned loopback54378, exact CI empty-database bootstrap, repaired reporting suite10/10 passed on1November; changed-test ESLint and diff checks passed. Database is synthetic only. No production migration/provider mutation. Fresh hosted checks will qualify the combined SEO navigation and fixture change.
