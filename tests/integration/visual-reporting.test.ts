@@ -53,6 +53,10 @@ test("isolated PostgreSQL reporting persistence, claims, expiry and history scop
       const failed=await db.reportRun.findFirstOrThrow({where:{scheduleId:schedule.id,status:"FAILED"}});assert.equal(failed.encryptedResult,null);assert.equal(failed.failureCode,"FORBIDDEN");
     });
     await t.test("all native adapters execute real scoped PostgreSQL queries",async()=>{
+      // Producers use the real clock; keep only this owned fixture inside the
+      // fixed report period so the assertion survives a calendar rollover.
+      const dated=await db.auditEvent.updateMany({where:{organisationId:org.id},data:{occurredAt:new Date("2026-10-15T12:00:00Z")}});
+      assert.equal(dated.count,5);
       for(const dataset of visualReportDatasets.filter(d=>!d.importOnly)){
         const scope={organisationId:org.id,userId:user.id,unrestrictedFacilities:true,facilityIds:[]};
         const rows=await visualReportSource(scope,defaultVisualQuery(dataset.key,"2026-10-01",["unpaid-native","marketing-payment-cohorts"].includes(dataset.key)?"2026-10-01":"2026-10-31"));
