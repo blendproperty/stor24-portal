@@ -1,0 +1,11 @@
+{
+  "name": "minimatch",
+  "version": "10.2.6-stor24.1",
+  "private": true,
+  "description": "Legacy callable API backed by patched upstream minimatch",
+  "main": "index.cjs",
+  "license": "BlueOak-1.0.0",
+  "dependencies": {
+    "brace-expansion": "5.0.12"
+  }
+}

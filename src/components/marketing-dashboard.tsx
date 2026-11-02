@@ -373,6 +373,17 @@ export function MarketingDashboard({ canManage }: { canManage: boolean }) {
             Export
           </button>
           {canManage && (
+            <a
+              className="button button-secondary"
+              href="https://cms.stor24.co.za/admin/collections/page-seo"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <ArrowUpRight size={16} aria-hidden="true" />
+              Website SEO
+            </a>
+          )}
+          {canManage && (
             <button
               className="button button-primary"
               onClick={() => {

@@ -20,6 +20,7 @@ export function reportCsvRows(source:string):string[][] {
 /** Maps explicit source columns to approved fields; never stores the untouched CSV. */
 export function prepareReportHistory(input:HistoryImportInput,facilityName:string) {
   const dataset=visualReportDatasets.find(d=>d.key===input.dataset);if(!dataset)throw new Error("REPORT_DATASET_UNAVAILABLE");
+  if(dataset.key==="customer-notes-native")throw new Error("REPORT_NOTE_SOURCE");
   const parsed=reportCsvRows(input.csv),headers=parsed[0]?.map(h=>h.trim())??[];
   if(!headers.length||headers.some(h=>!h)||new Set(headers).size!==headers.length)throw new Error("REPORT_CSV_INVALID");
   if(!input.mapping.sourceRecordId||!headers.includes(input.mapping.sourceRecordId))throw new Error("REPORT_HISTORY_MAPPING");
