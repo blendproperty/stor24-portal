@@ -43,6 +43,7 @@ export async function configureMetaConversions(organisationId:string,actorId:str
 }
 export async function disableMetaConversions(organisationId:string,actorId:string){
   await db.$transaction(async tx=>{
+    await tx.$queryRaw`SELECT "id" FROM "Organisation" WHERE "id"=${organisationId} FOR UPDATE`;
     await tx.configurationProfile.updateMany({where:{organisationId,domain,name:'website'},data:{status:'DISABLED',config:{dataset:META_DATASET}}});
     await tx.webhookOutbox.updateMany({where:{organisationId,destination,status:{in:['PENDING','FAILED','PROCESSING']}},data:{status:'DEAD_LETTER',payload:{},failureCode:'DISABLED'}});
     await tx.auditEvent.create({data:{organisationId,actorId,action:'marketing.meta_conversions.disabled',entityType:'Organisation',entityId:organisationId}});
@@ -53,19 +54,23 @@ export async function queueMetaLead(organisationId:string,facilityId:string,lead
   const parsed=metaConversionConsent.safeParse(consent);
   if(!parsed.success||organisationId!==process.env.ADVERTISING_ORGANISATION_ID)return undefined;
   try{
-    const config=await configuration(organisationId);if(config?.status!=='READY')return undefined;
     const eventId=createHash('sha256').update(`stor24:meta:Lead:${organisationId}:${leadId}`).digest('hex');
     const event:MetaLeadEvent={event_name:'Lead',event_time:Math.floor(Date.now()/1000),event_id:eventId,action_source:'website',event_source_url:`https://stor24.co.za${parsed.data.page}`,user_data:{fbp:parsed.data.fbp,...(parsed.data.fbc?{fbc:parsed.data.fbc}:{}),...(isIP(ip)?{client_ip_address:ip}:{}),...(userAgent&&userAgent.length<=512?{client_user_agent:userAgent}:{})}};
-    await db.webhookOutbox.upsert({where:{idempotencyKey:`meta:Lead:${eventId}`},update:{},create:{organisationId,facilityId,eventType:'marketing.meta.Lead',aggregateType:'Lead',aggregateId:leadId,destination,idempotencyKey:`meta:Lead:${eventId}`,payload:{consentVersion:parsed.data.version,encryptedEvent:encryptIntegrationSecret(JSON.stringify(event))},nextAttemptAt:new Date()}});
-    return eventId;
+    return await db.$transaction(async tx=>{
+      await tx.$queryRaw`SELECT "id" FROM "Organisation" WHERE "id"=${organisationId} FOR UPDATE`;
+      const config=await tx.configurationProfile.findFirst({where:{organisationId,facilityId:null,domain,name:"website"}});
+      if(config?.status!=="READY")return undefined;
+      await tx.webhookOutbox.upsert({where:{idempotencyKey:`meta:Lead:${eventId}`},update:{},create:{organisationId,facilityId,eventType:"marketing.meta.Lead",aggregateType:"Lead",aggregateId:leadId,destination,idempotencyKey:`meta:Lead:${eventId}`,payload:{consentVersion:parsed.data.version,encryptedEvent:encryptIntegrationSecret(JSON.stringify(event))},nextAttemptAt:new Date()}});
+      return eventId;
+    });
   }catch{return undefined;}
 }
 export async function processMetaConversions(client=db){
   const organisationId=process.env.ADVERTISING_ORGANISATION_ID;if(!organisationId)return {accepted:0,failed:0};
+  // Expiry still runs while delivery is disabled; it never needs a provider token.
+  await client.webhookOutbox.updateMany({where:{organisationId,destination,status:{in:["PENDING","PROCESSING","FAILED"]},createdAt:{lt:new Date(Date.now()-maxAge)}},data:{payload:{},status:'DEAD_LETTER',failureCode:'EXPIRED'}});
   const row=await configuration(organisationId,client);if(row?.status!=='READY')return {accepted:0,failed:0};
   const config=row.config as {encryptedToken:string};let accepted=0,failed=0;
-  // Expire matching payloads, including previously accepted events. No historical backfill.
-  await client.webhookOutbox.updateMany({where:{organisationId,destination,status:{in:["PENDING","PROCESSING","FAILED"]},createdAt:{lt:new Date(Date.now()-maxAge)}},data:{payload:{},status:'DEAD_LETTER',failureCode:'EXPIRED'}});
   const due=await client.webhookOutbox.findMany({where:{organisationId,destination,createdAt:{gte:new Date(Date.now()-maxAge)},OR:[{status:{in:['PENDING','FAILED']},nextAttemptAt:{lte:new Date()}},{status:'PROCESSING',nextAttemptAt:{lte:new Date()}}]},orderBy:{createdAt:'asc'},take:10});
   for(const job of due){
     const lease=new Date(Date.now()+60_000);

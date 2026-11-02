@@ -30,5 +30,5 @@ test('outbox leases prevent concurrent delivery; transient retries preserve even
 
 test('disabled server connection makes no provider requests',async()=>{
  const original=globalThis.fetch,env={...process.env};process.env.ADVERTISING_ORGANISATION_ID='fixture-org';
- try{globalThis.fetch=async()=>{throw Error('must not send');};const client={configurationProfile:{findFirst:async()=>({status:'DISABLED'})}} as unknown as typeof db;assert.deepEqual(await processMetaConversions(client),{accepted:0,failed:0});}finally{globalThis.fetch=original;process.env=env;}
+ try{globalThis.fetch=async()=>{throw Error('must not send');};const client={configurationProfile:{findFirst:async()=>({status:'DISABLED'})},webhookOutbox:{updateMany:async()=>({count:0})}} as unknown as typeof db;assert.deepEqual(await processMetaConversions(client),{accepted:0,failed:0});}finally{globalThis.fetch=original;process.env=env;}
 });
