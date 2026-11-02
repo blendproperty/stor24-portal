@@ -15,7 +15,7 @@ test('outbox leases prevent concurrent delivery; transient retries preserve even
  const client={configurationProfile:{findFirst:async()=>config},webhookOutbox:{
   findMany:async()=>[{...job}],
   updateMany:async({where,data}:{where:Record<string,unknown>;data:Record<string,unknown>})=>{
-   if(!where.id)return {count:0};
+   if(!where.id){const cutoff=(where.createdAt as {lt:Date}).lt;assert.ok(Math.abs(Date.now()-cutoff.getTime()-24*60*60*1000)<5000);return {count:0};}
    if(where.status!==job.status||where.attempts!==undefined&&where.attempts!==job.attempts||String(where.nextAttemptAt)!==String(job.nextAttemptAt))return {count:0};
    Object.assign(job,{...data,attempts:typeof data.attempts==='object'?job.attempts+1:job.attempts});return {count:1};
   },

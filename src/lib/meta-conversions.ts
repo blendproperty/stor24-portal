@@ -6,7 +6,8 @@ import {metaConversionConsent} from './meta-conversion-contract';
 import {deliverMetaLead,META_DATASET,type MetaLeadEvent} from './meta-conversion-delivery';
 
 const domain='META_CONVERSIONS',destination=`meta://${META_DATASET}`;
-const maxAge=6*24*60*60*1000;
+// Stay well inside Meta's 48-hour browser/server deduplication window.
+const maxAge=24*60*60*1000;
 export async function queueSavedMetaLead(id:string|null,consent:unknown,ip:string,userAgent:string|null,reservation=false,allowCreate=true){
   if(!id||!metaConversionConsent.safeParse(consent).success)return undefined;
   try{
