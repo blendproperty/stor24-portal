@@ -12,7 +12,7 @@ sha=$(git rev-parse HEAD)
 [[ "$sha" =~ ^[a-f0-9]{40}$ ]]
 release="/opt/stor24-monitor/releases/$sha"
 install -d -m 755 "$release/scripts" "$release/src/lib"
-for script in host-heartbeat.mjs host-heartbeat-policy.mjs write-monitor-status.mjs; do
+for script in host-heartbeat.mjs host-heartbeat-policy.mjs write-monitor-status.mjs check-host-security.mjs; do
   install -m 644 "scripts/$script" "$release/scripts/$script"
 done
 install -m 644 src/lib/operations-status-policy.mjs "$release/src/lib/operations-status-policy.mjs"
