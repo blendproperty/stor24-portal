@@ -32,7 +32,8 @@ import { leadAttributionSchema } from "../src/lib/lead-attribution";
 import { publicLeadSchema } from "../src/lib/public-lead-contract";
 import { marketingReport } from "../src/lib/marketing-reporting";
 test("micro journeys survive the public contract and campaign reporting remains scoped",()=>{
- const advertising=advertisingFromSearch("utm_source=facebook&utm_medium=paid_social&utm_campaign=stor24_micro_warehousing_round2_20261015&utm_content=micro-carousel-4")!;
+ const advertising=advertisingFromSearch("utm_source=facebook&utm_medium=paid_social&utm_campaign=stor24_micro_warehousing_leads_20261102&utm_content=micro-carousel-4")!;
+ assert.equal(advertising.campaignId,"120254236574370268");assert.equal(advertising.adId,"120254236620470268");
  const attribution={version:1,consent:"granted",source:"facebook",medium:"paid_social",method:"utm",landingPage:"/micro-warehousing",conversionPage:"/micro-warehousing/book",pages:["/micro-warehousing","/micro-warehousing/midpoint","/micro-warehousing/book"],advertising};
  assert.equal(leadAttributionSchema.safeParse(attribution).success,true);
  const input={firstName:"Synthetic",lastName:"Launch",email:"launch@example.invalid",phone:"0000000000",attribution};
