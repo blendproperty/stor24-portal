@@ -1,0 +1,11 @@
+services:
+  migrate:
+    command: ["node", "scripts/migrate-with-owner.mjs"]
+    environment:
+      MIGRATION_DATABASE_URL_FILE: /run/secrets/stor24_migration_url
+    secrets:
+      - source: stor24_migration_url
+        target: stor24_migration_url
+secrets:
+  stor24_migration_url:
+    file: ${STOR24_MIGRATION_SECRET_FILE:?migration-only secret file is required}
