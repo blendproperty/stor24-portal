@@ -12,7 +12,9 @@ export async function googleAdvertising(from:string,to:string):Promise<Advertisi
  if(!account||!developer||!customer||!ids)return unavailable('Google Ads','unconfigured');
  try{
   if(!/^\d{10}$/.test(customer)||manager&&!/^\d{10}$/.test(manager))throw Error('INVALID_ADS_ACCOUNT');
-  const query=googleAdvertisingQuery(from,to,ids),credentials=JSON.parse(account);
+  // The approved Micro campaign must not disappear under the legacy two-campaign configuration.
+  const reportingIds=customer==="5635711564"?[...new Set([...ids.split(","),"24352709658"])].join(","):ids;
+  const query=googleAdvertisingQuery(from,to,reportingIds),credentials=JSON.parse(account);
   if(!credentials.client_email?.endsWith('.gserviceaccount.com'))throw Error('INVALID_ACCOUNT');
   const key=await importPKCS8(credentials.private_key,'RS256');
   const assertion=await new SignJWT({scope:'https://www.googleapis.com/auth/adwords'}).setProtectedHeader({alg:'RS256'}).setIssuer(credentials.client_email).setAudience('https://oauth2.googleapis.com/token').setIssuedAt().setExpirationTime('5m').sign(key);
@@ -20,7 +22,7 @@ export async function googleAdvertising(from:string,to:string):Promise<Advertisi
   const {access_token}=await auth.json();
   const response=await fetch(`https://googleads.googleapis.com/v25/customers/${customer}/googleAds:search`,{method:'POST',headers:{Authorization:`Bearer ${access_token}`,'developer-token':developer,...(manager?{'login-customer-id':manager}:{}),'Content-Type':'application/json'},body:JSON.stringify({query}),signal:AbortSignal.timeout(15000),cache:'no-store'});if(!response.ok)throw Error('ADS_REPORT');
   const body=await response.json();if(body.nextPageToken)throw Error('ADS_REPORT_LIMIT');
-  const allowed=new Set(ids.split(','));
+  const allowed=new Set(reportingIds.split(','));
   const rows:AdvertisingRow[]=(body.results??[]).map((r:{campaign:{id:string;name:string};segments:{date:string};customer:{currencyCode:string};metrics:{costMicros:string;impressions:string;clicks:string;conversions:number}})=>{if(!allowed.has(r.campaign.id)||r.segments.date<from||r.segments.date>to)throw Error('ADS_SCOPE');return {provider:'Google Ads',campaignId:r.campaign.id,name:r.campaign.name,date:r.segments.date,currency:r.customer.currencyCode,spend:metric(r.metrics.costMicros)/1e6,impressions:metric(r.metrics.impressions),clicks:metric(r.metrics.clicks),conversions:metric(r.metrics.conversions)};});
   return {provider:'Google Ads',status:'connected',message:'Verified STOR24 campaigns only. Provider conversions differ from CRM enquiries and leases; paused campaigns may have no activity.',rows,retrievedAt:new Date().toISOString()};
  }catch{return unavailable('Google Ads','unavailable');}

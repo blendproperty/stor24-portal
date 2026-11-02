@@ -1,3 +1,4 @@
+import {generateKeyPair,exportPKCS8} from "jose";
 import test from 'node:test';import assert from 'node:assert/strict';
 import {googleAdvertisingQuery,googleAdvertising,metaAdvertising} from '../src/lib/marketing-ads';
 test('advertising query requires exact numeric campaign allowlist and rejects injection',()=>{
@@ -16,4 +17,20 @@ test('Meta pagination keeps credentials in headers and ignores provider-supplied
 });
 test('provider failures and invalid metrics disclose no raw provider details or credentials',async()=>{
  const original=globalThis.fetch;try{globalThis.fetch=async()=>Response.json({error:{message:'private token server-token'}},{status:403});const feed=await metaAdvertising('2026-09-01','2026-09-30',{token:'server-token',account:'1064679099720272',version:'v25.0'});assert.equal(feed.status,'unavailable');assert.ok(!JSON.stringify(feed).includes('server-token'));assert.deepEqual(feed.rows,[]);}finally{globalThis.fetch=original;}
+});
+
+test('STOR24 Google reporting includes approved Micro under legacy scope and still rejects unrequested rows',async()=>{
+ const env={...process.env},original=globalThis.fetch;const {privateKey}=await generateKeyPair('RS256',{extractable:true});let unexpected=false;
+ try{
+ process.env.GOOGLE_ADS_SERVICE_ACCOUNT_JSON=JSON.stringify({client_email:'fixture@fixture.iam.gserviceaccount.com',private_key:await exportPKCS8(privateKey)});
+ process.env.GOOGLE_ADS_DEVELOPER_TOKEN='fixture-developer';process.env.GOOGLE_ADS_CUSTOMER_ID='5635711564';process.env.GOOGLE_ADS_CAMPAIGN_IDS='24315692802,24315694704';delete process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID;
+ globalThis.fetch=async(input,init)=>{
+  if(String(input)==='https://oauth2.googleapis.com/token')return Response.json({access_token:'fixture-access'});
+  assert.equal(String(input),'https://googleads.googleapis.com/v25/customers/5635711564/googleAds:search');
+  assert.match(JSON.parse(String(init?.body)).query,/campaign.id IN \(24315692802,24315694704,24352709658\)/);
+  return Response.json({results:[{campaign:{id:unexpected?'99999999999':'24352709658',name:'Micro'},segments:{date:'2026-11-02'},customer:{currencyCode:'ZAR'},metrics:{costMicros:'1000000',impressions:'10',clicks:'1',conversions:0}}]});
+ };
+ const report=await googleAdvertising('2026-11-02','2026-11-02');assert.equal(report.status,'connected');assert.equal(report.rows[0].campaignId,'24352709658');assert.equal(report.rows[0].clicks,1);
+ unexpected=true;const rejected=await googleAdvertising('2026-11-02','2026-11-02');assert.equal(rejected.status,'unavailable');assert.deepEqual(rejected.rows,[]);
+ }finally{globalThis.fetch=original;process.env=env;}
 });
