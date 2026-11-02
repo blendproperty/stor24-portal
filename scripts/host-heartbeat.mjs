@@ -4,8 +4,9 @@ import { realpathSync } from 'node:fs';
 import { safeHeartbeat, monitorRequest } from './host-heartbeat-policy.mjs';
 import { safeMonitorEntry } from '../src/lib/operations-status-policy.mjs';
 import { saveMonitor } from './write-monitor-status.mjs';
+import { checkHostSecurity } from './check-host-security.mjs';
 
-export function collectHostHeartbeat(run = spawnSync) {
+export function collectHostHeartbeat(run = spawnSync, securityCheck = null) {
   const result = { version: 1, checkedAt: new Date().toISOString(), backup: 'unknown', resources: 'unknown', markers: [] };
   for (const [check, script, failure] of [['backup', 'dlp-backup-health.sh', 'STOR24_BACKUP_FAILED'], ['resources', 'production-resource-health.sh', 'STOR24_RESOURCES_FAILED']]) {
     const probe = run('/bin/bash', [`/opt/stor24-crm/scripts/${script}`], { encoding: 'utf8', timeout: 25_000, maxBuffer: 8192 });
@@ -16,11 +17,17 @@ export function collectHostHeartbeat(run = spawnSync) {
       for (const marker of ['HOST_DISK_THRESHOLD', 'HOST_MEMORY_THRESHOLD', 'DATABASE_CONNECTION_THRESHOLD']) if (String(probe.stdout).split(/\r?\n/).includes(marker)) result.markers.push(marker);
     }
   }
+  if (securityCheck) {
+    try { const security = securityCheck(); result.security = security.security; result.markers.push(...security.markers); }
+    catch { result.security = 'unknown'; result.markers.push('STOR24_SECURITY_CHECK_UNAVAILABLE'); }
+  }
   result.checkedAt = new Date().toISOString();
   return safeHeartbeat(result);
 }
-export async function publishHostHeartbeat(env, { run, fetcher, save = saveMonitor } = {}) {
-  const report = collectHostHeartbeat(run);
+export async function publishHostHeartbeat(env, { run, fetcher, save = saveMonitor, securityCheck = checkHostSecurity } = {}) {
+  if (!['', 'false', 'true'].includes(env.STOR24_SECURITY_CHANGES_ENABLED || '')) throw new Error('INVALID_SECURITY_CHECK_CONFIGURATION');
+  const report = collectHostHeartbeat(run, env.STOR24_SECURITY_CHANGES_ENABLED === 'true' ? securityCheck : null);
+  if (!report) throw new Error('INVALID_HOST_REPORT');
   await monitorRequest(env, 'host', { method: 'POST', body: report, fetcher });
   console.info('STOR24_HOST_HEARTBEAT_PUBLISHED');
   // Dashboard publication also travels outbound: never require an inbound SSH session.

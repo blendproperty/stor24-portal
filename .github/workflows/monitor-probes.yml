@@ -10,6 +10,8 @@ on:
       - 'scripts/external-monitor-worker.mjs'
       - 'wrangler.monitor.json'
       - 'tests/host-heartbeat.test.mjs'
+      - 'scripts/check-host-security.mjs'
+      - 'tests/host-security.test.mjs'
       - 'tests/external-monitor-worker.test.mjs'
       - 'scripts/origin-access-health.sh'
       - 'tests/*readiness*'
@@ -31,7 +33,10 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
-      - run: node --test tests/origin-access-health.test.mjs tests/production-readiness.test.mjs tests/production-alert-details.test.mjs tests/host-heartbeat.test.mjs tests/external-monitor-worker.test.mjs
+      - run: node --test tests/origin-access-health.test.mjs tests/production-readiness.test.mjs tests/production-alert-details.test.mjs tests/host-heartbeat.test.mjs tests/external-monitor-worker.test.mjs tests/host-security.test.mjs
+      - name: Verify root-only baseline lifecycle on the disposable Linux runner
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo -n env -i PATH=/usr/bin:/bin "$(command -v node)" --test tests/host-security.test.mjs
       - name: Verify actual external read-only probes from this network
         id: probe
         env:
