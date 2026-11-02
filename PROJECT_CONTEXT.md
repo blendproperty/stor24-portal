@@ -7361,9 +7361,34 @@ Commit/push, merge, deployment/configuration and live verification: pending for 
 2026-11-02: reconciled the security candidate with the latest default branch, preserving both canonical histories. Previous exact-head tests passed; fresh checks are required for this merge. Merge, deployment and live verification of this candidate remain pending; all security and recovery gates remain open.
 
 
+### 2026-10-31 — isolated migration credential file candidate
+
+Implementation: the opt-in migration launcher can read a migration-only URL from the fixed /run/secrets/stor24_migration_url path, with POSIX file ownership, permissions, type and content checks; it rejects mixed credential sources. The CRM opt-in runtime credential preflight also rejects the migration-file environment variable. This does not itself configure a secret mount or prevent a runtime container from receiving one.
+
+Testing: focused migration-connection tests passed on Windows, with POSIX-only cases skipped, and in isolated networkless Linux Node 24.22.1 containers (CRM 6/6 including runtime preflight; CMS 5/5). Independent review identified trusted parent-directory and mount isolation as necessary deployment assumptions. Tests use synthetic credentials and do not demonstrate production credential isolation or actual migration and backup roles.
+
+Commit/push, merge, deployment/configuration and live production verification: pending for this candidate. Hosted dependency auditing for the preceding migration guard pull requests fails on the newly published minimatch advisory GHSA-g3hv-75wg-m249; no audit bypass was applied. Actual one-off mount wiring, secret custody, production runtime exclusion, full migration and backup recovery, real-user routing, complete RLS and role grants, and staff/customer/editor/provider acceptance remain outstanding. No production database role, policy, credential or data was changed. Preserve all prior data, privacy, training and approval gates.
+
+2026-10-31 promotion update: CRM PR #686, branch codex/migration-file-isolation-20261031 was committed and pushed as a draft, based on the migration guard branch. Merge, deployment, configuration and live production verification remain pending.
+
+2026-10-31 further test attempt: the CRM production-shaped migrator image installed its dependencies, but Docker image export/unpack did not complete in time and the disposable PostgreSQL migration rehearsal did not run. This is not a passed real-migration test; repeat it, verify one-off secret mount isolation and backup/recovery before any production cutover. The preceding security-check failure remains unresolved.
+
+2026-11-02: refreshed the credential-file draft on its migration guard branch; prior context is preserved. This draft is not merged or deployed. Production secret mounting, isolation and migration/backup recovery still require verification.
+
+2026-11-02 original-20 review: website PR 249 records a conservative cross-application evidence and gap inventory. Fresh package-lock-only npm audits on website master 7c11116, CRM guard 9a6e1988 and CMS guard c075841 returned zero known advisories; this does not verify deployed images or future advisories. Focused migration guard tests passed on both refreshed branches. Current hosted checks, merge, deployment and live verification remain separate; production identity routing, RLS, secret custody and full recovery remain outstanding.
+
+2026-11-02: refreshed the credential-file draft on the current migration guard; production integration, secret custody, role isolation and live verification remain outstanding.
+
+2026-11-02: added a hosted synthetic PostgreSQL rehearsal of the actual migration CLI using the protected migration-only secret file. Local networkless Linux file-security tests passed; the new real-migration CI step, merge, deployment and live verification remain pending. It does not prove production mount isolation, secret custody, role routing or full recovery.
+
+2026-11-02: refreshed the CRM credential-file candidate after guard PR 684 merged; preserved main and draft evidence. Exact-head checks, deployment and production integration remain pending.
+
+
 ### 2026-11-02 - CRM migration credential security promotion
 
 Implementation: the opt-in migration launcher rejects URL identity overrides and inherited PGOPTIONS. This alone does not separate production runtime and migration roles or enable RLS.
 Testing: PR 684 head 7b88b56b80a03d71ff7331d549a1837641ac2a41 passed CI 41388655695, Security 41388655717, Transactions 41388655784 and Restricted runtime 41388655909. The separate protected-file candidate passed networkless Linux tests and an actual migration against synthetic PostgreSQL at its earlier tested head; its refreshed PR requires fresh checks.
-Commit/push and merge: PR 684 squash-merged as 0771b68d5143e1d60e86dc98ce51357766748fe6. Deployment and configuration: exact-main checks and deployment are pending. Live production verification: pending; no production database role, grant, policy or secret configuration was changed by this source patch.
+Commit/push and merge: PR 684 squash-merged as 0771b68d5143e1d60e86dc98ce51357766748fe6. Deployment and configuration: exact-main checks and deployment are pending. Live production verification: deployment health and exact image were verified in the release log; independent public/staff acceptance is not established; no production database role, grant, policy or secret configuration was changed by this source patch.
 Outstanding: protected secret mount and migration/backup identities, access inventory, real-user routing, production RLS, full backup/restore and staff/customer/provider/privacy/data/training/recovery acceptance remain open.
+
+2026-11-02 follow-up: PR 686 exact 62577455eece42ae5e7c58c8664a571d41211497 passed CI 41390380798, Security 41390380826 including the real synthetic PostgreSQL migration-file test, transactions and restricted runtime; squash-merged 892938d2fa54a953778e0439ee9e64b064c0b98c. Exact-main checks, deployment and live verification of the follow-up remain pending. Receipt PR 697 earlier transactions run 41390603965 failed two customer-history export cases with HTTP 422 rather than 200; this documentation change did not modify the tested application, and no cause or production failure is assumed. A fresh exact-head run is required without a waiver. Production DB roles, mounts, RLS and recovery are still outstanding.
