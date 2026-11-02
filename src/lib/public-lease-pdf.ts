@@ -14,8 +14,8 @@ export async function renderSignedLeasePdf(input: SignedLeasePdfInput) {
   const document = await PDFDocument.create();
   const regular = await document.embedFont(StandardFonts.Helvetica);
   const bold = await document.embedFont(StandardFonts.HelveticaBold);
-  document.setTitle(`Stor24 ${input.unsigned ? "terms review" : "signed agreement"} ${input.reference}`);
-  document.setSubject(input.unsigned ? "Storage terms - unsigned review copy" : "Signed Stor24 storage licence agreement");
+  document.setTitle(`Stor24 ${input.unsigned ? "customer terms" : "signed agreement"} ${input.reference}`);
+  document.setSubject(input.unsigned ? "Customer storage terms - unsigned copy" : "Signed Stor24 storage licence agreement");
   document.setAuthor("Stor24");
   document.setCreationDate(input.signedAt);
   document.setModificationDate(input.signedAt);
@@ -98,7 +98,7 @@ export async function renderSignedLeasePdf(input: SignedLeasePdfInput) {
     sheet.drawText("STOR24", { x: margin, y: height - 49, font: bold, size: 20, color: rgb(0.04, 0.1, 0.08) });
     sheet.drawText("STORAGE AGREEMENT", { x: width - margin - 128, y: height - 47, font: bold, size: 9, color: rgb(0.3, 0.34, 0.32) });
     sheet.drawLine({ start: { x: margin, y: 58 }, end: { x: width - margin, y: 58 }, thickness: 0.5, color: rgb(0.8, 0.83, 0.81) });
-    sheet.drawText(input.unsigned ? "Legal review copy - unsigned" : "Your retained agreement and acceptance record", { x: margin, y: 40, font: regular, size: 8, color: rgb(0.3, 0.34, 0.32) });
+    sheet.drawText(input.unsigned ? "Customer terms - unsigned" : "Your retained agreement and acceptance record", { x: margin, y: 40, font: regular, size: 8, color: rgb(0.3, 0.34, 0.32) });
     sheet.drawText(`${index + 1} / ${pages.length}`, { x: width - margin - 30, y: 40, font: bold, size: 8 });
   });
   return document.save({ useObjectStreams: false });
