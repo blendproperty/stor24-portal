@@ -24,7 +24,7 @@ export const STORAGE_TERMS = [
     return { title: section.title.replace(/^(\d+) /, "$1. "), body, refundRelevant: [1, 5, 10, 22].includes(number) };
   }),
   ...octoberTerms.filter(section => /^(15|16|2[1-8])\./.test(section.title)).map(section => ({
-    title: `Website and goods terms â€” ${section.title.replace(/^\d+\. /, "")}`,
+    title: `Website and goods terms — ${section.title.replace(/^\d+\. /, "")}`,
     body: section.body.replace("treatment of the deposit and ", ""),
     refundRelevant: /refund|cancellation|merchandise|interruption|fulfilment/i.test(section.title),
   })),
@@ -49,8 +49,8 @@ export function renderReviewLeaseDocument(ctx: LeaseClauseContext) {
     STORAGE_TERMS_INTRODUCTION[1], `Customer: ${ctx.customerName}`, `Facility: ${ctx.facilityName}`,
     `Unit: ${ctx.unitNumber}${ctx.unitTypeName ? ` (${ctx.unitTypeName})` : ""}`, `Start date: ${southAfricaDateKey(ctx.startDate)}`,
     `Monthly rent: R ${ctx.monthlyRate.toFixed(2)} including applicable VAT`, `Payment method: ${ctx.paymentMethod.replaceAll("_", " ")}`,
-    ...rent.lines.map(line => `Initial rent â€” ${line.period}: R ${line.amount.toFixed(2)}`),
-    "Security deposit: not required", ctx.storagePackage ? `Optional goods: ${ctx.storagePackage.name} â€” R ${goods.toFixed(2)} once-off. ${ctx.storagePackage.contents}` : "Optional goods: none",
+    ...rent.lines.map(line => `Initial rent — ${line.period}: R ${line.amount.toFixed(2)}`),
+    "Security deposit: not required", ctx.storagePackage ? `Optional goods: ${ctx.storagePackage.name} — R ${goods.toFixed(2)} once-off. ${ctx.storagePackage.contents}` : "Optional goods: none",
     `Initial total: R ${(rent.total + goods).toFixed(2)}`, "", "YOUR SUMMARY ACKNOWLEDGEMENTS",
     ...buildReviewLeaseClauses(ctx).flatMap(clause => [clause.title, clause.body, ""]), storageTermsText()].join("\n");
 }

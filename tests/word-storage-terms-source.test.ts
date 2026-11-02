@@ -21,7 +21,7 @@ test("customer edition omits internal templates and requires no deposit", () => 
   const content = storageTermsText();
   assert.equal(STORAGE_TERMS.length, 33);
   assert.match(content, /No security deposit is required/);
-  assert.doesNotMatch(content, /\[confirm|\[complete|________________|review draft|legal review|Faeez|Liezl|StoreSmart|deposit equal to one month|deposit or advance-payment|Initial rent and deposit/i);
+  assert.doesNotMatch(content, /\u00e2\u20ac|\u00c2|\[confirm|\[complete|________________|review draft|legal review|Faeez|Liezl|StoreSmart|deposit equal to one month|deposit or advance-payment|Initial rent and deposit/i);
   assert.match(content, /annual rate of 24%/);
   assert.match(content, /no later than the 15th/);
   assert.match(content, /Separate debit order authorisation/);
