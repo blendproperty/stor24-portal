@@ -13,8 +13,10 @@ export async function queueSavedMetaLead(id:string|null,consent:unknown,ip:strin
     const booking=reservation?await db.reservation.findUnique({where:{publicReference:id},select:{leadId:true,status:true,source:true}}):null;
     if(reservation&&(!booking||booking.status!=='ACTIVE'||booking.source==='PUBLIC_WALK_IN'))return undefined;
     const lead=await db.lead.findUnique({where:{id:booking?.leadId??id},select:{id:true,facilityId:true,facility:{select:{organisationId:true}}}});
-    if(!lead)return undefined;
-    if(!allowCreate){const existing=await db.webhookOutbox.findFirst({where:{organisationId:lead.facility.organisationId,destination,aggregateId:lead.id,eventType:"marketing.meta.Lead"},select:{idempotencyKey:true}});return existing?.idempotencyKey.slice("meta:Lead:".length);}
+    if(!lead||lead.facility.organisationId!==process.env.ADVERTISING_ORGANISATION_ID)return undefined;
+    // Idempotent acknowledgements share the ID even if the first request is still queueing.
+    // They never create a new server event or backfill an older booking.
+    if(!allowCreate)return createHash("sha256").update(`stor24:meta:Lead:${lead.facility.organisationId}:${lead.id}`).digest("hex");
     return await queueMetaLead(lead.facility.organisationId,lead.facilityId,lead.id,consent,ip,userAgent);
   }catch{return undefined;}
 }
