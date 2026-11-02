@@ -21,6 +21,7 @@ export function isPublicPathname(pathname: string) {
   if (pathname === "/api/v1/operations/alert-monitor-config") return true;
   if (pathname === "/api/v1/leads/sla-worker") return true;
   if (pathname === "/api/v1/reports/worker") return true;
+  if (pathname === "/api/v1/marketing/conversions/worker") return true;
   if (pathname === "/api/internal/staff-event-emails") return true;
   if (pathname === "/api/internal/collection-schedules") return true;
   if (pathname === "/api/internal/arrears-review-schedules") return true;
