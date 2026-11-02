@@ -7380,3 +7380,5 @@ Commit/push, merge, deployment/configuration and live production verification: p
 2026-11-02: refreshed the credential-file draft on the current migration guard; production integration, secret custody, role isolation and live verification remain outstanding.
 
 2026-11-02: added a hosted synthetic PostgreSQL rehearsal of the actual migration CLI using the protected migration-only secret file. Local networkless Linux file-security tests passed; the new real-migration CI step, merge, deployment and live verification remain pending. It does not prove production mount isolation, secret custody, role routing or full recovery.
+
+2026-11-02: refreshed the CRM credential-file candidate after guard PR 684 merged; preserved main and draft evidence. Exact-head checks, deployment and production integration remain pending.
