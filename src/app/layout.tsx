@@ -22,6 +22,7 @@ const satoshi = localFont({
 });
 
 export const metadata: Metadata = {
+  robots: { index: false, follow: false },
   title: {
     default: "Stor24 CRM",
     template: "%s | Stor24 CRM",

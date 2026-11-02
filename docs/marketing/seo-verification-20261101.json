@@ -1,0 +1,49 @@
+{
+  "date": "2026-11-01",
+  "pr": 691,
+  "source": "14fa8cd0a3ccf0b92dd6a64397a2cd629652c8d8",
+  "sourceChecks": {
+    "CI": 41278456139,
+    "security": 41278456198,
+    "transactions": 41278456129,
+    "restricted": 41278456138,
+    "result": "all passed"
+  },
+  "mainChecks": {
+    "CI": 41279610249,
+    "security": 41279610370,
+    "transactions": 41279610365,
+    "restricted": 41279610278,
+    "result": "all passed"
+  },
+  "deployment": {
+    "run": 41280788528,
+    "job": 124772120684,
+    "healthyAt": "2026-11-01T06:28:18Z",
+    "finalAt": "2026-11-01T06:28:20Z",
+    "imageTag": "stor24-crm:14fa8cd0a",
+    "image": "sha256:fb555646130ea14c9d5403fc7b636c54a0940600113559d46d184361145720bc",
+    "state": "running",
+    "health": "healthy",
+    "oom": false,
+    "localHttp": 200,
+    "service": "ok",
+    "database": "ok",
+    "exit": 0
+  },
+  "browser": {
+    "marketing": "normal login; authenticated owner acceptance pending",
+    "robotsAfterDeployment": "noindex,nofollow",
+    "cmsLoginRobots": "noindex,nofollow"
+  },
+  "gsc": {
+    "http": 200,
+    "pageRows": 10,
+    "checkedAt": "2026-11-01T05:42:43.377Z",
+    "scope": "existing configured readonly service account; no new grant"
+  },
+  "trackingReadback": "original3campaign QA records plus separateMeta diagnostic remain LOST; exact attribution and one cancellation audit each retained; no new enquiry submitted",
+  "contentGate": "8guide404links and test excerpt remain, prepared repair pending normal CMS login",
+  "ads": "paused until explicit owner activation approval",
+  "fullSeoContentAcceptance": "NOT COMPLETE"
+}

@@ -1,4 +1,5 @@
 import { marketingPaymentCohortSource } from "./marketing-payment-cohort-source";
+import { leasingCustomerWhere } from "./leasing-customer-scope";
 import { db } from "@/lib/db";
 import { requireFacility, facilityWhere, type RequestScope } from "@/lib/scope";
 import { unitIsOperational } from "@/lib/floor-availability";
@@ -29,6 +30,7 @@ async function rawVisualReportSource(scope:RequestScope, query:VisualReportQuery
   const interval=query.intervalMode?{startDate:query.intervalMode==="whole-period"?{lte:period.gte}:{lt:period.lt},OR:[{endDate:null},{endDate:query.intervalMode==="whole-period"?{gte:period.lt}:{gt:period.gte}}]}:{};
   const bounded=<T>(rows:T[])=>{if(rows.length>REPORT_SOURCE_LIMIT)throw new ReportError("REPORT_LIMIT");return rows;};
   switch(query.dataset) {
+    case "customer-notes-native": return bounded(await db.customerNote.findMany({where:{...direct,customer:leasingCustomerWhere(scope,query.facilityId?[query.facilityId]:scope.facilityIds),facility,...range("createdAt","date")},take,orderBy:{id:"asc"},select:{id:true,customerId:true,facility:{select:facilitySelect},customer:{select:customerSelect},category:true,authorName:true,createdAt:true,body:true}})).map(note=>({facility:note.facility.name,noteId:note.id,customerId:note.customerId,customer:name(note.customer),category:note.category,author:note.authorName,date:iso(note.createdAt),note:note.body}));
     case "marketing-payment-cohorts": return marketingPaymentCohortSource(scope,query);
     case "approved-rent-history-native": return db.$transaction(async tx=>{
       // Read the bounded retained approval set before date filtering so a reused
@@ -95,6 +97,7 @@ async function rawVisualReportSource(scope:RequestScope, query:VisualReportQuery
 }
 
 export async function visualReportSource(scope:RequestScope, query:VisualReportQuery):Promise<VisualReportRow[]> {
+  if(query.dataset==="customer-notes-native"&&query.historyImportId)throw new ReportError("REPORT_NOTE_SOURCE");
   if(query.dataset==="marketing-payment-cohorts"&&query.historyImportId)throw new ReportError("REPORT_COHORT_SOURCE");
   if(query.dataset==="approved-rent-history-native"&&query.historyImportId)throw new ReportError("REPORT_RATE_HISTORY_SOURCE");
   if(query.historyImportId) {

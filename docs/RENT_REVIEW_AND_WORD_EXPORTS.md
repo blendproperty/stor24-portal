@@ -41,3 +41,8 @@ Select **Word (.docx)** in the existing fixed report, visual builder/online repo
 Faeez/finance must approve the size denominator, source-status/area correctness, standard/current rent and tax interpretation, suggestion rule, caps, exceptions, dismissal responsibilities, notice requirements and exact audiences before real increases. Actual Microsoft Word/Excel/PDF opening, printing, accessibility and staff/device normal-day acceptance remain open even after synthetic rendering/browser tests.
 
 Editable operational notices with wording/version/recipient approval and guarded delivery remain a separate outstanding tranche. Maintenance/visitor/procurement forms and other email requirements remain in the email assessment. Financial/provider definitions, source data, legal/collections/physical access, invitations/MFA, laptop/Outlook/training and prior security/recovery gates retain their existing status. No real rate schedule, message, collection, payment, permission or physical action is authorised by this implementation evidence.
+
+
+## Current release reconciliation - 31 October 2026
+
+PR665 is merged and deployed with recorded authenticated synthetic live rent-review and editable Word-download evidence. The opening candidate status and the later notice/forms backlog are historical: PR669 delivered operational notices and PR677 delivered the attachment-mapped operational forms. See [the consolidated release and remaining-gate register](FAEEZ_DELIVERY_RECONCILIATION_2026-10-31.md). Business, finance, provider, source-data and staff/device acceptance remain separate; no new real rate or notice action is authorized by these software releases.

@@ -16,6 +16,7 @@ function matches(row:Row,where:Row={}):boolean {
     if(key==="NOT")return !(Array.isArray(value)?value:[value]).some(v=>matches(row,v));
     if(value instanceof Date)return row[key]?.getTime()===value.getTime();
     if(value&&typeof value==="object") {
+      if("some"in value)return (row[key]??[]).some((item:Row)=>matches(item,value.some));
       if("path"in value)return value.path.reduce((v:Row,k:string)=>v?.[k],row[key])===value.equals;
       if("in"in value)return value.in.includes(row[key]);
       if("not"in value)return row[key]!==value.not;
@@ -29,7 +30,7 @@ function matches(row:Row,where:Row={}):boolean {
 async function fixture():Promise<Row> {
   const facility={id:"a",organisationId:"org",name:"Fixture store",closedFloors:[]};
   const user={id:"staff",organisationId:"org",active:true,passwordHash:"synthetic-not-a-real-password-hash",sessionVersion:1,name:"Fixture employee",roleAssignments:[{facilityId:"a",role:{name:"Staff",permissions:["reports.view","reports.export"]}}]};
-  const tables:Record<string,Row[]>={user:[user],organisation:[{id:"org",currency:"ZAR"}],facility:[facility],unit:[{id:"unit-a",facilityId:"a",facility,number:"A1",floor:"G",unitType:{name:"Small",areaSqMetres:new Prisma.Decimal(4)},monthlyRate:new Prisma.Decimal(100),status:"AVAILABLE",combinedIntoUnitId:null,reservations:[],useTypes:["STORAGE"],attributes:{}}],savedReport:[],reportHistoryImport:[],reportSchedule:[],reportRun:[],auditEvent:[],lead:[]};
+  const tables:Record<string,Row[]>={user:[user],organisation:[{id:"org",currency:"ZAR"}],facility:[facility],unit:[{id:"unit-a",facilityId:"a",facility,number:"A1",floor:"G",unitType:{name:"Small",areaSqMetres:new Prisma.Decimal(4)},monthlyRate:new Prisma.Decimal(100),status:"AVAILABLE",combinedIntoUnitId:null,reservations:[],useTypes:["STORAGE"],attributes:{}}],savedReport:[],reportHistoryImport:[],reportSchedule:[],reportRun:[],auditEvent:[],lead:[],customerNote:[]};
   const state:Row={tables,user,Prisma,authenticated:true,queries:[],failAudit:false,authReads:0,changedOnRead:0};
   const db:Row={};
   for(const [model,rows] of Object.entries(tables)){
@@ -62,6 +63,43 @@ test("real builder routes enforce authentication, origin, field validation and f
   const read=f.queries.find((q:Row)=>q.model==="unit");assert.equal(read.where.facility.organisationId,"org");assert.deepEqual(read.where.facility.id,{in:["a"]});assert.equal(read.take,5001);
 });
 test("permission revocation between query and release blocks rows",async()=>{const f=await fixture();(globalThis as Row).__reportFixture.changedOnRead=2;const response=await f.api.builder.POST(request({kind:"preview",query:query()}));assert.equal(response.status,403);assert.equal((await response.json()).data,undefined);});
+
+test("native staff-note reports retain recorded author/text and enforce store, organisation and SAST boundaries",async()=>{
+  const f=await fixture();
+  f.user.roleAssignments=[{facilityId:"a",role:{name:"Synthetic note reporter",permissions:["reports.view","reports.export","operations.view","customer_history.export","data.personal_export"]}}];
+  const base={organisationId:"org",facilityId:"a",facility:{id:"a",organisationId:"org",name:"Fixture store"},customerId:"customer-a",customer:{organisationId:"org",companyName:null,firstName:"Synthetic",lastName:"Customer",tenancies:[{facilityId:"a"}]},category:"HANDOVER",authorName:"Original author",body:"Synthetic handover detail"};
+  f.tables.customerNote.push(...[
+    {...base,id:"included",createdAt:new Date("2026-09-30T22:00:00.000Z")},
+    {...base,id:"before",createdAt:new Date("2026-09-30T21:59:59.999Z")},
+    {...base,id:"after",createdAt:new Date("2026-10-01T22:00:00.000Z")},
+    {...base,id:"other-store",facilityId:"b",facility:{id:"b",organisationId:"org",name:"Other store"},createdAt:new Date("2026-10-01T08:00:00Z")},
+    {...base,id:"other-org",organisationId:"foreign",createdAt:new Date("2026-10-01T08:00:00Z")},
+    {...base,id:"foreign-customer",customer:{...base.customer,organisationId:"foreign"},createdAt:new Date("2026-10-01T08:00:00Z")},
+    {...base,id:"unlinked-customer",customer:{...base.customer,tenancies:[]},createdAt:new Date("2026-10-01T08:00:00Z")},
+  ]);
+  const q={...defaultVisualQuery("customer-notes-native","2026-10-01","2026-10-01"),dateField:"date",columns:["customer","category","author","date","note"]};
+  const response=await f.api.builder.POST(request({kind:"preview",query:q}));assert.equal(response.status,200);
+  assert.deepEqual((await response.json()).data,[{customer:"Synthetic Customer",category:"HANDOVER",author:"Original author",date:"2026-09-30T22:00:00.000Z",note:"Synthetic handover detail"}]);
+  const source=f.queries.find((r:Row)=>r.model==="customerNote");assert.equal(source.take,5001);assert.equal(source.where.customer.organisationId,"org");assert.equal(source.where.facility.organisationId,"org");assert.deepEqual(source.where.facilityId,{in:["a"]});
+  const downloaded=await f.api.builder.POST(request({kind:"export",query:q,format:"DOCX"}));assert.equal(downloaded.status,200);assert.equal(downloaded.headers.get("content-type"),WORD_REPORT_TYPE);assert.match(downloaded.headers.get("cache-control"),/no-store/);
+  assert.ok(f.tables.auditEvent.some((event:Row)=>event.after.format==="DOCX"));assert.equal(f.tables.customerNote.length,7);
+  assert.equal((await f.api.builder.POST(request({kind:"preview",query:{...q,historyImportId:"legacy"}}))).status,422);
+  f.user.roleAssignments=[{facilityId:null,role:{name:"Organisation owner",permissions:[]}}];
+  assert.equal((await f.api.history.POST(request({kind:"validate",dataset:"customer-notes-native",facilityId:"a",name:"Synthetic legacy notes",extractedAt:"2026-10-01T08:00:00Z",approvalReference:"Synthetic source review",csv:"ID,Note\nlegacy,Synthetic legacy",mapping:{sourceRecordId:"ID",note:"Note"}}))).status,422);
+  assert.equal(f.tables.reportHistoryImport.length,0);
+});
+
+test("staff-note reports require history scope and personal authorization again before release",async()=>{
+  const q={...defaultVisualQuery("customer-notes-native","2026-10-01","2026-10-31"),columns:["note"]};
+  for(const missing of ["operations.view","customer_history.export","data.personal_export"]){
+    const f=await fixture();f.user.roleAssignments=[{facilityId:"a",role:{name:"Synthetic note reporter",permissions:["reports.view","reports.export","operations.view","customer_history.export","data.personal_export"].filter(permission=>permission!==missing)}}];
+    f.tables.customerNote.push({id:"note",organisationId:"org",facilityId:"a",facility:{id:"a",organisationId:"org",name:"Fixture store"},customerId:"customer",customer:{organisationId:"org",companyName:null,firstName:"Synthetic",lastName:null},category:"GENERAL",authorName:"Original author",body:"Synthetic note",createdAt:new Date("2026-10-01")});
+    assert.equal((await f.api.builder.POST(request({kind:"export",query:q,format:"CSV"}))).status,403,missing);
+  }
+  const f=await fixture();f.user.roleAssignments=[{facilityId:"a",role:{name:"Synthetic note reporter",permissions:["reports.view","reports.export","operations.view","customer_history.export","data.personal_export"]}}];
+  (globalThis as Row).__reportFixture.changedOnRead=2;(globalThis as Row).__reportFixture.changedAssignments=[{facilityId:"a",role:{name:"Revoked history reporter",permissions:["reports.view","reports.export","operations.view","data.personal_export"]}}];
+  assert.equal((await f.api.builder.POST(request({kind:"preview",query:q}))).status,403);
+});
 
 test('Word downloads use actual builder, fixed, bundle and retained-snapshot routes with the same protection',async()=>{
   const f=await fixture(),JSZip=createRequire(import.meta.url)('jszip');
