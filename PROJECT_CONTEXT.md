@@ -7378,3 +7378,5 @@ Commit/push, merge, deployment/configuration and live production verification: p
 2026-11-02 original-20 review: website PR 249 records a conservative cross-application evidence and gap inventory. Fresh package-lock-only npm audits on website master 7c11116, CRM guard 9a6e1988 and CMS guard c075841 returned zero known advisories; this does not verify deployed images or future advisories. Focused migration guard tests passed on both refreshed branches. Current hosted checks, merge, deployment and live verification remain separate; production identity routing, RLS, secret custody and full recovery remain outstanding.
 
 2026-11-02: refreshed the credential-file draft on the current migration guard; production integration, secret custody, role isolation and live verification remain outstanding.
+
+2026-11-02: added a hosted synthetic PostgreSQL rehearsal of the actual migration CLI using the protected migration-only secret file. Local networkless Linux file-security tests passed; the new real-migration CI step, merge, deployment and live verification remain pending. It does not prove production mount isolation, secret custody, role routing or full recovery.
