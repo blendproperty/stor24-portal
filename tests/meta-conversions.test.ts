@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {deliverMetaLead,type MetaLeadEvent} from '../src/lib/meta-conversion-delivery';
 import {metaConversionConsent} from '../src/lib/meta-conversion-contract';
 import {metaWebsiteLeads} from '../src/lib/marketing-ads';
-const event:MetaLeadEvent={event_name:'Lead',event_id:'a'.repeat(64),event_time:1793610000,action_source:'website',event_source_url:'https://stor24.co.za/micro-warehousing',user_data:{fbp:'fb.1.1793610000000.12'}};
+const event:MetaLeadEvent={event_name:'Lead',event_id:'a'.repeat(64),event_time:1793610000,action_source:'website',event_source_url:'https://stor24.co.za/micro-warehousing',user_data:{fbp:'fb.1.1793610000000.12',client_user_agent:'STOR24 synthetic test browser'}};
 test('fresh explicit bounded consent is required; private paths and extra fields fail closed',()=>{
  const input={version:'stor24-meta-server-v1',consent:'granted',page:'/micro-warehousing',fbp:event.user_data.fbp};
  assert.equal(metaConversionConsent.safeParse(input).success,true);
@@ -26,5 +26,14 @@ test('transient failures retry; permission failures stop; raw provider errors ne
  for(const [http,status] of [[429,'retry'],[503,'retry'],[403,'rejected']] as const){globalThis.fetch=async()=>Response.json({error:{message:'private'}},{status:http});assert.deepEqual(await deliverMetaLead('secret',event),{status,http});}
  globalThis.fetch=async()=>{throw Error('secret private');};assert.deepEqual(await deliverMetaLead('secret',event),{status:'retry',http:0});
  globalThis.fetch=async()=>Response.json({events_received:0});assert.equal((await deliverMetaLead('secret',event)).status,'retry');
+ }finally{globalThis.fetch=original;}
+});
+
+test('website events without a browser user agent fail closed before provider transmission',async()=>{
+ const original=globalThis.fetch;let calls=0;try{
+ globalThis.fetch=async()=>{calls++;return Response.json({events_received:1});};
+ const missing=JSON.parse(JSON.stringify(event));delete missing.user_data.client_user_agent;
+ assert.deepEqual(await deliverMetaLead('secret',missing),{status:'rejected',http:0});
+ assert.deepEqual(await deliverMetaLead('secret',{...event,user_data:{...event.user_data,client_user_agent:''}}),{status:'rejected',http:0});assert.equal(calls,0);
  }finally{globalThis.fetch=original;}
 });

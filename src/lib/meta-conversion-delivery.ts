@@ -1,6 +1,7 @@
 export const META_DATASET = '2256945718217336';
-export type MetaLeadEvent = {event_name:'Lead';event_time:number;event_id:string;action_source:'website';event_source_url:string;user_data:{fbp:string;fbc?:string;client_ip_address?:string;client_user_agent?:string}};
+export type MetaLeadEvent = {event_name:'Lead';event_time:number;event_id:string;action_source:'website';event_source_url:string;user_data:{fbp:string;fbc?:string;client_ip_address?:string;client_user_agent:string}};
 export async function deliverMetaLead(token:string,event:MetaLeadEvent,testEventCode?:string) {
+  if(!event.user_data.client_user_agent?.trim())return {status:'rejected' as const,http:0};
   try {
     const response = await fetch(`https://graph.facebook.com/v25.0/${META_DATASET}/events`, {
       method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},

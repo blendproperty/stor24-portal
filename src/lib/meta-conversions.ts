@@ -29,7 +29,7 @@ export async function metaConversionStatus(organisationId:string){
 }
 export async function configureMetaConversions(organisationId:string,actorId:string,token:string,testEventCode:string){
   // Test Events explicitly excludes the probe from attributed/optimisation results.
-  const event:MetaLeadEvent={event_name:'Lead',event_time:Math.floor(Date.now()/1000),event_id:`stor24-connection-test-${randomUUID()}`,action_source:'website',event_source_url:'https://stor24.co.za/',user_data:{fbp:`fb.1.${Date.now()}.1`}};
+  const event:MetaLeadEvent={event_name:'Lead',event_time:Math.floor(Date.now()/1000),event_id:`stor24-connection-test-${randomUUID()}`,action_source:'website',event_source_url:'https://stor24.co.za/',user_data:{fbp:`fb.1.${Date.now()}.1`,client_user_agent:"STOR24 CRM Test Events verification"}};
   const result=await deliverMetaLead(token,event,testEventCode);
   if(result.status!=='accepted')return false;
   await db.$transaction(async tx=>{
@@ -52,10 +52,10 @@ export async function disableMetaConversions(organisationId:string,actorId:strin
 // Called only after a successful public CRM save. Failure never loses the enquiry.
 export async function queueMetaLead(organisationId:string,facilityId:string,leadId:string,consent:unknown,ip:string,userAgent:string|null){
   const parsed=metaConversionConsent.safeParse(consent);
-  if(!parsed.success||organisationId!==process.env.ADVERTISING_ORGANISATION_ID)return undefined;
+  if(!parsed.success||organisationId!==process.env.ADVERTISING_ORGANISATION_ID||!userAgent?.trim()||userAgent.length>512)return undefined;
   try{
     const eventId=createHash('sha256').update(`stor24:meta:Lead:${organisationId}:${leadId}`).digest('hex');
-    const event:MetaLeadEvent={event_name:'Lead',event_time:Math.floor(Date.now()/1000),event_id:eventId,action_source:'website',event_source_url:`https://stor24.co.za${parsed.data.page}`,user_data:{fbp:parsed.data.fbp,...(parsed.data.fbc?{fbc:parsed.data.fbc}:{}),...(isIP(ip)?{client_ip_address:ip}:{}),...(userAgent&&userAgent.length<=512?{client_user_agent:userAgent}:{})}};
+    const event:MetaLeadEvent={event_name:'Lead',event_time:Math.floor(Date.now()/1000),event_id:eventId,action_source:'website',event_source_url:`https://stor24.co.za${parsed.data.page}`,user_data:{fbp:parsed.data.fbp,...(parsed.data.fbc?{fbc:parsed.data.fbc}:{}),...(isIP(ip)?{client_ip_address:ip}:{}),client_user_agent:userAgent}};
     return await db.$transaction(async tx=>{
       await tx.$queryRaw`SELECT "id" FROM "Organisation" WHERE "id"=${organisationId} FOR UPDATE`;
       const config=await tx.configurationProfile.findFirst({where:{organisationId,facilityId:null,domain,name:"website"}});
