@@ -7359,3 +7359,11 @@ Commit/push, merge, deployment/configuration and live verification: pending for 
 2026-11-02: refreshed the migration identity guard candidate on the current main, preserving both histories. Earlier dependency-audit failures are historical; fresh exact-head checks are required. The guard is not merged or deployed, and production role separation, real-user routing, RLS, backup/recovery and acceptance remain outstanding.
 
 2026-11-02: reconciled the security candidate with the latest default branch, preserving both canonical histories. Previous exact-head tests passed; fresh checks are required for this merge. Merge, deployment and live verification of this candidate remain pending; all security and recovery gates remain open.
+
+
+### 2026-11-02 - CRM migration credential security promotion
+
+Implementation: the opt-in migration launcher rejects URL identity overrides and inherited PGOPTIONS. This alone does not separate production runtime and migration roles or enable RLS.
+Testing: PR 684 head 7b88b56b80a03d71ff7331d549a1837641ac2a41 passed CI 41388655695, Security 41388655717, Transactions 41388655784 and Restricted runtime 41388655909. The separate protected-file candidate passed networkless Linux tests and an actual migration against synthetic PostgreSQL at its earlier tested head; its refreshed PR requires fresh checks.
+Commit/push and merge: PR 684 squash-merged as 0771b68d5143e1d60e86dc98ce51357766748fe6. Deployment and configuration: exact-main checks and deployment are pending. Live production verification: pending; no production database role, grant, policy or secret configuration was changed by this source patch.
+Outstanding: protected secret mount and migration/backup identities, access inventory, real-user routing, production RLS, full backup/restore and staff/customer/provider/privacy/data/training/recovery acceptance remain open.
