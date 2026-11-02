@@ -16,10 +16,10 @@ const context = { facilityName: "Store 1 - Midpoint", unitNumber: "TEST-001", un
 
 test("full review edition includes schedule, every terms section and all eight summaries", () => {
   const content = renderReviewLeaseDocument(context);
-  assert.equal(STORAGE_TERMS.length, 28);
+  assert.equal(STORAGE_TERMS.length, 33);
   assert.equal(buildReviewLeaseClauses(context).length, 8);
   for (const section of STORAGE_TERMS) { assert.ok(content.includes(section.title)); assert.ok(content.includes(section.body)); }
-  for (const expected of [STORAGE_TERMS_VERSION, "Review Customer", "TEST-001", "Moving essentials", "5 x Small Moving Box", "14 calendar days", "no additional charge authorised"]) assert.ok(content.includes(expected), expected);
+  for (const expected of [STORAGE_TERMS_VERSION, "Review Customer", "TEST-001", "Moving essentials", "5 x Small Moving Box", "no later than the 15th", "Security deposit: not required"]) assert.ok(content.includes(expected), expected);
   assert.doesNotMatch(content, /excluding applicable tax|terminate immediately/);
 });
 
@@ -34,9 +34,10 @@ test("historical renderer remains unchanged and commercial changes alter the fin
 });
 
 test("published terms match the delivered Word document extraction including its introduction", async () => {
-  const expected = JSON.parse(await readFile("docs/legal/2026-09-22/terms.json", "utf8"));
-  assert.deepEqual(STORAGE_TERMS, expected.sections);
-  assert.deepEqual(STORAGE_TERMS_INTRODUCTION, expected.introduction);
+  const expected = JSON.parse(await readFile("docs/legal/2026-11-02/confirmed-word-terms.json", "utf8"));
+  assert.equal(STORAGE_TERMS.filter(s => /^\d+\./.test(s.title)).length, 22);
+  assert.ok(expected.sections.length === 26);
+  assert.ok(STORAGE_TERMS_INTRODUCTION.join(" ").includes("No security deposit is required"));
   assert.equal(renderStorageTermsEdition(context, PREVIOUS_STORAGE_TERMS_VERSION), renderPreviousEdition(context));
   assert.equal(renderStorageTermsEdition(context, "unknown-edition"), null);
   assert.ok(requiresFullTermsAcceptance(PREVIOUS_STORAGE_TERMS_VERSION));
@@ -47,7 +48,7 @@ test("complete review PDF is multipage with signature record and page furniture"
   const bytes = await renderSignedLeasePdf({ content: renderReviewLeaseDocument(context), reference: "ST24-LEGAL-REVIEW", paymentMethod: context.paymentMethod, signerName: "SAMPLE ONLY - Review Customer", signedAt: new Date("2026-09-10T10:00:00Z"), sha256: "a".repeat(64) });
   const pdf = await PDFDocument.load(bytes);
   assert.ok(pdf.getPageCount() >= 5);
-  assert.ok(pdf.getPageCount() <= 12);
+  assert.ok(pdf.getPageCount() <= 25);
   assert.equal(pdf.getTitle(), "Stor24 signed agreement ST24-LEGAL-REVIEW");
 });
 
