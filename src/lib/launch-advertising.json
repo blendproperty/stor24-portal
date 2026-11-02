@@ -152,5 +152,75 @@
       }
     },
     "keywords": []
+  },
+  "stor24_self_storage_leads_20261102": {
+    "id": "120254236574370268",
+    "name": "STOR24 | Self storage | Website Leads | 2026-11-02",
+    "source": "facebook",
+    "medium": "paid_social",
+    "ads": {
+      "self-carousel-1": {
+        "adId": "120254236618560268",
+        "adSetId": "120254236578690268"
+      },
+      "self-carousel-2": {
+        "adId": "120254236618560268",
+        "adSetId": "120254236578690268"
+      },
+      "self-carousel-3": {
+        "adId": "120254236618560268",
+        "adSetId": "120254236578690268"
+      },
+      "self-carousel-4": {
+        "adId": "120254236618560268",
+        "adSetId": "120254236578690268"
+      },
+      "self-carousel-5": {
+        "adId": "120254236618560268",
+        "adSetId": "120254236578690268"
+      },
+      "self-image": {
+        "adId": "120254236621180268",
+        "adSetId": "120254236590090268"
+      }
+    },
+    "keywords": []
+  },
+  "stor24_micro_warehousing_leads_20261102": {
+    "id": "120254236574370268",
+    "name": "STOR24 | Micro warehousing | Website Leads | 2026-11-02",
+    "source": "facebook",
+    "medium": "paid_social",
+    "ads": {
+      "micro-carousel-1": {
+        "adId": "120254236620470268",
+        "adSetId": "120254236588790268"
+      },
+      "micro-carousel-2": {
+        "adId": "120254236620470268",
+        "adSetId": "120254236588790268"
+      },
+      "micro-carousel-3": {
+        "adId": "120254236620470268",
+        "adSetId": "120254236588790268"
+      },
+      "micro-carousel-4": {
+        "adId": "120254236620470268",
+        "adSetId": "120254236588790268"
+      },
+      "micro-carousel-5": {
+        "adId": "120254236620470268",
+        "adSetId": "120254236588790268"
+      },
+      "micro-carousel-6": {
+        "adId": "120254236620470268",
+        "adSetId": "120254236588790268"
+      },
+      "micro-image": {
+        "adId": "120254236621820268",
+        "adSetId": "120254236591390268"
+      }
+    },
+    "keywords": []
   }
 }
