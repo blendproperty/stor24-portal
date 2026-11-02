@@ -25,18 +25,24 @@ export async function googleAdvertising(from:string,to:string):Promise<Advertisi
   return {provider:'Google Ads',status:'connected',message:'Verified STOR24 campaigns only. Provider conversions differ from CRM enquiries and leases; paused campaigns may have no activity.',rows,retrievedAt:new Date().toISOString()};
  }catch{return unavailable('Google Ads','unavailable');}
 }
+export function metaWebsiteLeads(actions:unknown):number|null {
+ if(!Array.isArray(actions))return null;
+ const leads=actions.filter((a:unknown)=>!!a&&typeof a==="object"&&(a as {action_type?:unknown}).action_type==="offsite_conversion.fb_pixel_lead");
+ if(leads.length>1)throw Error("DUPLICATE_META_LEAD_METRIC");
+ return leads.length?metric(leads[0].value):0;
+}
 export async function metaAdvertising(from:string,to:string,connection?:{token:string;account:string;version:string}|null):Promise<AdvertisingFeed>{
  const token=connection?.token??process.env.META_ADS_ACCESS_TOKEN,account=connection?.account??process.env.META_ADS_ACCOUNT_ID,version=connection?.version??process.env.META_ADS_API_VERSION;
  if(!token||!account||!version)return unavailable('Meta','unconfigured');
  try{
   if(!/^\d{5,30}$/.test(account)||!/^v\d{2}\.0$/.test(version))throw Error('INVALID_META_ACCOUNT');
-  const url=new URL(`https://graph.facebook.com/${version}/act_${account}/insights`);url.searchParams.set('fields','campaign_id,campaign_name,date_start,date_stop,account_currency,spend,impressions,clicks');url.searchParams.set('level','campaign');url.searchParams.set('time_increment','1');url.searchParams.set('time_range',JSON.stringify({since:from,until:to}));url.searchParams.set('limit','500');
+  const url=new URL(`https://graph.facebook.com/${version}/act_${account}/insights`);url.searchParams.set('fields','campaign_id,campaign_name,date_start,date_stop,account_currency,spend,impressions,clicks,actions');url.searchParams.set('level','campaign');url.searchParams.set('time_increment','1');url.searchParams.set('time_range',JSON.stringify({since:from,until:to}));url.searchParams.set('limit','500');
   const rows:AdvertisingRow[]=[];let after:string|undefined;const deadline=AbortSignal.timeout(20000);
   for(let page=0;page<20;page++){
    if(after)url.searchParams.set('after',after);
    const res=await fetch(url,{headers:{Authorization:`Bearer ${token}`},signal:deadline,cache:'no-store'});if(!res.ok)throw Error('META_REPORT');const body=await res.json();
-   for(const r of body.data??[]){if(r.date_start<from||r.date_start>to)throw Error('META_SCOPE');rows.push({provider:'Meta',campaignId:String(r.campaign_id),name:r.campaign_name,date:r.date_start,currency:r.account_currency,spend:metric(r.spend),impressions:metric(r.impressions),clicks:metric(r.clicks),conversions:null});}
-   if(!body.paging?.next)return {provider:'Meta',status:'connected',message:'STOR24 account campaign delivery. Meta clicks include all clicks; conversion definitions are not equated with CRM leases.',rows,retrievedAt:new Date().toISOString()};
+   for(const r of body.data??[]){if(r.date_start<from||r.date_start>to)throw Error('META_SCOPE');rows.push({provider:'Meta',campaignId:String(r.campaign_id),name:r.campaign_name,date:r.date_start,currency:r.account_currency,spend:metric(r.spend),impressions:metric(r.impressions),clicks:metric(r.clicks),conversions:metaWebsiteLeads(r.actions)});}
+   if(!body.paging?.next)return {provider:'Meta',status:'connected',message:'STOR24 account campaign delivery. Meta conversions count website Lead actions only, once per reported action type. Meta clicks include all clicks. Provider attribution and reporting delays differ from saved CRM enquiries; neither count represents completed leases.',rows,retrievedAt:new Date().toISOString()};
    after=body.paging?.cursors?.after;if(!after)throw Error('META_PAGINATION');
   }throw Error('META_REPORT_LIMIT');
  }catch{return unavailable('Meta','unavailable');}

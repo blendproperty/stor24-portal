@@ -22,3 +22,13 @@ jobs:
           curl --fail --silent --show-error --max-time 150 --connect-timeout 10 \
             --request POST --header "x-cron-key: $REPORT_CRON_KEY" \
             'https://portal.stor24.co.za/api/v1/reports/worker'
+
+      - name: Deliver due consented Meta website conversions
+        if: always()
+        env:
+          REPORT_CRON_KEY: ${{ secrets.REPORT_CRON_KEY }}
+        run: |
+          test -n "$REPORT_CRON_KEY"
+          curl --fail --silent --show-error --max-time 120 --connect-timeout 10 \
+            --request POST --header "x-cron-key: $REPORT_CRON_KEY" \
+            'https://portal.stor24.co.za/api/v1/marketing/conversions/worker'
