@@ -1,3 +1,4 @@
+import {randomBytes} from "node:crypto";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {processMetaConversions} from '../src/lib/meta-conversions';
@@ -6,7 +7,7 @@ import type {db} from '../src/lib/db';
 
 test('outbox leases prevent concurrent delivery; transient retries preserve event ID and erase accepted matching data',async()=>{
  const original=globalThis.fetch,env={...process.env};
- process.env.ADVERTISING_ORGANISATION_ID='fixture-org';process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY='isolated-fixture-encryption-key-32-characters';
+ process.env.ADVERTISING_ORGANISATION_ID='fixture-org';process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY=randomBytes(32).toString('hex');
  const event={event_name:'Lead',event_time:Math.floor(Date.now()/1000),event_id:'b'.repeat(64),action_source:'website',event_source_url:'https://stor24.co.za/',user_data:{fbp:`fb.1.${Date.now()}.1`}};
  const job={id:'fixture-job',status:'PENDING',attempts:0,nextAttemptAt:new Date(),payload:{encryptedEvent:encryptIntegrationSecret(JSON.stringify(event))}};
  const config={status:'READY',config:{encryptedToken:encryptIntegrationSecret('fixture-secret')}};

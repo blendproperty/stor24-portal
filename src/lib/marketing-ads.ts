@@ -29,6 +29,7 @@ export function metaWebsiteLeads(actions:unknown):number|null {
  if(!Array.isArray(actions))return null;
  const leads=actions.filter((a:unknown)=>!!a&&typeof a==="object"&&(a as {action_type?:unknown}).action_type==="offsite_conversion.fb_pixel_lead");
  if(leads.length>1)throw Error("DUPLICATE_META_LEAD_METRIC");
+ if(leads.length && !["string","number"].includes(typeof leads[0].value))throw Error("INVALID_META_LEAD_METRIC");
  return leads.length?metric(leads[0].value):0;
 }
 export async function metaAdvertising(from:string,to:string,connection?:{token:string;account:string;version:string}|null):Promise<AdvertisingFeed>{
