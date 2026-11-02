@@ -142,7 +142,7 @@ jobs:
           psql -h localhost -U ci -d postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE synthetic_migrator LOGIN PASSWORD 'synthetic-migrator-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS" -c "CREATE ROLE synthetic_runtime LOGIN PASSWORD 'synthetic-runtime-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS" -c "CREATE DATABASE rls_probe_ci OWNER synthetic_migrator"
           psql -h localhost -U ci -d rls_probe_ci -v ON_ERROR_STOP=1 -c "REVOKE CREATE ON SCHEMA public FROM PUBLIC" -c "GRANT USAGE ON SCHEMA public TO synthetic_runtime"
       - name: Verify role isolation and RLS trust boundary
-        run: node --test tests/integration/database-role-rls.test.mjs tests/migration-connection.test.mjs
+        run: node --test tests/integration/database-role-rls.test.mjs tests/migration-connection.test.mjs tests/integration/migration-compose.test.mjs
         env:
           DB_ROLE_TEST: isolated-ci
           DATABASE_URL: postgresql://synthetic_runtime:synthetic-runtime-only@localhost:5432/rls_probe_ci
