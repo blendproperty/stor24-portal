@@ -13,9 +13,10 @@ permissions:
   contents: read
   actions: read
 
-concurrency:
-  group: stor24-production-monitor
-  cancel-in-progress: false
+# Allow each external scheduled dispatch to finish independently.
+# GitHub concurrency groups retain at most one pending run; later dispatches
+# silently cancel earlier pending runs, yielding false backup failure alerts.
+# The ten-minute scheduler and per-job timeouts bound each monitor run.
 
 jobs:
   readiness-primary:
