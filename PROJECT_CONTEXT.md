@@ -7454,6 +7454,18 @@ Additional live evidence05:18:18Z: next automatic host heartbeat05:17:03Z remain
 Promotion refresh05:38Z2November: all applicable checks on2d7e68b8 passed, including the full116-step guided-help suite; GitHub normally rejected merging because main had advanced to0b2ce449 (PR696). Integrated that canonical main normally, preserving both context histories; PR698 remains documentation-only relative to current main. No branch/security rule was changed and no check result was reused to bypass the required refresh. Fresh checks are required on the integrated head. Actual scheduled41393758254, original attempt1, passed after temporary-token revocation; fresh automatic host report05:22:42Z remained security success. This closes the preparation-time later-cycle verification note above, without claiming notification delivery.
 
 
+### 2026-11-02 - CRM migration credential security promotion
+
+Implementation: the opt-in migration launcher rejects URL identity overrides and inherited PGOPTIONS. This alone does not separate production runtime and migration roles or enable RLS.
+Testing: PR 684 head 7b88b56b80a03d71ff7331d549a1837641ac2a41 passed CI 41388655695, Security 41388655717, Transactions 41388655784 and Restricted runtime 41388655909. The separate protected-file candidate passed networkless Linux tests and an actual migration against synthetic PostgreSQL at its earlier tested head; its refreshed PR requires fresh checks.
+Commit/push and merge: PR 684 squash-merged as 0771b68d5143e1d60e86dc98ce51357766748fe6. Deployment and configuration: exact-main checks and deployment are pending. Live production verification: deployment health and exact image were verified in the release log; independent public/staff acceptance is not established; no production database role, grant, policy or secret configuration was changed by this source patch.
+Outstanding: protected secret mount and migration/backup identities, access inventory, real-user routing, production RLS, full backup/restore and staff/customer/provider/privacy/data/training/recovery acceptance remain open.
+
+2026-11-02 follow-up: PR 686 exact 62577455eece42ae5e7c58c8664a571d41211497 passed CI 41390380798, Security 41390380826 including the real synthetic PostgreSQL migration-file test, transactions and restricted runtime; squash-merged 892938d2fa54a953778e0439ee9e64b064c0b98c. Exact-main CI 41392260829, Security 41392260778, Transactions 41392260826 and Restricted 41392260899 passed. Deploy 41393632526 reported revision 892938d2 healthy with local HTTP 200 and database status ok at 05:24:43 UTC. Independent current staff/customer live acceptance remains unverified. Receipt PR 697 earlier transactions run 41390603965 failed two customer-history export cases with HTTP 422 rather than 200; this documentation change did not modify the tested application, and no cause or production failure is assumed. A fresh exact-head run is required without a waiver. Production DB roles, mounts, RLS and recovery are still outstanding.
+
+2026-11-02: receipt PR 697 refresh integrated the latest main history. Its earlier customer-history test failures were followed by a full passing transactions run 41392342116 on the refreshed prior head; fresh exact-head checks are required. No security test was waived.
+
+
 ### 2026-11-02 — CRM migration-only mount candidate
 
 Implementation: added an opt-in Compose overlay for a separately mounted migration secret; ordinary application services are unchanged in the synthetic configuration test. This is not wired into the production release and does not change database roles or RLS.
@@ -7463,3 +7475,5 @@ Commit/push, merge, deployment/configuration and live production verification: p
 2026-11-02: added a hosted end-to-end synthetic PostgreSQL rehearsal using the real migration image with the proposed Compose secret mount. This new test is pending; it does not change or verify production release integration, credential custody, roles or RLS.
 
 2026-11-02 test update: source d79e57c7e092b5b53de2ac3c617946ed46a75b51, hosted Security 41406043928, passed the synthetic Linux Compose secret mount probe and the actual migration image/launcher against an already-migrated disposable PostgreSQL database. This does not prove applying a pending migration, production mounts, runtime credential exclusion or a deployed role/RLS boundary. A read-only credential preflight using the named administrator account was rejected at SSH public-key authentication; no alternate identity was used. Production host preflight, real-user routing, grants, RLS and recovery remain outstanding.
+
+2026-11-02: refreshed the isolated migration mount candidate after CRM release receipt PR 697; preserved both histories. Fresh exact-head checks remain required.
