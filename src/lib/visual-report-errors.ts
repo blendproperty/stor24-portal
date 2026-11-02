@@ -1,6 +1,7 @@
 import { authErrorResponse } from "./auth-guards";
 import { dlpPrivateHeaders } from "./dlp-policy";
 const errors:Record<string,[number,string]>={
+  REPORT_NOTE_SOURCE:[422,"Recorded staff notes require original STOR24 note records. Imported extracts remain separate historical evidence."],
   REPORT_COHORT_SOURCE:[422,"Enquiry/payment cohorts require original CRM and verified ledger evidence. Imported extracts cannot replace those links."],
   REPORT_COHORT_REVIEW:[422,"Enquiry, booking, account or receipt links need review. Inspect review rows before totaling money."],
   REPORT_COHORT_CURRENCY:[422,"This enquiry/payment cohort currently supports organisations using ZAR only."],

@@ -1,0 +1,19 @@
+{
+  "observed_at_utc": "2026-10-31T06:00:17Z",
+  "evidence": "Meta Ads connector ads_get_dataset_stats ordinary event aggregation, WEB_ONLY; not Test events",
+  "dataset_id": "2256945718217336",
+  "range_start_utc": "2026-10-31T00:00:00Z",
+  "range_end_utc": "2026-10-31T06:00:17Z",
+  "ordinary_hourly_stats": [
+    {
+      "hour_start_utc": "2026-10-31T04:00:00Z",
+      "PageView": 7
+    },
+    {
+      "hour_start_utc": "2026-10-31T05:00:00Z",
+      "PageView": 10,
+      "Lead": 3
+    }
+  ],
+  "reconciliation": "Three ordinary browser Lead events match the three original tagged saved QA enquiries. The fourth actual saved enquiry was independently received in Meta Test events and is separate from this ordinary total. No actual paid-click attribution claim. All four CRM records closed LOST with original attribution and cancellation audits retained."
+}
