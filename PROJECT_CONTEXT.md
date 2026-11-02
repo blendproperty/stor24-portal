@@ -7380,3 +7380,26 @@ Commit/push, merge, deployment/configuration and live verification: pending for 
 2026-11-02: refreshed the migration identity guard candidate on the current main, preserving both histories. Earlier dependency-audit failures are historical; fresh exact-head checks are required. The guard is not merged or deployed, and production role separation, real-user routing, RLS, backup/recovery and acceptance remain outstanding.
 
 2026-11-02: reconciled the security candidate with the latest default branch, preserving both canonical histories. Previous exact-head tests passed; fresh checks are required for this merge. Merge, deployment and live verification of this candidate remain pending; all security and recovery gates remain open.
+
+
+### 2026-10-31 — isolated migration credential file candidate
+
+Implementation: the opt-in migration launcher can read a migration-only URL from the fixed /run/secrets/stor24_migration_url path, with POSIX file ownership, permissions, type and content checks; it rejects mixed credential sources. The CRM opt-in runtime credential preflight also rejects the migration-file environment variable. This does not itself configure a secret mount or prevent a runtime container from receiving one.
+
+Testing: focused migration-connection tests passed on Windows, with POSIX-only cases skipped, and in isolated networkless Linux Node 24.22.1 containers (CRM 6/6 including runtime preflight; CMS 5/5). Independent review identified trusted parent-directory and mount isolation as necessary deployment assumptions. Tests use synthetic credentials and do not demonstrate production credential isolation or actual migration and backup roles.
+
+Commit/push, merge, deployment/configuration and live production verification: pending for this candidate. Hosted dependency auditing for the preceding migration guard pull requests fails on the newly published minimatch advisory GHSA-g3hv-75wg-m249; no audit bypass was applied. Actual one-off mount wiring, secret custody, production runtime exclusion, full migration and backup recovery, real-user routing, complete RLS and role grants, and staff/customer/editor/provider acceptance remain outstanding. No production database role, policy, credential or data was changed. Preserve all prior data, privacy, training and approval gates.
+
+2026-10-31 promotion update: CRM PR #686, branch codex/migration-file-isolation-20261031 was committed and pushed as a draft, based on the migration guard branch. Merge, deployment, configuration and live production verification remain pending.
+
+2026-10-31 further test attempt: the CRM production-shaped migrator image installed its dependencies, but Docker image export/unpack did not complete in time and the disposable PostgreSQL migration rehearsal did not run. This is not a passed real-migration test; repeat it, verify one-off secret mount isolation and backup/recovery before any production cutover. The preceding security-check failure remains unresolved.
+
+2026-11-02: refreshed the credential-file draft on its migration guard branch; prior context is preserved. This draft is not merged or deployed. Production secret mounting, isolation and migration/backup recovery still require verification.
+
+2026-11-02 original-20 review: website PR 249 records a conservative cross-application evidence and gap inventory. Fresh package-lock-only npm audits on website master 7c11116, CRM guard 9a6e1988 and CMS guard c075841 returned zero known advisories; this does not verify deployed images or future advisories. Focused migration guard tests passed on both refreshed branches. Current hosted checks, merge, deployment and live verification remain separate; production identity routing, RLS, secret custody and full recovery remain outstanding.
+
+2026-11-02: refreshed the credential-file draft on the current migration guard; production integration, secret custody, role isolation and live verification remain outstanding.
+
+2026-11-02: added a hosted synthetic PostgreSQL rehearsal of the actual migration CLI using the protected migration-only secret file. Local networkless Linux file-security tests passed; the new real-migration CI step, merge, deployment and live verification remain pending. It does not prove production mount isolation, secret custody, role routing or full recovery.
+
+2026-11-02: refreshed the CRM credential-file candidate after guard PR 684 merged; preserved main and draft evidence. Exact-head checks, deployment and production integration remain pending.
