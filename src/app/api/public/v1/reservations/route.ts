@@ -1,3 +1,5 @@
+import {after} from "next/server";
+import {queueSavedMetaLead,processMetaConversions} from "@/lib/meta-conversions";
 import { privacyHash, rateLimit, requestIp } from "@/lib/request-security";
 import {
   publicApiAuthorized,
@@ -32,7 +34,10 @@ export async function POST(request: Request) {
 
   try {
     const reservation = await createPublicReservation(parsed.data, ipHash);
-    return Response.json({ data: reservation }, { status: 201, headers: { "cache-control": "no-store" } });
+    const {newlyCreatedForMeasurement,...publicReservation}=reservation as typeof reservation & {newlyCreatedForMeasurement?:boolean};
+    const measurementEventId=parsed.data.walkInToken ? undefined : await queueSavedMetaLead(reservation.reference, parsed.data.conversionTracking, clientIp, request.headers.get("x-stor24-user-agent"), true, newlyCreatedForMeasurement===true);
+    if(measurementEventId)after(()=>processMetaConversions().then(()=>{}));
+    return Response.json({ data: {...publicReservation,measurementEventId} }, { status: 201, headers: { "cache-control": "no-store" } });
   } catch (error) {
     if (error instanceof PublicBookingError)
       return Response.json({

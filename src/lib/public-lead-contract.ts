@@ -1,6 +1,7 @@
 import { enquiryLocationInputSchema } from "@/lib/enquiry-location";
 import { leadAttributionSchema } from "@/lib/lead-attribution";
 import { z } from "zod";
+import {metaConversionConsent} from "./meta-conversion-contract";
 
 /**
  * Contract for the public "quote form" lead — distinct from
@@ -28,6 +29,7 @@ export const publicLeadSchema = z.object({
   privacyNoticeVersion: z.string().trim().max(80).optional(),
   contactMethod: z.string().trim().max(40).optional(),
   attribution: leadAttributionSchema.optional().catch(undefined),
+  conversionTracking: metaConversionConsent.optional().catch(undefined),
   websitePath: z.string().trim().max(300).optional(),
   honeypot: z.string().max(0).optional(),
 });

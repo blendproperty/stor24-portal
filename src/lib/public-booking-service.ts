@@ -371,7 +371,7 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
 
     if (!verificationEnabled) {
       await notifyPublicReservation({ organisationId: facility.organisationId, facilityId: facility.id, customerId, idempotencyKey: input.idempotencyKey, consent: input.communicationConsent, to: { email: input.email, phone: input.phone }, journey: created.journey, firstName: input.firstName, facilityName: created.facility.name, unitNumber: created.unit.number, monthlyRateZar: created.quotedRate.toString(), holdExpiresAt: created.holdExpiresAt?.toISOString() ?? "", intendedMoveIn: created.intendedMoveIn, viewingAt: created.viewingAt, reference: created.publicReference ?? "" });
-      return { ...reservationResult(created), verificationRequired: false };
+      return { ...reservationResult(created), verificationRequired: false, newlyCreatedForMeasurement:true };
     }
     const otp = await deliverVerificationCode({ code: verificationCode, phone: input.phone, organisationId: facility.organisationId, facilityId: facility.id, idempotencyKey: `${input.idempotencyKey}:VERIFY` });
     if (!otp.ok) {
@@ -389,7 +389,7 @@ export async function createPublicReservation(input: PublicReservationInput, ipH
       throw new Error("OTP_DELIVERY_FAILED");
     }
     await db.auditEvent.create({ data: { organisationId: facility.organisationId, facilityId: facility.id, action: "public_reservation.verification_sent", entityType: "Reservation", entityId: created.id, requestId: input.idempotencyKey, after: { channel: otp.channel, expiresAt: created.verificationExpiresAt?.toISOString() } } });
-    return { ...reservationResult(created), verificationRequired: true, verificationChannel: otp.channel, verificationExpiresAt: created.verificationExpiresAt?.toISOString() ?? null };
+    return { ...reservationResult(created), newlyCreatedForMeasurement:true, verificationRequired: true, verificationChannel: otp.channel, verificationExpiresAt: created.verificationExpiresAt?.toISOString() ?? null };
   } catch (error) {
     if (error instanceof PublicBookingError) throw error;
     if ((error as { code?: string }).code === "P2002") {

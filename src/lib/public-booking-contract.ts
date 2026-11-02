@@ -2,6 +2,7 @@ import {enquiryLocationInputSchema} from "./enquiry-location";
 import { leadAttributionSchema } from "@/lib/lead-attribution";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
+import {metaConversionConsent} from "./meta-conversion-contract";
 
 export const publicReservationSchema = z.object({
   enquiryLocation: enquiryLocationInputSchema.optional(),
@@ -32,6 +33,7 @@ export const publicReservationSchema = z.object({
   }).default({ email: false, sms: false, phone: false, whatsapp: false }),
   idempotencyKey: z.string().trim().min(16).max(100),
   attribution: leadAttributionSchema.optional().catch(undefined),
+  conversionTracking: metaConversionConsent.optional().catch(undefined),
   websitePath: z.string().trim().max(300).optional(),
   honeypot: z.string().max(0).optional(),
 }).superRefine((value, context) => {

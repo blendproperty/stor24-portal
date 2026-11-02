@@ -1,3 +1,5 @@
+import {after} from "next/server";
+import {queueSavedMetaLead,processMetaConversions} from "@/lib/meta-conversions";
 import { publicApiAuthorized } from "@/lib/public-booking-contract";
 import { publicLeadSchema } from "@/lib/public-lead-contract";
 import { createPublicLead, PublicLeadError } from "@/lib/public-lead-service";
@@ -28,7 +30,9 @@ export async function POST(request: Request) {
 
   try {
     const lead = await createPublicLead(parsed.data, ipHash);
-    return Response.json({ data: lead }, { status: 201, headers: { "cache-control": "no-store" } });
+    const measurementEventId=await queueSavedMetaLead(lead.id, parsed.data.conversionTracking, clientIp, request.headers.get("x-stor24-user-agent"));
+    if(measurementEventId)after(()=>processMetaConversions().then(()=>{}));
+    return Response.json({ data: {...lead,measurementEventId} }, { status: 201, headers: { "cache-control": "no-store" } });
   } catch (error) {
     if (error instanceof PublicLeadError)
       return Response.json({ error: { code: error.code, message: "That area is not yet available for online quotes." } }, { status: error.status });
