@@ -11,23 +11,26 @@ const sha256 = (value: string | Buffer) => createHash("sha256").update(value).di
 
 test("confirmed Word source retains all 22 clauses without wording changes", () => {
   assert.equal(STORAGE_TERMS_SOURCE.sha256, "055fb89975ca39c2a77574486494be44a1ef2811cc8aef09acb44e80f80e89da");
-  const clauses = STORAGE_TERMS.filter(section => /^\d+ /.test(section.title));
+  const clauses = source.sections.filter(section => /^\d+ /.test(section.title));
   assert.deepEqual(clauses.map(section => Number(section.title.split(" ")[0])), Array.from({ length: 22 }, (_, index) => index + 1));
   assert.equal(sha256(JSON.stringify(clauses)), "80553a2e53a47280cd368a0cac1e80f60bd4defc52403045c81a1b7ab6d27aa0");
   assert.equal(source.clausesSha256, sha256(JSON.stringify(clauses)));
 });
 
-test("review text includes the complete schedule, notices, execution and separate mandate", () => {
+test("customer edition omits internal templates and requires no deposit", () => {
   const content = storageTermsText();
-  assert.equal(STORAGE_TERMS.length, 26);
-  for (const title of ["Booking Schedule", "Important risk notices", "Execution", "Separate debit order mandate"]) {
-    assert.ok(content.includes(title), title);
-  }
-  assert.match(content, /deposit equal to one month's service charge/);
+  assert.equal(STORAGE_TERMS.length, 33);
+  assert.match(content, /No security deposit is required/);
+  assert.doesNotMatch(content, /\[confirm|\[complete|________________|review draft|legal review|Faeez|Liezl|StoreSmart|deposit equal to one month|deposit or advance-payment|Initial rent and deposit/i);
   assert.match(content, /annual rate of 24%/);
   assert.match(content, /no later than the 15th/);
-  assert.match(content, /not ready for collection until the creditor particulars and provider process are approved/);
-  assert.match(content, /Signing the Agreement, submitting EFT proof of payment or returning from a payment page does not itself confirm cleared payment/);
+  assert.match(content, /Separate debit order authorisation/);
+  assert.ok(STORAGE_TERMS.find(s => s.title.startsWith("1."))?.refundRelevant);
+  for (const original of source.sections.filter(s => /^\d+ /.test(s.title))) {
+    const number = Number(original.title.split(" ")[0]);
+    if ([10, 11, 20].includes(number)) continue;
+    assert.equal(STORAGE_TERMS.find(s => s.title.startsWith(`${number}. `))?.body, original.body);
+  }
 });
 
 test("the 20 October renderer is byte-preserved and still reproduces its accepted edition", async () => {
