@@ -13,7 +13,7 @@ test('worker requires its independent key even with a staff cookie, and fails cl
  try{
   process.env.REPORT_CRON_SECRET_SHA256=createHash('sha256').update(key).digest('hex');
   delete process.env.ADVERTISING_ORGANISATION_ID; // No fixture database/provider work.
-  for(const headers of [{},{cookie:'staff-session=fixture'},{'x-cron-key':'invalid'}]){
+  for(const headers of [new Headers(),new Headers({cookie:'staff-session=fixture'}),new Headers({'x-cron-key':'invalid'})]){
    const r=await POST(new Request('https://portal.stor24.co.za/api/v1/marketing/conversions/worker',{method:'POST',headers}));assert.equal(r.status,401);assert.ok(!(await r.text()).includes(key));
   }
   const r=await POST(new Request('https://portal.stor24.co.za/api/v1/marketing/conversions/worker',{method:'POST',headers:{'x-cron-key':key}}));assert.equal(r.status,200);assert.deepEqual(await r.json(),{data:{accepted:0,failed:0}});
