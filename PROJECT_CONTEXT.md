@@ -7522,6 +7522,15 @@ Open attention: EMAIL-only owner's delivery gate is satisfied for this observati
 - Disable/retention review: configuration and queue insertion serialize on the organisation lock, preventing a late enqueue after token removal. Expiry cleanup also runs with delivery disabled and needs no provider token. The disabled-connection test continues to require no provider request.
 
 
+### 2026-11-02 — original checks 1–3: scoped source and history evidence
+
+Implementation: no runtime change; this review does not close the checks. Source snapshots: website bfd62d7807e823f0c030136f74a851b30ff5c8d7, CRM 88326fc5d84ad01308dfb6f3c2fe7ec8a6bbb359 and CMS 7a8e644c7df9b9d1c7c16335b1066acf7199ef5f. Literal source searches found website direct client references to NEXT_PUBLIC_RECAPTCHA_SITE_KEY and NODE_ENV, CRM direct client reference to NODE_ENV, and no process.env reference in the three CMS client-directive files. These are syntactic checks, not an import-graph, emitted-bundle or runtime credential comparison. The website application source had no DATABASE_URL or DATABASE_URI matches; CRM and CMS use server-side DATABASE_URL and DATABASE_URI respectively. A public database key is not a substitute for the restricted server-side roles still needed.
+
+Testing: current website and CRM secret-scanning jobs passed on the above source revisions; CMS 7a8e644 differs from tested 752dbdae in PROJECT_CONTEXT.md only, whose earlier Security run passed. An existing 27 October historical scan recorded 7 website, 14 CRM and 0 CMS matches, including test and documentation material; matches are not automatically valid secrets and require individual current triage. No secret values were printed, rotated or tested for validity. Fresh all-ref and external-copy coverage remains incomplete.
+
+Commit/push and merge: evidence-only candidate pending normal checks and promotion. Deployment/configuration: no runtime, credentials or database change. Live production verification: current secret-versus-client-bundle and account/provider revocation checks are not complete; the named admin key requires private unlock. Checks 1 and 2 remain open for current runtime and historical credential verification. Check 3 is not a requirement for a browser public key in the observed server-side architecture, but privileged connection exposure and database role separation remain open. Preserve all existing privacy, data, provider, training, recovery and staff/customer/editor acceptance gates.
+
+
 ## 2026-11-02 10:10 UTC - Conversion worker authentication follow-up
 - Implementation: add only the exact /api/v1/marketing/conversions/worker path to the proxy handler-authentication exemptions, alongside the existing reports worker. The route independently requires the existing timing-safe SHA256-verified cron credential; owner conversion settings and all descendant/sibling routes remain session protected.
 - Testing: executable exact-path/sibling/descendant protection and missing/invalid/valid/unconfigured worker-key tests catch the missing exemption and must pass with the fix. Broader protected checks remain required.
