@@ -90,7 +90,7 @@ export function moveInReservationWhere(input: {
   };
 }
 
-export async function listLeasing(scope: RequestScope) {
+export async function listLeasing(scope: RequestScope, includeHandovers = false) {
   const facilities = await db.facility.findMany({
     where: facilityWhere(scope),
     orderBy: { name: "asc" },
@@ -169,7 +169,13 @@ export async function listLeasing(scope: RequestScope) {
       orderBy: { updatedAt: "desc" },
     }),
   ]);
-  return { facilities: facilities.map(facility => ({ ...facility, units: facility.units.map(unit => ({ ...unit, floorOperational: unitIsOperational(unit, facility.closedFloors) })) })), customers, leads, reservations, tenancies };
+  const customerTenancies = customers.flatMap(customer => customer.tenancies);
+  const handovers = includeHandovers && customerTenancies.length ? await db.auditEvent.findMany({
+    where: { organisationId: scope.organisationId, facilityId: { in: facilityIds }, entityType: "Tenancy", entityId: { in: customerTenancies.map(t => t.id) }, action: "tenancy.key_handover_confirmed" },
+    select: { entityId: true, facilityId: true },
+  }) : [];
+  const handedOver = new Set(handovers.map(event => `${event.facilityId}:${event.entityId}`));
+  return { facilities: facilities.map(facility => ({ ...facility, units: facility.units.map(unit => ({ ...unit, floorOperational: unitIsOperational(unit, facility.closedFloors) })) })), customers: customers.map(customer => ({ ...customer, tenancies: customer.tenancies.map(tenancy => ({ ...tenancy, handedOver: handedOver.has(`${tenancy.facilityId}:${tenancy.id}`) })) })), leads, reservations, tenancies };
 }
 
 export async function createFacility(
