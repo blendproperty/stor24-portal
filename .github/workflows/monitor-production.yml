@@ -1,4 +1,5 @@
 name: Monitor production
+run-name: ${{ inputs.owner_email_test && 'STOR24 owner email delivery test' || 'Monitor production' }}
 
 on:
   # Cloudflare owns the ten-minute schedule; keep dispatch for the trigger and manual recovery.
@@ -6,6 +7,10 @@ on:
     inputs:
       test_alert:
         description: Send labelled delivery tests to the configured operations recipients
+        type: boolean
+        default: false
+      owner_email_test:
+        description: Send one labelled email to Brett only; no other recipients or channels
         type: boolean
         default: false
 
@@ -102,6 +107,7 @@ jobs:
       - name: Install locked email transport
         run: npm ci --omit=dev --ignore-scripts --no-audit --no-fund
       - name: Restore encrypted last-known recipients
+        if: ${{ !inputs.owner_email_test }}
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: .operations-alert-config.enc
@@ -113,7 +119,8 @@ jobs:
           STOR24_ALERT_CONFIG_KEY: ${{ secrets.STOR24_ALERT_CONFIG_KEY }}
           READINESS_RESULT: ${{ needs.readiness.result }}
           BACKUP_RESULT: ${{ needs.backup.result }}
-          ALERT_TEST: ${{ inputs.test_alert || false }}
+          ALERT_TEST: ${{ inputs.test_alert || inputs.owner_email_test || false }}
+          ALERT_OWNER_EMAIL_TEST: ${{ inputs.owner_email_test || false }}
           ALERT_EMAIL_TO: ${{ vars.STOR24_ALERT_EMAIL_TO }}
           ALERT_SMS_TO: ${{ vars.STOR24_ALERT_MOBILE }}
           ALERT_WHATSAPP_TO: ${{ vars.STOR24_ALERT_MOBILE }}
@@ -125,7 +132,7 @@ jobs:
           TWILIO_WHATSAPP_FROM: ${{ secrets.TWILIO_WHATSAPP_FROM }}
         run: node scripts/send-production-alert.mjs
       - name: Publish aggregate dashboard evidence over HTTPS
-        if: always()
+        if: ${{ always() && !inputs.owner_email_test }}
         env:
           STOR24_HEARTBEAT_KEY: ${{ secrets.STOR24_HEARTBEAT_KEY }}
           READINESS_RESULT: ${{ needs.readiness.result }}
