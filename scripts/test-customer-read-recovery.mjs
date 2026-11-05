@@ -23,14 +23,14 @@ try {for(const width of [1440,390,320]) {
  });
  await page.goto(`http://127.0.0.1:${server.address().port}`);
  const reload=page.getByRole('button',{name:'Reload customer records',exact:true});
- await expect(page.getByRole('alert')).toContainText('could not be loaded');await expect(page.getByText('No customer records found.')).toHaveCount(0);await expect(page.getByRole('button',{name:'Add customer',exact:true})).toBeDisabled();
+ await expect(page.getByRole('alert')).toContainText('could not be loaded');await expect(page.getByText('No tenants found. Lead records remain in Lead to lease.')).toHaveCount(0);await expect(page.getByRole('button',{name:'Add customer',exact:true})).toBeDisabled();
  for(const failure of ['500','malformed','nested','network']){mode=failure;await reload.click();await expect(page.getByRole('alert')).toContainText('could not be loaded');await expect(reload).toBeEnabled();}
  mode='hold';await page.clock.install();await reload.click();await expect(page.getByRole('button',{name:'Loading customer records…'})).toBeDisabled();await page.clock.fastForward(21000);await expect(reload).toBeEnabled();
  mode='success';await reload.click();await expect(page.getByRole('heading',{name:'Synthetic Customer',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Edit details'}).click();await expect(page.getByRole('dialog')).toBeVisible();await page.getByRole('button',{name:'Cancel',exact:true}).click();
  mode='403';await reload.click();await expect(page.getByRole('alert')).toContainText('administrator');await expect(page.getByText('SYNTHETIC-ONLY')).toHaveCount(0);await expect(page.getByRole('button',{name:'Edit details'})).toHaveCount(0);
  mode='401';await reload.click();await expect(page.getByRole('link',{name:'Sign in again'})).toHaveAttribute('href','/login?next=%2Ftenants');
- mode='empty';await reload.click();await expect(page.getByText('No customer records found.')).toBeVisible();
+ mode='empty';await reload.click();await expect(page.getByText('No tenants found. Lead records remain in Lead to lease.')).toBeVisible();
  mode='success';await reload.click();await expect(page.getByRole('heading',{name:'Synthetic Customer',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Edit details'}).click();await page.getByRole('button',{name:'Save customer',exact:true}).click();await expect(page.getByText('Customer details updated.')).toBeVisible();await expect(page.getByRole('alert')).toContainText('could not be loaded');assert.equal(writes,1);
  mode='success';await reload.click();await expect(page.getByRole('heading',{name:'Synthetic Customer',exact:true})).toBeVisible();assert.equal(writes,1);assert.ok(reads>8);assert.deepEqual(errors,[]);

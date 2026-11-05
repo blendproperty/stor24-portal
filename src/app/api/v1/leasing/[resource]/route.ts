@@ -48,7 +48,7 @@ export async function GET(
   try {
     const { resource } = await context.params;
     if (!isResource(resource)) throw new Error("NOT_FOUND");
-    const data = await listLeasing(await requirePermissionScope(leasingResourcePermissions[resource].read));
+    const data = await listLeasing(await requirePermissionScope(leasingResourcePermissions[resource].read), resource === "customers");
     const values =
       resource === "unit-types"
         ? data.facilities.flatMap((f) => f.unitTypes)
