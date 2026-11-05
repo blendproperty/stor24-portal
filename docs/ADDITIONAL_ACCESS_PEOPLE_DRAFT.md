@@ -1,0 +1,33 @@
+# Additional authorised people — implementation draft
+
+5 November 2026. A local candidate implements nominations and supervised additional-person photo collection and review. It is not released, configured for production, or connected to HikCentral.
+
+## Configuration boundary
+
+Additional-person collection is disabled unless an organisation-specific entry exists in `ADDITIONAL_ACCESS_POLICIES_JSON` with `enabled: true`, a version, notice, consent label, approval reference and a retention period in hours. This is separate from the primary-customer policy. No approved wording or production setting is supplied here. The collection also requires the existing encryption key and a recent successful expiry-worker heartbeat. Configuration does not itself constitute legal approval or activate access.
+
+Staff must have access management permission for the facility. The screen requires a witnessed confirmation that the nominated person is present and has accepted the displayed notice; the checkbox records the staff operator's attestation, not independent identity verification. Photographs are encrypted and version-bound, removed on withdrawal or rejection and processed by the expiry worker. These controls still require independent review and real staff acceptance before use.
+
+## Required behaviour
+
+An authorised tenant may nominate multiple people for a booking/unit. Each person requires a separate identity, personal consent record, photo submission, review, access status and withdrawal/removal lifecycle. A nomination or photo approval must never be represented as active HikCentral or physical access. A person's removal must not revoke another person's access, including access to another active unit. The primary customer's existing photo and handover must continue to work independently.
+
+## Portal implementation boundaries
+
+- Replace the single-person assumption without invalidating existing reservation photo records, consent versions, encryption bindings, review audits or handover lookups. Backfill existing records as the primary customer; use a stable separate person identifier for each additional person and versioned encryption associated data.
+- A customer nomination is not evidence that the nominated person has consented. Provide a separately authenticated or supervised consent process whose notice, lawful basis, withdrawal path and retention are approved for additional users; do not reuse the primary tenant's checkbox as their consent. Keep collection disabled for this feature until the approved policy is configured.
+- Apply organisation, facility and booking scope to every list, upload, preview, review, withdrawal and removal. Verify the booking holder's authority to nominate a person and the person's identity before provisioning. Enforce request size, decoded image limits, encryption, private previews and audit requirements equivalent to the existing queue.
+- Extend the retention worker, cancellation, move-out, policy changes, withdrawal, replacement and deletion to all people independently. Prevent race conditions between those operations and any later provider request. Preserve version-specific review and reject stale approvals. Handle existing backups and provider/device deletion separately.
+- Present each person and their status separately. Staff review does not grant access. Clearly show pending provider and onsite verification; never report active access based only on photo capture or a provider request.
+
+## HikCentral integration gate
+
+The existing provider consumer is not implemented for the installed system. Obtain the installed HikCentral/OpenAPI version, the exact provider API contract, the confirmed organisation and door mappings, and an approved test person and access point. Implement durable per-person provider intent, stable identities, grant and readback, distribution, suspension, restoration, revocation, device deletion, retries and unknown-outcome reconciliation. Confirm that multiple people can be assigned the intended shared entrance and, where applicable, the unit door. Follow `FACIAL_ACCESS_RELEASE.md`; do not reconnect the old unverified adapter.
+
+## Required validation
+
+Use synthetic data for automated tests covering two people on one booking, a person with multiple valid unit grants, primary-photo compatibility, tenant/facility isolation, individual consent and withdrawal, stale review, replacement, expiration, move-out, simultaneous operations and deletion. Verify no provider mutation and no access-active claim while the provider gate is held. After provider contract and privacy decisions are approved, conduct a controlled end-to-end test with a consenting participant and an authorised operator at the actual access point, including independent removal and confirmation that other people's access remains intact.
+
+## Status
+
+The local candidate has been committed and pushed for draft review; see PROJECT_CONTEXT.md for the dated test evidence. It has not been merged, deployed, configured or verified live. Legal/privacy review, provider contract and mapping, physical UAT, staff training and business acceptance remain open. This draft does not authorise collecting real additional-user biometric data or changing physical access.

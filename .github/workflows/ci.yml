@@ -151,6 +151,7 @@ jobs:
       - run: node scripts/test-mri-sandbox.mjs
       - run: node scripts/test-mri-batches.mjs
       - run: node scripts/test-facial-photos.mjs
+      - run: node scripts/test-additional-access-browser.mjs
       - run: node scripts/test-identity.mjs
       - run: node scripts/test-move-in-flow.mjs
       - run: node scripts/test-assisted-signing.mjs

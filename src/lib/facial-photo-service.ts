@@ -20,7 +20,7 @@ async function tenantBooking(database: Database, session: Tenant, reservationId:
   if (!reservation) throw new Error("TENANT_NOT_FOUND");
   return reservation;
 }
-async function lockBooking(database: Database, id: string) {
+export async function lockBooking(database: Database, id: string) {
   await database.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id" = ${id} FOR UPDATE`;
   const accountNumber = `ST24-T-${id}`;
   await database.$queryRaw`SELECT "id" FROM "Account" WHERE "accountNumber" = ${accountNumber} FOR UPDATE`;
@@ -32,7 +32,7 @@ async function readyToCollect(database: Database, organisationId: string) {
   if (!maintenance || maintenance.completedAt.getTime() < Date.now() - 90 * 60 * 1000) throw new Error("PHOTO_MAINTENANCE_REQUIRED");
   return policy;
 }
-async function requireBookingEligible(database: Database, organisationId: string, reservationId: string) {
+export async function requireBookingEligible(database: Database, organisationId: string, reservationId: string) {
   const state = await reservationReadiness(database, { userId: "customer-photo", organisationId, facilityIds: [], unrestrictedFacilities: true }, reservationId, true);
   if (!state.view.ready) throw new Error("PHOTO_BOOKING_NOT_READY");
   const lease = await database.publicReservationLease.findUnique({ where: { reservationId } });
@@ -153,6 +153,21 @@ export async function expireFacialPhotos() {
     expired++;
   });
   if (await db.facialPhotoSubmission.count({ where }) > 0) throw new Error("PHOTO_EXPIRY_MORE_DUE");
+  const additionalWhere: Prisma.AdditionalAccessPersonWhereInput = { encryptedImage: { not: null }, OR: [
+    { expiresAt: { lte: new Date() } },
+    { reservation: { status: { in: ["CANCELLED", "EXPIRED"] } } },
+    { reservation: { convertedTenancy: { status: { in: ["CLOSED", "CANCELLED"] } } } },
+  ] };
+  const additionalCandidates = await db.additionalAccessPerson.findMany({ where: additionalWhere, select: { id: true, reservationId: true }, take: 100 });
+  for (const candidate of additionalCandidates) await db.$transaction(async tx => {
+    await lockBooking(tx, candidate.reservationId);
+    const person = await tx.additionalAccessPerson.findFirst({ where: { ...additionalWhere, id: candidate.id }, include: { reservation: { include: { facility: { select: { organisationId: true } } } } } });
+    if (!person) return;
+    await tx.additionalAccessPerson.update({ where: { id: person.id }, data: { encryptedImage: null, erasedAt: new Date(), status: "EXPIRED", reviewedAt: null, reviewedById: null } });
+    await tx.auditEvent.create({ data: { organisationId: person.reservation.facility.organisationId, facilityId: person.reservation.facilityId, action: "additional_access.photo_erased", entityType: "AdditionalAccessPerson", entityId: person.id, after: { version: person.photoVersion, reason: "RETENTION_OR_BOOKING_ENDED" } } });
+    expired++;
+  });
+  if (await db.additionalAccessPerson.count({ where: additionalWhere }) > 0) throw new Error("PHOTO_EXPIRY_MORE_DUE");
   await db.facialPhotoMaintenance.upsert({ where: { id: "expiry" }, create: { id: "expiry", completedAt: new Date() }, update: { completedAt: new Date() } });
   return expired;
 }
