@@ -535,6 +535,7 @@ model Reservation {
   publicLease        PublicReservationLease?
   packageSelection   ReservationPackage?
   facialPhoto        FacialPhotoSubmission?
+  additionalAccessPeople AdditionalAccessPerson[]
   identityDocument   IdentityDocument?
   identityAccessHash String?
   identityAccessExpiresAt DateTime?
@@ -894,6 +895,30 @@ model FacialPhotoSubmission {
 model FacialPhotoMaintenance {
   id          String @id
   completedAt DateTime
+}
+
+// Nominations do not grant access and cannot substitute for the person's consent.
+model AdditionalAccessPerson {
+  id            String @id @default(cuid())
+  reservationId String
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  name          String
+  status        String @default("NOMINATED")
+  photoVersion  Int @default(0)
+  encryptedImage String?
+  imageSha256   String?
+  policyVersion String?
+  policyHash    String?
+  consentNotice String?
+  consentAt     DateTime?
+  expiresAt     DateTime?
+  reviewedById  String?
+  reviewedAt    DateTime?
+  erasedAt      DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([reservationId, status])
 }
 
 model CollectionCase {

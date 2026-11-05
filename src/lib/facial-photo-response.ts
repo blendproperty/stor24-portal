@@ -14,6 +14,9 @@ export function facialPhotoError(error: unknown) {
     PHOTO_CHANGED: [409, "This photograph has changed or expired. Refresh before continuing."],
     PHOTO_PREVIEW_REQUIRED: [409, "Open and review this version of the photograph before approving it."],
     PHOTO_RATE_LIMITED: [429, "Please wait a minute before trying again."],
+    PERSON_INVALID: [422, "Enter a name between 2 and 100 characters."],
+    PERSON_LIMIT: [409, "This booking already has the maximum number of nominations. Contact your store for help."],
+    PHOTO_IDENTITY_REQUIRED: [409, "Confirm the nominated person's identity before capturing their photo."],
   };
   const [status, message] = code.includes("FORBIDDEN") ? [403, "You do not have access to this action."] : messages[code] ?? [503, "Facial access is temporarily unavailable. Please try again later."];
   return Response.json({ error: message }, { status, headers: tenantPrivateHeaders });

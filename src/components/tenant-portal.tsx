@@ -7,6 +7,7 @@ import { formatSouthAfricaDate, southAfricaDateKey } from "@/lib/south-africa-ti
 import type { AccountStatementData } from "@/lib/finance/statement-data";
 import { preferredTenantAccount, tenantAccountLabel } from "@/lib/tenant-account-presentation";
 import { TenantFacePhoto } from "@/components/tenant-face-photo";
+import { AdditionalAccessPeople } from "@/components/additional-access-people";
 import { TenantPurchases } from "@/components/tenant-purchases";
 import { TenantCardSubscriptions } from "@/components/tenant-card-subscriptions";
 import { TenantDebiCheckRequests } from "@/components/tenant-debicheck-requests";
@@ -173,7 +174,7 @@ export function TenantPortal({ organisation, initialAccount, initialFrom, initia
           </div>)}
           <p className="tenant-precinct-status"><ShieldCheck size={20} aria-hidden="true" /><span><strong>Precinct access</strong>{selectedUnit.accessState === "ACTIVE" ? "Recorded as active. Contact your store if you have difficulty entering." : ["REVOKED", "SUSPENDED", "BLOCKED"].includes(selectedUnit.accessState ?? "") ? "Not active. Contact your store to confirm your access arrangements." : "Not yet active. Our team will confirm activation as part of your move-in."}</span></p>
           {!!selectedUnit.reservations.length && <details className="tenant-photo-details" open={prepareForMoveIn || undefined}><summary><span>Access photograph<small>Upload guidance and photo status</small></span><ChevronDown size={18} aria-hidden="true" /></summary><div id="access-photo" className="tenant-photo-destination" ref={photoSection} tabIndex={-1} aria-label={`Access photograph for Unit ${selectedUnit.number}`}>
-            {selectedUnit.reservations.map(reservation => <TenantFacePhoto key={reservation.id} reservationId={reservation.id} />)}
+            {selectedUnit.reservations.map(reservation => <div key={reservation.id}><TenantFacePhoto reservationId={reservation.id} /><AdditionalAccessPeople reservationId={reservation.id} /></div>)}
           </div></details>}
         </section>}
 {selectedAccount?.tenancy && <TenantCardSubscriptions key={selectedAccount.id} accountId={selectedAccount.id} />}
