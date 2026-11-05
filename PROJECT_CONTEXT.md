@@ -7680,3 +7680,5 @@ Validation follow-up: the project typecheck and targeted ESLint for the candidat
 - Release-check update, 5 November: hosted CI run 42037702660 identified a restricted-navigation browser fixture still referring to the replaced Billing & payments label. The fixture now checks separate Invoicing and Payments links, and guided-help introductory wording is updated. Hosted rerun and live verification remain required.
 
 - Hosted CI 42038141104 also identified missing contextual tutorials for the two new pages. Added separate Invoicing and Payments guides; fresh exact-head checks remain required.
+
+- Local guided-help browser coverage identified missing access rules for the two new guides. Added billing.view and payments.view rules so authorised staff can see the relevant guidance; exact-head hosted checks remain required.

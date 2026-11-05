@@ -46,6 +46,8 @@ export const guideAccessRules: Record<string, Rule> = {
   "mri-sandbox-mapping": rule("mri.view", ["mri.manage", "mri.manage", "mri.manage"], true),
   settlements: rule("settlements.view", ["", "settlements.import", "settlements.import", "settlements.manage,settlements.approve,settlements.export"], true),
   "debit-orders": rule("debit_orders.view", ["", "debit_orders.manage", "debit_orders.manage", "debit_orders.submit"]),
+  "invoicing-hub": rule("billing.view", ["", "", ""]),
+  "payments-hub": rule("payments.view", ["", "", ""]),
   "monthly-billing": rule("billing.view", ["", "billing.manage", "billing.manage", "billing.manage"]),
   tenants: rule("operations.view", ["", "operations.manage", "@owner", "operations.manage", "ledger.view", "reservations.manage,move_in.create,ledger.view"]),
   leads: rule("leads.view", ["leads.create,operations.manage", "", "reservations.manage", "reservations.manage,operations.manage"]),
