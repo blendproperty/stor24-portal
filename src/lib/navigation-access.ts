@@ -9,6 +9,7 @@ const rules: Record<string, string[]> = {
   "/leads": ["leads.view"], "/reservations": ["reservations.manage"],
   "/marketing": ["leads.view"],
   "/identity": ["identity.review"], "/units": ["inventory.view"],
+  "/invoicing": ["billing.view"], "/payments": ["payments.view"],
   "/billing": ["billing.view"], "/billing/monthly": ["billing.view"], "/billing/rent-reviews": ["@owner"],
   "/billing/netcash": ["payments.view"], "/billing/mri": ["mri.view"],
   "/billing/unidentified-receipts": ["receipt_review.view"],

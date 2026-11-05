@@ -9,6 +9,10 @@ import { NextRequest } from "next/server";
 test("navigation follows grants and specific subpage rules, not job title", () => {
   const manager = { owner: false, permissions: ["operations.view", "payments.view"] };
   assert.equal(canVisit("/billing", manager), false);
+  assert.equal(canVisit("/invoicing", manager), false);
+  assert.equal(canVisit("/payments", manager), true);
+  assert.equal(canVisit("/invoicing", {owner:false,permissions:["billing.view"]}), true);
+  assert.equal(canVisit("/payments", {owner:false,permissions:["billing.view"]}), false);
   assert.equal(canVisit("/billing/monthly", manager), false);
   assert.equal(canVisit("/billing/netcash", manager), true);
   assert.equal(canVisit("/operations", manager), true);
@@ -35,6 +39,8 @@ test("restricted direct navigation redirects before rendering; APIs and current 
     assert.equal((await proxy(request("/api/v1/billing/monthly"))).status,200);
     grants = ["billing.view"];
     assert.equal((await proxy(request("/billing"))).status,200);
+    assert.equal((await proxy(request("/invoicing"))).status,200);
+    assert.equal((await proxy(request("/payments"))).status,307);
     active = false;
     assert.match((await proxy(request("/billing"))).headers.get("location")!, /\/login\?/);
   } finally { db.user.findUnique = original; }
