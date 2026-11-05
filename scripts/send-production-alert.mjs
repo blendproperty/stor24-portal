@@ -7,6 +7,22 @@ import { HOSTINGER_EMAIL_ADDRESS, hostingerTransport } from '../src/lib/hostinge
 import { alertDetails } from './production-alert-details.mjs';
 
 const SUCCESS = 'success';
+export const OWNER_EMAIL_TEST_RUN_NAME = 'STOR24 owner email delivery test';
+export function ownerEmailTestEnvironment(env) {
+  if (!['', 'false', 'true'].includes(env.ALERT_OWNER_EMAIL_TEST || '')) throw Error('Invalid owner email test mode');
+  if (env.ALERT_OWNER_EMAIL_TEST !== 'true') return null;
+  if (env.GITHUB_EVENT_NAME !== 'workflow_dispatch') throw Error('Owner email test requires manual dispatch');
+  // Fixed destination and an allowlist prevent saved routing or phone credentials entering this test.
+  const scoped = { ALERT_OWNER_EMAIL_TEST: 'true', ALERT_TEST: 'true', ALERT_CHANNELS: 'EMAIL', ALERT_EMAIL_TO: 'brettd@blendproperty.co.za' };
+  for (const name of ['GITHUB_EVENT_NAME', 'GITHUB_TOKEN', 'GITHUB_REPOSITORY', 'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT', 'READINESS_RESULT', 'BACKUP_RESULT', 'HOSTINGER_SMTP_PASSWORD']) scoped[name] = env[name];
+  return scoped;
+}
+export async function prepareAlertEnvironment(env, load = loadAlertRecipients) {
+  const scoped = ownerEmailTestEnvironment(env);
+  if (scoped) return { source: 'OWNER_EMAIL_TEST', env: scoped };
+  const configuration = await load(env);
+  return { source: configuration.source, env: configuration.recipients ? { ...env, ALERT_RECIPIENTS_JSON: JSON.stringify(configuration.recipients) } : env };
+}
 export function notificationKind(current, previous, test = false) {
   if (test) return 'TEST';
   if (current.readiness !== SUCCESS || current.backup !== SUCCESS) return 'FAILURE';
@@ -15,6 +31,9 @@ export function notificationKind(current, previous, test = false) {
 }
 
 export async function deliverAlert(env, kind, fetcher = fetch) {
+  const scoped = ownerEmailTestEnvironment(env);
+  if (scoped && kind !== 'TEST') throw Error('Owner email test requires TEST label');
+  env = scoped || env;
   if (!env.ALERT_RECIPIENTS_JSON) return deliverDestinations(env, kind, fetcher);
   const recipients = validateAlertRecipients(JSON.parse(env.ALERT_RECIPIENTS_JSON)).filter(r => r.enabled);
   const results = [];
@@ -96,11 +115,14 @@ async function deliverDestinations(env, kind, fetcher) {
 
 export async function run(env, fetcher = fetch) {
   if (Number(env.GITHUB_RUN_ATTEMPT || '1') > 1) return { status: 'SKIPPED_REPLAY', reason: 'Use a fresh explicit test run; provider requests are not replayed.' };
+  env = ownerEmailTestEnvironment(env) || env;
   const current = { readiness: env.READINESS_RESULT, backup: env.BACKUP_RESULT };
   const headers = { Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' };
   const api = `https://api.github.com/repos/${env.GITHUB_REPOSITORY}`;
   const get = async url => { const r = await fetcher(url, { headers, signal: AbortSignal.timeout(15000) }); if (!r.ok) throw new Error('Monitor history unavailable'); return r.json(); };
   const history = await get(`${api}/actions/workflows/monitor-production.yml/runs?status=completed&per_page=10`);
+  // Delivery tests must not create recovery notifications or consume a real incident's cooldown.
+  history.workflow_runs = history.workflow_runs?.filter(r => r.display_title !== OWNER_EMAIL_TEST_RUN_NAME);
   const previousRun = history.workflow_runs?.find(r => String(r.id) !== env.GITHUB_RUN_ID);
   let previous;
   if (previousRun) {
@@ -137,9 +159,8 @@ export async function run(env, fetcher = fetch) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    const configuration = await loadAlertRecipients(process.env);
-    const env = configuration.recipients ? { ...process.env, ALERT_RECIPIENTS_JSON: JSON.stringify(configuration.recipients) } : process.env;
-    const report = { verifiedAt: new Date().toISOString(), recipientSource: configuration.source, ...(await run(env)) };
+    const configuration = await prepareAlertEnvironment(process.env);
+    const report = { verifiedAt: new Date().toISOString(), recipientSource: configuration.source, ...(configuration.source === 'OWNER_EMAIL_TEST' ? { testRecipient: configuration.env.ALERT_EMAIL_TO } : {}), ...(await run(configuration.env)) };
     await writeFile('production-alert-result.json', JSON.stringify(report, null, 2), { flag: 'wx', mode: 0o600 });
     console.log(JSON.stringify(report));
     if (report.results?.some(r => !r.accepted)) process.exitCode = 1;

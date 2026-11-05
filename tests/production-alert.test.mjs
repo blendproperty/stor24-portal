@@ -1,9 +1,83 @@
 import nodemailer from 'nodemailer';
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { notificationKind, deliverAlert, run } from '../scripts/send-production-alert.mjs';
+import { notificationKind, deliverAlert, run, prepareAlertEnvironment, ownerEmailTestEnvironment, OWNER_EMAIL_TEST_RUN_NAME } from '../scripts/send-production-alert.mjs';
+import { readFileSync } from 'node:fs';
 const env = { READINESS_RESULT: 'success', BACKUP_RESULT: 'success', ALERT_EMAIL_TO: 'test@example.invalid', EMAIL_FROM: 'STOR24 <sender@example.invalid>', HOSTINGER_SMTP_PASSWORD: 'synthetic', TWILIO_ACCOUNT_SID: 'synthetic', TWILIO_AUTH_TOKEN: 'synthetic', TWILIO_SMS_FROM: '+12025550100', TWILIO_WHATSAPP_FROM: '+12025550101', ALERT_SMS_TO: '+12025550102', ALERT_WHATSAPP_TO: '+12025550102', ALERT_WHATSAPP_CONTENT_SID: 'HX' + 'a'.repeat(32) };
 beforeEach(t => t.mock.method(nodemailer, 'createTransport', () => ({ close() {}, async sendMail(message) { return { accepted: [message.to], rejected: [] }; } })));
+
+test('owner test bypasses saved routing and strips all phone and other-recipient configuration', async t => {
+  const raw = { ...env, ALERT_OWNER_EMAIL_TEST: 'true', GITHUB_EVENT_NAME: 'workflow_dispatch', ALERT_TEST: 'false', ALERT_RECIPIENTS_JSON: '[{"private":"saved list must not be used"}]', STOR24_ALERT_CONFIG_KEY: 'private' };
+  const prepared = await prepareAlertEnvironment(raw, () => { throw Error('Must not load or cache saved recipients'); });
+  assert.equal(prepared.source, 'OWNER_EMAIL_TEST');
+  assert.equal(prepared.env.ALERT_TEST, 'true');
+  assert.equal(prepared.env.ALERT_CHANNELS, 'EMAIL');
+  assert.equal(prepared.env.ALERT_EMAIL_TO, 'brettd@blendproperty.co.za');
+  assert.equal(prepared.env.HOSTINGER_SMTP_PASSWORD, raw.HOSTINGER_SMTP_PASSWORD);
+  assert.equal('ALERT_RECIPIENTS_JSON' in prepared.env, false);
+  assert.equal('STOR24_ALERT_CONFIG_KEY' in prepared.env, false);
+  assert.equal(Object.keys(prepared.env).some(k => k.startsWith('TWILIO_') || /SMS|WHATSAPP/.test(k)), false);
+  let sends = 0;
+  t.mock.method(nodemailer, 'createTransport', () => ({ close() {}, async sendMail(message) {
+    sends++; assert.deepEqual(message.envelope.to, ['brettd@blendproperty.co.za']);
+    assert.equal(message.to, 'brettd@blendproperty.co.za'); assert.equal(message.cc, undefined); assert.equal(message.bcc, undefined);
+    assert.equal(message.subject, 'STOR24 TEST ALERT - INFO');
+    return { accepted: [message.to], rejected: [] };
+  } }));
+  const result = await deliverAlert(raw, 'TEST', () => { throw Error('No phone-provider calls allowed'); });
+  assert.equal(sends, 1); assert.equal(result.length, 1); assert.equal(result[0].channel, 'EMAIL'); assert.equal(result[0].accepted, true);
+  await assert.rejects(deliverAlert(raw, 'FAILURE'), /TEST label/);
+  assert.match(raw.ALERT_RECIPIENTS_JSON, /saved list/);
+});
+
+test('owner test is manual-only, fails closed on invalid modes, and cannot replay', async () => {
+  assert.throws(() => ownerEmailTestEnvironment({ ALERT_OWNER_EMAIL_TEST: 'yes' }), /Invalid owner/);
+  assert.throws(() => ownerEmailTestEnvironment({ ALERT_OWNER_EMAIL_TEST: 'true', GITHUB_EVENT_NAME: 'schedule' }), /manual dispatch/);
+  const result = await run({ ALERT_OWNER_EMAIL_TEST: 'true', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_RUN_ATTEMPT: '2' }, () => { throw Error('No replay'); });
+  assert.equal(result.status, 'SKIPPED_REPLAY');
+});
+
+test('normal routing still loads the configured recipients and emergency defaults unchanged', async () => {
+  const recipients = [{ id: 'synthetic', email: 'normal@example.invalid', channels: ['EMAIL', 'SMS'] }];
+  let calls = 0;
+  const result = await prepareAlertEnvironment(env, async actual => { calls++; assert.equal(actual, env); return { source: 'SAVED_RECIPIENTS', recipients }; });
+  assert.equal(calls, 1); assert.equal(result.source, 'SAVED_RECIPIENTS');
+  assert.deepEqual(result.env, { ...env, ALERT_RECIPIENTS_JSON: JSON.stringify(recipients) });
+  const fallback = await prepareAlertEnvironment(env, async () => ({ source: 'EMERGENCY_DEFAULTS', recipients: null }));
+  assert.equal(fallback.env, env);
+});
+
+test('owner TEST is forced even when checks fail and cannot contact configured phone providers', async () => {
+  const result = await run({ ...env, ALERT_OWNER_EMAIL_TEST: 'true', GITHUB_EVENT_NAME: 'workflow_dispatch', READINESS_RESULT: 'failure', ALERT_TEST: 'false', GITHUB_RUN_ID: '10' }, async url => {
+    assert.match(url, /^https:\/\/api\.github\.com\//);
+    return new Response(JSON.stringify(url.includes('/workflows/') ? { workflow_runs: [] } : { jobs: [] }));
+  });
+  assert.equal(result.kind, 'TEST'); assert.equal(result.severity, 'INFO');
+  assert.deepEqual(result.results.map(x => x.channel), ['EMAIL']);
+});
+
+test('owner runs cannot manufacture a normal recovery or consume normal incident cooldown', async () => {
+  const owner = { id: 9, display_title: OWNER_EMAIL_TEST_RUN_NAME, created_at: new Date().toISOString() };
+  for (const current of ['success', 'failure']) {
+    const result = await run({ ...env, ALERT_CHANNELS: 'EMAIL', READINESS_RESULT: current, GITHUB_RUN_ID: '10' }, async url => {
+      assert.doesNotMatch(url, /\/runs\/9\/jobs/);
+      const data = url.includes('/workflows/') ? { workflow_runs: [owner, { id: 8, created_at: new Date(Date.now() - 60 * 60000).toISOString() }] }
+        : { jobs: [{ name: 'readiness', conclusion: current }, { name: 'backup', conclusion: 'success' }] };
+      return new Response(JSON.stringify(data));
+    });
+    assert.equal(result.status, current === 'success' ? 'HEALTHY_NO_NOTIFICATION' : 'ATTEMPTED');
+  }
+});
+
+test('workflow binds the owner mode to the actual SMTP secret and skips recipient cache/dashboard writes', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/monitor-production.yml', import.meta.url), 'utf8');
+  assert.ok(workflow.includes(OWNER_EMAIL_TEST_RUN_NAME));
+  assert.match(workflow, /owner_email_test:\s+description:[^\n]+\s+type: boolean\s+default: false/);
+  assert.match(workflow, /ALERT_OWNER_EMAIL_TEST: \$\{\{ inputs\.owner_email_test \|\| false \}\}/);
+  assert.match(workflow, /HOSTINGER_SMTP_PASSWORD: \$\{\{ secrets\.STOR24_ALERT_HOSTINGER_SMTP_PASSWORD \}\}/);
+  assert.match(workflow, /Restore encrypted last-known recipients\s+if: \$\{\{ !inputs\.owner_email_test \}\}/);
+  assert.match(workflow, /Publish aggregate dashboard evidence over HTTPS\s+if: \$\{\{ always\(\) && !inputs\.owner_email_test \}\}/);
+});
 
 test('healthy silence, failed checks and recovery are distinct', () => {
   assert.equal(notificationKind({ readiness: 'success', backup: 'success' }, null), null);
