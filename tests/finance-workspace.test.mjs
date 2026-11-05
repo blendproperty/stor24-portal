@@ -36,4 +36,3 @@ test("finance workspaces show only available workflows and require their own per
   assert.doesNotMatch(payments,/Monthly billing/);
   assert.doesNotMatch(payments,/Settlement reconciliation/);
 });
-
