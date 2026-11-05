@@ -53,6 +53,7 @@ try {
   await page.route("**/api/**",route=>{
    assert.equal(route.request().method(),"GET","move-in review must not create an operational write");
    if(route.request().url().includes("/access-photo"))return route.fulfill({json:{data:{available:false,policy:null,photo:null}}});
+   if(new URL(route.request().url()).pathname === "/api/tenant/additional-access-people")return route.fulfill({json:{data:[]}});
    return route.fulfill({json:{data:{accounts:[],documents:[],agreements:[],payments:[],merchandiseRequests:[],expiresAt:new Date(Date.now()+1800000).toISOString(),units:[{key:"reservation:booking-preview",unitId:"unit-preview",number:"168",facilityName:"Training store",accountId:null,status:"ACTIVE",accessState,reservations:[reservation]}],onboarding:[{reservationId:reservation.id,ready:false,paidAmount:0,requiredAmount:2099,startDate:"2026-09-30",mandateStatus:null,blockers:["The identity document needs staff acceptance before key handover. Open Identity review.","A test payment is recorded. It does not clear the real booking for key collection."]}]}}});
   });
   await page.goto(`http://127.0.0.1:${server.address().port}/my`);
@@ -85,6 +86,7 @@ try {
    assert.equal(route.request().method(),"GET","customer status checks must not change bookings or send messages");
    const path=new URL(route.request().url()).pathname;
    if(path.includes("/access-photo"))return route.fulfill({json:{data:{available:false,policy:null,photo:null}}});
+   if(path === "/api/tenant/additional-access-people")return route.fulfill({json:{data:[]}});
    if(path.endsWith("/statement"))return route.fulfill({json:{data:{accountNumber:account.accountNumber,currency:"ZAR",openingBalance:"0.00",closingBalance:"0.00",rows:[]}}});
    if(path.includes("/orders"))return route.fulfill({json:{data:[]}});
    assert.equal(path,"/api/tenant/accounts");

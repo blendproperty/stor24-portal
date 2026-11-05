@@ -8,6 +8,7 @@ import { db } from "../../src/lib/db";
 import { confirmReservationMoveIn, getReservationMoveInReadiness } from "../../src/lib/reservation-move-in";
 import { facialPhotoPolicy } from "../../src/lib/facial-photo-security";
 import { submitTenantPhoto, tenantPhotoStatus, withdrawTenantPhoto, listFacialPhotos, previewFacialPhoto, reviewFacialPhoto, expireFacialPhotos } from "../../src/lib/facial-photo-service";
+import { additionalPersonPolicy, captureAdditionalPhoto, listAdditionalAccessPeople, nominateAdditionalAccessPerson, previewAdditionalPhoto, removeAdditionalAccessPerson, reviewAdditionalPhoto, withdrawAdditionalPhoto } from "../../src/lib/additional-access-people";
 
 test("isolated PostgreSQL private facial photo lifecycle", async t => {
   assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci");
@@ -40,6 +41,55 @@ test("isolated PostgreSQL private facial photo lifecycle", async t => {
   }
 
   try {
+    await t.test("additional nominations are booking-scoped and do not grant access", async () => {
+      const f = await fixture();
+      const other = await fixture();
+      const one = await nominateAdditionalAccessPerson(f.session, f.reservation.id, "First Person");
+      const two = await nominateAdditionalAccessPerson(f.session, f.reservation.id, "Second Person");
+      assert.deepEqual(new Set((await listAdditionalAccessPeople(f.session, f.reservation.id)).map(person => person.id)), new Set([one.id, two.id]));
+      await assert.rejects(listAdditionalAccessPeople(other.session, f.reservation.id), /TENANT_NOT_FOUND/);
+      await assert.rejects(removeAdditionalAccessPerson(other.session, f.reservation.id, one.id), /TENANT_NOT_FOUND/);
+      const sameOrgOther = await db.customer.create({ data: { organisationId: f.org.id, email: randomUUID() + "@example.invalid", emailVerifiedAt: new Date() } });
+      const sameOrgSession = { organisationId: f.org.id, email: sameOrgOther.email!, customerIds: [sameOrgOther.id] };
+      await assert.rejects(listAdditionalAccessPeople(sameOrgSession, f.reservation.id), /TENANT_NOT_FOUND/);
+      await assert.rejects(nominateAdditionalAccessPerson(sameOrgSession, f.reservation.id, "Unauthorised"), /TENANT_NOT_FOUND/);
+      await assert.rejects(nominateAdditionalAccessPerson(f.session, f.reservation.id, " "), /PERSON_INVALID/);
+      await removeAdditionalAccessPerson(f.session, f.reservation.id, one.id);
+      assert.deepEqual((await listAdditionalAccessPeople(f.session, f.reservation.id)).map(person => person.id), [two.id]);
+      assert.equal(await db.biometricEnrollment.count({ where: { customerId: f.customer.id } }), 0);
+      assert.equal(await db.facialPhotoSubmission.count({ where: { reservationId: f.reservation.id } }), 0);
+    });
+    await t.test("additional photos require separate policy, consent and reviewed per-person records", async () => {
+      const f = await fixture(), other = await fixture();
+      const one = await nominateAdditionalAccessPerson(f.session, f.reservation.id, "First Person");
+      const two = await nominateAdditionalAccessPerson(f.session, f.reservation.id, "Second Person");
+      const image = f.upload.image;
+      await assert.rejects(captureAdditionalPhoto(f.scope, { id: one.id, version: 0, policyHash: "", consent: true, identityConfirmed: true, image }), /PHOTO_POLICY_PENDING/);
+      process.env.ADDITIONAL_ACCESS_POLICIES_JSON = JSON.stringify({ [f.org.id]: { enabled: true, version: "ci", notice: "Synthetic additional person policy, not legal approval or real consent.", consentLabel: "Synthetic person consent for test", approvalReference: "CI-only", retentionHours: 24 } });
+      const policy = additionalPersonPolicy(f.org.id)!;
+      await assert.rejects(captureAdditionalPhoto(f.scope, { id: one.id, version: 0, policyHash: policy.hash, consent: false, identityConfirmed: true, image }), /PHOTO_CONSENT_REQUIRED/);
+      await assert.rejects(captureAdditionalPhoto(f.scope, { id: one.id, version: 0, policyHash: policy.hash, consent: true, identityConfirmed: false, image }), /PHOTO_IDENTITY_REQUIRED/);
+      await captureAdditionalPhoto(f.scope, { id: one.id, version: 0, policyHash: policy.hash, consent: true, identityConfirmed: true, image });
+      await captureAdditionalPhoto(f.scope, { id: two.id, version: 0, policyHash: policy.hash, consent: true, identityConfirmed: true, image });
+      await assert.rejects(previewAdditionalPhoto(other.scope, one.id, 1), /NOT_FOUND/);
+      await assert.rejects(reviewAdditionalPhoto(f.scope, one.id, 1, "APPROVE"), /PHOTO_PREVIEW_REQUIRED/);
+      await previewAdditionalPhoto(f.scope, one.id, 1);
+      await reviewAdditionalPhoto(f.scope, one.id, 1, "APPROVE");
+      await assert.rejects(withdrawAdditionalPhoto(other.scope, one.id, 1), /NOT_FOUND/);
+      await withdrawAdditionalPhoto(f.scope, one.id, 1);
+      assert.equal((await db.additionalAccessPerson.findUniqueOrThrow({ where: { id: one.id } })).encryptedImage, null);
+      await captureAdditionalPhoto(f.scope, { id: one.id, version: 1, policyHash: policy.hash, consent: true, identityConfirmed: true, image });
+      assert.equal(await db.auditEvent.count({ where: { entityId: one.id, action: "additional_access.photo_captured" } }), 2);
+      await removeAdditionalAccessPerson(f.session, f.reservation.id, one.id);
+      const removed = await db.additionalAccessPerson.findUniqueOrThrow({ where: { id: one.id } });
+      assert.equal(removed.encryptedImage, null);
+      assert.equal((await db.additionalAccessPerson.findUniqueOrThrow({ where: { id: two.id } })).status, "WAITING_REVIEW");
+      await db.additionalAccessPerson.update({ where: { id: two.id }, data: { expiresAt: new Date(0) } });
+      await expireFacialPhotos();
+      assert.equal((await db.additionalAccessPerson.findUniqueOrThrow({ where: { id: two.id } })).encryptedImage, null);
+      assert.equal(await db.biometricEnrollment.count({ where: { customerId: f.customer.id } }), 0);
+      delete process.env.ADDITIONAL_ACCESS_POLICIES_JSON;
+    });
     await t.test("owner switch is shared, pinned, audited; tenancy retention and deletion continue while off", async () => {
       const f=await fixture();
       const role=await db.role.create({data:{organisationId:f.org.id,name:"Organisation owner",permissions:["*"]}});

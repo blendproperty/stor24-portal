@@ -9,6 +9,8 @@ import { PageHeader } from "@/components/page-header";
 import { listBiometricAccess } from "@/lib/biometric-access-service";
 import { listAccessDecisions, listIdentityLinks } from "@/lib/mel-integration-status-service";
 import { requirePermissionScope } from "@/lib/scope";
+import { additionalPersonPolicy, listAdditionalPeopleForStaff } from "@/lib/additional-access-people";
+import { AdditionalAccessQueue } from "@/components/additional-access-queue";
 
 export const metadata = { title: "Biometric access" };
 export const dynamic = "force-dynamic";
@@ -23,6 +25,8 @@ export default async function AccessPage({ searchParams }: { searchParams: Promi
   ]);
   const control = await photoControlSnapshot(scope.organisationId, scope.userId);
   const photos = await listFacialPhotos(scope, reservation);
+  const additionalPeople = await listAdditionalPeopleForStaff(scope, reservation);
+  const additionalPolicy = additionalPersonPolicy(scope.organisationId);
   let manageableFacilities: string[] | null = [];
   try { manageableFacilities = (await requirePermission("access.manage")).allowedFacilityIds; }
   catch (error) { if (!(error instanceof Error) || error.message !== "FORBIDDEN") throw error; }
@@ -31,6 +35,7 @@ export default async function AccessPage({ searchParams }: { searchParams: Promi
     {reservation && <a className="button button-secondary" href={`/operations/move-in?reservation=${encodeURIComponent(reservation)}`}>Back to move-in checks</a>}
     <PhotoCollectionControl initial={control} />
     <FacialPhotoQueue policyConfigured={control.enabled} manageableFacilities={manageableFacilities} photos={photos.map(photo => ({ id: photo.id, version: photo.version, status: photo.status, expiresAt: photo.expiresAt?.toISOString() ?? null, facilityId: photo.reservation.facilityId, facilityName: photo.reservation.facility.name, unitNumber: photo.reservation.unit.number, customerName: [photo.reservation.customer.firstName ?? photo.reservation.customer.companyName ?? "Customer", photo.reservation.customer.lastName].filter(Boolean).join(" ") }))} />
+    <AdditionalAccessQueue people={additionalPeople.map(person => ({ id: person.id, name: person.name, status: person.status, photoVersion: person.photoVersion, expiresAt: person.expiresAt?.toISOString() ?? null, facilityId: person.reservation.facilityId, facilityName: person.reservation.facility.name, unitNumber: person.reservation.unit.number }))} policy={additionalPolicy ? { hash: additionalPolicy.hash, notice: additionalPolicy.notice, consentLabel: additionalPolicy.consentLabel, retentionHours: additionalPolicy.retentionHours } : null} manageableFacilities={manageableFacilities} />
     <BiometricAccessWorkspace
       enrollments={enrollments.map((item) => ({ id: item.id, customerName: `${item.customer.firstName ?? item.customer.companyName ?? "Customer"} ${item.customer.lastName ?? ""}`.trim(), facilityName: item.facility.name, unitNumber: item.occupancy.unit.number, status: item.status, consentAt: item.consentAt.toISOString(), provisionedAt: item.provisionedAt?.toISOString() ?? null }))}
     />
