@@ -30,4 +30,4 @@ Use synthetic data for automated tests covering two people on one booking, a per
 
 ## Status
 
-Implementation, tests, commit/push, merge, deployment, configuration and live verification: not performed. Legal/privacy review, provider contract and mapping, physical UAT, staff training and business acceptance remain open. This draft does not authorise collecting real additional-user biometric data or changing physical access.
+The local candidate has been committed and pushed for draft review; see PROJECT_CONTEXT.md for the dated test evidence. It has not been merged, deployed, configured or verified live. Legal/privacy review, provider contract and mapping, physical UAT, staff training and business acceptance remain open. This draft does not authorise collecting real additional-user biometric data or changing physical access.

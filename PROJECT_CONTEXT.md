@@ -5633,7 +5633,7 @@ At the same53d2e3c3 checkpoint, the hosted real PostgreSQL task-status and colle
 - Live production verification: only the authorised no-AUTH TLS preflight passes (production host to smtp.hostinger.com465, certificate-valid TLS1.3). Runtime and saved server .env have no recognised SMTP password. Brett reports uncertainty about prior credential location. Authentication, one clearly labelled recipient test through DLP and inbox/SPF/DKIM verification remain BLOCKED on secure existing-password setup; code is not operationally complete or switched. Do not request the password in chat or claim SMTP acceptance/delivery. All financial/provider/real-booking/UAT gates and prior REA pause remain separate and OPEN at prior scope. No tracker is in scope.
 
 
-## 19 October 2026 ï¿½ Booking price customer lookup and reservation entry point
+## 19 October 2026 — Booking price customer lookup and reservation entry point
 
 - Implementation: bounded server-side booking search by customer name (including split full names), company, email, phone, exact unit and reference; all branches retain organisation/facility permission intersection. Results link into the existing governed price workspace. Reservations expose Price review only to staff with the existing review permissions; no grants changed. Selecting another booking clears proposal inputs. Search changes suppress stale responses.
 - Testing: focused actual-route tests pass for all required grants, disjoint facility denial, bounded paging, full-name matching query, private/no-store response and invalid requests. Existing price API independent-approval/customer acceptance tests pass. Responsive browser fixture now exercises customer-name selection before the existing proposal recovery/independent review flow; hosted validation and browser results PENDING.
@@ -7615,6 +7615,7 @@ Retained limits: the GitHub workflow SMTP-secret-to-owner-Inbox delivery gate is
 
 Dependency tracking readback5November: current default-branch Dependabot finding is alert7, Medium/minimatch/GHSA-g3hv-75wg-m249 on package-lock.json, created05:21:33Z; old alert6 now returns410 and must not be treated as independently verified fixed. This is the same advisory already tracked against the reviewed compatibility backport; no dependency remediation or alert dismissal is part of this delivery test. Source required dependency checks passed, and this receipt still requires fresh ordinary checks. No security threshold/rule was weakened.
 
+
 ## 2026-11-05 â€” additional access people (unfinished local candidate)
 
 - Implementation: isolated branch `codex/additional-access-people` adds a reservation-linked nomination model, customer-scoped nomination/removal API and portal UI. Nomination does not collect a face, establish consent, create a provider person or grant access. No production configuration was changed. Staff review, per-person photo capture/consent/retention, individual withdrawal and provider lifecycle remain unimplemented.
@@ -7640,3 +7641,5 @@ Validation follow-up: the project typecheck and targeted ESLint for the candidat
 - Commit/push, merge, deployment/configuration and live verification: none as at this local checkpoint. Preserve legal/privacy approval for additional users, provider contract and mappings, reconciliation and device deletion, transfer retention, physical UAT, staff training and business acceptance gates.
 
 - Commit/push update, 5 November: local candidate source `6d2a4d6e2003b09a3f07a900eaefd37e291927aa` pushed to `codex/additional-access-people`, draft PR #715 opened against main for review and hosted checks. This is not a merge, deployment, provider connection, privacy approval or business acceptance. This context-only follow-up also requires push and remote readback. All preceding blockers remain open.
+
+- Follow-up, 5 November: candidate and context receipt were pushed to draft PR #715; remote context readback succeeded. Targeted lint passed after the JSX fix. A preservation check found and repaired one unrelated encoding change against origin/main before this follow-up. Hosted checks on this follow-up remain pending; no merge, deployment, provider operation or live verification.
