@@ -64,7 +64,7 @@ function setSidebarHidden(hidden: boolean) {
 
 const navigation = [
   { group: "Overview", href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { group: "Customers & sales", href: "/tenants", label: "Customers & tenants", icon: Users },
+  { group: "Customers & sales", href: "/tenants", label: "Tenants", icon: Users },
   { group: "Administration", href: "/users", label: "Users & permissions", icon: Users },
   { group: "Customers & sales", href: "/leads", label: "Lead to lease", icon: CalendarCheck },
   { group: "Customers & sales", href: "/marketing", label: "Marketing", icon: BarChart3 },
