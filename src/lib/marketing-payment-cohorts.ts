@@ -79,7 +79,7 @@ export function marketingPaymentCohortRows(leads: CohortLead[], evidence: Cohort
       latestAcceptedQuote: review ? null : booking?.priceEvidence?.latestAcceptedQuote ?? null,
       latestAcceptedAt: review ? null : booking?.priceEvidence?.latestAcceptedAt ?? null,
       netReceipts: financial ? money(financial.netReceiptCents) : null, overdue: financial ? money(financial.overdueCents) : null,
-      paymentOutcome: review ? "REVIEW_REQUIRED" : !tenancy ? "NOT_CONVERTED" : financial?.overdueCents ? "OVERDUE" : financial?.receiptCount ? "VERIFIED_RECEIPTS_NO_OVERDUE" : "NO_VERIFIED_RECEIPTS",
+      paymentOutcome: review ? "REVIEW_REQUIRED" : !tenancy ? lead.stage==="WON" ? "NO_BOOKING_LINK" : "NOT_CONVERTED" : financial?.overdueCents ? "OVERDUE" : financial?.receiptCount ? "VERIFIED_RECEIPTS_NO_OVERDUE" : "NO_VERIFIED_RECEIPTS",
       review, acquisitionReview: unique.size > 1 || attributions.some(a => !a.parsed.success) ? "Conflicting or invalid retained attribution" : acquisition?.campaignId && campaign === "Unknown" ? "Original campaign reference needs review" : null,
       hold: financial?.hold ?? null,
     };
