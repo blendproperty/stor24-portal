@@ -10,9 +10,9 @@ function load(path, mocks) {
     {module:fixtureModule,exports:fixtureModule.exports,Response,Date,require:name=>{if (!(name in mocks)) throw new Error(`Unexpected import ${name}`);return mocks[name];}});
   return fixtureModule.exports;
 }
-test('server action modules expose only the three active guarded workflow actions', () => {
+test('server action modules expose the active guarded workflow actions', () => {
   const inertImports = new Proxy({}, {has:()=>true,get:()=>({})});
-  assert.deepEqual(Object.keys(load('src/app/actions/leasing.ts',inertImports)).sort(), ['confirmReservationMoveInAction','moveInAction']);
+  assert.deepEqual(Object.keys(load('src/app/actions/leasing.ts',inertImports)).sort(), ['confirmLegacyHandoverAction','confirmReservationMoveInAction','moveInAction']);
   assert.deepEqual(Object.keys(load('src/app/actions/reservation-payment.ts',inertImports)), ['recordReservationPaymentAction']);
 });
 
@@ -24,7 +24,7 @@ test('assisted move-in keeps its saved lease on dispatch failure and scopes crea
     '@/lib/leasing-service':{moveIn:async()=>({tenancy:{accountId:'account'},document:{id:'saved-doc'}})},
     '@/lib/blendsign-lease-service':{dispatchBlendSignLease:async (_scope,_result,input)=>{mode=input.invitationDelivery;if(dispatchFails)throw new Error('Provider failed');}},
     '@/lib/scope':{requirePermissionScope:async (p,f)=>{permission=[p,f];return {}; }},
-    '@/lib/validators':{moveInSchema:{parse:()=>parsed}},'@/lib/auth-guards':{},'@/lib/reservation-move-in':{},'@/lib/db':{},
+    '@/lib/validators':{moveInSchema:{parse:()=>parsed}},'@/lib/auth-guards':{},'@/lib/reservation-move-in':{},'@/lib/legacy-handover':{},'@/lib/db':{},
   };
   const action=load('src/app/actions/leasing.ts',mocks).moveInAction;
   const data=new FormData(); await action(data);

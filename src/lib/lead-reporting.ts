@@ -1,7 +1,7 @@
 import { leadSourceLabel, websiteSourceLabel } from "@/lib/lead-sources";
 import type { LeadMarketProfile } from './lead-market-profile';
-export const leadStages = ["NEW", "CONTACTED", "QUALIFIED", "QUOTED", "VIEWING_BOOKED", "RESERVED", "WON", "LOST"] as const;
-export const stageLabels: Record<string, string> = { NEW: "New enquiry", CONTACTED: "Contacted", QUALIFIED: "Qualified", QUOTED: "Quoted", VIEWING_BOOKED: "Viewing booked", RESERVED: "Reserved", WON: "Moved in", LOST: "Lost" };
+export const leadStages = ["NEW", "CONTACTED", "QUALIFIED", "QUOTED", "VIEWING_BOOKED", "RESERVED", "HANDOVER_REVIEW", "WON", "LOST"] as const;
+export const stageLabels: Record<string, string> = { NEW: "New enquiry", CONTACTED: "Contacted", QUALIFIED: "Qualified", QUOTED: "Quoted", VIEWING_BOOKED: "Viewing booked", RESERVED: "Reserved", HANDOVER_REVIEW: "Handover review", WON: "Moved in", LOST: "Lost" };
 export type ReportingLead = { marketProfile?:LeadMarketProfile|null; stage: string; source: string; createdAt: string; nextActionAt: string | null; attribution: { source: string; medium?: string; landingPage: string; conversionPage: string } | null; reservations: { status: string; quotedRate: number; convertedTenancyId: string | null }[] };
 export function leadReport(leads: ReportingLead[], now = new Date()) {
   const open = leads.filter(l => !["WON", "LOST"].includes(l.stage));

@@ -117,7 +117,7 @@ test('Word downloads use actual builder, fixed, bundle and retained-snapshot rou
   }finally{if(previous===undefined)delete process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY;else process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY=previous;}
 });
 test('Word never bypasses personal-data scope, current revocation, secret filtering, audit failure or output limits',async()=>{
-  let f=await fixture();f.user.roleAssignments=[{facilityId:'a',role:{name:'Synthetic reporter',permissions:['reports.sales','reports.export']}}];f.tables.lead.push({id:'lead',facility:{id:'a',organisationId:'org',name:'Fixture store'},customer:{companyName:null,firstName:'Synthetic',lastName:'Customer'},source:'Recorded',stage:'NEW',createdAt:new Date('2026-10-02')});
+  let f=await fixture();f.user.roleAssignments=[{facilityId:'a',role:{name:'Synthetic reporter',permissions:['reports.sales','reports.export']}}];f.tables.lead.push({id:'lead',facilityId:'a',reservations:[],facility:{id:'a',organisationId:'org',name:'Fixture store'},customer:{companyName:null,firstName:'Synthetic',lastName:'Customer'},source:'Recorded',stage:'NEW',createdAt:new Date('2026-10-02')});
   assert.equal((await f.api.builder.POST(request({kind:'export',query:{...defaultVisualQuery('leads','2026-10-01','2026-10-31'),columns:['customer']},format:'DOCX'}))).status,403);
   f=await fixture();assert.equal((await f.api.builder.POST(request({kind:'export',query:{...query(),facilityId:'excluded'},format:'DOCX'}))).status,403);
   f=await fixture();(globalThis as Row).__reportFixture.changedOnRead=2;assert.equal((await f.api.builder.POST(request({kind:'export',query:query(),format:'DOCX'}))).status,403);
@@ -137,7 +137,7 @@ test("save is idempotent and audit failures roll back definition changes",async(
 test("shared definitions require owner, and conflicts and personal exports remain explicit",async()=>{
   const f=await fixture();assert.equal((await f.api.builder.POST(request({kind:"save",query:query(),requestKey:randomUUID(),visibility:"ORGANISATION"}))).status,403);
   f.user.roleAssignments=[{facilityId:null,role:{name:"Admin",permissions:["*"]}}];
-  f.tables.lead.push({id:"lead",facility:{id:"a",organisationId:"org",name:"Fixture store"},customer:{companyName:null,firstName:"Synthetic",lastName:"Customer"},source:"Recorded",stage:"NEW",productLine:"STORAGE",assignedTo:null,createdAt:new Date("2026-10-02"),expectedMoveIn:null,nextActionAt:null});
+  f.tables.lead.push({id:"lead",facilityId:"a",reservations:[],facility:{id:"a",organisationId:"org",name:"Fixture store"},customer:{companyName:null,firstName:"Synthetic",lastName:"Customer"},source:"Recorded",stage:"NEW",productLine:"STORAGE",assignedTo:null,createdAt:new Date("2026-10-02"),expectedMoveIn:null,nextActionAt:null});
   const personal={...defaultVisualQuery("leads","2026-10-01","2026-10-31"),columns:["customer"]};
   const denied=await f.api.builder.POST(request({kind:"export",query:personal,format:"CSV"}));assert.equal(denied.status,403);assert.equal((await denied.json()).error.code,"PERSONAL_EXPORT_FORBIDDEN");
   f.user.roleAssignments=[{facilityId:null,role:{name:"Organisation owner",permissions:["*"]}}];assert.equal((await f.api.builder.POST(request({kind:"export",query:personal,format:"CSV"}))).status,200);
