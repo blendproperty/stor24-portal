@@ -61,14 +61,15 @@ async function rawVisualReportSource(scope:RequestScope, query:VisualReportQuery
     }
     case "tenants": {
       const tenancies=bounded(await db.tenancy.findMany({where:{facility,...range("startDate","start"),...range("endDate","end"),...range("noticeDate","notice")},take,orderBy:{id:"asc"},select:{id:true,facilityId:true,...tenancySelect,status:true,productLine:true,paymentMethod:true,startDate:true,endDate:true,noticeDate:true,customer:{select:{...customerSelect,email:true,phone:true}},account:{select:{accountNumber:true,balance:true,currency:true}},occupancies:{where:{status:{in:["ACTIVE","NOTICE_GIVEN"]}},select:{id:true,unitId:true,monthlyRate:true,unit:{select:{number:true,facilityId:true}}},take:101}}}));
+      if(tenancies.some(t=>t.occupancies.length>100))throw new ReportError("REPORT_LIMIT");
       const handedOver=await handoverKeys(scope,tenancies.map(t=>t.id));
       const unitIds=[...new Set(tenancies.flatMap(t=>t.occupancies.map(o=>o.unitId)))];
-      const occupied=unitIds.length?await db.occupancy.findMany({where:{unitId:{in:unitIds},status:{in:["ACTIVE","NOTICE_GIVEN"]}},select:{id:true,unitId:true}}):[];
+      if(unitIds.length>REPORT_SOURCE_LIMIT)throw new ReportError("REPORT_LIMIT");
+      const occupied=unitIds.length?bounded(await db.occupancy.findMany({where:{unitId:{in:unitIds},status:{in:["ACTIVE","NOTICE_GIVEN"]}},take,select:{id:true,unitId:true}})):[];
       const byUnit=new Map<string,string[]>();for(const o of occupied)byUnit.set(o.unitId,[...(byUnit.get(o.unitId)??[]),o.id]);
       const confirmed=(t:typeof tenancies[number])=>handedOver.has(`${t.facilityId}:${t.id}`)&&t.occupancies.every(o=>o.unit.facilityId===t.facilityId&&byUnit.get(o.unitId)?.length===1&&byUnit.get(o.unitId)?.[0]===o.id);
       if(query.metrics.some(m=>["monthlyRate","unitCount"].includes(m.field)) && tenancies.some(t=>t.occupancies.length && !confirmed(t)))throw new ReportError("REPORT_HANDOVER_REVIEW_REQUIRED");
       return tenancies.map(t=> {
-      if(t.occupancies.length>100)throw new ReportError("REPORT_LIMIT");
       // Sum Decimal values through Prisma Decimal, preserving exact cents.
       const rate=t.occupancies.reduce((sum,o)=>sum.add(o.monthlyRate),t.account.balance.mul(0));
       const verified=confirmed(t);

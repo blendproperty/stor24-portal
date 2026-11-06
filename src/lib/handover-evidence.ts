@@ -37,7 +37,8 @@ export async function legacyHandedOverLeadIds(scope:RequestScope,leads:{id:strin
   const eligible=leads.filter(l=>l.customerId && (scope.unrestrictedFacilities || scope.facilityIds.includes(l.facilityId)));
   for(let offset=0;offset<eligible.length;offset+=200){
     const batch=eligible.slice(offset,offset+200),byId=new Map(batch.map(l=>[l.id,l]));
-    const events=await database.auditEvent.findMany({where:{organisationId:scope.organisationId,entityType:"Tenancy",action:"tenancy.key_handover_confirmed",facilityId:{in:[...new Set(batch.map(l=>l.facilityId))]},OR:batch.map(l=>({after:{path:["leadId"],equals:l.id}}))},select:{entityId:true,facilityId:true,after:true}});
+    const events=await database.auditEvent.findMany({where:{organisationId:scope.organisationId,entityType:"Tenancy",action:"tenancy.key_handover_confirmed",facilityId:{in:[...new Set(batch.map(l=>l.facilityId))]},OR:batch.map(l=>({after:{path:["leadId"],equals:l.id}}))},take:5001,select:{entityId:true,facilityId:true,after:true}});
+    if(events.length>5000)throw Error("REPORT_LIMIT");
     const ids=[...new Set(events.map(e=>e.entityId))];
     const tenancies=ids.length?await database.tenancy.findMany({where:{id:{in:ids},facility:{organisationId:scope.organisationId},customer:{organisationId:scope.organisationId}},select:{id:true,facilityId:true,customerId:true,account:{select:{customerId:true}}}}):[];
     const indexed=new Map(tenancies.map(t=>[t.id,t]));
