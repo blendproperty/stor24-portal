@@ -71,6 +71,7 @@ jobs:
       - run: node scripts/test-adjustments.mjs
       - run: node scripts/test-netcash-refunds.mjs
       - run: node scripts/test-account-payment-retry.mjs
+      - run: node tests/transfer-workspace-browser.mjs
       - run: node scripts/test-accounts-read-recovery.mjs
       - run: node scripts/test-tenant-list.mjs
       - run: node scripts/test-customer-read-recovery.mjs
