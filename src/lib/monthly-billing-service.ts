@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
 import type { RequestScope } from "@/lib/scope";
 import { billingPlanSchema, calculateMonthlyBill, currentBillingPeriod, nextBillingPeriod, periodDates, type BillingPlan } from "./monthly-billing-policy";
+import { southAfricaDateKey } from "@/lib/south-africa-time";
 import { isTestPayment } from "./payments/payment-evidence";
 import { renderInvoiceHtml } from "./finance/invoice-renderer";
 import { getBillingDocumentCompanyDetails } from "./finance/billing-document-config";
@@ -93,12 +94,28 @@ export async function previewNextMonthForReview(scope: RequestScope, accountId: 
   }, { isolationLevel: "RepeatableRead", timeout: 20000 });
 }
 export async function postMonthlyBilling(scope: RequestScope, accountId: string, period: string, fingerprint: string, actorId: string | null = scope.userId) {
+  return postBilling(scope, accountId, period, fingerprint, actorId, false);
+}
+export async function postScheduledNextBilling(scope: RequestScope, accountId: string, period: string, fingerprint: string, now = new Date()) {
+  if (process.env.NEXT_MONTH_INVOICING_ENABLED !== "true" || southAfricaDateKey(now).slice(-2) !== "17" || period !== nextBillingPeriod(now)) throw new Error("BILLING_SCHEDULE_DISABLED");
+  return postBilling(scope, accountId, period, fingerprint, null, true);
+}
+async function postBilling(scope: RequestScope, accountId: string, period: string, fingerprint: string, actorId: string | null, scheduled: boolean) {
   // Documents snapshot the configured company information; no email or provider call occurs.
   const { tenancy } = await context(db, scope, accountId);
   const company = await getBillingDocumentCompanyDetails(scope.organisationId, tenancy.facilityId);
   return db.$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${accountId} FOR UPDATE`;
-    const bill = await preview(tx, scope, accountId, period);
+    if (scheduled) {
+      const { account, tenancy, profile } = await context(tx, scope, accountId);
+      if (tenancy.status !== "ACTIVE") throw new Error("BILLING_NOTICE_POLICY_REVIEW");
+      if (!await tx.auditEvent.findFirst({ where: { organisationId: scope.organisationId, facilityId: tenancy.facilityId, entityType: "Tenancy", entityId: tenancy.id, action: "tenancy.key_handover_confirmed" }, select: { id: true } })) throw new Error("BILLING_HANDOVER_REVIEW");
+      const discount = profile?.status === "READY" ? billingPlanSchema.parse(profile.config).discount : null;
+      if (discount && period >= discount.startsPeriod && period <= discount.endsPeriod) throw new Error("BILLING_DISCOUNT_POLICY_REVIEW");
+      const related = await tx.account.count({ where: { customerId: account.customerId, tenancy: { facilityId: tenancy.facilityId, status: { in: ["ACTIVE", "NOTICE_GIVEN"] } } } });
+      if (related !== 1) throw new Error("BILLING_COMBINED_REVIEW");
+    }
+    const bill = await preview(tx, scope, accountId, period, scheduled);
     if (bill.fingerprint !== fingerprint) throw new Error("BILLING_PREVIEW_CHANGED");
     const invoiceNumber = `INV-${period.replace("-", "")}-${bill.accountNumber}`;
     const posted = [];
@@ -106,7 +123,7 @@ export async function postMonthlyBilling(scope: RequestScope, accountId: string,
       posted.push(await tx.ledgerEntry.create({ data: { accountId, type: line.type, amount: line.amount, taxAmount: line.taxAmount, description: line.description, effectiveAt: periodDates(period).effectiveAt, externalRef: index === 0 ? `RENT-${period}` : `BILL-${period}-${line.key}`, createdById: actorId, metadata: { billingPeriod: period, invoiceNumber, approvalReference: bill.approvalReference, fingerprint: bill.fingerprint, chargeKey: line.key } } }));
     }
     const account = await tx.account.update({ where: { id: accountId }, data: { balance: { increment: bill.total } } });
-    const html = renderInvoiceHtml({ invoiceNumber, issueDate: periodDates(period).effectiveAt, facilityName: bill.facilityName, company, customerName: bill.customerName, accountNumber: bill.accountNumber, currentBalance: account.balance.toString(), lines: posted.map(line => ({ id: line.id, description: line.description, effectiveAt: line.effectiveAt, amount: Number(line.amount) * (line.type === "CREDIT" ? -1 : 1), taxAmount: Number(line.taxAmount) * (line.type === "CREDIT" ? -1 : 1) })) });
+    const html = renderInvoiceHtml({ invoiceNumber, issueDate: scheduled ? new Date() : periodDates(period).effectiveAt, facilityName: bill.facilityName, company, customerName: bill.customerName, accountNumber: bill.accountNumber, currentBalance: account.balance.toString(), lines: posted.map(line => ({ id: line.id, description: line.description, effectiveAt: line.effectiveAt, amount: Number(line.amount) * (line.type === "CREDIT" ? -1 : 1), taxAmount: Number(line.taxAmount) * (line.type === "CREDIT" ? -1 : 1) })) });
     const sha256 = createHash("sha256").update(html).digest("hex");
     const document = await tx.document.create({ data: { tenancyId: bill.tenancyId, type: "INVOICE", status: "GENERATED", storageKey: `inline:${sha256}`, content: html, sha256, externalId: invoiceNumber, idempotencyKey: `monthly-invoice:${accountId}:${period}` } });
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: bill.facilityId, actorId, action: "billing.month_posted", entityType: "Account", entityId: accountId, after: { period, invoiceNumber, documentId: document.id, total: bill.total, taxTotal: bill.taxTotal, fingerprint } } });

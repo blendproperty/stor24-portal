@@ -1,17 +1,26 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { POST as scheduledRoute } from "../../src/app/api/v1/billing/run-next-month/route";
 import { db } from "../../src/lib/db";
+import { runNextMonthInvoices } from "../../src/lib/next-month-invoice-run";
 import { currentBillingPeriod, nextBillingPeriod } from "../../src/lib/monthly-billing-policy";
-import { postMonthlyBilling, previewMonthlyBilling, previewNextMonthForReview, saveMonthlyBillingPlan } from "../../src/lib/monthly-billing-service";
+import { postMonthlyBilling, postScheduledNextBilling, previewMonthlyBilling, previewNextMonthForReview, saveMonthlyBillingPlan } from "../../src/lib/monthly-billing-service";
 
-test("next month review is scoped, read-only and cannot post future charges", async () => {
+test("next month review and guarded scheduled posting", async () => {
  assert.equal(process.env.MERCHANDISE_DB_TEST,"isolated-ci"); assert.equal(new URL(process.env.DATABASE_URL!).hostname,"localhost");
  try {
+  delete process.env.NEXT_MONTH_INVOICING_KEY_SHA256; delete process.env.NEXT_MONTH_INVOICING_ENABLED;
+  const request=(key: string) => new Request("http://localhost/api/v1/billing/run-next-month",{method:"POST",headers:{"x-cron-key":key}});
+  assert.equal((await scheduledRoute(request("synthetic"))).status,503);
+  process.env.NEXT_MONTH_INVOICING_KEY_SHA256=createHash("sha256").update("synthetic").digest("hex");
+  assert.equal((await scheduledRoute(request("wrong"))).status,401);
+  assert.equal((await scheduledRoute(request("synthetic"))).status,409);
+  delete process.env.NEXT_MONTH_INVOICING_KEY_SHA256;
   assert.equal(nextBillingPeriod(new Date("2026-12-20T08:00:00Z")),"2027-01");
   assert.equal(nextBillingPeriod(new Date("2026-11-30T22:30:00Z")),"2027-01");
   const key=randomUUID(), org=await db.organisation.create({data:{name:"Synthetic",slug:key}}), facility=await db.facility.create({data:{organisationId:org.id,name:"Synthetic",code:key}}), user=await db.user.create({data:{organisationId:org.id,name:"Synthetic",email:`${key}@example.invalid`}}), customer=await db.customer.create({data:{organisationId:org.id,firstName:"Synthetic"}}), type=await db.unitType.create({data:{facilityId:facility.id,name:"Unit"}}), unit=await db.unit.create({data:{facilityId:facility.id,unitTypeId:type.id,number:"N1",monthlyRate:1200,status:"OCCUPIED"}}),account=await db.account.create({data:{customerId:customer.id,accountNumber:`N-${key}`}}),tenancy=await db.tenancy.create({data:{facilityId:facility.id,customerId:customer.id,accountId:account.id,status:"ACTIVE",startDate:new Date("2025-01-01"),occupancies:{create:{unitId:unit.id,status:"ACTIVE",startDate:new Date("2025-01-01"),monthlyRate:1200}}}});
-  const scope={organisationId:org.id,userId:user.id,facilityIds:[facility.id],unrestrictedFacilities:false},period=nextBillingPeriod();
+  const scope={organisationId:org.id,userId:user.id,facilityIds:[facility.id],unrestrictedFacilities:false},period=nextBillingPeriod(), seventeenth = new Date(`${currentBillingPeriod()}-17T10:00:00+02:00`);
   const plan={firstPeriod:currentBillingPeriod(),proration:"ACTUAL_DAYS" as const,taxPercent:15,rentTaxable:true,insuranceEnabled:false,insuranceTaxable:false,charges:[],discount:null,approvalReference:"Synthetic approved plan"};
   await saveMonthlyBillingPlan(scope,account.id,plan);
   await assert.rejects(previewNextMonthForReview(scope,account.id),/HANDOVER_REVIEW/);
@@ -22,8 +31,36 @@ test("next month review is scoped, read-only and cannot post future charges", as
   await assert.rejects(postMonthlyBilling(scope,account.id,period,bill.fingerprint),/FUTURE_PERIOD/);
   assert.equal(await db.ledgerEntry.count({where:{accountId:account.id}}),0);assert.equal(await db.document.count({where:{tenancyId:tenancy.id}}),0);assert.equal(await db.communicationLog.count({where:{organisationId:org.id}}),0);
   await db.tenancy.update({where:{id:tenancy.id},data:{status:"NOTICE_GIVEN"}});await assert.rejects(previewNextMonthForReview(scope,account.id),/NOTICE_POLICY_REVIEW/);
+  process.env.NEXT_MONTH_INVOICING_ENABLED="true"; const heldNotice=await runNextMonthInvoices(seventeenth,org.id); assert.equal(heldNotice.generated,0);assert.equal(heldNotice.exceptions[0].code,"BILLING_NOTICE_POLICY_REVIEW"); delete process.env.NEXT_MONTH_INVOICING_ENABLED;
   await db.tenancy.update({where:{id:tenancy.id},data:{status:"ACTIVE"}});
   await saveMonthlyBillingPlan(scope,account.id,{...plan,discount:{name:"Synthetic offer",type:"PERCENTAGE",value:10,startsPeriod:period,endsPeriod:period}});
   await assert.rejects(previewNextMonthForReview(scope,account.id),/DISCOUNT_POLICY_REVIEW/);
- } finally {await db.$disconnect();}
+  await saveMonthlyBillingPlan(scope,account.id,plan);
+  const refreshed=await previewNextMonthForReview(scope,account.id);
+  await assert.rejects(postScheduledNextBilling(scope,account.id,period,refreshed.fingerprint,seventeenth),/SCHEDULE_DISABLED/);
+  process.env.NEXT_MONTH_INVOICING_ENABLED="true";
+  await assert.rejects(postScheduledNextBilling(scope,account.id,period,refreshed.fingerprint,new Date(`${currentBillingPeriod()}-16T10:00:00+02:00`)),/SCHEDULE_DISABLED/);
+  const otherAccount=await db.account.create({data:{customerId:customer.id,accountNumber:`N2-${key}`}});
+  const otherTenancy=await db.tenancy.create({data:{facilityId:facility.id,customerId:customer.id,accountId:otherAccount.id,status:"ACTIVE",startDate:new Date("2025-01-01")}});
+  await assert.rejects(postScheduledNextBilling(scope,account.id,period,refreshed.fingerprint,seventeenth),/COMBINED_REVIEW/);
+  await db.tenancy.update({where:{id:otherTenancy.id},data:{status:"CLOSED"}});
+  const outcomes=await Promise.allSettled([postScheduledNextBilling(scope,account.id,period,refreshed.fingerprint,seventeenth),postScheduledNextBilling(scope,account.id,period,refreshed.fingerprint,seventeenth)]);
+  assert.equal(outcomes.filter(x=>x.status==="fulfilled").length,1);
+  assert.equal(await db.ledgerEntry.count({where:{accountId:account.id}}),1);
+  assert.equal(await db.document.count({where:{tenancyId:tenancy.id,type:"INVOICE"}}),1);
+  assert.equal(await db.communicationLog.count({where:{organisationId:org.id}}),0);
+  const customer2=await db.customer.create({data:{organisationId:org.id,firstName:"Synthetic second"}});
+  const unit2=await db.unit.create({data:{facilityId:facility.id,unitTypeId:type.id,number:"N2",monthlyRate:900,status:"OCCUPIED"}});
+  const account2=await db.account.create({data:{customerId:customer2.id,accountNumber:`N3-${key}`}});
+  const tenancy2=await db.tenancy.create({data:{facilityId:facility.id,customerId:customer2.id,accountId:account2.id,status:"ACTIVE",startDate:new Date("2025-01-01"),occupancies:{create:{unitId:unit2.id,status:"ACTIVE",startDate:new Date("2025-01-01"),monthlyRate:900}}}});
+  await db.auditEvent.create({data:{organisationId:org.id,facilityId:facility.id,entityType:"Tenancy",entityId:tenancy2.id,action:"tenancy.key_handover_confirmed"}});
+  await saveMonthlyBillingPlan(scope,account2.id,plan);
+  const run=await runNextMonthInvoices(seventeenth,org.id);assert.equal(run.generated,1);assert.equal(run.alreadyGenerated,1);
+  assert.equal(await db.document.count({where:{tenancyId:tenancy2.id,type:"INVOICE"}}),1);
+  const retry=await runNextMonthInvoices(seventeenth,org.id);assert.equal(retry.period,period);assert.equal(retry.generated,0);assert.equal(retry.alreadyGenerated,2);
+  assert.equal(await db.ledgerEntry.count({where:{accountId:account.id}}),1);
+  delete process.env.NEXT_MONTH_INVOICING_ENABLED;
+  await assert.rejects(runNextMonthInvoices(seventeenth,org.id),/SCHEDULE_DISABLED/);
+
+ } finally {delete process.env.NEXT_MONTH_INVOICING_ENABLED; delete process.env.NEXT_MONTH_INVOICING_KEY_SHA256; await db.$disconnect();}
 });
