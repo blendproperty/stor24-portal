@@ -15,7 +15,7 @@ export const workflowGuides: WorkflowGuide[] = [
         body: "The priority work queue links to reservations approaching expiry, operational tasks and lead follow-ups. Open a queue to review the underlying records and decide the next action.",
         missing: "The priority work queue appears on the Dashboard." },
       { id: "navigation", title: "Follow the customer journey", route: "/", screen: "Dashboard", target: "workspace-navigation",
-        body: "Use Lead to lease for enquiries, Reservations for holds, and Operations for move-in and other daily tasks. Tenants, Billing & payments and Collections support the ongoing account. Your permissions still determine what you can do.",
+        body: "Use Lead to lease for enquiries, Reservations for holds, and Operations for move-in and other daily tasks. Tenants, Invoicing, Payments and Collections support the ongoing account. Your permissions still determine what you can do.",
         missing: "The workspace menu is on the left on desktop. If it is hidden on your smaller screen, use the page links or return on a wider screen to review the full menu." },
       { id: "activity", title: "Check what actually happened", route: "/", screen: "Dashboard", target: "dashboard-activity",
         body: "Recent operational activity records staff and system actions, with their time and facility. Use the actual record and audit evidence when checking work; a tutorial tick only means you have read a step.",

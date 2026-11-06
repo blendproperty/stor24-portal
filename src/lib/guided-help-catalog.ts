@@ -302,6 +302,16 @@ export const extendedGuides: WorkflowGuide[] = [
     ["Check the result before downloading", "Verify customer, account, facility, period, opening balance, each debit and credit and closing balance. Download PDF or Print uses the displayed statement. These controls do not create new charges.", ".statement-paper", "Choose View statement and resolve any reported error before a statement preview is available."],
     ["Send only after checking the recipient", "Email secure link requires a separate confirmation and uses the customer's verified email. Send / resend My STOR24 welcome is a different action for portal access instructions. Check the returned message and avoid repeated sends if delivery is uncertain.", ".statement-controls", "Open the selected account's statement screen first.", "Both email controls can send real messages. A welcome email does not confirm payment or grant physical access."],
   ]),
+  guide("invoicing-hub", "Find invoicing workflows", "Money and accounts", "/invoicing", "Invoicing", "Choose the correct invoicing, rent review or accounting workflow.", [
+    ["Open monthly billing", "Select Monthly billing to review the approved account terms, select an eligible period and preview the charges before posting a saved invoice.", ".finance-hub-workspace"],
+    ["Find statements and rent reviews", "Open the available reports or rent-review workflows to inspect account information and recorded changes. Available links depend on your current permissions.", ".finance-hub-workspace"],
+    ["Check the invoice process", "Review the account, charges and recipient in the destination workflow. Saving a monthly invoice does not itself send an email or collect payment.", ".finance-hub-workspace"],
+  ]),
+  guide("payments-hub", "Find payment workflows", "Money and accounts", "/payments", "Payments", "Choose a payment, receipt review or reconciliation workflow.", [
+    ["Record a payment", "Open Customer accounts and payments to select the correct account and record confirmed funds. The destination checks your current permissions before posting.", ".finance-hub-workspace"],
+    ["Review payment outcomes", "Use Payments awaiting review, Netcash operations or unidentified receipts when available to investigate records before taking further action.", ".finance-hub-workspace"],
+    ["Reconcile or review", "Open settlement reconciliation, debit-order runs or the audit trail where your role permits. A provider outcome alone does not establish bank settlement.", ".finance-hub-workspace"],
+  ]),
   guide("billing", "Billing, reconciliation and daily close", "Money and accounts", "/billing", "Billing & payments", "Use the finance shortcuts and understand what totals do and do not prove.", [
     ["Review the financial overview", "Collected this month, Outstanding balance and Active tenancies billed link to underlying account, collections and tenant screens. Treat summary figures as a starting point and reconcile exceptions before reporting them as final figures.", ".summary-strip"],
     ["Choose the right finance task", "Take payment opens customer accounts. Netcash operations checks payment outcomes against internal records. Invoices & statements and Daily close open Reports; Receipt audit opens System audit. Use the dedicated guides for those destinations.", ".module-grid"],
