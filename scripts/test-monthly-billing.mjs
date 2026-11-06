@@ -23,14 +23,17 @@ try {
   await page.route("**/api/v1/billing/monthly**", async route => {
     const req = route.request();
     if (req.method() === "GET" && req.url().includes("draft=true")) return route.fulfill({json:{data:{period:"2026-12",fingerprint:"c".repeat(64),customerName:"Example Tenant",total:1150,taxTotal:150,lines:[{key:"rent",description:"Draft rent",amount:1150,taxAmount:150,type:"CHARGE"}]}}});
-    if (req.method() === "GET") return route.fulfill({ json: { data: req.url().includes("accountId=") ? { plan: saved, invoices: [] } : [{ id: "cmfixtureaccount000000000001", accountNumber: "CI-101", customer: { firstName: "Example", lastName: "Tenant", companyName: null }, tenancy: { facilityId: "cmfixturefacility000000001", status: "ACTIVE", facility: { name: "Training store with a deliberately long facility name" } } }] } });
+    if (req.method() === "GET") return route.fulfill({ json: { data: req.url().includes("accountId=") ? { plan: saved, invoices: [] } : [{ id: "cmfixtureaccount000000000001", accountNumber: "CI-101", customer: { email: "fixture@example.invalid", firstName: "Example", lastName: "Tenant", companyName: null }, tenancy: { facilityId: "cmfixturefacility000000001", status: "ACTIVE", facility: { name: "Training store with a deliberately long facility name" } } }] } });
     const body = req.postDataJSON(); calls.push(body);
     if (body.action === "plan") { saved = body.plan; return route.fulfill({ json: { data: saved } }); }
+    if (body.action === "preview-multi") return route.fulfill({json:{data:{periods:["2026-11","2026-12"],fingerprint:"d".repeat(64),total:2300,bills:[{total:1150,lines:[{key:"r1",description:"Rent one",amount:1150,taxAmount:150,type:"CHARGE"}]},{total:1150,lines:[{key:"r2",description:"Rent two",amount:1150,taxAmount:150,type:"CHARGE"}]}]}}});
     if (body.action === "preview-next") return route.fulfill({ json: { data: { period: "2026-12", fingerprint: "b".repeat(64), customerName: "Example Tenant", total: 1150, taxTotal: 150, lines: [{ key: "rent", description: "Next month rent", amount: 1150, taxAmount: 150, type: "CHARGE" }] } } });
     if (body.action === "preview") return route.fulfill({ json: { data: { fingerprint: "a".repeat(64), customerName: "Example Tenant", total: 1150, taxTotal: 150, lines: [{ key: "rent", description: "Rent — unit 101", amount: 1150, taxAmount: 150, type: "CHARGE" }] } } });
     return route.fulfill({ json: { data: { documentId: "fixture-document", invoiceNumber: "INV-202602-CI-101" } } });
   });
   await page.route("**/api/v1/billing/invoice-schedule**", async route => { if (route.request().method() === "GET") return route.fulfill({json:{data:{date:"2026-11-17"}}}); const body=route.request().postDataJSON(); calls.push({schedule:body}); return route.fulfill({json:{data:{date:body.date}}}); });
+  await page.route("**/api/v1/billing/monthly/invoice/*/send", async route => { calls.push({send:route.request().postDataJSON()}); return route.fulfill({json:{data:{accepted:true}}}); });
+  page.on("dialog", dialog => dialog.accept());
   await page.goto(`http://127.0.0.1:${server.address().port}`);
   await page.getByLabel("Customer account").selectOption("cmfixtureaccount000000000001");
   await page.getByLabel("Billing month", { exact: true }).fill("2026-02");
@@ -44,6 +47,14 @@ try {
   await page.getByLabel("I reviewed the charges and customer notice status.").check();
   await page.getByRole("button", { name: "Approve and post invoice" }).click();
   assert.equal(calls.filter(c => c.action === "approve-draft").length,1);
+  await page.getByRole("button", { name: "Send / resend invoice" }).click();
+  assert.equal(calls.filter(c => c.send).length,1);
+  assert.equal(calls.find(c => c.send).send.email,"fixture@example.invalid");
+  await page.getByRole("button", { name: "Review multiple months" }).click();
+  await expect(page.getByRole("button", { name: "Post multiple months" })).toBeDisabled();
+  await page.getByLabel("I reviewed every month and approve posting these charges.").check();
+  await page.getByRole("button", { name: "Post multiple months" }).click();
+  assert.equal(calls.filter(c => c.action === "post-multi").length,1);
   await page.getByRole("button", { name: "Review next month" }).click();
   await expect(page.getByText("Estimate for 2026-12 · Example Tenant")).toBeVisible();
   assert.equal(calls.filter(c => c.action === "post").length, 0);
@@ -69,7 +80,7 @@ try {
   }
   await page.getByLabel("I have checked").check();
   await page.getByRole("button", { name: "Post charges and save invoice" }).click();
-  await expect(page.getByRole("status")).toContainText("INV-202602-CI-101");
+  await expect(page.getByText("Posted INV-202602-CI-101.")).toBeVisible();
   assert.equal(calls.filter(c => c.action === "post").length, 1);
   assert.equal(calls.find(c => c.action === "post").confirm, true);
   assert.deepEqual(errors, []);

@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash, randomUUID } from "node:crypto";
+import { sendSavedInvoice } from "../../src/lib/finance/saved-invoice-delivery";
 import { POST as scheduledRoute } from "../../src/app/api/v1/billing/run-next-month/route";
 import { db } from "../../src/lib/db";
 import { readInvoiceSchedule, saveInvoiceSchedule } from "../../src/lib/invoice-schedule";
 import { southAfricaDateKey } from "../../src/lib/south-africa-time";
 import { runNextMonthInvoices } from "../../src/lib/next-month-invoice-run";
 import { currentBillingPeriod, nextBillingPeriod } from "../../src/lib/monthly-billing-policy";
-import { postMonthlyBilling, prepareScheduledNextBilling, approveScheduledInvoiceDraft, readScheduledInvoiceDraft, previewMonthlyBilling, previewNextMonthForReview, saveMonthlyBillingPlan } from "../../src/lib/monthly-billing-service";
+import { postMonthlyBilling, previewMultiMonthInvoice, postMultiMonthInvoice, prepareScheduledNextBilling, approveScheduledInvoiceDraft, readScheduledInvoiceDraft, previewMonthlyBilling, previewNextMonthForReview, saveMonthlyBillingPlan } from "../../src/lib/monthly-billing-service";
 
 test("next month review and guarded scheduled posting", async () => {
  assert.equal(process.env.MERCHANDISE_DB_TEST,"isolated-ci"); assert.equal(new URL(process.env.DATABASE_URL!).hostname,"localhost");
@@ -62,7 +63,7 @@ test("next month review and guarded scheduled posting", async () => {
   await assert.rejects(approveScheduledInvoiceDraft(scope,account.id,period,savedDraft.fingerprint),/PREVIEW_CHANGED/);
   assert.equal(await db.communicationLog.count({where:{organisationId:org.id}}),0);
   await db.tenancy.update({where:{id:tenancy.id},data:{status:"CLOSED"}});
-  const customer2=await db.customer.create({data:{organisationId:org.id,firstName:"Synthetic second"}});
+  const customer2=await db.customer.create({data:{organisationId:org.id,firstName:"Synthetic second",email:`${key}@example.invalid`}});
   const unit2=await db.unit.create({data:{facilityId:facility.id,unitTypeId:type.id,number:"N2",monthlyRate:900,status:"OCCUPIED"}});
   const account2=await db.account.create({data:{customerId:customer2.id,accountNumber:`N3-${key}`}});
   const tenancy2=await db.tenancy.create({data:{facilityId:facility.id,customerId:customer2.id,accountId:account2.id,status:"ACTIVE",startDate:new Date("2025-01-01"),occupancies:{create:{unitId:unit2.id,status:"ACTIVE",startDate:new Date("2025-01-01"),monthlyRate:900}}}});
@@ -73,10 +74,53 @@ test("next month review and guarded scheduled posting", async () => {
   const secondDraft=await readScheduledInvoiceDraft(scope,account2.id);assert.ok(secondDraft);
   await approveScheduledInvoiceDraft(scope,account2.id,period,secondDraft.fingerprint);
   assert.equal(await db.document.count({where:{tenancyId:tenancy2.id,type:"INVOICE"}}),1);
+  process.env.AUTH_SECRET="synthetic-test-secret-not-production-123456";
+  const invoice=await db.document.findFirstOrThrow({where:{tenancyId:tenancy2.id,type:"INVOICE"}}), email=`${key}@example.invalid`; let deliveries=0;
+  const fakeProvider={send:async () => { deliveries++; }};
+  await db.tenancy.update({where:{id:tenancy2.id},data:{status:"NOTICE_GIVEN"}});
+  await assert.rejects(sendSavedInvoice(scope,invoice.id,randomUUID(),email,false,fakeProvider),/INVOICE_NOTICE_REVIEW/);
+  await db.tenancy.update({where:{id:tenancy2.id},data:{status:"ACTIVE"}});
+  const sendId=randomUUID();
+  await assert.rejects(sendSavedInvoice({...scope,facilityIds:[]},invoice.id,sendId,email,false,fakeProvider),/INVOICE_DELIVERY_REVIEW/);
+  await assert.rejects(sendSavedInvoice(scope,invoice.id,sendId,"wrong@example.invalid",false,fakeProvider),/INVOICE_RECIPIENT_CHANGED/);
+  await sendSavedInvoice(scope,invoice.id,sendId,email,false,fakeProvider);
+  await sendSavedInvoice(scope,invoice.id,sendId,email,false,fakeProvider);assert.equal(deliveries,1);
+  await sendSavedInvoice(scope,invoice.id,randomUUID(),email,false,fakeProvider);assert.equal(deliveries,2);
+  assert.equal(await db.ledgerEntry.count({where:{accountId:account2.id}}),1);
+  await assert.rejects(sendSavedInvoice(scope,invoice.id,randomUUID(),email,false,{send:async()=>{throw new Error("synthetic timeout");}}),/INVOICE_DELIVERY_REVIEW/);
+  await assert.rejects(sendSavedInvoice(scope,invoice.id,randomUUID(),email,false,fakeProvider),/INVOICE_DELIVERY_REVIEW/);
+  assert.equal(deliveries,2);
+
   const retry=await runNextMonthInvoices(scheduledNow,org.id);assert.equal(retry.period,period);assert.equal(retry.generated,0);assert.equal(retry.alreadyGenerated,1);
   assert.equal(await db.ledgerEntry.count({where:{accountId:account.id}}),0);
+  const customer3=await db.customer.create({data:{organisationId:org.id,firstName:"Synthetic multi",email:`multi-${key}@example.invalid`}});
+  const unit3=await db.unit.create({data:{facilityId:facility.id,unitTypeId:type.id,number:"N3",monthlyRate:1200,status:"OCCUPIED"}});
+  const account3=await db.account.create({data:{customerId:customer3.id,accountNumber:`N4-${key}`}});
+  const tenancy3=await db.tenancy.create({data:{facilityId:facility.id,customerId:customer3.id,accountId:account3.id,status:"ACTIVE",startDate:new Date("2025-01-01"),occupancies:{create:{unitId:unit3.id,status:"ACTIVE",startDate:new Date("2025-01-01"),monthlyRate:1200}}}});
+  await db.auditEvent.create({data:{organisationId:org.id,facilityId:facility.id,entityType:"Tenancy",entityId:tenancy3.id,action:"tenancy.key_handover_confirmed"}});
+  await saveMonthlyBillingPlan(scope,account3.id,plan);
+  const multi=await previewMultiMonthInvoice(scope,account3.id,currentBillingPeriod(),2);assert.equal(multi.total,2400);assert.equal(multi.periods.length,2);
+  assert.equal(await db.ledgerEntry.count({where:{accountId:account3.id}}),0);
+  await assert.rejects(previewMultiMonthInvoice({...scope,facilityIds:[]},account3.id,currentBillingPeriod(),2),/ACCOUNT_NOT_FOUND/);
+  await assert.rejects(postMultiMonthInvoice(scope,account3.id,currentBillingPeriod(),2,"0".repeat(64)),/PREVIEW_CHANGED/);
+  await saveMonthlyBillingPlan(scope,account3.id,{...plan,approvalReference:"Changed synthetic agreement"});
+  await assert.rejects(postMultiMonthInvoice(scope,account3.id,currentBillingPeriod(),2,multi.fingerprint),/PREVIEW_CHANGED/);
+  await saveMonthlyBillingPlan(scope,account3.id,plan);
+  const reviewed=await previewMultiMonthInvoice(scope,account3.id,currentBillingPeriod(),2);
+  const conflictNumber=`INV-${currentBillingPeriod().replace("-", "")}-M-${createHash("sha256").update(`${account3.id}:${multi.periods.at(-1)}`).digest("hex").slice(0,24)}`;
+  const collision=await db.document.create({data:{tenancyId:tenancy3.id,type:"CI_CONFLICT",storageKey:"ci",externalId:conflictNumber}});
+  await assert.rejects(postMultiMonthInvoice(scope,account3.id,currentBillingPeriod(),2,reviewed.fingerprint));
+  assert.equal(await db.ledgerEntry.count({where:{accountId:account3.id}}),0);assert.equal((await db.account.findUniqueOrThrow({where:{id:account3.id}})).balance.toString(),"0");
+  await db.document.delete({where:{id:collision.id}});
+  const posts=await Promise.allSettled([postMultiMonthInvoice(scope,account3.id,currentBillingPeriod(),2,reviewed.fingerprint),postMultiMonthInvoice(scope,account3.id,currentBillingPeriod(),2,reviewed.fingerprint)]);
+  assert.equal(posts.filter(x=>x.status==="fulfilled").length,1);
+  assert.equal(await db.ledgerEntry.count({where:{accountId:account3.id}}),2);assert.equal(await db.document.count({where:{tenancyId:tenancy3.id,type:"INVOICE"}}),1);
+  const multiDoc=await db.document.findFirstOrThrow({where:{tenancyId:tenancy3.id,type:"INVOICE"}});
+  await sendSavedInvoice(scope,multiDoc.id,randomUUID(),`multi-${key}@example.invalid`,false,fakeProvider);
+  assert.equal(await db.ledgerEntry.count({where:{accountId:account3.id}}),2);
+  await assert.rejects(previewMultiMonthInvoice(scope,account3.id,currentBillingPeriod(),2),/ALREADY_POSTED/);
   delete process.env.NEXT_MONTH_INVOICING_ENABLED;
   await assert.rejects(runNextMonthInvoices(seventeenth,org.id),/SCHEDULE_DISABLED/);
 
- } finally {delete process.env.NEXT_MONTH_INVOICING_ENABLED; delete process.env.NEXT_MONTH_INVOICING_KEY_SHA256; await db.$disconnect();}
+ } finally {delete process.env.NEXT_MONTH_INVOICING_ENABLED; delete process.env.NEXT_MONTH_INVOICING_KEY_SHA256; delete process.env.AUTH_SECRET; await db.$disconnect();}
 });

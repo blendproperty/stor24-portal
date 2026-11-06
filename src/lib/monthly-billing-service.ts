@@ -19,7 +19,7 @@ function accountWhere(scope: RequestScope, accountId?: string): Prisma.AccountWh
   return { ...(accountId ? { id: accountId } : {}), customer: { organisationId: scope.organisationId }, tenancy: { facility: { organisationId: scope.organisationId }, ...(scope.unrestrictedFacilities ? {} : { facilityId: { in: scope.facilityIds } }) } };
 }
 export async function monthlyBillingAccounts(scope: RequestScope) {
-  return db.account.findMany({ where: accountWhere(scope), select: { id: true, accountNumber: true, customer: { select: { companyName: true, firstName: true, lastName: true } }, tenancy: { select: { facilityId: true, status: true, facility: { select: { name: true } } } } }, orderBy: { accountNumber: "asc" } });
+  return db.account.findMany({ where: accountWhere(scope), select: { id: true, accountNumber: true, customer: { select: { email: true, companyName: true, firstName: true, lastName: true } }, tenancy: { select: { facilityId: true, status: true, facility: { select: { name: true } } } } }, orderBy: { accountNumber: "asc" } });
 }
 async function context(client: Client, scope: RequestScope, accountId: string) {
   const account = await client.account.findFirst({ where: accountWhere(scope, accountId), include: { customer: true, tenancy: { include: { facility: true, occupancies: { include: { unit: true }, orderBy: { id: "asc" } }, insuranceEnrollment: true } } } });
@@ -33,7 +33,7 @@ export async function getMonthlyBillingPlan(scope: RequestScope, accountId: stri
 }
 export async function monthlyBillingInvoices(scope: RequestScope, accountId: string) {
   const { tenancy } = await context(db, scope, accountId);
-  return db.document.findMany({ where: { tenancyId: tenancy.id, type: "INVOICE", idempotencyKey: { startsWith: "monthly-invoice:" } }, select: { id: true, externalId: true, createdAt: true }, orderBy: { createdAt: "desc" }, take: 60 });
+  return db.document.findMany({ where: { tenancyId: tenancy.id, type: "INVOICE", OR: [{ idempotencyKey: { startsWith: "monthly-invoice:" } }, { idempotencyKey: { startsWith: "multi-month-invoice:" } }] }, select: { id: true, externalId: true, createdAt: true }, orderBy: { createdAt: "desc" }, take: 60 });
 }
 export async function saveMonthlyBillingPlan(scope: RequestScope, accountId: string, value: unknown) {
   const plan = billingPlanSchema.parse(value);
@@ -50,9 +50,9 @@ export async function saveMonthlyBillingPlan(scope: RequestScope, accountId: str
 export async function monthlyBillingHistory(scope:RequestScope,accountId:string,before?:number){
  return db.$transaction(async tx=>{const {tenancy}=await context(tx,scope,accountId);return readBillingPlanVersions(tx,scope.organisationId,tenancy.facilityId,accountId,before)},{isolationLevel:"RepeatableRead",timeout:20000});
 }
-async function preview(client: Client, scope: RequestScope, accountId: string, period: string, reviewNextMonth = false) {
+async function preview(client: Client, scope: RequestScope, accountId: string, period: string, futureLimit?: string) {
   const dates = periodDates(period);
-  if (period > currentBillingPeriod() && !(reviewNextMonth && period === nextBillingPeriod())) throw new Error("BILLING_FUTURE_PERIOD");
+  if (period > currentBillingPeriod() && !(futureLimit && period <= futureLimit)) throw new Error("BILLING_FUTURE_PERIOD");
   const { account, tenancy, profile } = await context(client, scope, accountId);
   if (!profile || profile.status !== "READY") throw new Error("BILLING_PLAN_REQUIRED");
   if (!["ACTIVE", "NOTICE_GIVEN"].includes(tenancy.status)) throw new Error("BILLING_TENANCY_NOT_ACTIVE");
@@ -90,7 +90,7 @@ export async function previewNextMonthForReview(scope: RequestScope, accountId: 
     if (!handover) throw new Error("BILLING_HANDOVER_REVIEW");
     const period = nextBillingPeriod();
     if (profile?.status === "READY") { const discount = billingPlanSchema.parse(profile.config).discount; if (discount && period >= discount.startsPeriod && period <= discount.endsPeriod) throw new Error("BILLING_DISCOUNT_POLICY_REVIEW"); }
-    const bill = await preview(tx, scope, accountId, period, true);
+    const bill = await preview(tx, scope, accountId, period, nextBillingPeriod());
     return { ...bill, period };
   }, { isolationLevel: "RepeatableRead", timeout: 20000 });
 }
@@ -106,7 +106,7 @@ export async function prepareScheduledNextBilling(scope: RequestScope, accountId
     await tx.$queryRaw`SELECT "id" FROM "Facility" WHERE "id" = ${tenancy.facilityId} FOR UPDATE`;
     if (southAfricaDateKey(now) !== await scheduledInvoiceDate(tx, scope.organisationId, tenancy.facilityId, now)) throw new Error("BILLING_SCHEDULE_NOT_DUE");
     await assertDraftEligibility(tx, scope, account, tenancy, profile, period);
-    const bill = await preview(tx, scope, accountId, period, true);
+    const bill = await preview(tx, scope, accountId, period, nextBillingPeriod());
     if (bill.fingerprint !== fingerprint) throw new Error("BILLING_PREVIEW_CHANGED");
     const name = `${accountId}:${period}`;
     const existing = await tx.configurationProfile.findFirst({where:{organisationId:scope.organisationId,facilityId:tenancy.facilityId,domain:DRAFT_DOMAIN,name}});
@@ -155,7 +155,7 @@ async function postBilling(scope: RequestScope, accountId: string, period: strin
       const draft=await tx.configurationProfile.findFirst({where:{organisationId:scope.organisationId,facilityId:tenancy.facilityId,domain:DRAFT_DOMAIN,name:`${accountId}:${period}`,status:"READY"}});
       if (!draft || billingPeriodSchemaForDraft(draft.config).fingerprint !== fingerprint) throw new Error("BILLING_DRAFT_REVIEW");
     }
-    const bill = await preview(tx, scope, accountId, period, scheduled);
+    const bill = await preview(tx, scope, accountId, period, scheduled ? nextBillingPeriod() : undefined);
     if (bill.fingerprint !== fingerprint) throw new Error("BILLING_PREVIEW_CHANGED");
     const invoiceNumber = `INV-${period.replace("-", "")}-${bill.accountNumber}`;
     const posted = [];
@@ -170,4 +170,44 @@ async function postBilling(scope: RequestScope, accountId: string, period: strin
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: bill.facilityId, actorId, action: "billing.month_posted", entityType: "Account", entityId: accountId, after: { period, invoiceNumber, documentId: document.id, total: bill.total, taxTotal: bill.taxTotal, fingerprint } } });
     return { documentId: document.id, invoiceNumber, total: bill.total };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000 });
+}
+
+function multiPeriods(start: string, count: number) {
+  periodDates(start);
+  if (!Number.isInteger(count) || count < 2 || count > 12 || start < currentBillingPeriod() || start > nextBillingPeriod()) throw new Error("BILLING_MULTI_PERIOD_REVIEW");
+  const [year, month] = start.split("-").map(Number);
+  return Array.from({length:count},(_,index)=>new Date(Date.UTC(year,month-1+index,1)).toISOString().slice(0,7));
+}
+async function multiSnapshot(tx: Client, scope: RequestScope, accountId: string, start: string, count: number) {
+  const periods=multiPeriods(start,count), {account,tenancy,profile}=await context(tx,scope,accountId);
+  const company=await getBillingDocumentCompanyDetails(scope.organisationId,tenancy.facilityId,tx);
+  const bills=[];
+  for(const period of periods) { await assertDraftEligibility(tx,scope,account,tenancy,profile,period); bills.push(await preview(tx,scope,accountId,period,periods.at(-1))); }
+  const totalCents=bills.reduce((sum,bill)=>sum+Math.round(bill.total*100),0);
+  if(!Number.isSafeInteger(totalCents)) throw new Error("BILLING_MULTI_PERIOD_REVIEW");
+  const fingerprint=createHash("sha256").update(JSON.stringify({accountId,periods,bills:bills.map(b=>b.fingerprint),company})).digest("hex");
+  return {periods,bills,total:totalCents/100,fingerprint,company};
+}
+export async function previewMultiMonthInvoice(scope: RequestScope, accountId: string, start: string, count: number) {
+  return db.$transaction(async tx => { const {company: _company,...result}=await multiSnapshot(tx,scope,accountId,start,count); void _company; return result; },{isolationLevel:"RepeatableRead",timeout:20000});
+}
+export async function postMultiMonthInvoice(scope: RequestScope, accountId: string, start: string, count: number, fingerprint: string) {
+  return db.$transaction(async tx => {
+    await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${accountId} FOR UPDATE`;
+    const snapshot=await multiSnapshot(tx,scope,accountId,start,count);
+    if(snapshot.fingerprint!==fingerprint) throw new Error("BILLING_PREVIEW_CHANGED");
+    const first=snapshot.bills[0], invoiceNumber=`INV-${start.replace("-", "")}-M-${createHash("sha256").update(`${accountId}:${snapshot.periods.at(-1)}`).digest("hex").slice(0,24)}`;
+    const lines: Array<{id:string;description:string;effectiveAt:Date;amount:number;taxAmount:number}>=[];
+    for(const [monthIndex,bill] of snapshot.bills.entries()) for(const [index,line] of bill.lines.entries()) {
+      const period=snapshot.periods[monthIndex];
+      const entry=await tx.ledgerEntry.create({data:{accountId,type:line.type,amount:line.amount,taxAmount:line.taxAmount,description:line.description,effectiveAt:periodDates(period).effectiveAt,externalRef:index===0?`RENT-${period}`:`BILL-${period}-${line.key}`,createdById:scope.userId,metadata:{billingPeriod:period,invoiceNumber,approvalReference:bill.approvalReference,fingerprint:bill.fingerprint,chargeKey:line.key}}});
+      lines.push({id:entry.id,description:entry.description,effectiveAt:entry.effectiveAt,amount:Number(entry.amount)*(entry.type==="CREDIT"?-1:1),taxAmount:Number(entry.taxAmount)*(entry.type==="CREDIT"?-1:1)});
+    }
+    const account=await tx.account.update({where:{id:accountId},data:{balance:{increment:snapshot.total}}});
+    const html=renderInvoiceHtml({invoiceNumber,issueDate:new Date(),facilityName:first.facilityName,company:snapshot.company,customerName:first.customerName,accountNumber:first.accountNumber,currentBalance:account.balance.toString(),lines});
+    const sha256=createHash("sha256").update(html).digest("hex");
+    const doc=await tx.document.create({data:{tenancyId:first.tenancyId,type:"INVOICE",status:"GENERATED",storageKey:`inline:${sha256}`,content:html,sha256,externalId:invoiceNumber,idempotencyKey:`multi-month-invoice:${accountId}:${start}:${count}`}});
+    await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:first.facilityId,actorId:scope.userId,action:"billing.multiple_months_posted",entityType:"Account",entityId:accountId,after:{periods:snapshot.periods,invoiceNumber,documentId:doc.id,total:snapshot.total,fingerprint}}});
+    return {documentId:doc.id,invoiceNumber,total:snapshot.total};
+  },{isolationLevel:"Serializable",timeout:30000});
 }
