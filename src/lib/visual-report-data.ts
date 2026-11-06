@@ -60,15 +60,19 @@ async function rawVisualReportSource(scope:RequestScope, query:VisualReportQuery
       return nativeUnpaidRows(workspace.rows, query.to, query.metrics.some(m => m.field === "amount"));
     }
     case "tenants": {
-      const tenancies=bounded(await db.tenancy.findMany({where:{facility,...range("startDate","start"),...range("endDate","end"),...range("noticeDate","notice")},take,orderBy:{id:"asc"},select:{id:true,facilityId:true,...tenancySelect,status:true,productLine:true,paymentMethod:true,startDate:true,endDate:true,noticeDate:true,customer:{select:{...customerSelect,email:true,phone:true}},account:{select:{accountNumber:true,balance:true,currency:true}},occupancies:{where:{status:{in:["ACTIVE","NOTICE_GIVEN"]}},select:{monthlyRate:true,unit:{select:{number:true}}},take:101}}}));
+      const tenancies=bounded(await db.tenancy.findMany({where:{facility,...range("startDate","start"),...range("endDate","end"),...range("noticeDate","notice")},take,orderBy:{id:"asc"},select:{id:true,facilityId:true,...tenancySelect,status:true,productLine:true,paymentMethod:true,startDate:true,endDate:true,noticeDate:true,customer:{select:{...customerSelect,email:true,phone:true}},account:{select:{accountNumber:true,balance:true,currency:true}},occupancies:{where:{status:{in:["ACTIVE","NOTICE_GIVEN"]}},select:{id:true,unitId:true,monthlyRate:true,unit:{select:{number:true,facilityId:true}}},take:101}}}));
       const handedOver=await handoverKeys(scope,tenancies.map(t=>t.id));
-      if(query.metrics.some(m=>["monthlyRate","unitCount"].includes(m.field)) && tenancies.some(t=>t.occupancies.length && !handedOver.has(`${t.facilityId}:${t.id}`)))throw new ReportError("REPORT_HANDOVER_REVIEW_REQUIRED");
+      const unitIds=[...new Set(tenancies.flatMap(t=>t.occupancies.map(o=>o.unitId)))];
+      const occupied=unitIds.length?await db.occupancy.findMany({where:{unitId:{in:unitIds},status:{in:["ACTIVE","NOTICE_GIVEN"]}},select:{id:true,unitId:true}}):[];
+      const byUnit=new Map<string,string[]>();for(const o of occupied)byUnit.set(o.unitId,[...(byUnit.get(o.unitId)??[]),o.id]);
+      const confirmed=(t:typeof tenancies[number])=>handedOver.has(`${t.facilityId}:${t.id}`)&&t.occupancies.every(o=>o.unit.facilityId===t.facilityId&&byUnit.get(o.unitId)?.length===1&&byUnit.get(o.unitId)?.[0]===o.id);
+      if(query.metrics.some(m=>["monthlyRate","unitCount"].includes(m.field)) && tenancies.some(t=>t.occupancies.length && !confirmed(t)))throw new ReportError("REPORT_HANDOVER_REVIEW_REQUIRED");
       return tenancies.map(t=> {
       if(t.occupancies.length>100)throw new ReportError("REPORT_LIMIT");
       // Sum Decimal values through Prisma Decimal, preserving exact cents.
       const rate=t.occupancies.reduce((sum,o)=>sum.add(o.monthlyRate),t.account.balance.mul(0));
-      const confirmed=handedOver.has(`${t.facilityId}:${t.id}`);
-      return {facility:t.facility.name,account:t.account.accountNumber,customer:name(t.customer),email:t.customer.email,phone:t.customer.phone,status:!confirmed && t.status!=="DRAFT"?"HANDOVER_REVIEW":t.status,units:t.occupancies.map(o=>o.unit.number).join(", "),product:t.productLine,paymentMethod:t.paymentMethod,monthlyRate:confirmed?rate.toFixed(2):null,balance:t.account.balance.toFixed(2),currency:t.account.currency,start:iso(t.startDate),end:iso(t.endDate),notice:iso(t.noticeDate),unitCount:confirmed?t.occupancies.length:null};
+      const verified=confirmed(t);
+      return {facility:t.facility.name,account:t.account.accountNumber,customer:name(t.customer),email:t.customer.email,phone:t.customer.phone,status:!verified && t.status!=="DRAFT"?"HANDOVER_REVIEW":t.status,units:t.occupancies.map(o=>o.unit.number).join(", "),product:t.productLine,paymentMethod:t.paymentMethod,monthlyRate:verified?rate.toFixed(2):null,balance:t.account.balance.toFixed(2),currency:t.account.currency,start:iso(t.startDate),end:iso(t.endDate),notice:iso(t.noticeDate),unitCount:verified?t.occupancies.length:null};
       });
     }
     case "units": return bounded(await db.unit.findMany({where:{facility,combinedIntoUnitId:null},take,orderBy:{id:"asc"},include:{facility:{select:{name:true,closedFloors:true}},unitType:true}})).map(u=>({facility:u.facility.name,unit:u.number,floor:u.floor,type:u.unitType.name,status:u.status,effectiveStatus:unitIsOperational(u,u.facility.closedFloors)?u.status:"CLOSED_FLOOR",products:effectiveUseTypes(u).join(" | "),monthlyRate:u.monthlyRate.toFixed(2),area:u.unitType.areaSqMetres===null?null:Number(u.unitType.areaSqMetres),operational:unitIsOperational(u,u.facility.closedFloors)}));

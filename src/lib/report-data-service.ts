@@ -43,7 +43,7 @@ export async function buildReportRows(scope: RequestScope, parameters: ReportPar
       return facilities.map((item) => {
         const operational = item.units.filter(unit=>unitIsOperational(unit,item.closedFloors));
         const occupied = operational.map(unit => ({ unit, occupancy: unit.occupancies.length === 1 && unit.occupancies[0].tenancy.facilityId === item.id && handedOver.has(`${item.id}:${unit.occupancies[0].tenancyId}`) ? unit.occupancies[0] : null })).filter(row => row.occupancy);
-        const reviewUnits = operational.filter(unit => unit.occupancies.length > 0 && !(unit.occupancies.length === 1 && unit.occupancies[0].tenancy.facilityId === item.id && handedOver.has(`${item.id}:${unit.occupancies[0].tenancyId}`))).length;
+        const reviewUnits = operational.filter(unit => (unit.occupancies.length > 0 || unit.status === "OCCUPIED") && !(unit.occupancies.length === 1 && unit.occupancies[0].tenancy.facilityId === item.id && handedOver.has(`${item.id}:${unit.occupancies[0].tenancyId}`))).length;
         const potentialRent = operational.reduce((sum, unit) => sum + Number(unit.monthlyRate), 0);
         const achievedRent = occupied.reduce((sum, unit) => sum + Number(unit.occupancy!.monthlyRate), 0);
         return { snapshotTakenAt, facility: item.name, totalUnits: item.units.length, operationalUnits:operational.length, closedFloorUnits:item.units.length-operational.length, occupiedUnits: occupied.length, handoverReviewUnits: reviewUnits, physicalOccupancyPercent: operational.length ? Number((occupied.length / operational.length * 100).toFixed(2)) : 0, monthlyOccupiedRent: achievedRent, potentialMonthlyRent: potentialRent, economicOccupancyPercent: potentialRent ? Number((achievedRent / potentialRent * 100).toFixed(2)) : 0 };

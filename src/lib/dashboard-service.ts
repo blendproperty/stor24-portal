@@ -73,6 +73,7 @@ export async function getDashboardKpis(scope: RequestScope): Promise<DashboardKp
     currentTenancies,
     totalUnits,
     currentOccupancies,
+    orphanedOccupiedUnits,
     billedAgg,
     collectedAgg,
     leadsThisMonth,
@@ -82,6 +83,7 @@ export async function getDashboardKpis(scope: RequestScope): Promise<DashboardKp
     db.tenancy.findMany({ where: { facility: facilityWhere(scope), status: { in: ["ACTIVE", "NOTICE_GIVEN"] } }, select: { id: true, facilityId: true } }),
     db.unit.count({ where: { facility: facilityWhere(scope) } }),
     db.occupancy.findMany({ where: { unit: { facility: facilityWhere(scope) }, status: { in: ["ACTIVE", "NOTICE_GIVEN"] } }, select: { unitId: true, tenancyId: true, unit: { select: { facilityId: true } }, tenancy: { select: { facilityId: true } } } }),
+    db.unit.count({where:{facility:facilityWhere(scope),status:"OCCUPIED",occupancies:{none:{status:{in:["ACTIVE","NOTICE_GIVEN"]}}}}}),
     db.ledgerEntry.aggregate({
       _sum: { amount: true },
       where: { type: "CHARGE", effectiveAt: { gte: monthStart }, account: { tenancy: { facility: facilityWhere(scope) } } },
@@ -97,7 +99,7 @@ export async function getDashboardKpis(scope: RequestScope): Promise<DashboardKp
   for (const occupancy of currentOccupancies) byUnit.set(occupancy.unitId, [...(byUnit.get(occupancy.unitId) ?? []), occupancy]);
   const confirmedUnits = [...byUnit.values()].filter(rows => rows.length === 1 && rows[0].unit.facilityId === rows[0].tenancy.facilityId && handedOver.has(`${rows[0].tenancy.facilityId}:${rows[0].tenancyId}`));
   const occupiedUnits = confirmedUnits.length;
-  const handoverReviewUnits = byUnit.size - occupiedUnits;
+  const handoverReviewUnits = byUnit.size - occupiedUnits + orphanedOccupiedUnits;
   const legacyWon=await legacyHandedOverLeadIds(scope,cohortLeads);
   const wonThisMonth = cohortLeads.filter(l => legacyWon.has(l.id) || l.reservations.some(r => r.status === "CONVERTED" && r.convertedTenancyId && handedOver.has(`${l.facilityId}:${r.convertedTenancyId}`))).length;
 
@@ -223,7 +225,7 @@ export async function getUnitStatsByFacility(scope: RequestScope): Promise<Facil
   return facilities.map(facility => {
     const total = facility.units.length;
     const occupied = facility.units.filter(unit => (unit.occupancies.length === 1 && unit.occupancies[0].tenancy.facilityId === facility.id && handedOver.has(`${facility.id}:${unit.occupancies[0].tenancyId}`))).length;
-    const handoverReview = facility.units.filter(unit => unit.occupancies.length > 0 && !(unit.occupancies.length === 1 && unit.occupancies[0].tenancy.facilityId === facility.id && handedOver.has(`${facility.id}:${unit.occupancies[0].tenancyId}`))).length;
+    const handoverReview = facility.units.filter(unit => (unit.occupancies.length > 0 || unit.status === "OCCUPIED") && !(unit.occupancies.length === 1 && unit.occupancies[0].tenancy.facilityId === facility.id && handedOver.has(`${facility.id}:${unit.occupancies[0].tenancyId}`))).length;
     return {
       facilityId: facility.id, facilityName: facility.name, total, occupied, handoverReview,
       available: facility.units.filter(unit => unit.status === "AVAILABLE" && unitIsOperational(unit, facility.closedFloors)).length,

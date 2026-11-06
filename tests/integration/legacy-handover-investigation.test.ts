@@ -107,7 +107,15 @@ test('legacy signature does not establish recorded handover', async () => {
   assert.equal((await buildReportRows(scope,reportArgs))[0].handoverReviewUnits,1);
   assert.equal((await buildReportRows(scope,reportArgs))[0].occupiedUnits,0);
   assert.equal((await getDashboardKpis(scope)).handoverReviewUnits,1);
+  const conflictVisual=await visualReportSource(scope,visualLease);
+  assert.ok(conflictVisual.every(row=>row.status==='HANDOVER_REVIEW'&&row.unitCount===null));
+  await assert.rejects(visualReportSource(scope,{...visualLease,metrics:[{field:'unitCount',operation:'sum'}]}),/REPORT_HANDOVER_REVIEW_REQUIRED/);
   await db.occupancy.deleteMany({where:{tenancyId:conflict.id}}); await db.tenancy.delete({where:{id:conflict.id}});
+  const orphan=await db.unit.create({data:{facilityId:facility.id,unitTypeId:unitType.id,number:`orphan-${key}`,monthlyRate:100,status:'OCCUPIED'}});
+  assert.equal((await buildReportRows(scope,reportArgs))[0].handoverReviewUnits,1);
+  assert.equal((await getDashboardKpis(scope)).handoverReviewUnits,1);
+  assert.equal((await getUnitStatsByFacility(scope))[0].handoverReview,1);
+  await db.unit.delete({where:{id:orphan.id}});
   await db.tenancy.update({where:{id:signed.id},data:{status:'CLOSED'}});
   assert.equal((await marketingWorkspace(scope)).leads.find(l=>l.id===lead.id)?.won,true);
   assert.equal((await buildReportRows(scope,conversionArgs))[0].stage,'WON');
