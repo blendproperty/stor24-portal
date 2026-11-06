@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { db } from '../../src/lib/db';
+import { visualReportSource } from '../../src/lib/visual-report-data';
+import { defaultVisualQuery } from '../../src/lib/visual-report-engine';
 import { getDashboardKpis, getOccupancyTrend, getPipelineByStage, getUnitStatsByFacility } from '../../src/lib/dashboard-service';
 import { buildReportRows } from '../../src/lib/report-data-service';
 import { marketingWorkspace } from '../../src/lib/marketing-service';
@@ -44,8 +46,11 @@ test('legacy signature does not establish recorded handover', async () => {
   assert.equal((await getPipelineByStage(scope)).find(row=>row.stage==='WON')?.count,0);
   const conversionArgs={...reportArgs,reportKey:'lead-conversion'};
   assert.equal((await buildReportRows(scope,conversionArgs))[0].stage,'RESERVED');
+  const visualArgs={...defaultVisualQuery('leads','2026-01-01','2026-12-31'),facilityId:facility.id};
+  assert.equal((await visualReportSource(scope,visualArgs))[0].stage,'RESERVED');
   await db.lead.update({where:{id:lead.id},data:{stage:'WON'}});
   assert.equal((await buildReportRows(scope,conversionArgs))[0].stage,'HANDOVER_REVIEW');
+  assert.equal((await visualReportSource(scope,visualArgs))[0].stage,'HANDOVER_REVIEW');
   await db.lead.update({where:{id:lead.id},data:{stage:'RESERVED'}});
   await assert.rejects(updateLead(scope,lead.id,{updatedAt:before.updatedAt.toISOString(),stage:'WON',notes:'',nextActionAt:null,assignedToId:null}),/LEAD_BOOKING_STAGE/);
   const other=await db.facility.create({data:{organisationId:org.id,name:'Unrelated store',code:randomUUID()}});
@@ -62,6 +67,7 @@ test('legacy signature does not establish recorded handover', async () => {
   assert.equal((await getOccupancyTrend(scope)).at(-1)?.value,100); assert.equal((await getUnitStatsByFacility(scope))[0].occupied,1);
   assert.equal((await getPipelineByStage(scope)).find(row=>row.stage==='WON')?.count,1);
   assert.equal((await buildReportRows(scope,conversionArgs))[0].stage,'WON');
+  assert.equal((await visualReportSource(scope,visualArgs))[0].stage,'WON');
   const otherAccount=await db.account.create({data:{customerId:customer.id,accountNumber:`conflict-${key}`}});
   const conflict=await db.tenancy.create({data:{facilityId:facility.id,customerId:customer.id,accountId:otherAccount.id,status:'ACTIVE',startDate:new Date(),occupancies:{create:{unitId:unit.id,status:'ACTIVE',startDate:new Date(),monthlyRate:100}}}});
   assert.equal((await buildReportRows(scope,reportArgs))[0].handoverReviewUnits,1);
