@@ -52,7 +52,7 @@ export async function postCombinedBilling(scope: RequestScope, raw: unknown, fin
     for (const bill of combined.accounts) {
       for (const [index, line] of bill.lines.entries()) {
         const entry = await tx.ledgerEntry.create({ data: { accountId: bill.accountId, type: line.type, amount: line.amount, taxAmount: line.taxAmount, description: line.description, effectiveAt: periodDates(input.period).effectiveAt, externalRef: index === 0 ? `RENT-${input.period}` : `BILL-${input.period}-${line.key}`, createdById: scope.userId, metadata: { billingPeriod: input.period, invoiceNumber, approvalReference: bill.approvalReference, fingerprint: bill.fingerprint, chargeKey: line.key } } });
-        lines.push({ id: entry.id, description: `${bill.accountNumber} · ${entry.description}`, effectiveAt: entry.effectiveAt, amount: Number(entry.amount) * (entry.type === "CREDIT" ? -1 : 1), taxAmount: Number(entry.taxAmount) * (entry.type === "CREDIT" ? -1 : 1) });
+        lines.push({ id: entry.id, description: `${bill.accountNumber} - ${entry.description}`, effectiveAt: entry.effectiveAt, amount: Number(entry.amount) * (entry.type === "CREDIT" ? -1 : 1), taxAmount: Number(entry.taxAmount) * (entry.type === "CREDIT" ? -1 : 1) });
       }
       const account = await tx.account.update({ where: { id: bill.accountId }, data: { balance: { increment: bill.total } } });
       balance = balance.add(account.balance);

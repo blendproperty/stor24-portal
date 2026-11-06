@@ -7731,3 +7731,5 @@ Validation follow-up: the project typecheck and targeted ESLint for the candidat
 - Outstanding: Faeez must clarify introductory discount proration, notice eligibility and automatic invoice delivery; finance must confirm tax and contract treatment. Existing provider, data, training, UAT and approval gates remain open.
 
 2026-11-06 follow-up: isolated PostgreSQL additionally passed an injected invoice-number conflict proving all combined ledger entries, balances and memberships roll back, and a transfer adjustment against an account linked to a combined invoice. Draft PR #724 remains unmerged and undeployed; CI and staff/finance UAT remain outstanding.
+
+2026-11-06 PR #724 CI review: head 73e4671 had passing merchandise transaction and restricted-runtime workflows; CI and security staging failed at build due to invalid UTF-8 in combined-billing-preview.ts. Corrected the source encoding and prepared docs/testing/combined-invoice-transfer-uat-20261106.md for isolated staff and finance testing. New-head CI, non-production environment and staff/finance acceptance remain pending. No merge, deployment, configuration or production verification occurred.
