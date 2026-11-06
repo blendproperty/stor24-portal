@@ -16,6 +16,8 @@ test("navigation follows grants and specific subpage rules, not job title", () =
   assert.equal(canVisit("/billing/monthly", manager), false);
   assert.equal(canVisit("/billing/netcash", manager), true);
   assert.equal(canVisit("/operations", manager), true);
+  assert.equal(canVisit("/transfers", manager), false);
+  assert.equal(canVisit("/transfers", {owner:false,permissions:["ledger.view"]}), true);
   assert.equal(canVisit("/settings", manager), true);
   assert.equal(canVisit("/users", manager), false);
   assert.equal(canVisit("/billing", {owner:false,permissions:["billing.*"]}), true);

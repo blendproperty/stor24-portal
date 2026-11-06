@@ -20,7 +20,7 @@ test("real endpoint returns only the fresh authenticated selection and never cac
   assert.equal((await full.json()).data.guides.length, workflowGuides.length);
   endpoint.setAuth({role: "Organisation owner", user: {roleAssignments: [assignment(["ledger.view"])]}});
   const reduced = (await (await endpoint.GET()).json()).data;
-  assert.deepEqual(reduced.guides.map((g: {id: string}) => g.id), ["access-restricted", "accounts", "statements"]);
+  assert.deepEqual(reduced.guides.map((g: {id: string}) => g.id), ["access-restricted", "accounts", "transfers-hub", "statements"]);
   endpoint.setAuth(null);
   const rejected = await endpoint.GET();
   assert.equal(rejected.status, 401);

@@ -18,7 +18,7 @@ const rules: Record<string, string[]> = {
   "/billing/debit-orders": ["debit_orders.view"],
   "/collections": ["collections.view"], "/access": ["access.view"],
   "/operations": ["operations.view"], "/operations/move-in": ["move_in.create"], "/operations/lease-signing": ["move_in.create"],
-  "/operations/accounts": ["ledger.view"],
+  "/operations/accounts": ["ledger.view"], "/transfers": ["ledger.view"],
   "/operations/payment-review": ["payments.view"],
   "/insurance": ["operations.view"], "/adjustments": ["adjustments.view"],
   "/company": ["configuration.view"],

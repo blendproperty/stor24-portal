@@ -112,9 +112,11 @@ function generateReference(accountNumber: string) {
 export function AccountsWorkspace({
   initialAccountId,
   initialDocumentId,
+  transferMode = false,
 }: {
   initialAccountId?: string;
   initialDocumentId?: string;
+  transferMode?: boolean;
 }) {
   const [data, setData] = useState<Data | null>(null);
   const [selectedId, setSelectedId] = useState("");
@@ -285,8 +287,8 @@ export function AccountsWorkspace({
     <div className="page-stack finance-accounts-workspace">
       <PageHeader
         eyebrow="Operations centre"
-        title="Accounts"
-        description="Manage tenant balances, payments, transfers and move-outs against live store records."
+        title={transferMode ? "Transfers" : "Accounts"}
+        description={transferMode ? "Select an active account and choose Transfer to move the tenancy to an available unit." : "Manage tenant balances, payments, transfers and move-outs against live store records."}
         action={
           <Link href="/operations/move-in" className="button button-primary">
             <Plus size={16} />
@@ -294,9 +296,10 @@ export function AccountsWorkspace({
           </Link>
         }
       />
+      {transferMode && <p className="panel panel-spacious">Transfers change the unit and rental rate. They do not automatically calculate or post a pro-rata credit or charge. Confirm the financial adjustment and transfer documentation before completing a move.</p>}
       <section className="panel panel-spacious">
         {readError ? <p role="alert">{readError}</p> : null}
-        {readAccess === "signed-out" ? <Link className="button button-primary" href="/login?next=%2Faccounts">Sign in again</Link> : <button className="button button-secondary" disabled={readBusy || busy || !!dialog} onClick={() => void load()}>{readBusy ? "Loading accounts…" : "Reload accounts"}</button>}
+        {readAccess === "signed-out" ? <Link className="button button-primary" href={transferMode ? "/login?next=%2Ftransfers" : "/login?next=%2Faccounts"}>Sign in again</Link> : <button className="button button-secondary" disabled={readBusy || busy || !!dialog} onClick={() => void load()}>{readBusy ? "Loading accounts…" : "Reload accounts"}</button>}
       </section>
       {error && !dialog ? <p className="form-error" role="alert">{error}</p> : null}
       {notice ? <p className="form-success">{notice}</p> : null}
