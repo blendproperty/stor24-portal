@@ -43,8 +43,8 @@ test("reporting and move-in pages use their own permission scope despite unrelat
     const graphs = await load("src/app/graphs/page.tsx", db, restricted, { "dashboard-service": dashboard });
     await graphs.default();
     const page = await load("src/app/operations/move-in/page.tsx", db, restricted, {
-      "leasing-service": "export const listLeasing=async(s)=>{__db.scopes.push(s);return {facilities:[],customers:[],reservations:[]}};",
-      "leasing": "export const moveInAction=async()=>{};",
+      "leasing-service": "export const listLeasing=async(s)=>{__db.scopes.push(s);return {facilities:[],customers:[],reservations:[],tenancies:[]}};",
+      "leasing": "export const moveInAction=async()=>{};export const confirmLegacyHandoverAction=async()=>{};",
       "move-in-workspace": "export const MoveInWorkspace=()=>null;", "move-in-training": "export const TrainingEntry=()=>null;",
     });
     await page.default({ searchParams: Promise.resolve({}) });

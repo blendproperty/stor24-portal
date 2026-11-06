@@ -128,7 +128,7 @@ export async function marketingWorkspace(scope: RequestScope) {
         reserved: l.reservations.some(
           (r) => (r.status === "ACTIVE" && r.journey === "RENTAL") || (r.status === "CONVERTED" && Boolean(r.convertedTenancyId) && !handedOver.has(`${l.facilityId}:${r.convertedTenancyId}`)),
         ),
-        stage: l.stage,
+        stage: l.reservations.some(r=>r.status==="CONVERTED" && r.convertedTenancyId && handedOver.has(`${l.facilityId}:${r.convertedTenancyId}`)) ? "WON" : l.stage==="WON" ? "HANDOVER_REVIEW" : l.stage,
       };
     }),
   };

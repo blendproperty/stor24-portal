@@ -9,6 +9,7 @@ import { moveInSchema } from "@/lib/validators";
 import { confirmReservationMoveIn } from "@/lib/reservation-move-in";
 import { db } from "@/lib/db";
 import { facilityWhere, requirePermissionScope } from "@/lib/scope";
+import { confirmLegacyHandover } from "@/lib/legacy-handover";
 
 const text = (data: FormData, key: string) => String(data.get(key) ?? "").trim() || undefined;
 const number = (data: FormData, key: string) => text(data, key) ? Number(text(data, key)) : undefined;
@@ -52,4 +53,16 @@ export async function confirmReservationMoveInAction(data: FormData): Promise<{ 
   }
   for (const path of ["/tenants", "/units", "/reservations", "/operations/accounts", "/operations/move-in", "/my"]) revalidatePath(path);
   redirect(`/operations/move-in?reservation=${encodeURIComponent(reservationId)}`);
+}
+
+export async function confirmLegacyHandoverAction(data:FormData):Promise<{error:string}|undefined> {
+  const id=text(data,"tenancyId");
+  if(!id || data.get("handoverConfirmed")!=="on")return {error:"Check the original identity document and confirm that keys are being handed over."};
+  const visible=await requireScope();
+  const tenancy=await db.tenancy.findFirst({where:{id,facility:facilityWhere(visible)},select:{facilityId:true}});
+  if(!tenancy)return {error:"This lease is unavailable. Refresh and try again."};
+  const scope=await requirePermissionScope("move_in.create",tenancy.facilityId);
+  try {await confirmLegacyHandover(scope,id,true);} catch {return {error:"Handover could not be confirmed. Refresh to check its status and the agreement, payment, ID, photo, date and unit before retrying."};}
+  for(const path of ["/tenants","/units","/reservations","/operations/accounts","/operations/move-in","/my"])revalidatePath(path);
+  redirect("/operations/move-in");
 }

@@ -11,24 +11,28 @@ type PhotoState = {
 };
 const labels: Record<string, string> = { WAITING_REVIEW: "Photo received · awaiting staff review", APPROVED: "Photo reviewed · awaiting move-in", PENDING_PROVIDER: "Move-in recorded · access activation pending", EXPIRED: "Photo expired · a new photo will be needed", WITHDRAWN: "Consent withdrawn · stored photo removed", REJECTED: "New photograph needed" };
 
-export function TenantFacePhoto({ reservationId }: { reservationId: string }) {
+export function TenantFacePhoto({ reservationId, tenancyId }: { reservationId?: string; tenancyId?: string }) {
+  const legacy = Boolean(tenancyId);
+  const endpoint = legacy ? "/api/tenant/legacy-access-photo" : "/api/tenant/access-photo";
+  const idName = legacy ? "tenancyId" : "reservationId";
+  const id = tenancyId ?? reservationId ?? "";
   const [state, setState] = useState<PhotoState | null>(null), [error, setError] = useState("");
   const [busy, setBusy] = useState(false), [revision, setRevision] = useState(0);
   const [fileName, setFileName] = useState("");
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`/api/tenant/access-photo?${new URLSearchParams({ reservationId })}`, { cache: "no-store", signal: controller.signal }).then(async response => {
+    fetch(`${endpoint}?${new URLSearchParams({ [idName]: id })}`, { cache: "no-store", signal: controller.signal }).then(async response => {
       const body = await response.json();
       if (!response.ok) throw new Error(body.error);
       if (!controller.signal.aborted) { setState(body.data); setError(""); }
     }).catch(err => { if (!controller.signal.aborted) { setState(null); setError(err instanceof Error ? err.message : "Please refresh your account."); } });
     return () => controller.abort();
-  }, [reservationId, revision]);
+  }, [endpoint, idName, id, revision]);
   async function upload(form: HTMLFormElement) {
     setBusy(true); setError("");
     try {
       const data = new FormData(form);
-      const response = await fetch("/api/tenant/access-photo", { method: "POST", body: data });
+      const response = await fetch(endpoint, { method: "POST", body: data });
       const body = await response.json(); if (!response.ok) throw new Error(body.error);
       form.reset(); setFileName(""); setState(null); setRevision(value => value + 1);
     } catch (err) { form.reset(); setFileName(""); setState(null); setError(err instanceof Error ? err.message : "Your photo could not be saved. Please refresh."); }
@@ -38,7 +42,7 @@ export function TenantFacePhoto({ reservationId }: { reservationId: string }) {
     <header className="face-customer-heading">
       <span className="face-customer-eyebrow">PART OF YOUR MOVE-IN</span>
       <h2>Your photograph for precinct access.</h2>
-      <p>Your photo will be uploaded and added to the precinct’s facial recognition system as part of your move-in, so you can enter the precinct.</p>
+      <p>Your photo will be securely saved for staff review and preparation for precinct access. Uploading it does not activate access.</p>
     </header>
     <div className="face-customer-layout">
     <aside className="face-photo-guide">
@@ -46,7 +50,7 @@ export function TenantFacePhoto({ reservationId }: { reservationId: string }) {
       <h3>A clear view of you.</h3>
       <p>Look straight at the camera, with your whole face in good light.</p>
       <ul><li><Check size={15} aria-hidden="true" /> Face the camera</li><li><Check size={15} aria-hidden="true" /> Keep your face unobstructed</li><li><Check size={15} aria-hidden="true" /> Use a plain background</li></ul>
-      <div className="face-guide-next"><span>WHAT HAPPENS NEXT</span><p>Our team reviews your photo and arranges your enrolment. At move-in, staff check your identity, hand over your keys and confirm that your precinct access is active.</p></div>
+      <div className="face-guide-next"><span>WHAT HAPPENS NEXT</span><p>Our team reviews your photo and arranges your enrolment. At move-in, staff check your identity and hand over your keys. Precinct access must be confirmed separately.</p></div>
     </aside>
     <div className="face-customer-form">
     <div className="face-form-title"><h3>Your access photograph</h3><span><ShieldCheck size={14} aria-hidden="true" /> Private upload</span></div>
@@ -54,7 +58,7 @@ export function TenantFacePhoto({ reservationId }: { reservationId: string }) {
     {state && !state.available && <div className="face-collection-hold"><Clock3 size={24} aria-hidden="true" /><h4>Photo collection isn’t open yet</h4><p>{state.policy ? "Uploads are currently unavailable for this booking. Contact your store to arrange access." : "Photo upload is not available yet. Your store will arrange this step with you as part of your move-in."}</p></div>}
     {!state && !error && <p role="status">Checking your photo status…</p>}
     {state?.available && state.policy && <form key={`${state.photo?.version ?? 0}:${state.policy.hash}`} onSubmit={event => { event.preventDefault(); void upload(event.currentTarget); }}>
-      <input type="hidden" name="reservationId" value={reservationId} /><input type="hidden" name="version" value={state.photo?.version ?? 0} /><input type="hidden" name="policyHash" value={state.policy.hash} />
+      <input type="hidden" name={idName} value={id} /><input type="hidden" name="version" value={state.photo?.version ?? 0} /><input type="hidden" name="policyHash" value={state.policy.hash} />
       <label className={`face-photo-picker${fileName ? " has-file" : ""}`}>
         <span className="face-picker-icon">{fileName ? <FileImage size={25} aria-hidden="true" /> : <Camera size={25} aria-hidden="true" />}</span>
         <strong>{fileName || "Add your photograph"}</strong>
@@ -71,7 +75,7 @@ export function TenantFacePhoto({ reservationId }: { reservationId: string }) {
     {state?.photo && ["WAITING_REVIEW", "APPROVED", "PENDING_PROVIDER"].includes(state.photo.status) && <button className="face-text-button" disabled={busy} onClick={async () => {
       setBusy(true); setError("");
       try {
-        const response = await fetch(`/api/tenant/access-photo?${new URLSearchParams({ reservationId, version: String(state.photo!.version) })}`, { method: "DELETE" });
+        const response = await fetch(`${endpoint}?${new URLSearchParams({ [idName]: id, version: String(state.photo!.version) })}`, { method: "DELETE" });
         const body = await response.json(); if (!response.ok) throw new Error(body.error);
         setFileName(""); setState(null); setRevision(value => value + 1);
       } catch (err) { setError(err instanceof Error ? err.message : "Please try again."); }

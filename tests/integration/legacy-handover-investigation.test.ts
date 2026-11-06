@@ -29,9 +29,14 @@ test('legacy signature does not establish recorded handover', async () => {
   const envelope=`synthetic-${key}`;
   await db.document.update({where:{id:draft.document.id},data:{externalId:envelope,status:'SENT'}});
   await completeBlendSignEnvelope(envelope);
+  const afterSignature=await db.tenancy.findUniqueOrThrow({where:{id:draft.tenancy.id},include:{occupancies:true}});
+  assert.equal(afterSignature.status,'DRAFT');
+  assert.equal(afterSignature.occupancies[0].status,'PENDING');
+  // Reproduce rows created by the earlier signing implementation.
+  await db.tenancy.update({where:{id:draft.tenancy.id},data:{status:'ACTIVE'}});
+  await db.occupancy.update({where:{id:afterSignature.occupancies[0].id},data:{status:'ACTIVE'}});
+  await db.unit.update({where:{id:unit.id},data:{status:'OCCUPIED'}});
   const signed=await db.tenancy.findUniqueOrThrow({where:{id:draft.tenancy.id},include:{occupancies:true}});
-  assert.equal(signed.status,'ACTIVE');
-  assert.equal(signed.occupancies[0].status,'ACTIVE');
   assert.equal(await db.auditEvent.count({where:{organisationId:org.id,facilityId:facility.id,entityId:signed.id,action:'tenancy.key_handover_confirmed'}}),0);
   const listed=await listLeasing(scope,true);
   assert.equal(listed.customers.find(c=>c.id===customer.id)?.tenancies[0].handedOver,false);
@@ -45,6 +50,12 @@ test('legacy signature does not establish recorded handover', async () => {
   const moveArgs={...reportArgs,reportKey:'move-activity'};
   const beforeMove=(await buildReportRows(scope,moveArgs))[0];
   assert.equal(beforeMove.status,'HANDOVER_REVIEW'); assert.equal(beforeMove.moveIn,null); assert.ok(beforeMove.recordedStart);
+  const durationArgs={...reportArgs,reportKey:'tenant-duration'};
+  assert.equal((await buildReportRows(scope,durationArgs))[0].reviewStatus,'HANDOVER_REVIEW');
+  assert.equal((await buildReportRows(scope,durationArgs))[0].daysInUnit,null);
+  const rentRollArgs={...reportArgs,reportKey:'rent-roll'};
+  assert.equal((await buildReportRows(scope,rentRollArgs))[0].tenancyStatus,'HANDOVER_REVIEW');
+  assert.equal((await buildReportRows(scope,rentRollArgs))[0].monthlyRate,null);
   const beforeKpis=await getDashboardKpis(scope); assert.equal(beforeKpis.occupiedUnits,0); assert.equal(beforeKpis.activeTenancies,0); assert.equal(beforeKpis.handoverReviewUnits,1); assert.equal(beforeKpis.wonThisMonth,0);
   assert.equal((await getOccupancyTrend(scope)).at(-1)?.value,0); assert.equal((await getUnitStatsByFacility(scope))[0].handoverReview,1);
   assert.equal((await getPipelineByStage(scope)).find(row=>row.stage==='WON')?.count,0);
@@ -52,6 +63,12 @@ test('legacy signature does not establish recorded handover', async () => {
   assert.equal((await buildReportRows(scope,conversionArgs))[0].stage,'RESERVED');
   const visualArgs={...defaultVisualQuery('leads','2026-01-01','2026-12-31'),facilityId:facility.id};
   assert.equal((await visualReportSource(scope,visualArgs))[0].stage,'RESERVED');
+  const visualLease={...defaultVisualQuery('tenants','2026-01-01','2026-12-31'),facilityId:facility.id};
+  const visualOccupancy={...defaultVisualQuery('occupancies','2026-01-01','2026-12-31'),facilityId:facility.id};
+  assert.equal((await visualReportSource(scope,visualLease))[0].status,'HANDOVER_REVIEW');
+  assert.equal((await visualReportSource(scope,visualLease))[0].unitCount,null);
+  assert.equal((await visualReportSource(scope,visualOccupancy))[0].status,'HANDOVER_REVIEW');
+  await assert.rejects(visualReportSource(scope,{...visualLease,metrics:[{field:'unitCount',operation:'sum'}]}),/REPORT_HANDOVER_REVIEW_REQUIRED/);
   const today=southAfricaDateKey(new Date());
   const cohortArgs={...defaultVisualQuery('marketing-payment-cohorts',today,today),facilityId:facility.id};
   assert.equal((await visualReportSource(scope,cohortArgs))[0].stage,'RESERVED');
@@ -74,11 +91,16 @@ test('legacy signature does not establish recorded handover', async () => {
   assert.equal(afterReport.occupiedUnits,1); assert.equal(afterReport.handoverReviewUnits,0);
   const afterMove=(await buildReportRows(scope,moveArgs))[0];
   assert.equal(afterMove.status,'ACTIVE'); assert.ok(afterMove.moveIn);
+  assert.equal((await buildReportRows(scope,durationArgs))[0].reviewStatus,'PENDING');
+  assert.equal((await buildReportRows(scope,rentRollArgs))[0].monthlyRate,100);
   const afterKpis=await getDashboardKpis(scope); assert.equal(afterKpis.occupiedUnits,1); assert.equal(afterKpis.activeTenancies,1); assert.equal(afterKpis.handoverReviewUnits,0); assert.equal(afterKpis.wonThisMonth,1);
   assert.equal((await getOccupancyTrend(scope)).at(-1)?.value,100); assert.equal((await getUnitStatsByFacility(scope))[0].occupied,1);
   assert.equal((await getPipelineByStage(scope)).find(row=>row.stage==='WON')?.count,1);
   assert.equal((await buildReportRows(scope,conversionArgs))[0].stage,'WON');
   assert.equal((await visualReportSource(scope,visualArgs))[0].stage,'WON');
+  assert.equal((await visualReportSource(scope,visualLease))[0].status,'ACTIVE');
+  assert.equal((await visualReportSource(scope,visualLease))[0].unitCount,1);
+  assert.equal((await visualReportSource(scope,visualOccupancy))[0].status,'ACTIVE');
   assert.equal((await visualReportSource(scope,cohortArgs))[0].stage,'WON');
   const otherAccount=await db.account.create({data:{customerId:customer.id,accountNumber:`conflict-${key}`}});
   const conflict=await db.tenancy.create({data:{facilityId:facility.id,customerId:customer.id,accountId:otherAccount.id,status:'ACTIVE',startDate:new Date(),occupancies:{create:{unitId:unit.id,status:'ACTIVE',startDate:new Date(),monthlyRate:100}}}});
@@ -92,5 +114,11 @@ test('legacy signature does not establish recorded handover', async () => {
   assert.equal((await listLeasing(scope,true)).customers.find(c=>c.id===customer.id)?.tenancies[0].handedOver,true);
   assert.equal(await db.document.count({where:{id:draft.document.id,status:'SIGNED'}}),1);
   assert.equal(await db.ledgerEntry.count({where:{accountId:draft.tenancy.accountId}}),1);
+  const unlinked=await db.lead.create({data:{facilityId:facility.id,customerId:customer.id,source:'Synthetic historical',stage:'WON'}});
+  const review=(await leadsWorkspace(scope)).leads.find(l=>l.id===unlinked.id)!;
+  assert.equal(review.stage,'HANDOVER_REVIEW');
+  assert.equal((await marketingWorkspace(scope)).leads.find(l=>l.id===unlinked.id)?.stage,'HANDOVER_REVIEW');
+  await updateLead(scope,unlinked.id,{updatedAt:review.updatedAt.toISOString(),stage:'HANDOVER_REVIEW',notes:'Retained for review',nextActionAt:null,assignedToId:null});
+  assert.equal((await db.lead.findUniqueOrThrow({where:{id:unlinked.id}})).stage,'WON');
   } finally { await db.$disconnect(); }
 });
