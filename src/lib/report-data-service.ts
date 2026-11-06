@@ -1,4 +1,4 @@
-import { handoverKeys } from "@/lib/handover-evidence";
+import { handoverKeys, handoverTimes } from "@/lib/handover-evidence";
 import {reservationDiscountReport} from "./reservation-price-service";
 import { recurringChargeReport } from "./recurring-charge-service";
 import { postedRecurringChargeReport } from "./posted-recurring-charge-service";
@@ -47,8 +47,17 @@ export async function buildReportRows(scope: RequestScope, parameters: ReportPar
       return units.map((unit) => ({ snapshotTakenAt, facility: unit.facility.name, unit: unit.number, floor: unit.floor, type: unit.unitType.name, microGroundFloorEligible:unitIsOperational(unit,unit.facility.closedFloors)&&unitSupportsProduct(unit,"MICRO_WAREHOUSE"), areaSqMetres: unit.unitType.areaSqMetres === null ? null : Number(unit.unitType.areaSqMetres), status: unit.status, effectiveStatus:unitIsOperational(unit,unit.facility.closedFloors)?unit.status:"CLOSED_FLOOR", floorOperational:unitIsOperational(unit,unit.facility.closedFloors), products:effectiveUseTypes(unit).join(" | "), monthlyRate: Number(unit.monthlyRate), activeHoldExpiresAt: unit.reservations[0]?.holdExpiresAt?.toISOString() ?? null }));
     }
     case "move-activity": {
-      const occupancies = await db.occupancy.findMany({ where: { tenancy: { facility }, OR: [{ startDate: { gte: from, lte: to } }, { endDate: { gte: from, lte: to } }] }, include: { unit: { select: { number: true } }, tenancy: { include: { facility: { select: { name: true } }, customer: { select: { firstName: true, lastName: true, companyName: true } }, account: { select: { accountNumber: true } } } } }, orderBy: { startDate: "asc" } });
-      return occupancies.map((item) => ({ facility: item.tenancy.facility.name, account: item.tenancy.account.accountNumber, customer: item.tenancy.customer.companyName || [item.tenancy.customer.firstName, item.tenancy.customer.lastName].filter(Boolean).join(" "), unit: item.unit.number, status: item.status, moveIn: item.startDate.toISOString(), moveOut: item.endDate?.toISOString() ?? null, monthlyRate: Number(item.monthlyRate) }));
+      const periodHandovers = await db.auditEvent.findMany({ where: { organisationId: scope.organisationId, facility, entityType: "Tenancy", action: "tenancy.key_handover_confirmed", occurredAt: { gte: from, lte: to } }, select: { entityId: true } });
+      const occupancies = await db.occupancy.findMany({ where: { tenancy: { facility }, OR: [{ startDate: { gte: from, lte: to } }, { endDate: { gte: from, lte: to } }, { tenancyId: { in: periodHandovers.map(e => e.entityId) } }] }, include: { unit: { select: { number: true, facilityId: true } }, tenancy: { include: { facility: { select: { name: true } }, customer: { select: { firstName: true, lastName: true, companyName: true } }, account: { select: { accountNumber: true } } } } }, orderBy: { startDate: "asc" } });
+      const handovers = await handoverTimes(scope, occupancies.map(o => o.tenancyId));
+      return occupancies.flatMap(item => {
+        const recordedHandover = item.unit.facilityId === item.tenancy.facilityId ? handovers.get(`${item.tenancy.facilityId}:${item.tenancyId}`) : undefined;
+        const handover = recordedHandover && (!item.endDate || item.endDate >= recordedHandover) ? recordedHandover : undefined;
+        const moveIn = handover ? new Date(Math.max(handover.getTime(), item.startDate.getTime())) : null;
+        const inPeriod = (date: Date | null) => Boolean(date && date >= from && date <= to);
+        if (handover && !inPeriod(moveIn) && !inPeriod(item.endDate)) return [];
+        return [{ facility: item.tenancy.facility.name, account: item.tenancy.account.accountNumber, customer: item.tenancy.customer.companyName || [item.tenancy.customer.firstName, item.tenancy.customer.lastName].filter(Boolean).join(" "), unit: item.unit.number, status: handover ? item.status : "HANDOVER_REVIEW", moveIn: moveIn?.toISOString() ?? null, moveOut: handover ? item.endDate?.toISOString() ?? null : null, recordedStart: item.startDate.toISOString(), monthlyRate: Number(item.monthlyRate) }];
+      });
     }
     case "lead-conversion": {
       const leads = await db.lead.findMany({ where: { facility, createdAt: { gte: from, lte: to } }, include: { facility: { select: { name: true } }, customer: { select: { firstName: true, lastName: true, companyName: true } }, assignedTo: { select: { name: true } }, reservations: { select: { status: true, convertedTenancyId: true, convertedTenancy: { select: { status: true } } } } }, orderBy: { createdAt: "asc" } });
