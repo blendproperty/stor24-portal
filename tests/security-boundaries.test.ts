@@ -461,7 +461,7 @@ test("receivables export uses approved ageing and shows review states instead of
 
 test("report date windows include SAST midnight and exclude the next SAST day", async () => {
   const state = fixture();
-  const records = ["2026-09-24T21:59:59.999Z", "2026-09-24T22:00:00.000Z", "2026-09-25T21:59:59.999Z", "2026-09-25T22:00:00.000Z"].map((v, i) => ({ createdAt: new Date(v), facility: { name: "A" }, customer: null, assignedTo: null, source: `boundary-${i}`, stage: "NEW", expectedMoveIn: null, nextActionAt: null }));
+  const records = ["2026-09-24T21:59:59.999Z", "2026-09-24T22:00:00.000Z", "2026-09-25T21:59:59.999Z", "2026-09-25T22:00:00.000Z"].map((v, i) => ({ createdAt: new Date(v), facility: { name: "A" }, customer: null, assignedTo: null, source: `boundary-${i}`, stage: "NEW", reservations: [], facilityId: "a", expectedMoveIn: null, nextActionAt: null }));
   state.db.lead = { findMany: async ({ where }: Row) => records.filter(r => r.createdAt >= where.createdAt.gte && r.createdAt <= where.createdAt.lte) };
   const api = await load("./src/lib/report-data-service.ts", state);
   const rows = await api.buildReportRows({ userId: "staff", organisationId: "org", facilityIds: ["a"], unrestrictedFacilities: false }, { reportKey: "lead-conversion", from: "2026-09-25", to: "2026-09-25", format: "JSON", groupBy: "day" });
@@ -471,7 +471,7 @@ test("report date windows include SAST midnight and exclude the next SAST day", 
 
 test("current snapshot report rows identify capture time despite historical parameters", async () => {
   const state = fixture();
-  state.db.facility.findMany = async () => [{ name: "A", units: [{ monthlyRate: 100, occupancies: [{ monthlyRate: 90 }] }] }];
+  state.db.facility.findMany = async () => [{ id: "a", name: "A", units: [{ monthlyRate: 100, occupancies: [] }] }];
   state.db.unit = { findMany: async () => [{ facility: { name: "A" }, number: "SYN", unitType: { name: "Synthetic", areaSqMetres: null }, monthlyRate: 100, status: "AVAILABLE", reservations: [] }] };
   state.db.integrationConnection = { findMany: async () => [{ facility: null, category: "Synthetic", provider: "Fixture", status: "DISABLED", consecutiveFailures: 0, failureCode: null, failureMessage: null }] };
   const api = await load("./src/lib/report-data-service.ts", state);

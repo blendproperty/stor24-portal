@@ -578,8 +578,7 @@ export async function expireReservation(
  * key. The caller creates the external envelope after this transaction,
  * keeping the database transaction free of network calls.
  *
- * The Tenancy/Occupancy only become ACTIVE/OCCUPIED once the customer
- * actually signs, via the authenticated BlendSign webhook.
+ * Signature retains the hold. Key handover activates the tenancy and unit.
  */
 export async function moveIn(
   scope: RequestScope,
@@ -801,18 +800,6 @@ export async function completeBlendSignEnvelope(envelopeId: string) {
     );
     if (!occupancy) throw new Error("CONFLICT");
     await requireOperationalUnit(tx, document.tenancy.facilityId, occupancy.unitId);
-    await tx.occupancy.update({
-      where: { id: occupancy.id },
-      data: { status: "ACTIVE" },
-    });
-    await tx.unit.update({
-      where: { id: occupancy.unitId },
-      data: { status: "OCCUPIED" },
-    });
-    await tx.tenancy.update({
-      where: { id: document.tenancyId },
-      data: { status: "ACTIVE" },
-    });
     await completeMoveInCharge(tx, document.tenancy.accountId);
     await tx.document.update({
       where: { id: document.id },
@@ -837,9 +824,7 @@ export async function completeBlendSignEnvelope(envelopeId: string) {
  * Completes a lease e-signature submitted from the public /sign/[token]
  * page. Unauthenticated by design — the signingToken is the credential,
  * generated with 32 random bytes and single-use per Document. On success,
- * flips the Occupancy to ACTIVE, the Unit to OCCUPIED and the Tenancy to
- * ACTIVE — this is the point at which the deal actually becomes a live
- * tenancy, not the earlier moveIn() call.
+ * records the signature; key handover is a separate step.
  *
  * Throws Error with message NOT_FOUND / ALREADY_SIGNED / EXPIRED /
  * VALIDATION_ERROR so the calling API route can map each to the right
@@ -878,18 +863,6 @@ export async function completeLeaseSigning(
       clauseKey: key,
       initialedAt: new Date().toISOString(),
     }));
-    await tx.occupancy.update({
-      where: { id: occupancy.id },
-      data: { status: "ACTIVE" },
-    });
-    await tx.unit.update({
-      where: { id: occupancy.unitId },
-      data: { status: "OCCUPIED" },
-    });
-    await tx.tenancy.update({
-      where: { id: tenancy.id },
-      data: { status: "ACTIVE" },
-    });
     await completeMoveInCharge(tx, tenancy.accountId);
     await tx.document.update({
       where: { id: document.id },

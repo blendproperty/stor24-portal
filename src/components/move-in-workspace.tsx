@@ -41,6 +41,9 @@ type Reservation = {
   paymentMethod: string | null;
   intendedMoveIn: string | null;
   quotedRate: number;
+  legacyHandover?: boolean;
+  legacyAccountId?: string | null;
+  legacySigned?: boolean;
   readiness: ReservationMoveInReadiness | null;
 };
 
@@ -446,6 +449,8 @@ export function MoveInWorkspace({
             </section>
           </aside>
         </section>
+      ) : selectedReservation?.legacyHandover ? (
+        <section className="panel panel-spacious"><h2>Continue the existing lease</h2><p>This booking already has a lease. Use the existing record rather than creating another agreement.</p>{selectedReservation.legacySigned ? <a className="button button-primary" href="#legacy-handovers">Open existing lease handover</a> : selectedReservation.legacyAccountId ? <a className="button button-primary" href={`/operations/accounts?accountId=${encodeURIComponent(selectedReservation.legacyAccountId)}`}>Open pending lease and account</a> : <p>The linked lease needs staff review.</p>}</section>
       ) : selectedReservation?.readiness ? (
         <ReservationMoveInConfirmation key={selectedReservation.id} reservationId={selectedReservation.id}
           customerName={selectedCustomer?.name ?? selectedReservation.label} unitNumber={selected?.number ?? ""}
