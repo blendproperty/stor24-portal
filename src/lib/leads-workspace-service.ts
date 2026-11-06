@@ -13,6 +13,7 @@ export const leadUpdateSchema = z.object({
   updatedAt: z.iso.datetime(),
   stage: z.enum(["NEW", "CONTACTED", "QUALIFIED", "QUOTED", "VIEWING_BOOKED", "RESERVED", "WON", "LOST"]),
   nextActionAt: z.iso.datetime().nullable(),
+  viewingAt: z.iso.datetime().nullable().optional(),
   expectedMoveIn: z.iso.date().nullable().optional(),
   notes: z.string().trim().max(2000),
   assignedToId: z.string().min(1).max(100).nullable(),
@@ -78,14 +79,15 @@ export async function updateLead(scope: RequestScope, id: string, input: LeadUpd
     const changed = await tx.lead.updateMany({ where: { id, updatedAt: new Date(input.updatedAt) }, data: {
       ...(input.enquiryLocation !== undefined ? { enquiryLocation: location ?? Prisma.DbNull } : {}),
       stage: hasConvertedBooking && !converted && input.stage === displayedStage ? lead.stage : input.stage, nextActionAt: input.nextActionAt ? new Date(input.nextActionAt) : null,
+      ...(input.viewingAt !== undefined ? { viewingAt: input.viewingAt ? new Date(input.viewingAt) : null } : {}),
       ...(input.expectedMoveIn !== undefined ? { expectedMoveIn: input.expectedMoveIn ? new Date(`${input.expectedMoveIn}T00:00:00.000Z`) : null } : {}),
       notes: input.notes || null, assignedToId: input.assignedToId,
     } });
     if (changed.count !== 1) throw new Error("CONFLICT");
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: lead.facilityId, actorId: scope.userId,
       action: "lead.updated", entityType: "Lead", entityId: id,
-      before: { expectedMoveIn: lead.expectedMoveIn?.toISOString() ?? null, enquiryLocation: lead.enquiryLocation, stage: lead.stage, nextActionAt: lead.nextActionAt?.toISOString() ?? null, assignedToId: lead.assignedToId, notes: lead.notes },
-      after: { expectedMoveIn: input.expectedMoveIn === undefined ? lead.expectedMoveIn?.toISOString() ?? null : input.expectedMoveIn, enquiryLocation: location, stage: hasConvertedBooking && !converted && input.stage === displayedStage ? lead.stage : input.stage, nextActionAt: input.nextActionAt, assignedToId: input.assignedToId, notes: input.notes || null } } });
+      before: { expectedMoveIn: lead.expectedMoveIn?.toISOString() ?? null, enquiryLocation: lead.enquiryLocation, stage: lead.stage, viewingAt: lead.viewingAt?.toISOString() ?? null, nextActionAt: lead.nextActionAt?.toISOString() ?? null, assignedToId: lead.assignedToId, notes: lead.notes },
+      after: { expectedMoveIn: input.expectedMoveIn === undefined ? lead.expectedMoveIn?.toISOString() ?? null : input.expectedMoveIn, enquiryLocation: location, stage: hasConvertedBooking && !converted && input.stage === displayedStage ? lead.stage : input.stage, nextActionAt: input.nextActionAt, viewingAt: input.viewingAt === undefined ? lead.viewingAt?.toISOString() ?? null : input.viewingAt, assignedToId: input.assignedToId, notes: input.notes || null } } });
     if(input.marketProfile)await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:lead.facilityId,actorId:scope.userId,action:'lead.market_profile.captured',entityType:'Lead',entityId:id,after:{marketProfile:input.marketProfile}}});
     return { id };
   });

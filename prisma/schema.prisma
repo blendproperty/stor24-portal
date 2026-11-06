@@ -460,6 +460,7 @@ model Lead {
   notes             String?
   expectedMoveIn    DateTime?
   nextActionAt      DateTime?
+  viewingAt         DateTime?
   assignedToId      String?
   assignedTo        User?         @relation(fields: [assignedToId], references: [id])
   offlineSubmissionId String?      @unique
@@ -468,6 +469,7 @@ model Lead {
   updatedAt         DateTime      @updatedAt
 
   @@index([facilityId, stage, nextActionAt])
+  @@index([facilityId, viewingAt])
 }
 
 model ReservationPriceAmendment {
