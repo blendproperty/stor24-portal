@@ -133,9 +133,10 @@ try{
   await expect(page.getByRole('heading',{name:'Activity history'})).toBeVisible();
   await expect(nav.getByRole('button',{name:/Lease agreement/})).toBeDisabled();
   await page.getByLabel('Needed date / expected move-in').fill('2026-11-01');
-  await page.getByLabel('Sales stage',{exact:true}).selectOption('CONTACTED');await page.getByLabel('Assigned owner').selectOption('staff');await page.getByLabel('Next follow-up (South Africa time)').fill('2026-10-12T14:30');
+  await page.getByLabel('Sales stage',{exact:true}).selectOption('CONTACTED');await page.getByLabel('Assigned owner').selectOption('staff');await page.getByLabel('Next follow-up (South Africa time)').fill('2026-10-12T14:30');await page.getByLabel('Viewing time (South Africa time)').fill('2026-10-13T10:00');
   await page.getByLabel('Enquiry city / town').fill('Pretoria');await page.getByLabel('Enquiry postal code').fill('0081');await page.screenshot({path:`output/leads-design/enquiry-origin-${width}.png`,fullPage:false});
   await page.getByRole('button',{name:'Save & continue to unit',exact:true}).click();
+  if(patch.viewingAt!=='2026-10-13T08:00:00.000Z')throw Error('Viewing time was not saved in South Africa time');
   if(patch.expectedMoveIn!=='2026-11-01')throw Error('Needed date was not saved');
   if(patch.enquiryLocation.city!=='Pretoria'||patch.enquiryLocation.postalCode!=='0081')throw Error('Optional enquiry origin was not retained in update request');
   await expect(page.getByRole('dialog')).toHaveCount(1);await expect(page.getByRole('heading',{name:'Choose and reserve storage space'})).toBeVisible();
