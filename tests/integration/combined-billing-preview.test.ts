@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { db } from "../../src/lib/db";
 import { monthlyBillingInvoices, saveMonthlyBillingPlan } from "../../src/lib/monthly-billing-service";
 import { combinedBillingPreview, postCombinedBilling } from "../../src/lib/combined-billing-preview";
@@ -36,6 +36,13 @@ test("combined preview groups only confirmed tenants for one customer and facili
   await assert.rejects(postCombinedBilling(scope,input,"0".repeat(64)),/BILLING_PREVIEW_CHANGED/);
   assert.equal(await db.ledgerEntry.count({where:{accountId:{in:items.map(item=>item.account.id)}}}),0);
   const refreshed=await combinedBillingPreview(scope,input);
+  const conflictNumber=`INV-${input.period.replace("-", "")}-C-${createHash("sha256").update(`${customer.id}:${store.id}`).digest("hex").slice(0,24)}`;
+  const conflict=await db.document.create({data:{tenancyId:items[0].tenancy.id,type:"CI_CONFLICT",storageKey:"ci",externalId:conflictNumber}});
+  await assert.rejects(postCombinedBilling(scope,input,refreshed.fingerprint));
+  assert.equal(await db.ledgerEntry.count({where:{accountId:{in:items.map(item=>item.account.id)}}}),0);
+  for(const item of items) assert.equal((await db.account.findUniqueOrThrow({where:{id:item.account.id}})).balance.toString(),"0");
+  assert.equal(await db.combinedInvoiceMembership.count({where:{accountId:{in:items.map(item=>item.account.id)}}}),0);
+  await db.document.delete({where:{id:conflict.id}});
   const outcomes=await Promise.allSettled([postCombinedBilling(scope,input,refreshed.fingerprint),postCombinedBilling(scope,input,refreshed.fingerprint)]);
   assert.equal(outcomes.filter(x=>x.status==="fulfilled").length,1, JSON.stringify(outcomes.map(x=>x.status === "rejected" ? String(x.reason) : "ok")));
   const posted=outcomes.find(x=>x.status==="fulfilled"); assert.ok(posted && posted.status==="fulfilled");

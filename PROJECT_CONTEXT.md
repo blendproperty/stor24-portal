@@ -7729,3 +7729,5 @@ Validation follow-up: the project typecheck and targeted ESLint for the candidat
 - Deployment and configuration: not deployed or configured. The migration has been applied only to an isolated synthetic database.
 - Live production verification: not performed; no live invoices, ledger entries or customer email were created.
 - Outstanding: Faeez must clarify introductory discount proration, notice eligibility and automatic invoice delivery; finance must confirm tax and contract treatment. Existing provider, data, training, UAT and approval gates remain open.
+
+2026-11-06 follow-up: isolated PostgreSQL additionally passed an injected invoice-number conflict proving all combined ledger entries, balances and memberships roll back, and a transfer adjustment against an account linked to a combined invoice. Draft PR #724 remains unmerged and undeployed; CI and staff/finance UAT remain outstanding.

@@ -4,19 +4,27 @@ import { randomUUID } from "node:crypto";
 import { db } from "../../src/lib/db";
 import { currentBillingPeriod, periodDates } from "../../src/lib/monthly-billing-policy";
 import { saveMonthlyBillingPlan, previewMonthlyBilling, postMonthlyBilling } from "../../src/lib/monthly-billing-service";
+import { combinedBillingPreview, postCombinedBilling } from "../../src/lib/combined-billing-preview";
 import { transfer } from "../../src/lib/leasing-service";
 import { previewTransferAdjustment, requestAdjustment, decideAdjustment } from "../../src/lib/adjustment-service";
 import { southAfricaDateKey } from "../../src/lib/south-africa-time";
 
 test.after(async () => { await db.$disconnect(); });
-for (const [oldRate, newRate, expectedKind] of [[1200, 1800, "CHARGE"], [1800, 1200, "CREDIT"]] as const) test(`verified ${expectedKind} transfer adjustment requires independent review and posts once`, async () => {
+for (const [oldRate, newRate, expectedKind, combined] of [[1200, 1800, "CHARGE", false], [1800, 1200, "CREDIT", false], [1200, 1800, "CHARGE", true]] as const) test(`verified ${expectedKind} transfer adjustment (combined: ${combined}) requires independent review and posts once`, async () => {
  assert.equal(process.env.MERCHANDISE_DB_TEST,"isolated-ci");assert.equal(new URL(process.env.DATABASE_URL!).hostname,"localhost");
  const key=randomUUID(),org=await db.organisation.create({data:{name:"Synthetic",slug:key}}),facility=await db.facility.create({data:{organisationId:org.id,name:"Synthetic",code:key}}),requester=await db.user.create({data:{organisationId:org.id,name:"Requester",email:`${key}@example.invalid`}}),reviewer=await db.user.create({data:{organisationId:org.id,name:"Reviewer",email:`review-${key}@example.invalid`}}),customer=await db.customer.create({data:{organisationId:org.id,firstName:"Synthetic"}}),type=await db.unitType.create({data:{facilityId:facility.id,name:"Storage"}});
  const oldUnit=await db.unit.create({data:{facilityId:facility.id,unitTypeId:type.id,number:"T1",monthlyRate:oldRate,status:"OCCUPIED"}}),newUnit=await db.unit.create({data:{facilityId:facility.id,unitTypeId:type.id,number:"T2",monthlyRate:newRate,status:"AVAILABLE"}}),account=await db.account.create({data:{customerId:customer.id,accountNumber:`T-${key}`}}),start=new Date("2025-01-01T00:00:00+02:00"),tenancy=await db.tenancy.create({data:{facilityId:facility.id,customerId:customer.id,accountId:account.id,status:"ACTIVE",startDate:start,occupancies:{create:{unitId:oldUnit.id,status:"ACTIVE",startDate:start,monthlyRate:oldRate}}}});
  const scope={organisationId:org.id,userId:requester.id,facilityIds:[facility.id],unrestrictedFacilities:false}, reviewerScope={...scope,userId:reviewer.id}, period=currentBillingPeriod();
  await db.auditEvent.create({data:{organisationId:org.id,facilityId:facility.id,entityType:"Tenancy",entityId:tenancy.id,action:"tenancy.key_handover_confirmed"}});
  await saveMonthlyBillingPlan(scope,account.id,{firstPeriod:period,proration:"ACTUAL_DAYS",taxPercent:15,rentTaxable:true,insuranceEnabled:false,insuranceTaxable:false,charges:[],discount:null,approvalReference:"synthetic approval"});
- const bill=await previewMonthlyBilling(scope,account.id,period);await postMonthlyBilling(scope,account.id,period,bill.fingerprint);
+ if (combined) {
+  const unit2=await db.unit.create({data:{facilityId:facility.id,unitTypeId:type.id,number:"T3",monthlyRate:900,status:"OCCUPIED"}});
+  const account2=await db.account.create({data:{customerId:customer.id,accountNumber:`T2-${key}`}});
+  const tenancy2=await db.tenancy.create({data:{facilityId:facility.id,customerId:customer.id,accountId:account2.id,status:"ACTIVE",startDate:start,occupancies:{create:{unitId:unit2.id,status:"ACTIVE",startDate:start,monthlyRate:900}}}});
+  await db.auditEvent.create({data:{organisationId:org.id,facilityId:facility.id,entityType:"Tenancy",entityId:tenancy2.id,action:"tenancy.key_handover_confirmed"}});
+  await saveMonthlyBillingPlan(scope,account2.id,{firstPeriod:period,proration:"ACTUAL_DAYS",taxPercent:15,rentTaxable:true,insuranceEnabled:false,insuranceTaxable:false,charges:[],discount:null,approvalReference:"synthetic approval"});
+  const input={customerId:customer.id,facilityId:facility.id,period}; const group=await combinedBillingPreview(scope,input); await postCombinedBilling(scope,input,group.fingerprint);
+ } else { const bill=await previewMonthlyBilling(scope,account.id,period);await postMonthlyBilling(scope,account.id,period,bill.fingerprint); }
  const date=southAfricaDateKey(new Date()), effective=new Date(`${date}T00:00:00.000Z`);
  await transfer(scope,{tenancyId:tenancy.id,toUnitId:newUnit.id,effectiveAt:effective});
  const event=await db.auditEvent.findFirstOrThrow({where:{entityId:tenancy.id,action:"tenancy.transferred"}});
