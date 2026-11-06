@@ -3,9 +3,10 @@ import { authErrorResponse } from "@/lib/auth-guards";
 import { requirePermissionScope } from "@/lib/scope";
 import { sameOrigin } from "@/lib/request-security";
 import { billingPeriodSchema } from "@/lib/monthly-billing-policy";
-import { monthlyBillingHistory, getMonthlyBillingPlan, monthlyBillingAccounts, monthlyBillingInvoices, postMonthlyBilling, previewMonthlyBilling, previewNextMonthForReview, saveMonthlyBillingPlan } from "@/lib/monthly-billing-service";
+import { monthlyBillingHistory, getMonthlyBillingPlan, monthlyBillingAccounts, monthlyBillingInvoices, postMonthlyBilling, approveScheduledInvoiceDraft, readScheduledInvoiceDraft, previewMonthlyBilling, previewNextMonthForReview, saveMonthlyBillingPlan } from "@/lib/monthly-billing-service";
 
 const requestSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("approve-draft"), accountId: z.string().cuid(), period: billingPeriodSchema, fingerprint: z.string().regex(/^[a-f0-9]{64}$/), confirm: z.literal(true) }).strict(),
   z.object({ action: z.literal("preview-next"), accountId: z.string().cuid() }).strict(),
   z.object({ action: z.literal("preview"), accountId: z.string().cuid(), period: billingPeriodSchema }).strict(),
   z.object({ action: z.literal("post"), accountId: z.string().cuid(), period: billingPeriodSchema, fingerprint: z.string().regex(/^[a-f0-9]{64}$/), confirm: z.literal(true) }).strict(),
@@ -45,6 +46,7 @@ export async function GET(request: Request) {
     const accountId = params.get("accountId");
     if (accountId) {
       z.string().cuid().parse(accountId);
+      if(params.get("draft")==="true") return Response.json({data:await readScheduledInvoiceDraft(scope,accountId)},{headers:{"cache-control":"private, no-store"}});
       if(params.get("history")==="true") {const before=params.get("before");const cursor=before?z.coerce.number().int().min(1).max(10000000).parse(before):undefined;return Response.json({data:await monthlyBillingHistory(scope,accountId,cursor)},{headers:{"cache-control":"private, no-store","x-content-type-options":"nosniff"}})}
       const [plan, invoices] = await Promise.all([getMonthlyBillingPlan(scope, accountId), monthlyBillingInvoices(scope, accountId)]);
       return Response.json({ data: { plan, invoices } });
@@ -57,7 +59,7 @@ export async function POST(request: Request) {
     if (!sameOrigin(request)) throw new Error("FORBIDDEN");
     const input = requestSchema.parse(await request.json());
     const scope = await requirePermissionScope((input.action === "preview" || input.action === "preview-next") ? "billing.view" : input.action === "plan" ? "configuration.manage" : "billing.manage");
-    const data = input.action === "plan" ? await saveMonthlyBillingPlan(scope, input.accountId, input.plan) : input.action === "preview" ? await previewMonthlyBilling(scope, input.accountId, input.period) : input.action === "preview-next" ? await previewNextMonthForReview(scope, input.accountId) : await postMonthlyBilling(scope, input.accountId, input.period, input.fingerprint);
+    const data = input.action === "plan" ? await saveMonthlyBillingPlan(scope, input.accountId, input.plan) : input.action === "preview" ? await previewMonthlyBilling(scope, input.accountId, input.period) : input.action === "preview-next" ? await previewNextMonthForReview(scope, input.accountId) : input.action === "approve-draft" ? await approveScheduledInvoiceDraft(scope, input.accountId, input.period, input.fingerprint) : await postMonthlyBilling(scope, input.accountId, input.period, input.fingerprint);
     return Response.json({ data });
   } catch (error) { return failure(error); }
 }

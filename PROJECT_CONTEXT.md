@@ -7795,3 +7795,10 @@ Implementation: candidate adds a store-scoped manager-set generation date for th
 Testing: isolated PostgreSQL tests passed configurable-date authorization, audit, default and override behavior, wrong date, duplicate prevention, notice and multi-account holds, authentication and no communication. Billing browser fixture passed. Targeted lint and typecheck were run; hosted CI and staff/finance UAT remain pending.
 
 Commit/push: see PR #728 and branch history. Merge: not merged. Deployment/configuration: none for candidate. Live verification: none. Practice system remains synthetic and its web server was not started due the previously recorded automatic approval review rejection. Preserve all finance, provider, legal, data, training and UAT gates.
+
+
+## 2026-11-06 - manager review before next-month posting (candidate)
+
+Implementation: scheduled preparation now records an account-scoped review draft only; it creates no ledger entry, invoice or email. An authorised manager must review and confirm before posting; approval rechecks the latest account fingerprint, notice, handover, discount and multi-account conditions under transaction locks. Changed or late-notice accounts fail closed. Repeated preparation is idempotent and changed drafts may be refreshed by a later run. This supersedes the earlier candidate statement that the scheduler immediately posts charges. The existing current-month manual billing path is unchanged.
+Testing: isolated PostgreSQL checks passed for no charge before approval, late notice and stale-source rejection, scoped access, retry and manager posting; the billing browser fixture checks that confirmation is required. Targeted lint and typecheck passed. Hosted CI and actual staff/finance UAT are pending.
+Commit/push: see PR #728 branch. Merge: not merged. Deployment/configuration: none. Live verification: none. Automatic email, manager send and safe resend, multi-month invoices, combined scheduled invoices, promotion rules and future-effective balance treatment after approval remain open. No scheduler is enabled; retain provider, finance, data, training and acceptance gates.

@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { nextBillingPeriod } from "@/lib/monthly-billing-policy";
-import { previewNextMonthForReview, postScheduledNextBilling } from "@/lib/monthly-billing-service";
+import { previewNextMonthForReview, prepareScheduledNextBilling } from "@/lib/monthly-billing-service";
 import { southAfricaDateKey } from "@/lib/south-africa-time";
 import { scheduledInvoiceDate } from "@/lib/invoice-schedule";
 
@@ -16,11 +16,11 @@ export async function runNextMonthInvoices(now = new Date(), organisationId?: st
       if (southAfricaDateKey(now) !== await scheduledInvoiceDate(db, scope.organisationId, account.tenancy!.facilityId, now)) continue;
       const draft = await previewNextMonthForReview(scope, account.id);
       if (draft.period !== period) throw new Error("BILLING_PREVIEW_CHANGED");
-      await postScheduledNextBilling(scope, account.id, period, draft.fingerprint, now);
+      await prepareScheduledNextBilling(scope, account.id, period, draft.fingerprint, now);
       summary.generated++;
     } catch (error) {
       const code = error instanceof Error && error.message.startsWith("BILLING_") ? error.message : "BILLING_RETRY_REVIEW_REQUIRED";
-      if (code === "BILLING_ALREADY_POSTED") summary.alreadyGenerated++;
+      if (code === "BILLING_ALREADY_POSTED" || code === "BILLING_DRAFT_EXISTS") summary.alreadyGenerated++;
       else summary.exceptions.push({ accountId: account.id, code });
     }
   }

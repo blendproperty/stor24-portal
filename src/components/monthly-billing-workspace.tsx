@@ -22,6 +22,8 @@ export function MonthlyBillingWorkspace() {
   const [reviewed, setReviewed] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [scheduleDate, setScheduleDate] = useState("");
+  const [draft, setDraft] = useState<(Preview & { period: string }) | null>(null);
+  const [draftConfirmed, setDraftConfirmed] = useState(false);
   const [nextPreview, setNextPreview] = useState<(Preview & { period: string }) | null>(null);
   const [history,setHistory]=useState<PlanHistory|null>(null);
   const [historyBusy,setHistoryBusy]=useState(false);
@@ -33,7 +35,7 @@ export function MonthlyBillingWorkspace() {
   function edit(next: BillingPlan) { setNextPreview(null); setPlan(next); setApproved(false); setPreview(null); setReviewed(false); setResult(null); }
   async function select(id: string) {
     setHistory(null);
-    setAccountId(id); setScheduleDate(""); setNextPreview(null); setPreview(null); setResult(null); setReviewed(false); setApproved(false); setPlan(blankPlan()); setInvoices([]);
+    setAccountId(id); setDraft(null); setDraftConfirmed(false); setScheduleDate(""); setNextPreview(null); setPreview(null); setResult(null); setReviewed(false); setApproved(false); setPlan(blankPlan()); setInvoices([]);
     if (!id) return;
     setBusy(true); setError("");
     try { const selected = accounts.find(item => item.id === id); const [saved, schedule] = await Promise.all([request(`/api/v1/billing/monthly?accountId=${encodeURIComponent(id)}`), selected?.tenancy?.facilityId ? request(`/api/v1/billing/invoice-schedule?facilityId=${encodeURIComponent(selected.tenancy.facilityId)}`) : Promise.resolve(null)]); setPlan(saved.plan || blankPlan()); setApproved(Boolean(saved.plan)); setInvoices(saved.invoices); setScheduleDate(schedule?.date || ""); } catch(e) { setError((e as Error).message); } finally { setBusy(false); }
@@ -45,6 +47,17 @@ export function MonthlyBillingWorkspace() {
     setBusy(true); setError("");
     try { const saved = await request("/api/v1/billing/invoice-schedule", { facilityId, date: scheduleDate }); setScheduleDate(saved.date); }
     catch(e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+  async function loadDraft() {
+    setBusy(true); setError(""); setDraft(null); setDraftConfirmed(false);
+    try { setDraft(await request(`/api/v1/billing/monthly?accountId=${encodeURIComponent(accountId)}&draft=true`)); }
+    catch(e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+  async function approveDraft() {
+    if (!draft || !draftConfirmed) return;
+    setBusy(true); setError("");
+    try { const data = await request("/api/v1/billing/monthly", { action:"approve-draft", accountId, period:draft.period, fingerprint:draft.fingerprint, confirm:true }); setResult(data); setDraft(null); setDraftConfirmed(false); setInvoices(items => [{ id:data.documentId, externalId:data.invoiceNumber }, ...items]); }
+    catch(e) { setDraft(null); setError((e as Error).message); } finally { setBusy(false); }
   }
   async function previewNext() {
     setBusy(true); setError(""); setNextPreview(null);
@@ -65,6 +78,7 @@ export function MonthlyBillingWorkspace() {
       <div className="form-grid"><label>Customer account<select value={accountId} disabled={busy||historyBusy} onChange={e => void select(e.target.value)}><option value="">Select account</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.accountNumber} · {a.customer.companyName || [a.customer.firstName, a.customer.lastName].filter(Boolean).join(" ")} · {a.tenancy?.facility.name}</option>)}</select></label><label>Billing month<input type="month" value={period} max={currentBillingPeriod()} disabled={busy||historyBusy} onChange={e => { setPeriod(e.target.value); setPreview(null); setResult(null); setReviewed(false); }}/></label></div>
     </section>
     {accountId && <section className="panel"><h2>Invoice generation date</h2><p>The usual date is the 17th. A manager can choose a different date in the current month for this store. Changing the date does not activate automatic invoicing or send invoices.</p><label>Generation date<input type="date" value={scheduleDate} disabled={busy || historyBusy} onChange={e => setScheduleDate(e.target.value)}/></label><button type="button" className="button button-secondary" disabled={busy || historyBusy || !scheduleDate} onClick={() => void saveSchedule()}>Save generation date</button></section>}
+    {accountId && <section className="panel"><h2>Manager invoice review</h2><p>Scheduled preparation creates a draft without changing the ledger. Review the account, charges and notice status before approving. Approval posts charges and saves an invoice; it does not email it.</p><button type="button" className="button button-secondary" disabled={busy || historyBusy} onClick={() => void loadDraft()}>Load prepared draft</button>{draft && <div><h3>Review draft for {draft.period}</h3><ul>{draft.lines.map(line => <li key={line.key}>{line.description}: {line.type === "CREDIT" ? "−" : ""}{money(line.amount)}</li>)}</ul><p>Total {money(draft.total)}</p><label><input type="checkbox" checked={draftConfirmed} disabled={busy} onChange={e => setDraftConfirmed(e.target.checked)}/> I reviewed the charges and customer notice status.</label><button type="button" className="button button-primary" disabled={busy || !draftConfirmed} onClick={() => void approveDraft()}>Approve and post invoice</button></div>}</section>}
     {accountId && <section className="panel"><h2>Next-month invoice preparation</h2><p>Review an estimate for next month ahead of the 17th. No invoice, ledger charge or email is created. Notice and discount cases are held for review.</p><button type="button" className="button button-secondary" disabled={busy || historyBusy || !approved} onClick={() => void previewNext()}>Review next month</button>{nextPreview && <div role="status"><h3>Estimate for {nextPreview.period} · {nextPreview.customerName}</h3><ul>{nextPreview.lines.map(line => <li key={line.key}>{line.description}: {line.type === "CREDIT" ? "−" : ""}{money(line.amount)}</li>)}</ul><p><strong>Estimated total: {money(nextPreview.total)}</strong> · Included tax: {money(nextPreview.taxTotal)}</p><p>Review only. Changes to the account or agreement can change this amount.</p></div>}</section>}
     {accountId && <section className="panel billing-plan-history"><h2>Retained billing-plan history</h2><p>Review recorded terms and approvals. An observed legacy baseline is not proof of its original approval date or historical effective period.</p><button className="button button-secondary" disabled={busy||historyBusy} onClick={()=>void loadHistory()}>Review plan history</button>{history&&<><p>{history.coverage}</p>{!history.versions.length?<p>No retained version yet. The next approved save retains the existing plan as an observed baseline.</p>:<ol>{history.versions.map(v=><li key={v.recordNumber}><details><summary>Version {v.recordNumber} · {v.kind==="OBSERVED_LEGACY"?"Observed legacy baseline":"Recorded approval"} · {new Date(v.recordedAt).toLocaleString("en-ZA",{timeZone:"Africa/Johannesburg"})} SAST</summary><p>Reference: {v.plan.approvalReference}; first unbilled month: {v.plan.firstPeriod}; proration: {v.plan.proration}; included tax rate: {v.plan.taxPercent}%.</p><p>Recurring charges: {v.plan.charges.map(c=>`${c.code} — ${c.name}: R ${c.amount.toFixed(2)}`).join("; ")||"None recorded"}.</p><p>Rent tax: {v.plan.rentTaxable?"included":"not taxable"}; insurance: {v.plan.insuranceEnabled?`enabled (${v.plan.insuranceTaxable?"tax included":"not taxable"})`:"disabled"}. Discount: {v.plan.discount?`${v.plan.discount.name}; ${v.plan.discount.type} ${v.plan.discount.value}; ${v.plan.discount.startsPeriod} through ${v.plan.discount.endsPeriod}`:"None recorded"}.</p><p>Integrity reference: {v.hash.slice(0,16)}.</p></details></li>)}</ol>}{history.nextBefore&&<button className="button button-secondary" disabled={historyBusy} onClick={()=>void loadHistory(history.nextBefore!)}>Load older versions</button>}</>}</section>}
     {error && <p role="alert" className="panel">{error}</p>}

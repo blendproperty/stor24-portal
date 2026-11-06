@@ -97,11 +97,52 @@ export async function previewNextMonthForReview(scope: RequestScope, accountId: 
 export async function postMonthlyBilling(scope: RequestScope, accountId: string, period: string, fingerprint: string, actorId: string | null = scope.userId) {
   return postBilling(scope, accountId, period, fingerprint, actorId, false);
 }
-export async function postScheduledNextBilling(scope: RequestScope, accountId: string, period: string, fingerprint: string, now = new Date()) {
+const DRAFT_DOMAIN = "NEXT_MONTH_INVOICE_DRAFT";
+export async function prepareScheduledNextBilling(scope: RequestScope, accountId: string, period: string, fingerprint: string, now = new Date()) {
   if (process.env.NEXT_MONTH_INVOICING_ENABLED !== "true" || period !== nextBillingPeriod(now)) throw new Error("BILLING_SCHEDULE_DISABLED");
-  return postBilling(scope, accountId, period, fingerprint, null, true, now);
+  return db.$transaction(async tx => {
+    await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${accountId} FOR UPDATE`;
+    const { account, tenancy, profile } = await context(tx, scope, accountId);
+    await tx.$queryRaw`SELECT "id" FROM "Facility" WHERE "id" = ${tenancy.facilityId} FOR UPDATE`;
+    if (southAfricaDateKey(now) !== await scheduledInvoiceDate(tx, scope.organisationId, tenancy.facilityId, now)) throw new Error("BILLING_SCHEDULE_NOT_DUE");
+    await assertDraftEligibility(tx, scope, account, tenancy, profile, period);
+    const bill = await preview(tx, scope, accountId, period, true);
+    if (bill.fingerprint !== fingerprint) throw new Error("BILLING_PREVIEW_CHANGED");
+    const name = `${accountId}:${period}`;
+    const existing = await tx.configurationProfile.findFirst({where:{organisationId:scope.organisationId,facilityId:tenancy.facilityId,domain:DRAFT_DOMAIN,name}});
+    if (existing && (existing.status !== "READY" || billingPeriodSchemaForDraft(existing.config).fingerprint === fingerprint)) throw new Error("BILLING_DRAFT_EXISTS");
+    if (existing) await tx.configurationProfile.update({where:{id:existing.id},data:{config:{period,fingerprint}}});
+    else await tx.configurationProfile.create({data:{organisationId:scope.organisationId,facilityId:tenancy.facilityId,domain:DRAFT_DOMAIN,name,status:"READY",config:{period,fingerprint}}});
+    await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:tenancy.facilityId,actorId:null,action:"billing.draft_prepared",entityType:"Account",entityId:accountId,after:{period,fingerprint}}});
+    return {period,fingerprint};
+  }, {isolationLevel:"Serializable",timeout:20000});
 }
-async function postBilling(scope: RequestScope, accountId: string, period: string, fingerprint: string, actorId: string | null, scheduled: boolean, now = new Date()) {
+async function assertDraftEligibility(tx: Client, scope: RequestScope, account: {customerId:string}, tenancy: {id:string;facilityId:string;status:string}, profile: {status:string;config:Prisma.JsonValue}|null, period: string) {
+  if (tenancy.status !== "ACTIVE") throw new Error("BILLING_NOTICE_POLICY_REVIEW");
+  if (!await tx.auditEvent.findFirst({where:{organisationId:scope.organisationId,facilityId:tenancy.facilityId,entityType:"Tenancy",entityId:tenancy.id,action:"tenancy.key_handover_confirmed"},select:{id:true}})) throw new Error("BILLING_HANDOVER_REVIEW");
+  const discount=profile?.status === "READY" ? billingPlanSchema.parse(profile.config).discount : null;
+  if (discount && period >= discount.startsPeriod && period <= discount.endsPeriod) throw new Error("BILLING_DISCOUNT_POLICY_REVIEW");
+  const related=await tx.account.count({where:{customerId:account.customerId,tenancy:{facilityId:tenancy.facilityId,status:{in:["ACTIVE","NOTICE_GIVEN"]}}}});
+  if (related !== 1) throw new Error("BILLING_COMBINED_REVIEW");
+}
+export async function readScheduledInvoiceDraft(scope: RequestScope, accountId: string) {
+  const {tenancy}=await context(db,scope,accountId),period=nextBillingPeriod();
+  const draft=await db.configurationProfile.findFirst({where:{organisationId:scope.organisationId,facilityId:tenancy.facilityId,domain:DRAFT_DOMAIN,name:`${accountId}:${period}`,status:"READY"}});
+  if (!draft) return null;
+  const parsed=billingPeriodSchemaForDraft(draft.config);
+  const current=await previewNextMonthForReview(scope,accountId);
+  if (parsed.period !== period || parsed.fingerprint !== current.fingerprint) throw new Error("BILLING_PREVIEW_CHANGED");
+  return current;
+}
+function billingPeriodSchemaForDraft(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value) || typeof (value as {period?:unknown}).period !== "string" || typeof (value as {fingerprint?:unknown}).fingerprint !== "string") throw new Error("BILLING_DRAFT_REVIEW");
+  return value as {period:string;fingerprint:string};
+}
+export async function approveScheduledInvoiceDraft(scope: RequestScope, accountId: string, period: string, fingerprint: string) {
+  if (period !== nextBillingPeriod()) throw new Error("BILLING_DRAFT_REVIEW");
+  return postBilling(scope,accountId,period,fingerprint,scope.userId,true);
+}
+async function postBilling(scope: RequestScope, accountId: string, period: string, fingerprint: string, actorId: string | null, scheduled: boolean) {
   // Documents snapshot the configured company information; no email or provider call occurs.
   const { tenancy } = await context(db, scope, accountId);
   const company = await getBillingDocumentCompanyDetails(scope.organisationId, tenancy.facilityId);
@@ -110,13 +151,9 @@ async function postBilling(scope: RequestScope, accountId: string, period: strin
     if (scheduled) {
       const { account, tenancy, profile } = await context(tx, scope, accountId);
       await tx.$queryRaw`SELECT "id" FROM "Facility" WHERE "id" = ${tenancy.facilityId} FOR UPDATE`;
-      if (southAfricaDateKey(now) !== await scheduledInvoiceDate(tx, scope.organisationId, tenancy.facilityId, now)) throw new Error("BILLING_SCHEDULE_NOT_DUE");
-      if (tenancy.status !== "ACTIVE") throw new Error("BILLING_NOTICE_POLICY_REVIEW");
-      if (!await tx.auditEvent.findFirst({ where: { organisationId: scope.organisationId, facilityId: tenancy.facilityId, entityType: "Tenancy", entityId: tenancy.id, action: "tenancy.key_handover_confirmed" }, select: { id: true } })) throw new Error("BILLING_HANDOVER_REVIEW");
-      const discount = profile?.status === "READY" ? billingPlanSchema.parse(profile.config).discount : null;
-      if (discount && period >= discount.startsPeriod && period <= discount.endsPeriod) throw new Error("BILLING_DISCOUNT_POLICY_REVIEW");
-      const related = await tx.account.count({ where: { customerId: account.customerId, tenancy: { facilityId: tenancy.facilityId, status: { in: ["ACTIVE", "NOTICE_GIVEN"] } } } });
-      if (related !== 1) throw new Error("BILLING_COMBINED_REVIEW");
+      await assertDraftEligibility(tx,scope,account,tenancy,profile,period);
+      const draft=await tx.configurationProfile.findFirst({where:{organisationId:scope.organisationId,facilityId:tenancy.facilityId,domain:DRAFT_DOMAIN,name:`${accountId}:${period}`,status:"READY"}});
+      if (!draft || billingPeriodSchemaForDraft(draft.config).fingerprint !== fingerprint) throw new Error("BILLING_DRAFT_REVIEW");
     }
     const bill = await preview(tx, scope, accountId, period, scheduled);
     if (bill.fingerprint !== fingerprint) throw new Error("BILLING_PREVIEW_CHANGED");
@@ -129,6 +166,7 @@ async function postBilling(scope: RequestScope, accountId: string, period: strin
     const html = renderInvoiceHtml({ invoiceNumber, issueDate: scheduled ? new Date() : periodDates(period).effectiveAt, facilityName: bill.facilityName, company, customerName: bill.customerName, accountNumber: bill.accountNumber, currentBalance: account.balance.toString(), lines: posted.map(line => ({ id: line.id, description: line.description, effectiveAt: line.effectiveAt, amount: Number(line.amount) * (line.type === "CREDIT" ? -1 : 1), taxAmount: Number(line.taxAmount) * (line.type === "CREDIT" ? -1 : 1) })) });
     const sha256 = createHash("sha256").update(html).digest("hex");
     const document = await tx.document.create({ data: { tenancyId: bill.tenancyId, type: "INVOICE", status: "GENERATED", storageKey: `inline:${sha256}`, content: html, sha256, externalId: invoiceNumber, idempotencyKey: `monthly-invoice:${accountId}:${period}` } });
+    if (scheduled) await tx.configurationProfile.updateMany({where:{organisationId:scope.organisationId,facilityId:bill.facilityId,domain:DRAFT_DOMAIN,name:`${accountId}:${period}`,status:"READY"},data:{status:"POSTED"}});
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: bill.facilityId, actorId, action: "billing.month_posted", entityType: "Account", entityId: accountId, after: { period, invoiceNumber, documentId: document.id, total: bill.total, taxTotal: bill.taxTotal, fingerprint } } });
     return { documentId: document.id, invoiceNumber, total: bill.total };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000 });
