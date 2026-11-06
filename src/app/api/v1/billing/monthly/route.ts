@@ -3,9 +3,13 @@ import { authErrorResponse } from "@/lib/auth-guards";
 import { requirePermissionScope } from "@/lib/scope";
 import { sameOrigin } from "@/lib/request-security";
 import { billingPeriodSchema } from "@/lib/monthly-billing-policy";
-import { monthlyBillingHistory, getMonthlyBillingPlan, monthlyBillingAccounts, monthlyBillingInvoices, postMonthlyBilling, previewMonthlyBilling, saveMonthlyBillingPlan } from "@/lib/monthly-billing-service";
+import { monthlyBillingHistory, previewMultiMonthInvoice, postMultiMonthInvoice, getMonthlyBillingPlan, monthlyBillingAccounts, monthlyBillingInvoices, postMonthlyBilling, approveScheduledInvoiceDraft, readScheduledInvoiceDraft, previewMonthlyBilling, previewNextMonthForReview, saveMonthlyBillingPlan } from "@/lib/monthly-billing-service";
 
 const requestSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("approve-draft"), accountId: z.string().cuid(), period: billingPeriodSchema, fingerprint: z.string().regex(/^[a-f0-9]{64}$/), confirm: z.literal(true) }).strict(),
+  z.object({ action: z.literal("preview-multi"), accountId: z.string().cuid(), start: billingPeriodSchema, count: z.number().int().min(2).max(12) }).strict(),
+  z.object({ action: z.literal("post-multi"), accountId: z.string().cuid(), start: billingPeriodSchema, count: z.number().int().min(2).max(12), fingerprint: z.string().regex(/^[a-f0-9]{64}$/), confirm: z.literal(true) }).strict(),
+  z.object({ action: z.literal("preview-next"), accountId: z.string().cuid() }).strict(),
   z.object({ action: z.literal("preview"), accountId: z.string().cuid(), period: billingPeriodSchema }).strict(),
   z.object({ action: z.literal("post"), accountId: z.string().cuid(), period: billingPeriodSchema, fingerprint: z.string().regex(/^[a-f0-9]{64}$/), confirm: z.literal(true) }).strict(),
   z.object({ action: z.literal("plan"), accountId: z.string().cuid(), plan: z.unknown() }).strict(),
@@ -28,6 +32,9 @@ function failure(error: unknown) {
     BILLING_DISCOUNT_EXCEEDS_RENT: "The discount exceeds this month's rent. Check the agreed discount and dates.",
     BILLING_NO_OCCUPANCY_IN_PERIOD: "There is no billable occupancy in this month.",
     BILLING_TENANCY_NOT_ACTIVE: "Monthly billing requires an active tenancy or an active notice period. Final bills for closed tenancies need a separate review.",
+    BILLING_NOTICE_POLICY_REVIEW: "This account is on notice. A manager must review whether it needs an invoice.",
+    BILLING_HANDOVER_REVIEW: "The account needs a recorded key handover before next-month review.",
+    BILLING_DISCOUNT_POLICY_REVIEW: "A discount applies next month. Finance must review its treatment.",
     BILLING_FUTURE_PERIOD: "Future months cannot be posted through this workflow.",
   };
   if (error instanceof Error && error.message.startsWith("BILLING_")) return Response.json({ error: { code: error.message, message: messages[error.message] || "This account requires review before billing can proceed." } }, { status: error.message === "BILLING_ACCOUNT_NOT_FOUND" ? 404 : 409 });
@@ -41,6 +48,7 @@ export async function GET(request: Request) {
     const accountId = params.get("accountId");
     if (accountId) {
       z.string().cuid().parse(accountId);
+      if(params.get("draft")==="true") return Response.json({data:await readScheduledInvoiceDraft(scope,accountId)},{headers:{"cache-control":"private, no-store"}});
       if(params.get("history")==="true") {const before=params.get("before");const cursor=before?z.coerce.number().int().min(1).max(10000000).parse(before):undefined;return Response.json({data:await monthlyBillingHistory(scope,accountId,cursor)},{headers:{"cache-control":"private, no-store","x-content-type-options":"nosniff"}})}
       const [plan, invoices] = await Promise.all([getMonthlyBillingPlan(scope, accountId), monthlyBillingInvoices(scope, accountId)]);
       return Response.json({ data: { plan, invoices } });
@@ -52,8 +60,8 @@ export async function POST(request: Request) {
   try {
     if (!sameOrigin(request)) throw new Error("FORBIDDEN");
     const input = requestSchema.parse(await request.json());
-    const scope = await requirePermissionScope(input.action === "preview" ? "billing.view" : input.action === "plan" ? "configuration.manage" : "billing.manage");
-    const data = input.action === "plan" ? await saveMonthlyBillingPlan(scope, input.accountId, input.plan) : input.action === "preview" ? await previewMonthlyBilling(scope, input.accountId, input.period) : await postMonthlyBilling(scope, input.accountId, input.period, input.fingerprint);
+    const scope = await requirePermissionScope((input.action === "preview" || input.action === "preview-next" || input.action === "preview-multi") ? "billing.view" : input.action === "plan" ? "configuration.manage" : "billing.manage");
+    const data = input.action === "plan" ? await saveMonthlyBillingPlan(scope, input.accountId, input.plan) : input.action === "preview" ? await previewMonthlyBilling(scope, input.accountId, input.period) : input.action === "preview-multi" ? await previewMultiMonthInvoice(scope,input.accountId,input.start,input.count) : input.action === "post-multi" ? await postMultiMonthInvoice(scope,input.accountId,input.start,input.count,input.fingerprint) : input.action === "preview-next" ? await previewNextMonthForReview(scope, input.accountId) : input.action === "approve-draft" ? await approveScheduledInvoiceDraft(scope, input.accountId, input.period, input.fingerprint) : await postMonthlyBilling(scope, input.accountId, input.period, input.fingerprint);
     return Response.json({ data });
   } catch (error) { return failure(error); }
 }
