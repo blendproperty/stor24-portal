@@ -20,6 +20,7 @@ export default async function MoveInPage({ searchParams }: { searchParams: Promi
   const auth = await requireSession();
   const legacy = await Promise.all(data.tenancies.filter(t=>["DRAFT","ACTIVE","NOTICE_GIVEN"].includes(t.status) && t.documents.some(d=>d.status==="SIGNED")).map(async t=>({
     id:t.id,accountId:t.accountId,label:`${t.facility.name} · ${t.occupancies[0]?.unit.number ?? "Unit needs review"} · ${t.customer.companyName || t.customer.firstName || "Customer"}`,
+    possibleLeads:data.reservations.some(r=>r.convertedTenancyId===t.id)?[]:data.leads.filter(l=>l.facilityId===t.facilityId&&l.customerId===t.customerId&&l.stage!=="LOST"&&!data.reservations.some(r=>r.leadId===l.id)).map(l=>({id:l.id,label:`${l.source} · ${southAfricaDateKey(l.createdAt)} · ${l.stage.replaceAll("_"," ")}`})),
     canReviewPhoto:auth.role==="Organisation owner" || auth.user.roleAssignments.some(a=>(!a.facilityId || a.facilityId===t.facilityId)&&hasPermission(a.role.permissions,"access.manage")),
     ...(await legacyHandoverReadiness(scope,t.id)),
   })));
@@ -42,5 +43,5 @@ export default async function MoveInPage({ searchParams }: { searchParams: Promi
     facilities={data.facilities.map(({ id, name }) => ({ id, name }))}
     units={data.facilities.flatMap((facility) => facility.units.filter(unit => unit.floorOperational).map((unit) => ({ id: unit.id, facilityId: unit.facilityId, number: unit.number, floor: unit.floor ?? "", zone: unit.zone ?? "", status: unit.status, monthlyRate: Number(unit.monthlyRate), typeName: unit.unitType.name, width: unit.unitType.widthMetres === null ? null : Number(unit.unitType.widthMetres), length: unit.unitType.lengthMetres === null ? null : Number(unit.unitType.lengthMetres), area: unit.unitType.areaSqMetres === null ? null : Number(unit.unitType.areaSqMetres), features: unit.unitType.features })))}
     customers={data.customers.map((customer) => ({ id: customer.id, name: customer.companyName || [customer.firstName, customer.lastName].filter(Boolean).join(" ") || "Unnamed customer", email: customer.email }))}
-    reservations={reservations}/><LegacyHandoverList items={legacy.filter(t=>!t.handedOver || t.photo?.status==="WAITING_REVIEW")}/></>;
+    reservations={reservations}/><LegacyHandoverList items={legacy.filter(t=>!t.handedOver || (t.canReviewPhoto && t.photo && ["WAITING_REVIEW","APPROVED","PENDING_PROVIDER"].includes(t.photo.status)))}/></>;
 }

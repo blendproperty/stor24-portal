@@ -62,7 +62,7 @@ export async function confirmLegacyHandoverAction(data:FormData):Promise<{error:
   const tenancy=await db.tenancy.findFirst({where:{id,facility:facilityWhere(visible)},select:{facilityId:true}});
   if(!tenancy)return {error:"This lease is unavailable. Refresh and try again."};
   const scope=await requirePermissionScope("move_in.create",tenancy.facilityId);
-  try {await confirmLegacyHandover(scope,id,true);} catch {return {error:"Handover could not be confirmed. Refresh to check its status and the agreement, payment, ID, photo, date and unit before retrying."};}
+  try {await confirmLegacyHandover(scope,id,true,text(data,"leadId"));} catch {return {error:"Handover could not be confirmed. Refresh to check its status and the agreement, payment, ID, photo, date, unit and enquiry link before retrying."};}
   for(const path of ["/tenants","/units","/reservations","/operations/accounts","/operations/move-in","/my"])revalidatePath(path);
   redirect("/operations/move-in");
 }

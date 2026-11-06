@@ -1,4 +1,4 @@
-import { handoverKeys, handoverTimes } from "@/lib/handover-evidence";
+import { handoverKeys, handoverTimes, legacyHandedOverLeadIds } from "@/lib/handover-evidence";
 import {reservationDiscountReport} from "./reservation-price-service";
 import { recurringChargeReport } from "./recurring-charge-service";
 import { postedRecurringChargeReport } from "./posted-recurring-charge-service";
@@ -69,7 +69,8 @@ export async function buildReportRows(scope: RequestScope, parameters: ReportPar
     case "lead-conversion": {
       const leads = await db.lead.findMany({ where: { facility, createdAt: { gte: from, lte: to } }, include: { facility: { select: { name: true } }, customer: { select: { firstName: true, lastName: true, companyName: true } }, assignedTo: { select: { name: true } }, reservations: { select: { status: true, convertedTenancyId: true, convertedTenancy: { select: { status: true } } } } }, orderBy: { createdAt: "asc" } });
       const handedOver = await handoverKeys(scope, leads.flatMap(lead => lead.reservations.flatMap(r => r.convertedTenancyId ? [r.convertedTenancyId] : [])));
-      return leads.map((lead) => ({ facility: lead.facility.name, createdAt: lead.createdAt.toISOString(), source: lead.source, productLine:lead.productLine, stage: lead.reservations.some(r => r.status === "CONVERTED" && r.convertedTenancyId && handedOver.has(`${lead.facilityId}:${r.convertedTenancyId}`)) ? "WON" : lead.stage === "WON" ? "HANDOVER_REVIEW" : lead.stage, customer: lead.customer?.companyName || [lead.customer?.firstName, lead.customer?.lastName].filter(Boolean).join(" ") || "Unlinked", assignedTo: lead.assignedTo?.name ?? "Unassigned", expectedMoveIn: lead.expectedMoveIn?.toISOString() ?? null, nextActionAt: lead.nextActionAt?.toISOString() ?? null }));
+      const legacyWon=await legacyHandedOverLeadIds(scope,leads);
+      return leads.map((lead) => ({ facility: lead.facility.name, createdAt: lead.createdAt.toISOString(), source: lead.source, productLine:lead.productLine, stage: legacyWon.has(lead.id) || lead.reservations.some(r => r.status === "CONVERTED" && r.convertedTenancyId && handedOver.has(`${lead.facilityId}:${r.convertedTenancyId}`)) ? "WON" : lead.stage === "WON" ? "HANDOVER_REVIEW" : lead.stage, customer: lead.customer?.companyName || [lead.customer?.firstName, lead.customer?.lastName].filter(Boolean).join(" ") || "Unlinked", assignedTo: lead.assignedTo?.name ?? "Unassigned", expectedMoveIn: lead.expectedMoveIn?.toISOString() ?? null, nextActionAt: lead.nextActionAt?.toISOString() ?? null }));
     }
     case "receivables-ageing": {
       const reportScope = parameters.facilityId ? { ...scope, facilityIds: [parameters.facilityId], unrestrictedFacilities: false } : scope;

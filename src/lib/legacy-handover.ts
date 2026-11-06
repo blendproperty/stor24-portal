@@ -8,6 +8,7 @@ import { identityGate } from "@/lib/identity-document-service";
 import { southAfricaDateKey } from "@/lib/south-africa-time";
 import { fetchBlendSignArtifact } from "@/lib/blendsign-client";
 import { floorMapSelection, unitIsOperational } from "@/lib/floor-availability";
+import { resolvedPhotoPolicy } from "@/lib/facial-photo-control";
 import type { Prisma } from "@/generated/prisma/client";
 
 type Database=Prisma.TransactionClient;
@@ -36,7 +37,8 @@ async function checks(database:Database,scope:RequestScope,id:string) {
 }
 export async function legacyHandoverReadiness(scope:RequestScope,id:string) {
   const state=await checks(db,scope,id);
-  return {ready:state.ready,handedOver:Boolean(state.handover),blockers:state.blockers,payment:state.payment,documentId:state.document?.id??null,photo:state.tenancy.legacyAccessPhoto?{id:state.tenancy.legacyAccessPhoto.id,version:state.tenancy.legacyAccessPhoto.version,status:state.tenancy.legacyAccessPhoto.status}:null};
+  const policy=await resolvedPhotoPolicy(db,scope.organisationId);
+  return {ready:state.ready,handedOver:Boolean(state.handover),blockers:state.blockers,payment:state.payment,documentId:state.document?.id??null,photoPolicy:policy?.enabled?{hash:policy.hash,notice:policy.notice,consentLabel:policy.consentLabel,alternativeContact:policy.alternativeContact}:null,photo:state.tenancy.legacyAccessPhoto?{id:state.tenancy.legacyAccessPhoto.id,version:state.tenancy.legacyAccessPhoto.version,status:state.tenancy.legacyAccessPhoto.status}:null};
 }
 export async function legacySignedArtifactHash(envelopeId:string) {
   const response=await fetchBlendSignArtifact(envelopeId,"signed");
@@ -46,7 +48,7 @@ export async function legacySignedArtifactHash(envelopeId:string) {
   finally {chunks.forEach(c=>c.fill(0));}
 }
 /** Caller verifies move_in.create and physically checks the customer and keys. */
-export async function confirmLegacyHandover(scope:RequestScope,id:string,identityAndKeysConfirmed:boolean) {
+export async function confirmLegacyHandover(scope:RequestScope,id:string,identityAndKeysConfirmed:boolean,selectedLeadId?:string) {
   if(!identityAndKeysConfirmed)throw Error("MOVE_IN_NOT_READY");
   const initial=await checks(db,scope,id);if(initial.handover)return {tenancyId:id,idempotent:true};
   if(!initial.ready||!initial.document?.externalId||initial.tenancy.occupancies.length!==1)throw Error("MOVE_IN_NOT_READY");
@@ -66,8 +68,10 @@ export async function confirmLegacyHandover(scope:RequestScope,id:string,identit
     await tx.tenancy.update({where:{id},data:{status:"ACTIVE"}});
     await tx.legacyAccessPhoto.update({where:{tenancyId:id},data:{status:"PENDING_PROVIDER",activationRequestedAt:new Date()}});
     const reservation=state.tenancy.reservation;
-    if(reservation?.leadId) {await tx.$queryRaw`SELECT "id" FROM "Lead" WHERE "id" = ${reservation.leadId} FOR UPDATE`;const lead=await tx.lead.findFirst({where:{id:reservation.leadId,facilityId:state.tenancy.facilityId,customerId:state.tenancy.customerId}});if(!lead)throw Error("MOVE_IN_REVIEW_REQUIRED");if(lead.stage!=="WON"){await tx.lead.update({where:{id:lead.id},data:{stage:"WON"}});await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:state.tenancy.facilityId,actorId:scope.userId,action:"lead.stage_changed",entityType:"Lead",entityId:lead.id,before:{stage:lead.stage},after:{stage:"WON",reservationId:reservation.id,tenancyId:id}}});}}
-    await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:state.tenancy.facilityId,actorId:scope.userId,action:"tenancy.key_handover_confirmed",entityType:"Tenancy",entityId:id,after:{reservationId:reservation?.id??null,accountId:state.tenancy.accountId,documentId:state.document!.id,signedArtifactSha256:artifactHash,paymentIds:state.payment.paymentIds,requiredAmount:state.payment.requiredAmount,paidAmount:state.payment.paidAmount,photoId:state.tenancy.legacyAccessPhoto!.id,photoVersion:state.tenancy.legacyAccessPhoto!.version,identityCheckedInPerson:true,accessState:"PENDING"}}});
+    if(reservation && selectedLeadId)throw Error("MOVE_IN_REVIEW_REQUIRED");
+    const leadId=reservation?.leadId??selectedLeadId??null;
+    if(leadId) {await tx.$queryRaw`SELECT "id" FROM "Lead" WHERE "id" = ${leadId} FOR UPDATE`;const lead=await tx.lead.findFirst({where:{id:leadId,facilityId:state.tenancy.facilityId,customerId:state.tenancy.customerId}});if(!lead||lead.stage==="LOST")throw Error("MOVE_IN_REVIEW_REQUIRED");if(selectedLeadId && (await tx.reservation.count({where:{leadId:selectedLeadId}}) || await tx.auditEvent.findFirst({where:{organisationId:scope.organisationId,facilityId:state.tenancy.facilityId,entityType:"Tenancy",action:"tenancy.key_handover_confirmed",after:{path:["leadId"],equals:selectedLeadId}}})))throw Error("MOVE_IN_REVIEW_REQUIRED");if(lead.stage!=="WON"){await tx.lead.update({where:{id:lead.id},data:{stage:"WON"}});await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:state.tenancy.facilityId,actorId:scope.userId,action:"lead.stage_changed",entityType:"Lead",entityId:lead.id,before:{stage:lead.stage},after:{stage:"WON",reservationId:reservation?.id??null,tenancyId:id}}});}}
+    await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:state.tenancy.facilityId,actorId:scope.userId,action:"tenancy.key_handover_confirmed",entityType:"Tenancy",entityId:id,after:{leadId,reservationId:reservation?.id??null,accountId:state.tenancy.accountId,documentId:state.document!.id,signedArtifactSha256:artifactHash,paymentIds:state.payment.paymentIds,requiredAmount:state.payment.requiredAmount,paidAmount:state.payment.paidAmount,photoId:state.tenancy.legacyAccessPhoto!.id,photoVersion:state.tenancy.legacyAccessPhoto!.version,identityCheckedInPerson:true,accessState:"PENDING"}}});
     return {tenancyId:id,idempotent:false};
   });
 }

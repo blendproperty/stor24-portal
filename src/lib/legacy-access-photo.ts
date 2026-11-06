@@ -66,6 +66,40 @@ export async function withdrawLegacyPhoto(session:CustomerSession,id:string,vers
     await tx.auditEvent.create({data:{organisationId:session.organisationId,facilityId:tenancy.facilityId,action:"legacy_photo.consent_withdrawn",entityType:"LegacyAccessPhoto",entityId:photo.id,after:{version}}});
   });
 }
+/** Assisted capture is for a customer physically present with their original ID. */
+export async function submitAssistedLegacyPhoto(scope:RequestScope,input:{tenancyId:string;policyHash:string;customerConsent:boolean;identityChecked:boolean;expectedVersion:number;image:File}) {
+  const find=async (database:Database)=>{
+    const tenancy=await database.tenancy.findFirst({where:{id:input.tenancyId,facility:facilityWhere(scope),customer:{organisationId:scope.organisationId}},include:{documents:true,account:{select:{customerId:true}}}});
+    if(!tenancy || tenancy.customerId!==tenancy.account.customerId)throw Error("NOT_FOUND");return tenancy;
+  };
+  if(!input.customerConsent||!input.identityChecked)throw Error("PHOTO_CONSENT_REQUIRED");
+  const tenancy=await find(db),policy=await policyForCollection(db,scope.organisationId);
+  if(policy.hash!==input.policyHash)throw Error("PHOTO_CONSENT_REQUIRED");
+  if(!eligible(tenancy)||!(await legacyPaymentEvidence(db,tenancy.accountId)).ready)throw Error("PHOTO_BOOKING_NOT_READY");
+  const signed=tenancy.documents.find(d=>d.type==="LEASE_AGREEMENT"&&d.status==="SIGNED"&&d.signedAt&&d.provider==="BLENDSIGN"&&d.externalId)!;
+  await legacySignedArtifactHash(signed.externalId!);
+  const image=await normaliseFacialPhoto(input.image);
+  try{return await db.$transaction(async tx=>{
+    await tx.$queryRaw`SELECT "id" FROM "Organisation" WHERE "id" = ${scope.organisationId} FOR UPDATE`;
+    await lock(tx,input.tenancyId);const current=await find(tx),currentPolicy=await policyForCollection(tx,scope.organisationId);
+    await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${current.accountId} FOR UPDATE`;
+    if(currentPolicy.hash!==input.policyHash)throw Error("PHOTO_CONSENT_REQUIRED");
+    if(!eligible(current)||!current.documents.some(d=>d.id===signed.id&&d.status==="SIGNED"&&d.externalId===signed.externalId)||!(await legacyPaymentEvidence(tx,current.accountId)).ready)throw Error("PHOTO_BOOKING_NOT_READY");
+    const old=await tx.legacyAccessPhoto.findUnique({where:{tenancyId:input.tenancyId}});if((old?.version??0)!==input.expectedVersion)throw Error("PHOTO_CHANGED");
+    const version=(old?.version??0)+1,now=new Date();
+    const values={version,status:"WAITING_REVIEW",encryptedImage:encryptPhoto(image,binding(input.tenancyId,version)),imageSha256:createHash("sha256").update(image).digest("hex"),policyVersion:currentPolicy.version,policyHash:currentPolicy.hash,consentNotice:JSON.stringify({notice:currentPolicy.notice,consentLabel:currentPolicy.consentLabel,alternativeContact:currentPolicy.alternativeContact,retentionHours:currentPolicy.retentionHours,approvalReference:currentPolicy.approvalReference}),consentAt:now,expiresAt:currentPolicy.retentionHours===null?null:new Date(now.getTime()+currentPolicy.retentionHours*3600000),reviewedAt:null,reviewedById:null,activationRequestedAt:null,erasedAt:null};
+    const photo=await tx.legacyAccessPhoto.upsert({where:{tenancyId:input.tenancyId},create:{tenancyId:input.tenancyId,...values},update:values,select:summary});
+    await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:current.facilityId,actorId:scope.userId,action:"legacy_photo.assisted_customer_submitted",entityType:"LegacyAccessPhoto",entityId:photo.id,after:{customerId:current.customerId,tenancyId:input.tenancyId,version,policyHash:currentPolicy.hash,policyVersion:currentPolicy.version,identityCheckedInPerson:true,customerConsentInPerson:true,consentAt:now.toISOString(),expiresAt:values.expiresAt?.toISOString()??null}}});return photo;
+  });}finally{image.fill(0);}
+}
+export async function withdrawAssistedLegacyPhoto(scope:RequestScope,tenancyId:string,version:number,identityChecked:boolean) {
+  if(!identityChecked)throw Error("PHOTO_IDENTITY_REQUIRED");
+  await db.$transaction(async tx=>{await lock(tx,tenancyId);const photo=await tx.legacyAccessPhoto.findFirst({where:{tenancyId,tenancy:{facility:facilityWhere(scope),customer:{organisationId:scope.organisationId}}},include:{tenancy:{select:{facilityId:true,customerId:true}}}});
+    if(!photo)throw Error("NOT_FOUND");if(photo.version!==version)throw Error("PHOTO_CHANGED");if(photo.status==="WITHDRAWN")return;
+    await tx.legacyAccessPhoto.update({where:{id:photo.id},data:{status:"WITHDRAWN",encryptedImage:null,erasedAt:new Date(),reviewedAt:null,reviewedById:null,activationRequestedAt:null}});
+    await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:photo.tenancy.facilityId,actorId:scope.userId,action:"legacy_photo.assisted_consent_withdrawn",entityType:"LegacyAccessPhoto",entityId:photo.id,after:{version,customerId:photo.tenancy.customerId,identityCheckedInPerson:true}}});
+  });
+}
 async function staffPhoto(tx:Database,scope:RequestScope,id:string) {
   const photo=await tx.legacyAccessPhoto.findFirst({where:{id,tenancy:{facility:facilityWhere(scope),customer:{organisationId:scope.organisationId}}},include:{tenancy:{include:{documents:true}}}});
   if(!photo)throw Error("NOT_FOUND");return photo;

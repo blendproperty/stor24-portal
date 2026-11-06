@@ -1,4 +1,4 @@
-import { handoverKeys } from "./handover-evidence";
+import { handoverKeys, legacyHandedOverLeadIds } from "./handover-evidence";
 import {marketProfileSchema} from "./lead-market-profile";
 import { db } from "./db";
 import { createHash } from "node:crypto";
@@ -32,6 +32,7 @@ export async function marketingWorkspace(scope: RequestScope) {
       where: { facilityId: { in: facilityIds } },
       select: {
         id: true,
+        customerId: true,
         facilityId: true,
         stage: true,
         source: true,
@@ -72,6 +73,7 @@ export async function marketingWorkspace(scope: RequestScope) {
   );
   const profiles=new Map(evidence.flatMap(e=>{const p=marketProfileSchema.safeParse((e.after as {marketProfile?:unknown}|null)?.marketProfile);return p.success?[[e.entityId,p.data] as const]:[];}));
   const handedOver = await handoverKeys(scope, leads.flatMap(l => l.reservations.flatMap(r => r.convertedTenancyId ? [r.convertedTenancyId] : [])));
+  const legacyWon=await legacyHandedOverLeadIds(scope,leads);
   const known = new Map(campaigns.map((c) => [c.id, c]));
   return {
     facilities,
@@ -119,7 +121,7 @@ export async function marketingWorkspace(scope: RequestScope) {
                   : null,
             }
           : null,
-        won: l.reservations.some(
+        won: legacyWon.has(l.id) || l.reservations.some(
           (r) =>
             r.status === "CONVERTED" &&
             r.convertedTenancyId &&
@@ -128,7 +130,7 @@ export async function marketingWorkspace(scope: RequestScope) {
         reserved: l.reservations.some(
           (r) => (r.status === "ACTIVE" && r.journey === "RENTAL") || (r.status === "CONVERTED" && Boolean(r.convertedTenancyId) && !handedOver.has(`${l.facilityId}:${r.convertedTenancyId}`)),
         ),
-        stage: l.reservations.some(r=>r.status==="CONVERTED" && r.convertedTenancyId && handedOver.has(`${l.facilityId}:${r.convertedTenancyId}`)) ? "WON" : l.stage==="WON" ? "HANDOVER_REVIEW" : l.stage,
+        stage: legacyWon.has(l.id) || l.reservations.some(r=>r.status==="CONVERTED" && r.convertedTenancyId && handedOver.has(`${l.facilityId}:${r.convertedTenancyId}`)) ? "WON" : l.stage==="WON" ? "HANDOVER_REVIEW" : l.stage,
       };
     }),
   };

@@ -36,6 +36,20 @@ test("facility grants cannot enter any shared provider credential or processing 
   }
 });
 
+test("assisted legacy photo capture requires same-origin access management",async()=>{
+  const db:Bag={calls:0,permissionNames:[]};
+  const route=await load("src/app/api/v1/access/legacy-photo/route.ts",db,restricted,{
+    "scope":"export const requirePermissionScope=async p=>{__db.permissionNames.push(p);if(__db.denied)throw Error('FORBIDDEN');return __auth};",
+    "request-security":"export const sameOrigin=r=>r.headers.get('origin')==='https://fixture.invalid';export const rateLimit=async()=>false;",
+    "dlp-transfer-service":"export const protectDlpResponse=async r=>r;",
+    "legacy-access-photo":"export const submitAssistedLegacyPhoto=async()=>{__db.calls++;return {id:'test'}};export const withdrawAssistedLegacyPhoto=async()=>{__db.calls++};export const previewLegacyPhoto=async()=>new Uint8Array();export const reviewLegacyPhoto=async()=>{__db.calls++};",
+  });
+  const request=(origin:string)=>{const form=new FormData();form.set('tenancyId','test');form.set('image',new File(['test'],'test.jpg',{type:'image/jpeg'}));return new Request('https://fixture.invalid/api/v1/access/legacy-photo?action=assisted-submit',{method:'POST',headers:{origin},body:form});};
+  assert.equal((await route.POST(request('https://foreign.invalid'))).status,403);assert.equal(db.calls,0);
+  db.denied=true;assert.equal((await route.POST(request('https://fixture.invalid'))).status,403);assert.equal(db.calls,0);
+  db.denied=false;assert.equal((await route.POST(request('https://fixture.invalid'))).status,201);assert.deepEqual(db.permissionNames,['access.manage','access.manage']);assert.equal(db.calls,1);
+});
+
 test("reporting and move-in pages use their own permission scope despite unrelated facility/global roles", async () => {
   for (const unrelated of [foreign, null]) {
     const db: Bag = { scopes: [], permissionNames: [], user: { findUnique: async () => ({ id: "actor", organisationId: "org", active: true, roleAssignments: [{ facilityId: own, role: { name: "Scoped", permissions: ["reports.view", "move_in.create"] } }, { facilityId: unrelated, role: { name: "Phone", permissions: ["phone.view"] } }] }) } };

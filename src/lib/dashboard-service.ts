@@ -1,4 +1,4 @@
-import { handoverKeys, handoverTimes } from "@/lib/handover-evidence";
+import { handoverKeys, handoverTimes, legacyHandedOverLeadIds } from "@/lib/handover-evidence";
 import { unitIsOperational, floorMapSelection } from "@/lib/floor-availability";
 import { netCollectionTotal } from "@/lib/finance/collection-total";
 import { db } from "@/lib/db";
@@ -88,7 +88,7 @@ export async function getDashboardKpis(scope: RequestScope): Promise<DashboardKp
     }),
     netCollectionTotal(scope, monthStart),
     db.lead.count({ where: { facility: facilityWhere(scope), createdAt: { gte: monthStart } } }),
-    db.lead.findMany({ where: { facility: facilityWhere(scope), createdAt: { gte: monthStart } }, select: { facilityId: true, reservations: { select: { status: true, convertedTenancyId: true } } } }),
+    db.lead.findMany({ where: { facility: facilityWhere(scope), createdAt: { gte: monthStart } }, select: { id:true,customerId:true,facilityId: true, reservations: { select: { status: true, convertedTenancyId: true } } } }),
   ]);
 
   const handedOver = await handoverKeys(scope, [...currentTenancies.map(t => t.id), ...currentOccupancies.map(o => o.tenancyId), ...cohortLeads.flatMap(l => l.reservations.flatMap(r => r.convertedTenancyId ? [r.convertedTenancyId] : []))]);
@@ -98,7 +98,8 @@ export async function getDashboardKpis(scope: RequestScope): Promise<DashboardKp
   const confirmedUnits = [...byUnit.values()].filter(rows => rows.length === 1 && rows[0].unit.facilityId === rows[0].tenancy.facilityId && handedOver.has(`${rows[0].tenancy.facilityId}:${rows[0].tenancyId}`));
   const occupiedUnits = confirmedUnits.length;
   const handoverReviewUnits = byUnit.size - occupiedUnits;
-  const wonThisMonth = cohortLeads.filter(l => l.reservations.some(r => r.status === "CONVERTED" && r.convertedTenancyId && handedOver.has(`${l.facilityId}:${r.convertedTenancyId}`))).length;
+  const legacyWon=await legacyHandedOverLeadIds(scope,cohortLeads);
+  const wonThisMonth = cohortLeads.filter(l => legacyWon.has(l.id) || l.reservations.some(r => r.status === "CONVERTED" && r.convertedTenancyId && handedOver.has(`${l.facilityId}:${r.convertedTenancyId}`))).length;
 
   const monthToDateBilled = Number(billedAgg._sum.amount ?? 0);
   const monthToDateCollected = collectedAgg;
@@ -135,11 +136,12 @@ const STAGE_LABELS: Record<string, string> = {
 
 export async function getPipelineByStage(scope: RequestScope): Promise<StagePoint[]> {
   const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-  const leads = await db.lead.findMany({ where: { facility: facilityWhere(scope), createdAt: { gte: ninetyDaysAgo } }, select: { facilityId: true, stage: true, reservations: { select: { status: true, convertedTenancyId: true } } } });
+  const leads = await db.lead.findMany({ where: { facility: facilityWhere(scope), createdAt: { gte: ninetyDaysAgo } }, select: { id:true,customerId:true,facilityId: true, stage: true, reservations: { select: { status: true, convertedTenancyId: true } } } });
   const handedOver = await handoverKeys(scope, leads.flatMap(l => l.reservations.flatMap(r => r.convertedTenancyId ? [r.convertedTenancyId] : [])));
+  const legacyWon=await legacyHandedOverLeadIds(scope,leads);
   const counts = new Map<string, number>();
   for (const lead of leads) {
-    const moved = lead.reservations.some(r => r.status === "CONVERTED" && r.convertedTenancyId && handedOver.has(`${lead.facilityId}:${r.convertedTenancyId}`));
+    const moved = legacyWon.has(lead.id) || lead.reservations.some(r => r.status === "CONVERTED" && r.convertedTenancyId && handedOver.has(`${lead.facilityId}:${r.convertedTenancyId}`));
     const stage = moved ? "WON" : lead.stage === "WON" ? "HANDOVER_REVIEW" : lead.stage;
     counts.set(stage, (counts.get(stage) ?? 0) + 1);
   }

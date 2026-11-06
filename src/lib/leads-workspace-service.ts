@@ -6,6 +6,7 @@ import { leadAttributionSchema } from "@/lib/lead-attribution";
 import { z } from "zod";
 import { marketProfileSchema } from './lead-market-profile';
 import { leadFollowupWhere } from "./lead-followup-policy";
+import { legacyHandedOverLeadIds } from "./handover-evidence";
 
 export const leadUpdateSchema = z.object({
   enquiryLocation: enquiryLocationInputSchema.optional(),
@@ -42,6 +43,7 @@ export async function leadsWorkspace(scope: RequestScope, followupsDue = false) 
     select: { entityId: true, facilityId: true },
   }) : [];
   const handedOver = new Set(handovers.map(event => `${event.facilityId}:${event.entityId}`));
+  const legacyWon=await legacyHandedOverLeadIds(scope,leads);
   const attribution = new Map(evidence.flatMap(event => {
     const after = event.after as { attribution?: unknown } | null;
     const parsed = leadAttributionSchema.safeParse(after?.attribution);
@@ -50,7 +52,7 @@ export async function leadsWorkspace(scope: RequestScope, followupsDue = false) 
   const marketProfiles=new Map(evidence.flatMap(event=>{const parsed=marketProfileSchema.safeParse((event.after as {marketProfile?:unknown}|null)?.marketProfile);return parsed.success?[[event.entityId,parsed.data] as const]:[];}));
   return { facilities, staff: staff.map(person => ({ id: person.id, name: person.name, facilityIds: person.roleAssignments.map(a => a.facilityId) })), count,
     leads: leads.map(lead => ({ ...lead, enquiryLocation: readEnquiryLocation(lead.enquiryLocation), attribution: attribution.get(lead.id) ?? null,marketProfile:marketProfiles.get(lead.id)??null,
-      stage: lead.reservations.some(r => r.status === "CONVERTED" && r.convertedTenancyId && handedOver.has(`${lead.facilityId}:${r.convertedTenancyId}`)) ? "WON" : lead.stage === "WON" ? "HANDOVER_REVIEW" : lead.stage,
+      stage: legacyWon.has(lead.id) || lead.reservations.some(r => r.status === "CONVERTED" && r.convertedTenancyId && handedOver.has(`${lead.facilityId}:${r.convertedTenancyId}`)) ? "WON" : lead.stage === "WON" ? "HANDOVER_REVIEW" : lead.stage,
       reservations: lead.reservations.map(r => ({ ...r, handedOver: Boolean(r.status === "CONVERTED" && r.convertedTenancyId && handedOver.has(`${lead.facilityId}:${r.convertedTenancyId}`)), quotedRate: Number(r.quotedRate) })) })) };
 }
 
@@ -60,13 +62,13 @@ export async function updateLead(scope: RequestScope, id: string, input: LeadUpd
     const lead = await tx.lead.findFirst({ where: { id, facility: facilityWhere(scope) }, include: { reservations: { select: { status: true, journey: true, convertedTenancyId: true, convertedTenancy: { select: { status: true } } } } } });
     if (!lead) throw new Error("NOT_FOUND");
     const candidateIds = lead.reservations.flatMap(r => r.status === "CONVERTED" && r.convertedTenancyId ? [r.convertedTenancyId] : []);
-    const converted = candidateIds.length > 0 && Boolean(await tx.auditEvent.findFirst({ where: { organisationId: scope.organisationId, facilityId: lead.facilityId, entityType: "Tenancy", entityId: { in: candidateIds }, action: "tenancy.key_handover_confirmed" }, select: { id: true } }));
+    const converted = (await legacyHandedOverLeadIds(scope,[lead],tx)).has(lead.id) || (candidateIds.length > 0 && Boolean(await tx.auditEvent.findFirst({ where: { organisationId: scope.organisationId, facilityId: lead.facilityId, entityType: "Tenancy", entityId: { in: candidateIds }, action: "tenancy.key_handover_confirmed" }, select: { id: true } })));
     const hasConvertedBooking = lead.reservations.some(r => r.status === "CONVERTED");
     const displayedStage = converted ? "WON" : lead.stage === "WON" ? "HANDOVER_REVIEW" : lead.stage;
     if (input.stage === "HANDOVER_REVIEW" && displayedStage !== "HANDOVER_REVIEW") throw new Error("LEAD_BOOKING_STAGE");
     if (input.stage === "WON" && !converted) throw new Error("LEAD_BOOKING_STAGE");
     if (input.stage === "RESERVED" && !hasConvertedBooking && !lead.reservations.some(r => r.status === "ACTIVE" && r.journey === "RENTAL")) throw new Error("LEAD_BOOKING_STAGE");
-    if (lead.reservations.some(r => ["ACTIVE", "CONVERTED"].includes(r.status)) && input.stage !== displayedStage) throw new Error("LEAD_BOOKING_STAGE");
+    if ((converted || lead.reservations.some(r => ["ACTIVE", "CONVERTED"].includes(r.status))) && input.stage !== displayedStage) throw new Error("LEAD_BOOKING_STAGE");
     if (input.assignedToId && !await tx.user.findFirst({ where: { id: input.assignedToId, organisationId: scope.organisationId, active: true,
       roleAssignments: { some: { OR: [{ facilityId: null }, { facilityId: lead.facilityId }] } } } })) throw new Error("FORBIDDEN");
     let location = lead.enquiryLocation;
