@@ -18,6 +18,7 @@ import {
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { formatSouthAfricaDate, southAfricaDateKey } from "@/lib/south-africa-time";
+import { transferRentPreview } from "@/lib/transfer-preview";
 
 type Ledger = {
   id: string;
@@ -112,9 +113,11 @@ function generateReference(accountNumber: string) {
 export function AccountsWorkspace({
   initialAccountId,
   initialDocumentId,
+  transferMode = false,
 }: {
   initialAccountId?: string;
   initialDocumentId?: string;
+  transferMode?: boolean;
 }) {
   const [data, setData] = useState<Data | null>(null);
   const [selectedId, setSelectedId] = useState("");
@@ -122,6 +125,9 @@ export function AccountsWorkspace({
   const detailRef = useRef<HTMLElement>(null);
   const [search, setSearch] = useState("");
   const [dialog, setDialog] = useState<Dialog>(null);
+  const [transferUnit, setTransferUnit] = useState("");
+  const [transferDate, setTransferDate] = useState("");
+  const [transferOverride, setTransferOverride] = useState("");
   const [paymentReference, setPaymentReference] = useState("");
   const [paymentRequestId, setPaymentRequestId] = useState("");
   const [moveOutIdempotencyKey, setMoveOutIdempotencyKey] = useState("");
@@ -281,12 +287,16 @@ export function AccountsWorkspace({
     (item) => item.id === selected?.tenancy?.facilityId,
   );
 
+  const activeOccupancies = selected?.tenancy?.occupancies.filter(occupancy => occupancy.status === "ACTIVE") ?? [];
+  const destination = facility?.units.find(unit => unit.id === transferUnit);
+  const transferPreview = activeOccupancies.length === 1 && destination ? transferRentPreview(transferDate, activeOccupancies[0].monthlyRate, transferOverride || destination.monthlyRate) : null;
+
   return (
     <div className="page-stack finance-accounts-workspace">
       <PageHeader
         eyebrow="Operations centre"
-        title="Accounts"
-        description="Manage tenant balances, payments, transfers and move-outs against live store records."
+        title={transferMode ? "Transfers" : "Accounts"}
+        description={transferMode ? "Select an active account and choose Transfer to move the tenancy to an available unit." : "Manage tenant balances, payments, transfers and move-outs against live store records."}
         action={
           <Link href="/operations/move-in" className="button button-primary">
             <Plus size={16} />
@@ -294,9 +304,10 @@ export function AccountsWorkspace({
           </Link>
         }
       />
+      {transferMode && <p className="panel panel-spacious">Transfers change the unit and rental rate. The form shows an indicative rent difference but does not post a pro-rata credit or charge. Confirm the financial adjustment and transfer documentation before completing a move.</p>}
       <section className="panel panel-spacious">
         {readError ? <p role="alert">{readError}</p> : null}
-        {readAccess === "signed-out" ? <Link className="button button-primary" href="/login?next=%2Faccounts">Sign in again</Link> : <button className="button button-secondary" disabled={readBusy || busy || !!dialog} onClick={() => void load()}>{readBusy ? "Loading accounts…" : "Reload accounts"}</button>}
+        {readAccess === "signed-out" ? <Link className="button button-primary" href={transferMode ? "/login?next=%2Ftransfers" : "/login?next=%2Faccounts"}>Sign in again</Link> : <button className="button button-secondary" disabled={readBusy || busy || !!dialog} onClick={() => void load()}>{readBusy ? "Loading accounts…" : "Reload accounts"}</button>}
       </section>
       {error && !dialog ? <p className="form-error" role="alert">{error}</p> : null}
       {notice ? <p className="form-success">{notice}</p> : null}
@@ -410,6 +421,9 @@ export function AccountsWorkspace({
                   disabled={selected.tenancy?.status !== "ACTIVE"}
                   onClick={() => {
                     setError("");
+                    setTransferUnit("");
+                    setTransferDate(southAfricaDateKey(new Date()));
+                    setTransferOverride("");
                     setDialog("transfer");
                   }}
                 >
@@ -610,7 +624,7 @@ export function AccountsWorkspace({
               <form action={submitTransfer} className="invite-form">
                 <label>
                   New unit
-                  <select name="toUnitId" required>
+                  <select name="toUnitId" required value={transferUnit} onChange={e => setTransferUnit(e.target.value)}>
                     <option value="">Select available unit</option>
                     {facility?.units.map((unit) => (
                       <option value={unit.id} key={unit.id}>
@@ -625,14 +639,16 @@ export function AccountsWorkspace({
                   <input
                     name="effectiveAt"
                     type="date"
-                    defaultValue={southAfricaDateKey(new Date())}
+                    value={transferDate}
+                    onChange={e => setTransferDate(e.target.value)}
                     required
                   />
                 </label>
                 <label>
                   Monthly rent override
-                  <input name="monthlyRate" type="number" min="0" step="0.01" />
+                  <input name="monthlyRate" type="number" min="0" step="0.01" value={transferOverride} onChange={e => setTransferOverride(e.target.value)} />
                 </label>
+                {transferPreview && <div role="status"><strong>Indicative rent difference: {transferPreview.difference < 0 ? "credit " : transferPreview.difference > 0 ? "additional charge " : "no difference "}{money(Math.abs(transferPreview.difference))}</strong><p>For {transferPreview.newDays} of {transferPreview.days} days at the new rate, compared with a full month at the old rate. This estimate excludes discounts, fees, tax changes and prior adjustments. Confirm the actual ledger treatment; completing a transfer does not post this amount.</p></div>}
                 <ActionButtons
                   busy={busy}
                   close={() => setDialog(null)}

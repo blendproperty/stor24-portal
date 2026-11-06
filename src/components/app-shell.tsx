@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import {
   PanelLeftClose,
   PanelLeftOpen,
+  ArrowRightLeft,
   BarChart3,
   Building2,
   CalendarDays,
@@ -72,6 +73,7 @@ const navigation = [
   { group: "Customers & sales", href: "/reservations/prices", label: "Booking price review", icon: CalendarDays },
   { group: "Customers & sales", href: "/identity", label: "Identity review", icon: ShieldCheck },
   { group: "Facility operations", href: "/units", label: "Units & rates", icon: Warehouse },
+  { group: "Facility operations", href: "/transfers", label: "Transfers", icon: ArrowRightLeft },
   { group: "Finance", href: "/invoicing", label: "Invoicing", icon: FileText },
   { group: "Finance", href: "/payments", label: "Payments", icon: CreditCard },
   { group: "Finance", href: "/collections", label: "Collections", icon: ShieldAlert },
