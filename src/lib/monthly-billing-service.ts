@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { db } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
 import type { RequestScope } from "@/lib/scope";
-import { billingPlanSchema, calculateMonthlyBill, currentBillingPeriod, periodDates, type BillingPlan } from "./monthly-billing-policy";
+import { billingPlanSchema, calculateMonthlyBill, currentBillingPeriod, nextBillingPeriod, periodDates, type BillingPlan } from "./monthly-billing-policy";
 import { isTestPayment } from "./payments/payment-evidence";
 import { renderInvoiceHtml } from "./finance/invoice-renderer";
 import { getBillingDocumentCompanyDetails } from "./finance/billing-document-config";
@@ -48,9 +48,9 @@ export async function saveMonthlyBillingPlan(scope: RequestScope, accountId: str
 export async function monthlyBillingHistory(scope:RequestScope,accountId:string,before?:number){
  return db.$transaction(async tx=>{const {tenancy}=await context(tx,scope,accountId);return readBillingPlanVersions(tx,scope.organisationId,tenancy.facilityId,accountId,before)},{isolationLevel:"RepeatableRead",timeout:20000});
 }
-async function preview(client: Client, scope: RequestScope, accountId: string, period: string) {
+async function preview(client: Client, scope: RequestScope, accountId: string, period: string, reviewNextMonth = false) {
   const dates = periodDates(period);
-  if (period > currentBillingPeriod()) throw new Error("BILLING_FUTURE_PERIOD");
+  if (period > currentBillingPeriod() && !(reviewNextMonth && period === nextBillingPeriod())) throw new Error("BILLING_FUTURE_PERIOD");
   const { account, tenancy, profile } = await context(client, scope, accountId);
   if (!profile || profile.status !== "READY") throw new Error("BILLING_PLAN_REQUIRED");
   if (!["ACTIVE", "NOTICE_GIVEN"].includes(tenancy.status)) throw new Error("BILLING_TENANCY_NOT_ACTIVE");
@@ -79,6 +79,19 @@ async function preview(client: Client, scope: RequestScope, accountId: string, p
   return { ...result, fingerprint, accountNumber: account.accountNumber, accountId, customerName: account.customer.companyName || [account.customer.firstName, account.customer.lastName].filter(Boolean).join(" ") || "Customer", facilityName: tenancy.facility.name, tenancyId: tenancy.id, facilityId: tenancy.facilityId, balance: account.balance.toString(), approvalReference: plan.approvalReference };
 }
 export async function previewMonthlyBilling(scope: RequestScope, accountId: string, period: string) { return preview(db, scope, accountId, period); }
+// Read-only preparation only: future posting remains blocked in postMonthlyBilling.
+export async function previewNextMonthForReview(scope: RequestScope, accountId: string) {
+  return db.$transaction(async tx => {
+    const { tenancy, profile } = await context(tx, scope, accountId);
+    if (tenancy.status === "NOTICE_GIVEN") throw new Error("BILLING_NOTICE_POLICY_REVIEW");
+    const handover = await tx.auditEvent.findFirst({ where: { organisationId: scope.organisationId, facilityId: tenancy.facilityId, entityType: "Tenancy", entityId: tenancy.id, action: "tenancy.key_handover_confirmed" }, select: { id: true } });
+    if (!handover) throw new Error("BILLING_HANDOVER_REVIEW");
+    const period = nextBillingPeriod();
+    if (profile?.status === "READY") { const discount = billingPlanSchema.parse(profile.config).discount; if (discount && period >= discount.startsPeriod && period <= discount.endsPeriod) throw new Error("BILLING_DISCOUNT_POLICY_REVIEW"); }
+    const bill = await preview(tx, scope, accountId, period, true);
+    return { ...bill, period };
+  }, { isolationLevel: "RepeatableRead", timeout: 20000 });
+}
 export async function postMonthlyBilling(scope: RequestScope, accountId: string, period: string, fingerprint: string, actorId: string | null = scope.userId) {
   // Documents snapshot the configured company information; no email or provider call occurs.
   const { tenancy } = await context(db, scope, accountId);

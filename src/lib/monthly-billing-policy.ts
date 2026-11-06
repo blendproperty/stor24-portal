@@ -22,6 +22,7 @@ export type BillingLine = { key: string; description: string; amount: number; ta
 export type BillingOccupancy = { id: string; number: string; monthlyRate: number; startDate: Date; endDate: Date | null };
 export type BillingInsurance = { status: string; monthlyPremium: number | null; effectiveFrom: Date | null; endedAt: Date | null };
 export function currentBillingPeriod(now = new Date()) { return southAfricaDateKey(now).slice(0, 7); }
+export function nextBillingPeriod(now = new Date()) { const [year, month] = currentBillingPeriod(now).split("-").map(Number); return new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 7); }
 export function periodDates(period: string) {
   billingPeriodSchema.parse(period);
   const [year, month] = period.split("-").map(Number);

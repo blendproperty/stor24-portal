@@ -21,6 +21,7 @@ export function MonthlyBillingWorkspace() {
   const [approved, setApproved] = useState(false);
   const [reviewed, setReviewed] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [nextPreview, setNextPreview] = useState<(Preview & { period: string }) | null>(null);
   const [history,setHistory]=useState<PlanHistory|null>(null);
   const [historyBusy,setHistoryBusy]=useState(false);
   const [busy, setBusy] = useState(false);
@@ -28,17 +29,22 @@ export function MonthlyBillingWorkspace() {
   const [result, setResult] = useState<{ documentId: string; invoiceNumber: string } | null>(null);
   const [invoices, setInvoices] = useState<{ id: string; externalId: string }[]>([]);
   useEffect(() => { request("/api/v1/billing/monthly").then(setAccounts).catch(e => setError(e.message)); }, []);
-  function edit(next: BillingPlan) { setPlan(next); setApproved(false); setPreview(null); setReviewed(false); setResult(null); }
+  function edit(next: BillingPlan) { setNextPreview(null); setPlan(next); setApproved(false); setPreview(null); setReviewed(false); setResult(null); }
   async function select(id: string) {
     setHistory(null);
-    setAccountId(id); setPreview(null); setResult(null); setReviewed(false); setApproved(false); setPlan(blankPlan()); setInvoices([]);
+    setAccountId(id); setNextPreview(null); setPreview(null); setResult(null); setReviewed(false); setApproved(false); setPlan(blankPlan()); setInvoices([]);
     if (!id) return;
     setBusy(true); setError("");
     try { const saved = await request(`/api/v1/billing/monthly?accountId=${encodeURIComponent(id)}`); setPlan(saved.plan || blankPlan()); setApproved(Boolean(saved.plan)); setInvoices(saved.invoices); } catch(e) { setError((e as Error).message); } finally { setBusy(false); }
   }
   async function loadHistory(before?:number){setHistoryBusy(true);setError("");try{const data=await request(`/api/v1/billing/monthly?accountId=${encodeURIComponent(accountId)}&history=true${before?`&before=${before}`:""}`);setHistory(previous=>before&&previous?{...data,versions:[...previous.versions,...data.versions]}:data)}catch(e){setError((e as Error).message)}finally{setHistoryBusy(false)}}
+  async function previewNext() {
+    setBusy(true); setError(""); setNextPreview(null);
+    try { setNextPreview(await request("/api/v1/billing/monthly", { action: "preview-next", accountId })); }
+    catch(e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
   async function act(action: "plan" | "preview" | "post") {
-    setBusy(true); setError(""); setResult(null);
+    setBusy(true); setError(""); setResult(null); setNextPreview(null);
     try {
       const data = await request("/api/v1/billing/monthly", action === "plan" ? { action, accountId, plan } : action === "post" ? { action, accountId, period, fingerprint: preview?.fingerprint, confirm: true } : { action, accountId, period });
       if (action === "plan") { setHistory(null); setApproved(true); setPreview(null); }
@@ -50,6 +56,7 @@ export function MonthlyBillingWorkspace() {
     <section className="panel"><p>Posting creates an account charge and a saved invoice. It does not collect money or email the customer. Charges are VAT-inclusive where marked taxable. Confirm the tax treatment, contract and first unbilled month with finance.</p>
       <div className="form-grid"><label>Customer account<select value={accountId} disabled={busy||historyBusy} onChange={e => void select(e.target.value)}><option value="">Select account</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.accountNumber} · {a.customer.companyName || [a.customer.firstName, a.customer.lastName].filter(Boolean).join(" ")} · {a.tenancy?.facility.name}</option>)}</select></label><label>Billing month<input type="month" value={period} max={currentBillingPeriod()} disabled={busy||historyBusy} onChange={e => { setPeriod(e.target.value); setPreview(null); setResult(null); setReviewed(false); }}/></label></div>
     </section>
+    {accountId && <section className="panel"><h2>Next-month invoice preparation</h2><p>Review an estimate for next month ahead of the 17th. No invoice, ledger charge or email is created. Notice and discount cases are held for finance while the rules are confirmed.</p><button type="button" className="button button-secondary" disabled={busy || historyBusy || !approved} onClick={() => void previewNext()}>Review next month</button>{nextPreview && <div role="status"><h3>Estimate for {nextPreview.period} · {nextPreview.customerName}</h3><ul>{nextPreview.lines.map(line => <li key={line.key}>{line.description}: {line.type === "CREDIT" ? "−" : ""}{money(line.amount)}</li>)}</ul><p><strong>Estimated total: {money(nextPreview.total)}</strong> · Included tax: {money(nextPreview.taxTotal)}</p><p>Review only. Changes to the account or agreement can change this amount.</p></div>}</section>}
     {accountId && <section className="panel billing-plan-history"><h2>Retained billing-plan history</h2><p>Review recorded terms and approvals. An observed legacy baseline is not proof of its original approval date or historical effective period.</p><button className="button button-secondary" disabled={busy||historyBusy} onClick={()=>void loadHistory()}>Review plan history</button>{history&&<><p>{history.coverage}</p>{!history.versions.length?<p>No retained version yet. The next approved save retains the existing plan as an observed baseline.</p>:<ol>{history.versions.map(v=><li key={v.recordNumber}><details><summary>Version {v.recordNumber} · {v.kind==="OBSERVED_LEGACY"?"Observed legacy baseline":"Recorded approval"} · {new Date(v.recordedAt).toLocaleString("en-ZA",{timeZone:"Africa/Johannesburg"})} SAST</summary><p>Reference: {v.plan.approvalReference}; first unbilled month: {v.plan.firstPeriod}; proration: {v.plan.proration}; included tax rate: {v.plan.taxPercent}%.</p><p>Recurring charges: {v.plan.charges.map(c=>`${c.code} — ${c.name}: R ${c.amount.toFixed(2)}`).join("; ")||"None recorded"}.</p><p>Rent tax: {v.plan.rentTaxable?"included":"not taxable"}; insurance: {v.plan.insuranceEnabled?`enabled (${v.plan.insuranceTaxable?"tax included":"not taxable"})`:"disabled"}. Discount: {v.plan.discount?`${v.plan.discount.name}; ${v.plan.discount.type} ${v.plan.discount.value}; ${v.plan.discount.startsPeriod} through ${v.plan.discount.endsPeriod}`:"None recorded"}.</p><p>Integrity reference: {v.hash.slice(0,16)}.</p></details></li>)}</ol>}{history.nextBefore&&<button className="button button-secondary" disabled={historyBusy} onClick={()=>void loadHistory(history.nextBefore!)}>Load older versions</button>}</>}</section>}
     {error && <p role="alert" className="panel">{error}</p>}
     {accountId && <fieldset className="panel monthly-plan" disabled={busy||historyBusy}><legend>Account billing terms {approved ? "— saved" : "— review required"}</legend>

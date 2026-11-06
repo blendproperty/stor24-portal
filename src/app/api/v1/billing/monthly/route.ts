@@ -3,9 +3,10 @@ import { authErrorResponse } from "@/lib/auth-guards";
 import { requirePermissionScope } from "@/lib/scope";
 import { sameOrigin } from "@/lib/request-security";
 import { billingPeriodSchema } from "@/lib/monthly-billing-policy";
-import { monthlyBillingHistory, getMonthlyBillingPlan, monthlyBillingAccounts, monthlyBillingInvoices, postMonthlyBilling, previewMonthlyBilling, saveMonthlyBillingPlan } from "@/lib/monthly-billing-service";
+import { monthlyBillingHistory, getMonthlyBillingPlan, monthlyBillingAccounts, monthlyBillingInvoices, postMonthlyBilling, previewMonthlyBilling, previewNextMonthForReview, saveMonthlyBillingPlan } from "@/lib/monthly-billing-service";
 
 const requestSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("preview-next"), accountId: z.string().cuid() }).strict(),
   z.object({ action: z.literal("preview"), accountId: z.string().cuid(), period: billingPeriodSchema }).strict(),
   z.object({ action: z.literal("post"), accountId: z.string().cuid(), period: billingPeriodSchema, fingerprint: z.string().regex(/^[a-f0-9]{64}$/), confirm: z.literal(true) }).strict(),
   z.object({ action: z.literal("plan"), accountId: z.string().cuid(), plan: z.unknown() }).strict(),
@@ -28,6 +29,9 @@ function failure(error: unknown) {
     BILLING_DISCOUNT_EXCEEDS_RENT: "The discount exceeds this month's rent. Check the agreed discount and dates.",
     BILLING_NO_OCCUPANCY_IN_PERIOD: "There is no billable occupancy in this month.",
     BILLING_TENANCY_NOT_ACTIVE: "Monthly billing requires an active tenancy or an active notice period. Final bills for closed tenancies need a separate review.",
+    BILLING_NOTICE_POLICY_REVIEW: "This account is on notice. Its next invoice needs finance review while the notice rule is confirmed.",
+    BILLING_HANDOVER_REVIEW: "The account needs a recorded key handover before next-month review.",
+    BILLING_DISCOUNT_POLICY_REVIEW: "A discount applies next month. Finance must review it while the discount rules are confirmed.",
     BILLING_FUTURE_PERIOD: "Future months cannot be posted through this workflow.",
   };
   if (error instanceof Error && error.message.startsWith("BILLING_")) return Response.json({ error: { code: error.message, message: messages[error.message] || "This account requires review before billing can proceed." } }, { status: error.message === "BILLING_ACCOUNT_NOT_FOUND" ? 404 : 409 });
@@ -52,8 +56,8 @@ export async function POST(request: Request) {
   try {
     if (!sameOrigin(request)) throw new Error("FORBIDDEN");
     const input = requestSchema.parse(await request.json());
-    const scope = await requirePermissionScope(input.action === "preview" ? "billing.view" : input.action === "plan" ? "configuration.manage" : "billing.manage");
-    const data = input.action === "plan" ? await saveMonthlyBillingPlan(scope, input.accountId, input.plan) : input.action === "preview" ? await previewMonthlyBilling(scope, input.accountId, input.period) : await postMonthlyBilling(scope, input.accountId, input.period, input.fingerprint);
+    const scope = await requirePermissionScope((input.action === "preview" || input.action === "preview-next") ? "billing.view" : input.action === "plan" ? "configuration.manage" : "billing.manage");
+    const data = input.action === "plan" ? await saveMonthlyBillingPlan(scope, input.accountId, input.plan) : input.action === "preview" ? await previewMonthlyBilling(scope, input.accountId, input.period) : input.action === "preview-next" ? await previewNextMonthForReview(scope, input.accountId) : await postMonthlyBilling(scope, input.accountId, input.period, input.fingerprint);
     return Response.json({ data });
   } catch (error) { return failure(error); }
 }
