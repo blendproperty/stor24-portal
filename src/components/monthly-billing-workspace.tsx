@@ -45,7 +45,7 @@ export function MonthlyBillingWorkspace() {
   const [result, setResult] = useState<{ documentId: string; invoiceNumber: string } | null>(null);
   const [invoices, setInvoices] = useState<{ id: string; externalId: string }[]>([]);
   useEffect(() => { request("/api/v1/billing/monthly").then(setAccounts).catch(e => setError(e.message)); }, []);
-  function edit(next: BillingPlan) { setMulti(null); setMultiConfirmed(false); setNextPreview(null); setPlan(next); setApproved(false); setPreview(null); setReviewed(false); setResult(null); }
+  function edit(next: BillingPlan) { setBatchReview(null); setBatchConfirmed(false); setMulti(null); setMultiConfirmed(false); setNextPreview(null); setPlan(next); setApproved(false); setPreview(null); setReviewed(false); setResult(null); }
   async function select(id: string) {
     setHistory(null);
     setAccountId(id); setMulti(null); setMultiConfirmed(false); setNotice(""); setDraft(null); setDraftConfirmed(false); setScheduleDate(""); setNextPreview(null); setPreview(null); setResult(null); setReviewed(false); setApproved(false); setPlan(blankPlan()); setInvoices([]);
