@@ -40,6 +40,9 @@ export function refundLimits(config: unknown) {
   return { minimum, maximum };
 }
 export const adjustmentMessages: Record<string, string> = {
+  TRANSFER_ADJUSTMENT_REVIEW: "This transfer, original invoice or account needs finance review. No adjustment was requested or posted.",
+  TRANSFER_ADJUSTMENT_NO_DIFFERENCE: "There is no rent difference to adjust for this transfer.",
+  TRANSFER_ADJUSTMENT_DUPLICATE: "An adjustment for this transfer is already pending or posted. Review its history before retrying.",
   NETCASH_REFUND_RESERVED: "This payment has a retained Netcash refund reservation. Request and independently review its release before recording a manual payout or cancelling the refund.",
   NETCASH_REFUND_INTEGRITY_REVIEW: "Retained Netcash refund evidence needs investigation. No manual payout or cancellation was recorded.",
   NETCASH_REFUND_HOLD_COVERAGE_REVIEW: "Refund reservation coverage needs investigation. No manual payout or cancellation was recorded.",

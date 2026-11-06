@@ -1,3 +1,4 @@
+import { transferAdjustmentSource } from "./transfer-adjustment-source";
 import {assertNoNetcashRefundHold} from './payments/netcash-refund-interlock';
 import {receiptAllocationGraph} from "./receipt-reallocation-source";
 import { createHash } from "node:crypto";
@@ -31,6 +32,13 @@ function matchedPayment(account: Awaited<ReturnType<typeof context>>["account"],
 async function review(tx: Client, scope: RequestScope, raw: unknown, ownId?: string) {
   const input = adjustmentInputSchema.parse(raw);
   const { account, tenancy, policy } = await context(tx, scope, input.accountId);
+  let transferDigest: string | null = null;
+  if (input.evidenceReference.startsWith("transfer:")) {
+    const source = await transferAdjustmentSource(tx, scope, input.evidenceReference.slice("transfer:".length));
+    if (hash(source.input) !== hash(input)) throw new Error("TRANSFER_ADJUSTMENT_REVIEW");
+    if (await tx.financialAdjustment.count({ where: { accountId: account.id, evidenceReference: input.evidenceReference, status: { in: ["PENDING_APPROVAL", "APPROVED", "POSTED"] }, ...(ownId ? { id: { not: ownId } } : {}) } })) throw new Error("TRANSFER_ADJUSTMENT_DUPLICATE");
+    transferDigest = source.digest;
+  }
   if (account.currency !== "ZAR") throw new Error("ADJUSTMENT_SOURCE");
   const entries = account.ledgerEntries;
   if (entries.some(e => e.type === "PAYMENT" && account.payments.some(p => isTestPayment(p) && (e.externalRef === p.idempotencyKey || (e.metadata as { paymentId?: string } | null)?.paymentId === p.id)))) throw new Error("ADJUSTMENT_TEST_REVIEW");
@@ -87,7 +95,7 @@ async function review(tx: Client, scope: RequestScope, raw: unknown, ownId?: str
     if (cents(input.taxAmount) !== 0) throw new Error("ADJUSTMENT_TAX");
   }
   const snapshot = { input, accountNumber: account.accountNumber, facilityId: tenancy.facilityId, facilityName: tenancy.facility.name, tenancyId: tenancy.id, balanceBefore: amountText(balance), balanceAfter: amountText(balance + adjustmentDelta(input.kind, amount)), amount: amountText(amount), taxAmount: amountText(tax), source: source ? { id: source.id, type: source.type, description: source.description, amount: source.amount.toString(), effectiveAt: source.effectiveAt.toISOString(), externalRef: source.externalRef } : null, paymentId };
-  return { ...snapshot, allocationRoots, fingerprint: hash({ snapshot, entries, payments: account.payments, policy: policy?.config ?? null, history, ...(allocationDigests.length?{allocationDigests}:{}) }) };
+  return { ...snapshot, allocationRoots, fingerprint: hash({ snapshot, entries, payments: account.payments, policy: policy?.config ?? null, history, ...(transferDigest ? { transferDigest } : {}), ...(allocationDigests.length?{allocationDigests}:{}) }) };
 }
 export async function adjustmentWorkspace(scope: RequestScope) {
   const [accounts, requests] = await Promise.all([
@@ -101,6 +109,15 @@ export async function adjustmentAccount(scope: RequestScope, accountId: string) 
   return { balance: account.balance, entries: account.ledgerEntries.filter(e => ["CHARGE", "PAYMENT"].includes(e.type)).map(e => ({ id: e.id, type: e.type, description: e.description, amount: e.amount.toString(), taxAmount: e.taxAmount.toString(), effectiveAt: e.effectiveAt })) };
 }
 export const previewAdjustment = (scope: RequestScope, raw: unknown) => review(db, scope, raw);
+export async function previewTransferAdjustment(scope: RequestScope, eventId: string, accountId: string) {
+  const source = await transferAdjustmentSource(db, scope, eventId);
+  if (source.input.accountId !== accountId) throw new Error("TRANSFER_ADJUSTMENT_REVIEW");
+  return review(db, scope, source.input);
+}
+export async function adjustmentTransfers(scope: RequestScope, accountId: string) {
+  const { tenancy } = await context(db, scope, accountId);
+  return db.auditEvent.findMany({ where: { organisationId: scope.organisationId, facilityId: tenancy.facilityId, entityType: "Tenancy", entityId: tenancy.id, action: "tenancy.transferred" }, select: { id: true, occurredAt: true, after: true }, orderBy: { occurredAt: "desc" }, take: 20 });
+}
 export async function requestAdjustment(scope: RequestScope, raw: unknown, fingerprint: string, requestKey: string) {
   const input = adjustmentInputSchema.parse(raw);
   return db.$transaction(async tx => {

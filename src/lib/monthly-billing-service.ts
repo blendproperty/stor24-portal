@@ -17,7 +17,7 @@ function accountWhere(scope: RequestScope, accountId?: string): Prisma.AccountWh
   return { ...(accountId ? { id: accountId } : {}), customer: { organisationId: scope.organisationId }, tenancy: { facility: { organisationId: scope.organisationId }, ...(scope.unrestrictedFacilities ? {} : { facilityId: { in: scope.facilityIds } }) } };
 }
 export async function monthlyBillingAccounts(scope: RequestScope) {
-  return db.account.findMany({ where: accountWhere(scope), select: { id: true, accountNumber: true, customer: { select: { companyName: true, firstName: true, lastName: true } }, tenancy: { select: { facilityId: true, status: true, facility: { select: { name: true } } } } }, orderBy: { accountNumber: "asc" } });
+  return db.account.findMany({ where: accountWhere(scope), select: { id: true, accountNumber: true, customer: { select: { id: true, companyName: true, firstName: true, lastName: true } }, tenancy: { select: { facilityId: true, status: true, facility: { select: { name: true } } } } }, orderBy: { accountNumber: "asc" } });
 }
 async function context(client: Client, scope: RequestScope, accountId: string) {
   const account = await client.account.findFirst({ where: accountWhere(scope, accountId), include: { customer: true, tenancy: { include: { facility: true, occupancies: { include: { unit: true }, orderBy: { id: "asc" } }, insuranceEnrollment: true } } } });
@@ -31,7 +31,7 @@ export async function getMonthlyBillingPlan(scope: RequestScope, accountId: stri
 }
 export async function monthlyBillingInvoices(scope: RequestScope, accountId: string) {
   const { tenancy } = await context(db, scope, accountId);
-  return db.document.findMany({ where: { tenancyId: tenancy.id, type: "INVOICE", idempotencyKey: { startsWith: "monthly-invoice:" } }, select: { id: true, externalId: true, createdAt: true }, orderBy: { createdAt: "desc" }, take: 60 });
+  return db.document.findMany({ where: { type: "INVOICE", OR: [{ tenancyId: tenancy.id, idempotencyKey: { startsWith: "monthly-invoice:" } }, { combinedInvoiceMemberships: { some: { accountId } }, idempotencyKey: { startsWith: "combined-invoice:" } }] }, select: { id: true, externalId: true, createdAt: true }, orderBy: { createdAt: "desc" }, take: 60 });
 }
 export async function saveMonthlyBillingPlan(scope: RequestScope, accountId: string, value: unknown) {
   const plan = billingPlanSchema.parse(value);
@@ -48,7 +48,7 @@ export async function saveMonthlyBillingPlan(scope: RequestScope, accountId: str
 export async function monthlyBillingHistory(scope:RequestScope,accountId:string,before?:number){
  return db.$transaction(async tx=>{const {tenancy}=await context(tx,scope,accountId);return readBillingPlanVersions(tx,scope.organisationId,tenancy.facilityId,accountId,before)},{isolationLevel:"RepeatableRead",timeout:20000});
 }
-async function preview(client: Client, scope: RequestScope, accountId: string, period: string) {
+export async function previewMonthlyBillingInTransaction(client: Client, scope: RequestScope, accountId: string, period: string) {
   const dates = periodDates(period);
   if (period > currentBillingPeriod()) throw new Error("BILLING_FUTURE_PERIOD");
   const { account, tenancy, profile } = await context(client, scope, accountId);
@@ -78,14 +78,14 @@ async function preview(client: Client, scope: RequestScope, accountId: string, p
   const fingerprint = createHash("sha256").update(JSON.stringify({ account, profile, entries, payments, result })).digest("hex");
   return { ...result, fingerprint, accountNumber: account.accountNumber, accountId, customerName: account.customer.companyName || [account.customer.firstName, account.customer.lastName].filter(Boolean).join(" ") || "Customer", facilityName: tenancy.facility.name, tenancyId: tenancy.id, facilityId: tenancy.facilityId, balance: account.balance.toString(), approvalReference: plan.approvalReference };
 }
-export async function previewMonthlyBilling(scope: RequestScope, accountId: string, period: string) { return preview(db, scope, accountId, period); }
+export async function previewMonthlyBilling(scope: RequestScope, accountId: string, period: string) { return previewMonthlyBillingInTransaction(db, scope, accountId, period); }
 export async function postMonthlyBilling(scope: RequestScope, accountId: string, period: string, fingerprint: string, actorId: string | null = scope.userId) {
   // Documents snapshot the configured company information; no email or provider call occurs.
   const { tenancy } = await context(db, scope, accountId);
   const company = await getBillingDocumentCompanyDetails(scope.organisationId, tenancy.facilityId);
   return db.$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${accountId} FOR UPDATE`;
-    const bill = await preview(tx, scope, accountId, period);
+    const bill = await previewMonthlyBillingInTransaction(tx, scope, accountId, period);
     if (bill.fingerprint !== fingerprint) throw new Error("BILLING_PREVIEW_CHANGED");
     const invoiceNumber = `INV-${period.replace("-", "")}-${bill.accountNumber}`;
     const posted = [];

@@ -843,6 +843,7 @@ model InsuranceEnrollment {
 }
 
 model Account {
+  combinedInvoiceMemberships CombinedInvoiceMembership[]
   receiptImportPostings ReceiptImportPosting[]
   outgoingReceiptReallocations ReceiptReallocation[] @relation("ReceiptReallocationSourceAccount")
   incomingReceiptReallocations ReceiptReallocation[] @relation("ReceiptReallocationTargetAccount")
@@ -1250,6 +1251,7 @@ model SettlementBalanceObservation {
 }
 
 model Document {
+  combinedInvoiceMemberships CombinedInvoiceMembership[]
   receiptImportPosting ReceiptImportPosting?
   receiptReallocationSource ReceiptReallocation? @relation("ReceiptReallocationSourceDocument")
   receiptReallocationTarget ReceiptReallocation? @relation("ReceiptReallocationTargetDocument")
@@ -1279,6 +1281,19 @@ model Document {
 
   @@index([tenancyId, type])
   @@index([provider, externalId])
+}
+
+model CombinedInvoiceMembership {
+  id         String   @id @default(cuid())
+  accountId  String
+  account    Account  @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  period     String
+  createdAt  DateTime @default(now())
+
+  @@unique([accountId, period])
+  @@index([documentId])
 }
 
 model User {

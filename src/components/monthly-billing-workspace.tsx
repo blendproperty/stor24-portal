@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { currentBillingPeriod, type BillingPlan, type BillingLine } from "@/lib/monthly-billing-policy";
 
-type Account = { id: string; accountNumber: string; customer: { companyName: string | null; firstName: string | null; lastName: string | null }; tenancy: { facility: { name: string }; status: string } | null };
+type Account = { id: string; accountNumber: string; customer: { id?: string; companyName: string | null; firstName: string | null; lastName: string | null }; tenancy: { facilityId?: string; facility: { name: string }; status: string } | null };
 type Preview = { fingerprint: string; customerName: string; total: number; taxTotal: number; lines: BillingLine[] };
 const money = (n: number) => n.toLocaleString("en-ZA", { style: "currency", currency: "ZAR" });
 function blankPlan(): BillingPlan { return { firstPeriod: currentBillingPeriod(), proration: "ACTUAL_DAYS", taxPercent: 0, rentTaxable: false, insuranceEnabled: false, insuranceTaxable: false, charges: [], discount: null, approvalReference: "" }; }
@@ -12,6 +12,7 @@ async function request(url: string, body?: unknown) {
   if (!response.ok) throw new Error(json.error?.message || "Unable to complete request");
   return json.data;
 }
+type CombinedPreview = { period: string; total: number; fingerprint: string; accounts: Array<{ accountId: string; accountNumber: string; total: number; lines: BillingLine[] }> };
 type PlanHistory={versions:Array<{recordNumber:number;kind:string;recordedAt:string;sourcePlanUpdatedAt:string|null;actorId:string|null;plan:BillingPlan;hash:string}>;nextBefore:number|null;coverage:string};
 export function MonthlyBillingWorkspace() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -21,6 +22,8 @@ export function MonthlyBillingWorkspace() {
   const [approved, setApproved] = useState(false);
   const [reviewed, setReviewed] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [combined, setCombined] = useState<CombinedPreview | null>(null);
+  const [combinedReviewed, setCombinedReviewed] = useState(false);
   const [history,setHistory]=useState<PlanHistory|null>(null);
   const [historyBusy,setHistoryBusy]=useState(false);
   const [busy, setBusy] = useState(false);
@@ -28,17 +31,31 @@ export function MonthlyBillingWorkspace() {
   const [result, setResult] = useState<{ documentId: string; invoiceNumber: string } | null>(null);
   const [invoices, setInvoices] = useState<{ id: string; externalId: string }[]>([]);
   useEffect(() => { request("/api/v1/billing/monthly").then(setAccounts).catch(e => setError(e.message)); }, []);
-  function edit(next: BillingPlan) { setPlan(next); setApproved(false); setPreview(null); setReviewed(false); setResult(null); }
+  function edit(next: BillingPlan) { setCombined(null); setCombinedReviewed(false); setPlan(next); setApproved(false); setPreview(null); setReviewed(false); setResult(null); }
   async function select(id: string) {
     setHistory(null);
-    setAccountId(id); setPreview(null); setResult(null); setReviewed(false); setApproved(false); setPlan(blankPlan()); setInvoices([]);
+    setAccountId(id); setCombined(null); setCombinedReviewed(false); setPreview(null); setResult(null); setReviewed(false); setApproved(false); setPlan(blankPlan()); setInvoices([]);
     if (!id) return;
     setBusy(true); setError("");
     try { const saved = await request(`/api/v1/billing/monthly?accountId=${encodeURIComponent(id)}`); setPlan(saved.plan || blankPlan()); setApproved(Boolean(saved.plan)); setInvoices(saved.invoices); } catch(e) { setError((e as Error).message); } finally { setBusy(false); }
   }
   async function loadHistory(before?:number){setHistoryBusy(true);setError("");try{const data=await request(`/api/v1/billing/monthly?accountId=${encodeURIComponent(accountId)}&history=true${before?`&before=${before}`:""}`);setHistory(previous=>before&&previous?{...data,versions:[...previous.versions,...data.versions]}:data)}catch(e){setError((e as Error).message)}finally{setHistoryBusy(false)}}
+  async function previewCombined() {
+    const account = accounts.find(item => item.id === accountId);
+    if (!account?.customer.id || !account.tenancy?.facilityId) return;
+    setBusy(true); setError(""); setResult(null); setCombined(null); setCombinedReviewed(false);
+    try { setCombined(await request("/api/v1/billing/combined-preview", { action: "preview", customerId: account.customer.id, facilityId: account.tenancy.facilityId, period })); }
+    catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+  async function postCombined() {
+    const account = accounts.find(item => item.id === accountId);
+    if (!combined || !combinedReviewed || !account?.customer.id || !account.tenancy?.facilityId) return;
+    setBusy(true); setError("");
+    try { const data = await request("/api/v1/billing/combined-preview", { action: "post", customerId: account.customer.id, facilityId: account.tenancy.facilityId, period, fingerprint: combined.fingerprint, confirm: true }); setResult(data); setInvoices(items => [{ id: data.documentId, externalId: data.invoiceNumber }, ...items]); setCombined(null); setCombinedReviewed(false); }
+    catch (e) { setCombined(null); setCombinedReviewed(false); setError((e as Error).message); } finally { setBusy(false); }
+  }
   async function act(action: "plan" | "preview" | "post") {
-    setBusy(true); setError(""); setResult(null);
+    setBusy(true); setError(""); setResult(null); setCombined(null); setCombinedReviewed(false);
     try {
       const data = await request("/api/v1/billing/monthly", action === "plan" ? { action, accountId, plan } : action === "post" ? { action, accountId, period, fingerprint: preview?.fingerprint, confirm: true } : { action, accountId, period });
       if (action === "plan") { setHistory(null); setApproved(true); setPreview(null); }
@@ -48,8 +65,9 @@ export function MonthlyBillingWorkspace() {
   }
   return <div className="page-stack monthly-billing">
     <section className="panel"><p>Posting creates an account charge and a saved invoice. It does not collect money or email the customer. Charges are VAT-inclusive where marked taxable. Confirm the tax treatment, contract and first unbilled month with finance.</p>
-      <div className="form-grid"><label>Customer account<select value={accountId} disabled={busy||historyBusy} onChange={e => void select(e.target.value)}><option value="">Select account</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.accountNumber} · {a.customer.companyName || [a.customer.firstName, a.customer.lastName].filter(Boolean).join(" ")} · {a.tenancy?.facility.name}</option>)}</select></label><label>Billing month<input type="month" value={period} max={currentBillingPeriod()} disabled={busy||historyBusy} onChange={e => { setPeriod(e.target.value); setPreview(null); setResult(null); setReviewed(false); }}/></label></div>
+      <div className="form-grid"><label>Customer account<select value={accountId} disabled={busy||historyBusy} onChange={e => void select(e.target.value)}><option value="">Select account</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.accountNumber} · {a.customer.companyName || [a.customer.firstName, a.customer.lastName].filter(Boolean).join(" ")} · {a.tenancy?.facility.name}</option>)}</select></label><label>Billing month<input type="month" value={period} max={currentBillingPeriod()} disabled={busy||historyBusy} onChange={e => { setPeriod(e.target.value); setCombined(null); setCombinedReviewed(false); setPreview(null); setResult(null); setReviewed(false); }}/></label></div>
     </section>
+    {accountId && <section className="panel"><h2>Combined invoice review</h2><p>Preview all active accounts for this customer at this store together. Previewing creates no invoice, charge or email. After review, posting saves one invoice and charges each account; it does not email the customer. Accounts on notice require separate review until the notice rule is confirmed.</p><button type="button" className="button button-secondary" disabled={busy || historyBusy || !accounts.find(item => item.id === accountId)?.customer.id} onClick={() => void previewCombined()}>Preview combined charges</button>{combined && <div role="status"><h3>Draft combined charges · {combined.period}</h3>{combined.accounts.map(account => <div key={account.accountId}><strong>{account.accountNumber} · {money(account.total)}</strong><ul>{account.lines.map(line => <li key={line.key}>{line.description}: {line.type === "CREDIT" ? "−" : ""}{money(line.amount)}</li>)}</ul></div>)}<p><strong>Combined charges: {money(combined.total)}</strong></p><p>Review every account and amount before posting.</p><label><input type="checkbox" checked={combinedReviewed} disabled={busy} onChange={e => setCombinedReviewed(e.target.checked)}/> I have reviewed these charges and approve posting to each account.</label><button type="button" className="button" disabled={busy || !combinedReviewed} onClick={() => void postCombined()}>Post combined invoice</button></div>}</section>}
     {accountId && <section className="panel billing-plan-history"><h2>Retained billing-plan history</h2><p>Review recorded terms and approvals. An observed legacy baseline is not proof of its original approval date or historical effective period.</p><button className="button button-secondary" disabled={busy||historyBusy} onClick={()=>void loadHistory()}>Review plan history</button>{history&&<><p>{history.coverage}</p>{!history.versions.length?<p>No retained version yet. The next approved save retains the existing plan as an observed baseline.</p>:<ol>{history.versions.map(v=><li key={v.recordNumber}><details><summary>Version {v.recordNumber} · {v.kind==="OBSERVED_LEGACY"?"Observed legacy baseline":"Recorded approval"} · {new Date(v.recordedAt).toLocaleString("en-ZA",{timeZone:"Africa/Johannesburg"})} SAST</summary><p>Reference: {v.plan.approvalReference}; first unbilled month: {v.plan.firstPeriod}; proration: {v.plan.proration}; included tax rate: {v.plan.taxPercent}%.</p><p>Recurring charges: {v.plan.charges.map(c=>`${c.code} — ${c.name}: R ${c.amount.toFixed(2)}`).join("; ")||"None recorded"}.</p><p>Rent tax: {v.plan.rentTaxable?"included":"not taxable"}; insurance: {v.plan.insuranceEnabled?`enabled (${v.plan.insuranceTaxable?"tax included":"not taxable"})`:"disabled"}. Discount: {v.plan.discount?`${v.plan.discount.name}; ${v.plan.discount.type} ${v.plan.discount.value}; ${v.plan.discount.startsPeriod} through ${v.plan.discount.endsPeriod}`:"None recorded"}.</p><p>Integrity reference: {v.hash.slice(0,16)}.</p></details></li>)}</ol>}{history.nextBefore&&<button className="button button-secondary" disabled={historyBusy} onClick={()=>void loadHistory(history.nextBefore!)}>Load older versions</button>}</>}</section>}
     {error && <p role="alert" className="panel">{error}</p>}
     {accountId && <fieldset className="panel monthly-plan" disabled={busy||historyBusy}><legend>Account billing terms {approved ? "— saved" : "— review required"}</legend>
