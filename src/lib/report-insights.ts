@@ -60,6 +60,7 @@ export function reportInsights(key: string, rows: ReportRow[]): ReportInsight {
     metrics = [
       { label: "Units", value: sum("totalUnits") },
       { label: "Occupied", value: sum("occupiedUnits") },
+      { label: "Handover review", value: sum("handoverReviewUnits") },
       {
         label: "Contracted monthly rent",
         value: sum("monthlyOccupiedRent"),
@@ -77,7 +78,7 @@ export function reportInsights(key: string, rows: ReportRow[]): ReportInsight {
     }));
     chartTitle = "Physical occupancy (%)";
     guidance =
-      "Compare occupied units with contracted rent. Potential rent is capacity, not cash collected; closed floors are shown separately in the detail.";
+      "Occupied units require recorded key handover. Units with active occupancy but no handover record need review and are excluded from occupied rent. Potential rent is capacity, not cash collected; closed floors are shown separately in the detail.";
   }
   if (key === "unit-availability") {
     bars = groups("effectiveStatus");
@@ -114,7 +115,7 @@ export function reportInsights(key: string, rows: ReportRow[]): ReportInsight {
       },
     ];
     guidance =
-      "Follow up on unassigned enquiries and compare sources and products. Current-stage counts for leads created in this period are not a historical funnel or verified conversion rate.";
+      "Won requires a recorded key handover; earlier WON records without matching evidence are shown for handover review. Current-stage counts for leads created in this period are not a historical funnel or verified conversion rate.";
   }
   if (key === "move-activity") {
     bars = groups("status");

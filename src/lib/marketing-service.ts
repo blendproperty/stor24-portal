@@ -1,3 +1,4 @@
+import { handoverKeys } from "./handover-evidence";
 import {marketProfileSchema} from "./lead-market-profile";
 import { db } from "./db";
 import { createHash } from "node:crypto";
@@ -70,6 +71,7 @@ export async function marketingWorkspace(scope: RequestScope) {
     }),
   );
   const profiles=new Map(evidence.flatMap(e=>{const p=marketProfileSchema.safeParse((e.after as {marketProfile?:unknown}|null)?.marketProfile);return p.success?[[e.entityId,p.data] as const]:[];}));
+  const handedOver = await handoverKeys(scope, leads.flatMap(l => l.reservations.flatMap(r => r.convertedTenancyId ? [r.convertedTenancyId] : [])));
   const known = new Map(campaigns.map((c) => [c.id, c]));
   return {
     facilities,
@@ -121,12 +123,10 @@ export async function marketingWorkspace(scope: RequestScope) {
           (r) =>
             r.status === "CONVERTED" &&
             r.convertedTenancyId &&
-            ["ACTIVE", "NOTICE_GIVEN"].includes(
-              r.convertedTenancy?.status ?? "",
-            ),
+            handedOver.has(`${l.facilityId}:${r.convertedTenancyId}`),
         ),
         reserved: l.reservations.some(
-          (r) => r.status === "ACTIVE" && r.journey === "RENTAL",
+          (r) => (r.status === "ACTIVE" && r.journey === "RENTAL") || (r.status === "CONVERTED" && Boolean(r.convertedTenancyId) && !handedOver.has(`${l.facilityId}:${r.convertedTenancyId}`)),
         ),
         stage: l.stage,
       };

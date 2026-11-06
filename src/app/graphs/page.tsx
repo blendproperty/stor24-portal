@@ -82,8 +82,8 @@ export default async function GraphsPage() {
 
       <section className="metric-grid" aria-label="Portfolio KPIs">
         <MetricCard label="New leads (7 days)" value={String(kpis.newLeadsThisWeek)} detail={`${kpis.leadsThisMonth} this month`} icon={Users} tone="default" />
-        <MetricCard label="Lead conversion" value={`${kpis.conversionRatePct.toFixed(1)}%`} detail={`${kpis.wonThisMonth} won this month`} icon={TrendingUp} tone="green" />
-        <MetricCard label="Physical occupancy" value={`${kpis.occupancyPct.toFixed(1)}%`} detail={`${kpis.occupiedUnits} of ${kpis.totalUnits} units`} icon={DoorOpen} tone="orange" />
+        <MetricCard label="Lead conversion" value={`${kpis.conversionRatePct.toFixed(1)}%`} detail={`${kpis.wonThisMonth} of this month’s leads moved in`} icon={TrendingUp} tone="green" />
+        <MetricCard label="Physical occupancy" value={`${kpis.occupancyPct.toFixed(1)}%`} detail={`${kpis.occupiedUnits} of ${kpis.totalUnits} units; ${kpis.handoverReviewUnits} need handover review`} icon={DoorOpen} tone="orange" />
         <MetricCard label="Active tenancies" value={String(kpis.activeTenancies)} detail="Across all permitted facilities" icon={BarChart3} tone="default" />
         <MetricCard label="Billed month to date" value={currency.format(kpis.monthToDateBilled)} detail="Charges raised this month" icon={Wallet} tone="default" />
         <MetricCard label="Collections rate" value={`${kpis.collectionsRatePct.toFixed(1)}%`} detail={`${currency.format(kpis.monthToDateCollected)} collected`} icon={Activity} tone={kpis.collectionsRatePct >= 90 ? "green" : "warning"} />
@@ -92,7 +92,7 @@ export default async function GraphsPage() {
       <section className="dashboard-grid">
         <article className="panel panel-spacious">
           <div className="panel-heading">
-            <div><h2>Occupancy trend</h2><p className="panel-subtitle">Rolling 12 months, reconstructed from occupancy records</p></div>
+            <div><h2>Occupancy trend</h2><p className="panel-subtitle">Rolling 12 months, based on occupancy intervals and recorded handovers</p></div>
             <TrendingUp className="positive-icon" />
           </div>
           <LineChart points={occupancyTrend} formatValue={(v) => `${v}%`} />
@@ -159,6 +159,7 @@ export default async function GraphsPage() {
               <th>Available</th>
               <th>Reserved / held</th>
               <th>Occupied</th>
+              <th>Handover review</th>
               <th>Service / unavailable</th>
               <th>Occupancy</th>
             </tr>
@@ -171,6 +172,7 @@ export default async function GraphsPage() {
                 <td>{f.available}</td>
                 <td>{f.reserved}</td>
                 <td>{f.occupied}</td>
+                <td>{f.handoverReview}</td>
                 <td>{f.service}</td>
                 <td>
                   <span className="occupancy-pct-cell">
@@ -181,7 +183,7 @@ export default async function GraphsPage() {
               </tr>
             ))}
             {unitStats.length === 0 && (
-              <tr><td colSpan={7} className="empty-row">No facilities in scope.</td></tr>
+              <tr><td colSpan={8} className="empty-row">No facilities in scope.</td></tr>
             )}
           </tbody>
         </table>

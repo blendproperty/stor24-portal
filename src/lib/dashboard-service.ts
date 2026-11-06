@@ -1,3 +1,4 @@
+import { handoverKeys, handoverTimes } from "@/lib/handover-evidence";
 import { unitIsOperational, floorMapSelection } from "@/lib/floor-availability";
 import { netCollectionTotal } from "@/lib/finance/collection-total";
 import { db } from "@/lib/db";
@@ -53,6 +54,7 @@ export type DashboardKpis = {
   totalUnits: number;
   occupiedUnits: number;
   occupancyPct: number;
+  handoverReviewUnits: number;
   monthToDateBilled: number;
   monthToDateCollected: number;
   collectionsRatePct: number;
@@ -68,26 +70,35 @@ export async function getDashboardKpis(scope: RequestScope): Promise<DashboardKp
 
   const [
     newLeadsThisWeek,
-    activeTenancies,
+    currentTenancies,
     totalUnits,
-    occupiedUnits,
+    currentOccupancies,
     billedAgg,
     collectedAgg,
     leadsThisMonth,
-    wonThisMonth,
+    cohortLeads,
   ] = await Promise.all([
     db.lead.count({ where: { facility: facilityWhere(scope), createdAt: { gte: weekAgo } } }),
-    db.tenancy.count({ where: { facility: facilityWhere(scope), status: "ACTIVE" } }),
+    db.tenancy.findMany({ where: { facility: facilityWhere(scope), status: { in: ["ACTIVE", "NOTICE_GIVEN"] } }, select: { id: true, facilityId: true } }),
     db.unit.count({ where: { facility: facilityWhere(scope) } }),
-    db.unit.count({ where: { facility: facilityWhere(scope), status: "OCCUPIED" } }),
+    db.occupancy.findMany({ where: { unit: { facility: facilityWhere(scope) }, status: { in: ["ACTIVE", "NOTICE_GIVEN"] } }, select: { unitId: true, tenancyId: true, unit: { select: { facilityId: true } }, tenancy: { select: { facilityId: true } } } }),
     db.ledgerEntry.aggregate({
       _sum: { amount: true },
       where: { type: "CHARGE", effectiveAt: { gte: monthStart }, account: { tenancy: { facility: facilityWhere(scope) } } },
     }),
     netCollectionTotal(scope, monthStart),
     db.lead.count({ where: { facility: facilityWhere(scope), createdAt: { gte: monthStart } } }),
-    db.lead.count({ where: { facility: facilityWhere(scope), stage: "WON", updatedAt: { gte: monthStart } } }),
+    db.lead.findMany({ where: { facility: facilityWhere(scope), createdAt: { gte: monthStart } }, select: { facilityId: true, reservations: { select: { status: true, convertedTenancyId: true } } } }),
   ]);
+
+  const handedOver = await handoverKeys(scope, [...currentTenancies.map(t => t.id), ...currentOccupancies.map(o => o.tenancyId), ...cohortLeads.flatMap(l => l.reservations.flatMap(r => r.convertedTenancyId ? [r.convertedTenancyId] : []))]);
+  const activeTenancies = currentTenancies.filter(t => handedOver.has(`${t.facilityId}:${t.id}`)).length;
+  const byUnit = new Map<string, typeof currentOccupancies>();
+  for (const occupancy of currentOccupancies) byUnit.set(occupancy.unitId, [...(byUnit.get(occupancy.unitId) ?? []), occupancy]);
+  const confirmedUnits = [...byUnit.values()].filter(rows => rows.length === 1 && rows[0].unit.facilityId === rows[0].tenancy.facilityId && handedOver.has(`${rows[0].tenancy.facilityId}:${rows[0].tenancyId}`));
+  const occupiedUnits = confirmedUnits.length;
+  const handoverReviewUnits = byUnit.size - occupiedUnits;
+  const wonThisMonth = cohortLeads.filter(l => l.reservations.some(r => r.status === "CONVERTED" && r.convertedTenancyId && handedOver.has(`${l.facilityId}:${r.convertedTenancyId}`))).length;
 
   const monthToDateBilled = Number(billedAgg._sum.amount ?? 0);
   const monthToDateCollected = collectedAgg;
@@ -98,6 +109,7 @@ export async function getDashboardKpis(scope: RequestScope): Promise<DashboardKp
     totalUnits,
     occupiedUnits,
     occupancyPct: totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0,
+    handoverReviewUnits,
     monthToDateBilled,
     monthToDateCollected,
     collectionsRatePct: monthToDateBilled > 0 ? (monthToDateCollected / monthToDateBilled) * 100 : 0,
@@ -116,22 +128,25 @@ const STAGE_LABELS: Record<string, string> = {
   QUOTED: "Quoted",
   VIEWING_BOOKED: "Viewing booked",
   RESERVED: "Reserved",
-  WON: "Won",
+  WON: "Moved in",
+  HANDOVER_REVIEW: "Handover review",
   LOST: "Lost",
 };
 
 export async function getPipelineByStage(scope: RequestScope): Promise<StagePoint[]> {
   const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-  const grouped = await db.lead.groupBy({
-    by: ["stage"],
-    where: { facility: facilityWhere(scope), createdAt: { gte: ninetyDaysAgo } },
-    _count: { _all: true },
-  });
-  const counts = new Map(grouped.map((g) => [g.stage, g._count._all]));
+  const leads = await db.lead.findMany({ where: { facility: facilityWhere(scope), createdAt: { gte: ninetyDaysAgo } }, select: { facilityId: true, stage: true, reservations: { select: { status: true, convertedTenancyId: true } } } });
+  const handedOver = await handoverKeys(scope, leads.flatMap(l => l.reservations.flatMap(r => r.convertedTenancyId ? [r.convertedTenancyId] : [])));
+  const counts = new Map<string, number>();
+  for (const lead of leads) {
+    const moved = lead.reservations.some(r => r.status === "CONVERTED" && r.convertedTenancyId && handedOver.has(`${lead.facilityId}:${r.convertedTenancyId}`));
+    const stage = moved ? "WON" : lead.stage === "WON" ? "HANDOVER_REVIEW" : lead.stage;
+    counts.set(stage, (counts.get(stage) ?? 0) + 1);
+  }
   return Object.entries(STAGE_LABELS).map(([stage, label]) => ({
     stage,
     label,
-    count: counts.get(stage as never) ?? 0,
+    count: counts.get(stage) ?? 0,
   }));
 }
 
@@ -150,22 +165,20 @@ export type MonthPoint = { label: string; value: number };
 /** Reconstructs historical physical occupancy from real Occupancy start/end dates.
  *  Caveat: totalUnits uses the CURRENT unit count for every month (no historical
  *  inventory snapshots exist), so the trend is accurate for occupied-unit counts
- *  but the percentage denominator assumes portfolio size hasn't materially changed. */
+ *  but the percentage denominator assumes portfolio size hasn't materially changed.
+ *  Only recorded handovers count, starting no earlier than the handover audit. */
 export async function getOccupancyTrend(scope: RequestScope): Promise<MonthPoint[]> {
   const months = last12Months();
   const totalUnits = await db.unit.count({ where: { facility: facilityWhere(scope) } });
-  const counts = await Promise.all(
-    months.map((m) =>
-      db.occupancy.count({
-        where: {
-          unit: { facility: facilityWhere(scope) },
-          status: { not: "CANCELLED" },
-          startDate: { lt: m.end },
-          OR: [{ endDate: null }, { endDate: { gte: m.end } }],
-        },
-      }),
-    ),
-  );
+  const records = await db.occupancy.findMany({
+    where: { unit: { facility: facilityWhere(scope) }, status: { not: "CANCELLED" }, startDate: { lt: months[months.length - 1].end }, OR: [{ endDate: null }, { endDate: { gte: months[0].end } }] },
+    select: { unitId: true, tenancyId: true, startDate: true, endDate: true, unit: { select: { facilityId: true } }, tenancy: { select: { facilityId: true } } },
+  });
+  const firstHandover = await handoverTimes(scope, records.map(r => r.tenancyId));
+  const counts = months.map(m => new Set(records.filter(r => {
+    const handover = firstHandover.get(`${r.tenancy.facilityId}:${r.tenancyId}`);
+    return r.unit.facilityId === r.tenancy.facilityId && handover && handover < m.end && r.startDate < m.end && (!r.endDate || r.endDate >= m.end);
+  }).map(r => r.unitId)).size);
   return months.map((m, i) => ({ label: m.label, value: totalUnits > 0 ? Math.round((counts[i] / totalUnits) * 1000) / 10 : 0 }));
 }
 
@@ -195,19 +208,22 @@ export type FacilityUnitStats = {
   occupied: number;
   service: number;
   occupancyPct: number;
+  handoverReview: number;
 };
 
 export async function getUnitStatsByFacility(scope: RequestScope): Promise<FacilityUnitStats[]> {
   const facilities = await db.facility.findMany({
     where: facilityWhere(scope),
-    select: { id: true, name: true, closedFloors: true, units: { select: { status: true, floor: true, mapElements: floorMapSelection } } },
+    select: { id: true, name: true, closedFloors: true, units: { select: { status: true, floor: true, mapElements: floorMapSelection, occupancies: { where: { status: { in: ["ACTIVE", "NOTICE_GIVEN"] } }, select: { tenancyId: true, tenancy: { select: { facilityId: true } } } } } } },
     orderBy: { name: "asc" },
   });
+  const handedOver = await handoverKeys(scope, facilities.flatMap(f => f.units.flatMap(u => u.occupancies.map(o => o.tenancyId))));
   return facilities.map(facility => {
     const total = facility.units.length;
-    const occupied = facility.units.filter(unit => unit.status === "OCCUPIED").length;
+    const occupied = facility.units.filter(unit => (unit.occupancies.length === 1 && unit.occupancies[0].tenancy.facilityId === facility.id && handedOver.has(`${facility.id}:${unit.occupancies[0].tenancyId}`))).length;
+    const handoverReview = facility.units.filter(unit => unit.occupancies.length > 0 && !(unit.occupancies.length === 1 && unit.occupancies[0].tenancy.facilityId === facility.id && handedOver.has(`${facility.id}:${unit.occupancies[0].tenancyId}`))).length;
     return {
-      facilityId: facility.id, facilityName: facility.name, total, occupied,
+      facilityId: facility.id, facilityName: facility.name, total, occupied, handoverReview,
       available: facility.units.filter(unit => unit.status === "AVAILABLE" && unitIsOperational(unit, facility.closedFloors)).length,
       reserved: facility.units.filter(unit => ["RESERVED", "HELD"].includes(unit.status)).length,
       service: facility.units.filter(unit => ["SERVICE", "UNAVAILABLE"].includes(unit.status) || (unit.status === "AVAILABLE" && !unitIsOperational(unit, facility.closedFloors))).length,

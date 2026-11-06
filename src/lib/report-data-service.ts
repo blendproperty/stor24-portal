@@ -1,3 +1,4 @@
+import { handoverKeys } from "@/lib/handover-evidence";
 import {reservationDiscountReport} from "./reservation-price-service";
 import { recurringChargeReport } from "./recurring-charge-service";
 import { postedRecurringChargeReport } from "./posted-recurring-charge-service";
@@ -30,13 +31,15 @@ export async function buildReportRows(scope: RequestScope, parameters: ReportPar
       return reports.flatMap(({facility,report})=>report.rows.map(r=>({snapshotTakenAt,facility,unit:r.unit,account:r.account,customer:r.customer,start:r.start,daysInUnit:r.daysInUnit,monthsInUnit:r.monthsInUnit,lastPriceChange:r.lastPriceChange,daysSincePriceChange:r.daysSincePriceChange,currentRate:r.currentRate,currency:r.currency,unitType:r.unitType,areaSqMetres:r.areaSqMetres,standardRateZar:r.standardRate,varianceAmountZar:r.varianceAmount,variancePercent:r.variancePercent,sizeOccupiedCount:r.sizeOccupiedCount,sizeUnitCount:r.sizeUnitCount,sizeOccupancyPercent:r.sizeOccupancyPercent,reviewStatus:r.reviewStatus,scheduledChanges:r.schedule?.changes.map(c=>`${c.period}: ${c.rate}`).join(" | ")??null})));
     }
     case "occupancy-revenue": {
-      const facilities = await db.facility.findMany({ where: facility, include: { units: { where:{combinedIntoUnitId:null}, include: { unitType: true, occupancies: { where: { status: { in: ["ACTIVE", "NOTICE_GIVEN"] } }, select: { monthlyRate: true } } } } }, orderBy: { name: "asc" } });
+      const facilities = await db.facility.findMany({ where: facility, include: { units: { where:{combinedIntoUnitId:null}, include: { unitType: true, occupancies: { where: { status: { in: ["ACTIVE", "NOTICE_GIVEN"] } }, select: { monthlyRate: true, tenancyId: true, tenancy: { select: { facilityId: true } } } } } } }, orderBy: { name: "asc" } });
+      const handedOver = await handoverKeys(scope, facilities.flatMap(f => f.units.flatMap(u => u.occupancies.map(o => o.tenancyId))));
       return facilities.map((item) => {
         const operational = item.units.filter(unit=>unitIsOperational(unit,item.closedFloors));
-        const occupied = operational.filter((unit) => unit.occupancies.length);
+        const occupied = operational.map(unit => ({ unit, occupancy: unit.occupancies.length === 1 && unit.occupancies[0].tenancy.facilityId === item.id && handedOver.has(`${item.id}:${unit.occupancies[0].tenancyId}`) ? unit.occupancies[0] : null })).filter(row => row.occupancy);
+        const reviewUnits = operational.filter(unit => unit.occupancies.length > 0 && !(unit.occupancies.length === 1 && unit.occupancies[0].tenancy.facilityId === item.id && handedOver.has(`${item.id}:${unit.occupancies[0].tenancyId}`))).length;
         const potentialRent = operational.reduce((sum, unit) => sum + Number(unit.monthlyRate), 0);
-        const achievedRent = occupied.reduce((sum, unit) => sum + Number(unit.occupancies[0].monthlyRate), 0);
-        return { snapshotTakenAt, facility: item.name, totalUnits: item.units.length, operationalUnits:operational.length, closedFloorUnits:item.units.length-operational.length, occupiedUnits: occupied.length, physicalOccupancyPercent: operational.length ? Number((occupied.length / operational.length * 100).toFixed(2)) : 0, monthlyOccupiedRent: achievedRent, potentialMonthlyRent: potentialRent, economicOccupancyPercent: potentialRent ? Number((achievedRent / potentialRent * 100).toFixed(2)) : 0 };
+        const achievedRent = occupied.reduce((sum, unit) => sum + Number(unit.occupancy!.monthlyRate), 0);
+        return { snapshotTakenAt, facility: item.name, totalUnits: item.units.length, operationalUnits:operational.length, closedFloorUnits:item.units.length-operational.length, occupiedUnits: occupied.length, handoverReviewUnits: reviewUnits, physicalOccupancyPercent: operational.length ? Number((occupied.length / operational.length * 100).toFixed(2)) : 0, monthlyOccupiedRent: achievedRent, potentialMonthlyRent: potentialRent, economicOccupancyPercent: potentialRent ? Number((achievedRent / potentialRent * 100).toFixed(2)) : 0 };
       });
     }
     case "unit-availability": {
@@ -48,8 +51,9 @@ export async function buildReportRows(scope: RequestScope, parameters: ReportPar
       return occupancies.map((item) => ({ facility: item.tenancy.facility.name, account: item.tenancy.account.accountNumber, customer: item.tenancy.customer.companyName || [item.tenancy.customer.firstName, item.tenancy.customer.lastName].filter(Boolean).join(" "), unit: item.unit.number, status: item.status, moveIn: item.startDate.toISOString(), moveOut: item.endDate?.toISOString() ?? null, monthlyRate: Number(item.monthlyRate) }));
     }
     case "lead-conversion": {
-      const leads = await db.lead.findMany({ where: { facility, createdAt: { gte: from, lte: to } }, include: { facility: { select: { name: true } }, customer: { select: { firstName: true, lastName: true, companyName: true } }, assignedTo: { select: { name: true } } }, orderBy: { createdAt: "asc" } });
-      return leads.map((lead) => ({ facility: lead.facility.name, createdAt: lead.createdAt.toISOString(), source: lead.source, productLine:lead.productLine, stage: lead.stage, customer: lead.customer?.companyName || [lead.customer?.firstName, lead.customer?.lastName].filter(Boolean).join(" ") || "Unlinked", assignedTo: lead.assignedTo?.name ?? "Unassigned", expectedMoveIn: lead.expectedMoveIn?.toISOString() ?? null, nextActionAt: lead.nextActionAt?.toISOString() ?? null }));
+      const leads = await db.lead.findMany({ where: { facility, createdAt: { gte: from, lte: to } }, include: { facility: { select: { name: true } }, customer: { select: { firstName: true, lastName: true, companyName: true } }, assignedTo: { select: { name: true } }, reservations: { select: { status: true, convertedTenancyId: true, convertedTenancy: { select: { status: true } } } } }, orderBy: { createdAt: "asc" } });
+      const handedOver = await handoverKeys(scope, leads.flatMap(lead => lead.reservations.flatMap(r => r.convertedTenancyId ? [r.convertedTenancyId] : [])));
+      return leads.map((lead) => ({ facility: lead.facility.name, createdAt: lead.createdAt.toISOString(), source: lead.source, productLine:lead.productLine, stage: lead.reservations.some(r => r.status === "CONVERTED" && r.convertedTenancyId && handedOver.has(`${lead.facilityId}:${r.convertedTenancyId}`)) ? "WON" : lead.stage === "WON" ? "HANDOVER_REVIEW" : lead.stage, customer: lead.customer?.companyName || [lead.customer?.firstName, lead.customer?.lastName].filter(Boolean).join(" ") || "Unlinked", assignedTo: lead.assignedTo?.name ?? "Unassigned", expectedMoveIn: lead.expectedMoveIn?.toISOString() ?? null, nextActionAt: lead.nextActionAt?.toISOString() ?? null }));
     }
     case "receivables-ageing": {
       const reportScope = parameters.facilityId ? { ...scope, facilityIds: [parameters.facilityId], unrestrictedFacilities: false } : scope;

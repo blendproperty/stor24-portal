@@ -50,7 +50,7 @@ export async function leadsWorkspace(scope: RequestScope, followupsDue = false) 
   const marketProfiles=new Map(evidence.flatMap(event=>{const parsed=marketProfileSchema.safeParse((event.after as {marketProfile?:unknown}|null)?.marketProfile);return parsed.success?[[event.entityId,parsed.data] as const]:[];}));
   return { facilities, staff: staff.map(person => ({ id: person.id, name: person.name, facilityIds: person.roleAssignments.map(a => a.facilityId) })), count,
     leads: leads.map(lead => ({ ...lead, enquiryLocation: readEnquiryLocation(lead.enquiryLocation), attribution: attribution.get(lead.id) ?? null,marketProfile:marketProfiles.get(lead.id)??null,
-      stage: lead.reservations.some(r => r.status === "CONVERTED" && r.convertedTenancyId && handedOver.has(`${lead.facilityId}:${r.convertedTenancyId}`) && ["ACTIVE", "NOTICE_GIVEN"].includes(r.convertedTenancy?.status ?? "")) ? "WON" : lead.reservations.some(r => r.status === "CONVERTED") && lead.stage === "WON" ? "RESERVED" : lead.stage,
+      stage: lead.reservations.some(r => r.status === "CONVERTED" && r.convertedTenancyId && handedOver.has(`${lead.facilityId}:${r.convertedTenancyId}`)) ? "WON" : lead.reservations.some(r => r.status === "CONVERTED") && lead.stage === "WON" ? "RESERVED" : lead.stage,
       reservations: lead.reservations.map(r => ({ ...r, handedOver: Boolean(r.status === "CONVERTED" && r.convertedTenancyId && handedOver.has(`${lead.facilityId}:${r.convertedTenancyId}`)), quotedRate: Number(r.quotedRate) })) })) };
 }
 
@@ -59,7 +59,7 @@ export async function updateLead(scope: RequestScope, id: string, input: LeadUpd
     await tx.$queryRaw`SELECT "id" FROM "Lead" WHERE "id" = ${id} FOR UPDATE`;
     const lead = await tx.lead.findFirst({ where: { id, facility: facilityWhere(scope) }, include: { reservations: { select: { status: true, journey: true, convertedTenancyId: true, convertedTenancy: { select: { status: true } } } } } });
     if (!lead) throw new Error("NOT_FOUND");
-    const candidateIds = lead.reservations.flatMap(r => r.status === "CONVERTED" && r.convertedTenancyId && ["ACTIVE", "NOTICE_GIVEN"].includes(r.convertedTenancy?.status ?? "") ? [r.convertedTenancyId] : []);
+    const candidateIds = lead.reservations.flatMap(r => r.status === "CONVERTED" && r.convertedTenancyId ? [r.convertedTenancyId] : []);
     const converted = candidateIds.length > 0 && Boolean(await tx.auditEvent.findFirst({ where: { organisationId: scope.organisationId, facilityId: lead.facilityId, entityType: "Tenancy", entityId: { in: candidateIds }, action: "tenancy.key_handover_confirmed" }, select: { id: true } }));
     const hasConvertedBooking = lead.reservations.some(r => r.status === "CONVERTED");
     const displayedStage = converted ? "WON" : hasConvertedBooking && lead.stage === "WON" ? "RESERVED" : lead.stage;
