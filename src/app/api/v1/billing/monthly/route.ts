@@ -29,9 +29,9 @@ function failure(error: unknown) {
     BILLING_DISCOUNT_EXCEEDS_RENT: "The discount exceeds this month's rent. Check the agreed discount and dates.",
     BILLING_NO_OCCUPANCY_IN_PERIOD: "There is no billable occupancy in this month.",
     BILLING_TENANCY_NOT_ACTIVE: "Monthly billing requires an active tenancy or an active notice period. Final bills for closed tenancies need a separate review.",
-    BILLING_NOTICE_POLICY_REVIEW: "This account is on notice. Its next invoice needs finance review while the notice rule is confirmed.",
+    BILLING_NOTICE_POLICY_REVIEW: "This account is on notice. A manager must review whether it needs an invoice.",
     BILLING_HANDOVER_REVIEW: "The account needs a recorded key handover before next-month review.",
-    BILLING_DISCOUNT_POLICY_REVIEW: "A discount applies next month. Finance must review it while the discount rules are confirmed.",
+    BILLING_DISCOUNT_POLICY_REVIEW: "A discount applies next month. Finance must review its treatment.",
     BILLING_FUTURE_PERIOD: "Future months cannot be posted through this workflow.",
   };
   if (error instanceof Error && error.message.startsWith("BILLING_")) return Response.json({ error: { code: error.message, message: messages[error.message] || "This account requires review before billing can proceed." } }, { status: error.message === "BILLING_ACCOUNT_NOT_FOUND" ? 404 : 409 });

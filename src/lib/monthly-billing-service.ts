@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
 import type { RequestScope } from "@/lib/scope";
 import { billingPlanSchema, calculateMonthlyBill, currentBillingPeriod, nextBillingPeriod, periodDates, type BillingPlan } from "./monthly-billing-policy";
+import { scheduledInvoiceDate } from "@/lib/invoice-schedule";
 import { southAfricaDateKey } from "@/lib/south-africa-time";
 import { isTestPayment } from "./payments/payment-evidence";
 import { renderInvoiceHtml } from "./finance/invoice-renderer";
@@ -97,10 +98,10 @@ export async function postMonthlyBilling(scope: RequestScope, accountId: string,
   return postBilling(scope, accountId, period, fingerprint, actorId, false);
 }
 export async function postScheduledNextBilling(scope: RequestScope, accountId: string, period: string, fingerprint: string, now = new Date()) {
-  if (process.env.NEXT_MONTH_INVOICING_ENABLED !== "true" || southAfricaDateKey(now).slice(-2) !== "17" || period !== nextBillingPeriod(now)) throw new Error("BILLING_SCHEDULE_DISABLED");
-  return postBilling(scope, accountId, period, fingerprint, null, true);
+  if (process.env.NEXT_MONTH_INVOICING_ENABLED !== "true" || period !== nextBillingPeriod(now)) throw new Error("BILLING_SCHEDULE_DISABLED");
+  return postBilling(scope, accountId, period, fingerprint, null, true, now);
 }
-async function postBilling(scope: RequestScope, accountId: string, period: string, fingerprint: string, actorId: string | null, scheduled: boolean) {
+async function postBilling(scope: RequestScope, accountId: string, period: string, fingerprint: string, actorId: string | null, scheduled: boolean, now = new Date()) {
   // Documents snapshot the configured company information; no email or provider call occurs.
   const { tenancy } = await context(db, scope, accountId);
   const company = await getBillingDocumentCompanyDetails(scope.organisationId, tenancy.facilityId);
@@ -108,6 +109,8 @@ async function postBilling(scope: RequestScope, accountId: string, period: strin
     await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${accountId} FOR UPDATE`;
     if (scheduled) {
       const { account, tenancy, profile } = await context(tx, scope, accountId);
+      await tx.$queryRaw`SELECT "id" FROM "Facility" WHERE "id" = ${tenancy.facilityId} FOR UPDATE`;
+      if (southAfricaDateKey(now) !== await scheduledInvoiceDate(tx, scope.organisationId, tenancy.facilityId, now)) throw new Error("BILLING_SCHEDULE_NOT_DUE");
       if (tenancy.status !== "ACTIVE") throw new Error("BILLING_NOTICE_POLICY_REVIEW");
       if (!await tx.auditEvent.findFirst({ where: { organisationId: scope.organisationId, facilityId: tenancy.facilityId, entityType: "Tenancy", entityId: tenancy.id, action: "tenancy.key_handover_confirmed" }, select: { id: true } })) throw new Error("BILLING_HANDOVER_REVIEW");
       const discount = profile?.status === "READY" ? billingPlanSchema.parse(profile.config).discount : null;
