@@ -22,15 +22,25 @@ try {
   page.on("pageerror", e => errors.push(e.message));
   await page.route("**/api/v1/billing/monthly**", async route => {
     const req = route.request();
-    if (req.method() === "GET") return route.fulfill({ json: { data: req.url().includes("accountId=") ? { plan: saved, invoices: [] } : [{ id: "cmfixtureaccount000000000001", accountNumber: "CI-101", customer: { firstName: "Example", lastName: "Tenant", companyName: null }, tenancy: { status: "ACTIVE", facility: { name: "Training store with a deliberately long facility name" } } }] } });
+    if (req.method() === "GET") return route.fulfill({ json: { data: req.url().includes("accountId=") ? { plan: saved, invoices: [] } : [{ id: "cmfixtureaccount000000000001", accountNumber: "CI-101", customer: { id: "cmcustomerfixture000001", firstName: "Example", lastName: "Tenant", companyName: null }, tenancy: { facilityId: "cmfacilityfixture000001", status: "ACTIVE", facility: { name: "Training store with a deliberately long facility name" } } }] } });
     const body = req.postDataJSON(); calls.push(body);
     if (body.action === "plan") { saved = body.plan; return route.fulfill({ json: { data: saved } }); }
     if (body.action === "preview") return route.fulfill({ json: { data: { fingerprint: "a".repeat(64), customerName: "Example Tenant", total: 1150, taxTotal: 150, lines: [{ key: "rent", description: "Rent — unit 101", amount: 1150, taxAmount: 150, type: "CHARGE" }] } } });
     return route.fulfill({ json: { data: { documentId: "fixture-document", invoiceNumber: "INV-202602-CI-101" } } });
   });
+  await page.route("**/api/v1/billing/combined-preview", async route => { const body=route.request().postDataJSON(); calls.push({combined:body}); if(body.action === "post") return route.fulfill({json:{data:{documentId:"combined-doc",invoiceNumber:"INV-COMBINED"}}}); return route.fulfill({json:{data:{fingerprint:"a".repeat(64),period:body.period,total:2500,accounts:[{accountId:"a1",accountNumber:"UNIT-101",total:1000,lines:[{key:"r1",description:"Rent — unit 101",amount:1000,taxAmount:0,type:"CHARGE"}]},{accountId:"a2",accountNumber:"UNIT-102",total:1500,lines:[{key:"r2",description:"Rent — unit 102",amount:1500,taxAmount:0,type:"CHARGE"}]}]}}}); });
   await page.goto(`http://127.0.0.1:${server.address().port}`);
   await page.getByLabel("Customer account").selectOption("cmfixtureaccount000000000001");
   await page.getByLabel("Billing month", { exact: true }).fill("2026-02");
+  await page.getByRole("button", { name: "Preview combined charges" }).click();
+  await expect(page.getByText("Draft combined charges · 2026-02")).toBeVisible();await expect(page.getByText(/UNIT-101/)).toBeVisible();await expect(page.getByText(/UNIT-102/)).toBeVisible();assert.equal(calls.filter(c => c.action === "post").length, 0);
+  await expect(page.getByRole("button", { name: "Post combined invoice" })).toBeDisabled();
+  await page.getByLabel("I have reviewed these charges and approve posting to each account.").check();
+  await page.getByRole("button", { name: "Post combined invoice" }).click();
+  assert.equal(calls.filter(c => c.combined?.action === "post").length,1);
+  await expect(page.getByText("Posted INV-COMBINED.")).toBeVisible();
+  await page.getByRole("button", { name: "Preview combined charges" }).click();
+  await page.getByLabel("Billing month", { exact: true }).fill("2026-03");await expect(page.getByText("Draft combined charges · 2026-02")).toHaveCount(0);await page.getByLabel("Billing month", { exact: true }).fill("2026-02");
   await page.getByRole("button", { name: "Preview monthly invoice" }).click();
   await expect(page.getByRole("button", { name: "Post charges and save invoice" })).toBeDisabled();
   assert.equal(calls.filter(c => c.action === "post").length, 0);
