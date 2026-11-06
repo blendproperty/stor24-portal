@@ -665,6 +665,7 @@ model Tenancy {
   occupancies Occupancy[]
   reservation Reservation?
   documents   Document[]
+  legacyAccessPhoto LegacyAccessPhoto?
   mandateSession DebitMandateSession?
   insuranceEnrollment InsuranceEnrollment?
   createdAt   DateTime      @default(now())
@@ -897,6 +898,29 @@ model FacialPhotoSubmission {
 model FacialPhotoMaintenance {
   id          String @id
   completedAt DateTime
+}
+
+model LegacyAccessPhoto {
+  id String @id @default(cuid())
+  tenancyId String @unique
+  tenancy Tenancy @relation(fields: [tenancyId], references: [id], onDelete: Cascade)
+  version Int @default(1)
+  status String @default("WAITING_REVIEW")
+  encryptedImage String? @db.Text
+  imageSha256 String
+  policyVersion String
+  policyHash String
+  consentNotice String @db.Text
+  consentAt DateTime
+  expiresAt DateTime?
+  reviewedById String?
+  reviewedAt DateTime?
+  activationRequestedAt DateTime?
+  erasedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, expiresAt])
 }
 
 // Nominations do not grant access and cannot substitute for the person's consent.

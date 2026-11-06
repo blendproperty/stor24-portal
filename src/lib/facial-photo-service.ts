@@ -8,6 +8,7 @@ import { reservationReadiness } from "@/lib/reservation-move-in";
 import { decryptPhoto, encryptPhoto, normaliseFacialPhoto } from "@/lib/facial-photo-security";
 import { integrationEncryptionConfigured } from "@/lib/integrations/integration-secret-vault";
 import { requestPhotoActivation } from "@/lib/facial-photo-activation";
+import { expireLegacyPhotos } from "@/lib/legacy-access-photo";
 
 type Database = Prisma.TransactionClient;
 type Tenant = { organisationId: string; email: string; customerIds: string[] };
@@ -168,6 +169,7 @@ export async function expireFacialPhotos() {
     expired++;
   });
   if (await db.additionalAccessPerson.count({ where: additionalWhere }) > 0) throw new Error("PHOTO_EXPIRY_MORE_DUE");
+  await expireLegacyPhotos();
   await db.facialPhotoMaintenance.upsert({ where: { id: "expiry" }, create: { id: "expiry", completedAt: new Date() }, update: { completedAt: new Date() } });
   return expired;
 }

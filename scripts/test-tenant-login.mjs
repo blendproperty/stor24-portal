@@ -62,7 +62,7 @@ try {
   await expect(moveIn.locator(".tenant-photo-details")).not.toHaveAttribute("open", "");
   await moveIn.locator(".tenant-photo-details>summary").click();
   await expect(moveIn.getByText("Photo collection isn’t open yet",{exact:true})).toBeVisible();
-  await expect(moveIn.getByText("Your photo will be uploaded and added",{exact:false})).toBeVisible();
+  await expect(moveIn.getByText("Uploading it does not activate access",{exact:false})).toBeVisible();
   await expect(moveIn.getByText("Not yet active.",{exact:false})).toBeVisible();
   await expect(page.getByRole("heading",{name:"Facial access",exact:true})).toHaveCount(0);
   await expect(page.getByText("Facial access is confirmed separately.",{exact:false})).toHaveCount(0);
