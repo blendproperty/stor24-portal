@@ -43,7 +43,17 @@ try {
   await page.getByLabel("Charge code", { exact: true }).fill("ADMIN");
   await page.getByLabel("Description", { exact: true }).fill("Approved monthly admin");
   await page.getByLabel("Monthly amount (R)").fill("115");
+  await page.getByLabel("Apply an agreed rent discount").check();
+  await page.getByRole("button", { name: "10% discount" }).click();
+  await expect(page.getByLabel("Discount description")).toHaveValue("10% rent discount");
+  await expect(page.getByLabel("Value", { exact: true })).toHaveValue("10");
+  await page.getByRole("button", { name: "15% discount" }).click();
+  await expect(page.getByLabel("Discount description")).toHaveValue("15% rent discount");
+  await expect(page.getByLabel("Value", { exact: true })).toHaveValue("15");
   await page.getByRole("button", { name: "Save approved terms" }).click();
+  const savedPlan = calls.filter(c => c.action === "plan").at(-1).plan;
+  assert.equal(savedPlan.discount.type, "PERCENTAGE"); assert.equal(savedPlan.discount.value, 15);
+  assert.equal(savedPlan.discount.startsPeriod, "2026-03"); assert.equal(savedPlan.discount.endsPeriod, "2026-03");
   await page.getByRole("button", { name: "Preview monthly invoice" }).click();
   await mkdir("output/monthly-billing", { recursive: true });
   for (const width of [1440, 390]) {
