@@ -23,7 +23,7 @@ try {
   await page.route("**/api/v1/billing/monthly**", async route => {
     const req = route.request();
     if (req.method() === "GET" && req.url().includes("draft=true")) return route.fulfill({json:{data:{period:"2026-12",fingerprint:"c".repeat(64),customerName:"Example Tenant",total:1150,taxTotal:150,lines:[{key:"rent",description:"Draft rent",amount:1150,taxAmount:150,type:"CHARGE"}]}}});
-    if (req.method() === "GET") return route.fulfill({ json: { data: req.url().includes("accountId=") ? { plan: saved, invoices: [] } : [{ id: "cmfixtureaccount000000000001", accountNumber: "CI-101", customer: { email: "fixture@example.invalid", firstName: "Example", lastName: "Tenant", companyName: null }, tenancy: { facilityId: "cmfixturefacility000000001", status: "ACTIVE", facility: { name: "Training store with a deliberately long facility name" } } }] } });
+    if (req.method() === "GET") return route.fulfill({ json: { data: req.url().includes("accountId=") ? { plan: saved, invoices: [] } : [{ id: "cmfixtureaccount000000000001", accountNumber: "CI-101", customer: { email: "fixture@example.invalid", firstName: "Example", lastName: "Tenant", companyName: null }, tenancy: { facilityId: "cmfixturefacility000000001", status: "ACTIVE", facility: { name: "Training store with a deliberately long facility name" } } }, { id: "cmfixtureaccount000000000002", accountNumber: "CI-102", customer: { email: "second@example.invalid", firstName: "Second", lastName: "Tenant", companyName: null }, tenancy: { facilityId: "cmfixturefacility000000001", status: "ACTIVE", facility: { name: "Training store" } } }] } });
     const body = req.postDataJSON(); calls.push(body);
     if (body.action === "plan") { saved = body.plan; return route.fulfill({ json: { data: saved } }); }
     if (body.action === "preview-multi") return route.fulfill({json:{data:{periods:["2026-11","2026-12"],fingerprint:"d".repeat(64),total:2300,bills:[{total:1150,lines:[{key:"r1",description:"Rent one",amount:1150,taxAmount:150,type:"CHARGE"}]},{total:1150,lines:[{key:"r2",description:"Rent two",amount:1150,taxAmount:150,type:"CHARGE"}]}]}}});
@@ -34,7 +34,17 @@ try {
   await page.route("**/api/v1/billing/invoice-schedule**", async route => { if (route.request().method() === "GET") return route.fulfill({json:{data:{date:"2026-11-17"}}}); const body=route.request().postDataJSON(); calls.push({schedule:body}); return route.fulfill({json:{data:{date:body.date}}}); });
   await page.route("**/api/v1/billing/monthly/invoice/*/send", async route => { calls.push({send:route.request().postDataJSON()}); return route.fulfill({json:{data:{accepted:true}}}); });
   page.on("dialog", dialog => dialog.accept());
+  await page.route("**/api/v1/billing/monthly/batch", async route => { const body=route.request().postDataJSON(); calls.push({batch:body}); return route.fulfill({json:{data:body.action === "review" ? body.accountIds.map(accountId=>({accountId,draft:{period:"2026-12",fingerprint:"f".repeat(64),accountNumber:"CI-101",customerName:"Example Tenant",total:1150,taxTotal:150,lines:[{key:"rent",description:"Batch rent",amount:1150,taxAmount:150,type:"CHARGE"}]},error:null})) : body.items.map(item=>({accountId:item.accountId,posted:{invoiceNumber:"INV-BATCH"},error:null}))}}); });
   await page.goto(`http://127.0.0.1:${server.address().port}`);
+  await page.getByRole("checkbox", { name: /CI-101/ }).check();
+  await page.getByRole("checkbox", { name: /CI-102/ }).check();
+  await page.getByRole("button", { name: "Review selected accounts" }).click();
+  await expect(page.getByRole("button", { name: "Approve reviewed accounts" })).toBeDisabled();
+  await page.getByLabel("I reviewed the listed charges and notice status.").check();
+  await page.getByRole("button", { name: "Approve reviewed accounts" }).click();
+  await expect(page.getByRole("heading", { name: "Batch results" })).toBeVisible();
+  assert.equal(calls.filter(c => c.batch?.action === "approve").length,1);
+  assert.equal(calls.find(c => c.batch?.action === "approve").batch.items.length,2);
   await page.getByLabel("Customer account").selectOption("cmfixtureaccount000000000001");
   await page.getByLabel("Billing month", { exact: true }).fill("2026-02");
   await expect(page.getByLabel("Generation date")).toHaveValue("2026-11-17");

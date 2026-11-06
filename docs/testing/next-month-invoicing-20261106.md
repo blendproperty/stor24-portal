@@ -16,3 +16,5 @@ Synthetic tests exercise date and scope guards, missing handover, notice and mul
 The scheduler creates a review draft without an invoice or charge. Approval rechecks notice and financial evidence; a changed account invalidates the draft. A notice after approval still needs a separately reviewed accounting process.
 
 Single-account multi-month billing currently supports 2–12 months beginning in the current or next month. It holds active discounts, notice and multiple accounts for review, and posts all selected charges atomically only after staff confirmation. It immediately affects the balance, including future-effective charges; finance acceptance is required.
+
+Managers may select up to 50 customer accounts and review their prepared drafts together. Approval processes each eligible account separately and displays a result for each; an interrupted request requires checking every account before retrying. No customer emails are sent as part of the batch. Multiple accounts belonging to the same customer and store remain held for the combined-invoice workflow until integration is complete.

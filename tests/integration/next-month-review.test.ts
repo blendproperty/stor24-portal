@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash, randomUUID } from "node:crypto";
+import { reviewInvoiceDraftBatch, approveInvoiceDraftBatch } from "../../src/lib/invoice-draft-batch";
 import { sendSavedInvoice } from "../../src/lib/finance/saved-invoice-delivery";
 import { POST as scheduledRoute } from "../../src/app/api/v1/billing/run-next-month/route";
 import { db } from "../../src/lib/db";
@@ -119,6 +120,22 @@ test("next month review and guarded scheduled posting", async () => {
   await sendSavedInvoice(scope,multiDoc.id,randomUUID(),`multi-${key}@example.invalid`,false,fakeProvider);
   assert.equal(await db.ledgerEntry.count({where:{accountId:account3.id}}),2);
   await assert.rejects(previewMultiMonthInvoice(scope,account3.id,currentBillingPeriod(),2),/ALREADY_POSTED/);
+  const batchAccounts=[];
+  for (const i of [1,2]) {
+    const c=await db.customer.create({data:{organisationId:org.id,firstName:`Batch ${i}`}});
+    const u=await db.unit.create({data:{facilityId:facility.id,unitTypeId:type.id,number:`B${i}`,monthlyRate:800,status:"OCCUPIED"}});
+    const a=await db.account.create({data:{customerId:c.id,accountNumber:`B${i}-${key}`}});
+    const t=await db.tenancy.create({data:{facilityId:facility.id,customerId:c.id,accountId:a.id,status:"ACTIVE",startDate:new Date("2025-01-01"),occupancies:{create:{unitId:u.id,status:"ACTIVE",startDate:new Date("2025-01-01"),monthlyRate:800}}}});
+    await db.auditEvent.create({data:{organisationId:org.id,facilityId:facility.id,entityType:"Tenancy",entityId:t.id,action:"tenancy.key_handover_confirmed"}});await saveMonthlyBillingPlan(scope,a.id,plan);batchAccounts.push({account:a,tenancy:t});
+  }
+  const batchRun=await runNextMonthInvoices(scheduledNow,org.id);assert.equal(batchRun.generated,2);
+  const reviews=await reviewInvoiceDraftBatch(scope,batchAccounts.map(x=>x.account.id));assert.equal(reviews.filter(x=>x.draft).length,2);
+  assert.equal(await db.ledgerEntry.count({where:{accountId:{in:batchAccounts.map(x=>x.account.id)}}}),0);
+  await db.tenancy.update({where:{id:batchAccounts[1].tenancy.id},data:{status:"NOTICE_GIVEN"}});
+  const batch=await approveInvoiceDraftBatch(scope,reviews.map(x=>({accountId:x.accountId,period:x.draft!.period,fingerprint:x.draft!.fingerprint})));
+  assert.equal(batch.filter(x=>x.posted).length,1);assert.equal(batch[1].error,"BILLING_NOTICE_POLICY_REVIEW");
+  assert.equal(await db.ledgerEntry.count({where:{accountId:batchAccounts[0].account.id}}),1);assert.equal(await db.ledgerEntry.count({where:{accountId:batchAccounts[1].account.id}}),0);
+  const denied=await reviewInvoiceDraftBatch({...scope,facilityIds:[]},[batchAccounts[1].account.id]);assert.equal(denied[0].error,"BILLING_ACCOUNT_NOT_FOUND");
   delete process.env.NEXT_MONTH_INVOICING_ENABLED;
   await assert.rejects(runNextMonthInvoices(seventeenth,org.id),/SCHEDULE_DISABLED/);
 

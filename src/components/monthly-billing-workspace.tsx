@@ -4,6 +4,7 @@ import { currentBillingPeriod, nextBillingPeriod, type BillingPlan, type Billing
 
 type Account = { id: string; accountNumber: string; customer: { email: string | null; companyName: string | null; firstName: string | null; lastName: string | null }; tenancy: { facilityId: string; facility: { name: string }; status: string } | null };
 type Preview = { fingerprint: string; customerName: string; total: number; taxTotal: number; lines: BillingLine[] };
+const batchReason = (code: string | null) => ({ BILLING_NO_DRAFT:"No prepared draft.", BILLING_NOTICE_POLICY_REVIEW:"Customer is on notice.", BILLING_PREVIEW_CHANGED:"Account changed; prepare a new draft.", BILLING_COMBINED_REVIEW:"Multiple accounts require a combined invoice.", BILLING_DISCOUNT_POLICY_REVIEW:"Discount needs finance review.", BILLING_HANDOVER_REVIEW:"Recorded handover is required.", BILLING_ALREADY_POSTED:"This month has already been posted." } as Record<string,string>)[code || ""] || "Account needs review before billing.";
 const money = (n: number) => n.toLocaleString("en-ZA", { style: "currency", currency: "ZAR" });
 function blankPlan(): BillingPlan { return { firstPeriod: currentBillingPeriod(), proration: "ACTUAL_DAYS", taxPercent: 0, rentTaxable: false, insuranceEnabled: false, insuranceTaxable: false, charges: [], discount: null, approvalReference: "" }; }
 async function request(url: string, body?: unknown) {
@@ -13,8 +14,14 @@ async function request(url: string, body?: unknown) {
   return json.data;
 }
 type MultiPreview = { periods: string[]; bills: Array<{ lines: BillingLine[]; total: number }>; total: number; fingerprint: string };
+type BatchReview = { accountId: string; draft: (Preview & { period: string; accountNumber: string }) | null; error: string | null };
+type BatchResult = { accountId: string; posted: { invoiceNumber: string } | null; error: string | null };
 type PlanHistory={versions:Array<{recordNumber:number;kind:string;recordedAt:string;sourcePlanUpdatedAt:string|null;actorId:string|null;plan:BillingPlan;hash:string}>;nextBefore:number|null;coverage:string};
 export function MonthlyBillingWorkspace() {
+  const [batchIds, setBatchIds] = useState<string[]>([]);
+  const [batchReview, setBatchReview] = useState<BatchReview[] | null>(null);
+  const [batchResult, setBatchResult] = useState<BatchResult[] | null>(null);
+  const [batchConfirmed, setBatchConfirmed] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountId, setAccountId] = useState("");
   const [period, setPeriod] = useState(currentBillingPeriod());
@@ -65,6 +72,23 @@ export function MonthlyBillingWorkspace() {
     try { const data = await request("/api/v1/billing/monthly", { action:"approve-draft", accountId, period:draft.period, fingerprint:draft.fingerprint, confirm:true }); setResult(data); setDraft(null); setDraftConfirmed(false); setInvoices(items => [{ id:data.documentId, externalId:data.invoiceNumber }, ...items]); }
     catch(e) { setDraft(null); setError((e as Error).message); } finally { setBusy(false); }
   }
+  function selectBatch(id: string, selected: boolean) {
+    setBatchIds(previous => selected ? [...previous, id] : previous.filter(value => value !== id));
+    setBatchReview(null); setBatchResult(null); setBatchConfirmed(false);
+  }
+  async function reviewBatch() {
+    setBusy(true); setError(""); setBatchReview(null); setBatchResult(null); setBatchConfirmed(false);
+    try { setBatchReview(await request("/api/v1/billing/monthly/batch", { action:"review", accountIds:batchIds })); }
+    catch(e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+  async function postBatch() {
+    if (!batchReview || !batchConfirmed) return;
+    const items=batchReview.flatMap(item => item.draft ? [{accountId:item.accountId,period:item.draft.period,fingerprint:item.draft.fingerprint}] : []);
+    if (!items.length) return;
+    setBusy(true); setError("");
+    try { setBatchResult(await request("/api/v1/billing/monthly/batch",{action:"approve",items,confirm:true})); setBatchReview(null); setBatchConfirmed(false); }
+    catch { setBatchReview(null); setBatchConfirmed(false); setError("Batch results could not be confirmed. Check each account before trying again."); } finally { setBusy(false); }
+  }
   async function reviewMultiple() {
     setBusy(true); setError(""); setMulti(null); setMultiConfirmed(false);
     try { setMulti(await request("/api/v1/billing/monthly",{action:"preview-multi",accountId,start:multiStart,count:multiCount})); }
@@ -104,6 +128,7 @@ export function MonthlyBillingWorkspace() {
     <section className="panel"><p>Posting creates an account charge and a saved invoice. It does not collect money or email the customer. Charges are VAT-inclusive where marked taxable. Confirm the tax treatment, contract and first unbilled month with finance.</p>
       <div className="form-grid"><label>Customer account<select value={accountId} disabled={busy||historyBusy} onChange={e => void select(e.target.value)}><option value="">Select account</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.accountNumber} · {a.customer.companyName || [a.customer.firstName, a.customer.lastName].filter(Boolean).join(" ")} · {a.tenancy?.facility.name}</option>)}</select></label><label>Billing month<input type="month" value={period} max={currentBillingPeriod()} disabled={busy||historyBusy} onChange={e => { setPeriod(e.target.value); setPreview(null); setResult(null); setReviewed(false); }}/></label></div>
     </section>
+    <section className="panel"><h2>Review multiple customer accounts</h2><p>Select up to 50 accounts to review their prepared invoices together. Each approved account is posted separately; accounts needing attention are held. No email is sent.</p><div>{accounts.map(account => <label key={account.id} style={{display:"block"}}><input type="checkbox" checked={batchIds.includes(account.id)} disabled={busy || (!batchIds.includes(account.id) && batchIds.length >= 50)} onChange={e => selectBatch(account.id,e.target.checked)}/> {account.accountNumber} · {account.customer.companyName || [account.customer.firstName,account.customer.lastName].filter(Boolean).join(" ")} · {account.tenancy?.facility.name}</label>)}</div><button type="button" className="button button-secondary" disabled={busy || !batchIds.length} onClick={() => void reviewBatch()}>Review selected accounts</button>{batchReview && <div><h3>Review selected invoices</h3>{batchReview.map(item => <div key={item.accountId}><strong>{accounts.find(account=>account.id===item.accountId)?.accountNumber}</strong>{item.draft ? <><p>{item.draft.period} · {money(item.draft.total)}</p><ul>{item.draft.lines.map(line=><li key={line.key}>{line.description}: {line.type === "CREDIT" ? "−" : ""}{money(line.amount)}</li>)}</ul></> : <p>Held for review: {batchReason(item.error)}</p>}</div>)}<label><input type="checkbox" checked={batchConfirmed} disabled={busy} onChange={e=>setBatchConfirmed(e.target.checked)}/> I reviewed the listed charges and notice status.</label><button type="button" className="button button-primary" disabled={busy || !batchConfirmed || !batchReview.some(item=>item.draft)} onClick={() => void postBatch()}>Approve reviewed accounts</button></div>}{batchResult && <div role="status"><h3>Batch results</h3>{batchResult.map(item=><p key={item.accountId}>{accounts.find(account=>account.id===item.accountId)?.accountNumber}: {item.posted ? `Posted ${item.posted.invoiceNumber}` : `Held for review: ${batchReason(item.error)}`}</p>)}<p>Each account was processed separately. Check held accounts before retrying.</p></div>}</section>
     {accountId && <section className="panel"><h2>Invoice generation date</h2><p>The usual date is the 17th. A manager can choose a different date in the current month for this store. Changing the date does not activate automatic invoicing or send invoices.</p><label>Generation date<input type="date" value={scheduleDate} disabled={busy || historyBusy} onChange={e => setScheduleDate(e.target.value)}/></label><button type="button" className="button button-secondary" disabled={busy || historyBusy || !scheduleDate} onClick={() => void saveSchedule()}>Save generation date</button></section>}
     {accountId && <section className="panel"><h2>Invoice for multiple months</h2><p>Review agreed charges for two to twelve months. Posting creates one invoice and charges the account for all selected months. Future charges affect the account balance immediately; confirm this treatment with finance.</p><label>First month<select value={multiStart} disabled={busy} onChange={e => { setMultiStart(e.target.value); setMulti(null); setMultiConfirmed(false); }}><option value={currentBillingPeriod()}>{currentBillingPeriod()}</option><option value={nextBillingPeriod()}>{nextBillingPeriod()}</option></select></label><label>Number of months<input type="number" min="2" max="12" value={multiCount} disabled={busy} onChange={e => { setMultiCount(Number(e.target.value)); setMulti(null); setMultiConfirmed(false); }}/></label><button type="button" className="button button-secondary" disabled={busy || !approved || multiCount<2 || multiCount>12} onClick={() => void reviewMultiple()}>Review multiple months</button>{multi && <div><h3>Review multiple months</h3>{multi.bills.map((bill,index)=><div key={multi.periods[index]}><strong>{multi.periods[index]} · {money(bill.total)}</strong><ul>{bill.lines.map(line=><li key={line.key}>{line.description}: {line.type === "CREDIT" ? "−" : ""}{money(line.amount)}</li>)}</ul></div>)}<p>Total {money(multi.total)}</p><label><input type="checkbox" checked={multiConfirmed} disabled={busy} onChange={e => setMultiConfirmed(e.target.checked)}/> I reviewed every month and approve posting these charges.</label><button type="button" className="button button-primary" disabled={busy || !multiConfirmed} onClick={() => void postMultiple()}>Post multiple months</button></div>}</section>}
     {accountId && <section className="panel"><h2>Manager invoice review</h2><p>Scheduled preparation creates a draft without changing the ledger. Review the account, charges and notice status before approving. Approval posts charges and saves an invoice; it does not email it.</p><button type="button" className="button button-secondary" disabled={busy || historyBusy} onClick={() => void loadDraft()}>Load prepared draft</button>{draft && <div><h3>Review draft for {draft.period}</h3><ul>{draft.lines.map(line => <li key={line.key}>{line.description}: {line.type === "CREDIT" ? "−" : ""}{money(line.amount)}</li>)}</ul><p>Total {money(draft.total)}</p><label><input type="checkbox" checked={draftConfirmed} disabled={busy} onChange={e => setDraftConfirmed(e.target.checked)}/> I reviewed the charges and customer notice status.</label><button type="button" className="button button-primary" disabled={busy || !draftConfirmed} onClick={() => void approveDraft()}>Approve and post invoice</button></div>}</section>}
