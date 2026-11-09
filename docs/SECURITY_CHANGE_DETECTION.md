@@ -14,6 +14,8 @@ Only SHA256 fingerprints and file/directory ownership/mode are retained locally.
 
 The local baseline is `/var/lib/stor24-security/baseline.json` (root,0600; parent root,0700). Initialization uses exclusive creation and refuses to replace an existing baseline. A read check never initializes or updates it.
 
+Baseline version 2 ignores lines consisting only of spaces, tabs or carriage returns in authorised-key files. All bytes of non-blank lines and all path, ownership and permission checks are retained. Server host keys and other monitored files still use byte-for-byte fingerprints. Version 1 continues to use its original fingerprints. For an upgrade, verify the version 1 comparison is clean, preserve the version 1 file in protected storage, and compare the candidate version 2 inventory against the reviewed version 1 state before activation. For rollback to a version 1-only checker, restore the matching protected version 1 baseline and then verify its report.
+
 ## Reporting and retained findings
 
 The version-1 heartbeat accepts an optional `security` state for a backwards-compatible receiver-first rollout. Exact flags are `STOR24_SECURITY_CHANGES_ENABLED=true` in the root host monitor environment and `STOR24_SECURITY_CHANGES_REQUIRED=true` in the production GitHub repository variables. Invalid values fail closed. Once required, a legacy report without a security state is unavailable.
