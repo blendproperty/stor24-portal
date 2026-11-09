@@ -3,7 +3,7 @@ import { db } from "./db";
 import type { Prisma } from "@/generated/prisma/client";
 import { currentRoleAccess } from "./current-role-access";
 import { facilityWhere, type RequestScope } from "./scope";
-import { CHECKLIST_PURPOSE, checklistCreateSchema, checklistChangeSchema, checklistRecordSchema, checklistTemplates, checklistDates, checklistRows, validateChecklistSubmission, type ChecklistCreate, type ChecklistChange, type ChecklistRow } from "./operational-checklist-policy";
+import { CHECKLIST_PURPOSE, checklistCreateSchema, checklistChangeSchema, checklistRecordSchema, checklistTemplates, checklistDates, checklistRows, checklistWeek, validateChecklistSubmission, type ChecklistCreate, type ChecklistChange, type ChecklistRow, type ChecklistTemplate } from "./operational-checklist-policy";
 
 type Client = Prisma.TransactionClient;
 const json = (v: unknown) => JSON.parse(JSON.stringify(v)) as Prisma.InputJsonValue;
@@ -15,11 +15,19 @@ async function staff(tx: Client, scope: RequestScope, id: string, facilityId: st
   if (!user || !["operations.view", permission].every(p => currentRoleAccess(user.roleAssignments.filter(a => a.role.organisationId === scope.organisationId), p, facilityId).allowed)) throw new Error("FORBIDDEN");
   return user;
 }
-async function assignments(tx: Client, scope: RequestScope, input: { assigneeId: string; coverId: string | null; reviewerId: string; facilityId: string }) {
+// The built-in CSO grant includes operations.manage for ordinary operations work.
+// A separate role must supply the reviewer grant for padlock counts.
+function canReviewPadlocks(user: Awaited<ReturnType<typeof staff>>, organisationId: string, facilityId: string) {
+  const roles = user.roleAssignments.filter(a => a.role.organisationId === organisationId && a.role.name !== "Customer service operator");
+  return currentRoleAccess(roles, "operations.manage", facilityId).allowed;
+}
+
+async function assignments(tx: Client, scope: RequestScope, input: { assigneeId: string; coverId: string | null; reviewerId: string; facilityId: string; template: ChecklistTemplate }) {
   if (input.assigneeId === input.reviewerId || input.coverId === input.reviewerId || input.coverId === input.assigneeId) throw new Error("CHECKLIST_REVIEWER_REQUIRED");
   await staff(tx, scope, input.assigneeId, input.facilityId);
   if (input.coverId) await staff(tx, scope, input.coverId, input.facilityId);
-  await staff(tx, scope, input.reviewerId, input.facilityId, "operations.manage");
+  const reviewer = await staff(tx, scope, input.reviewerId, input.facilityId, "operations.manage");
+  if (input.template === "PADLOCK" && !canReviewPadlocks(reviewer, scope.organisationId, input.facilityId)) throw new Error("CHECKLIST_PADLOCK_REVIEWER_REQUIRED");
 }
 async function snapshot(tx: Client, scope: RequestScope, facilityId: string) {
   const units = await tx.unit.findMany({ where: { facilityId, facility: facilityWhere(scope), combinedIntoUnitId: null }, select: { id: true, number: true, status: true, occupancies: { where: { status: { in: ["ACTIVE", "NOTICE_GIVEN"] }, endDate: null }, select: { tenancy: { select: { facilityId: true, status: true, customer: { select: { organisationId: true } } } } } } }, orderBy: { number: "asc" }, take: 1501 });
@@ -95,6 +103,7 @@ export async function changeOperationalChecklist(scope: RequestScope, raw: Check
         record.submittedBy = scope.userId; record.submittedAt = now.toISOString(); status = "WAITING";
       }
     } else if (input.action === "APPROVE" || input.action === "RETURN") {
+      if (record.template === "PADLOCK" && !canReviewPadlocks(actor, scope.organisationId, before.facilityId)) throw new Error("FORBIDDEN");
       if (before.status !== "WAITING" || record.reviewerId !== scope.userId || record.submittedBy === scope.userId) throw new Error("FORBIDDEN");
       validateChecklistSubmission(record);
       record.reviewNote = input.note;
@@ -102,7 +111,7 @@ export async function changeOperationalChecklist(scope: RequestScope, raw: Check
         record.reviewedBy = scope.userId; record.reviewedAt = now.toISOString(); status = "COMPLETED";
       } else { status = "IN_PROGRESS"; record.submittedAt = null; record.submittedBy = null; }
     } else if (input.action === "ASSIGN") {
-      await assignments(tx, scope, { ...input, facilityId: before.facilityId });
+      await assignments(tx, scope, { ...input, facilityId: before.facilityId, template: record.template });
       if (input.reviewerId === record.submittedBy) throw new Error("CHECKLIST_REVIEWER_REQUIRED");
       record.reviewerId = input.reviewerId; data.assigneeId = input.assigneeId; data.coverId = input.coverId;
     } else if (input.action === "CANCEL") status = "CANCELLED";
@@ -114,7 +123,7 @@ export async function changeOperationalChecklist(scope: RequestScope, raw: Check
   }, { timeout: 30000 });
 }
 
-export async function operationalChecklists(scope: RequestScope, query: { facilityId?: string; id?: string; closed?: boolean; cursor?: string }) {
+export async function operationalChecklists(scope: RequestScope, query: { facilityId?: string; id?: string; closed?: boolean; cursor?: string; kind?: "checklists" | "padlocks" }) {
   return db.$transaction(async tx => {
     const users = await tx.user.findMany({ where: { organisationId: scope.organisationId, active: true }, include: { roleAssignments: { include: { role: true } } }, take: 1001 });
     if (users.length > 1000) throw new Error("CHECKLIST_LIMIT");
@@ -124,14 +133,50 @@ export async function operationalChecklists(scope: RequestScope, query: { facili
     const facilities = (await tx.facility.findMany({ where: facilityWhere(scope), select: { id: true, name: true }, orderBy: { name: "asc" } })).filter(f => access(actor, "operations.view", f.id));
     if (query.facilityId && !facilities.some(f => f.id === query.facilityId)) throw new Error("FORBIDDEN");
     const base = { organisationId: scope.organisationId, facilityId: { in: facilities.filter(f => !query.facilityId || f.id === query.facilityId).map(f => f.id) }, purpose: CHECKLIST_PURPOSE };
+    const metadata = {
+      actorId: scope.userId,
+      facilities,
+      managerFacilityIds: facilities.filter(f => access(actor, "operations.manage", f.id)).map(f => f.id),
+      staff: users.map(user => ({
+        id: user.id, name: user.name,
+        facilityIds: facilities.filter(f => access(user, "operations.view", f.id)).map(f => f.id),
+        reviewerFacilityIds: facilities.filter(f => access(user, "operations.manage", f.id)).map(f => f.id),
+        padlockReviewerFacilityIds: facilities.filter(f => access(user, "operations.manage", f.id) && canReviewPadlocks(user, scope.organisationId, f.id)).map(f => f.id),
+      })).filter(user => user.facilityIds.length > 0),
+    };
     if (query.id) {
       const task = await tx.task.findFirst({ where: { ...base, id: query.id }, select: { ...summarySelect, operationalChecklist: true } });
       if (!task) throw new Error("NOT_FOUND");
-      return { task: { ...task, operationalChecklist: checklistRecordSchema.parse(task.operationalChecklist) }, actorId: scope.userId, facilities, managerFacilityIds: facilities.filter(f => access(actor, "operations.manage", f.id)).map(f => f.id), staff: users.map(u => ({ id: u.id, name: u.name, facilityIds: facilities.filter(f => access(u, "operations.view", f.id)).map(f => f.id), reviewerFacilityIds: facilities.filter(f => access(u, "operations.manage", f.id)).map(f => f.id) })).filter(u => u.facilityIds.length > 0) };
+      const record = checklistRecordSchema.parse(task.operationalChecklist);
+      const week = [];
+      if (record.template !== "PADLOCK" && task.startAt) {
+        const days = checklistWeek(task.startAt);
+        for (const [index, date] of days.slice(0, 7).entries()) {
+          if (task.startAt >= date && task.startAt < days[index + 1]) continue;
+          // One saved run per date in the grid. Any additional runs remain available in the queue.
+          const sibling = await tx.task.findFirst({
+            where: { ...base, facilityId: task.facilityId, startAt: { gte: date, lt: days[index + 1] },
+              status: { not: "CANCELLED" }, operationalChecklist: { path: ["template"], equals: record.template } },
+            orderBy: [{ startAt: "asc" }, { id: "asc" }],
+            select: { id: true, assignee: { select: { name: true } }, operationalChecklist: true },
+          });
+          if (sibling) {
+            const saved = checklistRecordSchema.parse(sibling.operationalChecklist);
+            week.push({ id: sibling.id, day: index, name: sibling.assignee?.name ?? null,
+              rows: saved.rows.length ? saved.rows : checklistRows(record.template, date) });
+          }
+        }
+      }
+      return { ...metadata, task: { ...task, operationalChecklist: record }, week, tasks: undefined, nextCursor: undefined };
     }
-    const where = { ...base, status: query.closed ? { in: ["COMPLETED", "CANCELLED"] as ("COMPLETED" | "CANCELLED")[] } : { notIn: ["COMPLETED", "CANCELLED"] as ("COMPLETED" | "CANCELLED")[] } };
+    const padlockTemplate = { operationalChecklist: { path: ["template"], equals: "PADLOCK" } };
+    const where: Prisma.TaskWhereInput = {
+      ...base,
+      ...(query.kind === "padlocks" ? padlockTemplate : query.kind === "checklists" ? { NOT: padlockTemplate } : {}),
+      status: query.closed ? { in: ["COMPLETED", "CANCELLED"] } : { notIn: ["COMPLETED", "CANCELLED"] },
+    };
     if (query.cursor && !await tx.task.count({ where: { ...where, id: query.cursor } })) throw new Error("CONFLICT");
     const tasks = await tx.task.findMany({ where, select: summarySelect, orderBy: [{ dueAt: "asc" }, { id: "asc" }], ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}), take: 51 });
-    return { tasks: tasks.slice(0, 50), nextCursor: tasks.length > 50 ? tasks[49].id : null, actorId: scope.userId, facilities, managerFacilityIds: facilities.filter(f => access(actor, "operations.manage", f.id)).map(f => f.id), staff: users.map(u => ({ id: u.id, name: u.name, facilityIds: facilities.filter(f => access(u, "operations.view", f.id)).map(f => f.id), reviewerFacilityIds: facilities.filter(f => access(u, "operations.manage", f.id)).map(f => f.id) })).filter(u => u.facilityIds.length > 0) };
+    return { ...metadata, week: undefined, tasks: tasks.slice(0, 50), nextCursor: tasks.length > 50 ? tasks[49].id : null };
   }, { isolationLevel: "RepeatableRead", timeout: 30000 });
 }

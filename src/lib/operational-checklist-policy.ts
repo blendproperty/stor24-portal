@@ -23,6 +23,19 @@ export const checklistTemplates = {
 } as const;
 export const templateKeySchema = z.enum(["OPENING", "CLOSING", "CLEANING", "MANAGEMENT", "PADLOCK"]);
 export type ChecklistTemplate = z.infer<typeof templateKeySchema>;
+
+export function checklistWeek(at: Date | string) {
+  const day = new Date(`${southAfricaDateKey(at)}T00:00:00+02:00`);
+  const weekday = new Date(`${southAfricaDateKey(at)}T12:00:00Z`).getUTCDay();
+  const monday = day.getTime() - (weekday + 6) % 7 * 86400000;
+  return Array.from({ length: 8 }, (_, index) => new Date(monday + index * 86400000));
+}
+
+export function checklistHref(title: string, id: string) {
+  const page = title === checklistTemplates.PADLOCK.name ? "padlocks" : "checklists";
+  return `/operations/${page}?id=${encodeURIComponent(id)}`;
+}
+
 const text = z.string().trim().max(2000);
 export const checklistRowSchema = z.object({
   id: z.string().min(1).max(100), label: z.string().min(1).max(300),
