@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import { db } from "@/lib/db";
+import { facilityWhere } from "@/lib/scope";
 import type { RequestScope } from "@/lib/scope";
 import { approveScheduledInvoiceDraft, readScheduledInvoiceDraft } from "@/lib/monthly-billing-service";
 import { readScheduledCombined, postCombinedBilling } from "@/lib/combined-billing-preview";
@@ -39,6 +42,20 @@ export async function approveInvoiceDraftBatch(scope: RequestScope, items: Batch
         results.push({accountId:item.accountId,posted,error:null});
       }
     } catch(error) { results.push({accountId:item.accountId,posted:null,error:code(error)}); }
+  }
+  return results;
+}
+
+// A missing document may still be in flight; this read does not authorize retry.
+export async function inspectInvoiceBatchOutcome(scope: RequestScope, accountIds: string[], period: string) {
+  const results=[];
+  for (const accountId of accountIds) {
+    const account=await db.account.findFirst({where:{id:accountId,customer:{organisationId:scope.organisationId},tenancy:{facility:facilityWhere(scope)}},select:{customerId:true,tenancy:{select:{id:true,facilityId:true,customerId:true}}}});
+    if (!account?.tenancy || account.tenancy.customerId !== account.customerId) { results.push({accountId,state:"REVIEW_REQUIRED",invoice:null}); continue; }
+    const docs=await db.document.findMany({where:{type:"INVOICE",tenancy:{facilityId:account.tenancy.facilityId,customerId:account.customerId,customer:{organisationId:scope.organisationId}},OR:[{tenancyId:account.tenancy.id,idempotencyKey:`monthly-invoice:${accountId}:${period}`},{idempotencyKey:`combined-invoice:${account.customerId}:${account.tenancy.facilityId}:${period}`,combinedInvoiceMemberships:{some:{accountId,period}}}]},select:{id:true,externalId:true,status:true,content:true,sha256:true},take:2});
+    const doc=docs[0];
+    const valid=docs.length===1 && ["GENERATED","SENT"].includes(doc.status) && doc.content && doc.sha256 && createHash("sha256").update(doc.content).digest("hex")===doc.sha256;
+    results.push(valid ? {accountId,state:"POSTED",invoice:{id:doc.id,externalId:doc.externalId}} : {accountId,state:docs.length ? "REVIEW_REQUIRED" : "NOT_FOUND",invoice:null});
   }
   return results;
 }

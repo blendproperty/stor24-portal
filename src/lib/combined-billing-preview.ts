@@ -70,7 +70,7 @@ export async function postCombinedBilling(scope: RequestScope, raw: unknown, fin
       balance = balance.add(account.balance);
     }
     const first = combined.accounts[0];
-    const html = renderInvoiceHtml({ invoiceNumber, issueDate: periodDates(input.period).effectiveAt, facilityName: first.facilityName, company, customerName: first.customerName, accountNumber: combined.accounts.map(b => b.accountNumber).join(", "), currentBalance: balance.toString(), lines });
+    const html = renderInvoiceHtml({ invoiceNumber, issueDate: scheduled ? new Date() : periodDates(input.period).effectiveAt, facilityName: first.facilityName, company, customerName: first.customerName, accountNumber: combined.accounts.map(b => b.accountNumber).join(", "), currentBalance: balance.toString(), lines });
     const sha256 = createHash("sha256").update(html).digest("hex");
     const document = await tx.document.create({ data: { tenancyId: first.tenancyId, type: "INVOICE", status: "GENERATED", storageKey: `inline:${sha256}`, content: html, sha256, externalId: invoiceNumber, idempotencyKey: `combined-invoice:${input.customerId}:${input.facilityId}:${input.period}` } });
     for (const bill of combined.accounts) {

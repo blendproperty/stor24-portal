@@ -19,14 +19,16 @@ export async function sendSavedInvoice(scope: RequestScope, id: string, requestI
     const key = `saved-invoice-send:${id}:${requestId}`;
     const existing = await tx.communicationLog.findUnique({where:{idempotencyKey:key}});
     if (existing) { if (existing.status === "SUCCEEDED" && existing.recipientHash === privacyHash(email)) return {sent:true as const,logId:existing.id}; throw new Error("INVOICE_DELIVERY_REVIEW"); }
-    const unresolved = await tx.communicationLog.findFirst({where:{idempotencyKey:{startsWith:`saved-invoice-send:${id}:`},status:{in:["PENDING","PROCESSING","FAILED"]}},select:{id:true}});
+    const unresolved = await tx.communicationLog.findFirst({where:{idempotencyKey:{startsWith:`saved-invoice-send:${id}:`},status:{not:"SUCCEEDED"}},select:{id:true}});
     if (unresolved) throw new Error("INVOICE_DELIVERY_REVIEW");
     const log = await tx.communicationLog.create({data:{organisationId:scope.organisationId,facilityId:doc.tenancy.facilityId,customerId:customer.id,channel:"EMAIL",direction:"OUTBOUND",messageType:"INVOICE",recipientHash:privacyHash(email),idempotencyKey:key,status:"PENDING",metadata:{documentId:id,invoiceNumber:doc.externalId,noticeConfirmed:allowNotice}}});
     await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:doc.tenancy.facilityId,actorId:scope.userId,action:"billing.invoice_delivery_requested",entityType:"Document",entityId:id,after:{communicationLogId:log.id,noticeConfirmed:allowNotice}}});
-    return {sent:false as const,logId:log.id,email,html:doc.content,number:doc.externalId || "Invoice",customerId:customer.id,facilityId:doc.tenancy.facilityId,tenancyId:doc.tenancy.id,memberTenancyIds:isCombined ? members.map(m=>m.account.tenancy!.id) : []};
+    return {sent:false as const,logId:log.id,email,html:doc.content,sha256:doc.sha256,number:doc.externalId || "Invoice",customerId:customer.id,facilityId:doc.tenancy.facilityId,tenancyId:doc.tenancy.id,memberTenancyIds:isCombined ? members.map(m=>m.account.tenancy!.id) : []};
   },{isolationLevel:"Serializable",timeout:20000});
   if (claim.sent) return {accepted:true,logId:claim.logId};
   try {
+    const currentDoc = await db.document.findFirst({where:{id,type:"INVOICE",status:{in:["GENERATED","SENT"]},tenancy:{facility:facilityWhere(scope),customer:{organisationId:scope.organisationId}}},select:{tenancyId:true,content:true,sha256:true}});
+    if (!currentDoc || currentDoc.tenancyId !== claim.tenancyId || currentDoc.sha256 !== claim.sha256 || currentDoc.content !== claim.html || createHash("sha256").update(currentDoc.content ?? "").digest("hex") !== currentDoc.sha256) throw new Error("DOCUMENT_CHANGED");
     const current = await db.customer.findFirst({where:{id:claim.customerId,organisationId:scope.organisationId},select:{email:true}});
     if (current?.email?.trim().toLowerCase() !== claim.email.toLowerCase()) throw new Error("RECIPIENT_CHANGED");
     const currentTenancy=await db.tenancy.findUnique({where:{id:claim.tenancyId},select:{status:true}});
@@ -42,4 +44,15 @@ export async function sendSavedInvoice(scope: RequestScope, id: string, requestI
     // A provider may have accepted before a timeout; keep the durable claim for review.
     throw new Error("INVOICE_DELIVERY_REVIEW");
   }
+}
+
+// A pending or failed claim may represent a provider timeout, so status never clears it.
+export async function savedInvoiceDeliveryStatus(scope: RequestScope, id: string) {
+  const doc=await db.document.findFirst({where:{id,type:"INVOICE",OR:[{idempotencyKey:{startsWith:"monthly-invoice:"}},{idempotencyKey:{startsWith:"multi-month-invoice:"}},{idempotencyKey:{startsWith:"combined-invoice:"}}],tenancy:{facility:facilityWhere(scope),customer:{organisationId:scope.organisationId}}},select:{id:true}});
+  if (!doc) throw new Error("INVOICE_DELIVERY_REVIEW");
+  const where={organisationId:scope.organisationId,idempotencyKey:{startsWith:`saved-invoice-send:${id}:`}};
+  const unresolved=await db.communicationLog.findFirst({where:{...where,status:{not:"SUCCEEDED"}},select:{queuedAt:true},orderBy:{queuedAt:"desc"}});
+  if (unresolved) return {state:"REVIEW_REQUIRED" as const,at:unresolved.queuedAt};
+  const accepted=await db.communicationLog.findFirst({where:{...where,status:"SUCCEEDED"},select:{queuedAt:true,sentAt:true},orderBy:{queuedAt:"desc"}});
+  return accepted ? {state:"PROVIDER_ACCEPTED" as const,at:accepted.sentAt ?? accepted.queuedAt} : {state:"NOT_SENT" as const,at:null};
 }

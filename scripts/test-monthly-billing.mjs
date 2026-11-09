@@ -16,6 +16,7 @@ const server = createServer(async (req, res) => {
 await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
 const browser = await chromium.launch(process.env.PLAYWRIGHT_CHANNEL ? { channel: process.env.PLAYWRIGHT_CHANNEL } : {});
 const calls = [], errors = [];
+let failBatchOnce = false;
 let saved = { firstPeriod: "2026-02", proration: "ACTUAL_DAYS", taxPercent: 15, rentTaxable: true, insuranceEnabled: false, insuranceTaxable: false, charges: [], discount: null, approvalReference: "Fixture approval only" };
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
@@ -32,9 +33,9 @@ try {
     return route.fulfill({ json: { data: { documentId: "fixture-document", invoiceNumber: "INV-202602-CI-101" } } });
   });
   await page.route("**/api/v1/billing/invoice-schedule**", async route => { if (route.request().method() === "GET") return route.fulfill({json:{data:{date:"2026-11-17"}}}); const body=route.request().postDataJSON(); calls.push({schedule:body}); return route.fulfill({json:{data:{date:body.date}}}); });
-  await page.route("**/api/v1/billing/monthly/invoice/*/send", async route => { calls.push({send:route.request().postDataJSON()}); return route.fulfill({json:{data:{accepted:true}}}); });
+  await page.route("**/api/v1/billing/monthly/invoice/*/send", async route => { if (route.request().method() === "GET") { calls.push({deliveryStatus:true}); return route.fulfill({json:{data:{state:"REVIEW_REQUIRED"}}}); } calls.push({send:route.request().postDataJSON()}); return route.fulfill({json:{data:{accepted:true}}}); });
   page.on("dialog", dialog => dialog.accept());
-  await page.route("**/api/v1/billing/monthly/batch", async route => { const body=route.request().postDataJSON(); calls.push({batch:body}); return route.fulfill({json:{data:body.action === "review" ? [{accountId:body.accountIds[0],draft:{period:"2026-12",fingerprint:"f".repeat(64),accountNumber:"CI-101, CI-102",customerName:"Example Tenant",combined:true,total:2300,taxTotal:300,lines:[{key:"rent1",description:"CI-101 - Batch rent",amount:1150,taxAmount:150,type:"CHARGE"},{key:"rent2",description:"CI-102 - Batch rent",amount:1150,taxAmount:150,type:"CHARGE"}]},error:null}] : body.items.map(item=>({accountId:item.accountId,posted:{invoiceNumber:"INV-BATCH",documentId:"fixture-batch-document"},error:null}))}}); });
+  await page.route("**/api/v1/billing/monthly/batch", async route => { const body=route.request().postDataJSON(); calls.push({batch:body}); if(body.action === "approve" && failBatchOnce) { failBatchOnce=false; return route.fulfill({status:503,json:{error:{message:"Synthetic interruption"}}}); } return route.fulfill({json:{data:body.action === "status" ? body.accountIds.map(accountId=>({accountId,state:"POSTED",invoice:{id:"fixture-batch-document",externalId:"INV-BATCH"}})) : body.action === "review" ? [{accountId:body.accountIds[0],draft:{period:"2026-12",fingerprint:"f".repeat(64),accountNumber:"CI-101, CI-102",customerName:"Example Tenant",combined:true,total:2300,taxTotal:300,lines:[{key:"rent1",description:"CI-101 - Batch rent",amount:1150,taxAmount:150,type:"CHARGE"},{key:"rent2",description:"CI-102 - Batch rent",amount:1150,taxAmount:150,type:"CHARGE"}]},error:null}] : body.items.map(item=>({accountId:item.accountId,posted:{invoiceNumber:"INV-BATCH",documentId:"fixture-batch-document"},error:null}))}}); });
   await page.goto(`http://127.0.0.1:${server.address().port}`);
   await page.getByRole("checkbox", { name: /CI-101/ }).check();
   await page.getByRole("checkbox", { name: /CI-102/ }).check();
@@ -48,6 +49,21 @@ try {
   assert.equal(calls.find(c => c.batch?.action === "approve").batch.items.length,1);
   await page.getByRole("button", {name:"Send invoice",exact:true}).first().click();
   assert.equal(calls.filter(c=>c.send).length,1);
+  await page.getByRole("button", {name:"Check delivery status"}).first().click();
+  await expect(page.getByText("Delivery is unresolved.", {exact:false})).toBeVisible();
+  assert.equal(calls.filter(c=>c.deliveryStatus).length,1);
+  await page.getByRole("button", {name:"Check batch outcomes"}).click();
+  await expect(page.getByText("A missing invoice may still be processing.", {exact:false})).toBeVisible();
+  assert.equal(calls.filter(c=>c.batch?.action==="status").length,1);
+  await page.getByRole("button", { name: "Review selected accounts" }).click();
+  await page.getByLabel("I reviewed the listed charges and notice status.").check();
+  failBatchOnce=true;
+  await page.getByRole("button", { name: "Approve reviewed accounts" }).click();
+  await expect(page.getByText("Batch results could not be confirmed.", {exact:false})).toBeVisible();
+  assert.equal(calls.filter(c=>c.batch?.action==="approve").length,2);
+  await page.getByRole("button", {name:"Check batch outcomes"}).click();
+  assert.equal(calls.filter(c=>c.batch?.action==="status").length,2);
+  assert.equal(calls.filter(c=>c.batch?.action==="approve").length,2);
   await page.getByLabel("Customer account").selectOption("cmfixtureaccount000000000001");
   await page.getByLabel("Billing month", { exact: true }).fill("2026-02");
   await expect(page.getByLabel("Generation date")).toHaveValue("2026-11-17");
