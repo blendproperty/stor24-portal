@@ -7880,3 +7880,14 @@ Batch review is invalidated if the operator edits account billing terms; the syn
 - Deployment and configuration: Local practice database and operator-started loopback server only. Real email and payments remain disabled; fresh fixture invoice is a synthetic local record.
 - Live production verification: None.
 - Outstanding gates: Staff and finance must carry out their own UAT, including the fresh upgrade, downgrade credit, combined invoice posting and presentation; email provider acceptance and inbox receipt are untested; future-effective balance treatment, notice and discount policy, migration/deployment, data, training and production approval remain open. Local instructions: output/finance-uat/STAFF-FINANCE-TEST-GUIDE.txt.
+
+
+## 2026-11-09 - Practice combined posting and downgrade credit
+
+- Implementation: No runtime code changed. Created local synthetic repeatable practice fixtures C103/C104, U102 to U202, and D102 to D202; prepared the next-month combined draft for C103/C104. Updated the local staff and finance test guide with current fixture names.
+- Testing: In authenticated local finance UI approved the previously reviewed combined December invoice for C101/C102; UI returned one invoice INV-202612-C-b61e93e4497518d8ca1f5e6e. Database inspection found one membership for each of the two accounts, both unit labels in the document, and exactly one R1,000 charge and one R1,500 charge. Staff transferred synthetic D101 to D201 on 9 November; preview showed a R440 credit and staff requested review with original balance R1,800 unchanged. Independent finance approved; UI showed posted once and database found exactly one R440 credit with R57.39 tax and balance R1,360. Readback confirms fresh combined draft C103/C104 totals R2,500, both fresh accounts have zero charges, and fresh U202/D202 destination units are available. These checks are technical test-actor verification; staff and finance have not yet recorded their own acceptance.
+- Commit and push: This evidence is recorded on the draft PR #731 branch; verify remote branch after push.
+- Merge: None.
+- Deployment and configuration: Only the operator-started loopback test server and synthetic database. The fresh D102 account has a synthetic current-month invoice to support the transfer scenario. Email and external payments remain disabled.
+- Live production verification: None; provider delivery and customer inbox receipt were not tested.
+- Remaining gates: Staff and finance to perform their own UAT with the fresh fixtures and sign off. Finance must resolve future-effective charge balance treatment, and notice/discount decisions, migration/deployment, provider, data, training and release approvals remain open. Test-only guide is output/finance-uat/STAFF-FINANCE-TEST-GUIDE.txt.
