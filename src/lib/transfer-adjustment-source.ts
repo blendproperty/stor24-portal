@@ -1,0 +1,41 @@
+import { createHash } from "node:crypto";
+import { z } from "zod";
+import type { Prisma } from "@/generated/prisma/client";
+import { facilityWhere, type RequestScope } from "@/lib/scope";
+import { currentBillingPeriod, periodDates } from "@/lib/monthly-billing-policy";
+import { southAfricaDateKey } from "@/lib/south-africa-time";
+import { transferRentPreview } from "@/lib/transfer-preview";
+import type { AdjustmentInput } from "@/lib/adjustment-policy";
+
+const beforeSchema = z.object({ unitId: z.string(), occupancyId: z.string() });
+const afterSchema = z.object({ unitId: z.string(), occupancyId: z.string(), effectiveAt: z.string().datetime(), monthlyRate: z.number() });
+const money = (value: string) => Math.round(Number(value) * 100);
+export async function transferAdjustmentSource(tx: Prisma.TransactionClient, scope: RequestScope, eventId: string) {
+  const event = await tx.auditEvent.findFirst({ where: { id: eventId, organisationId: scope.organisationId, entityType: "Tenancy", action: "tenancy.transferred", facility: facilityWhere(scope) } });
+  if (!event?.facilityId) throw new Error("TRANSFER_ADJUSTMENT_REVIEW");
+  const before = beforeSchema.safeParse(event.before), after = afterSchema.safeParse(event.after);
+  if (!before.success || !after.success) throw new Error("TRANSFER_ADJUSTMENT_REVIEW");
+  const effective = new Date(after.data.effectiveAt), date = southAfricaDateKey(effective), period = date.slice(0, 7);
+  if (period !== currentBillingPeriod() || date > southAfricaDateKey(new Date())) throw new Error("TRANSFER_ADJUSTMENT_REVIEW");
+  const tenancy = await tx.tenancy.findFirst({ where: { id: event.entityId, facilityId: event.facilityId, facility: facilityWhere(scope), customer: { organisationId: scope.organisationId } }, include: { account: true, occupancies: true } });
+  if (!tenancy || tenancy.status !== "ACTIVE" || tenancy.account.currency !== "ZAR") throw new Error("TRANSFER_ADJUSTMENT_REVIEW");
+  const old = tenancy.occupancies.find(o => o.id === before.data.occupancyId), next = tenancy.occupancies.find(o => o.id === after.data.occupancyId);
+  if (!old || !next || old.unitId !== before.data.unitId || next.unitId !== after.data.unitId || old.status !== "MOVED_OUT" || next.status !== "ACTIVE" || !old.endDate || old.endDate.getTime() !== effective.getTime() || next.startDate.getTime() !== effective.getTime() || Number(next.monthlyRate) !== after.data.monthlyRate || old.startDate > periodDates(period).effectiveAt) throw new Error("TRANSFER_ADJUSTMENT_REVIEW");
+  const overlapping = tenancy.occupancies.filter(o => o.startDate <= new Date(`${periodDates(period).end}T23:59:59.999+02:00`) && (!o.endDate || o.endDate > periodDates(period).effectiveAt) && !["PENDING", "CANCELLED"].includes(o.status));
+  if (overlapping.length !== 2 || !overlapping.some(o => o.id === old.id) || !overlapping.some(o => o.id === next.id)) throw new Error("TRANSFER_ADJUSTMENT_REVIEW");
+  const handover = await tx.auditEvent.findFirst({ where: { organisationId: scope.organisationId, facilityId: event.facilityId, entityType: "Tenancy", entityId: tenancy.id, action: "tenancy.key_handover_confirmed" }, select: { id: true } });
+  if (!handover) throw new Error("TRANSFER_ADJUSTMENT_REVIEW");
+  const entries = await tx.ledgerEntry.findMany({ where: { accountId: tenancy.accountId, effectiveAt: { gte: periodDates(period).effectiveAt, lte: new Date(`${periodDates(period).end}T23:59:59.999+02:00`) } }, orderBy: { id: "asc" } });
+  const rent = entries.find(e => e.externalRef === `RENT-${period}`);
+  const meta = rent?.metadata as { chargeKey?: string; invoiceNumber?: string } | null;
+  if (!rent || rent.type !== "CHARGE" || money(rent.amount.toString()) !== money(old.monthlyRate.toString()) || meta?.chargeKey !== `rent:${old.id}` || !meta.invoiceNumber || entries.some(e => ["CREDIT", "REVERSAL", "WRITE_OFF", "REFUND"].includes(e.type)) || entries.filter(e => ((e.metadata as { chargeKey?: string } | null)?.chargeKey ?? "").startsWith("rent:")).length !== 1) throw new Error("TRANSFER_ADJUSTMENT_REVIEW");
+  const invoice = await tx.document.findFirst({ where: { type: "INVOICE", status: { in: ["GENERATED", "SENT"] }, externalId: meta.invoiceNumber, OR: [{ tenancyId: tenancy.id, idempotencyKey: `monthly-invoice:${tenancy.accountId}:${period}` }, { idempotencyKey: { startsWith: "combined-invoice:" }, combinedInvoiceMemberships: { some: { accountId: tenancy.accountId, period } }, tenancy: { facilityId: event.facilityId, customer: { organisationId: scope.organisationId } } }] } });
+  if (!invoice?.content || !invoice.sha256 || createHash("sha256").update(invoice.content).digest("hex") !== invoice.sha256) throw new Error("TRANSFER_ADJUSTMENT_REVIEW");
+  const estimate = transferRentPreview(date, old.monthlyRate.toString(), next.monthlyRate.toString());
+  if (!estimate || estimate.difference === 0) throw new Error("TRANSFER_ADJUSTMENT_NO_DIFFERENCE");
+  const amountCents = Math.abs(Math.round(estimate.difference * 100)), oldCents = money(rent.amount.toString());
+  if (oldCents <= 0) throw new Error("TRANSFER_ADJUSTMENT_REVIEW");
+  const taxCents = estimate.difference > 0 ? Math.round(amountCents * money(rent.taxAmount.toString()) / oldCents) : 0;
+  const input: AdjustmentInput = { accountId: tenancy.accountId, kind: estimate.difference > 0 ? "CHARGE" : "CREDIT", amount: (amountCents / 100).toFixed(2), taxAmount: (taxCents / 100).toFixed(2), sourceEntryId: estimate.difference < 0 ? rent.id : null, reason: `Unit transfer rent adjustment for ${date}`, evidenceReference: `transfer:${event.id}` };
+  return { input, digest: createHash("sha256").update(JSON.stringify({ event, old, next, rent, invoiceId: invoice.id, invoiceHash: invoice.sha256, handover: handover.id })).digest("hex") };
+}
