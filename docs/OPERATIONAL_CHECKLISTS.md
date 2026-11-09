@@ -1,6 +1,12 @@
 # Operational checklists and padlock walkthroughs
 
-Implementation checkpoint: 30 October 2026, Africa/Johannesburg. Entry point: **Operations centre → Checklists & padlocks** (`/operations/checklists`). This extends existing Tasks, Operations queues, Calendar, assignment/cover and audit records. Release and live acceptance status belong in `PROJECT_CONTEXT.md`.
+Implementation checkpoint: 30 October 2026, Africa/Johannesburg. Entry points are **Operations → Checklists** (`/operations/checklists`) and **Operations → Padlock counts** (`/operations/padlocks`). This extends existing Tasks, Operations queues, Calendar, assignment/cover and audit records. Release and live acceptance status belong in `PROJECT_CONTEXT.md`.
+
+## Workbook layout
+
+Opening, closing, cleaning and management use a Monday–Sunday sheet for the selected store and template. Open another scheduled day from its column heading. The highlighted day is the selected run. Other columns show saved results and each day's assigned staff member. A day with more than one run shows the earliest non-cancelled run in the sheet. Open additional runs from the queue. Friday equipment tests and Sunday cleaning retain their own rows. Comments and evidence belong to the selected run.
+
+Padlock counts have a separate planner, queue and history. The sheet puts each current unit beside its lock count and observed status. Assign the counting CSO or a named cover, then choose a separate manager or GM with store access. The built-in CSO grant alone cannot approve or return a padlock count. If an existing open count names a CSO as its reviewer, reassign the reviewer through staff cover and administration.
 
 ## Plan and perform a run
 

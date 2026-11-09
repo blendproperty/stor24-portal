@@ -80,7 +80,7 @@ export function OperationalForms() {
     void mutate("PATCH",{ id: task.id,expectedUpdatedAt: task.updatedAt,action,...(["SAVE","SUBMIT"].includes(action) ? { values: record.values,photos: record.photos,reviewerId: record.reviewerId } : { note }) });
   }
   return <>
-    <PageHeader eyebrow="Facility workflows" title="Operational forms" description="Record maintenance findings, track certificates and prepare documents for review." action={<Link href="/operations/checklists" className="button button-secondary">Checklists &amp; padlocks</Link>} />
+    <PageHeader eyebrow="Facility workflows" title="Operational forms" description="Record maintenance findings, track certificates and prepare documents for review." action={<Link href="/operations/checklists" className="button button-secondary">Checklists</Link>} />
     <div className={styles.toolbar}><button className="button button-secondary" disabled={busy || reading} onClick={() => navigate(task ? { id: task.id } : { facilityId: facility,closed })}>Reload saved forms</button><Link href="/operations">Operations centre</Link></div>
     {message ? <p role="alert">{message}</p> : null}{reading ? <p role="status">Loading saved forms…</p> : null}
     {!task ? <>

@@ -6,7 +6,48 @@
 .workspace p { overflow-wrap: anywhere; }
 .workspace label { display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
 .workspace label:has(input[type="checkbox"]) { flex-direction: row; align-items: center; }
-.rows { display: grid; gap: .5rem; }
-.row { background: var(--surface, #fff); }
+
+.sheetFilters { display: flex; align-items: end; flex-wrap: wrap; gap: .65rem 1rem; margin-block: .55rem; }
+.sheetFilters label:first-child { flex: 1 1 15rem; max-width: 26rem; }
+.sheetFilters label:last-child { padding-block: .55rem; }
+.sheetHint { color: var(--muted, #52616a); font-size: .85rem; }
+.sheetScroll { position: relative; max-height: 65vh; max-width: 100%; min-width: 0; overflow: auto; border: 1px solid var(--border, #ccd5d9); border-radius: .5rem; }
+.sheet { width: 100%; min-width: 940px; border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: .82rem; }
+.sheet th, .sheet td { padding: .35rem .45rem; border-inline-end: 1px solid var(--border, #ccd5d9); border-block-end: 1px solid var(--border, #ccd5d9); vertical-align: middle; overflow-wrap: anywhere; }
+.sheet tr > :first-child { width: 190px; }
+.sheet tr > :last-child { width: 185px; border-inline-end: 0; }
+.sheet thead th, .sheet thead td { background: #e8eef2; text-align: center; }
+.sheet thead tr:first-child th { position: sticky; top: 0; z-index: 2; }
+.sheet thead th:first-child, .sheet tbody th { text-align: left; }
+.sheet tbody tr:nth-child(even) { background: #f7f9fa; }
+.sheet tbody td { text-align: center; }
+.sheet small { display: block; font-size: .72rem; line-height: 1.25; }
+.sheet .group th { background: #e1e9ef; padding-block: .3rem; }
+.sheet .activeDay { width: 115px; background: #edf5ee; }
+.sheet th.activeDay { background: #d4ead8; }
+.workspace .sheet td :is(input, select, textarea) { min-height: 34px; width: 100%; min-width: 0; padding: .25rem .3rem; margin: 0; font-size: inherit; border-radius: .22rem; }
+.workspace .sheet td textarea { field-sizing: content; max-height: 120px; resize: vertical; }
+.savedComment { text-align: left; white-space: pre-wrap; }
+.sheet [data-result="PASS"] { background: #dceee0; color: #194c2d; }
+.sheet [data-result="ISSUE"], .sheet [data-result="OVERLOCKED"] { background: #f7e1dd; color: #752820; }
+.sheet [data-result="NA"] { background: #fff0d5; color: #604719; }
+.dayButton { font-weight: 700; text-decoration: underline; text-underline-offset: .17em; }
+.evidence { text-align: left; font-size: .72rem; }
+.evidence summary { cursor: pointer; width: fit-content; }
+.padlockSheet { min-width: 570px; }
+.padlockSheet tr > :first-child { width: 122px; }
+.padlockSheet tr > :nth-child(2) { width: 68px; }
+.padlockSheet tr > :nth-child(3) { width: 132px; }
+.padlockSheet tr > :last-child { width: auto; }
+@media (max-width: 600px) {
+  .sheet tr > :first-child { width: 128px; }
+  .sheet tr > th:first-child:not([colspan]) { position: sticky; left: 0; z-index: 1; background: #f1f5f7; }
+  .sheet thead tr:first-child th:first-child { z-index: 3; }
+  .padlockSheet { min-width: 420px; }
+  .padlockSheet tr > :first-child { width: 72px; }
+  .padlockSheet tr > :nth-child(2) { width: 53px; }
+  .padlockSheet tr > :nth-child(3) { width: 105px; }
+}
+
 .run { flex-wrap: wrap; justify-content: space-between; }
 @media (max-width: 600px) { .workspace fieldset { padding: .65rem; } .workspace :global(.form-grid) { grid-template-columns: minmax(0, 1fr); } .workspace :global(.button-row) { flex-wrap: wrap; } }
