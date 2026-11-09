@@ -7869,3 +7869,14 @@ Batch review is invalidated if the operator edits account billing terms; the syn
 - Deployment and configuration: Local synthetic database and practice server only; outbound email/payment/access providers remain disabled. The earlier automated review rejection for assistant background launch was not resolved; the user independently started the process.
 - Live production verification: None. Provider delivery and customer inbox receipt remain unverified.
 - Outstanding gates: Staff must sign in and verify request flow; finance must review and complete separate transfer approvals and confirm calculations; test real send/resend only through an approved provider test plan; finance sign-off for future-effective balances, discount and notice policy, migrations, release approval, data, training and production verification remain open. The local practice guide is output/finance-uat/STAFF-FINANCE-TEST-GUIDE.txt.
+
+
+## 2026-11-09 - Practice staff-to-finance transfer check
+
+- Implementation: No application code changes. Added a new synthetic current-month upgrade fixture UAT-U102 to available U202, so the team can repeat the workflow after the earlier upgrade was used for this check. UAT-D101 to D201 and combined accounts C101/C102 remain available.
+- Testing: Brett signed in as the separate UAT Staff account and completed MFA. In the local practice UI, staff transferred UAT-U101 to U201 dated 9 November, saw an indicative R440 charge, prepared and requested the adjustment, and saw the balance remain R1,200 while awaiting independent review. Staff self-approval was disabled. In the distinct signed-in finance account, reviewed the saved source and approved with synthetic review reference UAT-REVIEW-20261109. UI reported posted once; database readback showed the original R1,200 rent and exactly one R440 charge, balance R1,640, including R57.39 tax. This was synthetic staff-role/finance-role technical testing performed by Codex, not staff/finance acceptance. The previously reviewed combined draft remains unposted.
+- Commit and push: This evidence is recorded on the draft PR #731 branch; confirm final remote head separately.
+- Merge: None.
+- Deployment and configuration: Local practice database and operator-started loopback server only. Real email and payments remain disabled; fresh fixture invoice is a synthetic local record.
+- Live production verification: None.
+- Outstanding gates: Staff and finance must carry out their own UAT, including the fresh upgrade, downgrade credit, combined invoice posting and presentation; email provider acceptance and inbox receipt are untested; future-effective balance treatment, notice and discount policy, migration/deployment, data, training and production approval remain open. Local instructions: output/finance-uat/STAFF-FINANCE-TEST-GUIDE.txt.
