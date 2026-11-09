@@ -38,9 +38,14 @@ function readBounded(file) {
   } finally { closeSync(fd); }
 }
 
-export function collectSecuritySnapshot(root = '/') {
+function authorizedKeyBytes(data) {
+  // Keep every byte of non-blank lines, including key options and line endings.
+  return Buffer.from(data.toString('latin1').split(/(?<=\n)/).filter(line => /[^ \t\r\n]/.test(line)).join(''), 'latin1');
+}
+
+export function collectSecuritySnapshot(root = '/', version = 2) {
   const groups = { accounts: Object.create(null), sshKeys: Object.create(null), settings: Object.create(null) }; let entries = 0;
-  function record(name, group, depth = 0, recurse = true) {
+  function record(name, group, depth = 0, recurse = true, authorizedKeys = false) {
     if (++entries > MAX_ENTRIES || depth > 6) throw Error('SECURITY_INVENTORY_TOO_LARGE');
     const file = diskPath(root, name); let stat;
     try { stat = lstatSync(file); }
@@ -49,10 +54,11 @@ export function collectSecuritySnapshot(root = '/') {
     group[name] = { type: stat.isDirectory() ? 'directory' : 'file', uid: stat.uid, gid: stat.gid, mode: stat.mode & 0o7777 };
     if (stat.isDirectory() && recurse) {
       const names = readdirSync(file).sort(); if (names.length > MAX_ENTRIES) throw Error('SECURITY_INVENTORY_TOO_LARGE');
-      for (const child of names) record(`${name}/${child}`, group, depth + 1);
+      for (const child of names) record(`${name}/${child}`, group, depth + 1, true, authorizedKeys);
     } else if (stat.isFile()) {
       const read = readBounded(file);
-      group[name] = { type: 'file', uid: read.stat.uid, gid: read.stat.gid, mode: read.stat.mode & 0o7777, sha256: createHash('sha256').update(read.data).digest('hex') };
+      const data = version === 2 && authorizedKeys ? authorizedKeyBytes(read.data) : read.data;
+      group[name] = { type: 'file', uid: read.stat.uid, gid: read.stat.gid, mode: read.stat.mode & 0o7777, sha256: createHash('sha256').update(data).digest('hex') };
     }
   }
   for (const name of accountFiles) record(name, groups.accounts);
@@ -66,12 +72,12 @@ export function collectSecuritySnapshot(root = '/') {
   for (const home of [...homes].sort()) {
     const prefix = home === '/' ? '' : home;
     record(`${prefix}/.ssh`, groups.sshKeys, 0, false);
-    for (const suffix of ['authorized_keys', 'authorized_keys2']) record(`${prefix}/.ssh/${suffix}`, groups.sshKeys);
+    for (const suffix of ['authorized_keys', 'authorized_keys2']) record(`${prefix}/.ssh/${suffix}`, groups.sshKeys, 0, true, true);
   }
-  for (const name of keyDirectories) record(name, groups.sshKeys);
+  for (const name of keyDirectories) record(name, groups.sshKeys, 0, true, true);
   for (const name of hostPublicKeys) record(name, groups.sshKeys);
   for (const name of settingPaths) record(name, groups.settings);
-  return { version: 1, groups };
+  return { version, groups };
 }
 
 function trustedBaseline(root) {
@@ -82,14 +88,14 @@ function trustedBaseline(root) {
   const file = diskPath(root, BASELINE); const stat = lstatSync(file);
   if (!stat.isFile() || stat.uid !== 0 || (stat.mode & 0o777) !== 0o600) throw Error('SECURITY_BASELINE_PERMISSIONS');
   const parsed = JSON.parse(readBounded(file).data.toString('utf8'));
-  if (parsed.version !== 1 || !Number.isFinite(Date.parse(parsed.createdAt)) || !parsed.groups || Object.keys(parsed.groups).sort().join(',') !== 'accounts,settings,sshKeys') throw Error('SECURITY_BASELINE_INVALID');
+  if (![1, 2].includes(parsed.version) || !Number.isFinite(Date.parse(parsed.createdAt)) || !parsed.groups || Object.keys(parsed.groups).sort().join(',') !== 'accounts,settings,sshKeys') throw Error('SECURITY_BASELINE_INVALID');
   for (const group of Object.values(parsed.groups)) if (!group || typeof group !== 'object' || Array.isArray(group) || !Object.keys(group).length) throw Error('SECURITY_BASELINE_INVALID');
   return parsed;
 }
 
 export function checkHostSecurity(root = '/') {
   try {
-    const baseline = trustedBaseline(root); const current = collectSecuritySnapshot(root); const markers = [];
+    const baseline = trustedBaseline(root); const current = collectSecuritySnapshot(root, baseline.version); const markers = [];
     for (const [index, group] of ['accounts', 'sshKeys', 'settings'].entries()) {
       if (JSON.stringify(current.groups[group]) !== JSON.stringify(baseline.groups[group])) markers.push(SECURITY_CHANGE_MARKERS[index]);
     }
