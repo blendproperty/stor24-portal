@@ -76,6 +76,43 @@ test('account creation/group changes, default/custom keys and security settings 
   });
 });
 
+test('blank lines are ignored only in authorised-key content', t => {
+  const f = fixture(t);
+  const path = 'root/.ssh/authorized_keys';
+  const web = 'etc/ssh/stor24-keys/web';
+  const hostKey = 'etc/ssh/ssh_host_ed25519_key.pub';
+  const keys = 'from="192.0.2.1" ssh-ed25519 KEY_A comment\nssh-ed25519 KEY_B\n';
+  f.put(path, keys);
+  const baseline = collectSecuritySnapshot(f.root);
+  const legacy = collectSecuritySnapshot(f.root, 1);
+  f.put(path, '\nfrom="192.0.2.1" ssh-ed25519 KEY_A comment\n \t\r\nssh-ed25519 KEY_B\n\n\t');
+  f.put(web, 'ssh-ed25519 FORCED_WEB_KEY\n\n');
+  assert.deepEqual(collectSecuritySnapshot(f.root), baseline);
+  assert.notDeepEqual(collectSecuritySnapshot(f.root, 1), legacy);
+  f.put(path, keys.replace('192.0.2.1', '192.0.2.2'));
+  assert.notEqual(collectSecuritySnapshot(f.root).groups.sshKeys['/' + path].sha256, baseline.groups.sshKeys['/' + path].sha256);
+  f.put(path, keys.replace('ssh-ed25519 KEY_B\n', ''));
+  assert.notEqual(collectSecuritySnapshot(f.root).groups.sshKeys['/' + path].sha256, baseline.groups.sshKeys['/' + path].sha256);
+  f.put(hostKey, 'ssh-ed25519 SERVER_PUBLIC_KEY\n\n');
+  assert.notEqual(collectSecuritySnapshot(f.root).groups.sshKeys['/' + hostKey].sha256, baseline.groups.sshKeys['/' + hostKey].sha256);
+});
+
+test('checker uses the fingerprint rules of the installed baseline version', { skip: !linuxRoot }, t => {
+  const f = fixture(t);
+  const key = 'ssh-ed25519 PRIVATE_PUBLIC_KEY_LABEL\n';
+  const legacy = collectSecuritySnapshot(f.root, 1);
+  initializeSecurityBaseline(f.root);
+  const path = join(f.root, 'var/lib/stor24-security/baseline.json');
+  const v2 = readFileSync(path);
+  assert.equal(JSON.parse(v2).version, 2);
+  f.put('root/.ssh/authorized_keys', key + '\n');
+  assert.deepEqual(checkHostSecurity(f.root), { security: 'success', markers: [] });
+  writeFileSync(path, JSON.stringify({ ...legacy, createdAt: new Date().toISOString() }));
+  assert.deepEqual(checkHostSecurity(f.root), { security: 'failure', markers: ['STOR24_SSH_KEYS_CHANGED'] });
+  f.put('root/.ssh/authorized_keys', key);
+  assert.deepEqual(checkHostSecurity(f.root), { security: 'success', markers: [] });
+});
+
 test('deletion and permissions are detected; recreated identical content clears the finding without changing baseline', { skip: !linuxRoot }, t => {
   const f = fixture(t); const path = join(f.root, 'root/.ssh/authorized_keys'); chmodSync(path, 0o600); initializeSecurityBaseline(f.root);
   chmodSync(path, 0o644); assert.ok(checkHostSecurity(f.root).markers.includes('STOR24_SSH_KEYS_CHANGED'));
