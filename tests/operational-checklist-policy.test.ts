@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { checklistCreateSchema, checklistDates, checklistRows, checklistRecordSchema, validateChecklistSubmission } from "../src/lib/operational-checklist-policy";
+import { checklistCreateSchema, checklistDates, checklistRows, checklistRecordSchema, validateChecklistSubmission, type ChecklistRecord } from "../src/lib/operational-checklist-policy";
 const base = { facilityId: "cm00000000000000000000001", assigneeId: "cm00000000000000000000002", reviewerId: "cm00000000000000000000003", coverId: null, template: "OPENING", startAt: "2026-12-31T22:30:00Z", endAt: "2026-12-31T23:30:00Z", repeat: "DAILY", occurrences: 3, requestKey: randomUUID() };
 test("checklists retain SAST daily/weekly boundaries and reject ambiguous staff or unbounded schedules", () => {
   const input = checklistCreateSchema.parse(base);
@@ -21,7 +21,11 @@ test("submission requires all results, trolley counts, reasons and padlock compa
   assert.throws(() => validateChecklistSubmission(record),/INCOMPLETE/);
   record.rows = record.rows.map(r => ({ ...r,state:"PASS",lockCount:r.label.includes("trolleys")?2:null })); validateChecklistSubmission(record);
   record.rows[0].state="NA";assert.throws(() => validateChecklistSubmission(record),/INCOMPLETE/);record.rows[0].notes="Not installed at this store";validateChecklistSubmission(record);
-  const padlock = { ...record, template: "PADLOCK" as const, rows: [{ ...record.rows[0],expected:"VACANT" as const,state:"OVERLOCKED" as const,lockCount:2,notes:"" }] };
+  const padlock: ChecklistRecord = { ...record, template: "PADLOCK", rows: [{ ...record.rows[0], expected:"VACANT", state:"OVERLOCKED", lockCount:2, notes:"" }] };
   assert.throws(() => validateChecklistSubmission(padlock),/INCOMPLETE/);padlock.rows[0].notes="Found physical overlock; referred to manager";
   assert.throws(() => validateChecklistSubmission(padlock),/COMPARISON/);padlock.comparisonReference="Rent roll and collections reviewed today";validateChecklistSubmission(padlock);
+  padlock.rows = [{ ...padlock.rows[0], expected: "VACANT", state: "VACANT", notes: "", comparisonDiscrepancy: true }];
+  assert.throws(() => validateChecklistSubmission(padlock), /INCOMPLETE/);
+  padlock.rows[0].notes = "Collections list and register disagree";
+  validateChecklistSubmission(padlock);
 });

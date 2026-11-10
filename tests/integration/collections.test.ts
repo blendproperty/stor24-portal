@@ -2,7 +2,9 @@ import { updateArrearsReviewTaskStatus } from "../../src/lib/arrears-review-task
 import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
-import type { Prisma } from "../../src/generated/prisma/client";
+import { build } from "esbuild";
+import { createRequire } from "node:module";
+import { Prisma } from "../../src/generated/prisma/client";
 import { db } from "../../src/lib/db";
 import { collectionsWorkspace, updateCollection, processArrearsReviewSchedules } from "../../src/lib/collections-service";
 import { ARREARS_REVIEW_CURSOR, ARREARS_REVIEW_SCHEDULE } from "../../src/lib/arrears-review-schedule-policy";
@@ -33,6 +35,34 @@ test("isolated PostgreSQL aged collections", async t => {
   const base = async (f: Awaited<ReturnType<typeof fixture>>) => ({ accountId: f.account.id, revision: (await row(f)).revision, requestKey: randomUUID(), note: "CI evidence reference" });
   const terms = async (f: Awaited<ReturnType<typeof fixture>>) => updateCollection(f.scope, { ...await base(f), action: "terms", terms: { dueDays: 0, allocation: "OLDEST_DUE_FIRST", approvalReference: "CI approved agreement", overrides: [] }, confirm: true });
   try {
+    await t.test("print the store calls list with unit numbers and no tenant details", async () => {
+      const f = await fixture(), other = await fixture();
+      await db.user.update({ where: { id: f.user.id }, data: { passwordHash: "synthetic-print-test-only" } });
+      const type = await db.unitType.create({ data: { facilityId: f.facility.id, name: "Print test", areaSqMetres: 5 } });
+      const unit = await db.unit.create({ data: { facilityId: f.facility.id, unitTypeId: type.id, number: "01", monthlyRate: 100 } });
+      const tenancy = await db.tenancy.findFirstOrThrow({ where: { accountId: f.account.id } });
+      await db.occupancy.create({ data: { tenancyId: tenancy.id, unitId: unit.id, monthlyRate: 100, status: "ACTIVE", startDate: tenancy.startDate } });
+      await terms(f);
+      await updateCollection(f.scope, { ...await base(f), action: "follow-up", ownerId: null, nextFollowUp: today, outcome: "PLAN" });
+      const state = { session: { userId: f.user.id, sessionVersion: f.user.sessionVersion, mfaVerified: true } };
+      const output = await build({ entryPoints: ["src/app/api/v1/collections/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "real-collection-guards", setup(b) {
+        b.onResolve({ filter: /^(?:@\/lib\/|\.\/)(db|session)$/ }, a => ({ path: a.path, namespace: "fixture" }));
+        b.onResolve({ filter: /^@\/generated\/prisma\/client$/ }, a => ({ path: a.path, namespace: "fixture" }));
+        b.onLoad({ filter: /.*/, namespace: "fixture" }, a => ({ contents: a.path.endsWith("db") ? "export const db=__db;" : a.path.endsWith("session") ? "export const getSession=async()=>__state.session;" : "export const Prisma=__prisma;" }));
+      } }] });
+      const loaded = { exports: {} as { GET: (request: Request) => Promise<Response> } };
+      new Function("require", "module", "exports", "__db", "__state", "__prisma", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, state, Prisma);
+      const print = (facility: string) => loaded.exports.GET(new Request(`https://example.invalid/api?print=calls&facility=${facility}`));
+      const response = await print(f.facility.id);
+      assert.equal(response.status, 200);
+      assert.match(response.headers.get("cache-control") ?? "", /no-store/);
+      const document = await response.text();
+      assert.match(document, /<th scope="row">01<\/th>/);
+      assert.doesNotMatch(document, /CI formula|COL-CI-/);
+      assert.equal((await print(other.facility.id)).status, 403);
+      await db.role.updateMany({ where: { organisationId: f.org.id }, data: { permissions: ["collections.view"] } });
+      assert.equal((await print(f.facility.id)).status, 403);
+    });
     await t.test("explicit escalation tasks preserve holds, deduplicate open work and require fresh authority", async () => {
       const f = await fixture();
       const request = { ...await base(f), action: "escalation-review-task" as const, target: "FEE" as const, channel: "EMAIL" as const, reviewOn: today, policyReference: "Unapproved policy evidence" };

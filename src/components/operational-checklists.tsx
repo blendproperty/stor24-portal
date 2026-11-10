@@ -5,15 +5,20 @@ import { z } from "zod";
 import Link from "next/link";
 import { PageHeader } from "./page-header";
 import { StatusPill } from "./status-pill";
-import { checklistHref, checklistIssue, checklistRecordSchema, checklistRows, checklistRowSchema, checklistTemplates, type ChecklistTemplate, type ChecklistRow } from "@/lib/operational-checklist-policy";
+import { checklistHref, checklistIssue, checklistRecordSchema, checklistRows, checklistRowSchema, checklistTemplates, padlockMapSchema, type ChecklistTemplate, type ChecklistRow } from "@/lib/operational-checklist-policy";
 import { formatSouthAfricaDateTime, southAfricaDateKey } from "@/lib/south-africa-time";
 import { OperationalChecklistSheet, workbookItemLabel } from "./operational-checklist-sheet";
+import { PadlockCountMap } from "./padlock-count-map";
 import styles from "./operational-checklists.module.css";
+
+function observationInput({ id, state, notes, evidence, lockCount, comparisonDiscrepancy }: ChecklistRow) {
+  return { id, state, notes, evidence, lockCount, comparisonDiscrepancy };
+}
 
 const runStatusLabels: Record<string, string> = { OPEN: "Open", IN_PROGRESS: "In progress", WAITING: "Awaiting review", COMPLETED: "Signed off", CANCELLED: "Cancelled" };
 
 const taskSchema = z.object({ id: z.string(), title: z.string(), facilityId: z.string(), assigneeId: z.string().nullable(), coverId: z.string().nullable(), status: z.string(), startAt: z.string().nullable(), dueAt: z.string().nullable(), updatedAt: z.string(), completedAt: z.string().nullable(), facility: z.object({ name: z.string() }), assignee: z.object({ name: z.string() }).nullable(), cover: z.object({ name: z.string() }).nullable() });
-const responseSchema = z.object({ actorId: z.string(), facilities: z.array(z.object({ id: z.string(), name: z.string() })), managerFacilityIds: z.array(z.string()), staff: z.array(z.object({ id: z.string(), name: z.string(), facilityIds: z.array(z.string()), reviewerFacilityIds: z.array(z.string()), padlockReviewerFacilityIds: z.array(z.string()) })), week: z.array(z.object({ id: z.string(), day: z.number().int().min(0).max(6), name: z.string().nullable(), rows: z.array(checklistRowSchema) })).optional(), tasks: z.array(taskSchema).optional(), nextCursor: z.string().nullable().optional(), task: taskSchema.extend({ operationalChecklist: checklistRecordSchema }).optional() });
+const responseSchema = z.object({ actorId: z.string(), facilities: z.array(z.object({ id: z.string(), name: z.string() })), managerFacilityIds: z.array(z.string()), staff: z.array(z.object({ id: z.string(), name: z.string(), facilityIds: z.array(z.string()), reviewerFacilityIds: z.array(z.string()), padlockReviewerFacilityIds: z.array(z.string()) })), padlockMap: padlockMapSchema.optional(), week: z.array(z.object({ id: z.string(), day: z.number().int().min(0).max(6), name: z.string().nullable(), rows: z.array(checklistRowSchema) })).optional(), tasks: z.array(taskSchema).optional(), nextCursor: z.string().nullable().optional(), task: taskSchema.extend({ operationalChecklist: checklistRecordSchema }).optional() });
 type PageData = z.infer<typeof responseSchema>;
 type Detail = NonNullable<PageData["task"]>;
 type Plan = { template: ChecklistTemplate; facilityId: string; assigneeId: string; coverId: string; reviewerId: string; date: string; start: string; end: string; repeat: "ONCE" | "DAILY" | "WEEKLY"; occurrences: number };
@@ -78,13 +83,26 @@ export function OperationalChecklists({ kind = "checklists" }: { kind?: "checkli
   }
   function act(action: string) {
     if (!task) return;
-    void mutate("PATCH", { id: task.id, expectedUpdatedAt: task.updatedAt, action, ...(["SAVE", "SUBMIT"].includes(action) ? { rows: rows.map(({ id,state,notes,evidence,lockCount }) => ({ id,state,notes,evidence,lockCount })), summary, comparisonReference: reference } : ["APPROVE", "RETURN"].includes(action) ? { note: reviewNote } : action === "ASSIGN" ? { ...assignment, coverId: assignment.coverId || null } : {}) });
+    void mutate("PATCH", { id: task.id, expectedUpdatedAt: task.updatedAt, action, ...(["SAVE", "SUBMIT"].includes(action) ? { rows: rows.map(observationInput), summary, comparisonReference: reference } : ["APPROVE", "RETURN"].includes(action) ? { note: reviewNote } : action === "ASSIGN" ? { ...assignment, coverId: assignment.coverId || null } : {}) });
   }
   function updateRow(id: string, values: Partial<ChecklistRow>) { setRows(old => old.map(r => r.id === id ? { ...r, ...values } : r)); setDirty(true); }
   const disabled = busy || reading || blocked, record = task?.operationalChecklist;
+  const changedUnit = padlocks && record ? rows.find((row, index) => row !== record.rows[index])?.id : undefined;
+  function saveObservation(row: ChecklistRow) {
+    if (!task) return;
+    void mutate("PATCH", {
+      id: task.id, expectedUpdatedAt: task.updatedAt, action: "OBSERVE", row: observationInput(row), summary, comparisonReference: reference,
+    });
+  }
+  function discardObservation() {
+    if (!record) return;
+    setRows(record.rows);
+    setDirty(summary !== record.summary || reference !== record.comparisonReference);
+  }
   const manager = !!task && !!data?.managerFacilityIds.includes(task.facilityId), preparer = !!task && (task.assigneeId === data?.actorId || task.coverId === data?.actorId);
   const editable = preparer && task?.status === "IN_PROGRESS" && !disabled;
   const people = (store: string, reviewers = false) => data?.staff.filter(p => (reviewers ? (padlocks ? p.padlockReviewerFacilityIds : p.reviewerFacilityIds) : p.facilityIds).includes(store)) ?? [];
+  const canPrintWalk = preparer || !!task && people(task.facilityId, true).some(person => person.id === data?.actorId);
   const staffName = (id: string | null) => data?.staff.find(p => p.id === id)?.name ?? id ?? "—";
   const sheetDate = task?.startAt ?? task?.dueAt;
   const sheetRows = !rows.length && record && sheetDate && !padlocks && task?.status === "OPEN" ? checklistRows(record.template, new Date(sheetDate)) : rows;
@@ -94,25 +112,60 @@ export function OperationalChecklists({ kind = "checklists" }: { kind?: "checkli
     .map(row => row.label));
   const issues = rows.filter(r => r.state !== "PENDING" && checklistIssue(r)), pending = rows.filter(r => r.state === "PENDING").length;
   function selectors(store: string, value: typeof assignment, change: (v: typeof assignment) => void) {
-    return <div className="form-grid"><label>{assigneeLabel}<select aria-label={assigneeLabel} required value={value.assigneeId} onChange={e => change({ ...value, assigneeId: e.target.value })}><option value="">Choose staff</option>{people(store).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label><label>Absence cover<select aria-label="Absence cover" value={value.coverId} onChange={e => change({ ...value, coverId: e.target.value })}><option value="">No cover assigned</option>{people(store).filter(p => p.id !== value.assigneeId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label><label>Manager / GM reviewer<select aria-label="Manager / GM reviewer" required value={value.reviewerId} onChange={e => change({ ...value, reviewerId: e.target.value })}><option value="">Choose reviewer</option>{people(store,true).filter(p => p.id !== value.assigneeId && p.id !== value.coverId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label></div>;
+    return <div className={styles.peopleGrid}><label>{assigneeLabel}<select aria-label={assigneeLabel} required value={value.assigneeId} onChange={e => change({ ...value, assigneeId: e.target.value })}><option value="">Choose staff</option>{people(store).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label><label>Absence cover<select aria-label="Absence cover" value={value.coverId} onChange={e => change({ ...value, coverId: e.target.value })}><option value="">No cover assigned</option>{people(store).filter(p => p.id !== value.assigneeId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label><label>Manager / GM reviewer<select aria-label="Manager / GM reviewer" required value={value.reviewerId} onChange={e => change({ ...value, reviewerId: e.target.value })}><option value="">Choose reviewer</option>{people(store,true).filter(p => p.id !== value.assigneeId && p.id !== value.coverId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label></div>;
   }
   return <div className={`page-stack operational-checklist-workspace ${styles.workspace}`}>
-    <PageHeader eyebrow="Operations" title={title} description={padlocks ? "Assigned CSOs count locks unit by unit and submit the sheet for manager review." : "Open a scheduled worksheet for opening, closing, cleaning or management checks."} action={<div className="button-row"><Link className="button button-secondary" href="/operations">Operations centre</Link><Link className="button button-secondary" href={padlocks ? "/operations/checklists" : "/operations/padlocks"} onClick={event => { if (dirty && !window.confirm("Leave this sheet without saving your edits?")) event.preventDefault(); }}>{padlocks ? "Checklists" : "Padlock counts"}</Link></div>}/>
-    <div className="button-row"><button className="button button-secondary" disabled={busy || reading} onClick={reload}>Reload saved records</button>{data?.managerFacilityIds.length ? <button className="button button-primary" disabled={disabled || dirty} onClick={() => { requestKey.current = crypto.randomUUID(); setPlan({ template: padlocks ? "PADLOCK" : "OPENING", facilityId: data.managerFacilityIds[0], assigneeId: "", coverId: "", reviewerId: "", date: southAfricaDateKey(new Date()), start: "08:00", end: "09:00", repeat: "ONCE", occurrences: 1 }); }}>{planLabel}</button> : null}</div>
+    <PageHeader eyebrow="Operations" title={title} description={padlocks ? "Tap each unit on the facility map, record what you see and submit the weekly count for review." : "Open a scheduled worksheet for opening, closing, cleaning or management checks."} action={<div className="button-row"><Link className="button button-secondary" href="/operations">Operations centre</Link><Link className="button button-secondary" href={padlocks ? "/operations/checklists" : "/operations/padlocks"} onClick={event => { if (dirty && !window.confirm("Leave this sheet without saving your edits?")) event.preventDefault(); }}>{padlocks ? "Checklists" : "Padlock counts"}</Link></div>}/>
+    <div className="button-row"><button className="button button-secondary" disabled={busy || reading} onClick={reload}>Reload saved records</button>{data?.managerFacilityIds.length ? <button className="button button-primary" disabled={disabled || dirty} onClick={() => { requestKey.current = crypto.randomUUID(); setPlan({ template: padlocks ? "PADLOCK" : "OPENING", facilityId: data.managerFacilityIds[0], assigneeId: "", coverId: "", reviewerId: "", date: southAfricaDateKey(new Date()), start: "08:00", end: "09:00", repeat: padlocks ? "WEEKLY" : "ONCE", occurrences: 1 }); }}>{planLabel}</button> : null}</div>
     {reading ? <p role="status">Loading saved records…</p> : null}{message ? <p role="alert">{message}</p> : null}
-    {plan && <form aria-label={planLabel} className="panel panel-spacious" onSubmit={e => { e.preventDefault(); void mutate("POST", { facilityId: plan.facilityId, template: plan.template, assigneeId: plan.assigneeId, coverId: plan.coverId || null, reviewerId: plan.reviewerId, startAt: new Date(`${plan.date}T${plan.start}:00+02:00`).toISOString(), endAt: new Date(`${plan.date}T${plan.end}:00+02:00`).toISOString(), repeat: plan.repeat, occurrences: plan.occurrences, requestKey: requestKey.current }); }}>
-      <fieldset disabled={disabled}><legend>{planLabel}</legend><div className="form-grid"><label>Store<select aria-label="Store" value={plan.facilityId} onChange={e => setPlan({ ...plan, facilityId: e.target.value, assigneeId: "", coverId: "", reviewerId: "" })}>{data?.facilities.filter(f => data.managerFacilityIds.includes(f.id)).map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select></label>{!padlocks && <label>Checklist<select aria-label="Checklist" value={plan.template} onChange={e => setPlan({ ...plan, template: e.target.value as ChecklistTemplate, repeat: e.target.value === "PADLOCK" ? "WEEKLY" : "ONCE", occurrences: 1 })}>{Object.entries(checklistTemplates).filter(([key]) => key !== "PADLOCK").map(([key,t]) => <option key={key} value={key}>{t.name}</option>)}</select></label>}<label>First date (SAST)<input required type="date" value={plan.date} onChange={e => setPlan({ ...plan, date: e.target.value })}/></label><label>Start (SAST)<input required type="time" value={plan.start} onChange={e => setPlan({ ...plan, start: e.target.value })}/></label><label>Due (SAST)<input required type="time" value={plan.end} onChange={e => setPlan({ ...plan, end: e.target.value })}/></label><label>Repeat<select aria-label="Repeat" value={plan.repeat} onChange={e => setPlan({ ...plan, repeat: e.target.value as Plan["repeat"], occurrences: 1 })}><option value="ONCE">Once</option>{plan.template !== "PADLOCK" && <option value="DAILY">Daily</option>}<option value="WEEKLY">Weekly</option></select></label><label>Total occurrences<input type="number" min="1" max={plan.repeat === "ONCE" ? 1 : 31} required value={plan.occurrences} onChange={e => setPlan({ ...plan, occurrences: Number(e.target.value) })}/></label></div>
-      {selectors(plan.facilityId,plan,v => setPlan({ ...plan,...v }))}<p>Creates {plan.occurrences} independent run(s), each with the selected staff and due time. The series ends after those occurrences.{!padlocks && " Friday equipment tests and Sunday cleaning are included on their scheduled days."}</p><button className="button button-primary" type="submit">Create planned runs</button></fieldset><button type="button" className="text-button" disabled={busy} onClick={() => setPlan(null)}>Close planner</button>
+    {plan && <form aria-label={planLabel} className={`panel panel-spacious ${styles.planner}`} onSubmit={e => { e.preventDefault(); void mutate("POST", { facilityId: plan.facilityId, template: plan.template, assigneeId: plan.assigneeId, coverId: plan.coverId || null, reviewerId: plan.reviewerId, startAt: new Date(`${plan.date}T${plan.start}:00+02:00`).toISOString(), endAt: new Date(`${plan.date}T${plan.end}:00+02:00`).toISOString(), repeat: plan.repeat, occurrences: plan.occurrences, requestKey: requestKey.current }); }}>
+      <h2>{planLabel}</h2>
+      {padlocks && <p>Schedule the walkthrough and assign the CSO and a separate reviewer. Open the saved run to count from the facility map.</p>}
+      <div className={styles.planGroups}>
+        <fieldset disabled={disabled}>
+          <legend>Store and schedule</legend>
+          <div className={styles.scheduleGrid}>
+            <label className={styles.planStore}>Store<select aria-label="Store" value={plan.facilityId} onChange={e => setPlan({ ...plan, facilityId: e.target.value, assigneeId: "", coverId: "", reviewerId: "" })}>{data?.facilities.filter(f => data.managerFacilityIds.includes(f.id)).map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select></label>
+            {!padlocks && <label className={styles.planStore}>Checklist<select aria-label="Checklist" value={plan.template} onChange={e => setPlan({ ...plan, template: e.target.value as ChecklistTemplate, repeat: "ONCE", occurrences: 1 })}>{Object.entries(checklistTemplates).filter(([key]) => key !== "PADLOCK").map(([key,t]) => <option key={key} value={key}>{t.name}</option>)}</select></label>}
+            <label className={styles.planStore}>First date (SAST)<input required type="date" value={plan.date} onChange={e => setPlan({ ...plan, date: e.target.value })}/></label>
+            <label>Start (SAST)<input required type="time" value={plan.start} onChange={e => setPlan({ ...plan, start: e.target.value })}/></label>
+            <label>Due (SAST)<input required type="time" value={plan.end} onChange={e => setPlan({ ...plan, end: e.target.value })}/></label>
+            <label>Repeat<select aria-label="Repeat" value={plan.repeat} onChange={e => setPlan({ ...plan, repeat: e.target.value as Plan["repeat"], occurrences: 1 })}><option value="ONCE">Once</option>{!padlocks && <option value="DAILY">Daily</option>}<option value="WEEKLY">Weekly</option></select></label>
+            {plan.repeat !== "ONCE" && <label>{padlocks ? "Number of weekly runs" : "Total occurrences"}<input type="number" min="1" max="31" required value={plan.occurrences} onChange={e => setPlan({ ...plan, occurrences: Number(e.target.value) })}/></label>}
+          </div>
+        </fieldset>
+        <fieldset disabled={disabled}>
+          <legend>{padlocks ? "CSO and reviewer" : "Staff and reviewer"}</legend>
+          {selectors(plan.facilityId,plan,v => setPlan({ ...plan,...v }))}
+          {padlocks && <p>Assign the CSO doing the walk. Choose the General Manager or designated manager to assess the report.</p>}
+        </fieldset>
+      </div>
+      <p>{plan.occurrences === 1 ? "Creates one scheduled run." : `Creates ${plan.occurrences} ${plan.repeat === "WEEKLY" ? "weekly" : "daily"} runs, then ends.`}{!padlocks && " Friday equipment tests and Sunday cleaning are included on their scheduled days."}</p>
+      <div className="button-row"><button className="button button-primary" type="submit" disabled={disabled}>Create planned runs</button><button type="button" className="button button-secondary" disabled={busy} onClick={() => setPlan(null)}>Close planner</button></div>
     </form>}
     {task && record ? <section className="panel panel-spacious" aria-label={padlocks ? "Padlock count record" : "Checklist record"}>
-      <div className="panel-heading"><div><h2>{task.title}</h2><p>{task.facility.name} · {task.status.replaceAll("_"," ")} · Due {formatSouthAfricaDateTime(task.dueAt)} SAST</p></div><button className="text-button" disabled={busy || dirty} onClick={() => void read({ facilityId: facility,closed })}>Back to runs</button></div>
+      <div className="panel-heading"><div><h2>{task.title}</h2><p>{task.facility.name} · {runStatusLabels[task.status] ?? task.status} · Due {formatSouthAfricaDateTime(task.dueAt)} SAST</p></div><button className="text-button" disabled={busy || dirty} onClick={() => void read({ facilityId: facility,closed })}>Back to runs</button></div>
       <p>{padlocks ? "Counting CSO / staff" : "Responsible"}: {task.assignee?.name ?? "—"} · Cover: {task.cover?.name ?? "None"} · Reviewer: {staffName(record.reviewerId)}</p>
       {task.dueAt && new Date(task.dueAt) < new Date() && !["COMPLETED","CANCELLED"].includes(task.status) && <p role="status">Overdue — this run still needs completion or review.</p>}
-      {record.sourceAt && <p>Inspection list captured {formatSouthAfricaDateTime(record.sourceAt)} SAST. {rows.length - pending}/{rows.length} checked · {issues.length} finding(s){record.template === "PADLOCK" ? ` · ${rows.reduce((n,r) => n + (r.lockCount ?? 0),0)} locks counted` : ""}.</p>}
-      {record.template === "PADLOCK" && <p>Compare each unit with the rent roll and the collections list. An open overlock task is a review flag, not approval to restrict access. Findings remain for manager action after sign-off.</p>}
+      {!padlocks && record.sourceAt && <p>Inspection list captured {formatSouthAfricaDateTime(record.sourceAt)} SAST. {rows.length - pending}/{rows.length} checked · {issues.length} finding(s).</p>}
+      {padlocks && <>
+        {task.status === "OPEN" && (preparer ? <button className="button button-primary" disabled={disabled} onClick={() => act("START")}>Start padlock count</button> : <p role="status">Waiting for {task.assignee?.name ?? "the assigned CSO"} to start the count.</p>)}
+        {(task.status !== "CANCELLED" || rows.length > 0) && <PadlockCountMap key={task.id}
+          layout={data?.padlockMap} rows={rows} saved={record.rows} changedUnit={changedUnit} editable={editable} disabled={disabled}
+          date={record.sourceAt ?? sheetDate ?? null} operator={staffName(record.submittedBy ?? (preparer ? data?.actorId ?? null : task.assigneeId))}
+          store={task.facility.name} update={updateRow} save={saveObservation} discard={discardObservation}/>}
+        {task.status !== "CANCELLED" && <details className={styles.padlockReports}>
+          <summary>Rent roll and collections references</summary>
+          <p>Compare the count with the store’s rent roll and collections calls list before submitting. Ask the reviewer for the calls list if you lack export access.</p>
+          <div className="button-row">
+            {canPrintWalk && <a className="button button-secondary" href={`/api/v1/operations/checklists?id=${encodeURIComponent(task.id)}&print=walkthrough`} target="_blank" rel="noreferrer">Open printable rent roll</a>}
+            <a className="button button-secondary" href={`/collections?facility=${encodeURIComponent(task.facilityId)}&mode=follow-up`} target="_blank" rel="noreferrer">Open collections calls list</a>
+          </div>
+        </details>}
+      </>}
       {record.reviewNote && <p><strong>Reviewer feedback:</strong> {record.reviewNote}</p>}
-      {preparer && task.status === "OPEN" && <button className="button button-primary" disabled={disabled} onClick={() => act("START")}>Start inspection</button>}
-      {sheetDate && sheetRows.length > 0 && <>
+      {!padlocks && preparer && task.status === "OPEN" && <button className="button button-primary" disabled={disabled} onClick={() => act("START")}>Start inspection</button>}
+      {!padlocks && sheetDate && sheetRows.length > 0 && <>
         {rows.length > 0 && <div className={styles.sheetFilters}><label>Find item or unit<input value={search} onChange={e => setSearch(e.target.value)}/></label><label><input type="checkbox" checked={onlyIssues} onChange={e => setOnlyIssues(e.target.checked)}/> Show findings only</label></div>}
         <OperationalChecklistSheet
           rows={sheetRows.filter(row => visibleLabels.has(row.label))}
@@ -120,10 +173,19 @@ export function OperationalChecklists({ kind = "checklists" }: { kind?: "checkli
           startAt={sheetDate} assignee={task.assignee?.name ?? null} template={record.template} editable={editable} canSwitch={!disabled}
           update={updateRow} openDay={id => { if (!dirty || window.confirm("Open the other day without saving your edits?")) { setSearch(""); setOnlyIssues(false); void read({ id }); } }} />
       </>}
+      {padlocks && sheetDate && record.rows.length > 0 && <details className={styles.padlockReports}>
+        <summary>View saved count report</summary>
+        <div className={styles.sheetFilters}>
+          <label>Filter saved report<input value={search} onChange={event => setSearch(event.target.value)}/></label>
+          <label><input type="checkbox" checked={onlyIssues} onChange={event => setOnlyIssues(event.target.checked)}/> Show findings only</label>
+        </div>
+        <OperationalChecklistSheet rows={record.rows.filter(row => row.label.toLowerCase().includes(search.toLowerCase()) && (!onlyIssues || row.state !== "PENDING" && checklistIssue(row)))} week={[]} startAt={sheetDate} assignee={task.assignee?.name ?? null}
+          template="PADLOCK" editable={false} canSwitch={false} update={updateRow} openDay={() => {}}/>
+      </details>}
       {rows.length > 0 && <>
-      {record.template === "PADLOCK" && <label>Rent roll and collections comparison reference<textarea disabled={!editable} maxLength={1000} value={reference} onChange={e => { setReference(e.target.value); setDirty(true); }}/></label>}
+      {record.template === "PADLOCK" && <label>Rent roll and collections comparison reference<textarea placeholder="Enter the dates or references of both lists." disabled={!editable} maxLength={1000} value={reference} onChange={e => { setReference(e.target.value); setDirty(true); }}/></label>}
       <label>Summary and escalation to reviewer<textarea disabled={!editable} maxLength={2000} value={summary} onChange={e => { setSummary(e.target.value); setDirty(true); }}/></label>
-      {preparer && task.status === "IN_PROGRESS" && <div className="button-row"><button className="button button-secondary" disabled={disabled} onClick={() => act("SAVE")}>Save progress</button><button className="button button-primary" disabled={disabled || pending > 0} onClick={() => act("SUBMIT")}>Submit for manager review</button>{record.template === "PADLOCK" && <button className="text-button" disabled={disabled} onClick={() => { if (window.confirm("Restart with current units? All recorded results in this draft will be cleared; audit history is retained.")) act("RESTART"); }}>Restart with current units</button>}</div>}
+      {preparer && task.status === "IN_PROGRESS" && <div className="button-row"><button className="button button-secondary" disabled={disabled || !!changedUnit} onClick={() => act("SAVE")}>Save progress</button><button className="button button-primary" disabled={disabled || pending > 0 || !!changedUnit} onClick={() => act("SUBMIT")}>Submit for manager review</button>{record.template === "PADLOCK" && <button className="text-button" disabled={disabled} onClick={() => { if (window.confirm("Restart with current units? All recorded results in this draft will be cleared; audit history is retained.")) act("RESTART"); }}>Restart with current units</button>}</div>}
       </>}
       {record.submittedAt && <p>Submitted by {staffName(record.submittedBy)} · {formatSouthAfricaDateTime(record.submittedAt)} SAST</p>}
       {task.status === "WAITING" && manager && (!padlocks || people(task.facilityId, true).some(person => person.id === data?.actorId)) && record.reviewerId === data?.actorId && record.submittedBy !== data?.actorId && <fieldset disabled={disabled}><legend>Manager review</legend><p>Confirm the findings, evidence and escalation. Sign-off records review; it does not resolve a fault or perform overlocking.</p><label>Review and action note<textarea value={reviewNote} onChange={e => setReviewNote(e.target.value)} minLength={5} maxLength={2000}/></label><div className="button-row"><button className="button button-primary" disabled={reviewNote.trim().length < 5} onClick={() => act("APPROVE")}>Sign off review</button><button className="button button-secondary" disabled={reviewNote.trim().length < 5} onClick={() => act("RETURN")}>Return for correction</button></div></fieldset>}
