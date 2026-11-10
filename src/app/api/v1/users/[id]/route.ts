@@ -27,7 +27,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const facility = parsed.data.facilityCode ? await db.facility.findUnique({ where: { organisationId_code: { organisationId: target.organisationId, code: parsed.data.facilityCode } } }) : null;
   if (parsed.data.facilityCode && !facility) return Response.json({ error: { message: "Choose a valid facility." } }, { status: 422 });
   await db.$transaction(async (tx) => {
-    if (parsed.data.active !== undefined) await tx.user.update({ where: { id }, data: { active: parsed.data.active, sessionVersion: { increment: 1 } } });
+    if (parsed.data.active !== undefined) {
+      await tx.user.update({ where: { id }, data: { active: parsed.data.active, sessionVersion: { increment: 1 } } });
+      if (!parsed.data.active) await tx.passwordResetToken.updateMany({ where: { userId: id, usedAt: null }, data: { usedAt: new Date() } });
+    }
     if (role) { await tx.roleAssignment.deleteMany({ where: { userId: id } }); await tx.roleAssignment.create({ data: { userId: id, roleId: role.id, facilityId: facility?.id } }); await tx.user.update({ where: { id }, data: { sessionVersion: { increment: 1 } } }); }
     await tx.auditEvent.create({ data: { organisationId: target.organisationId, actorId: actor.user.id, action: "user.access.updated", entityType: "User", entityId: id, before: { active: target.active }, after: parsed.data } });
   });

@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { requireOwner, authErrorResponse } from "@/lib/auth-guards";
 import { createResetToken, hashResetToken } from "@/lib/password-reset";
+import { currentRoleAccess } from "@/lib/current-role-access";
 import { sameOrigin } from "@/lib/request-security";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -12,6 +13,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const token = createResetToken();
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
     const result = await db.$transaction(async tx => {
+      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${actor.user.id} FOR UPDATE`;
+      const currentActor = await tx.user.findUnique({ where: { id: actor.user.id }, include: { roleAssignments: { include: { role: true } } } });
+      if (!currentActor?.active || !currentActor.passwordHash || currentActor.sessionVersion !== actor.user.sessionVersion || !currentRoleAccess(currentActor.roleAssignments).owner) throw new Error("FORBIDDEN");
       const target = await tx.user.findFirst({ where: { id, organisationId: actor.user.organisationId, active: true } });
       if (!target) return false;
       const changed = await tx.user.updateMany({ where: { id, organisationId: actor.user.organisationId, active: true, sessionVersion: target.sessionVersion }, data: { passwordHash: null, sessionVersion: { increment: 1 } } });

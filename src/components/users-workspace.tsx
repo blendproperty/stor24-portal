@@ -64,6 +64,8 @@ export function UsersWorkspace() {
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [resetUser, setResetUser] = useState<UserRow | null>(null);
+  const [removalUser, setRemovalUser] = useState<UserRow | null>(null);
+  const [showInactive, setShowInactive] = useState(false);
   const [temporaryPassword, setTemporaryPassword] = useState("");
   const [permissionUser, setPermissionUser] = useState<UserRow | null>(null);
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
@@ -146,17 +148,23 @@ export function UsersWorkspace() {
     changes: { active?: boolean; roleName?: string },
   ) {
     setError("");
-    const response = await fetch(`/api/v1/users/${id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(changes),
-    });
-    if (!response.ok) {
-      const payload = await response.json();
-      setError(payload.error?.message ?? "The user could not be updated.");
-      return;
+    setNotice("");
+    try {
+      const response = await fetch(`/api/v1/users/${id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(changes),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        setError(payload?.error?.message ?? "The user could not be updated. Please refresh and try again.");
+        return;
+      }
+      await load();
+      if (changes.active !== undefined) setNotice(changes.active ? "User reactivated." : "User deactivated. Their existing sessions have been signed out; their history is retained.");
+    } catch {
+      setError("The result is uncertain. Refresh the user list to check the status before trying again.");
     }
-    await load();
   }
 
   async function resetPassword() {
@@ -287,6 +295,7 @@ export function UsersWorkspace() {
             <Search size={16} />
             <input placeholder="Search users, roles or facilitiesâ€¦" />
           </label>
+          <label><input type="checkbox" checked={showInactive} onChange={event => setShowInactive(event.target.checked)} /> Show removed users</label>
           <span>
             <UserCog size={16} /> Database-backed access
           </span>
@@ -304,7 +313,7 @@ export function UsersWorkspace() {
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
+              {users.filter(user => showInactive || user.active !== false).map((user) => (
                 <tr key={user.email}>
                   <td className="primary-cell">
                     {user.name}
@@ -357,11 +366,9 @@ export function UsersWorkspace() {
                             ? "text-button"
                             : "text-button text-button-danger"
                         }
-                        onClick={() =>
-                          updateUser(user.id, { active: user.active === false })
-                        }
+                        onClick={() => user.active === false ? updateUser(user.id, { active: true }) : setRemovalUser(user)}
                       >
-                        {user.active === false ? "Reactivate" : "Deactivate"}
+                        {user.active === false ? "Reactivate" : "Remove user"}
                       </button>
                     </div>
                   </td>
@@ -498,9 +505,15 @@ export function UsersWorkspace() {
           </div>
         </div>
       ) : null}
+      {removalUser ? <div className="modal-backdrop" role="presentation"><div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="removal-title">
+        <h2 id="removal-title">Remove {removalUser.name}?</h2>
+        <p>Their access will be deactivated and their existing sessions signed out. Their history is retained, and you can reactivate them using Show removed users.</p>
+        <button className="button button-primary" onClick={() => { const id = removalUser.id; setRemovalUser(null); void updateUser(id, { active: false }); }}>Remove user</button>
+        <button className="button button-secondary" onClick={() => setRemovalUser(null)}>Cancel</button>
+      </div></div> : null}
       {resetUser ? <div className="modal-backdrop" role="presentation"><div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="reset-title">
         <h2 id="reset-title">Reset password for {resetUser.name}</h2>
-        {temporaryPassword ? <><p>Send this temporary password privately to {resetUser.name}. It expires in 30 minutes and is shown only here. They must choose a new password and complete their existing two-step verification.</p><p style={{ overflowWrap: "anywhere" }}><strong>{temporaryPassword}</strong></p></> : <><p>This signs the user out and disables their current password immediately. A temporary password will be shown once and expires in 30 minutes.</p><button className="button button-primary" disabled={busy} onClick={resetPassword}>{busy ? "Creating…" : "Create temporary password"}</button></>}
+        {temporaryPassword ? <><p>Send this temporary password privately to {resetUser.name}. It expires in 30 minutes and is shown only here. They must choose a new password and complete their existing two-step verification.</p><p style={{ overflowWrap: "anywhere" }}><strong>{temporaryPassword}</strong></p></> : <><p>This signs the user out and disables their current password immediately. A temporary password will be shown once and expires in 30 minutes.</p><button className="button button-primary" disabled={busy} onClick={resetPassword}>{busy ? "Creating..." : "Create temporary password"}</button></>}
         {error ? <p className="form-error" role="alert">{error}</p> : null}<button className="button button-secondary" disabled={busy} onClick={() => { setResetUser(null); setTemporaryPassword(""); setError(""); }}>Close</button>
       </div></div> : null}
       {permissionUser ? (

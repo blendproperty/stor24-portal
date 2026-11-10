@@ -14,7 +14,9 @@ import { mfaRequest } from "../helpers/mfa-routes-fixture";
   const key = randomUUID();
   const org = await db.organisation.create({ data: { name: "Temporary password CI", slug: key } });
   const user = await db.user.create({ data: { organisationId: org.id, name: "Test", email: `${key}@example.invalid`, passwordHash: await hash("Old-Synthetic-Password-2026!", 4) } });
-  const actor = await db.user.create({ data: { organisationId: org.id, name: "Owner", email: `owner-${key}@example.invalid` } });
+  const actor = await db.user.create({ data: { organisationId: org.id, name: "Owner", email: `owner-${key}@example.invalid`, passwordHash: await hash("Owner-Synthetic-Password-2026!", 4) } });
+  const role = await db.role.create({ data: { organisationId: org.id, name: "Organisation owner", permissions: ["*"] } });
+  await db.roleAssignment.create({ data: { userId: actor.id, roleId: role.id } });
   const output = await build({ entryPoints: ["src/app/api/v1/users/[id]/temporary-password/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "fixture", setup(b) {
     b.onResolve({ filter: /^@\/lib\/(db|auth-guards)$/ }, a => ({ path: a.path, namespace: "fixture" }));
     b.onLoad({ filter: /.*/, namespace: "fixture" }, a => ({ contents: a.path.endsWith("/db") ? "export const db=__db;" : "export const requireOwner=async()=>__actor;export const authErrorResponse=()=>new Response(null,{status:403});" }));
