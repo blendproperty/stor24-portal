@@ -83,13 +83,16 @@
 .queueFilters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem 1rem; max-width: 42rem; }
 .queueFilters select { width: 100%; min-width: 0; }
 .runList { list-style: none; margin: 0; padding: 0; }
-.queue .run { grid-template-columns: minmax(0, 1fr) minmax(0, 14rem) auto; gap: .65rem 1.25rem; }
+.workspace .queue .run { grid-template-columns: minmax(0, 1fr) minmax(0, 14rem) auto; gap: .65rem 1.25rem; padding-block: .875rem; }
 .runDetails, .runTiming { min-width: 0; }
 .runDetails strong { overflow-wrap: anywhere; }
 .runDetails p, .runTiming p { margin: .25rem 0 0; color: var(--muted, #52616a); }
 .runStatus { display: flex; flex-wrap: wrap; gap: .3rem; }
 .queue .run > button, .queue > button { justify-self: start; width: auto; }
 @media (max-width: 600px) {
-  .queueFilters, .queue .run { grid-template-columns: minmax(0, 1fr); }
+  .queueFilters { grid-template-columns: minmax(0, 1fr); }
+  .workspace .queue .run { grid-template-columns: minmax(0, 1fr) auto; column-gap: .75rem; }
+  .runDetails { grid-column: 1 / -1; }
+  .queue .run > button { align-self: end; }
 }
 @media (max-width: 600px) { .workspace fieldset { padding: .65rem; } .workspace :global(.form-grid) { grid-template-columns: minmax(0, 1fr); } }

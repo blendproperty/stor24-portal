@@ -7855,3 +7855,5 @@ Validation follow-up: the project typecheck and targeted ESLint for the candidat
 - **Commit, push and merge:** Candidate on codex/operations-run-list-layout, based on main 44025fc0. Hosted checks and merge remain pending at this entry.
 - **Deployment and live verification:** The list correction awaits its own deployment and readback. Prior checklist and padlock releases and their evidence are recorded above.
 - **Open acceptance:** Faeez/business approval, real CSO count, manager review, physical counts, training and staff/device acceptance remain open. Existing finance, privacy, provider and physical access gates remain open as recorded above.
+
+- **Hosted test follow-up:** CI 42755530016 caught a 217.8px tall queue row at 320px on Linux. The phone layout now keeps the action next to the status and due date beneath the details, reducing vertical space. The regression waits for the actual font before measuring and checks the details height separately. All three local browser sizes passed again. Fresh hosted qualification is required.

@@ -50,15 +50,16 @@ try {for(const width of [1440,390,320]) {
     await expect(open).toBeEnabled();
     const row = page.locator(".work-row").filter({ hasText: title });
     await expect(row).toBeVisible();
+    await page.evaluate(() => document.fonts.ready.then(() => true));
     const size = await row.evaluate(element => {
       const details = element.firstElementChild.getBoundingClientRect();
       const action = element.querySelector("button").getBoundingClientRect();
       const bounds = element.getBoundingClientRect();
-      return { detailWidth: details.width, actionWidth: action.width, rowWidth: bounds.width, height: bounds.height, actionRight: action.right, rowRight: bounds.right };
+      return { detailWidth: details.width, detailHeight: details.height, actionWidth: action.width, rowWidth: bounds.width, height: bounds.height, actionRight: action.right, rowRight: bounds.right };
     });
     assert.ok(size.detailWidth >= size.rowWidth * .5, `${screen} at ${width}px: run details were squeezed to ${size.detailWidth}px`);
     assert.ok(size.actionWidth < 190 && size.actionRight <= size.rowRight + 1, `${screen} at ${width}px: open action overflowed or filled the row`);
-    assert.ok(size.height < 210, `${screen} at ${width}px: saved run was ${size.height}px tall`);
+    assert.ok(size.detailHeight < 100 && size.height < (width > 600 ? 140 : 230), `${screen} at ${width}px: saved run was ${size.height}px tall`);
     const storeFilter = await page.getByLabel("Store filter", { exact: true }).boundingBox();
     const statusFilter = await page.getByLabel("Run status", { exact: true }).boundingBox();
     assert.ok(width > 600 ? Math.abs(storeFilter.y - statusFilter.y) < 2 : statusFilter.y > storeFilter.y);
