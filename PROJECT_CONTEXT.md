@@ -7846,3 +7846,11 @@ Validation follow-up: the project typecheck and targeted ESLint for the candidat
 - **Outstanding:** All PRIV-01-11 and P14 acceptance remain open, including legal notice and biometric decisions, approved retention, provider/device and backup deletion, processor agreements, privacy-request rehearsal, actual public tracking/withdrawal assessment, incident readiness and staff/customer/device UAT. Preserve all existing provider, finance, data, training, recovery and business approval gates.
 
 - **Commit and push update:** Source and review committed as `7bde2ada` and pushed to `codex/gapp-review-20261110`; this receipt is a follow-up. Merge, deployment and live verification remain pending.
+
+
+### 2026-11-10 - Website tracking and consent follow-up
+
+- **Implementation:** Website repository candidate `0383703` on `codex/gapp-live-audit-20261110` removes Clarity `_cltk` session storage when consent is absent or denied. The website tracking audit documents bounded live observations and remaining work. No CRM runtime change in this follow-up; earlier reset-log candidate remains separate.
+- **Testing:** Website candidate passed twelve focused synthetic tests, one local Clarity browser test and scoped lint. Live fresh browser checks observed no Google/Meta/Clarity traffic before choice or after rejection and reload; accepting loaded those providers. Withdrawal left `_cltk` and two Clarity POSTs occurred during the transition; contents and cause were not verified. No booking or enquiry submitted.
+- **Commit and push:** Website candidate and receipt pushed; this CRM context update pending at this entry. **Merge:** none for these candidates. **Deployment and configuration:** none. **Live production verification:** existing website behaviour observed; website cleanup and CRM reset-log fixes not verified live.
+- **Outstanding:** PRIV-09 and all privacy/P14 acceptance remain open, including provider transition investigation, legal/notice/retention, provider and backup deletion, privacy-request rehearsal, supported-browser and cross-tab validation, UAT, training, recovery and business approval.
