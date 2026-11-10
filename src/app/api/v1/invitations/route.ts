@@ -91,7 +91,7 @@ export async function POST(request: Request) {
   ]);
 
   if (existingUser) {
-    return Response.json({ error: { code: "USER_EXISTS", message: "This email already belongs to an active user." } }, { status: 409 });
+    return Response.json({ error: { code: "USER_EXISTS", message: "This email already belongs to a user account. Delete that account before inviting this email again." } }, { status: 409 });
   }
   if (existingInvitation) {
     return Response.json({ error: { code: "INVITATION_EXISTS", message: "A pending invitation already exists for this email." } }, { status: 409 });

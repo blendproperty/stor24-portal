@@ -2342,3 +2342,13 @@ model PriceApprovalChallenge {
   @@index([organisationId, requestedById, createdAt])
   @@index([expiresAt])
 }
+
+// Opaque IDs prevent stale writers from relinking a deleted staff account.
+model DeletedStaffIdentity {
+  id String @id
+}
+
+model StaffDeletionFence {
+  id Int @id
+  generation Int @default(0)
+}
