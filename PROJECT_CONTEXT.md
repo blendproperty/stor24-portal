@@ -1,3 +1,9 @@
+## 2026-11-10 — Bounded deletion reference checks (draft)
+
+- Implementation: A stress test exposed excessive work when a structured field contains a long alphanumeric string. The candidate now checks retained opaque identifiers directly rather than generating every possible overlapping substring. The database migration remains atomic with a bounded lock wait.
+- Testing: The previous isolated tests passed, but this revision requires renewed tests and CI. Synthetic workload checks do not establish production capacity.
+- Commit and push: See draft branch history. Merge: Not merged. Deployment and configuration: Not deployed. Live production verification: Not performed. No account has been removed or invited; existing operational and acceptance gates remain open.
+
 ## 2026-11-10 — Deletion fence embedded-ID correction (draft)
 
 - Implementation: The draft fence now checks overlapping IDs embedded in longer alphanumeric strings. Its migration is transactional with a bounded lock wait, so a failed migration cannot leave a partially installed guard.
