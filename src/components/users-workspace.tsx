@@ -167,6 +167,20 @@ export function UsersWorkspace() {
     }
   }
 
+  async function deleteUser() {
+    if (!removalUser) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const response = await fetch(`/api/v1/users/${removalUser.id}/permanent-delete`, { method: "DELETE", cache: "no-store" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) { setError(payload?.error?.message ?? "The user could not be deleted."); return; }
+      setRemovalUser(null);
+      await load();
+      setNotice("User permanently deleted. Their email can be invited again.");
+    } catch { setError("The result is uncertain. Refresh the user list to check before trying again."); }
+    finally { setBusy(false); }
+  }
+
   async function resetPassword() {
     if (!resetUser) return;
     setBusy(true); setError("");
@@ -225,7 +239,7 @@ export function UsersWorkspace() {
           </button>
         }
       />
-      {error && !open && !permissionUser ? <p className="form-error" role="alert">{error}</p> : null}
+      {error && !open && !permissionUser && !removalUser ? <p className="form-error" role="alert">{error}</p> : null}
       {notice ? <p role="status">{notice}</p> : null}
       <section className="summary-strip">
         {[
@@ -295,7 +309,7 @@ export function UsersWorkspace() {
             <Search size={16} />
             <input placeholder="Search users, roles or facilities…" />
           </label>
-          <label><input type="checkbox" checked={showInactive} onChange={event => setShowInactive(event.target.checked)} /> Show removed users</label>
+          <label><input type="checkbox" checked={showInactive} onChange={event => setShowInactive(event.target.checked)} /> Show inactive users</label>
           <span>
             <UserCog size={16} /> Database-backed access
           </span>
@@ -366,10 +380,11 @@ export function UsersWorkspace() {
                             ? "text-button"
                             : "text-button text-button-danger"
                         }
-                        onClick={() => user.active === false ? updateUser(user.id, { active: true }) : setRemovalUser(user)}
+                        onClick={() => updateUser(user.id, { active: user.active === false })}
                       >
-                        {user.active === false ? "Reactivate" : "Remove user"}
+                        {user.active === false ? "Reactivate" : "Deactivate"}
                       </button>
+                      <button className="text-button text-button-danger" onClick={() => { setError(""); setRemovalUser(user); }}>Delete user</button>
                     </div>
                   </td>
                 </tr>
@@ -506,10 +521,11 @@ export function UsersWorkspace() {
         </div>
       ) : null}
       {removalUser ? <div className="modal-backdrop" role="presentation"><div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="removal-title">
-        <h2 id="removal-title">Remove {removalUser.name}?</h2>
-        <p>Their access will be deactivated and their existing sessions signed out. Their history is retained, and you can reactivate them using Show removed users.</p>
-        <button className="button button-primary" onClick={() => { const id = removalUser.id; setRemovalUser(null); void updateUser(id, { active: false }); }}>Remove user</button>
-        <button className="button button-secondary" onClick={() => setRemovalUser(null)}>Cancel</button>
+        <h2 id="removal-title">Permanently delete {removalUser.name}?</h2>
+        <p>This permanently deletes the account, credentials and access, and frees {removalUser.email} for a new invitation. This cannot be undone. Deletion is blocked if business records are still linked to the user. Existing audit entries remain, but their user link is removed.</p>
+        {error ? <p className="form-error" role="alert">{error}</p> : null}
+        <button className="button button-primary" disabled={busy} onClick={deleteUser}>{busy ? "Deleting..." : "Permanently delete user"}</button>
+        <button className="button button-secondary" disabled={busy} onClick={() => { setRemovalUser(null); setError(""); }}>Cancel</button>
       </div></div> : null}
       {resetUser ? <div className="modal-backdrop" role="presentation"><div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="reset-title">
         <h2 id="reset-title">Reset password for {resetUser.name}</h2>

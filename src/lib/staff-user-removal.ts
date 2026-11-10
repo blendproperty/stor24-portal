@@ -1,0 +1,51 @@
+import type { Prisma } from "@/generated/prisma/client";
+
+// Block deletion for staff references, including legacy IDs without database foreign keys.
+export async function userRemovalDependencies(tx: Prisma.TransactionClient, userId: string) {
+  const matches = await Promise.all([
+    tx.lead.findFirst({ where: { assignedToId: userId }, select: { id: true } }),
+    tx.reservationPriceAmendment.findFirst({ where: { OR: [{ proposedById: userId }, { reviewedById: userId }] }, select: { id: true } }),
+    tx.biometricEnrollment.findFirst({ where: { consentRecordedById: userId }, select: { id: true } }),
+    tx.integrationIdentityLink.findFirst({ where: { resolvedById: userId }, select: { id: true } }),
+    tx.accessDecision.findFirst({ where: { requestedById: userId }, select: { id: true } }),
+    tx.insuranceEnrollment.findFirst({ where: { createdById: userId }, select: { id: true } }),
+    tx.facialPhotoSubmission.findFirst({ where: { reviewedById: userId }, select: { id: true } }),
+    tx.legacyAccessPhoto.findFirst({ where: { reviewedById: userId }, select: { id: true } }),
+    tx.additionalAccessPerson.findFirst({ where: { reviewedById: userId }, select: { id: true } }),
+    tx.collectionCase.findFirst({ where: { ownerId: userId }, select: { id: true } }),
+    tx.collectionActivity.findFirst({ where: { actorId: userId }, select: { id: true } }),
+    tx.collectionPromise.findFirst({ where: { createdById: userId }, select: { id: true } }),
+    tx.receiptReallocation.findFirst({ where: { OR: [{ requestedById: userId }, { reviewedById: userId }, { postedById: userId }] }, select: { id: true } }),
+    tx.financialAdjustment.findFirst({ where: { OR: [{ requestedById: userId }, { reviewedById: userId }, { postedById: userId }] }, select: { id: true } }),
+    tx.debitOrderRun.findFirst({ where: { createdById: userId }, select: { id: true } }),
+    tx.ledgerEntry.findFirst({ where: { createdById: userId }, select: { id: true } }),
+    tx.settlementStatement.findFirst({ where: { OR: [{ importedById: userId }, { editedById: userId }, { approvedById: userId }] }, select: { id: true } }),
+    tx.settlementLine.findFirst({ where: { resolvedById: userId }, select: { id: true } }),
+    tx.settlementBankImport.findFirst({ where: { importedById: userId }, select: { id: true } }),
+    tx.settlementBalanceObservation.findFirst({ where: { recordedById: userId }, select: { id: true } }),
+    tx.task.findFirst({ where: { OR: [{ assigneeId: userId }, { createdById: userId }, { coverId: userId }] }, select: { id: true } }),
+    tx.staffOperationalAcknowledgement.findFirst({ where: { userId: userId }, select: { id: true } }),
+    tx.arrivalHandover.findFirst({ where: { OR: [{ ownerId: userId }, { coverId: userId }] }, select: { id: true } }),
+    tx.unitNote.findFirst({ where: { authorId: userId }, select: { id: true } }),
+    tx.maintenanceRequest.findFirst({ where: { assignedToId: userId }, select: { id: true } }),
+    tx.stockMovement.findFirst({ where: { createdById: userId }, select: { id: true } }),
+    tx.dailyClose.findFirst({ where: { closedById: userId }, select: { id: true } }),
+    tx.savedReport.findFirst({ where: { ownerId: userId }, select: { id: true } }),
+    tx.reportHistoryImport.findFirst({ where: { importedById: userId }, select: { id: true } }),
+    tx.reportRun.findFirst({ where: { requestedById: userId }, select: { id: true } }),
+    tx.identityDocument.findFirst({ where: { reviewedById: userId }, select: { id: true } }),
+    tx.moveInTrainingControl.findFirst({ where: { controllerUserId: userId }, select: { controllerUserId: true } }),
+    tx.moveInTrainingRun.findFirst({ where: { userId: userId }, select: { id: true } }),
+    tx.facialPhotoControl.findFirst({ where: { controllerUserId: userId }, select: { controllerUserId: true } }),
+    tx.marketingActivity.findFirst({ where: { createdById: userId }, select: { id: true } }),
+    tx.walkInVisit.findFirst({ where: { createdById: userId }, select: { id: true } }),
+    tx.customerNote.findFirst({ where: { authorId: userId }, select: { id: true } }),
+    tx.unidentifiedReceiptIntake.findFirst({ where: { capturedById: userId }, select: { id: true } }),
+    tx.unidentifiedReceiptMatchProposal.findFirst({ where: { OR: [{ proposedById: userId }, { reviewedById: userId }] }, select: { id: true } }),
+    tx.receiptBankSourceProfile.findFirst({ where: { OR: [{ requestedById: userId }, { reviewedById: userId }] }, select: { id: true } }),
+    tx.receiptImportPosting.findFirst({ where: { postedById: userId }, select: { id: true } }),
+    tx.priceApprovalChallenge.findFirst({ where: { OR: [{ requestedById: userId }, { approverId: userId }] }, select: { id: true } }),
+  ]);
+  const names = ["Lead", "ReservationPriceAmendment", "BiometricEnrollment", "IntegrationIdentityLink", "AccessDecision", "InsuranceEnrollment", "FacialPhotoSubmission", "LegacyAccessPhoto", "AdditionalAccessPerson", "CollectionCase", "CollectionActivity", "CollectionPromise", "ReceiptReallocation", "FinancialAdjustment", "DebitOrderRun", "LedgerEntry", "SettlementStatement", "SettlementLine", "SettlementBankImport", "SettlementBalanceObservation", "Task", "StaffOperationalAcknowledgement", "ArrivalHandover", "UnitNote", "MaintenanceRequest", "StockMovement", "DailyClose", "SavedReport", "ReportHistoryImport", "ReportRun", "IdentityDocument", "MoveInTrainingControl", "MoveInTrainingRun", "FacialPhotoControl", "MarketingActivity", "WalkInVisit", "CustomerNote", "UnidentifiedReceiptIntake", "UnidentifiedReceiptMatchProposal", "ReceiptBankSourceProfile", "ReceiptImportPosting", "PriceApprovalChallenge"];
+  return names.filter((_, index) => matches[index] !== null);
+}

@@ -1,3 +1,12 @@
+## 2026-11-10 — Permanent staff account deletion candidate (not released)
+
+- **Implementation:** user corrected the prior deactivation-only interpretation: they need permanent user-account removal so an email can be invited again. Owner-only Delete user confirmation deletes the selected User and dependent credentials/role assignments, revokes matching pending invitations, retains audit entries with their user link cleared, and records an audit event. The separate Deactivate and Reactivate controls remain. Deletion is blocked when linked business records exist, per user instruction; the check covers User foreign-key relationships and known legacy staff-ID columns. The invitation error now correctly says an existing account, rather than always saying active. No real user or invitation changed.
+- **Testing:** disposable isolated PostgreSQL tests pass owner/MFA/origin/organisation/self protection, linked lead and non-FK training reference blocks, audit failure rollback, actual account/credential deletion, prior audit retention, pending-invitation revocation, and successful re-invitation of the exact email with a simulated email provider. Synthetic browser checks pass delete confirmation, block feedback, success, deactivation/reactivation at 1440/390/320. Scope tests and focused lint pass; final typecheck and protected exact-head checks remain pending. Dynamic JSON or future unmodelled references and concurrent non-foreign-key writes require further review before release. Reassignment tools are not added by this candidate; blocked links need appropriate operational resolution.
+- **Commit and push:** candidate based on deployed main c11d0b705 on branch codex/staff-permanent-removal-20261110; Git records publication. Preserve the separate deployment evidence successor for PR #748.
+- **Merge:** not merged; security review and exact-head protected checks are required.
+- **Deployment and configuration:** no deployment or production account deletion for this candidate. The existing reset and deactivation release remains deployed.
+- **Live production verification:** none for permanent deletion; real staff UAT and training remain open. Preserve all previously documented provider, data, approval and recovery gates.
+
 ## 2026-11-10 — Staff access candidate reconciled with main
 
 - **Implementation:** incorporated main 5074d481 (#750) while preserving both facility scope on role changes and revocation of reset credentials on user deactivation. No real user or invitation changed.
