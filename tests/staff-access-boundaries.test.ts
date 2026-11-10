@@ -11,8 +11,8 @@ const held = ["adjustments.approve", "adjustments.record_refund", "settlements.a
 test("facility-scoped user managers cannot change global or other-store accounts", async () => {
   const role = { name: "Store employee", permissions: [] as string[] };
   let assignments = [{ facilityId: "store-b" as string | null, role }];
-  let writes = 0;
-  const db = { user: { findFirst: async () => ({ id: "target", organisationId: "org", active: true, roleAssignments: assignments }) }, role: {}, facility: {}, $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn({ user: { update: async () => { writes++; } }, auditEvent: { create: async () => {} } }) };
+  let writes = 0, resetRevocations = 0;
+  const db = { user: { findFirst: async () => ({ id: "target", organisationId: "org", active: true, roleAssignments: assignments }) }, role: {}, facility: {}, $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn({ user: { update: async () => { writes++; } }, passwordResetToken: { updateMany: async () => { resetRevocations++; } }, auditEvent: { create: async () => {} } }) };
   const actor = { allowedFacilityIds: ["store-a"], user: { id: "actor", organisationId: "org", roleAssignments: [{ facilityId: "store-a", role: { name: "Manager", permissions: ["users.manage"] } }] } };
   const bundle = await build({ entryPoints: ["src/app/api/v1/users/[id]/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "user-scope-fixture", setup(b) {
     b.onResolve({ filter: /^@\/lib\/(db|auth-guards|request-security)$/ }, a => ({ path: a.path, namespace: "fixture" }));
@@ -25,10 +25,12 @@ test("facility-scoped user managers cannot change global or other-store accounts
     assignments = facilities.map(facilityId => ({ facilityId, role }));
     assert.equal((await loaded.exports.PATCH(request(), { params: Promise.resolve({ id: "target" }) })).status, 403);
     assert.equal(writes, 0);
+    assert.equal(resetRevocations, 0);
   }
   assignments = [{ facilityId: "store-a", role }];
   assert.equal((await loaded.exports.PATCH(request(), { params: Promise.resolve({ id: "target" }) })).status, 200);
   assert.equal(writes, 1);
+  assert.equal(resetRevocations, 1);
 });
 
 test("a saved store workflow role allows casework and requests without financial approval or cross-store authority", () => {

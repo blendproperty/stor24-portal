@@ -1,3 +1,12 @@
+## 2026-11-10 — Staff access release checks and fixture correction
+
+- **Implementation:** no additional runtime change in this checkpoint. Existing scope-test fixture now models reset-token revocation and asserts it is invoked only after an authorised deactivation.
+- **Testing:** exact candidate 9145c69e security checks 42772264622 and restricted runtime 42772264803 passed; CI 42772264620 validate failed because the old staff access mock lacked passwordResetToken.updateMany after the new revocation behavior. The fixture correction passes all three focused staff-access tests locally; new exact-head CI, transaction, security and production release checks are pending. Initial CI built the production image successfully. Local Turbopack remains blocked by external node_modules junction; clean Linux checks are authoritative.
+- **Commit and push:** correction and context prepared for the existing PR #748 branch; remote head verification remains required.
+- **Merge:** pending exact-head checks; no bypass.
+- **Deployment and configuration:** not deployed; no staff account or invitation modified.
+- **Live production verification:** pending; staff/device UAT and training remain open. Previously recorded provider, data, approval and recovery gates remain open.
+
 ## 2026-11-10 — Staff reset and removal hardening, release candidate
 
 - **Implementation:** organisation owners can issue a one-time, 30-minute temporary credential. Existing password, sessions and reset links are invalidated; recipient chooses a strong new password before sign-in and retains MFA. Owner authority is rechecked under the user lock. User-requested Remove user deactivates access, retains history, signs out sessions, invalidates reset links and hides inactive users until Show removed users; reactivation remains available. Invitation revocation now atomically claims pending status, so a concurrently accepted invitation cannot be falsely marked revoked. Error and success feedback improved. No actual accounts or invitations changed in this work.
