@@ -11,7 +11,6 @@ export async function userRemovalDependencies(tx: Prisma.TransactionClient, user
     Prisma.sql`SELECT 'Role data' AS "type" WHERE EXISTS (SELECT 1 FROM "Role" WHERE position(${userId} in "permissions"::text) > 0)`,
     Prisma.sql`SELECT 'ReportSchedule data' AS "type" WHERE EXISTS (SELECT 1 FROM "ReportSchedule" WHERE position(${userId} in "recipients"::text) > 0)`,
     Prisma.sql`SELECT 'CommunicationTemplate data' AS "type" WHERE EXISTS (SELECT 1 FROM "CommunicationTemplate" WHERE position(${userId} in "variables"::text) > 0)`,
-    Prisma.sql`SELECT 'AuditEvent data' AS "type" WHERE EXISTS (SELECT 1 FROM "AuditEvent" WHERE position(${userId} in "before"::text) > 0 OR position(${userId} in "after"::text) > 0)`,
     Prisma.sql`SELECT 'Facility data' AS "type" WHERE EXISTS (SELECT 1 FROM "Facility" WHERE position(${userId} in "address"::text) > 0)`,
     Prisma.sql`SELECT 'UnitType data' AS "type" WHERE EXISTS (SELECT 1 FROM "UnitType" WHERE position(${userId} in "businessAttributes"::text) > 0)`,
     Prisma.sql`SELECT 'Unit data' AS "type" WHERE EXISTS (SELECT 1 FROM "Unit" WHERE position(${userId} in "combinationSnapshot"::text) > 0 OR position(${userId} in "businessAttributesOverride"::text) > 0)`,

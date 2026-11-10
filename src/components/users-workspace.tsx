@@ -520,12 +520,12 @@ export function UsersWorkspace() {
           </div>
         </div>
       ) : null}
-      {removalUser ? <div className="modal-backdrop" role="presentation"><div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="removal-title">
+      {removalUser ? <div className="modal-backdrop" role="presentation"><div className="modal-card user-removal-dialog" role="dialog" aria-modal="true" aria-labelledby="removal-title">
         <h2 id="removal-title">Permanently delete {removalUser.name}?</h2>
         <p>Deactivate the user first, then show inactive users to delete their account. Deletion removes the account and credentials and frees {removalUser.email} for a new invitation. This cannot be undone. Deletion is blocked if business records are still linked to the user. Existing audit entries remain, but their user link is removed.</p>
         {error ? <p className="form-error" role="alert">{error}</p> : null}
-        <button className="button button-primary" disabled={busy} onClick={deleteUser}>{busy ? "Deleting..." : "Permanently delete user"}</button>
-        <button className="button button-secondary" disabled={busy} onClick={() => { setRemovalUser(null); setError(""); }}>Cancel</button>
+        <div className="user-removal-actions"><button className="button button-secondary" disabled={busy} onClick={() => { setRemovalUser(null); setError(""); }}>Cancel</button>
+        <button className="button button-primary" disabled={busy} onClick={deleteUser}>{busy ? "Deleting..." : "Permanently delete user"}</button></div>
       </div></div> : null}
       {resetUser ? <div className="modal-backdrop" role="presentation"><div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="reset-title">
         <h2 id="reset-title">Reset password for {resetUser.name}</h2>
