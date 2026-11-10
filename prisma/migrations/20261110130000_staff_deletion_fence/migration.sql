@@ -1,3 +1,6 @@
+BEGIN;
+SET LOCAL lock_timeout = '3s';
+
 -- The opaque identifier remains only to prevent a stale in-flight writer from
 -- creating a new reference after the account has been deleted.
 CREATE TABLE "DeletedStaffIdentity" ("id" TEXT PRIMARY KEY);
@@ -20,7 +23,7 @@ REVOKE ALL ON FUNCTION public.stor24_staff_reference_statement() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_facility"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."address"::text, NEW."closedFloors"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."address"::text, NEW."closedFloors"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -32,7 +35,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_facility"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_unittype"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."businessAttributes"::text, NEW."useTypes"::text, NEW."features"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."businessAttributes"::text, NEW."useTypes"::text, NEW."features"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -44,7 +47,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_unittype"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_unit"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."combinationSnapshot"::text, NEW."businessAttributesOverride"::text, NEW."useTypesOverride"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."combinationSnapshot"::text, NEW."businessAttributesOverride"::text, NEW."useTypesOverride"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -56,7 +59,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_unit"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_mapelement"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."config"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."config"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -68,7 +71,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_mapelement"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_customer"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."billingAddress"::text, NEW."emergencyContact"::text, NEW."alternateContact"::text, NEW."workContact"::text, NEW."communicationConsent"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."billingAddress"::text, NEW."emergencyContact"::text, NEW."alternateContact"::text, NEW."workContact"::text, NEW."communicationConsent"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -80,7 +83,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_customer"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_lead"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."enquiryLocation"::text, NEW."businessDetails"::text, NEW."assignedToId"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."enquiryLocation"::text, NEW."businessDetails"::text, NEW."assignedToId"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -92,7 +95,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_lead"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_reservationpriceamendment"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."proposedById"::text, NEW."reviewedById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."proposedById"::text, NEW."reviewedById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -104,7 +107,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_reservationpriceamendment"() FRO
 CREATE FUNCTION public."stor24_staff_ref_reservation"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."businessDetails"::text, NEW."initialRentSnapshot"::text, NEW."rentalPlan"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."businessDetails"::text, NEW."initialRentSnapshot"::text, NEW."rentalPlan"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -116,7 +119,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_reservation"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_publicreservationlease"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."clauses"::text, NEW."initials"::text, NEW."debitOrderPreferences"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."clauses"::text, NEW."initials"::text, NEW."debitOrderPreferences"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -128,7 +131,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_publicreservationlease"() FROM P
 CREATE FUNCTION public."stor24_staff_ref_publicdebitmandate"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."terms"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."terms"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -140,7 +143,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_publicdebitmandate"() FROM PUBLI
 CREATE FUNCTION public."stor24_staff_ref_debitmandatesession"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."source"::text, NEW."preferences"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."source"::text, NEW."preferences"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -152,7 +155,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_debitmandatesession"() FROM PUBL
 CREATE FUNCTION public."stor24_staff_ref_tenancy"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."businessDetails"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."businessDetails"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -164,7 +167,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_tenancy"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_biometricenrollment"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."consentRecordedById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."consentRecordedById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -176,7 +179,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_biometricenrollment"() FROM PUBL
 CREATE FUNCTION public."stor24_staff_ref_integrationidentitylink"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."resolvedById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."resolvedById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -188,7 +191,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_integrationidentitylink"() FROM 
 CREATE FUNCTION public."stor24_staff_ref_accessdecision"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."requestedById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."requestedById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -200,7 +203,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_accessdecision"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_insuranceenrollment"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."createdById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."createdById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -212,7 +215,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_insuranceenrollment"() FROM PUBL
 CREATE FUNCTION public."stor24_staff_ref_facialphotosubmission"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."reviewedById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."reviewedById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -224,7 +227,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_facialphotosubmission"() FROM PU
 CREATE FUNCTION public."stor24_staff_ref_legacyaccessphoto"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."reviewedById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."reviewedById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -236,7 +239,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_legacyaccessphoto"() FROM PUBLIC
 CREATE FUNCTION public."stor24_staff_ref_additionalaccessperson"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."reviewedById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."reviewedById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -248,7 +251,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_additionalaccessperson"() FROM P
 CREATE FUNCTION public."stor24_staff_ref_collectioncase"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."ownerId"::text, NEW."terms"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."ownerId"::text, NEW."terms"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -260,7 +263,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_collectioncase"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_collectionactivity"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."actorId"::text, NEW."payload"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."actorId"::text, NEW."payload"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -272,7 +275,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_collectionactivity"() FROM PUBLI
 CREATE FUNCTION public."stor24_staff_ref_collectionpromise"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."createdById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."createdById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -284,7 +287,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_collectionpromise"() FROM PUBLIC
 CREATE FUNCTION public."stor24_staff_ref_receiptreallocation"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."snapshot"::text, NEW."requestedById"::text, NEW."reviewedById"::text, NEW."postedById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."snapshot"::text, NEW."requestedById"::text, NEW."reviewedById"::text, NEW."postedById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -296,7 +299,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_receiptreallocation"() FROM PUBL
 CREATE FUNCTION public."stor24_staff_ref_financialadjustment"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."snapshot"::text, NEW."requestedById"::text, NEW."reviewedById"::text, NEW."postedById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."snapshot"::text, NEW."requestedById"::text, NEW."reviewedById"::text, NEW."postedById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -308,7 +311,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_financialadjustment"() FROM PUBL
 CREATE FUNCTION public."stor24_staff_ref_debitorderrun"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."snapshot"::text, NEW."createdById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."snapshot"::text, NEW."createdById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -320,7 +323,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_debitorderrun"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_ledgerentry"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."metadata"::text, NEW."createdById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."metadata"::text, NEW."createdById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -332,7 +335,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_ledgerentry"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_settlementstatement"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."importedById"::text, NEW."editedById"::text, NEW."approvedById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."importedById"::text, NEW."editedById"::text, NEW."approvedById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -344,7 +347,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_settlementstatement"() FROM PUBL
 CREATE FUNCTION public."stor24_staff_ref_settlementline"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."extras"::text, NEW."resolutionSnapshot"::text, NEW."resolvedById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."extras"::text, NEW."resolutionSnapshot"::text, NEW."resolvedById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -356,7 +359,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_settlementline"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_settlementbankimport"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."importedById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."importedById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -368,7 +371,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_settlementbankimport"() FROM PUB
 CREATE FUNCTION public."stor24_staff_ref_settlementbalanceobservation"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."recordedById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."recordedById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -380,7 +383,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_settlementbalanceobservation"() 
 CREATE FUNCTION public."stor24_staff_ref_document"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."initials"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."initials"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -392,7 +395,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_document"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_tenantportalchallenge"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."customerIds"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."customerIds"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -404,7 +407,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_tenantportalchallenge"() FROM PU
 CREATE FUNCTION public."stor24_staff_ref_tenantportalsession"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."customerIds"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."customerIds"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -416,7 +419,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_tenantportalsession"() FROM PUBL
 CREATE FUNCTION public."stor24_staff_ref_role"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."permissions"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."permissions"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -428,7 +431,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_role"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_task"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."operationalForm"::text, NEW."operationalChecklist"::text, NEW."assigneeId"::text, NEW."createdById"::text, NEW."coverId"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."operationalForm"::text, NEW."operationalChecklist"::text, NEW."assigneeId"::text, NEW."createdById"::text, NEW."coverId"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -440,7 +443,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_task"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_staffoperationalacknowledgement"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."userId"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."userId"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -452,7 +455,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_staffoperationalacknowledgement"
 CREATE FUNCTION public."stor24_staff_ref_arrivalhandover"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."ownerId"::text, NEW."coverId"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."ownerId"::text, NEW."coverId"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -464,7 +467,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_arrivalhandover"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_integrationconnection"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."config"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."config"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -476,7 +479,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_integrationconnection"() FROM PU
 CREATE FUNCTION public."stor24_staff_ref_configurationprofile"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."config"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."config"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -488,7 +491,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_configurationprofile"() FROM PUB
 CREATE FUNCTION public."stor24_staff_ref_chargedefinition"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."config"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."config"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -500,7 +503,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_chargedefinition"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_discountplan"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."rules"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."rules"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -512,7 +515,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_discountplan"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_unitnote"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."authorId"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."authorId"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -524,7 +527,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_unitnote"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_maintenancerequest"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."assignedToId"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."assignedToId"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -536,7 +539,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_maintenancerequest"() FROM PUBLI
 CREATE FUNCTION public."stor24_staff_ref_tenantmerchandiserequest"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."items"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."items"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -548,7 +551,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_tenantmerchandiserequest"() FROM
 CREATE FUNCTION public."stor24_staff_ref_reservationpackage"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."itemsSnapshot"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."itemsSnapshot"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -560,7 +563,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_reservationpackage"() FROM PUBLI
 CREATE FUNCTION public."stor24_staff_ref_stockmovement"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."createdById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."createdById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -572,7 +575,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_stockmovement"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_dailyclose"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."checks"::text, NEW."closedById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."checks"::text, NEW."closedById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -584,7 +587,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_dailyclose"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_reportschedule"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."parameters"::text, NEW."recipients"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."parameters"::text, NEW."recipients"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -596,7 +599,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_reportschedule"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_savedreport"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."ownerId"::text, NEW."definition"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."ownerId"::text, NEW."definition"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -608,7 +611,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_savedreport"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_reporthistoryimport"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."importedById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."importedById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -620,7 +623,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_reporthistoryimport"() FROM PUBL
 CREATE FUNCTION public."stor24_staff_ref_reportrun"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."requestedById"::text, NEW."parameters"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."requestedById"::text, NEW."parameters"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -632,7 +635,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_reportrun"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_communicationtemplate"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."variables"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."variables"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -644,7 +647,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_communicationtemplate"() FROM PU
 CREATE FUNCTION public."stor24_staff_ref_communicationlog"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."metadata"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."metadata"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -656,7 +659,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_communicationlog"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_webhookinbox"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."payload"::text, NEW."headers"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."payload"::text, NEW."headers"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -668,7 +671,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_webhookinbox"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_webhookoutbox"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."payload"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."payload"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -680,7 +683,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_webhookoutbox"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_auditevent"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."actorId"::text, NEW."before"::text, NEW."after"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."actorId"::text, NEW."before"::text, NEW."after"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -692,7 +695,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_auditevent"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_identitydocument"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."reviewedById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."reviewedById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -704,7 +707,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_identitydocument"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_moveintrainingcontrol"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."controllerUserId"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."controllerUserId"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -716,7 +719,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_moveintrainingcontrol"() FROM PU
 CREATE FUNCTION public."stor24_staff_ref_moveintrainingrun"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."userId"::text, NEW."state"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."userId"::text, NEW."state"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -728,7 +731,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_moveintrainingrun"() FROM PUBLIC
 CREATE FUNCTION public."stor24_staff_ref_facialphotocontrol"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."controllerUserId"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."controllerUserId"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -740,7 +743,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_facialphotocontrol"() FROM PUBLI
 CREATE FUNCTION public."stor24_staff_ref_marketingactivity"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."createdById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."createdById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -752,7 +755,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_marketingactivity"() FROM PUBLIC
 CREATE FUNCTION public."stor24_staff_ref_walkinvisit"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."createdById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."createdById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -764,7 +767,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_walkinvisit"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_customernote"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."authorId"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."authorId"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -776,7 +779,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_customernote"() FROM PUBLIC;
 CREATE FUNCTION public."stor24_staff_ref_unidentifiedreceiptintake"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."capturedById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."capturedById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -788,7 +791,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_unidentifiedreceiptintake"() FRO
 CREATE FUNCTION public."stor24_staff_ref_unidentifiedreceiptmatchproposal"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."proposedById"::text, NEW."reviewedById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."proposedById"::text, NEW."reviewedById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -800,7 +803,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_unidentifiedreceiptmatchproposal
 CREATE FUNCTION public."stor24_staff_ref_receiptbanksourceprofile"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."requestedById"::text, NEW."reviewedById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."requestedById"::text, NEW."reviewedById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -812,7 +815,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_receiptbanksourceprofile"() FROM
 CREATE FUNCTION public."stor24_staff_ref_receiptimportposting"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."snapshot"::text, NEW."postedById"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."snapshot"::text, NEW."postedById"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -824,7 +827,7 @@ REVOKE ALL ON FUNCTION public."stor24_staff_ref_receiptimportposting"() FROM PUB
 CREATE FUNCTION public."stor24_staff_ref_priceapprovalchallenge"() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."requestedById"::text, NEW."approverId"::text), 'c[a-z0-9]{24}', 'g') candidate JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = candidate[1]) THEN
+  IF EXISTS (SELECT 1 FROM regexp_matches(concat_ws(' ', NEW."requestedById"::text, NEW."approverId"::text), '[a-z0-9]{25,}', 'g') candidate CROSS JOIN LATERAL generate_series(1, length(candidate[1]) - 24) idx JOIN public."DeletedStaffIdentity" deleted ON deleted."id" = substring(candidate[1] FROM idx FOR 25)) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'A deleted staff identity cannot be added to business records.';
   END IF;
   RETURN NEW;
@@ -832,3 +835,5 @@ END $$;
 CREATE TRIGGER "staff_ref_fence" BEFORE INSERT OR UPDATE OF "requestedById", "approverId" ON public."PriceApprovalChallenge" FOR EACH STATEMENT EXECUTE FUNCTION public.stor24_staff_reference_statement();
 CREATE TRIGGER "staff_ref_check" BEFORE INSERT OR UPDATE OF "requestedById", "approverId" ON public."PriceApprovalChallenge" FOR EACH ROW EXECUTE FUNCTION public."stor24_staff_ref_priceapprovalchallenge"();
 REVOKE ALL ON FUNCTION public."stor24_staff_ref_priceapprovalchallenge"() FROM PUBLIC;
+
+COMMIT;

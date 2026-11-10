@@ -1,3 +1,9 @@
+## 2026-11-10 — Deletion fence embedded-ID correction (draft)
+
+- Implementation: The draft fence now checks overlapping IDs embedded in longer alphanumeric strings. Its migration is transactional with a bounded lock wait, so a failed migration cannot leave a partially installed guard.
+- Testing: Isolated PostgreSQL concurrency tests include an embedded-ID case and passed; the account deletion tests passed when run separately. The previous branch security and restricted-runtime CI checks passed, but these latest edits require fresh CI. Production-scale scan duration and live rollout remain unverified.
+- Commit and push: See the draft branch history for commit and push evidence. Merge: Not merged. Deployment and configuration: Not deployed. Live production verification: Not performed. No real user has been removed or reinvited; existing acceptance and operational gates remain open.
+
 ## 2026-11-10 — Permanent staff removal race-fence prototype (not released)
 
 - Implementation: Draft PR #753 adds an owner-only permanent deletion path that blocks linked business records, deletes the account and credentials, frees its email, retains security audit history, and uses a database fence with an opaque deleted-ID marker to prevent stale concurrent references. The migration guards writes on numerous business tables; the marker contains no email or credentials.

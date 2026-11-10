@@ -33,6 +33,7 @@ test("staff deletion fence serializes business writers and rejects stale referen
       } finally { commit.resolve(); }
       await deletion;assert.equal(waiting,true,"writer must wait on the deletion fence");assert.equal(await observed,true);assert.equal(await db.user.findUnique({where:{id:u.id}}),null);
       assert.equal(await db.configurationProfile.count({where:{organisationId:org.id,config:{path:["nested","reviewerId"],equals:u.id}}}),0);
+      await assert.rejects(db.configurationProfile.create({data:{organisationId:org.id,domain:"CI",name:randomUUID(),config:{embedded:`c${u.id}`}}}));
       await assert.rejects(db.configurationProfile.create({data:{organisationId:org.id,domain:"CI",name:randomUUID(),config:{nested:{reviewerId:u.id}}}}));
       await db.configurationProfile.create({data:{organisationId:org.id,domain:"CI",name:randomUUID(),config:{safe:"unrelated"}}});
     });
