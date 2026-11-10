@@ -14,15 +14,22 @@ const css = compiled.css + (await Promise.all(["src/styles/stor24-brand.css","sr
 const font=await readFile("public/brand/Satoshi-Variable.ttf");
 const server=createServer((req,res)=>{if(req.url==="/font.ttf"){res.setHeader("content-type","font/ttf");return res.end(font);}res.setHeader("content-type",req.url==="/app.js"?"text/javascript":req.url==="/style.css"?"text/css":"text/html");res.end(req.url==="/app.js"?bundle.outputFiles.find(f=>f.path.endsWith(".js")).text:req.url==="/style.css"?css:'<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"></head><body><div class="app-shell"><main class="content"><div id="root"></div></main></div><script type="module" src="/app.js"></script></body></html>');});
 await new Promise(r=>server.listen(0,"127.0.0.1",r));await mkdir("output/checklist-browser",{recursive:true});const browser=await chromium.launch();
-try {for(const width of [1440,390,320]) {
-  const page=await browser.newPage({viewport:{width,height:1000}}), errors=[];page.on("pageerror",e=>errors.push(e.message));
+try {for(const width of [1440,1024,768,390,320]) {
+  const touch = width === 1024 || width === 768;
+  const page=await browser.newPage({viewport:{width,height:1000},hasTouch:touch}), errors=[];page.on("pageerror",e=>errors.push(e.message));
   let actor=manager,writes=0,mode="ok",version=0;
   const makeRow=(id,label,expected="PASS")=>({id,label,expected,state:"PENDING",notes:"",evidence:"",lockCount:null,overlockTask:false});
   let record={version:1,template:"CLOSING",reviewerId:manager,rows:[],sourceAt:null,sourceHash:null,summary:"",comparisonReference:"",submittedAt:null,submittedBy:null,reviewedAt:null,reviewedBy:null,reviewNote:""};
   let task={id:runId,title:"Closing checklist",facilityId:store,assigneeId:cso,coverId:cover,status:"OPEN",startAt:"2026-10-23T06:00:00.000Z",dueAt:"2026-10-23T08:00:00.000Z",updatedAt:"2026-10-23T06:00:00.000Z",completedAt:null,facility:{name:"Synthetic Midpoint"},assignee:{name:"Synthetic CSO"},cover:{name:"Synthetic cover"}};
   const mondayRow={...makeRow("0","Evening · Check all doors are locked"),state:"PASS"};
   const monday={...task,id:"savedMonday",status:"COMPLETED",startAt:"2026-10-19T06:00:00.000Z",dueAt:"2026-10-19T08:00:00.000Z",assignee:{name:"Previous CSO"}};
-  const metadata=()=>({actorId:actor,facilities:[{id:store,name:"Synthetic Midpoint"}],managerFacilityIds:actor===manager?[store]:[],staff:[{id:cso,name:"Synthetic CSO",facilityIds:[store],reviewerFacilityIds:[],padlockReviewerFacilityIds:[]},{id:manager,name:"Synthetic manager",facilityIds:[store],reviewerFacilityIds:[store],padlockReviewerFacilityIds:[store]},{id:cover,name:"Synthetic cover",facilityIds:[store],reviewerFacilityIds:[],padlockReviewerFacilityIds:[]}]});
+  const padlockRows = [makeRow("unit1", "Unit 01", "VACANT"), makeRow("unit2", "Unit 02", "OCCUPIED"), makeRow("unit3", "Unit 03", "VACANT")];
+  const unitShape = (id, x, y) => ({ id: `shape-${id}`, type: "UNIT", x, y, width: 170, height: 120, rotation: 0, label: null, unitId: id });
+  const padlockMap = { units: padlockRows.map(({id,label}) => ({id,label})), floors: [
+    { id: "ground", name: "Ground Floor", width: 900, height: 600, operational: true, elements: [unitShape("unit1", 30, 30), unitShape("unit2", 230, 30), { ...unitShape("stairs", 225, 180), type: "STAIRS", unitId: null }] },
+    { id: "upper", name: "First Floor", width: 900, height: 600, operational: false, elements: [] },
+  ] };
+  const metadata=()=>({actorId:actor,...(record.template === "PADLOCK" ? {padlockMap} : {}),facilities:[{id:store,name:"Synthetic Midpoint"}],managerFacilityIds:actor===manager?[store]:[],staff:[{id:cso,name:"Synthetic CSO",facilityIds:[store],reviewerFacilityIds:[],padlockReviewerFacilityIds:[]},{id:manager,name:"Synthetic manager",facilityIds:[store],reviewerFacilityIds:[store],padlockReviewerFacilityIds:[store]},{id:cover,name:"Synthetic cover",facilityIds:[store],reviewerFacilityIds:[],padlockReviewerFacilityIds:[]}]});
   await page.route("**/api/v1/operations/checklists*",route=>{
     const req=route.request(),url=new URL(req.url());
     if(req.method()==="GET"){
@@ -37,7 +44,13 @@ try {for(const width of [1440,390,320]) {
       assert.equal(body.template,"CLOSING");assert.equal(body.assigneeId,cso);assert.equal(body.reviewerId,manager);assert.equal(body.coverId,cover);assert.equal(new Date(body.startAt).getUTCHours(),6);assert.equal(body.occurrences,2);
     } else {
       assert.equal(body.expectedUpdatedAt,task.updatedAt);
-      if(body.action==="START"){task.status="IN_PROGRESS";record.rows=[makeRow("0","Evening · Check all doors are locked"),makeRow("1","Evening · Count ground floor trolleys")];record.sourceAt="2026-10-23T06:10:00.000Z";}
+      if(body.action==="START"){task.status="IN_PROGRESS";record.rows=record.template === "PADLOCK" ? padlockRows : [makeRow("0","Evening · Check all doors are locked"),makeRow("1","Evening · Count ground floor trolleys")];record.sourceAt="2026-10-23T06:10:00.000Z";}
+      if(body.action==="OBSERVE"){
+        assert.equal(body.rows,undefined);
+        assert.ok(record.rows.some(row=>row.id===body.row.id));
+        record.rows=record.rows.map(row=>row.id===body.row.id?{...row,...body.row}:row);
+        record.summary=body.summary;record.comparisonReference=body.comparisonReference;
+      }
       if(["SAVE","SUBMIT"].includes(body.action)){record.rows=record.rows.map(r=>({...r,...body.rows.find(b=>b.id===r.id)}));record.summary=body.summary;record.comparisonReference=body.comparisonReference;if(body.action==="SUBMIT"){task.status="WAITING";record.submittedAt="2026-10-23T07:00:00.000Z";record.submittedBy=actor;}}
       if(body.action==="RETURN"){record.reviewNote=body.note;task.status="IN_PROGRESS";record.submittedAt=null;}
       if(body.action==="APPROVE"){record.reviewNote=body.note;record.reviewedAt="2026-10-23T08:10:00.000Z";record.reviewedBy=actor;task.status="COMPLETED";task.completedAt=record.reviewedAt;}
@@ -108,8 +121,9 @@ try {for(const width of [1440,390,320]) {
     await page.screenshot({path:"output/checklist-browser/management-1440.png",fullPage:true});
     record=previous;task.title=previousTitle;
   }
-  // Reuse the same rendered editor for a padlock run and verify discrepancies/counts and stale/lost-response recovery.
-  actor=manager;task.status="IN_PROGRESS";task.title="Weekly padlock walkthrough";task.completedAt=null;record={...record,template:"PADLOCK",rows:[makeRow("unit1","Unit 01","VACANT"),makeRow("unit2","Unit 02","REVIEW")],submittedAt:null,submittedBy:null,reviewedAt:null,reviewedBy:null,reviewNote:""};
+  // Use the saved facility geometry and the same workflow for a padlock observation.
+  actor=manager;task.status="OPEN";task.title="Weekly padlock walkthrough";task.completedAt=null;
+  record={...record,template:"PADLOCK",rows:[],sourceAt:null,submittedAt:null,submittedBy:null,reviewedAt:null,reviewedBy:null,reviewNote:""};
   await page.goto(`${base}/operations/padlocks`);
   const openPadlocks = await verifyQueue("Weekly padlock walkthrough", "padlocks");
   await page.getByRole("button", { name: "Plan padlock count", exact: true }).click();
@@ -122,23 +136,79 @@ try {for(const width of [1440,390,320]) {
   await padlockPlan.getByLabel("Repeat", { exact: true }).selectOption("ONCE");
   await expect(padlockPlan.getByLabel("Number of weekly runs")).toHaveCount(0);
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-  await padlockPlan.getByLabel("Repeat", { exact: true }).selectOption("WEEKLY");
-  await padlockPlan.screenshot({ path: `output/checklist-browser/padlock-planner-${width}.png` });
   await padlockPlan.getByRole("button", { name: "Close planner" }).click();
   await openPadlocks.click();
-  await expect(page.getByRole("region", { name: "Padlock count record" })).toBeVisible();
+  const map = page.getByRole("region", { name: "Padlock facility map" });
+  const observation = map.getByRole("complementary", { name: "Unit observation" });
+  await expect(map.getByText("0 of 3", { exact: true })).toBeVisible();
+  await expect(map.getByRole("list", { name: "Padlock status legend" })).toContainText("VacantOccupiedOverlockedNot checked");
+  await expect(page.getByRole("button", { name: "Start padlock count" })).toHaveCount(0);
+  const firstUnit = map.getByRole("button", { name: "Unit 01, Not checked", exact: true });
+  if (touch) await firstUnit.tap(); else await firstUnit.click();
+  await expect(observation.getByRole("heading", { name: "Unit 01", exact: true })).toBeVisible();
+  await expect(observation.getByRole("radio")).toHaveCount(0);
+  await page.getByText("Rent roll and collections references", { exact: true }).click();
   await expect(page.getByRole("link", { name: "Open printable rent roll" })).toHaveAttribute("href", `/api/v1/operations/checklists?id=${runId}&print=walkthrough`);
   await expect(page.getByRole("link", { name: "Open collections calls list" })).toHaveAttribute("href", `/collections?facility=${task.facilityId}&mode=follow-up`);
   actor=cso;
   await page.goto(`${base}/operations/checklists?id=${runId}`);
   await expect(page).toHaveURL(`${base}/operations/padlocks?id=${runId}`);
-  await expect(page.getByRole("heading",{name:"Padlock counts",exact:true})).toBeVisible();
-  await expect(page.getByRole("region",{name:"Padlock count sheet"}).getByRole("columnheader",{name:"Locks",exact:true})).toBeVisible();
-  await page.getByLabel("Collections discrepancy: Unit 02").check();
-  await page.getByLabel(/^Result:/).first().selectOption("OVERLOCKED");await page.getByLabel(/^Result:/).nth(1).selectOption("OCCUPIED");await page.getByLabel(/^Locks counted:/).first().fill("2");await page.getByLabel(/^Locks counted:/).nth(1).fill("1");await page.getByLabel(/^Comment:/).first().fill("Unexpected overlock; manager to investigate");await page.getByLabel(/^Comment:/).nth(1).fill("Service unit occupied; needs review");await page.getByLabel("Rent roll and collections comparison reference").fill("Rent roll and approved collections list 23 October");await page.getByLabel("Show findings only").check();await expect(page.getByLabel(/^Result:/)).toHaveCount(2);
-  await page.screenshot({path:`output/checklist-browser/padlocks-${width}.png`,fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
-  mode="stale";await page.getByRole("button",{name:"Submit for manager review"}).click();await expect(page.getByRole("alert")).toContainText("Reload");await expect(page.getByRole("button",{name:"Save progress"})).toBeDisabled();
-  mode="ok";page.once("dialog",d=>d.accept());await page.getByRole("button",{name:"Reload saved records"}).click();mode="lost";const before=writes;await page.getByRole("button",{name:"Save progress"}).click();await expect(page.getByRole("alert")).toContainText("could not be confirmed");await expect(page.getByRole("button",{name:"Save progress"})).toBeDisabled();assert.equal(writes,before+1);
-  mode="denied";await page.getByRole("button",{name:"Reload saved records"}).click();await expect(page.getByRole("region",{name:"Padlock count record"})).toHaveCount(0);await expect(page.getByText("Unexpected overlock; manager to investigate")).toHaveCount(0);
-  assert.deepEqual(errors,[]);await page.close();console.log(`PASS planner, assigned results/counts, review/return/history, padlocks, stale/lost response and access clearing ${width}`);
+  await page.getByRole("button", { name: "Start padlock count" }).click();
+  await expect(map.getByText("Synthetic CSO", { exact: true })).toBeVisible();
+  await map.getByRole("button", { name: "Zoom in" }).click();
+  await map.getByRole("button", { name: "Fit map" }).click();
+  await map.getByRole("button", { name: "Unit 01, Not checked", exact: true }).click();
+  await observation.getByRole("radio", { name: "Vacant", exact: true }).check();
+  await observation.getByLabel("Locks seen").fill("0");
+  await map.getByLabel("Find unit").selectOption("unit2");
+  await expect(observation.getByRole("status")).toHaveText("Save or discard this observation before switching units.");
+  await expect(map.getByRole("button", { name: "Unit 01, Not checked", exact: true })).toBeVisible();
+  await observation.getByRole("button", { name: "Save observation" }).click();
+  await expect(map.getByRole("button", { name: "Unit 01, Vacant", exact: true })).toBeVisible();
+  await expect(map.getByText("1 of 3", { exact: true })).toBeVisible();
+  await map.getByLabel("Find unit").selectOption("unit2");
+  await observation.getByRole("radio", { name: "Overlocked", exact: true }).check();
+  await observation.getByLabel("Locks seen").fill("2");
+  await observation.getByLabel("Reason if different").fill("Unexpected overlock; refer to the manager.");
+  await observation.getByLabel("Collections discrepancy").check();
+  await observation.getByRole("button", { name: "Save observation" }).click();
+  await expect(map.getByRole("button", { name: "Unit 02, Overlocked", exact: true })).toBeVisible();
+  await expect(map.getByText("2 of 3", { exact: true })).toBeVisible();
+  await map.getByLabel("Floor", { exact: true }).selectOption("upper");
+  await expect(map.getByText(/marked closed in the register/)).toBeVisible();
+  await map.getByLabel("Find unit").selectOption("unit3");
+  await observation.getByRole("radio", { name: "Vacant", exact: true }).check();
+  await observation.getByLabel("Locks seen").fill("0");
+  await observation.getByRole("button", { name: "Discard edits" }).click();
+  await expect(observation.getByLabel("Locks seen")).toHaveValue("");
+  await observation.getByRole("radio", { name: "Occupied", exact: true }).check();
+  await observation.getByLabel("Locks seen").fill("1");
+  await observation.getByLabel("Reason if different").fill("Store register and physical check disagree.");
+  await observation.getByRole("button", { name: "Save observation" }).click();
+  await expect(map.getByText("3 of 3", { exact: true })).toBeVisible();
+  await map.getByLabel("Floor", { exact: true }).selectOption("ground");
+  await map.getByLabel("Find unit").selectOption("unit2");
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await map.screenshot({path:`output/checklist-browser/padlock-map-${width}.png`});
+  await page.getByLabel("Rent roll and collections comparison reference").fill("Rent roll and approved collections list 23 October");
+  await page.getByRole("button",{name:"Submit for manager review"}).click();
+  await expect(page.getByText(/Submitted by Synthetic CSO/)).toBeVisible();
+  actor=manager;await page.getByRole("button",{name:"Reload saved records"}).click();
+  await expect(page.getByRole("group",{name:"Manager review"})).toBeVisible();
+  await map.getByLabel("Find unit").selectOption("unit2");
+  await expect(observation.getByText("Unexpected overlock; refer to the manager.")).toBeVisible();
+  await expect(observation.getByRole("radio")).toHaveCount(0);
+  await page.getByLabel("Review and action note").fill("Please confirm the location of the unexpected lock.");
+  await page.getByRole("button",{name:"Return for correction"}).click();
+  await expect(page.getByText("Please confirm the location of the unexpected lock.")).toBeVisible();
+  actor=cso;await page.getByRole("button",{name:"Reload saved records"}).click();
+  await page.getByLabel("Rent roll and collections comparison reference").fill("Updated comparison before the concurrent change");
+  mode="stale";await page.getByRole("button",{name:"Submit for manager review"}).click();await expect(page.getByRole("alert")).toContainText("Reload");
+  mode="ok";page.once("dialog",d=>d.accept());await page.getByRole("button",{name:"Reload saved records"}).click();
+  await map.getByLabel("Find unit").selectOption("unit2");await observation.getByLabel("Locks seen").fill("3");
+  mode="lost";const before=writes;await observation.getByRole("button",{name:"Save observation"}).click();
+  await expect(page.getByRole("alert")).toContainText("could not be confirmed");assert.equal(writes,before+1);
+  mode="denied";page.once("dialog",d=>d.accept());await page.getByRole("button",{name:"Reload saved records"}).click();
+  await expect(map).toHaveCount(0);await expect(page.getByText("Unexpected overlock; refer to the manager.")).toHaveCount(0);
+  assert.deepEqual(errors,[]);await page.close();console.log(`PASS planner, checklist, padlock map taps, saves, fallback and recovery at ${width}px`);
 }} finally { await browser.close();server.close(); }

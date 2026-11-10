@@ -44,6 +44,18 @@ export const checklistRowSchema = z.object({
   notes: text, evidence: z.string().trim().max(500), lockCount: z.number().int().min(0).max(100).nullable(), overlockTask: z.boolean(), comparisonDiscrepancy: z.boolean().optional(),
 }).strict();
 export type ChecklistRow = z.infer<typeof checklistRowSchema>;
+const padlockMapUnitSchema = z.object({ id: z.string(), label: z.string() });
+export const padlockMapSchema = z.object({
+  units: z.array(padlockMapUnitSchema),
+  floors: z.array(z.object({
+    id: z.string(), name: z.string(), operational: z.boolean(), width: z.number(), height: z.number(),
+    elements: z.array(z.object({
+      id: z.string(), type: z.string(), x: z.number(), y: z.number(), width: z.number(), height: z.number(),
+      rotation: z.number(), label: z.string().nullable(), unitId: z.string().nullable(),
+    })),
+  })),
+});
+export type PadlockMapData = z.infer<typeof padlockMapSchema>;
 export const checklistRecordSchema = z.object({
   version: z.literal(1), template: templateKeySchema, reviewerId: z.string().cuid(),
   rows: z.array(checklistRowSchema).max(1500), sourceAt: z.iso.datetime().nullable(), sourceHash: z.string().nullable(),
@@ -64,9 +76,14 @@ export const checklistCreateSchema = z.object({
 });
 export type ChecklistCreate = z.infer<typeof checklistCreateSchema>;
 const identity = { id: z.string().cuid(), expectedUpdatedAt: z.iso.datetime() };
+const editableRow = checklistRowSchema.pick({ id: true, state: true, notes: true, evidence: true, lockCount: true, comparisonDiscrepancy: true });
+const reportFields = { summary: text, comparisonReference: z.string().trim().max(1000) };
 export const checklistChangeSchema = z.discriminatedUnion("action", [
   z.object({ ...identity, action: z.enum(["START", "RESTART", "CANCEL"]) }).strict(),
-  z.object({ ...identity, action: z.enum(["SAVE", "SUBMIT"]), rows: z.array(checklistRowSchema.pick({ id: true, state: true, notes: true, evidence: true, lockCount: true, comparisonDiscrepancy: true })).max(1500), summary: text, comparisonReference: z.string().trim().max(1000) }).strict(),
+  z.object({ ...identity, ...reportFields, action: z.enum(["SAVE", "SUBMIT"]), rows: z.array(editableRow).max(1500) }).strict(),
+  z.object({ ...identity, ...reportFields, action: z.literal("OBSERVE"), row: editableRow.extend({
+    state: z.enum(["VACANT", "OCCUPIED", "OVERLOCKED"]), lockCount: z.number().int().min(0).max(100),
+  }) }).strict(),
   z.object({ ...identity, action: z.enum(["APPROVE", "RETURN"]), note: z.string().trim().min(5).max(2000) }).strict(),
   z.object({ ...identity, action: z.literal("ASSIGN"), assigneeId: z.string().cuid(), coverId: z.string().cuid().nullable(), reviewerId: z.string().cuid() }).strict(),
 ]);
