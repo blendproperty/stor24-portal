@@ -84,7 +84,8 @@ test("permanent user deletion frees email while preserving linked business recor
       }}]});
       const invite={exports:{} as {POST:(r:Request)=>Promise<Response>}};
       new Function("require","module","exports","__db","__session",inviteBundle.outputFiles[0].text)(createRequire(import.meta.url),invite,invite.exports,db,()=>({...session as object,name:"Synthetic owner"}));
-      const request=new Request("https://example.invalid/api/v1/invitations",{method:"POST",headers:{origin:"https://example.invalid","content-type":"application/json"},body:JSON.stringify({name:"New employee",email:target.email,roleName:"Facility manager"})});
+      const facility=await db.facility.create({data:{organisationId:org.id,name:"Synthetic facility",code:`CI-${key}`}});
+      const request=new Request("https://example.invalid/api/v1/invitations",{method:"POST",headers:{origin:"https://example.invalid","content-type":"application/json"},body:JSON.stringify({name:"New employee",email:target.email,roleName:"Facility manager",facilityCode:facility.code})});
       assert.equal((await invite.exports.POST(request)).status,201);
       assert.equal(await db.userInvitation.count({where:{organisationId:org.id,email:target.email,status:"PENDING"}}),1);
     });

@@ -40,7 +40,7 @@ test("changing a role without a facility preserves all existing facility scopes"
   const actor = {allowedFacilityIds:null,user:{id:"owner",organisationId:"org",roleAssignments:[{facilityId:null,role:{name:"Organisation owner",permissions:["*"]}}]}};
   const database = {
     user:{findFirst:async()=>({id:"target",organisationId:"org",active:true,roleAssignments:scopes.map(facilityId=>({facilityId,role:oldRole}))})},
-    role:{findUnique:async()=>({id:"manager"})}, facility:{findUnique:async()=>({id:"melrose"})},
+    role:{findUnique:async()=>({id:"manager",name:"Facility manager"})}, facility:{findUnique:async()=>({id:"melrose"})},
     $transaction:async(fn:(tx:unknown)=>Promise<unknown>)=>fn({$queryRaw:async()=>[],roleAssignment:{findMany:async()=>scopes.map(facilityId=>({facilityId})),deleteMany:async()=>{},create:async({data}:{data:{userId:string;roleId:string;facilityId:string|null}})=>{created.push(data)}},user:{update:async()=>{}},auditEvent:{create:async()=>{}}}),
   };
   const bundle=await build({entryPoints:["src/app/api/v1/users/[id]/route.ts"],bundle:true,write:false,platform:"node",format:"cjs",packages:"external",plugins:[{name:"role-scope",setup(b){b.onResolve({filter:/^@\/lib\/(db|auth-guards|request-security)$/},a=>({path:a.path,namespace:"fixture"}));b.onLoad({filter:/.*/,namespace:"fixture"},a=>({contents:a.path.endsWith("/db")?"export const db=__db;":a.path.endsWith("/request-security")?"export const sameOrigin=()=>true;":"export const requirePermission=async()=>__actor;"}));}}]});
@@ -53,14 +53,14 @@ test("changing a role without a facility preserves all existing facility scopes"
   assert.equal((await change({roleName:"Facility manager"})).status,200);
   assert.deepEqual(created.map(x=>x.facilityId),["midpoint","melrose"]);
   created.length=0; scopes=[null];
-  assert.equal((await change({roleName:"Facility manager"})).status,200);
-  assert.deepEqual(created.map(x=>x.facilityId),[null]);
+  assert.equal((await change({roleName:"Facility manager"})).status,409);
+  assert.equal(created.length,0);
   created.length=0; scopes=["midpoint"];
   assert.equal((await change({roleName:"Facility manager",facilityCode:"MELROSE"})).status,200);
   assert.deepEqual(created.map(x=>x.facilityId),["melrose"]);
   created.length=0; scopes=[];
   assert.equal((await change({roleName:"Facility manager"})).status,409);
-  assert.deepEqual(created,[]);
+  assert.equal(created.length,0);
 });
 
 test("a saved store workflow role allows casework and requests without financial approval or cross-store authority", () => {
