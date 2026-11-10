@@ -3,6 +3,15 @@ import { Prisma } from "@/generated/prisma/client";
 // Block deletion for staff references, including legacy IDs without database foreign keys.
 export async function userRemovalDependencies(tx: Prisma.TransactionClient, userId: string) {
   const jsonChecks = [
+    Prisma.sql`SELECT 'Facility data' AS "type" WHERE EXISTS (SELECT 1 FROM "Facility" WHERE position(${userId} in "closedFloors"::text) > 0)`,
+    Prisma.sql`SELECT 'UnitType data' AS "type" WHERE EXISTS (SELECT 1 FROM "UnitType" WHERE position(${userId} in "useTypes"::text) > 0 OR position(${userId} in "features"::text) > 0)`,
+    Prisma.sql`SELECT 'Unit data' AS "type" WHERE EXISTS (SELECT 1 FROM "Unit" WHERE position(${userId} in "useTypesOverride"::text) > 0)`,
+    Prisma.sql`SELECT 'TenantPortalChallenge data' AS "type" WHERE EXISTS (SELECT 1 FROM "TenantPortalChallenge" WHERE position(${userId} in "customerIds"::text) > 0)`,
+    Prisma.sql`SELECT 'TenantPortalSession data' AS "type" WHERE EXISTS (SELECT 1 FROM "TenantPortalSession" WHERE position(${userId} in "customerIds"::text) > 0)`,
+    Prisma.sql`SELECT 'Role data' AS "type" WHERE EXISTS (SELECT 1 FROM "Role" WHERE position(${userId} in "permissions"::text) > 0)`,
+    Prisma.sql`SELECT 'ReportSchedule data' AS "type" WHERE EXISTS (SELECT 1 FROM "ReportSchedule" WHERE position(${userId} in "recipients"::text) > 0)`,
+    Prisma.sql`SELECT 'CommunicationTemplate data' AS "type" WHERE EXISTS (SELECT 1 FROM "CommunicationTemplate" WHERE position(${userId} in "variables"::text) > 0)`,
+    Prisma.sql`SELECT 'AuditEvent data' AS "type" WHERE EXISTS (SELECT 1 FROM "AuditEvent" WHERE position(${userId} in "before"::text) > 0 OR position(${userId} in "after"::text) > 0)`,
     Prisma.sql`SELECT 'Facility data' AS "type" WHERE EXISTS (SELECT 1 FROM "Facility" WHERE position(${userId} in "address"::text) > 0)`,
     Prisma.sql`SELECT 'UnitType data' AS "type" WHERE EXISTS (SELECT 1 FROM "UnitType" WHERE position(${userId} in "businessAttributes"::text) > 0)`,
     Prisma.sql`SELECT 'Unit data' AS "type" WHERE EXISTS (SELECT 1 FROM "Unit" WHERE position(${userId} in "combinationSnapshot"::text) > 0 OR position(${userId} in "businessAttributesOverride"::text) > 0)`,

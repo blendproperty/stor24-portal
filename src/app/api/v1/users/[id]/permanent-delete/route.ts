@@ -10,7 +10,10 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     const actor = await requireOwner();
     const { id } = await context.params;
     if (id === actor.user.id) return Response.json({ error: { message: "You cannot delete your own account." } }, { status: 409 });
+    if (!/^c[a-z0-9]{24}$/.test(id)) return Response.json({ error: { message: "This account requires administrator review before deletion." } }, { status: 409 });
     const result = await db.$transaction(async tx => {
+      const [{ acquired }] = await tx.$queryRaw<{ acquired: boolean }[]>`SELECT pg_try_advisory_xact_lock(143, 2441) AS acquired`;
+      if (!acquired) return { kind: "busy" as const };
       await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${actor.user.id} FOR UPDATE`;
       const current = await tx.user.findUnique({ where: { id: actor.user.id }, include: { roleAssignments: { include: { role: true } } } });
       if (!current?.active || !current.passwordHash || current.sessionVersion !== actor.user.sessionVersion || !currentRoleAccess(current.roleAssignments).owner) throw new Error("FORBIDDEN");
@@ -20,11 +23,14 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
       if (target.active) return { kind: "active" as const };
       const dependencies = await userRemovalDependencies(tx, id);
       if (dependencies.length) return { kind: "linked" as const, dependencies };
+      await tx.staffDeletionFence.update({ where: { id: 1 }, data: { generation: { increment: 1 } } });
+      await tx.deletedStaffIdentity.create({ data: { id } });
       await tx.userInvitation.updateMany({ where: { organisationId: target.organisationId, email: target.email, status: "PENDING" }, data: { status: "REVOKED", revokedAt: new Date() } });
       await tx.user.delete({ where: { id } });
       await tx.auditEvent.create({ data: { organisationId: target.organisationId, actorId: actor.user.id, action: "user.account.deleted", entityType: "User", entityId: id } });
       return { kind: "deleted" as const };
-    }, { isolationLevel: "Serializable", timeout: 20000 });
+    }, { isolationLevel: "ReadCommitted", timeout: 6000 });
+    if (result.kind === "busy") return Response.json({ error: { message: "The system is processing another change. Please try deleting this user again shortly." } }, { status: 409 });
     if (result.kind === "missing") return Response.json({ error: { message: "User not found." } }, { status: 404 });
     if (result.kind === "active") return Response.json({ error: { message: "Deactivate this user first, then select Show inactive users to delete the account." } }, { status: 409 });
     if (result.kind === "linked") return Response.json({ error: { message: `This user is linked to business records (${result.dependencies.map(name => name.replace(/([a-z])([A-Z])/g, "$1 $2")).join(", ")}). Reassign those records before deleting the user.` } }, { status: 409 });

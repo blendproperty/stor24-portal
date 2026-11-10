@@ -42,6 +42,14 @@ test("permanent user deletion frees email while preserving linked business recor
       assert.equal((await call(target.id)).status,409);
       await db.user.update({where:{id:target.id},data:{active:false,sessionVersion:{increment:1}}});
     });
+    await t.test("deletion fails closed while an unrelated business writer holds the fence",async()=>{
+      let ready!:()=>void,release!:()=>void;
+      const written=new Promise<void>(r=>{ready=r}),resume=new Promise<void>(r=>{release=r});
+      const writer=db.$transaction(async tx=>{await tx.configurationProfile.create({data:{organisationId:org.id,domain:"CI",name:`fence-${key}`,config:{safe:true}}});ready();await resume;},{timeout:20000});
+      await written;
+      try { const response=await call(target.id);assert.equal(response.status,409);assert.match((await response.json()).error.message,/processing another change/);assert.ok(await db.user.findUnique({where:{id:target.id}})); }
+      finally { release();await writer; }
+    });
     await t.test("linked records prevent deletion until reassigned",async()=>{
       const facility=await db.facility.create({data:{organisationId:org.id,code:"CI",name:"Synthetic facility"}});
       const lead=await db.lead.create({data:{facilityId:facility.id,source:"CI",assignedToId:target.id}});
