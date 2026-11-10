@@ -1,3 +1,11 @@
+## 2026-11-10 — Audit-history deletion fix deployed; account removal pending
+
+- Implementation: PR #755 retains historical audit snapshots while allowing deletion to proceed where only those snapshots referenced staff, preserves business-link blocking, and improves the deletion dialog spacing.
+- Testing: Isolated PostgreSQL migration, deletion, audit retention, stale-writer, schema-inventory and desktop/mobile browser tests passed; pull-request and merged-main CI, security, restricted-runtime and transaction workflows passed.
+- Commit and push: Candidate b51424a38244d1feef9bc0945ad9f4d76c4bbb17 pushed. Merge: PR #755 squash-merged as e7204b43b9d49a74672d11ffc03bbbf7cb8adcee.
+- Deployment and configuration: Production deployment run 42796912627 succeeded with a healthy app and database.
+- Live production verification: The refreshed Users & permissions page displayed the revised confirmation for inactive Katlego Makhubele. Actual permanent deletion and reinvitation remain unverified; no user was deleted in this release check. The record check may identify other linked business records. Preserve all other outstanding UAT, provider, data, training and approval gates.
+
 ## 2026-11-10 — Staff deletion audit-history and dialog correction (candidate)
 
 - Implementation: Preserve historical audit snapshots without treating their embedded staff IDs as live business assignments. Continue blocking business-record links and business audit actors; retain the concurrency guard for new or changed audit references. Improve deletion dialog spacing and responsive action layout.
