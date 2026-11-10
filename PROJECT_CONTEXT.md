@@ -7836,3 +7836,11 @@ Validation follow-up: the project typecheck and targeted ESLint for the candidat
 - **Commit, push and merge:** Candidate on codex/checklist-workbook-layout, based on remote main 0e54e156 with the complete #735 release and #736 verification receipt. Hosted checks and merge remain pending at this entry.
 - **Deployment and live verification:** The workbook layout correction awaits its own qualification and deployment. The prior #735 separate checklist and CSO padlock release remains deployed and its signed-in readback is recorded above.
 - **Open acceptance:** Faeez/business approval, physical counts, staff/device acceptance and training remain open. Earlier accepted cases remain recorded. Visitor/client capture, overlocking, access, collections and finance retain their separate authority gates.
+
+
+### 2026-11-10 - GAPP follow-up and reset-log minimisation
+
+- **Implementation:** Reviewed the eleven privacy register items against CRM main `428cfdc5b56a4b3926aea9979a47c8dcf44f863b` and existing release records; [follow-up](docs/GAPP_REVIEW_2026-11-10.md) distinguishes delivered controls and outstanding evidence. Password reset delivery failure now logs a fixed message rather than arbitrary provider error text that could contain personal data or a reset link. This is a targeted review, not a full GAPP audit or legal assessment.
+- **Testing:** Five targeted synthetic tests passed, including injected sensitive provider-error content, generic response, rate limits and preference evidence. Scoped ESLint passed; no live data was used.
+- **Commit and push:** Candidate pending commit and push at this entry. **Merge:** none. **Deployment and configuration:** none. **Live production verification:** none for this change.
+- **Outstanding:** All PRIV-01-11 and P14 acceptance remain open, including legal notice and biometric decisions, approved retention, provider/device and backup deletion, processor agreements, privacy-request rehearsal, actual public tracking/withdrawal assessment, incident readiness and staff/customer/device UAT. Preserve all existing provider, finance, data, training, recovery and business approval gates.
