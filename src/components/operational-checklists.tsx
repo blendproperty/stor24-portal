@@ -4,10 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import Link from "next/link";
 import { PageHeader } from "./page-header";
+import { StatusPill } from "./status-pill";
 import { checklistHref, checklistIssue, checklistRecordSchema, checklistRows, checklistRowSchema, checklistTemplates, type ChecklistTemplate, type ChecklistRow } from "@/lib/operational-checklist-policy";
 import { formatSouthAfricaDateTime, southAfricaDateKey } from "@/lib/south-africa-time";
 import { OperationalChecklistSheet, workbookItemLabel } from "./operational-checklist-sheet";
 import styles from "./operational-checklists.module.css";
+
+const runStatusLabels: Record<string, string> = { OPEN: "Open", IN_PROGRESS: "In progress", WAITING: "Awaiting review", COMPLETED: "Signed off", CANCELLED: "Cancelled" };
 
 const taskSchema = z.object({ id: z.string(), title: z.string(), facilityId: z.string(), assigneeId: z.string().nullable(), coverId: z.string().nullable(), status: z.string(), startAt: z.string().nullable(), dueAt: z.string().nullable(), updatedAt: z.string(), completedAt: z.string().nullable(), facility: z.object({ name: z.string() }), assignee: z.object({ name: z.string() }).nullable(), cover: z.object({ name: z.string() }).nullable() });
 const responseSchema = z.object({ actorId: z.string(), facilities: z.array(z.object({ id: z.string(), name: z.string() })), managerFacilityIds: z.array(z.string()), staff: z.array(z.object({ id: z.string(), name: z.string(), facilityIds: z.array(z.string()), reviewerFacilityIds: z.array(z.string()), padlockReviewerFacilityIds: z.array(z.string()) })), week: z.array(z.object({ id: z.string(), day: z.number().int().min(0).max(6), name: z.string().nullable(), rows: z.array(checklistRowSchema) })).optional(), tasks: z.array(taskSchema).optional(), nextCursor: z.string().nullable().optional(), task: taskSchema.extend({ operationalChecklist: checklistRecordSchema }).optional() });
@@ -126,8 +129,39 @@ export function OperationalChecklists({ kind = "checklists" }: { kind?: "checkli
       {task.status === "WAITING" && manager && (!padlocks || people(task.facilityId, true).some(person => person.id === data?.actorId)) && record.reviewerId === data?.actorId && record.submittedBy !== data?.actorId && <fieldset disabled={disabled}><legend>Manager review</legend><p>Confirm the findings, evidence and escalation. Sign-off records review; it does not resolve a fault or perform overlocking.</p><label>Review and action note<textarea value={reviewNote} onChange={e => setReviewNote(e.target.value)} minLength={5} maxLength={2000}/></label><div className="button-row"><button className="button button-primary" disabled={reviewNote.trim().length < 5} onClick={() => act("APPROVE")}>Sign off review</button><button className="button button-secondary" disabled={reviewNote.trim().length < 5} onClick={() => act("RETURN")}>Return for correction</button></div></fieldset>}
       {record.reviewedAt && <p>Reviewed by {staffName(record.reviewedBy)} · {formatSouthAfricaDateTime(record.reviewedAt)} SAST · {record.reviewNote}</p>}
       {manager && !["COMPLETED","CANCELLED"].includes(task.status) && <details><summary>Staff cover and administration</summary><fieldset disabled={disabled || dirty}>{selectors(task.facilityId,assignment,setAssignment)}<div className="button-row"><button className="button button-secondary" onClick={() => act("ASSIGN")}>Save staff assignments</button><button className="text-button" onClick={() => { if (window.confirm("Cancel this run? Saved results and audit history will be retained.")) act("CANCEL"); }}>Cancel run</button></div></fieldset></details>}
-    </section> : <section className="panel panel-spacious"><h2>Planned runs and history</h2><div className="form-grid"><label>Store filter<select aria-label="Store filter" disabled={busy || reading} value={facility} onChange={e => { setFacility(e.target.value); void read({ facilityId: e.target.value,closed }); }}><option value="">All permitted stores</option>{data?.facilities.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select></label><label>Run status<select aria-label="Run status" disabled={busy || reading} value={String(closed)} onChange={e => { setClosed(e.target.value === "true"); void read({ facilityId: facility,closed: e.target.value === "true" }); }}><option value="false">Open and awaiting review</option><option value="true">Signed off and cancelled history</option></select></label></div>
-      {!reading && !blocked && !tasks.length && <p>No matching runs.</p>}<div className="work-list">{tasks.map(t => <div className={`work-row ${styles.run}`} key={t.id}><div><strong>{t.title}</strong><p>{t.facility.name} · {t.assignee?.name ?? "Unassigned"} · {t.status.replaceAll("_"," ")}</p><p>Due {formatSouthAfricaDateTime(t.dueAt)} SAST{t.dueAt && new Date(t.dueAt) < new Date() && !["COMPLETED","CANCELLED"].includes(t.status) ? " · Overdue" : ""}</p></div><button className="button button-secondary" disabled={disabled} onClick={() => { setSearch(""); setOnlyIssues(false); void read({ id: t.id }); }}>Open record</button></div>)}</div>{data?.nextCursor && <button className="button button-secondary" disabled={disabled} onClick={() => void read({ facilityId: facility,closed,cursor: data.nextCursor! })}>Load more runs</button>}
+    </section> : <section className={`panel panel-spacious ${styles.queue}`} aria-label="Planned runs and history">
+      <h2>Planned runs and history</h2>
+      <div className={styles.queueFilters}>
+        <label>Store filter<select aria-label="Store filter" disabled={busy || reading} value={facility} onChange={e => { setFacility(e.target.value); void read({ facilityId: e.target.value, closed }); }}>
+          <option value="">All permitted stores</option>
+          {data?.facilities.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+        </select></label>
+        <label>Run status<select aria-label="Run status" disabled={busy || reading} value={String(closed)} onChange={e => { setClosed(e.target.value === "true"); void read({ facilityId: facility, closed: e.target.value === "true" }); }}>
+          <option value="false">Open and awaiting review</option>
+          <option value="true">Signed off and cancelled history</option>
+        </select></label>
+      </div>
+      {!reading && !blocked && !tasks.length && <p>No matching runs.</p>}
+      {tasks.length > 0 && <ul className={styles.runList}>
+        {tasks.map(t => {
+          const overdue = t.dueAt && new Date(t.dueAt) < new Date() && !["COMPLETED", "CANCELLED"].includes(t.status);
+          return <li className={`work-row ${styles.run}`} key={t.id}>
+            <div className={styles.runDetails}>
+              <strong>{t.title}</strong>
+              <p>{t.facility.name} · {t.assignee?.name ?? "Unassigned"}</p>
+            </div>
+            <div className={styles.runTiming}>
+              <div className={styles.runStatus}>
+                <StatusPill tone={t.status === "COMPLETED" ? "positive" : "neutral"}>{runStatusLabels[t.status] ?? t.status}</StatusPill>
+                {overdue && <StatusPill tone="warning">Overdue</StatusPill>}
+              </div>
+              <p>{t.dueAt ? <>Due <time dateTime={t.dueAt}>{formatSouthAfricaDateTime(t.dueAt)} SAST</time></> : "No due date"}</p>
+            </div>
+            <button className="button button-secondary" disabled={disabled} onClick={() => { setSearch(""); setOnlyIssues(false); void read({ id: t.id }); }}>Open record</button>
+          </li>;
+        })}
+      </ul>}
+      {data?.nextCursor && <button className="button button-secondary" disabled={disabled} onClick={() => void read({ facilityId: facility, closed, cursor: data.nextCursor! })}>Load more runs</button>}
     </section>}
   </div>;
 }

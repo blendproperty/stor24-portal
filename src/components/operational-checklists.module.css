@@ -1,4 +1,5 @@
 .workspace { min-width: 0; }
+.workspace :global(.button-row) { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
 .workspace fieldset { min-width: 0; border: 1px solid var(--border, #d7dde1); border-radius: 10px; padding: 1rem; margin: 1rem 0; }
 .workspace legend { font-weight: 650; padding: 0 .35rem; overflow-wrap: anywhere; }
 .workspace textarea { width: 100%; min-height: 70px; resize: vertical; }
@@ -78,5 +79,17 @@
   .workspace .workbookSheet td :is(select, input) { height: 36px; }
 }
 
-.run { flex-wrap: wrap; justify-content: space-between; }
-@media (max-width: 600px) { .workspace fieldset { padding: .65rem; } .workspace :global(.form-grid) { grid-template-columns: minmax(0, 1fr); } .workspace :global(.button-row) { flex-wrap: wrap; } }
+.queue { display: grid; gap: 1rem; }
+.queueFilters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem 1rem; max-width: 42rem; }
+.queueFilters select { width: 100%; min-width: 0; }
+.runList { list-style: none; margin: 0; padding: 0; }
+.queue .run { grid-template-columns: minmax(0, 1fr) minmax(0, 14rem) auto; gap: .65rem 1.25rem; }
+.runDetails, .runTiming { min-width: 0; }
+.runDetails strong { overflow-wrap: anywhere; }
+.runDetails p, .runTiming p { margin: .25rem 0 0; color: var(--muted, #52616a); }
+.runStatus { display: flex; flex-wrap: wrap; gap: .3rem; }
+.queue .run > button, .queue > button { justify-self: start; width: auto; }
+@media (max-width: 600px) {
+  .queueFilters, .queue .run { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 600px) { .workspace fieldset { padding: .65rem; } .workspace :global(.form-grid) { grid-template-columns: minmax(0, 1fr); } }

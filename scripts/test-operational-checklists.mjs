@@ -45,7 +45,32 @@ try {for(const width of [1440,390,320]) {
     task.updatedAt=new Date(Date.parse("2026-10-23T06:00:00.000Z")+(++version)*1000).toISOString();return route.fulfill({json:{data:{id:runId,count:2}}});
   });
   const base=`http://127.0.0.1:${server.address().port}`;
-  await page.goto(base);await page.getByRole("button",{name:"Plan checklist",exact:true}).click();const form=page.getByRole("form",{name:"Plan checklist"});
+  async function verifyQueue(title, screen) {
+    const open = page.getByRole("button", { name: "Open record", exact: true });
+    await expect(open).toBeEnabled();
+    const row = page.locator(".work-row").filter({ hasText: title });
+    await expect(row).toBeVisible();
+    const size = await row.evaluate(element => {
+      const details = element.firstElementChild.getBoundingClientRect();
+      const action = element.querySelector("button").getBoundingClientRect();
+      const bounds = element.getBoundingClientRect();
+      return { detailWidth: details.width, actionWidth: action.width, rowWidth: bounds.width, height: bounds.height, actionRight: action.right, rowRight: bounds.right };
+    });
+    assert.ok(size.detailWidth >= size.rowWidth * .5, `${screen} at ${width}px: run details were squeezed to ${size.detailWidth}px`);
+    assert.ok(size.actionWidth < 190 && size.actionRight <= size.rowRight + 1, `${screen} at ${width}px: open action overflowed or filled the row`);
+    assert.ok(size.height < 210, `${screen} at ${width}px: saved run was ${size.height}px tall`);
+    const storeFilter = await page.getByLabel("Store filter", { exact: true }).boundingBox();
+    const statusFilter = await page.getByLabel("Run status", { exact: true }).boundingBox();
+    assert.ok(width > 600 ? Math.abs(storeFilter.y - statusFilter.y) < 2 : statusFilter.y > storeFilter.y);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await page.getByRole("region", { name: "Planned runs and history" }).screenshot({ path: `output/checklist-browser/${screen}-queue-${width}.png` });
+    return open;
+  }
+  await page.goto(`${base}/operations/checklists`);
+  await (await verifyQueue("Closing checklist", "checklists")).click();
+  await expect(page.getByRole("region", { name: "Checklist record" })).toBeVisible();
+  await page.getByRole("button", { name: "Back to runs", exact: true }).click();
+  await page.getByRole("button",{name:"Plan checklist",exact:true}).click();const form=page.getByRole("form",{name:"Plan checklist"});
   await form.getByLabel("Checklist",{exact:true}).selectOption("CLOSING");await form.getByLabel("First date (SAST)").fill("2026-10-23");await form.getByLabel("Responsible staff").selectOption(cso);await form.getByLabel("Absence cover").selectOption(cover);await form.getByLabel("Manager / GM reviewer").selectOption(manager);await form.getByLabel("Repeat",{exact:true}).selectOption("DAILY");await form.getByLabel("Total occurrences").fill("2");await form.getByRole("button",{name:"Create planned runs"}).click();await expect(page.getByRole("region",{name:"Checklist record"})).toBeVisible();
   actor=cso;await page.getByRole("button",{name:"Reload saved records"}).click();await page.getByRole("button",{name:"Start inspection"}).click();await expect(page.getByLabel(/^Result:/)).toHaveCount(2);
   const sheet=page.getByRole("region",{name:"Weekly checklist sheet"});
@@ -84,6 +109,9 @@ try {for(const width of [1440,390,320]) {
   }
   // Reuse the same rendered editor for a padlock run and verify discrepancies/counts and stale/lost-response recovery.
   actor=cso;task.status="IN_PROGRESS";task.title="Weekly padlock walkthrough";task.completedAt=null;record={...record,template:"PADLOCK",rows:[makeRow("unit1","Unit 01","VACANT"),makeRow("unit2","Unit 02","REVIEW")],submittedAt:null,submittedBy:null,reviewedAt:null,reviewedBy:null,reviewNote:""};
+  await page.goto(`${base}/operations/padlocks`);
+  await (await verifyQueue("Weekly padlock walkthrough", "padlocks")).click();
+  await expect(page.getByRole("region", { name: "Padlock count record" })).toBeVisible();
   await page.goto(`${base}/operations/checklists?id=${runId}`);
   await expect(page).toHaveURL(`${base}/operations/padlocks?id=${runId}`);
   await expect(page.getByRole("heading",{name:"Padlock counts",exact:true})).toBeVisible();
