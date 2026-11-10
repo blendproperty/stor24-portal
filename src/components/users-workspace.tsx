@@ -63,6 +63,8 @@ export function UsersWorkspace() {
   const [notice, setNotice] = useState("");
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [resetUser, setResetUser] = useState<UserRow | null>(null);
+  const [temporaryPassword, setTemporaryPassword] = useState("");
   const [permissionUser, setPermissionUser] = useState<UserRow | null>(null);
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
 
@@ -155,6 +157,18 @@ export function UsersWorkspace() {
       return;
     }
     await load();
+  }
+
+  async function resetPassword() {
+    if (!resetUser) return;
+    setBusy(true); setError("");
+    try {
+      const response = await fetch(`/api/v1/users/${resetUser.id}/temporary-password`, { method: "POST", cache: "no-store" });
+      const payload = await response.json();
+      if (!response.ok) { setError(payload.error?.message ?? "Password reset failed."); return; }
+      setTemporaryPassword(payload.data.temporaryPassword);
+    } catch { setError("The result is uncertain. Check the account before trying again."); }
+    finally { setBusy(false); }
   }
 
   async function savePermissions() {
@@ -336,6 +350,7 @@ export function UsersWorkspace() {
                       >
                         Edit permissions
                       </button>
+                      {user.active !== false ? <button className="text-button" onClick={() => { setResetUser(user); setTemporaryPassword(""); setError(""); }}>Reset password</button> : null}
                       <button
                         className={
                           user.active === false
@@ -483,6 +498,11 @@ export function UsersWorkspace() {
           </div>
         </div>
       ) : null}
+      {resetUser ? <div className="modal-backdrop" role="presentation"><div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="reset-title">
+        <h2 id="reset-title">Reset password for {resetUser.name}</h2>
+        {temporaryPassword ? <><p>Send this temporary password privately to {resetUser.name}. It expires in 30 minutes and is shown only here. They must choose a new password and complete their existing two-step verification.</p><p style={{ overflowWrap: "anywhere" }}><strong>{temporaryPassword}</strong></p></> : <><p>This signs the user out and disables their current password immediately. A temporary password will be shown once and expires in 30 minutes.</p><button className="button button-primary" disabled={busy} onClick={resetPassword}>{busy ? "Creating…" : "Create temporary password"}</button></>}
+        {error ? <p className="form-error" role="alert">{error}</p> : null}<button className="button button-secondary" disabled={busy} onClick={() => { setResetUser(null); setTemporaryPassword(""); setError(""); }}>Close</button>
+      </div></div> : null}
       {permissionUser ? (
         <div className="modal-backdrop" role="presentation">
           <div

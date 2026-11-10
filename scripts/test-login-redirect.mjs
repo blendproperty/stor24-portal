@@ -36,5 +36,24 @@ try {
     assert.equal(await page.evaluate(() => window.__destination), undefined);
     assert.deepEqual(errors, []); await page.close();
   }
+  {
+    const page = await browser.newPage();
+    let resetBody;
+    await page.route("**/api/auth/**", async route => {
+      if (route.request().url().endsWith("/login")) return route.fulfill({ json: { data: { passwordChangeRequired: true } } });
+      resetBody = route.request().postDataJSON();
+      return route.fulfill({ json: { data: { reset: true } } });
+    });
+    await page.goto(`${origin}/login`);
+    await page.getByLabel("Work email").fill("staff@example.invalid");
+    await page.getByLabel("Password", { exact: true }).fill("synthetic-temporary-credential-1234567890");
+    await page.getByRole("button", { name: "Sign in to portal" }).click();
+    await page.getByLabel("New password").fill("Synthetic-New-Password-2026!");
+    await page.getByRole("button", { name: "Set new password" }).click();
+    await expect(page.getByRole("alert")).toContainText("Password changed");
+    assert.deepEqual(resetBody, { token: "synthetic-temporary-credential-1234567890", password: "Synthetic-New-Password-2026!" });
+    assert.equal(await page.evaluate(() => window.__destination), undefined);
+    await page.close();
+  }
   console.log("PASS: actual password/MFA/setup component rejects external and normalized redirect variants; local query/hash destination preserved.");
 } finally { await browser.close(); await new Promise(r => server.close(r)); }

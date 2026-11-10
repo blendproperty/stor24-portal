@@ -4,6 +4,7 @@ import { setSession } from "@/lib/session";
 import { loginSchema } from "@/lib/validators";
 import { privacyHash, rateLimit, requestIp, sameOrigin } from "@/lib/request-security";
 import { hash } from "bcryptjs";
+import { hashResetToken } from "@/lib/password-reset";
 import { setMfaChallenge } from "@/lib/mfa-challenge";
 
 export async function POST(request: Request) {
@@ -22,6 +23,12 @@ export async function POST(request: Request) {
   const comparisonHash = user?.passwordHash ?? await hash("constant-time-invalid-password", 12);
   const valid = await compare(parsed.data.password, comparisonHash);
   if (!user?.passwordHash || !valid) {
+    if (user && parsed.data.password.length >= 32) {
+      const reset = await db.passwordResetToken.findUnique({ where: { tokenHash: hashResetToken(parsed.data.password) } });
+      if (reset && reset.userId === user.id && !reset.usedAt && reset.expiresAt >= new Date()) {
+        return Response.json({ data: { passwordChangeRequired: true } }, { headers: { "Cache-Control": "no-store" } });
+      }
+    }
     if (user) await db.auditEvent.create({ data: { organisationId: user.organisationId, actorId: user.id, action: "user.login.failed", entityType: "User", entityId: user.id, ipHash: privacyHash(ip) } });
     return Response.json({ error: "Email or password is incorrect." }, { status: 401 });
   }
