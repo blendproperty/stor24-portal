@@ -54,13 +54,13 @@ test("changing a role without a facility preserves all existing facility scopes"
   assert.deepEqual(created.map(x=>x.facilityId),["midpoint","melrose"]);
   created.length=0; scopes=[null];
   assert.equal((await change({roleName:"Facility manager"})).status,409);
-  assert.deepEqual(created,[]);
+  assert.equal(created.length,0);
   created.length=0; scopes=["midpoint"];
   assert.equal((await change({roleName:"Facility manager",facilityCode:"MELROSE"})).status,200);
   assert.deepEqual(created.map(x=>x.facilityId),["melrose"]);
   created.length=0; scopes=[];
   assert.equal((await change({roleName:"Facility manager"})).status,409);
-  assert.deepEqual(created,[]);
+  assert.equal(created.length,0);
 });
 
 test("a saved store workflow role allows casework and requests without financial approval or cross-store authority", () => {
