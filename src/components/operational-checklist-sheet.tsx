@@ -101,11 +101,13 @@ export function OperationalChecklistSheet({ rows, week, startAt, assignee, templ
     <p className={styles.sheetHint}>{padlocks ? editable ? "Enter the lock count and observed status for each unit." : "Recorded lock count and observed status by unit." : `Select a weekday heading to open that run.${editable ? " Edit the highlighted day, then save below." : " The highlighted column shows the open run."}`} Scroll the sheet on smaller screens.</p>
     <div ref={viewport} className={padlocks ? styles.sheetScroll : `${styles.sheetScroll} ${styles.workbookScroll}`} role="region" tabIndex={0} aria-label={padlocks ? "Padlock count sheet" : "Weekly checklist sheet"}>
       {padlocks ? <table className={`${styles.sheet} ${styles.padlockSheet}`}>
-        <thead><tr><th scope="col">Unit</th><th scope="col">Locks</th><th scope="col">Observed status</th><th scope="col">Comment</th></tr></thead>
+        <thead><tr><th scope="col">Unit</th><th scope="col">Locks</th><th scope="col">Observed status</th><th scope="col">Discrepancy reason / comment</th></tr></thead>
         <tbody>{rows.map(row => <tr key={row.id}>
           <th scope="row">{row.label}<small>Expected: {row.expected === "REVIEW" ? "Review" : resultLabels[row.expected === "PASS" ? "PENDING" : row.expected]}</small>
             {row.overlockTask && <small>Compare collections list</small>}</th>
-          <td>{count(row)}</td><td>{result(row)}</td><td>{comment(row)}</td>
+          <td>{count(row)}</td><td>{result(row)}</td><td>{comment(row)}
+            {editable ? <label className={styles.discrepancy}><input type="checkbox" aria-label={`Collections discrepancy: ${row.label}`} checked={row.comparisonDiscrepancy ?? false} onChange={event => update(row.id, { comparisonDiscrepancy: event.target.checked })}/> Collections discrepancy</label> : row.comparisonDiscrepancy && <small>Collections discrepancy</small>}
+          </td>
         </tr>)}</tbody>
       </table> : <table className={`${styles.sheet} ${styles.workbookSheet}`}>
         <caption>{checklistTemplates[template].name}</caption>

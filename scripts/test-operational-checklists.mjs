@@ -109,14 +109,32 @@ try {for(const width of [1440,390,320]) {
     record=previous;task.title=previousTitle;
   }
   // Reuse the same rendered editor for a padlock run and verify discrepancies/counts and stale/lost-response recovery.
-  actor=cso;task.status="IN_PROGRESS";task.title="Weekly padlock walkthrough";task.completedAt=null;record={...record,template:"PADLOCK",rows:[makeRow("unit1","Unit 01","VACANT"),makeRow("unit2","Unit 02","REVIEW")],submittedAt:null,submittedBy:null,reviewedAt:null,reviewedBy:null,reviewNote:""};
+  actor=manager;task.status="IN_PROGRESS";task.title="Weekly padlock walkthrough";task.completedAt=null;record={...record,template:"PADLOCK",rows:[makeRow("unit1","Unit 01","VACANT"),makeRow("unit2","Unit 02","REVIEW")],submittedAt:null,submittedBy:null,reviewedAt:null,reviewedBy:null,reviewNote:""};
   await page.goto(`${base}/operations/padlocks`);
-  await (await verifyQueue("Weekly padlock walkthrough", "padlocks")).click();
+  const openPadlocks = await verifyQueue("Weekly padlock walkthrough", "padlocks");
+  await page.getByRole("button", { name: "Plan padlock count", exact: true }).click();
+  const padlockPlan = page.getByRole("form", { name: "Plan padlock count" });
+  const schedule = await padlockPlan.getByRole("group", { name: "Store and schedule" }).boundingBox();
+  const assignments = await padlockPlan.getByRole("group", { name: "CSO and reviewer" }).boundingBox();
+  assert.ok(width > 760 ? assignments.x > schedule.x + schedule.width : assignments.y > schedule.y + schedule.height);
+  await expect(padlockPlan.getByLabel("Repeat", { exact: true })).toHaveValue("WEEKLY");
+  await expect(padlockPlan.getByLabel("Number of weekly runs")).toBeVisible();
+  await padlockPlan.getByLabel("Repeat", { exact: true }).selectOption("ONCE");
+  await expect(padlockPlan.getByLabel("Number of weekly runs")).toHaveCount(0);
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await padlockPlan.getByLabel("Repeat", { exact: true }).selectOption("WEEKLY");
+  await padlockPlan.screenshot({ path: `output/checklist-browser/padlock-planner-${width}.png` });
+  await padlockPlan.getByRole("button", { name: "Close planner" }).click();
+  await openPadlocks.click();
   await expect(page.getByRole("region", { name: "Padlock count record" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open printable rent roll" })).toHaveAttribute("href", `/api/v1/operations/checklists?id=${runId}&print=walkthrough`);
+  await expect(page.getByRole("link", { name: "Open collections calls list" })).toHaveAttribute("href", `/collections?facility=${task.facilityId}&mode=follow-up`);
+  actor=cso;
   await page.goto(`${base}/operations/checklists?id=${runId}`);
   await expect(page).toHaveURL(`${base}/operations/padlocks?id=${runId}`);
   await expect(page.getByRole("heading",{name:"Padlock counts",exact:true})).toBeVisible();
   await expect(page.getByRole("region",{name:"Padlock count sheet"}).getByRole("columnheader",{name:"Locks",exact:true})).toBeVisible();
+  await page.getByLabel("Collections discrepancy: Unit 02").check();
   await page.getByLabel(/^Result:/).first().selectOption("OVERLOCKED");await page.getByLabel(/^Result:/).nth(1).selectOption("OCCUPIED");await page.getByLabel(/^Locks counted:/).first().fill("2");await page.getByLabel(/^Locks counted:/).nth(1).fill("1");await page.getByLabel(/^Comment:/).first().fill("Unexpected overlock; manager to investigate");await page.getByLabel(/^Comment:/).nth(1).fill("Service unit occupied; needs review");await page.getByLabel("Rent roll and collections comparison reference").fill("Rent roll and approved collections list 23 October");await page.getByLabel("Show findings only").check();await expect(page.getByLabel(/^Result:/)).toHaveCount(2);
   await page.screenshot({path:`output/checklist-browser/padlocks-${width}.png`,fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   mode="stale";await page.getByRole("button",{name:"Submit for manager review"}).click();await expect(page.getByRole("alert")).toContainText("Reload");await expect(page.getByRole("button",{name:"Save progress"})).toBeDisabled();

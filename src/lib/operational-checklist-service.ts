@@ -93,7 +93,7 @@ export async function changeOperationalChecklist(scope: RequestScope, raw: Check
       record.rows = record.rows.map(row => {
         const result = input.rows.find(r => r.id === row.id)!;
         const allowed = record.template === "PADLOCK" ? ["PENDING", "VACANT", "OCCUPIED", "OVERLOCKED"] : ["PENDING", "PASS", "ISSUE", "NA"];
-        if (!allowed.includes(result.state)) throw new Error("CHECKLIST_INCOMPLETE");
+        if (!allowed.includes(result.state) || (record.template !== "PADLOCK" && result.comparisonDiscrepancy !== undefined)) throw new Error("CHECKLIST_INCOMPLETE");
         return { ...row, ...result };
       });
       record.summary = input.summary; record.comparisonReference = input.comparisonReference;
@@ -121,6 +121,24 @@ export async function changeOperationalChecklist(scope: RequestScope, raw: Check
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: before.facilityId, actorId: scope.userId, action: `operationalChecklist.${input.action.toLowerCase()}`, entityType: "Task", entityId: before.id, before: json(before), after: json(after) } });
     return after.id;
   }, { timeout: 30000 });
+}
+
+export async function padlockWalkthrough(scope: RequestScope, id: string) {
+  return db.$transaction(async tx => {
+    const task = await tx.task.findFirst({
+      where: {
+        id, organisationId: scope.organisationId, facility: facilityWhere(scope), purpose: CHECKLIST_PURPOSE,
+        status: { not: "CANCELLED" }, operationalChecklist: { path: ["template"], equals: "PADLOCK" },
+      },
+      select: { facilityId: true, facility: { select: { name: true } }, assigneeId: true, coverId: true, dueAt: true, operationalChecklist: true },
+    });
+    if (!task?.facilityId || !task.facility) throw new Error("NOT_FOUND");
+    const actor = await staff(tx, scope, scope.userId, task.facilityId);
+    if (scope.userId !== task.assigneeId && scope.userId !== task.coverId && !canReviewPadlocks(actor, scope.organisationId, task.facilityId)) throw new Error("FORBIDDEN");
+    const record = checklistRecordSchema.parse(task.operationalChecklist);
+    const rows = record.sourceAt ? record.rows : (await snapshot(tx, scope, task.facilityId)).rows;
+    return { store: task.facility.name, dueAt: task.dueAt, rows };
+  }, { isolationLevel: "RepeatableRead", timeout: 30000 });
 }
 
 export async function operationalChecklists(scope: RequestScope, query: { facilityId?: string; id?: string; closed?: boolean; cursor?: string; kind?: "checklists" | "padlocks" }) {
