@@ -80,6 +80,11 @@ export async function POST(request: Request) {
     );
   }
 
+  if (parsed.data.roleName === "Facility manager") {
+    const facility = parsed.data.facilityCode && await db.facility.findUnique({ where: { organisationId_code: { organisationId: actor.user.organisationId, code: parsed.data.facilityCode } }, select: { id: true } });
+    if (!facility) return Response.json({ error: { code: "FACILITY_REQUIRED", message: "Choose a valid facility for a facility manager." } }, { status: 422 });
+  }
+
   const organisation = await db.organisation.findUniqueOrThrow({ where: { id: actor.user.organisationId } });
   await expireOldInvitations();
 
