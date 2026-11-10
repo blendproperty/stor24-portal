@@ -14,17 +14,19 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
       await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${actor.user.id} FOR UPDATE`;
       const current = await tx.user.findUnique({ where: { id: actor.user.id }, include: { roleAssignments: { include: { role: true } } } });
       if (!current?.active || !current.passwordHash || current.sessionVersion !== actor.user.sessionVersion || !currentRoleAccess(current.roleAssignments).owner) throw new Error("FORBIDDEN");
+      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${id} AND "organisationId" = ${actor.user.organisationId} FOR UPDATE`;
       const target = await tx.user.findFirst({ where: { id, organisationId: actor.user.organisationId } });
       if (!target) return { kind: "missing" as const };
-      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${id} FOR UPDATE`;
+      if (target.active) return { kind: "active" as const };
       const dependencies = await userRemovalDependencies(tx, id);
       if (dependencies.length) return { kind: "linked" as const, dependencies };
       await tx.userInvitation.updateMany({ where: { organisationId: target.organisationId, email: target.email, status: "PENDING" }, data: { status: "REVOKED", revokedAt: new Date() } });
       await tx.user.delete({ where: { id } });
       await tx.auditEvent.create({ data: { organisationId: target.organisationId, actorId: actor.user.id, action: "user.account.deleted", entityType: "User", entityId: id } });
       return { kind: "deleted" as const };
-    }, { isolationLevel: "Serializable" });
+    }, { isolationLevel: "Serializable", timeout: 20000 });
     if (result.kind === "missing") return Response.json({ error: { message: "User not found." } }, { status: 404 });
+    if (result.kind === "active") return Response.json({ error: { message: "Deactivate this user first, then select Show inactive users to delete the account." } }, { status: 409 });
     if (result.kind === "linked") return Response.json({ error: { message: `This user is linked to business records (${result.dependencies.map(name => name.replace(/([a-z])([A-Z])/g, "$1 $2")).join(", ")}). Reassign those records before deleting the user.` } }, { status: 409 });
     return Response.json({ data: { deleted: true } }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

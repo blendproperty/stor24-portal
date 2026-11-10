@@ -21,11 +21,11 @@ test("permanent user deletion frees email while preserving linked business recor
   await db.roleAssignment.create({data:{userId:target.id,roleId:staffRole.id}});
   const reset=await db.passwordResetToken.create({data:{userId:target.id,organisationId:org.id,tokenHash:hashResetToken(randomUUID()),expiresAt:new Date(Date.now()+60000)}});
   const oldInvite=await db.userInvitation.create({data:{organisationId:org.id,email:target.email,name:target.name,roleName:"Facility manager",invitedByName:"Synthetic owner",tokenHash:hashResetToken(randomUUID()),expiresAt:new Date(Date.now()+60000)}});
-  const priorAudit=await db.auditEvent.create({data:{organisationId:org.id,actorId:target.id,action:"synthetic.staff.action",entityType:"User",entityId:target.id}});
+  const priorAudit=await db.auditEvent.create({data:{organisationId:org.id,actorId:target.id,action:"user.login.succeeded",entityType:"User",entityId:target.id}});
   let session: unknown=null;
   const out=await build({entryPoints:["src/app/api/v1/users/[id]/permanent-delete/route.ts"],bundle:true,write:false,platform:"node",format:"cjs",packages:"external",plugins:[{name:"fixture",setup(b){
-    b.onResolve({filter:/^@\/lib\/(db|session)$/},a=>({path:a.path,namespace:"fixture"}));
-    b.onLoad({filter:/.*/,namespace:"fixture"},a=>({contents:a.path.endsWith("/db")?"export const db=__db;":"export const getSession=async()=>__session();"}));
+    b.onResolve({filter:/^@\/(lib\/(db|session)|generated\/prisma\/client)$/},a=>({path:a.path,namespace:"fixture"}));
+    b.onLoad({filter:/.*/,namespace:"fixture"},a=>({contents:a.path.endsWith("/db")?"export const db=__db;":a.path.endsWith("/session")?"export const getSession=async()=>__session();":"import {sqltag,join} from '@prisma/client/runtime/client';export const Prisma={sql:sqltag,join};",resolveDir:process.cwd()}));
   }}]});
   const mod={exports:{} as {DELETE:(r:Request,c:{params:Promise<{id:string}>})=>Promise<Response>}};
   new Function("require","module","exports","__db","__session",out.outputFiles[0].text)(createRequire(import.meta.url),mod,mod.exports,db,()=>session);
@@ -39,6 +39,8 @@ test("permanent user deletion frees email while preserving linked business recor
       session={userId:owner.id,sessionVersion:owner.sessionVersion,mfaVerified:true};
       assert.equal((await call(target.id,"https://attacker.invalid")).status,403);
       assert.equal((await call(foreign.id)).status,404); assert.equal((await call(owner.id)).status,409);
+      assert.equal((await call(target.id)).status,409);
+      await db.user.update({where:{id:target.id},data:{active:false,sessionVersion:{increment:1}}});
     });
     await t.test("linked records prevent deletion until reassigned",async()=>{
       const facility=await db.facility.create({data:{organisationId:org.id,code:"CI",name:"Synthetic facility"}});
@@ -49,6 +51,12 @@ test("permanent user deletion frees email while preserving linked business recor
       const training=await db.moveInTrainingRun.create({data:{organisationId:org.id,userId:target.id,facilityId:facility.id,generation:1,state:{}}});
       const legacy=await call(target.id);assert.equal(legacy.status,409);assert.match((await legacy.json()).error.message,/Move In Training Run/);
       await db.moveInTrainingRun.update({where:{id:training.id},data:{userId:owner.id}});
+      const config=await db.configurationProfile.create({data:{organisationId:org.id,domain:"CI",name:key,config:{nested:{reviewerId:target.id}}}});
+      const json=await call(target.id);assert.equal(json.status,409);assert.match((await json.json()).error.message,/Configuration Profile data/);
+      await db.configurationProfile.update({where:{id:config.id},data:{config:{nested:{reviewerId:owner.id}}}});
+      const businessAudit=await db.auditEvent.create({data:{organisationId:org.id,actorId:target.id,action:"netcash.debicheck_bank_consent_reviewed",entityType:"ConfigurationProfile",entityId:config.id}});
+      const auditBlock=await call(target.id);assert.equal(auditBlock.status,409);assert.match((await auditBlock.json()).error.message,/Business audit event/);
+      await db.auditEvent.update({where:{id:businessAudit.id},data:{actorId:owner.id}});
     });
     await t.test("audit failure rolls back; success removes account and credential, retains audit and frees the exact email",async()=>{
       await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_user_delete_audit_failure CHECK (false) NOT VALID');
