@@ -3,7 +3,9 @@ import { apiError, jsonBody } from "@/lib/api";
 import { requirePermissionScope } from "@/lib/scope";
 import { sameOrigin } from "@/lib/request-security";
 import { checklistChangeSchema, checklistCreateSchema } from "@/lib/operational-checklist-policy";
-import { createOperationalChecklist, changeOperationalChecklist, operationalChecklists } from "@/lib/operational-checklist-service";
+import { createOperationalChecklist, changeOperationalChecklist, operationalChecklists, padlockWalkthrough } from "@/lib/operational-checklist-service";
+import { operationalPrintTable } from "@/lib/operational-print-table";
+import { formatSouthAfricaDateTime } from "@/lib/south-africa-time";
 
 const messages: Record<string, string> = {
   CHECKLIST_INCOMPLETE: "Complete every item. Explain failed, skipped and discrepant checks; enter each padlock count.",
@@ -24,7 +26,18 @@ export async function GET(request: Request) {
   try {
     const scope = await requirePermissionScope("operations.view"), params = new URL(request.url).searchParams;
     if ([...params.keys()].some(k => params.getAll(k).length !== 1)) throw new Error("INVALID_JSON");
-    const query = z.object({ kind: z.enum(["checklists", "padlocks"]).optional(), facilityId: z.string().cuid().optional(), id: z.string().cuid().optional(), closed: z.enum(["true", "false"]).optional(), cursor: z.string().cuid().optional() }).strict().parse(Object.fromEntries(params));
+    const query = z.object({ kind: z.enum(["checklists", "padlocks"]).optional(), facilityId: z.string().cuid().optional(), id: z.string().cuid().optional(), closed: z.enum(["true", "false"]).optional(), cursor: z.string().cuid().optional(), print: z.literal("walkthrough").optional() }).strict().parse(Object.fromEntries(params));
+    if (query.print) {
+      if (!query.id || [...params.keys()].length !== 2) throw new Error("INVALID_JSON");
+      const { store, dueAt, rows } = await padlockWalkthrough(scope, query.id);
+      if (!rows.length) throw new Error("CHECKLIST_EMPTY");
+      return operationalPrintTable("All-units rent roll for padlock walkthrough", [
+        `${store} · ${rows.length} units · Run due ${formatSouthAfricaDateTime(dueAt)} SAST`,
+        "CSO: ________________________    Walk date: ________________________",
+        "At each unit, tick one observed status and note the lock count or anything unexpected.",
+      ], ["Unit", "Register status", "Vacant", "Occupied", "Overlocked", "Locks / notes"],
+      rows.map(row => [row.label, row.expected === "OCCUPIED" ? "Occupied" : row.expected === "VACANT" ? "Vacant" : "Review", "", "", "", ""]));
+    }
     return Response.json({ data: await operationalChecklists(scope, { ...query, closed: query.closed === "true" }) }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) { return failure(error); }
 }
