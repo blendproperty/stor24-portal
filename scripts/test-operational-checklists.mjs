@@ -70,6 +70,15 @@ try {for(const width of [1440,390,320]) {
     record.rows=items.map((label,i)=>({...makeRow(String(i),`Daily · ${label}`),state:i<7?"PASS":"PENDING"}));
     await page.getByRole("button",{name:"Reload saved records"}).click();
     await expect(page.getByRole("heading",{name:"Management checklist",exact:true})).toBeVisible();
+    const workbook=page.getByRole("region",{name:"Weekly checklist sheet"});
+    await expect(workbook.getByRole("rowheader",{name:"Date",exact:true})).toBeVisible();
+    await expect(workbook.getByText("Weekly TEST-Friday",{exact:true})).toHaveCount(2);
+    await expect(workbook.getByRole("rowheader",{name:"CCTV display working properly",exact:true})).toBeVisible();
+    assert.ok(await workbook.evaluate(region=>{
+      const headers=region.querySelectorAll("thead tr:first-child th");
+      return headers[0].offsetWidth>3*headers[1].offsetWidth && region.scrollHeight<=region.clientHeight+1;
+    }));
+    await workbook.screenshot({path:"output/checklist-browser/workbook-management-1440.png"});
     await page.screenshot({path:"output/checklist-browser/management-1440.png",fullPage:true});
     record=previous;task.title=previousTitle;
   }
