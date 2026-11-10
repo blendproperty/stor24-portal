@@ -10,6 +10,7 @@ const messages: Record<string, string> = {
   CHECKLIST_COMPARISON_REQUIRED: "Record the rent roll and collections-list reference used for the padlock comparison.",
   CHECKLIST_SOURCE_CHANGED: "The unit list or recorded overlock work changed. Save your notes, then restart the walkthrough with the current list.",
   CHECKLIST_REVIEWER_REQUIRED: "Choose a reviewer separate from the preparer, cover and submitting staff member.",
+  CHECKLIST_PADLOCK_REVIEWER_REQUIRED: "Choose a separate manager or GM with padlock review access.",
   CHECKLIST_EMPTY: "There are no units to inspect at this store.", CHECKLIST_LIMIT: "This store exceeds the supported checklist limit. Contact your administrator.",
   CHECKLIST_TIMEZONE: "The store must be configured for Africa/Johannesburg.", CHECKLIST_NOT_DUE: "This check window has not started yet.",
 };
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
   try {
     const scope = await requirePermissionScope("operations.view"), params = new URL(request.url).searchParams;
     if ([...params.keys()].some(k => params.getAll(k).length !== 1)) throw new Error("INVALID_JSON");
-    const query = z.object({ facilityId: z.string().cuid().optional(), id: z.string().cuid().optional(), closed: z.enum(["true", "false"]).optional(), cursor: z.string().cuid().optional() }).strict().parse(Object.fromEntries(params));
+    const query = z.object({ kind: z.enum(["checklists", "padlocks"]).optional(), facilityId: z.string().cuid().optional(), id: z.string().cuid().optional(), closed: z.enum(["true", "false"]).optional(), cursor: z.string().cuid().optional() }).strict().parse(Object.fromEntries(params));
     return Response.json({ data: await operationalChecklists(scope, { ...query, closed: query.closed === "true" }) }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) { return failure(error); }
 }
