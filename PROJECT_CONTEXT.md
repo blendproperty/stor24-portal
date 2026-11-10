@@ -7824,3 +7824,12 @@ Testing: isolated PostgreSQL exercises two-account review, no pre-approval charg
 Commit/push: see PR #728 branch. Merge: not merged. Deployment/configuration: none. Live production verification: none. Combined-account billing and delivery integration, finance review of future-effective balance treatment, provider acceptance, staff/device UAT, training and all previous gates remain open.
 
 Batch review is invalidated if the operator edits account billing terms; the synthetic billing browser checks passed after this change. Exact-head hosted checks and staff/finance UAT remain pending.
+
+## 2026-11-10 — Invoice generation date permission candidate
+
+- **Implementation:** Candidate adds `billing.schedule.manage` to the permission editor and requires it for the store-scoped invoice-schedule POST. It is based on unmerged PR #728, which contains the date control; it does not grant billing posting or company configuration. Existing scheduler defaults and review/finance holds are unchanged. Existing billing managers need this new grant to change the date after release.
+- **Testing:** Focused mocked route test passed: billing posting and company configuration grants alone cannot change the date; a grant for another store cannot authorize it; same-origin and a matching store grant are required. Changed-file ESLint passed. Existing PR #728 isolated database schedule tests are prior evidence, not an exact-head rerun. Initial mocked test failed due to an unmocked dependency and passed after fixing the fixture.
+- **Commit and push:** Candidate prepared on `codex/invoice-schedule-access-20261110` from PR #728 head `0aafc0a0e620f37eccfc727372453c9c5c0740db`; Git records publication. This is not based on current main and requires integration with the dependent PR and normal validation.
+- **Merge:** Neither this permission candidate nor dependent PR #728 is merged at this entry.
+- **Deployment and configuration:** No deployment, scheduler activation, permission grant or production financial change. The date control is not available on current main. Financial policy and approval gates for the next-month workflow remain open.
+- **Live production verification:** None for this candidate. Katlego's actual permission grant and staff/device UAT remain pending release and verification. Existing provider, data, privacy, training, finance and acceptance gates remain open.
