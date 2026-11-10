@@ -49,5 +49,34 @@
   .padlockSheet tr > :nth-child(3) { width: 105px; }
 }
 
+.workbookScroll { max-width: min(100%, 1140px); max-height: none; border: 0; border-radius: 0; }
+.workbookSheet { min-width: 900px; border: 1px solid #454545; border-collapse: collapse; color: #171717; background: white; font-size: .78rem; line-height: 1.25; }
+.workbookItemColumn { width: 34%; }
+.workbookCommentColumn { width: 24%; }
+.workbookSheet caption { padding: .3rem .35rem .55rem; background: white; text-align: left; font-size: .9rem; font-weight: 700; text-transform: uppercase; }
+.workbookSheet tr > :is(:first-child, :last-child, .activeDay) { width: auto; }
+.workbookSheet :is(th, td) { padding: .2rem .35rem; border: 1px solid #454545; }
+.workbookSheet :is(thead th, tbody th) { text-transform: uppercase; }
+.workbookSheet thead tr:first-child th { position: static; }
+.workbookSheet thead :is(th, td), .workbookSheet tbody tr:nth-child(even), .workbookSheet .group th { background: white; }
+.workbookSheet :is(th, td).activeDay { background: #eef5ec; }
+.workbookSheet time { font-size: .68rem; }
+.workbookSheet tbody td:last-child { text-align: left; }
+.workbookInstruction { margin-bottom: .125rem; }
+.workbookComment { display: flex; align-items: start; flex-wrap: wrap; gap: .25rem; }
+.workbookComment textarea { flex: 1 1 9rem; }
+.workbookComment details[open] { flex-basis: 100%; }
+.workspace .workbookSheet td :is(select, input, textarea) { min-height: 24px; padding: .1rem .2rem; border-radius: 0; }
+.workspace .workbookSheet td :is(select, input) { height: 24px; }
+.workspace .workbookSheet td select { appearance: none; cursor: pointer; text-align: center; }
+@media (max-width: 600px) {
+  .workbookItemColumn { width: 150px; }
+  .workbookCommentColumn { width: 190px; }
+  .workbookSheet tr > th:first-child:not([colspan]) { background: white; }
+  .workbookSheet thead tr:first-child th:first-child { position: sticky; }
+  .workspace .workbookSheet td :is(select, input, textarea) { min-height: 36px; }
+  .workspace .workbookSheet td :is(select, input) { height: 36px; }
+}
+
 .run { flex-wrap: wrap; justify-content: space-between; }
 @media (max-width: 600px) { .workspace fieldset { padding: .65rem; } .workspace :global(.form-grid) { grid-template-columns: minmax(0, 1fr); } .workspace :global(.button-row) { flex-wrap: wrap; } }

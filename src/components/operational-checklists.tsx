@@ -6,7 +6,7 @@ import Link from "next/link";
 import { PageHeader } from "./page-header";
 import { checklistHref, checklistIssue, checklistRecordSchema, checklistRows, checklistRowSchema, checklistTemplates, type ChecklistTemplate, type ChecklistRow } from "@/lib/operational-checklist-policy";
 import { formatSouthAfricaDateTime, southAfricaDateKey } from "@/lib/south-africa-time";
-import { OperationalChecklistSheet } from "./operational-checklist-sheet";
+import { OperationalChecklistSheet, workbookItemLabel } from "./operational-checklist-sheet";
 import styles from "./operational-checklists.module.css";
 
 const taskSchema = z.object({ id: z.string(), title: z.string(), facilityId: z.string(), assigneeId: z.string().nullable(), coverId: z.string().nullable(), status: z.string(), startAt: z.string().nullable(), dueAt: z.string().nullable(), updatedAt: z.string(), completedAt: z.string().nullable(), facility: z.object({ name: z.string() }), assignee: z.object({ name: z.string() }).nullable(), cover: z.object({ name: z.string() }).nullable() });
@@ -87,7 +87,7 @@ export function OperationalChecklists({ kind = "checklists" }: { kind?: "checkli
   const sheetRows = !rows.length && record && sheetDate && !padlocks && task?.status === "OPEN" ? checklistRows(record.template, new Date(sheetDate)) : rows;
   const week = data?.week ?? [];
   const visibleLabels = new Set([...sheetRows, ...week.flatMap(day => day.rows)]
-    .filter(row => row.label.toLowerCase().includes(search.toLowerCase()) && (!onlyIssues || row.state !== "PENDING" && checklistIssue(row)))
+    .filter(row => (row.label.toLowerCase().includes(search.toLowerCase()) || record && workbookItemLabel(record.template, row.label).toLowerCase().includes(search.toLowerCase())) && (!onlyIssues || row.state !== "PENDING" && checklistIssue(row)))
     .map(row => row.label));
   const issues = rows.filter(r => r.state !== "PENDING" && checklistIssue(r)), pending = rows.filter(r => r.state === "PENDING").length;
   function selectors(store: string, value: typeof assignment, change: (v: typeof assignment) => void) {
@@ -114,7 +114,7 @@ export function OperationalChecklists({ kind = "checklists" }: { kind?: "checkli
         <OperationalChecklistSheet
           rows={sheetRows.filter(row => visibleLabels.has(row.label))}
           week={week.map(day => ({ ...day, rows: day.rows.filter(row => visibleLabels.has(row.label)) }))}
-          startAt={sheetDate} assignee={task.assignee?.name ?? null} padlocks={padlocks} editable={editable} canSwitch={!disabled}
+          startAt={sheetDate} assignee={task.assignee?.name ?? null} template={record.template} editable={editable} canSwitch={!disabled}
           update={updateRow} openDay={id => { if (!dirty || window.confirm("Open the other day without saving your edits?")) { setSearch(""); setOnlyIssues(false); void read({ id }); } }} />
       </>}
       {rows.length > 0 && <>
