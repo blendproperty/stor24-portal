@@ -30,6 +30,7 @@ export async function POST(request: Request) {
   if (!role) {
     return Response.json({ error: { code: "ROLE_UNAVAILABLE", message: "The assigned role is no longer available." } }, { status: 409 });
   }
+  if (invitation.roleName === "Facility manager" && !facility) return Response.json({ error: { code: "FACILITY_REQUIRED", message: "This invitation needs a valid facility. Ask an administrator for a new invitation." } }, { status: 409 });
 
   try {
     const passwordHash = await hash(parsed.data.password, 12);

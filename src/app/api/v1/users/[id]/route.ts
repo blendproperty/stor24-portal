@@ -28,6 +28,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const facility = parsed.data.facilityCode ? await db.facility.findUnique({ where: { organisationId_code: { organisationId: target.organisationId, code: parsed.data.facilityCode } } }) : null;
   if (parsed.data.facilityCode && !facility) return Response.json({ error: { message: "Choose a valid facility." } }, { status: 422 });
   if (role && parsed.data.facilityCode === undefined && !target.roleAssignments.length) return Response.json({ error: { message: "Choose a facility for this user." } }, { status: 409 });
+  if (role?.name === "Facility manager" && (parsed.data.facilityCode === null || parsed.data.facilityCode === "" || (parsed.data.facilityCode === undefined && target.roleAssignments.some(a => a.facilityId === null)))) return Response.json({ error: { message: "Choose a facility for a facility manager." } }, { status: 409 });
   await db.$transaction(async (tx) => {
     if (parsed.data.active !== undefined) {
       await tx.user.update({ where: { id }, data: { active: parsed.data.active, sessionVersion: { increment: 1 } } });
@@ -38,6 +39,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       const existing = await tx.roleAssignment.findMany({ where: { userId: id }, select: { facilityId: true } });
       const facilities = parsed.data.facilityCode === undefined ? [...new Set(existing.map(a => a.facilityId))] : [facility?.id ?? null];
       if (!facilities.length) throw new Error("USER_SCOPE_REQUIRED");
+      if (role.name === "Facility manager" && facilities.some(id => id === null)) throw new Error("USER_SCOPE_REQUIRED");
       await tx.roleAssignment.deleteMany({ where: { userId: id } });
       for (const facilityId of facilities) await tx.roleAssignment.create({ data: { userId: id, roleId: role.id, facilityId } });
       await tx.user.update({ where: { id }, data: { sessionVersion: { increment: 1 } } });
