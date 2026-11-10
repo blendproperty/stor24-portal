@@ -1,3 +1,12 @@
+## 2026-11-10 — Permanent staff deletion deployed and control verified
+
+- Implementation: PR #753 adds owner-only permanent deletion of inactive staff, blocks deletion when business records remain linked, preserves business and security audit history, removes the account and credentials, and releases its email for a new invitation. Transactional database fencing and opaque ID markers prevent stale concurrent business references. The opaque marker contains neither email nor credentials.
+- Testing: Fresh isolated PostgreSQL migrations and deletion, permissions, linked-record, rollback, reinvitation, embedded-identifier and concurrency tests passed. Pull-request and merged-main CI, security, restricted-runtime and merchandise transaction workflows succeeded for release commit 049f2aedeb94df676f23606497505cf54c50d6d3. Synthetic checks do not establish production-scale scan cost or replace staff acceptance.
+- Commit and push: The implementation branch was pushed through 8759a35b81e08d986aa051fc4162ab43413d1883; this evidence is a separate documentation-only change.
+- Merge: PR #753 was squash merged to main as 049f2aedeb94df676f23606497505cf54c50d6d3.
+- Deployment and configuration: Production deployment run 42788834650 succeeded on 2026-11-10, applied migration 20261110130000_staff_deletion_fence and started the 049f2aede application image. Deployment logs report a healthy container and local application/database health.
+- Live production verification: The authenticated Users & permissions page displayed the new Delete user action for inactive Katlego Makhubele (katlego@stor24.co.za), and its confirmation stated that linked business records block deletion. The confirmation was cancelled; no actual account deletion or reinvitation was performed. Production linked-record status and end-to-end staff acceptance remain unverified. Preserve all other outstanding UAT, provider, data, training and approval gates.
+
 ## 2026-11-10 — Bounded deletion reference checks (draft)
 
 - Implementation: A stress test exposed excessive work when a structured field contains a long alphanumeric string. The candidate now checks retained opaque identifiers directly rather than generating every possible overlapping substring. The database migration remains atomic with a bounded lock wait.
