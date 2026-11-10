@@ -22,6 +22,7 @@ test("permanent user deletion frees email while preserving linked business recor
   const reset=await db.passwordResetToken.create({data:{userId:target.id,organisationId:org.id,tokenHash:hashResetToken(randomUUID()),expiresAt:new Date(Date.now()+60000)}});
   const oldInvite=await db.userInvitation.create({data:{organisationId:org.id,email:target.email,name:target.name,roleName:"Facility manager",invitedByName:"Synthetic owner",tokenHash:hashResetToken(randomUUID()),expiresAt:new Date(Date.now()+60000)}});
   const priorAudit=await db.auditEvent.create({data:{organisationId:org.id,actorId:target.id,action:"user.login.succeeded",entityType:"User",entityId:target.id}});
+  const historicalAudit=await db.auditEvent.create({data:{organisationId:org.id,actorId:target.id,action:"user.login.succeeded",entityType:"User",entityId:target.id,after:{userId:target.id}}});
   let session: unknown=null;
   const out=await build({entryPoints:["src/app/api/v1/users/[id]/permanent-delete/route.ts"],bundle:true,write:false,platform:"node",format:"cjs",packages:"external",plugins:[{name:"fixture",setup(b){
     b.onResolve({filter:/^@\/(lib\/(db|session)|generated\/prisma\/client)$/},a=>({path:a.path,namespace:"fixture"}));
@@ -73,6 +74,8 @@ test("permanent user deletion frees email while preserving linked business recor
       assert.equal((await call(target.id)).status,200);
       assert.equal(await db.user.findUnique({where:{id:target.id}}),null);assert.equal(await db.passwordResetToken.findUnique({where:{id:reset.id}}),null);
       assert.equal((await db.auditEvent.findUniqueOrThrow({where:{id:priorAudit.id}})).actorId,null);
+      const retained=await db.auditEvent.findUniqueOrThrow({where:{id:historicalAudit.id}}); assert.equal(retained.actorId,null); assert.deepEqual(retained.after,{userId:target.id});
+      await assert.rejects(db.auditEvent.create({data:{organisationId:org.id,action:"test",entityType:"User",entityId:"fixture",after:{userId:target.id}}}));
       assert.equal((await db.userInvitation.findUniqueOrThrow({where:{id:oldInvite.id}})).status,"REVOKED");
       assert.equal(await db.auditEvent.count({where:{entityId:target.id,action:"user.account.deleted"}}),1);
       const inviteBundle=await build({entryPoints:["src/app/api/v1/invitations/route.ts"],bundle:true,write:false,platform:"node",format:"cjs",packages:"external",plugins:[{name:"fixture",setup(b){

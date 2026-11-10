@@ -1,3 +1,9 @@
+## 2026-11-10 — Staff deletion audit-history and dialog correction (candidate)
+
+- Implementation: Preserve historical audit snapshots without treating their embedded staff IDs as live business assignments. Continue blocking business-record links and business audit actors; retain the concurrency guard for new or changed audit references. Improve deletion dialog spacing and responsive action layout.
+- Testing: Fresh isolated PostgreSQL migrations, retained audit snapshot and blocked-link deletion tests, stale-writer concurrency tests, schema inventory and responsive browser checks passed. Production-scale timings and real-account acceptance remain unverified.
+- Commit and push: See the candidate branch for commit and push evidence. Merge: Pending. Deployment and configuration: Pending. Live production verification: Pending; Katlego has not been deleted by this change. Preserve outstanding UAT, provider, data, training and approval gates.
+
 ## 2026-11-10 — Permanent staff deletion deployed and control verified
 
 - Implementation: PR #753 adds owner-only permanent deletion of inactive staff, blocks deletion when business records remain linked, preserves business and security audit history, removes the account and credentials, and releases its email for a new invitation. Transactional database fencing and opaque ID markers prevent stale concurrent business references. The opaque marker contains neither email nor credentials.

@@ -27,7 +27,7 @@ test("permanent deletion inventory covers staff references and structured record
     }
   }
   for (const field of ["actorId","before","after"]) assert.match(migration,new RegExp(`CREATE TRIGGER "staff_ref_check" BEFORE INSERT OR UPDATE OF [^\n]*"${field}"[^\n]* ON public\."AuditEvent"`));
-  assert.ok(source.includes(`FROM "AuditEvent" WHERE`) && source.includes(`in "before"::text`) && source.includes(`in "after"::text`));
+  assert.ok(source.includes("tx.auditEvent.findFirst"), "business audit actors still block deletion");
   assert.equal((migration.match(/CREATE FUNCTION public\."stor24_staff_ref_/g)||[]).length,(migration.match(/REVOKE ALL ON FUNCTION public\."stor24_staff_ref_/g)||[]).length);
   assert.ok(migration.includes("REVOKE ALL ON FUNCTION public.stor24_staff_reference_statement() FROM PUBLIC"));
 });
