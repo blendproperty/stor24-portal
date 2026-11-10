@@ -31,6 +31,36 @@ test("facility-scoped user managers cannot change global or other-store accounts
   assert.equal(writes, 1);
 });
 
+test("changing a role without a facility preserves all existing facility scopes", async () => {
+  let scopes: (string | null)[] = ["midpoint"];
+  const created: Array<{userId:string;roleId:string;facilityId:string|null}> = [];
+  const oldRole = {name:"Custom access · target",permissions:["operations.view"]};
+  const actor = {allowedFacilityIds:null,user:{id:"owner",organisationId:"org",roleAssignments:[{facilityId:null,role:{name:"Organisation owner",permissions:["*"]}}]}};
+  const database = {
+    user:{findFirst:async()=>({id:"target",organisationId:"org",active:true,roleAssignments:scopes.map(facilityId=>({facilityId,role:oldRole}))})},
+    role:{findUnique:async()=>({id:"manager"})}, facility:{findUnique:async()=>({id:"melrose"})},
+    $transaction:async(fn:(tx:unknown)=>Promise<unknown>)=>fn({$queryRaw:async()=>[],roleAssignment:{findMany:async()=>scopes.map(facilityId=>({facilityId})),deleteMany:async()=>{},create:async({data}:{data:{userId:string;roleId:string;facilityId:string|null}})=>{created.push(data)}},user:{update:async()=>{}},auditEvent:{create:async()=>{}}}),
+  };
+  const bundle=await build({entryPoints:["src/app/api/v1/users/[id]/route.ts"],bundle:true,write:false,platform:"node",format:"cjs",packages:"external",plugins:[{name:"role-scope",setup(b){b.onResolve({filter:/^@\/lib\/(db|auth-guards|request-security)$/},a=>({path:a.path,namespace:"fixture"}));b.onLoad({filter:/.*/,namespace:"fixture"},a=>({contents:a.path.endsWith("/db")?"export const db=__db;":a.path.endsWith("/request-security")?"export const sameOrigin=()=>true;":"export const requirePermission=async()=>__actor;"}));}}]});
+  const loaded={exports:{} as {PATCH:(r:Request,c:{params:Promise<{id:string}>})=>Promise<Response>}};
+  new Function("require","module","exports","__db","__actor",bundle.outputFiles[0].text)(createRequire(import.meta.url),loaded,loaded.exports,database,actor);
+  const change=(body:unknown)=>loaded.exports.PATCH(new Request("https://example.invalid",{method:"PATCH",body:JSON.stringify(body)}),{params:Promise.resolve({id:"target"})});
+  assert.equal((await change({roleName:"Facility manager"})).status,200);
+  assert.deepEqual(created,[{userId:"target",roleId:"manager",facilityId:"midpoint"}]);
+  created.length=0; scopes=["midpoint","melrose"];
+  assert.equal((await change({roleName:"Facility manager"})).status,200);
+  assert.deepEqual(created.map(x=>x.facilityId),["midpoint","melrose"]);
+  created.length=0; scopes=[null];
+  assert.equal((await change({roleName:"Facility manager"})).status,200);
+  assert.deepEqual(created.map(x=>x.facilityId),[null]);
+  created.length=0; scopes=["midpoint"];
+  assert.equal((await change({roleName:"Facility manager",facilityCode:"MELROSE"})).status,200);
+  assert.deepEqual(created.map(x=>x.facilityId),["melrose"]);
+  created.length=0; scopes=[];
+  assert.equal((await change({roleName:"Facility manager"})).status,409);
+  assert.deepEqual(created,[]);
+});
+
 test("a saved store workflow role allows casework and requests without financial approval or cross-store authority", () => {
   const assignments = [{ facilityId: "store-a", role: { name: "Custom access · staff", permissions: grants } }];
   for (const permission of ["leads.view", "reservations.manage", "move_in.create", "operations.manage", "inventory.view", "ledger.view", "payments.manage", "payments.view", "collections.view", "collections.manage", "adjustments.request", "billing.documents.send", "reports.export", "identity.review"]) {

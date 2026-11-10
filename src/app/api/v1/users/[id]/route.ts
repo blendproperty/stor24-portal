@@ -24,11 +24,21 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (ownerCount <= 1) return Response.json({ error: { message: "The final active organisation owner cannot be removed." } }, { status: 409 });
   }
   const role = parsed.data.roleName ? await db.role.findUnique({ where: { organisationId_name: { organisationId: target.organisationId, name: parsed.data.roleName } } }) : null;
+  if (parsed.data.roleName && !role) return Response.json({ error: { message: "Choose a valid security role." } }, { status: 422 });
   const facility = parsed.data.facilityCode ? await db.facility.findUnique({ where: { organisationId_code: { organisationId: target.organisationId, code: parsed.data.facilityCode } } }) : null;
   if (parsed.data.facilityCode && !facility) return Response.json({ error: { message: "Choose a valid facility." } }, { status: 422 });
+  if (role && parsed.data.facilityCode === undefined && !target.roleAssignments.length) return Response.json({ error: { message: "Choose a facility for this user." } }, { status: 409 });
   await db.$transaction(async (tx) => {
     if (parsed.data.active !== undefined) await tx.user.update({ where: { id }, data: { active: parsed.data.active, sessionVersion: { increment: 1 } } });
-    if (role) { await tx.roleAssignment.deleteMany({ where: { userId: id } }); await tx.roleAssignment.create({ data: { userId: id, roleId: role.id, facilityId: facility?.id } }); await tx.user.update({ where: { id }, data: { sessionVersion: { increment: 1 } } }); }
+    if (role) {
+      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${id} FOR UPDATE`;
+      const existing = await tx.roleAssignment.findMany({ where: { userId: id }, select: { facilityId: true } });
+      const facilities = parsed.data.facilityCode === undefined ? [...new Set(existing.map(a => a.facilityId))] : [facility?.id ?? null];
+      if (!facilities.length) throw new Error("USER_SCOPE_REQUIRED");
+      await tx.roleAssignment.deleteMany({ where: { userId: id } });
+      for (const facilityId of facilities) await tx.roleAssignment.create({ data: { userId: id, roleId: role.id, facilityId } });
+      await tx.user.update({ where: { id }, data: { sessionVersion: { increment: 1 } } });
+    }
     await tx.auditEvent.create({ data: { organisationId: target.organisationId, actorId: actor.user.id, action: "user.access.updated", entityType: "User", entityId: id, before: { active: target.active }, after: parsed.data } });
   });
   return Response.json({ data: { updated: true } });
