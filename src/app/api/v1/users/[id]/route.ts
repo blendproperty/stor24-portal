@@ -29,7 +29,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (parsed.data.facilityCode && !facility) return Response.json({ error: { message: "Choose a valid facility." } }, { status: 422 });
   if (role && parsed.data.facilityCode === undefined && !target.roleAssignments.length) return Response.json({ error: { message: "Choose a facility for this user." } }, { status: 409 });
   await db.$transaction(async (tx) => {
-    if (parsed.data.active !== undefined) await tx.user.update({ where: { id }, data: { active: parsed.data.active, sessionVersion: { increment: 1 } } });
+    if (parsed.data.active !== undefined) {
+      await tx.user.update({ where: { id }, data: { active: parsed.data.active, sessionVersion: { increment: 1 } } });
+      if (!parsed.data.active) await tx.passwordResetToken.updateMany({ where: { userId: id, usedAt: null }, data: { usedAt: new Date() } });
+    }
     if (role) {
       await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${id} FOR UPDATE`;
       const existing = await tx.roleAssignment.findMany({ where: { userId: id }, select: { facilityId: true } });
