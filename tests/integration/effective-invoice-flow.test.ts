@@ -27,7 +27,7 @@ test("isolated reviewed invoice to effective-date recognition with production ho
     const scope = { organisationId: org.id, userId: user.id, facilityIds: [facility.id], unrestrictedFacilities: false };
     const period = nextBillingPeriod(), due = periodDates(period).effectiveAt, now = new Date();
     await db.auditEvent.create({ data: { organisationId: org.id, facilityId: facility.id, entityType: "Tenancy", entityId: tenancy.id, action: "tenancy.key_handover_confirmed" } });
-    await saveMonthlyBillingPlan(scope, account.id, { firstPeriod: currentBillingPeriod(), proration: "ACTUAL_DAYS", taxPercent: 15, rentTaxable: true, insuranceEnabled: false, insuranceTaxable: false, charges: [], discount: null, approvalReference: "Synthetic approved plan" });
+    await saveMonthlyBillingPlan(scope, account.id, { firstPeriod: currentBillingPeriod(), proration: "ACTUAL_DAYS", taxPercent: 15, rentTaxable: true, insuranceEnabled: false, insuranceTaxable: false, charges: [{ code: "FEE", name: "Synthetic fee", amount: 50, taxable: true }], discount: null, approvalReference: "Synthetic approved plan" });
     await saveInvoiceSchedule(scope, facility.id, { date: southAfricaDateKey(now) });
     const preview = await previewNextMonthForReview(scope, account.id);
     await prepareScheduledNextBilling(scope, account.id, period, preview.fingerprint, now);
@@ -54,15 +54,15 @@ test("isolated reviewed invoice to effective-date recognition with production ho
     const attempts = await Promise.allSettled([approveScheduledInvoiceDraftInIsolatedTest(scope, account.id, period, draft.fingerprint), approveScheduledInvoiceDraftInIsolatedTest(scope, account.id, period, draft.fingerprint)]);
     const success = attempts.find(result => result.status === "fulfilled"); assert.ok(success && success.status === "fulfilled");
     const staged = success.value;
-    assert.equal(staged.total, 1200);
+    assert.equal(staged.total, 1250);
     const retry = await approveScheduledInvoiceDraftInIsolatedTest(scope, account.id, period, draft.fingerprint);
     assert.equal(retry.alreadyStaged, true); assert.equal(retry.documentId, staged.documentId);
     assert.equal(await db.document.count({ where: { tenancyId: tenancy.id, type: "INVOICE" } }), 1);
-    assert.equal(await db.scheduledBillingCharge.count({ where: { accountId: account.id } }), 1);
+    assert.equal(await db.scheduledBillingCharge.count({ where: { accountId: account.id } }), 2);
     await assert.rejects(previewNextMonthForReview(scope, account.id), /ALREADY_POSTED/);
     const invoice = await db.document.findUniqueOrThrow({ where: { id: staged.documentId } });
     assert.match(invoice.content!, /Current account balance \(excluding this future invoice\)/);
-    const charge = await db.scheduledBillingCharge.findUniqueOrThrow({ where: { invoiceId: invoice.id } });
+    const charge = await db.scheduledBillingCharge.findFirstOrThrow({ where: { invoiceId: invoice.id, externalRef: `RENT-${period}` } });
     assert.equal(charge.amount.toFixed(2), "1200.00"); assert.equal(charge.taxAmount.toFixed(2), "156.52");
     assert.equal(await db.ledgerEntry.count({ where: { accountId: account.id } }), 0);
     assert.equal((await db.account.findUniqueOrThrow({ where: { id: account.id } })).balance.toFixed(2), "0.00");
@@ -80,10 +80,10 @@ test("isolated reviewed invoice to effective-date recognition with production ho
     const recognized = await recogniseScheduledBillingCharge(charge.id, due);
     assert.equal(recognized.alreadyRecognised, false);
     assert.equal((await recogniseScheduledBillingCharge(charge.id, due)).alreadyRecognised, true);
-    assert.equal((await db.account.findUniqueOrThrow({ where: { id: account.id } })).balance.toFixed(2), "1000.00");
+    assert.equal((await db.account.findUniqueOrThrow({ where: { id: account.id } })).balance.toFixed(2), "1050.00");
     const entries = await db.ledgerEntry.findMany({ where: { accountId: account.id }, orderBy: { effectiveAt: "asc" } });
-    assert.equal(entries.length, 2);
-    assert.equal(buildAccountStatement(entries.map(e => ({ ...e, amount: e.amount.toString() })), new Date(0), new Date(due.getTime() + 1)).closingBalance, "1000.00");
+    assert.equal(entries.length, 3);
+    assert.equal(buildAccountStatement(entries.map(e => ({ ...e, amount: e.amount.toString() })), new Date(0), new Date(due.getTime() + 1)).closingBalance, "1050.00");
     assert.equal(await db.auditEvent.count({ where: { entityId: account.id, action: "billing.scheduled_charge_recognised" } }), 1);
   } finally { delete process.env.NEXT_MONTH_INVOICING_ENABLED; delete process.env.AUTH_SECRET; await db.$disconnect(); }
 });

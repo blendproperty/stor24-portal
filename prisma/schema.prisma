@@ -1159,12 +1159,16 @@ model ScheduledBillingCharge {
   recognisedAt DateTime?
   ledgerEntryId String? @unique
   ledgerEntry LedgerEntry? @relation(fields: [ledgerEntryId], references: [id], onDelete: Restrict)
-  invoiceId String? @unique
+  invoiceId String?
   invoice Document? @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  lineType String @default("CHARGE")
+  groupSize Int?
+  groupHash String?
   createdAt DateTime @default(now())
 
   @@unique([accountId, externalRef])
   @@index([recognisedAt, effectiveAt])
+  @@index([invoiceId])
 }
 
 model Payment {
@@ -1299,7 +1303,7 @@ model SettlementBalanceObservation {
 }
 
 model Document {
-  scheduledBillingCharge ScheduledBillingCharge?
+  scheduledBillingCharges ScheduledBillingCharge[]
   receiptImportPosting ReceiptImportPosting?
   receiptReallocationSource ReceiptReallocation? @relation("ReceiptReallocationSourceDocument")
   receiptReallocationTarget ReceiptReallocation? @relation("ReceiptReallocationTargetDocument")

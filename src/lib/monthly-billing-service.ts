@@ -9,6 +9,7 @@ import { southAfricaDateKey } from "@/lib/south-africa-time";
 import { isTestPayment } from "./payments/payment-evidence";
 import { renderInvoiceHtml } from "./finance/invoice-renderer";
 import { getBillingDocumentCompanyDetails } from "./finance/billing-document-config";
+import { scheduledBillingGroupHash } from "./scheduled-billing-group";
 
 import { buildAccountStatement } from "./finance/account-statement";
 import { rentRatesForBilling } from './rent-review-service';
@@ -157,20 +158,25 @@ export async function approveScheduledInvoiceDraftInIsolatedTest(scope: RequestS
     if (draft.status === "STAGED") {
       const staged = await tx.scheduledBillingCharge.findUnique({ where: { accountId_externalRef: { accountId, externalRef: `RENT-${period}` } }, include: { invoice: true } });
       if (!staged?.invoice || staged.invoice.tenancyId !== tenancy.id || staged.invoice.idempotencyKey !== `monthly-invoice:${accountId}:${period}`) throw new Error("BILLING_DRAFT_REVIEW");
-      return { documentId: staged.invoice.id, invoiceNumber: staged.invoice.externalId, total: staged.amount.toNumber(), alreadyStaged: true };
+      const lines = await tx.scheduledBillingCharge.findMany({ where: { invoiceId: staged.invoice.id } });
+      if (!staged.groupHash || lines.length !== staged.groupSize || lines.some(line => line.groupHash !== staged.groupHash || line.groupSize !== staged.groupSize) || scheduledBillingGroupHash(lines) !== staged.groupHash) throw new Error("BILLING_DRAFT_REVIEW");
+      const total = lines.reduce((sum, line) => line.lineType === "CREDIT" ? sum.sub(line.amount) : sum.add(line.amount), new Prisma.Decimal(0));
+      return { documentId: staged.invoice.id, invoiceNumber: staged.invoice.externalId, total: total.toNumber(), alreadyStaged: true };
     }
     if (draft.status !== "READY") throw new Error("BILLING_DRAFT_REVIEW");
     await assertDraftEligibility(tx, scope, account, tenancy, profile, period);
     const bill = await preview(tx, scope, accountId, period, nextBillingPeriod());
     if (bill.fingerprint !== fingerprint) throw new Error("BILLING_PREVIEW_CHANGED");
-    // Multi-line, zero and credit invoices need atomic group recognition and policy review.
-    if (bill.lines.length !== 1 || bill.lines[0].type !== "CHARGE" || bill.lines[0].amount <= 0) throw new Error("BILLING_STAGING_REVIEW");
-    const line = bill.lines[0], invoiceNumber = `INV-${period.replace("-", "")}-${bill.accountNumber}`;
+    const positiveLines = bill.lines.filter(line => line.amount > 0);
+    if (!positiveLines.length || bill.lines[0].type !== "CHARGE" || bill.lines[0].amount <= 0) throw new Error("BILLING_STAGING_REVIEW");
+    const invoiceNumber = `INV-${period.replace("-", "")}-${bill.accountNumber}`;
     const company = await getBillingDocumentCompanyDetails(scope.organisationId, tenancy.facilityId, tx);
-    const html = renderInvoiceHtml({ invoiceNumber, issueDate: new Date(), facilityName: bill.facilityName, company, customerName: bill.customerName, accountNumber: bill.accountNumber, currentBalance: account.balance.toString(), futureChargeExcluded: true, lines: [{ id: line.key, description: line.description, effectiveAt: periodDates(period).effectiveAt, amount: line.amount, taxAmount: line.taxAmount }] });
+    const html = renderInvoiceHtml({ invoiceNumber, issueDate: new Date(), facilityName: bill.facilityName, company, customerName: bill.customerName, accountNumber: bill.accountNumber, currentBalance: account.balance.toString(), futureChargeExcluded: true, lines: positiveLines.map(line => ({ id: line.key, description: line.description, effectiveAt: periodDates(period).effectiveAt, amount: line.type === "CREDIT" ? -line.amount : line.amount, taxAmount: line.type === "CREDIT" ? -line.taxAmount : line.taxAmount })) });
     const sha256 = createHash("sha256").update(html).digest("hex");
     const document = await tx.document.create({ data: { tenancyId: tenancy.id, type: "INVOICE", status: "GENERATED", storageKey: `inline:${sha256}`, content: html, sha256, externalId: invoiceNumber, idempotencyKey: `monthly-invoice:${accountId}:${period}` } });
-    await tx.scheduledBillingCharge.create({ data: { accountId, organisationId: scope.organisationId, facilityId: tenancy.facilityId, invoiceId: document.id, externalRef: `RENT-${period}`, description: line.description, amount: line.amount, taxAmount: line.taxAmount, effectiveAt: periodDates(period).effectiveAt } });
+    const lines = positiveLines.map((line, index) => ({ accountId, organisationId: scope.organisationId, facilityId: tenancy.facilityId, invoiceId: document.id, externalRef: index === 0 ? `RENT-${period}` : `BILL-${period}-${line.key}`, description: line.description, lineType: line.type, amount: new Prisma.Decimal(line.amount), taxAmount: new Prisma.Decimal(line.taxAmount), effectiveAt: periodDates(period).effectiveAt }));
+    const groupHash = scheduledBillingGroupHash(lines);
+    await tx.scheduledBillingCharge.createMany({ data: lines.map(line => ({ ...line, groupSize: lines.length, groupHash })) });
     await tx.configurationProfile.update({ where: { id: draft.id }, data: { status: "STAGED" } });
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: tenancy.facilityId, actorId: scope.userId, action: "billing.invoice_staged", entityType: "Account", entityId: accountId, after: { period, invoiceNumber, documentId: document.id, fingerprint } } });
     return { documentId: document.id, invoiceNumber, total: bill.total, alreadyStaged: false };
