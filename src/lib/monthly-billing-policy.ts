@@ -11,11 +11,11 @@ export const billingPlanSchema = z.object({
   insuranceEnabled: z.boolean(),
   insuranceTaxable: z.boolean(),
   charges: z.array(z.object({ code: z.string().min(1).max(40), name: z.string().min(1).max(120), amount: money, taxable: z.boolean() }).strict()).max(30),
-  discount: z.object({ name: z.string().min(1).max(120), type: z.enum(["FIXED", "PERCENTAGE"]), value: money, startsPeriod: billingPeriodSchema, endsPeriod: billingPeriodSchema }).strict().nullable(),
+  discount: z.object({ name: z.string().min(1).max(120), type: z.enum(["FIXED", "PERCENTAGE", "R1_FIRST_FULL_MONTH"]), value: money, startsPeriod: billingPeriodSchema, endsPeriod: billingPeriodSchema }).strict().nullable(),
   approvalReference: z.string().trim().min(5).max(250),
 }).strict().superRefine((plan, ctx) => {
   if (new Set(plan.charges.map(c => c.code)).size !== plan.charges.length) ctx.addIssue({ code: "custom", message: "Duplicate charges" });
-  if (plan.discount && (plan.discount.startsPeriod > plan.discount.endsPeriod || (plan.discount.type === "PERCENTAGE" && plan.discount.value > 100))) ctx.addIssue({ code: "custom", message: "Invalid discount" });
+  if (plan.discount && (plan.discount.startsPeriod > plan.discount.endsPeriod || (plan.discount.type === "PERCENTAGE" && plan.discount.value > 100) || (plan.discount.type === "R1_FIRST_FULL_MONTH" && (plan.discount.value !== 1 || plan.discount.startsPeriod !== plan.discount.endsPeriod)))) ctx.addIssue({ code: "custom", message: "Invalid discount" });
 });
 export type BillingPlan = z.infer<typeof billingPlanSchema>;
 export type BillingLine = { key: string; description: string; amount: number; taxAmount: number; type: "CHARGE" | "CREDIT" };
@@ -59,6 +59,7 @@ export function calculateMonthlyBill(period: string, plan: BillingPlan, occupanc
   if (plan.proration === "FULL_MONTH" && lines.length > 1) throw new Error("BILLING_TRANSFER_REQUIRES_REVIEW");
   const rent = lines.reduce((sum, line) => sum + Math.round(line.amount * 100), 0);
   const discount = plan.discount;
+  if (discount?.type === "R1_FIRST_FULL_MONTH" && period >= discount.startsPeriod) throw new Error("BILLING_PROMOTION_REQUIRES_REVIEW");
   if (discount && period >= discount.startsPeriod && period <= discount.endsPeriod) {
     const cents = discount.type === "PERCENTAGE" ? Math.round(rent * discount.value / 100) : Math.round(discount.value * 100);
     if (cents > rent) throw new Error("BILLING_DISCOUNT_EXCEEDS_RENT");
