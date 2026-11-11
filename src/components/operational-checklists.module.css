@@ -47,6 +47,42 @@
 .padlockReports { margin-block: .85rem; }
 .padlockReports summary { cursor: pointer; font-weight: 650; }
 .padlockReports[open] > :not(summary) { margin-block-start: .65rem; }
+.walkRoute { container-type: inline-size; display: grid; gap: .85rem; margin-block: 1rem; }
+.walkRoute :is(h3, h4, p) { margin: 0; }
+.walkRoute :is(h3, h4) { font-weight: 750; }
+.walkLayout { grid-template-columns: minmax(0, 1fr) minmax(20rem, 24rem); }
+.workspace .walkLayout .mapEditor :is(input:not([type="radio"]), textarea) {
+  border: 1px solid #adbfc8; border-radius: .45rem; background: #fff; color: #183341; min-height: 44px; padding: .45rem .6rem;
+}
+.workspace .walkLayout .mapEditor input[type="number"] { width: 8rem; }
+.walkProgress { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem 1rem; }
+.walkProgress progress { flex: 1 1 7rem; min-width: 0; height: .65rem; border-radius: 1rem; overflow: hidden; accent-color: #226348; }
+.walkProgress button { width: auto; }
+.walkStops { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .5rem; }
+.walkChecks { display: grid; align-content: start; gap: .35rem; min-width: 0; scroll-margin-top: 4.5rem; }
+.walkStops button, .walkChecks button {
+  border: 1px solid var(--border, #cdd8de); border-radius: .55rem; background: #f7f9fa; color: #183341;
+  cursor: pointer; min-height: 48px; min-width: 0; padding: .5rem .65rem; text-align: left;
+}
+.walkStops button span { display: block; font-weight: 750; }
+.walkChecks button { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+.walkStops button[aria-pressed="true"], .walkChecks button[aria-pressed="true"] { border-color: #23634c; box-shadow: inset 0 0 0 1px #23634c; background: #e6f1e9; }
+.walkBadge { display: inline-block; flex-shrink: 0; border-radius: .3rem; padding: .2rem .45rem; font-size: .78rem; font-weight: 700; color: #334a58; background: #e8eef2; }
+.walkBadge[data-result="PASS"] { background: #dceee0; color: #194c2d; }
+.walkBadge[data-result="ISSUE"] { background: #f7e1dd; color: #752820; }
+.walkBadge[data-result="NA"] { background: #fff0d5; color: #604719; }
+.workspace .walkChoices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .35rem; padding: .45rem; }
+.workspace .walkChoices label { flex-direction: row; align-items: center; min-height: 44px; padding-inline: .6rem; }
+.walkChoices label:has(:checked) { outline: 2px solid currentColor; outline-offset: -2px; }
+.walkOptional summary { cursor: pointer; font-size: .85rem; font-weight: 650; }
+.walkOptional label { margin-block-start: .5rem; }
+@container (max-width: 40rem) {
+  .walkStops { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (max-width: 23rem) {
+  .walkChecks button { flex-wrap: wrap; }
+  .workspace .walkChoices { grid-template-columns: minmax(0, 1fr); }
+}
 @container (max-width: 45rem) {
   .mapLayout { grid-template-columns: minmax(0, 1fr); }
   .mapReturn { display: inline-flex; }

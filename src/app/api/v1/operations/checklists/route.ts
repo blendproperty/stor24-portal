@@ -8,7 +8,8 @@ import { operationalPrintTable } from "@/lib/operational-print-table";
 import { formatSouthAfricaDateTime } from "@/lib/south-africa-time";
 
 const messages: Record<string, string> = {
-  CHECKLIST_INCOMPLETE: "Complete every item. Explain failed, skipped and discrepant checks; enter each padlock count.",
+  CHECKLIST_INCOMPLETE: "Complete the required checks, explain issues or skipped items, and enter any required counts.",
+  CHECKLIST_SAVE_EACH: "Reload the Opening route and save each changed check before submitting.",
   CHECKLIST_COMPARISON_REQUIRED: "Record the rent roll and collections-list reference used for the padlock comparison.",
   CHECKLIST_SOURCE_CHANGED: "The unit list or recorded overlock work changed. Save your notes, then restart the walkthrough with the current list.",
   CHECKLIST_REVIEWER_REQUIRED: "Choose a reviewer separate from the preparer, cover and submitting staff member.",
