@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const SOCIAL_INTAKE_DOMAIN = 'WHATCHIMP_SOCIAL_INTAKE';
 export const SOCIAL_SESSION_DOMAIN = 'WHATCHIMP_SOCIAL_SESSION';
 export const SOCIAL_NOTICE_DOMAIN = 'WHATCHIMP_SOCIAL_NOTICE';
-export const socialConfig = z.object({ enabled: z.boolean(), channel: z.enum(['facebook', 'instagram']), botId: z.string().regex(/^\d{1,30}$/), keyHash: z.string().regex(/^[a-f0-9]{64}$/), facilityId: z.string().min(1), recipientUserId: z.string().min(1) }).strict();
+export const socialConfig = z.object({ enabled: z.boolean(), channel: z.enum(['facebook', 'instagram']), botId: z.string().regex(/^\d{1,30}$/), keyHash: z.string().regex(/^[a-f0-9]{64}$/), facilityId: z.string().min(1), recipientUserId: z.string().min(1), recipientEmail: z.email().max(320) }).strict();
 
 /** Format check, not proof that a number exists or belongs to the sender. */
 export function normalizeSocialPhone(raw: string): string | null {

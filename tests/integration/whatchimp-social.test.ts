@@ -16,7 +16,7 @@ test('social intake validates, scopes, deduplicates and claims notification once
     const user = await db.user.create({ data: { organisationId: org.id, name: 'Fixture staff', email: `${id}@example.invalid` } });
     const role = await db.role.create({ data: { organisationId: org.id, name: 'Fixture sales', permissions: ['leads.view'] } });
     await db.roleAssignment.create({ data: { userId: user.id, roleId: role.id, facilityId: facility.id } });
-    const create = (channel: 'facebook' | 'instagram') => db.configurationProfile.create({ data: { organisationId: org.id, facilityId: facility.id, domain: SOCIAL_INTAKE_DOMAIN, name: channel, status: 'READY', config: { enabled: true, channel, botId: '72238', keyHash: keyHash(token + channel), facilityId: facility.id, recipientUserId: user.id } } });
+    const create = (channel: 'facebook' | 'instagram') => db.configurationProfile.create({ data: { organisationId: org.id, facilityId: facility.id, domain: SOCIAL_INTAKE_DOMAIN, name: channel, status: 'READY', config: { enabled: true, channel, botId: '72238', keyHash: keyHash(token + channel), facilityId: facility.id, recipientUserId: user.id, recipientEmail: user.email } } });
     const fb = await create('facebook'), ig = await create('instagram');
     const endpoint = (authorization: string, body: string) => POST(new Request('http://localhost/api/integrations/whatchimp/social', { method: 'POST', headers: { authorization, 'content-type': 'application/x-www-form-urlencoded' }, body }));
     assert.equal((await endpoint('Bearer wrong', 'action=probe')).status, 401);
@@ -52,10 +52,18 @@ test('social intake validates, scopes, deduplicates and claims notification once
     const third = await call({ action: 'start' });
     const unapproved = await call({ ...data, enquiryKey: third.enquiryKey! });
     const withheld = await db.configurationProfile.findFirstOrThrow({ where: { organisationId: org.id, domain: SOCIAL_NOTICE_DOMAIN, name: unapproved.leadReference! } });
-    await db.roleAssignment.deleteMany({ where: { userId: user.id } });
+    await db.user.update({ where: { id: user.id }, data: { email: `changed-${id}@example.invalid` } });
     await sendSocialNotice(withheld.id, send);
     assert.equal(sent, 1);
     assert.equal((await db.configurationProfile.findUniqueOrThrow({ where: { id: withheld.id } })).status, 'REVIEW_REQUIRED');
+    await db.user.update({ where: { id: user.id }, data: { email: user.email } });
+    const fourth = await call({ action: 'start' });
+    const revoked = await call({ ...data, enquiryKey: fourth.enquiryKey! });
+    const withoutPermission = await db.configurationProfile.findFirstOrThrow({ where: { organisationId: org.id, domain: SOCIAL_NOTICE_DOMAIN, name: revoked.leadReference! } });
+    await db.roleAssignment.deleteMany({ where: { userId: user.id } });
+    await sendSocialNotice(withoutPermission.id, send);
+    assert.equal(sent, 1);
+    assert.equal((await db.configurationProfile.findUniqueOrThrow({ where: { id: withoutPermission.id } })).status, 'REVIEW_REQUIRED');
     await db.configurationProfile.update({ where: { id: fb.id }, data: { status: 'DISABLED' } });
     await assert.rejects(call({ action: 'probe' }), /SOCIAL_DISABLED/);
   } finally { await db.organisation.delete({ where: { id: org.id } }); await db.$disconnect(); }

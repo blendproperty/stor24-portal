@@ -12,5 +12,5 @@ test('social requests do not accept arbitrary routing or unresolved answer field
   assert.equal(socialRequest.safeParse({ action: 'probe', organisationId: 'other' }).success, false);
   assert.equal(socialRequest.safeParse({ action: 'submit', enquiryKey: 'not-a-uuid', name: 'A', phone: '123', requirements: 'Boxes', startDate: 'Soon' }).success, false);
   assert.equal(socialRequest.safeParse({ action: 'submit', enquiryKey: '00000000-0000-4000-8000-000000000000', name: '#NAME#', phone: '123', requirements: 'Boxes', startDate: 'Soon' }).success, false);
-  assert.equal(socialConfig.safeParse({ enabled: true, channel: 'whatsapp', botId: '1', keyHash: 'a'.repeat(64), facilityId: 'f', recipientUserId: 'u' }).success, false);
+  assert.equal(socialConfig.safeParse({ enabled: true, channel: 'whatsapp', botId: '1', keyHash: 'a'.repeat(64), facilityId: 'f', recipientUserId: 'u', recipientEmail: 'test@example.invalid' }).success, false);
 });
