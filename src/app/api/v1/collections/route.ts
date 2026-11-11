@@ -3,9 +3,10 @@ import { z } from "zod";
 import { requirePermissionScope } from "@/lib/scope";
 import { sameOrigin } from "@/lib/request-security";
 import { collectionActionSchema } from "@/lib/collections-policy";
-import { collectionCsv } from "@/lib/collections-view";
+import { collectionCsv, filterCollections } from "@/lib/collections-view";
 import { collectionsWorkspace, updateCollection } from "@/lib/collections-service";
 import { southAfricaDateKey } from "@/lib/south-africa-time";
+import { operationalPrintTable } from "@/lib/operational-print-table";
 const messages: Record<string, string> = {
   COLLECTION_REVIEW_TASK_OWNER: "The existing review task has no currently eligible assignee. Cancel it in Operations before creating a replacement review task.",
   COLLECTION_NOT_FOUND: "This account is outside your permitted stores.", COLLECTION_CHANGED: "This case changed or the request was already used. Reload before retrying.", COLLECTION_DATE: "Check the date. Reports cannot be future dated and new follow-ups cannot be backdated.", COLLECTION_TERMS: "Check the due-date overrides against this account's original charges.", COLLECTION_OWNER: "Choose an active colleague permitted to manage collections at this store.", COLLECTION_PROMISE: "Check the overdue balance, holds, existing promise and verified receipt evidence.", COLLECTION_LIMIT: "More than 2,000 accounts are in scope. An administrator must arrange a narrower store role before running this report.",
@@ -25,6 +26,19 @@ function failure(e: unknown) {
 export async function GET(request: Request) {
   try {
     const params = new URL(request.url).searchParams, exporting = params.get("export") === "csv";
+    if (params.get("print") === "calls") {
+      const facility = z.string().cuid().parse(params.get("facility"));
+      const scope = await requirePermissionScope("collections.export", facility);
+      const asOf = southAfricaDateKey(new Date());
+      const data = await collectionsWorkspace({ ...scope, facilityIds: [facility], unrestrictedFacilities: false }, asOf);
+      const calls = filterCollections(data, { facility, search: "", owner: "", mode: "follow-up" });
+      const response = operationalPrintTable("Collections calls list for padlock comparison", [
+        `${calls[0]?.facility ?? "Selected store"} · ${asOf} SAST · ${calls.length} accounts with calls due`,
+        "Use these unit numbers to reconcile the walkthrough. A call due does not authorise physical overlocking.",
+      ], ["Unit", "Follow-up due", "Comparison notes"], calls.flatMap(call =>
+        (call.units?.length ? call.units : ["No current unit"]).map(unit => [unit, call.nextFollowUp ?? "", ""])));
+      return await protectDlpResponse(response, { organisationId: scope.organisationId, actorId: scope.userId, facilityId: facility, resourceId: "padlock-collections-calls" }, "confidential");
+    }
     const scope = await requirePermissionScope(exporting ? "collections.export" : "collections.view");
     const data = await collectionsWorkspace(scope, params.get("asOf") ?? southAfricaDateKey(new Date()));
     if (exporting) return await protectDlpResponse(new Response(collectionCsv(data, { search: params.get("search") ?? "", facility: params.get("facility") ?? "", owner: params.get("owner") ?? "", mode: params.get("mode") ?? "all" }), { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="collections-${data.asOf}.csv"`, "cache-control": "no-store", "x-content-type-options": "nosniff" } }), { organisationId: scope.organisationId, actorId: scope.userId, resourceId: "collections", personalDataExport: { facilityIds: scope.facilityIds, unrestrictedFacilities: scope.unrestrictedFacilities } }, "confidential");

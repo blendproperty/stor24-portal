@@ -13,18 +13,13 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     if (!invitation || invitation.status !== "PENDING") {
       return Response.json({ error: { code: "NOT_PENDING", message: "Only pending invitations can be revoked." } }, { status: 409 });
     }
-    await db.$transaction([
-      db.userInvitation.update({ where: { id }, data: { status: "REVOKED", revokedAt: new Date() } }),
-      db.auditEvent.create({
-        data: {
-          organisationId: invitation.organisationId,
-          actorId: actor.user.id,
-          action: "user.invitation.revoked",
-          entityType: "UserInvitation",
-          entityId: id,
-        },
-      }),
-    ]);
+    const revoked = await db.$transaction(async tx => {
+      const changed = await tx.userInvitation.updateMany({ where: { id, organisationId: actor.user.organisationId, status: "PENDING" }, data: { status: "REVOKED", revokedAt: new Date() } });
+      if (changed.count !== 1) return false;
+      await tx.auditEvent.create({ data: { organisationId: invitation.organisationId, actorId: actor.user.id, action: "user.invitation.revoked", entityType: "UserInvitation", entityId: id } });
+      return true;
+    });
+    if (!revoked) return Response.json({ error: { code: "NOT_PENDING", message: "The invitation was already accepted or revoked. Refresh the user list." } }, { status: 409 });
     return Response.json({ data: { id, status: "REVOKED" } });
   } catch (error) {
     return authErrorResponse(error);

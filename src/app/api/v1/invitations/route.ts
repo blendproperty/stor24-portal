@@ -80,6 +80,11 @@ export async function POST(request: Request) {
     );
   }
 
+  if (parsed.data.roleName === "Facility manager") {
+    const facility = parsed.data.facilityCode && await db.facility.findUnique({ where: { organisationId_code: { organisationId: actor.user.organisationId, code: parsed.data.facilityCode } }, select: { id: true } });
+    if (!facility) return Response.json({ error: { code: "FACILITY_REQUIRED", message: "Choose a valid facility for a facility manager." } }, { status: 422 });
+  }
+
   const organisation = await db.organisation.findUniqueOrThrow({ where: { id: actor.user.organisationId } });
   await expireOldInvitations();
 
@@ -91,7 +96,7 @@ export async function POST(request: Request) {
   ]);
 
   if (existingUser) {
-    return Response.json({ error: { code: "USER_EXISTS", message: "This email already belongs to an active user." } }, { status: 409 });
+    return Response.json({ error: { code: "USER_EXISTS", message: "This email already belongs to a user account. Delete that account before inviting this email again." } }, { status: 409 });
   }
   if (existingInvitation) {
     return Response.json({ error: { code: "INVITATION_EXISTS", message: "A pending invitation already exists for this email." } }, { status: 409 });

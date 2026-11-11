@@ -8,7 +8,7 @@ import { sameOrigin } from "@/lib/request-security";
 export async function POST(request: Request) {
   if (!sameOrigin(request)) return Response.json({ error: "Request rejected." }, { status: 403 });
   const parsed = resetPasswordSchema.safeParse(await request.json());
-  if (!parsed.success) return Response.json({ error: "The reset link or password is invalid." }, { status: 422 });
+  if (!parsed.success || parsed.data.password === parsed.data.token) return Response.json({ error: "The reset link or password is invalid." }, { status: 422 });
   const reset = await db.passwordResetToken.findUnique({ where: { tokenHash: hashResetToken(parsed.data.token) } });
   if (!reset || reset.usedAt || reset.expiresAt < new Date()) return Response.json({ error: "This reset link is invalid, expired or already used." }, { status: 410 });
   const passwordHash = await hash(parsed.data.password, 12);
@@ -16,7 +16,8 @@ export async function POST(request: Request) {
     await db.$transaction(async (tx) => {
       const claimed = await tx.passwordResetToken.updateMany({ where: { id: reset.id, usedAt: null, expiresAt: { gte: new Date() } }, data: { usedAt: new Date() } });
       if (claimed.count !== 1) throw new Error("TOKEN_CLAIMED");
-      await tx.user.update({ where: { id: reset.userId }, data: { passwordHash, passwordChangedAt: new Date(), sessionVersion: { increment: 1 } } });
+      const updated = await tx.user.updateMany({ where: { id: reset.userId, organisationId: reset.organisationId, active: true }, data: { passwordHash, passwordChangedAt: new Date(), sessionVersion: { increment: 1 } } });
+      if (updated.count !== 1) throw new Error("USER_INACTIVE");
       await tx.passwordResetToken.updateMany({ where: { userId: reset.userId, usedAt: null }, data: { usedAt: new Date() } });
       await tx.auditEvent.create({ data: { organisationId: reset.organisationId, actorId: reset.userId, action: "user.password_reset.completed", entityType: "User", entityId: reset.userId } });
     });

@@ -55,6 +55,19 @@ test("extended boundaries use isolated PostgreSQL and synthetic records only", a
   const type = await db.unitType.create({ data: { facilityId: a.id, name: "Synthetic unit type" } });
   const unit = async () => db.unit.create({ data: { facilityId: a.id, unitTypeId: type.id, number: randomUUID(), monthlyRate: 100 } });
   try {
+    await t.test("role change preserves facility scope in PostgreSQL", async () => {
+      const ownerRole = await db.role.create({data:{organisationId:org.id,name:"Organisation owner",permissions:["*"]}});
+      const managerRole = await db.role.create({data:{organisationId:org.id,name:"Facility manager",permissions:["operations.view"]}});
+      const owner = await db.user.create({data:{organisationId:org.id,name:"Synthetic owner",email:`${randomUUID()}@example.invalid`,passwordHash:"synthetic-not-a-login",roleAssignments:{create:{roleId:ownerRole.id}}}});
+      const target = await db.user.create({data:{organisationId:org.id,name:"Synthetic staff",email:`${randomUUID()}@example.invalid`,roleAssignments:{create:{roleId:role.id,facilityId:a.id}}}});
+      const {api}=await load("src/app/api/v1/users/[id]/route.ts",{userId:owner.id,sessionVersion:owner.sessionVersion,mfaVerified:true});
+      const response=await api.PATCH(new Request("http://localhost/api/v1/users/target",{method:"PATCH",headers:{origin:"http://localhost","content-type":"application/json"},body:JSON.stringify({roleName:"Facility manager"})}),{params:Promise.resolve({id:target.id})});
+      assert.equal(response.status,200);
+      const saved=await db.roleAssignment.findMany({where:{userId:target.id}});
+      assert.deepEqual(saved.map(x=>({roleId:x.roleId,facilityId:x.facilityId})),[{roleId:managerRole.id,facilityId:a.id}]);
+      assert.equal((await db.user.findUniqueOrThrow({where:{id:target.id}})).sessionVersion,target.sessionVersion+1);
+      assert.equal(await db.auditEvent.count({where:{entityId:target.id,action:"user.access.updated"}}),1);
+    });
     await t.test("reservation reads and writes ignore unrelated facility and global roles", async () => {
       const { api } = await load("src/app/api/v1/reservations/route.ts", session);
       for (const facilityId of [b.id, null]) {

@@ -17,16 +17,17 @@ export function PortalAuthForm(props: Props) {
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [mfaRequired, setMfaRequired] = useState(false);
+  const [temporaryPassword, setTemporaryPassword] = useState("");
 
   async function submit(formData: FormData) {
     setBusy(true);
     setError("");
     const setup = props.mode === "setup";
-    const response = await fetch(mfaRequired ? "/api/auth/mfa/verify" : setup ? "/api/auth/setup" : "/api/auth/login", {
+    const response = await fetch(temporaryPassword ? "/api/auth/reset-password" : mfaRequired ? "/api/auth/mfa/verify" : setup ? "/api/auth/setup" : "/api/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        ...(mfaRequired ? { code: formData.get("code") } : {
+        ...(temporaryPassword ? { token: temporaryPassword, password: formData.get("newPassword") } : mfaRequired ? { code: formData.get("code") } : {
           ...(setup ? { token: props.token, name: formData.get("name") } : {}),
           email: formData.get("email"), password: formData.get("password"),
         }),
@@ -38,6 +39,8 @@ export function PortalAuthForm(props: Props) {
       setError(payload.error ?? "Unable to continue.");
       return;
     }
+    if (temporaryPassword) { setTemporaryPassword(""); setError("Password changed. Please sign in with your new password."); return; }
+    if (payload.data?.passwordChangeRequired) { setTemporaryPassword(String(formData.get("password"))); return; }
     if (payload.data?.mfaRequired) { setMfaRequired(true); return; }
     if (payload.data?.mfaSetupRequired) { router.replace("/mfa-setup"); router.refresh(); return; }
     router.replace(setup ? "/" : loginDestination(searchParams.get("next")));
@@ -46,7 +49,7 @@ export function PortalAuthForm(props: Props) {
 
   return (
     <form className="portal-auth-form" action={submit}>
-      {mfaRequired ? <><div className="mfa-login-intro"><ShieldCheck size={22}/><div><strong>Two-step verification</strong><p>Enter the 6-digit code from your authenticator app, or one unused recovery code.</p></div></div><label><span>Verification code</span><div className="portal-field"><KeyRound size={18}/><input name="code" autoComplete="one-time-code" inputMode="numeric" required autoFocus /></div></label></> : <>
+      {temporaryPassword ? <><p>Choose a new password before signing in. Your existing two-step verification still applies.</p><label><span>New password</span><div className="portal-field"><LockKeyhole size={18}/><input name="newPassword" type="password" autoComplete="new-password" minLength={12} required autoFocus /></div></label><p className="password-guidance">Use 12+ characters with upper and lowercase letters, a number and a symbol.</p></> : mfaRequired ? <><div className="mfa-login-intro"><ShieldCheck size={22}/><div><strong>Two-step verification</strong><p>Enter the 6-digit code from your authenticator app, or one unused recovery code.</p></div></div><label><span>Verification code</span><div className="portal-field"><KeyRound size={18}/><input name="code" autoComplete="one-time-code" inputMode="numeric" required autoFocus /></div></label></> : <>
       {props.mode === "setup" ? (
         <label>
           <span>Full name</span>
@@ -78,10 +81,10 @@ export function PortalAuthForm(props: Props) {
       ) : null}</>}
       {error ? <p className="portal-form-error" role="alert">{error}</p> : null}
       <button className="portal-submit" disabled={busy} type="submit">
-        {busy ? "Securing access…" : mfaRequired ? "Verify and sign in" : props.mode === "setup" ? "Create owner account" : "Sign in to portal"}
+        {busy ? "Securing access…" : temporaryPassword ? "Set new password" : mfaRequired ? "Verify and sign in" : props.mode === "setup" ? "Create owner account" : "Sign in to portal"}
         <ArrowRight size={18} />
       </button>
-      {props.mode === "login" && !mfaRequired ? <p className="portal-auth-footer"><Link href="/forgot-password">Forgot password?</Link></p> : null}
+      {props.mode === "login" && !mfaRequired && !temporaryPassword ? <p className="portal-auth-footer"><Link href="/forgot-password">Forgot password?</Link></p> : null}
     </form>
   );
 }

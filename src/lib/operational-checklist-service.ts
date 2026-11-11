@@ -3,6 +3,7 @@ import { db } from "./db";
 import type { Prisma } from "@/generated/prisma/client";
 import { currentRoleAccess } from "./current-role-access";
 import { facilityWhere, type RequestScope } from "./scope";
+import { floorIsOperational } from "./floor-availability";
 import { CHECKLIST_PURPOSE, checklistCreateSchema, checklistChangeSchema, checklistRecordSchema, checklistTemplates, checklistDates, checklistRows, checklistWeek, validateChecklistSubmission, type ChecklistCreate, type ChecklistChange, type ChecklistRow, type ChecklistTemplate } from "./operational-checklist-policy";
 
 type Client = Prisma.TransactionClient;
@@ -32,10 +33,10 @@ async function assignments(tx: Client, scope: RequestScope, input: { assigneeId:
 async function snapshot(tx: Client, scope: RequestScope, facilityId: string) {
   const units = await tx.unit.findMany({ where: { facilityId, facility: facilityWhere(scope), combinedIntoUnitId: null }, select: { id: true, number: true, status: true, occupancies: { where: { status: { in: ["ACTIVE", "NOTICE_GIVEN"] }, endDate: null }, select: { tenancy: { select: { facilityId: true, status: true, customer: { select: { organisationId: true } } } } } } }, orderBy: { number: "asc" }, take: 1501 });
   if (units.length > 1500) throw new Error("CHECKLIST_LIMIT");
-  const overlocks = await tx.task.findMany({ where: { organisationId: scope.organisationId, facilityId, purpose: "PHYSICAL_OVERLOCK", status: { notIn: ["COMPLETED", "CANCELLED"] } }, select: { unitId: true } });
+  const overlocks = new Set((await tx.task.findMany({ where: { organisationId: scope.organisationId, facilityId, purpose: "PHYSICAL_OVERLOCK", status: { notIn: ["COMPLETED", "CANCELLED"] } }, select: { unitId: true } })).map(task => task.unitId));
   const rows: ChecklistRow[] = units.sort((a,b) => a.number.localeCompare(b.number, "en", { numeric: true })).map(u => ({
     id: u.id, label: `Unit ${u.number}`, expected: u.status === "OCCUPIED" && u.occupancies.length === 1 && u.occupancies.every(o => o.tenancy.facilityId === facilityId && o.tenancy.customer.organisationId === scope.organisationId && ["ACTIVE", "NOTICE_GIVEN"].includes(o.tenancy.status)) ? "OCCUPIED" : !u.occupancies.length && u.status === "AVAILABLE" ? "VACANT" : "REVIEW",
-    state: "PENDING", notes: "", evidence: "", lockCount: null, overlockTask: overlocks.some(t => t.unitId === u.id),
+    state: "PENDING", notes: "", evidence: "", lockCount: null, overlockTask: overlocks.has(u.id),
   }));
   return { rows, sourceHash: hash(rows) };
 }
@@ -76,6 +77,7 @@ export async function changeOperationalChecklist(scope: RequestScope, raw: Check
     if (before.updatedAt.toISOString() !== input.expectedUpdatedAt || ["COMPLETED", "CANCELLED"].includes(before.status)) throw new Error("CONFLICT");
     const record = checklistRecordSchema.parse(before.operationalChecklist);
     let status = before.status;
+    let observationAudit: { before: Prisma.InputJsonValue; after: Prisma.InputJsonValue } | undefined;
     const data: Prisma.TaskUncheckedUpdateManyInput = {};
     if (["APPROVE", "RETURN", "ASSIGN", "CANCEL"].includes(input.action)) {
       if (!manager) throw new Error("FORBIDDEN");
@@ -87,13 +89,26 @@ export async function changeOperationalChecklist(scope: RequestScope, raw: Check
       if (!source.rows.length) throw new Error("CHECKLIST_EMPTY");
       Object.assign(record, source, { sourceAt: now.toISOString(), summary: "", comparisonReference: "", submittedBy: null, submittedAt: null });
       status = "IN_PROGRESS";
+    } else if (input.action === "OBSERVE") {
+      if (record.template !== "PADLOCK" || before.status !== "IN_PROGRESS" || !record.sourceAt) throw new Error("CONFLICT");
+      const index = record.rows.findIndex(row => row.id === input.row.id);
+      if (index < 0) throw new Error("CONFLICT");
+      observationAudit = {
+        before: json({ row: record.rows[index], summary: record.summary, comparisonReference: record.comparisonReference }),
+        after: json({ row: { ...record.rows[index], ...input.row }, summary: input.summary, comparisonReference: input.comparisonReference }),
+      };
+      record.rows[index] = { ...record.rows[index], ...input.row };
+      record.summary = input.summary;
+      record.comparisonReference = input.comparisonReference;
     } else if (input.action === "SAVE" || input.action === "SUBMIT") {
       if (before.status !== "IN_PROGRESS" || !record.sourceAt) throw new Error("CONFLICT");
-      if (new Set(input.rows.map(r => r.id)).size !== record.rows.length || input.rows.length !== record.rows.length || input.rows.some(r => !record.rows.some(saved => saved.id === r.id))) throw new Error("CONFLICT");
+      const byId = new Map(input.rows.map(row => [row.id, row]));
+      if (byId.size !== record.rows.length || input.rows.length !== record.rows.length) throw new Error("CONFLICT");
       record.rows = record.rows.map(row => {
-        const result = input.rows.find(r => r.id === row.id)!;
+        const result = byId.get(row.id);
+        if (!result) throw new Error("CONFLICT");
         const allowed = record.template === "PADLOCK" ? ["PENDING", "VACANT", "OCCUPIED", "OVERLOCKED"] : ["PENDING", "PASS", "ISSUE", "NA"];
-        if (!allowed.includes(result.state)) throw new Error("CHECKLIST_INCOMPLETE");
+        if (!allowed.includes(result.state) || (record.template !== "PADLOCK" && result.comparisonDiscrepancy !== undefined)) throw new Error("CHECKLIST_INCOMPLETE");
         return { ...row, ...result };
       });
       record.summary = input.summary; record.comparisonReference = input.comparisonReference;
@@ -117,10 +132,28 @@ export async function changeOperationalChecklist(scope: RequestScope, raw: Check
     } else if (input.action === "CANCEL") status = "CANCELLED";
     const saved = await tx.task.updateMany({ where: { id: before.id, updatedAt: before.updatedAt, status: before.status }, data: { ...data, status, operationalChecklist: json(record), completedAt: status === "COMPLETED" ? now : null, updatedAt: new Date(Math.max(now.getTime(), before.updatedAt.getTime() + 1)) } });
     if (saved.count !== 1) throw new Error("CONFLICT");
-    const after = await tx.task.findUniqueOrThrow({ where: { id: before.id } });
-    await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: before.facilityId, actorId: scope.userId, action: `operationalChecklist.${input.action.toLowerCase()}`, entityType: "Task", entityId: before.id, before: json(before), after: json(after) } });
-    return after.id;
+    const audit = observationAudit ?? { before: json(before), after: json(await tx.task.findUniqueOrThrow({ where: { id: before.id } })) };
+    await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: before.facilityId, actorId: scope.userId, action: `operationalChecklist.${input.action.toLowerCase()}`, entityType: "Task", entityId: before.id, ...audit } });
+    return before.id;
   }, { timeout: 30000 });
+}
+
+export async function padlockWalkthrough(scope: RequestScope, id: string) {
+  return db.$transaction(async tx => {
+    const task = await tx.task.findFirst({
+      where: {
+        id, organisationId: scope.organisationId, facility: facilityWhere(scope), purpose: CHECKLIST_PURPOSE,
+        status: { not: "CANCELLED" }, operationalChecklist: { path: ["template"], equals: "PADLOCK" },
+      },
+      select: { facilityId: true, facility: { select: { name: true } }, assigneeId: true, coverId: true, dueAt: true, operationalChecklist: true },
+    });
+    if (!task?.facilityId || !task.facility) throw new Error("NOT_FOUND");
+    const actor = await staff(tx, scope, scope.userId, task.facilityId);
+    if (scope.userId !== task.assigneeId && scope.userId !== task.coverId && !canReviewPadlocks(actor, scope.organisationId, task.facilityId)) throw new Error("FORBIDDEN");
+    const record = checklistRecordSchema.parse(task.operationalChecklist);
+    const rows = record.sourceAt ? record.rows : (await snapshot(tx, scope, task.facilityId)).rows;
+    return { store: task.facility.name, dueAt: task.dueAt, rows };
+  }, { isolationLevel: "RepeatableRead", timeout: 30000 });
 }
 
 export async function operationalChecklists(scope: RequestScope, query: { facilityId?: string; id?: string; closed?: boolean; cursor?: string; kind?: "checklists" | "padlocks" }) {
@@ -148,6 +181,29 @@ export async function operationalChecklists(scope: RequestScope, query: { facili
       const task = await tx.task.findFirst({ where: { ...base, id: query.id }, select: { ...summarySelect, operationalChecklist: true } });
       if (!task) throw new Error("NOT_FOUND");
       const record = checklistRecordSchema.parse(task.operationalChecklist);
+      if (record.template === "PADLOCK" && task.facilityId) {
+        const facilityId = task.facilityId;
+        const layout = await tx.facility.findFirstOrThrow({
+          where: { id: facilityId, organisationId: scope.organisationId },
+          select: { closedFloors: true, maps: {
+            orderBy: { name: "asc" },
+            select: { id: true, name: true, width: true, height: true, elements: {
+              orderBy: { sortOrder: "asc" },
+              select: { id: true, type: true, x: true, y: true, width: true, height: true, rotation: true, label: true, unit: { select: { id: true, facilityId: true } } },
+            } },
+          } },
+        });
+        const units = task.status === "OPEN" ? (await tx.unit.findMany({
+          where: { facilityId, combinedIntoUnitId: null }, select: { id: true, number: true }, take: 1501,
+        })).sort((a, b) => a.number.localeCompare(b.number, "en", { numeric: true })).map(unit => ({ id: unit.id, label: `Unit ${unit.number}` })) : [];
+        const floors = layout.maps.map(map => ({
+          ...map, operational: floorIsOperational(map.name, layout.closedFloors),
+          elements: map.elements.map(({ unit, ...element }) => ({
+            ...element, unitId: element.type === "UNIT" && unit?.facilityId === facilityId ? unit.id : null,
+          })),
+        }));
+        return { ...metadata, task: { ...task, operationalChecklist: record }, padlockMap: { units, floors }, week: undefined, tasks: undefined, nextCursor: undefined };
+      }
       const week = [];
       if (record.template !== "PADLOCK" && task.startAt) {
         const days = checklistWeek(task.startAt);
