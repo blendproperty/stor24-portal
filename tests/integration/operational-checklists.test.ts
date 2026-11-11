@@ -28,15 +28,20 @@ test("isolated PostgreSQL checklist lifecycle, padlock snapshots, permissions an
       await assert.rejects(createOperationalChecklist(csoScope,{...base,requestKey:randomUUID()}),/FORBIDDEN/);
       const future=await createOperationalChecklist(scope,{...base,repeat:"ONCE",occurrences:1,startAt:"2099-01-01T06:00:00Z",endAt:"2099-01-01T08:00:00Z",requestKey:randomUUID()});await assert.rejects(act(future.id),/NOT_DUE/);
     });
-    await t.test("assigned preparer and cover save progress, all rows and independent review required",async()=>{
+    await t.test("Closing saves each check and keeps weekly history and independent review",async()=>{
       await assert.rejects(act(id,scope),/FORBIDDEN/);await act(id);
       await assert.rejects(act(id,csoScope,{action:"SUBMIT",...await results(id),rows:[]}),/CONFLICT/);
-      const old=await current(id);await act(id,coverScope,{action:"SAVE",...await results(id)});
-      await assert.rejects(changeOperationalChecklist(csoScope,{id,expectedUpdatedAt:old.updatedAt.toISOString(),action:"SAVE",...await results(id)} as ChecklistChange),/CONFLICT/);
       const forged=await results(id);forged.rows[0].id="arbitrary";await assert.rejects(act(id,csoScope,{action:"SAVE",...forged}),/CONFLICT/);
       const version=(await current(id)).updatedAt.toISOString(),payload=await results(id);
-      const concurrent=await Promise.allSettled([csoScope,coverScope].map(s=>changeOperationalChecklist(s,{id,expectedUpdatedAt:version,action:"SAVE",...payload} as ChecklistChange)));
+      assert.equal(payload.rows.length, 13);
+      assert.equal(payload.rows.filter(row => row.lockCount !== null).length, 3);
+      await assert.rejects(act(id,csoScope,{action:"SUBMIT",...payload}),/CHECKLIST_SAVE_EACH/);
+      const { rows, ...summaryFields } = payload;
+      const observe = { ...summaryFields, action: "OBSERVE" as const, row: rows[0] };
+      const concurrent=await Promise.allSettled([csoScope,coverScope].map(s=>changeOperationalChecklist(s,{id,expectedUpdatedAt:version,...observe} as ChecklistChange)));
       assert.equal(concurrent.filter(r=>r.status==="fulfilled").length,1);assert.equal(concurrent.filter(r=>r.status==="rejected").length,1);
+      for (const row of rows.slice(1)) await act(id,coverScope,{ ...observe, row });
+      assert.equal(await db.auditEvent.count({where:{entityId:id,action:"operationalChecklist.observe"}}),13);
       await act(id,csoScope,{action:"SUBMIT",...await results(id)});assert.equal((await current(id)).status,"WAITING");
       await assert.rejects(act(id,csoScope,{action:"APPROVE",note:"Self approval"}),/FORBIDDEN/);
       await act(id,scope,{action:"RETURN",note:"Please confirm trolley counts"});assert.equal((await current(id)).status,"IN_PROGRESS");
