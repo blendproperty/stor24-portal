@@ -1159,6 +1159,8 @@ model ScheduledBillingCharge {
   recognisedAt DateTime?
   ledgerEntryId String? @unique
   ledgerEntry LedgerEntry? @relation(fields: [ledgerEntryId], references: [id], onDelete: Restrict)
+  invoiceId String? @unique
+  invoice Document? @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
   createdAt DateTime @default(now())
 
   @@unique([accountId, externalRef])
@@ -1297,6 +1299,7 @@ model SettlementBalanceObservation {
 }
 
 model Document {
+  scheduledBillingCharge ScheduledBillingCharge?
   receiptImportPosting ReceiptImportPosting?
   receiptReallocationSource ReceiptReallocation? @relation("ReceiptReallocationSourceDocument")
   receiptReallocationTarget ReceiptReallocation? @relation("ReceiptReallocationTargetDocument")

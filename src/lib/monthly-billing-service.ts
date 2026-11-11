@@ -59,6 +59,7 @@ async function preview(client: Client, scope: RequestScope, accountId: string, p
   if (account.currency !== "ZAR") throw new Error("BILLING_CURRENCY_UNSUPPORTED");
   const plan = billingPlanSchema.parse(profile.config);
   const entries = await client.ledgerEntry.findMany({ where: { accountId }, orderBy: { id: "asc" } });
+  if (await client.scheduledBillingCharge.findFirst({ where: { accountId, externalRef: `RENT-${period}` }, select: { id: true } })) throw new Error("BILLING_ALREADY_POSTED");
   if (entries.some(entry => entry.externalRef === `RENT-${period}`)) throw new Error("BILLING_ALREADY_POSTED");
   // An existing initial charge/manual adjustment cannot silently be charged again.
   const end = new Date(`${dates.end}T23:59:59.999+02:00`);
@@ -141,6 +142,39 @@ function billingPeriodSchemaForDraft(value: unknown) {
 export async function approveScheduledInvoiceDraft(scope: RequestScope, accountId: string, period: string, fingerprint: string) {
   if (period !== nextBillingPeriod()) throw new Error("BILLING_DRAFT_REVIEW");
   return postBilling(scope,accountId,period,fingerprint,scope.userId,true);
+}
+
+// Isolated test entry only; the customer-facing approval path remains held.
+export async function approveScheduledInvoiceDraftInIsolatedTest(scope: RequestScope, accountId: string, period: string, fingerprint: string) {
+  if (process.env.NODE_ENV !== "test" || process.env.MERCHANDISE_DB_TEST !== "isolated-ci" || !process.env.DATABASE_URL || new URL(process.env.DATABASE_URL).hostname !== "localhost") throw new Error("BILLING_ISOLATED_TEST_ONLY");
+  if (period !== nextBillingPeriod() || periodDates(period).effectiveAt <= new Date()) throw new Error("BILLING_DRAFT_REVIEW");
+  return db.$transaction(async tx => {
+    await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${accountId} FOR UPDATE`;
+    const { account, tenancy, profile } = await context(tx, scope, accountId);
+    await tx.$queryRaw`SELECT "id" FROM "Facility" WHERE "id" = ${tenancy.facilityId} FOR UPDATE`;
+    const draft = await tx.configurationProfile.findFirst({ where: { organisationId: scope.organisationId, facilityId: tenancy.facilityId, domain: DRAFT_DOMAIN, name: `${accountId}:${period}` } });
+    if (!draft || billingPeriodSchemaForDraft(draft.config).fingerprint !== fingerprint) throw new Error("BILLING_DRAFT_REVIEW");
+    if (draft.status === "STAGED") {
+      const staged = await tx.scheduledBillingCharge.findUnique({ where: { accountId_externalRef: { accountId, externalRef: `RENT-${period}` } }, include: { invoice: true } });
+      if (!staged?.invoice || staged.invoice.tenancyId !== tenancy.id || staged.invoice.idempotencyKey !== `monthly-invoice:${accountId}:${period}`) throw new Error("BILLING_DRAFT_REVIEW");
+      return { documentId: staged.invoice.id, invoiceNumber: staged.invoice.externalId, total: staged.amount.toNumber(), alreadyStaged: true };
+    }
+    if (draft.status !== "READY") throw new Error("BILLING_DRAFT_REVIEW");
+    await assertDraftEligibility(tx, scope, account, tenancy, profile, period);
+    const bill = await preview(tx, scope, accountId, period, nextBillingPeriod());
+    if (bill.fingerprint !== fingerprint) throw new Error("BILLING_PREVIEW_CHANGED");
+    // Multi-line, zero and credit invoices need atomic group recognition and policy review.
+    if (bill.lines.length !== 1 || bill.lines[0].type !== "CHARGE" || bill.lines[0].amount <= 0) throw new Error("BILLING_STAGING_REVIEW");
+    const line = bill.lines[0], invoiceNumber = `INV-${period.replace("-", "")}-${bill.accountNumber}`;
+    const company = await getBillingDocumentCompanyDetails(scope.organisationId, tenancy.facilityId, tx);
+    const html = renderInvoiceHtml({ invoiceNumber, issueDate: new Date(), facilityName: bill.facilityName, company, customerName: bill.customerName, accountNumber: bill.accountNumber, currentBalance: account.balance.toString(), futureChargeExcluded: true, lines: [{ id: line.key, description: line.description, effectiveAt: periodDates(period).effectiveAt, amount: line.amount, taxAmount: line.taxAmount }] });
+    const sha256 = createHash("sha256").update(html).digest("hex");
+    const document = await tx.document.create({ data: { tenancyId: tenancy.id, type: "INVOICE", status: "GENERATED", storageKey: `inline:${sha256}`, content: html, sha256, externalId: invoiceNumber, idempotencyKey: `monthly-invoice:${accountId}:${period}` } });
+    await tx.scheduledBillingCharge.create({ data: { accountId, organisationId: scope.organisationId, facilityId: tenancy.facilityId, invoiceId: document.id, externalRef: `RENT-${period}`, description: line.description, amount: line.amount, taxAmount: line.taxAmount, effectiveAt: periodDates(period).effectiveAt } });
+    await tx.configurationProfile.update({ where: { id: draft.id }, data: { status: "STAGED" } });
+    await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: tenancy.facilityId, actorId: scope.userId, action: "billing.invoice_staged", entityType: "Account", entityId: accountId, after: { period, invoiceNumber, documentId: document.id, fingerprint } } });
+    return { documentId: document.id, invoiceNumber, total: bill.total, alreadyStaged: false };
+  }, { isolationLevel: "Serializable", timeout: 20000 });
 }
 async function postBilling(scope: RequestScope, accountId: string, period: string, fingerprint: string, actorId: string | null, scheduled: boolean) {
   // Future-effective balances need a reliable recognition and reconciliation mechanism.
