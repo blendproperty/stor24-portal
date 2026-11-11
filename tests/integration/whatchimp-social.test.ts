@@ -49,5 +49,14 @@ test('social intake validates, scopes, deduplicates and claims notification once
     await sendSocialNotice(failed.id, async () => { throw Error('ambiguous'); });
     await sendSocialNotice(failed.id, send);
     assert.equal(sent, 1); assert.equal((await db.configurationProfile.findUniqueOrThrow({ where: { id: failed.id } })).status, 'REVIEW_REQUIRED');
+    const third = await call({ action: 'start' });
+    const unapproved = await call({ ...data, enquiryKey: third.enquiryKey! });
+    const withheld = await db.configurationProfile.findFirstOrThrow({ where: { organisationId: org.id, domain: SOCIAL_NOTICE_DOMAIN, name: unapproved.leadReference! } });
+    await db.roleAssignment.deleteMany({ where: { userId: user.id } });
+    await sendSocialNotice(withheld.id, send);
+    assert.equal(sent, 1);
+    assert.equal((await db.configurationProfile.findUniqueOrThrow({ where: { id: withheld.id } })).status, 'REVIEW_REQUIRED');
+    await db.configurationProfile.update({ where: { id: fb.id }, data: { status: 'DISABLED' } });
+    await assert.rejects(call({ action: 'probe' }), /SOCIAL_DISABLED/);
   } finally { await db.organisation.delete({ where: { id: org.id } }); await db.$disconnect(); }
 });
