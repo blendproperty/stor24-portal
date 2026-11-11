@@ -5,7 +5,7 @@ import { unitSupportsProduct } from "@/lib/product-line";
 import { releaseLeadBookingStage } from "@/lib/lead-booking-stage";
 import { requireOperationalUnit } from "@/lib/floor-availability-service";
 import { unitIsOperational, floorMapSelection } from "@/lib/floor-availability";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {initialRentPreview,type InitialRentPolicy} from './proration-preview';
 import {southAfricaDateKey} from './south-africa-time';
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
@@ -580,9 +580,7 @@ export async function expireReservation(
  *
  * Signature retains the hold. Key handover activates the tenancy and unit.
  */
-export async function moveIn(
-  scope: RequestScope,
-  input: {
+type MoveInInput = {
     reservationId?: string;
     facilityId: string;
     customerId: string;
@@ -594,10 +592,9 @@ export async function moveIn(
     accessState: string;
     paymentMethod: "DEBIT_ORDER" | "CARD" | "EFT" | "OTHER";
     simulation?: boolean;
-  },
-) {
-  await requireFacility(scope, input.facilityId);
-  const result = await db.$transaction(async (tx) => {
+};
+
+async function moveInTransaction(tx: Prisma.TransactionClient, scope: RequestScope, input: MoveInInput, accountNumber = `ST24-${Date.now().toString(36).toUpperCase()}`) {
     await requireOperationalUnit(tx, input.facilityId, input.unitId);
     await tx.$queryRaw`SELECT "id" FROM "Unit" WHERE "id" = ${input.unitId} FOR UPDATE`;
     const blockingOccupancy = await tx.occupancy.count({ where: { unitId: input.unitId, status: { in: ["PENDING", "ACTIVE", "NOTICE_GIVEN", "TRANSFERRING"] } } });
@@ -635,7 +632,7 @@ export async function moveIn(
     const account = await tx.account.create({
       data: {
         customerId: customer.id,
-        accountNumber: `ST24-${Date.now().toString(36).toUpperCase()}`,
+        accountNumber,
       },
     });
     const monthlyRate = input.monthlyRate ?? unit.monthlyRate;
@@ -716,9 +713,43 @@ export async function moveIn(
       input.facilityId,
     );
     return { tenancy, document, customer, facility, unit };
-  });
+}
+
+export async function moveIn(scope: RequestScope, input: MoveInInput) {
+  await requireFacility(scope, input.facilityId);
+  const result = await db.$transaction(tx => moveInTransaction(tx, scope, input));
   if (!input.simulation) await welcomeTenantWhenReady(result.customer.id, scope.organisationId, { kind: "TENANCY", id: result.tenancy.id, facilityId: result.tenancy.facilityId });
   return result;
+}
+
+export async function moveInBatch(scope: RequestScope, requestKey: string, inputs: MoveInInput[]) {
+  if (!inputs.length || inputs.length > 20 || inputs.some(i => i.reservationId || i.simulation || i.facilityId !== inputs[0].facilityId || i.customerId !== inputs[0].customerId) || new Set(inputs.map(i => i.unitId)).size !== inputs.length) throw new Error("CONFLICT");
+  await requireFacility(scope, inputs[0].facilityId);
+  const ordered = [...inputs].sort((a, b) => a.unitId.localeCompare(b.unitId));
+  const requestHash = createHash("sha256").update(JSON.stringify(ordered)).digest("hex");
+  const batch = await db.$transaction(async tx => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${scope.organisationId + ':' + requestKey}, 0))`;
+    const previous = await tx.multiUnitMoveIn.findUnique({ where: { organisationId_requestKey: { organisationId: scope.organisationId, requestKey } }, include: { items: true } });
+    if (previous) {
+      if (previous.requestHash !== requestHash || previous.facilityId !== inputs[0].facilityId || previous.customerId !== inputs[0].customerId) throw new Error("CONFLICT");
+      await requireLeasingCustomer(scope, previous.customerId, tx);
+      return previous;
+    }
+    const customer = await requireLeasingCustomer(scope, inputs[0].customerId, tx);
+    if (!customer.email) throw new Error("CUSTOMER_EMAIL_REQUIRED");
+    const documents: { unitId: string; unitNumber: string; documentId: string; accountId: string; tenancyId: string }[] = [];
+    for (const input of ordered) {
+      await requireOperationalUnit(tx, input.facilityId, input.unitId);
+      const available = await tx.unit.findFirst({ where: { id: input.unitId, facilityId: input.facilityId, status: "AVAILABLE" }, select: { id: true } });
+      if (!available) throw new Error("CONFLICT");
+      const result = await moveInTransaction(tx, scope, input, `ST24-${randomUUID()}`);
+      documents.push({ unitId: input.unitId, unitNumber: result.unit.number, documentId: result.document.id, accountId: result.tenancy.accountId, tenancyId: result.tenancy.id });
+    }
+    return tx.multiUnitMoveIn.create({ data: { organisationId: scope.organisationId, facilityId: inputs[0].facilityId, customerId: inputs[0].customerId, requestKey, requestHash, items: { create: documents } }, include: { items: true } });
+  }, { timeout: 30000 });
+  const first = batch.items[0];
+  await welcomeTenantWhenReady(batch.customerId, scope.organisationId, { kind: "TENANCY", id: first.tenancyId, facilityId: batch.facilityId });
+  return batch;
 }
 
 export type MoveInResult = Awaited<ReturnType<typeof moveIn>>;

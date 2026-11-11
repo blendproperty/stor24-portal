@@ -11,6 +11,11 @@ function guide(id: string, title: string, category: string, route: string, scree
 }
 
 export const extendedGuides: WorkflowGuide[] = [
+  guide("multi-unit-move-in", "Move in multiple units for one customer", "Customer journey", "/operations/move-in/multiple", "Multiple unit move-in", "Select vacant units, review each agreement and recover saved signing sessions.", [
+    ["Select available units", "Choose the store and tick the available units required by the customer. Up to 20 units at the same store can be included; reserved units must follow their existing booking workflow.", ".multi-unit-move-in"],
+    ["Review every agreement", "Choose the customer and payment method, then review each unit's start date, monthly rent, deposit and agreed initial charge. Confirm only after checking all details and the required billing approval.", ".multi-unit-move-in"],
+    ["Recover and sign", "If the save response is uncertain, use Retry / recover saved batch in the same browser tab. Open each saved agreement and use its signing preparation retry if needed. Signing, payment checks and physical handover remain separate.", ".multi-unit-move-in"],
+  ]),
   guide("operational-forms", "Prepare and review operational forms", "Facility operations", "/operations/forms", "Operational forms", "Record maintenance and certificates, retain photographs and prepare held drafts.", [
     ["Choose the form", "Choose a permitted store and inspect the source fields. Client/visitor capture and banking authority are off pending agreed rules. Use the existing checklist, calendar, billing and quote workflows where linked.", "[aria-label='Choose operational form']"],
     ["Record the finding", "Create a maintenance draft, enter the discovery date, area, required action, response, outcome and evidence. Upload up to three site photographs without people or private identity/banking details. Save before leaving; a lost response requires reading saved records before another action.", "[aria-label='Saved operational forms']"],

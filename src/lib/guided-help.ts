@@ -79,6 +79,7 @@ export type PageHelp = { route: string; title: string; body: string; guideId?: s
 export const pageHelp: PageHelp[] = [
   { route: "/audit/data-protection", title: "Data protection", body: "Review the report export policy and recent decisions. Use the request reference in System audit to investigate a block without copying sensitive content.", guideId: "data-protection" },
   ...extendedPageHelp,
+  { route: "/operations/move-in/multiple", title: "Move in multiple units", body: "Select vacant units for one customer, review each agreement amount and recover each saved signing session.", guideId: "multi-unit-move-in" },
   { route: "/operations/move-in", title: "Move in", body: "Start from the correct reservation. Signed bookings use the original agreement, verified payment and date checks before physical key handover.", guideId: "move-in" },
   { route: "/operations/walk-in", title: "Walk-in tablet", body: "Prepare the store, hand over the website booking journey, clear the tablet and continue the exact saved booking through Move In.", guideId: "walk-in-tablet" },
   { route: "/operations/lease-signing", title: "Agreement signing", body: "Review and sign with the customer during a visit or call, then continue from saved agreement evidence.", guideId: "assisted-signing" },
