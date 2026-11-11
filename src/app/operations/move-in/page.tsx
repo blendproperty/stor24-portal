@@ -38,7 +38,7 @@ export default async function MoveInPage({ searchParams }: { searchParams: Promi
     legacySigned: Boolean(data.tenancies.find(t=>t.id===reservation.convertedTenancyId)?.documents.some(d=>d.status==="SIGNED")),
     readiness: reservation.publicLease?.status === "SIGNED" ? await getReservationMoveInReadiness(scope, reservation.id) : null,
   })));
-  return <><TrainingEntry/><MoveInWorkspace action={moveInAction}
+  return <><TrainingEntry/><a className="button button-secondary" href="/operations/move-in/multiple">Move in multiple available units for one customer</a><MoveInWorkspace action={moveInAction}
     initialReservationId={initialReservationId}
     facilities={data.facilities.map(({ id, name }) => ({ id, name }))}
     units={data.facilities.flatMap((facility) => facility.units.filter(unit => unit.floorOperational).map((unit) => ({ id: unit.id, facilityId: unit.facilityId, number: unit.number, floor: unit.floor ?? "", zone: unit.zone ?? "", status: unit.status, monthlyRate: Number(unit.monthlyRate), typeName: unit.unitType.name, width: unit.unitType.widthMetres === null ? null : Number(unit.unitType.widthMetres), length: unit.unitType.lengthMetres === null ? null : Number(unit.unitType.lengthMetres), area: unit.unitType.areaSqMetres === null ? null : Number(unit.unitType.areaSqMetres), features: unit.unitType.features })))}
