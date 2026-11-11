@@ -143,6 +143,8 @@ export async function approveScheduledInvoiceDraft(scope: RequestScope, accountI
   return postBilling(scope,accountId,period,fingerprint,scope.userId,true);
 }
 async function postBilling(scope: RequestScope, accountId: string, period: string, fingerprint: string, actorId: string | null, scheduled: boolean) {
+  // Future-effective balances need a reliable recognition and reconciliation mechanism.
+  if (periodDates(period).effectiveAt > new Date()) throw new Error("BILLING_EFFECTIVE_DATE_RECOGNITION_REQUIRED");
   // Documents snapshot the configured company information; no email or provider call occurs.
   const { tenancy } = await context(db, scope, accountId);
   const company = await getBillingDocumentCompanyDetails(scope.organisationId, tenancy.facilityId);
@@ -196,6 +198,7 @@ export async function postMultiMonthInvoice(scope: RequestScope, accountId: stri
     await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${accountId} FOR UPDATE`;
     const snapshot=await multiSnapshot(tx,scope,accountId,start,count);
     if(snapshot.fingerprint!==fingerprint) throw new Error("BILLING_PREVIEW_CHANGED");
+    if (snapshot.periods.some(period => periodDates(period).effectiveAt > new Date())) throw new Error("BILLING_EFFECTIVE_DATE_RECOGNITION_REQUIRED");
     const first=snapshot.bills[0], invoiceNumber=`INV-${start.replace("-", "")}-M-${createHash("sha256").update(`${accountId}:${snapshot.periods.at(-1)}`).digest("hex").slice(0,24)}`;
     const lines: Array<{id:string;description:string;effectiveAt:Date;amount:number;taxAmount:number}>=[];
     for(const [monthIndex,bill] of snapshot.bills.entries()) for(const [index,line] of bill.lines.entries()) {

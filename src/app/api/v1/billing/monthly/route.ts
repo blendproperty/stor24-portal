@@ -35,6 +35,7 @@ function failure(error: unknown) {
     BILLING_NOTICE_POLICY_REVIEW: "This account is on notice. A manager must review whether it needs an invoice.",
     BILLING_HANDOVER_REVIEW: "The account needs a recorded key handover before next-month review.",
     BILLING_DISCOUNT_POLICY_REVIEW: "A discount applies next month. Finance must review its treatment.",
+    BILLING_EFFECTIVE_DATE_RECOGNITION_REQUIRED: "Future-dated invoices are on hold until effective-date balance recognition is available.",
     BILLING_FUTURE_PERIOD: "Future months cannot be posted through this workflow.",
   };
   if (error instanceof Error && error.message.startsWith("BILLING_")) return Response.json({ error: { code: error.message, message: messages[error.message] || "This account requires review before billing can proceed." } }, { status: error.message === "BILLING_ACCOUNT_NOT_FOUND" ? 404 : 409 });
