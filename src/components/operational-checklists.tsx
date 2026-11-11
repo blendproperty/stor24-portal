@@ -5,7 +5,7 @@ import { z } from "zod";
 import Link from "next/link";
 import { PageHeader } from "./page-header";
 import { StatusPill } from "./status-pill";
-import { checklistHref, checklistIssue, checklistRecordSchema, checklistRows, checklistRowSchema, checklistTemplates, padlockMapSchema, type ChecklistTemplate, type ChecklistRow } from "@/lib/operational-checklist-policy";
+import { checklistHref, checklistIssue, checklistRecordSchema, checklistRows, checklistRowSchema, checklistTemplates, checklistUsesRoute, padlockMapSchema, type ChecklistTemplate, type ChecklistRow } from "@/lib/operational-checklist-policy";
 import { formatSouthAfricaDateTime, southAfricaDateKey } from "@/lib/south-africa-time";
 import { OperationalChecklistSheet, workbookItemLabel } from "./operational-checklist-sheet";
 import { OperationalChecklistRoute } from "./operational-checklist-route";
@@ -88,8 +88,8 @@ export function OperationalChecklists({ kind = "checklists" }: { kind?: "checkli
   }
   function updateRow(id: string, values: Partial<ChecklistRow>) { setRows(old => old.map(r => r.id === id ? { ...r, ...values } : r)); setDirty(true); }
   const disabled = busy || reading || blocked, record = task?.operationalChecklist;
-  const opening = record?.template === "OPENING";
-  const changedObservation = (padlocks || opening) && record ? rows.find((row, index) => row !== record.rows[index])?.id : undefined;
+  const routeTemplate = checklistUsesRoute(record?.template) ? record.template : null;
+  const changedObservation = (padlocks || routeTemplate) && record ? rows.find((row, index) => row !== record.rows[index])?.id : undefined;
   function saveObservation(row: ChecklistRow) {
     if (!task) return;
     void mutate("PATCH", {
@@ -149,7 +149,7 @@ export function OperationalChecklists({ kind = "checklists" }: { kind?: "checkli
       <div className="panel-heading"><div><h2>{task.title}</h2><p>{task.facility.name} · {runStatusLabels[task.status] ?? task.status} · Due {formatSouthAfricaDateTime(task.dueAt)} SAST</p></div><button className="text-button" disabled={busy || dirty} onClick={() => void read({ facilityId: facility,closed })}>Back to runs</button></div>
       <p>{padlocks ? "Counting CSO / staff" : "Responsible"}: {task.assignee?.name ?? "—"} · Cover: {task.cover?.name ?? "None"} · Reviewer: {staffName(record.reviewerId)}</p>
       {task.dueAt && new Date(task.dueAt) < new Date() && !["COMPLETED","CANCELLED"].includes(task.status) && <p role="status">Overdue — this run still needs completion or review.</p>}
-      {!padlocks && !opening && record.sourceAt && <p>Inspection list captured {formatSouthAfricaDateTime(record.sourceAt)} SAST. {rows.length - pending}/{rows.length} checked · {issues.length} finding(s).</p>}
+      {!padlocks && !routeTemplate && record.sourceAt && <p>Inspection list captured {formatSouthAfricaDateTime(record.sourceAt)} SAST. {rows.length - pending}/{rows.length} checked · {issues.length} finding(s).</p>}
       {padlocks && <>
         {task.status === "OPEN" && (preparer ? <button className="button button-primary" disabled={disabled} onClick={() => act("START")}>Start padlock count</button> : <p role="status">Waiting for {task.assignee?.name ?? "the assigned CSO"} to start the count.</p>)}
         {(task.status !== "CANCELLED" || rows.length > 0) && <PadlockCountMap key={task.id}
@@ -166,16 +166,16 @@ export function OperationalChecklists({ kind = "checklists" }: { kind?: "checkli
         </details>}
       </>}
       {record.reviewNote && <p><strong>Reviewer feedback:</strong> {record.reviewNote}</p>}
-      {!padlocks && preparer && task.status === "OPEN" && <button className="button button-primary" disabled={disabled} onClick={() => act("START")}>{opening ? "Start opening route" : "Start inspection"}</button>}
-      {opening && sheetDate && sheetRows.length > 0 && <OperationalChecklistRoute key={task.id} rows={sheetRows} saved={record.rows} changedId={changedObservation}
+      {!padlocks && preparer && task.status === "OPEN" && <button className="button button-primary" disabled={disabled} onClick={() => act("START")}>{routeTemplate ? `Start ${routeTemplate.toLowerCase()} route` : "Start inspection"}</button>}
+      {routeTemplate && sheetDate && sheetRows.length > 0 && <OperationalChecklistRoute key={task.id} template={routeTemplate} rows={sheetRows} saved={record.rows} changedId={changedObservation}
         editable={editable} disabled={disabled} date={sheetDate} operator={staffName(record.submittedBy ?? (preparer ? data?.actorId ?? null : task.assigneeId))}
         update={updateRow} save={saveObservation} discard={discardObservation}/>}
-      {opening && sheetDate && week.length > 0 && <details className={styles.padlockReports}>
+      {routeTemplate && sheetDate && week.length > 0 && <details className={styles.padlockReports}>
         <summary>View weekly history</summary>
         <OperationalChecklistSheet rows={record.rows} week={week} startAt={sheetDate} assignee={task.assignee?.name ?? null}
-          template="OPENING" editable={false} canSwitch={!disabled && !dirty} update={updateRow} openDay={id => void read({ id })}/>
+          template={routeTemplate} editable={false} canSwitch={!disabled && !dirty} update={updateRow} openDay={id => void read({ id })}/>
       </details>}
-      {!padlocks && !opening && sheetDate && sheetRows.length > 0 && <>
+      {!padlocks && !routeTemplate && sheetDate && sheetRows.length > 0 && <>
         {rows.length > 0 && <div className={styles.sheetFilters}><label>Find item or unit<input value={search} onChange={e => setSearch(e.target.value)}/></label><label><input type="checkbox" checked={onlyIssues} onChange={e => setOnlyIssues(e.target.checked)}/> Show findings only</label></div>}
         <OperationalChecklistSheet
           rows={sheetRows.filter(row => visibleLabels.has(row.label))}
@@ -195,7 +195,7 @@ export function OperationalChecklists({ kind = "checklists" }: { kind?: "checkli
       {rows.length > 0 && <>
       {record.template === "PADLOCK" && <label>Rent roll and collections comparison reference<textarea placeholder="Enter the dates or references of both lists." disabled={!editable} maxLength={1000} value={reference} onChange={e => { setReference(e.target.value); setDirty(true); }}/></label>}
       <label>Summary and escalation to reviewer<textarea disabled={!editable} maxLength={2000} value={summary} onChange={e => { setSummary(e.target.value); setDirty(true); }}/></label>
-      {preparer && task.status === "IN_PROGRESS" && <div className="button-row"><button className="button button-secondary" disabled={disabled || !!changedObservation} onClick={() => act("SAVE")}>{opening ? "Save summary" : "Save progress"}</button><button className="button button-primary" disabled={disabled || pending > 0 || !!changedObservation} onClick={() => act("SUBMIT")}>Submit for manager review</button>{record.template === "PADLOCK" && <button className="text-button" disabled={disabled} onClick={() => { if (window.confirm("Restart with current units? All recorded results in this draft will be cleared; audit history is retained.")) act("RESTART"); }}>Restart with current units</button>}</div>}
+      {preparer && task.status === "IN_PROGRESS" && <div className="button-row"><button className="button button-secondary" disabled={disabled || !!changedObservation} onClick={() => act("SAVE")}>{routeTemplate ? "Save summary" : "Save progress"}</button><button className="button button-primary" disabled={disabled || pending > 0 || !!changedObservation} onClick={() => act("SUBMIT")}>Submit for manager review</button>{record.template === "PADLOCK" && <button className="text-button" disabled={disabled} onClick={() => { if (window.confirm("Restart with current units? All recorded results in this draft will be cleared; audit history is retained.")) act("RESTART"); }}>Restart with current units</button>}</div>}
       </>}
       {record.submittedAt && <p>Submitted by {staffName(record.submittedBy)} · {formatSouthAfricaDateTime(record.submittedAt)} SAST</p>}
       {task.status === "WAITING" && manager && (!padlocks || people(task.facilityId, true).some(person => person.id === data?.actorId)) && record.reviewerId === data?.actorId && record.submittedBy !== data?.actorId && <fieldset disabled={disabled}><legend>Manager review</legend><p>Confirm the findings, evidence and escalation. Sign-off records review; it does not resolve a fault or perform overlocking.</p><label>Review and action note<textarea value={reviewNote} onChange={e => setReviewNote(e.target.value)} minLength={5} maxLength={2000}/></label><div className="button-row"><button className="button button-primary" disabled={reviewNote.trim().length < 5} onClick={() => act("APPROVE")}>Sign off review</button><button className="button button-secondary" disabled={reviewNote.trim().length < 5} onClick={() => act("RETURN")}>Return for correction</button></div></fieldset>}
