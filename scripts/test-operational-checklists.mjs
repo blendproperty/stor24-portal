@@ -23,6 +23,7 @@ try {for(const width of [1440,1024,768,390,320]) {
   let task={id:runId,title:"Closing checklist",facilityId:store,assigneeId:cso,coverId:cover,status:"OPEN",startAt:"2026-10-23T06:00:00.000Z",dueAt:"2026-10-23T08:00:00.000Z",updatedAt:"2026-10-23T06:00:00.000Z",completedAt:null,facility:{name:"Synthetic Midpoint"},assignee:{name:"Synthetic CSO"},cover:{name:"Synthetic cover"}};
   const mondayRow={...makeRow("0","Evening · Check all doors are locked"),state:"PASS"};
   const monday={...task,id:"savedMonday",status:"COMPLETED",startAt:"2026-10-19T06:00:00.000Z",dueAt:"2026-10-19T08:00:00.000Z",assignee:{name:"Previous CSO"}};
+  const openingRows = [makeRow("0", "Opening · Disarm alarm"), makeRow("1", "Ground floor · Count and check trolleys")];
   const padlockRows = [makeRow("unit1", "Unit 01", "VACANT"), makeRow("unit2", "Unit 02", "OCCUPIED"), makeRow("unit3", "Unit 03", "VACANT")];
   const unitShape = (id, x, y) => ({ id: `shape-${id}`, type: "UNIT", x, y, width: 170, height: 120, rotation: 0, label: null, unitId: id });
   const padlockMap = { units: padlockRows.map(({id,label}) => ({id,label})), floors: [
@@ -44,7 +45,7 @@ try {for(const width of [1440,1024,768,390,320]) {
       assert.equal(body.template,"CLOSING");assert.equal(body.assigneeId,cso);assert.equal(body.reviewerId,manager);assert.equal(body.coverId,cover);assert.equal(new Date(body.startAt).getUTCHours(),6);assert.equal(body.occurrences,2);
     } else {
       assert.equal(body.expectedUpdatedAt,task.updatedAt);
-      if(body.action==="START"){task.status="IN_PROGRESS";record.rows=record.template === "PADLOCK" ? padlockRows : [makeRow("0","Evening · Check all doors are locked"),makeRow("1","Evening · Count ground floor trolleys")];record.sourceAt="2026-10-23T06:10:00.000Z";}
+      if(body.action==="START"){task.status="IN_PROGRESS";record.rows=record.template === "PADLOCK" ? padlockRows : record.template === "OPENING" ? openingRows : [makeRow("0","Evening · Check all doors are locked"),makeRow("1","Evening · Count ground floor trolleys")];record.sourceAt="2026-10-23T06:10:00.000Z";}
       if(body.action==="OBSERVE"){
         assert.equal(body.rows,undefined);
         assert.ok(record.rows.some(row=>row.id===body.row.id));
@@ -210,5 +211,42 @@ try {for(const width of [1440,1024,768,390,320]) {
   await expect(page.getByRole("alert")).toContainText("could not be confirmed");assert.equal(writes,before+1);
   mode="denied";page.once("dialog",d=>d.accept());await page.getByRole("button",{name:"Reload saved records"}).click();
   await expect(map).toHaveCount(0);await expect(page.getByText("Unexpected overlock; refer to the manager.")).toHaveCount(0);
-  assert.deepEqual(errors,[]);await page.close();console.log(`PASS planner, checklist, padlock map taps, saves, fallback and recovery at ${width}px`);
+  mode="ok"; actor=cso;
+  record={...record,template:"OPENING",rows:[],sourceAt:null,reviewNote:"",submittedBy:null,submittedAt:null};
+  task={...task,title:"Opening checklist",status:"OPEN"};
+  await page.goto(`${base}/operations/checklists?id=${runId}`);
+  const walk=page.getByRole("region",{name:"Walkthrough route"}), editor=walk.getByRole("region",{name:"Selected check"});
+  const press=target=>touch ? target.tap() : target.click();
+  await expect(walk.getByText("0 of 34 checks saved")).toBeVisible();
+  await press(page.getByRole("button",{name:"Start opening route"}));
+  await expect(walk.getByText("0 of 2 checks saved")).toBeVisible();
+  await press(editor.getByRole("radio",{name:"Pass",exact:true}));
+  await press(walk.getByRole("button",{name:/Ground floor/}));
+  await expect(walk.getByText("Save or discard this check before moving to another one.")).toBeVisible();
+  await press(editor.getByRole("button",{name:"Save check"}));
+  await expect(walk.getByText("1 of 2 checks saved")).toBeVisible();
+  await expect(editor.getByRole("heading",{name:"Disarm alarm",exact:true})).toBeVisible();
+  await press(editor.getByRole("button",{name:"Next unchecked"}));
+  await press(editor.getByRole("radio",{name:"Issue",exact:true}));
+  const saveCheck=editor.getByRole("button",{name:"Save check"});
+  await expect(saveCheck).toBeDisabled();
+  await editor.getByLabel("Trolleys counted").fill("0");
+  await expect(saveCheck).toBeDisabled();
+  await editor.getByLabel("Reason (required)").fill("Trolley missing from its bay.");
+  await press(saveCheck);
+  await expect(walk.getByText("2 of 2 checks saved")).toBeVisible();
+  await page.reload();
+  await expect(walk.getByText("2 of 2 checks saved")).toBeVisible();
+  await press(walk.getByRole("button",{name:"Show findings (1)"}));
+  await expect(editor.getByLabel("Trolleys counted")).toHaveValue("0");
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await press(page.getByRole("button",{name:"Submit for manager review"}));
+  await expect(page.getByText(/Submitted by Synthetic CSO/)).toBeVisible();
+  actor=manager;
+  await page.reload();
+  await expect(page.getByRole("group",{name:"Manager review"})).toBeVisible();
+  await press(walk.getByRole("button",{name:"Show findings (1)"}));
+  await expect(editor.getByText(/Trolley missing from its bay/)).toBeVisible();
+  await expect(editor.getByRole("radio")).toHaveCount(0);
+  assert.deepEqual(errors,[]);await page.close();console.log(`PASS Opening route, other checklists, padlock map taps, saves, fallback and recovery at ${width}px`);
 }} finally { await browser.close();server.close(); }

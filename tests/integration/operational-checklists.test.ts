@@ -48,6 +48,29 @@ test("isolated PostgreSQL checklist lifecycle, padlock snapshots, permissions an
       const done=await current(id);assert.equal(done.status,"COMPLETED");assert.ok(done.completedAt);assert.equal(checklistRecordSchema.parse(done.operationalChecklist).reviewedBy,manager.id);
       await assert.rejects(act(id,scope,{action:"CANCEL"}),/CONFLICT/);assert.equal(await db.task.count({where:{organisationId:org.id,status:"OPEN",startAt:{lt:new Date("2090-01-01")}}}),2);
     });
+    await t.test("Opening saves individual checks with counts, reasons and actor evidence", async () => {
+      const opening = await createOperationalChecklist(scope, { ...base, template: "OPENING", repeat: "ONCE", occurrences: 1, requestKey: randomUUID() });
+      await act(opening.id);
+      const started = await current(opening.id);
+      const record = checklistRecordSchema.parse(started.operationalChecklist);
+      assert.equal(record.rows.length, 34);
+      const trolley = record.rows.find(row => row.label === "Ground floor · Count and check trolleys")!;
+      const observe = { action: "OBSERVE" as const, summary: "", comparisonReference: "", row: {
+        id: trolley.id, state: "ISSUE" as const, notes: "Trolley wheel damaged", evidence: "Inspection photo reference", lockCount: 0,
+      } };
+      await assert.rejects(act(opening.id, scope, observe), /FORBIDDEN/);
+      await assert.rejects(act(opening.id, csoScope, { ...observe, row: { ...observe.row, state: "OCCUPIED" } }), /CHECKLIST_INCOMPLETE/);
+      await assert.rejects(act(opening.id, csoScope, { ...observe, row: { ...observe.row, notes: "" } }), /CHECKLIST_INCOMPLETE/);
+      await assert.rejects(act(opening.id, csoScope, { ...observe, row: { ...observe.row, lockCount: null } }), /CHECKLIST_INCOMPLETE/);
+      await act(opening.id, coverScope, observe);
+      await assert.rejects(changeOperationalChecklist(csoScope, { ...observe, id: opening.id, expectedUpdatedAt: started.updatedAt.toISOString() }), /CONFLICT/);
+      const stored = checklistRecordSchema.parse((await current(opening.id)).operationalChecklist);
+      assert.deepEqual(stored.rows, record.rows.map(row => row.id === trolley.id ? { ...trolley, ...observe.row } : row));
+      const evidence = await db.auditEvent.findFirstOrThrow({ where: { entityId: opening.id, action: "operationalChecklist.observe" } });
+      assert.equal(evidence.actorId, cover.id);
+      assert.deepEqual(evidence.after, { row: { ...trolley, ...observe.row }, summary: "", comparisonReference: "" });
+      await assert.rejects(act(opening.id, csoScope, { action: "SUBMIT", ...await results(opening.id) }), /CHECKLIST_SAVE_EACH/);
+    });
     await t.test("padlocks use current units, reject inventory drift and retain physical findings without access actions",async()=>{
       const type=await db.unitType.create({data:{facilityId:a.id,name:"5 sqm",areaSqMetres:5}});
       const unit=await db.unit.create({data:{facilityId:a.id,unitTypeId:type.id,number:"01",monthlyRate:100}});
