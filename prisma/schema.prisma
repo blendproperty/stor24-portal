@@ -855,6 +855,7 @@ model Account {
   currency      String        @default("ZAR")
   tenancy       Tenancy?
   ledgerEntries LedgerEntry[]
+  scheduledBillingCharges ScheduledBillingCharge[]
   payments      Payment[]
   debitInstructions DebitOrderInstruction[]
   adjustments FinancialAdjustment[]
@@ -1119,6 +1120,7 @@ model DebitOrderInstruction {
 }
 
 model LedgerEntry {
+  scheduledBillingCharge ScheduledBillingCharge?
   receiptImportPosting ReceiptImportPosting?
   receiptReallocationSources ReceiptReallocation[] @relation("ReceiptReallocationOriginalEntry")
   receiptReallocationOutgoing ReceiptReallocation? @relation("ReceiptReallocationOutgoingEntry")
@@ -1140,6 +1142,27 @@ model LedgerEntry {
 
   @@unique([accountId, externalRef])
   @@index([accountId, effectiveAt])
+}
+
+// Internal staged charges; no production producer or scheduler is enabled.
+model ScheduledBillingCharge {
+  id String @id @default(cuid())
+  accountId String
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  organisationId String
+  facilityId String
+  externalRef String
+  description String
+  amount Decimal @db.Decimal(14, 2)
+  taxAmount Decimal @db.Decimal(14, 2)
+  effectiveAt DateTime
+  recognisedAt DateTime?
+  ledgerEntryId String? @unique
+  ledgerEntry LedgerEntry? @relation(fields: [ledgerEntryId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+
+  @@unique([accountId, externalRef])
+  @@index([recognisedAt, effectiveAt])
 }
 
 model Payment {
