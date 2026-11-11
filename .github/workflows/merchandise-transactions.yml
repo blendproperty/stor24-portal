@@ -123,6 +123,9 @@ jobs:
       - run: npx tsx --test tests/integration/monthly-billing.test.ts
       - run: npx tsx --test tests/integration/scheduled-billing-recognition.test.ts
       - run: npx tsx --test tests/integration/scheduled-billing-groups.test.ts
+      - run: npx tsx --test tests/integration/scheduled-billing-worker.test.ts
+        env:
+          NODE_ENV: test
       - run: npx tsx --test tests/integration/effective-invoice-flow.test.ts
         env:
           NODE_ENV: test

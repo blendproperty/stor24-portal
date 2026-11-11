@@ -7,6 +7,7 @@ import { currentBillingPeriod, nextBillingPeriod, periodDates } from "../../src/
 import { saveInvoiceSchedule } from "../../src/lib/invoice-schedule";
 import { approveScheduledInvoiceDraft, approveScheduledInvoiceDraftInIsolatedTest, prepareScheduledNextBilling, previewNextMonthForReview, readScheduledInvoiceDraft, saveMonthlyBillingPlan } from "../../src/lib/monthly-billing-service";
 import { recogniseScheduledBillingCharge } from "../../src/lib/scheduled-billing-recognition";
+import { recognitionWorkerHealthInIsolatedTest, runRecognitionWorkerInIsolatedTest } from "../../src/lib/scheduled-billing-worker";
 import { sendSavedInvoice } from "../../src/lib/finance/saved-invoice-delivery";
 import { buildAccountStatement } from "../../src/lib/finance/account-statement";
 
@@ -68,6 +69,7 @@ test("isolated reviewed invoice to effective-date recognition with production ho
     assert.equal((await db.account.findUniqueOrThrow({ where: { id: account.id } })).balance.toFixed(2), "0.00");
     assert.equal(await db.communicationLog.count({ where: { organisationId: org.id } }), 0);
     await assert.rejects(recogniseScheduledBillingCharge(charge.id, new Date(due.getTime() - 1)), /NOT_DUE/);
+    assert.equal((await runRecognitionWorkerInIsolatedTest(org.id, new Date(due.getTime() - 1))).processed, 0);
     let sends = 0; const fakeProvider = { send: async () => { sends++; } };
     await sendSavedInvoice(scope, invoice.id, randomUUID(), customer.email!, false, fakeProvider);
     assert.equal(sends, 1);
@@ -77,9 +79,11 @@ test("isolated reviewed invoice to effective-date recognition with production ho
       await tx.account.update({ where: { id: account.id }, data: { balance: { decrement: "200.00" } } });
     });
     assert.equal((await db.account.findUniqueOrThrow({ where: { id: account.id } })).balance.toFixed(2), "-200.00");
-    const recognized = await recogniseScheduledBillingCharge(charge.id, due);
-    assert.equal(recognized.alreadyRecognised, false);
+    const worker = await runRecognitionWorkerInIsolatedTest(org.id, due);
+    assert.equal(worker.processed, 1); assert.equal(worker.held, 0);
     assert.equal((await recogniseScheduledBillingCharge(charge.id, due)).alreadyRecognised, true);
+    assert.equal((await runRecognitionWorkerInIsolatedTest(org.id, due)).processed, 0);
+    assert.equal((await recognitionWorkerHealthInIsolatedTest(org.id, due)).status, "HEALTHY");
     assert.equal((await db.account.findUniqueOrThrow({ where: { id: account.id } })).balance.toFixed(2), "1050.00");
     const entries = await db.ledgerEntry.findMany({ where: { accountId: account.id }, orderBy: { effectiveAt: "asc" } });
     assert.equal(entries.length, 3);

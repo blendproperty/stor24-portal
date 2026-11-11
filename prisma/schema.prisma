@@ -2382,3 +2382,36 @@ model StaffDeletionFence {
   id Int @id
   generation Int @default(0)
 }
+
+// Isolated recognition-worker prototype; no production scheduler is connected.
+model BillingRecognitionLease {
+  organisationId String @id
+  token String
+  expiresAt DateTime
+  updatedAt DateTime @updatedAt
+}
+
+model BillingRecognitionRun {
+  id String @id @default(cuid())
+  organisationId String
+  startedAt DateTime @default(now())
+  finishedAt DateTime?
+  status String
+  processed Int @default(0)
+  held Int @default(0)
+  @@index([organisationId, startedAt])
+}
+
+model BillingRecognitionIssue {
+  id String @id @default(cuid())
+  organisationId String
+  facilityId String
+  accountId String
+  groupKey String
+  representativeId String
+  code String
+  status String @default("HELD")
+  updatedAt DateTime @updatedAt
+  @@unique([organisationId, groupKey])
+  @@index([organisationId, status])
+}
