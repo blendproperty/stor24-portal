@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { floorPlanView } from "./inventory-floor-canvas";
 import { InventoryFloorViewport } from "./inventory-floor-viewport";
 type Unit = {
   id: string;
@@ -86,15 +87,7 @@ export function UnitFacilityMap({
     id: e.unit.id, number: e.unit.number, status: e.unit.status, areaSqMetres: e.unit.unitType.areaSqMetres ? String(Number(e.unit.unitType.areaSqMetres)) : null,
     availability: (e.unit.floorOperational !== false && !e.unit.combinedIntoUnitId && ["AVAILABLE", "HELD", "RESERVED", "OCCUPIED"].includes(e.unit.status) ? "AVAILABLE" : "UNAVAILABLE") as "AVAILABLE" | "UNAVAILABLE",
   } : null })) }) : null; }, [maps, mapId]);
-  const view = useMemo(() => {
-    const map = maps.find(m => m.id === mapId);
-    const elements = map?.elements.filter(e => e.unit || /lift|stair|elevator/i.test(`${e.type} ${e.label ?? ""}`)) ?? [];
-    if (!elements.length) return { x: 0, y: 0, width: map?.width ?? 400, height: map?.height ?? 300 };
-    const left = Math.min(...elements.map(e => e.x)), top = Math.min(...elements.map(e => e.y));
-    const right = Math.max(...elements.map(e => e.x+e.width)), bottom = Math.max(...elements.map(e => e.y+e.height));
-    const padding = Math.max(right-left, bottom-top) * .035;
-    return { x: left-padding, y: top-padding, width: right-left+padding*2, height: bottom-top+padding*2 };
-  }, [maps, mapId]);
+  const view = useMemo(() => floorPlanView(floor ?? undefined), [floor]);
   const matchingCount = map?.elements.filter(e => e.unit && matchingIds.has(e.unit.id)).length ?? 0;
   function choose(id: string) {
     setPreview(null); setReady(false);

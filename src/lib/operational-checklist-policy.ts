@@ -41,9 +41,21 @@ export const checklistRowSchema = z.object({
   id: z.string().min(1).max(100), label: z.string().min(1).max(300),
   expected: z.enum(["PASS", "VACANT", "OCCUPIED", "REVIEW"]),
   state: z.enum(["PENDING", "PASS", "ISSUE", "NA", "VACANT", "OCCUPIED", "OVERLOCKED"]),
-  notes: text, evidence: z.string().trim().max(500), lockCount: z.number().int().min(0).max(100).nullable(), overlockTask: z.boolean(),
+  notes: text, evidence: z.string().trim().max(500), lockCount: z.number().int().min(0).max(100).nullable(), overlockTask: z.boolean(), comparisonDiscrepancy: z.boolean().optional(),
 }).strict();
 export type ChecklistRow = z.infer<typeof checklistRowSchema>;
+const padlockMapUnitSchema = z.object({ id: z.string(), label: z.string() });
+export const padlockMapSchema = z.object({
+  units: z.array(padlockMapUnitSchema),
+  floors: z.array(z.object({
+    id: z.string(), name: z.string(), operational: z.boolean(), width: z.number(), height: z.number(),
+    elements: z.array(z.object({
+      id: z.string(), type: z.string(), x: z.number(), y: z.number(), width: z.number(), height: z.number(),
+      rotation: z.number(), label: z.string().nullable(), unitId: z.string().nullable(),
+    })),
+  })),
+});
+export type PadlockMapData = z.infer<typeof padlockMapSchema>;
 export const checklistRecordSchema = z.object({
   version: z.literal(1), template: templateKeySchema, reviewerId: z.string().cuid(),
   rows: z.array(checklistRowSchema).max(1500), sourceAt: z.iso.datetime().nullable(), sourceHash: z.string().nullable(),
@@ -64,9 +76,14 @@ export const checklistCreateSchema = z.object({
 });
 export type ChecklistCreate = z.infer<typeof checklistCreateSchema>;
 const identity = { id: z.string().cuid(), expectedUpdatedAt: z.iso.datetime() };
+const editableRow = checklistRowSchema.pick({ id: true, state: true, notes: true, evidence: true, lockCount: true, comparisonDiscrepancy: true });
+const reportFields = { summary: text, comparisonReference: z.string().trim().max(1000) };
 export const checklistChangeSchema = z.discriminatedUnion("action", [
   z.object({ ...identity, action: z.enum(["START", "RESTART", "CANCEL"]) }).strict(),
-  z.object({ ...identity, action: z.enum(["SAVE", "SUBMIT"]), rows: z.array(z.object({ id: z.string(), state: checklistRowSchema.shape.state, notes: text, evidence: z.string().trim().max(500), lockCount: checklistRowSchema.shape.lockCount }).strict()).max(1500), summary: text, comparisonReference: z.string().trim().max(1000) }).strict(),
+  z.object({ ...identity, ...reportFields, action: z.enum(["SAVE", "SUBMIT"]), rows: z.array(editableRow).max(1500) }).strict(),
+  z.object({ ...identity, ...reportFields, action: z.literal("OBSERVE"), row: editableRow.extend({
+    state: z.enum(["PASS", "ISSUE", "NA", "VACANT", "OCCUPIED", "OVERLOCKED"]),
+  }) }).strict(),
   z.object({ ...identity, action: z.enum(["APPROVE", "RETURN"]), note: z.string().trim().min(5).max(2000) }).strict(),
   z.object({ ...identity, action: z.literal("ASSIGN"), assigneeId: z.string().cuid(), coverId: z.string().cuid().nullable(), reviewerId: z.string().cuid() }).strict(),
 ]);
@@ -84,13 +101,23 @@ export function checklistRows(template: ChecklistTemplate, at: Date): ChecklistR
   return labels.map((label, i) => ({ id: String(i), label, expected: "PASS", state: "PENDING", notes: "", evidence: "", lockCount: null, overlockTask: false }));
 }
 export function checklistIssue(row: ChecklistRow) {
-  return row.expected === "PASS" ? ["ISSUE", "NA"].includes(row.state) : row.expected === "REVIEW" || row.state === "OVERLOCKED" || row.state !== row.expected || row.overlockTask;
+  return row.expected === "PASS" ? ["ISSUE", "NA"].includes(row.state) : row.expected === "REVIEW" || row.state === "OVERLOCKED" || row.state !== row.expected || row.overlockTask || row.comparisonDiscrepancy === true;
+}
+export function checklistNeedsTrolleyCount(row: ChecklistRow) {
+  return row.label.includes("trolleys");
+}
+export function checklistRouteResultReady(row: ChecklistRow) {
+  return ["PASS", "ISSUE", "NA"].includes(row.state) &&
+    (!checklistNeedsTrolleyCount(row) || row.lockCount !== null) &&
+    (!(checklistIssue(row) || row.state === "NA") || row.notes.trim().length >= 5);
 }
 export function validateChecklistSubmission(record: ChecklistRecord) {
   if (!record.rows.length) throw new Error("CHECKLIST_INCOMPLETE");
   for (const row of record.rows) {
-    const allowed = record.template === "PADLOCK" ? ["VACANT", "OCCUPIED", "OVERLOCKED"] : ["PASS", "ISSUE", "NA"];
-    if (!allowed.includes(row.state) || (record.template === "PADLOCK" || row.label.includes("trolleys")) && row.lockCount === null || (checklistIssue(row) || row.state === "NA") && row.notes.length < 5) throw new Error("CHECKLIST_INCOMPLETE");
+    const ready = record.template === "PADLOCK"
+      ? ["VACANT", "OCCUPIED", "OVERLOCKED"].includes(row.state) && row.lockCount !== null && (!checklistIssue(row) || row.notes.length >= 5)
+      : checklistRouteResultReady(row);
+    if (!ready) throw new Error("CHECKLIST_INCOMPLETE");
   }
   if (record.template === "PADLOCK" && record.comparisonReference.length < 5) throw new Error("CHECKLIST_COMPARISON_REQUIRED");
 }

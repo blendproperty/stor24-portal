@@ -25,6 +25,16 @@ export type PlanElement = {
 
 export type PlanFloor = { elements: PlanElement[] };
 export type PlanView = { x: number; y: number; width: number; height: number };
+export type PlanObservations = ReadonlyMap<string, { color: string; label: string }>;
+
+export function floorPlanView(floor?: PlanFloor & { width: number; height: number }): PlanView {
+  const elements = floor?.elements.filter(element => element.unit || fixtureKind(element)) ?? [];
+  if (!elements.length) return { x: 0, y: 0, width: floor?.width ?? 400, height: floor?.height ?? 300 };
+  const left = Math.min(...elements.map(element => element.x)), top = Math.min(...elements.map(element => element.y));
+  const right = Math.max(...elements.map(element => element.x + element.width)), bottom = Math.max(...elements.map(element => element.y + element.height));
+  const padding = Math.max(right - left, bottom - top) * .035;
+  return { x: left - padding, y: top - padding, width: right - left + padding * 2, height: bottom - top + padding * 2 };
+}
 
 function fixtureKind(element: PlanElement) {
   const value = `${element.type} ${element.label || ""}`.toLowerCase();
@@ -57,12 +67,13 @@ function hasExposedRightSide(unit: PlanElement, units: PlanElement[]) {
  * wall panels. Making this fully data-driven from map geometry is tracked as
  * follow-up work, not a blocker for reusing this renderer across facilities.
  */
-export default function InventoryFloorCanvas({ floor, view, recommendedIds, selectedIds, matchingIds }: {
+export default function InventoryFloorCanvas({ floor, view, recommendedIds, selectedIds, matchingIds, observations }: {
   floor: PlanFloor;
   view: PlanView;
   recommendedIds: Set<string>;
   selectedIds: Set<string>;
   matchingIds: Set<string>;
+  observations?: PlanObservations;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -123,6 +134,7 @@ export default function InventoryFloorCanvas({ floor, view, recommendedIds, sele
         const w = Math.max(2, element.width * sx);
         const h = Math.max(2, element.height * sy);
         const selected = selectedIds.has(unit.id);
+        const observation = observations?.get(unit.id);
         const recommended = recommendedIds.has(unit.id);
         const occupied = unit.status === "OCCUPIED" && unit.availability !== "UNAVAILABLE";
         const unavailable = unit.availability !== "AVAILABLE";
@@ -161,12 +173,13 @@ export default function InventoryFloorCanvas({ floor, view, recommendedIds, sele
         if (showRightWall) drawRightWall();
 
         const facadeGradient = ctx.createLinearGradient(0, h, 0, h + d);
-        if (selected) { facadeGradient.addColorStop(0, "#f24b08"); facadeGradient.addColorStop(1, "#7e2106"); }
+        if (selected && observation) { facadeGradient.addColorStop(0, "#435770"); facadeGradient.addColorStop(1, "#162b43"); }
+        else if (selected) { facadeGradient.addColorStop(0, "#f24b08"); facadeGradient.addColorStop(1, "#7e2106"); }
         else if (recommended) { facadeGradient.addColorStop(0, "#f58a4c"); facadeGradient.addColorStop(1, "#9b380d"); }
         else if (unavailable) { facadeGradient.addColorStop(0, "#d0d3ce"); facadeGradient.addColorStop(.5, "#c4c9c3"); facadeGradient.addColorStop(1, "#afb7b0"); }
         else { facadeGradient.addColorStop(0, "#c8cbc6"); facadeGradient.addColorStop(.45, "#8f9691"); facadeGradient.addColorStop(1, "#4d5c57"); }
         ctx.fillStyle = facadeGradient;
-        ctx.strokeStyle = selected ? "#561704" : unavailable ? "#89968e" : "#29463d";
+        ctx.strokeStyle = selected ? observation ? "#162b43" : "#561704" : unavailable ? "#89968e" : "#29463d";
         ctx.lineWidth = 1;
         for (const { start, end } of facadeSegments) {
           const facade = new Path2D();
@@ -181,18 +194,19 @@ export default function InventoryFloorCanvas({ floor, view, recommendedIds, sele
 
         ctx.shadowColor = "transparent";
         const top = ctx.createLinearGradient(0, 0, w, h);
-        if (selected) { top.addColorStop(0, "#ff681f"); top.addColorStop(1, "#ff510a"); }
+        if (observation) { top.addColorStop(0, observation.color); top.addColorStop(1, observation.color); }
+        else if (selected) { top.addColorStop(0, "#ff681f"); top.addColorStop(1, "#ff510a"); }
         else if (recommended) { top.addColorStop(0, "#ffd2b4"); top.addColorStop(1, "#ffbc96"); }
         else if (occupied) { top.addColorStop(0, "#d9eaf2"); top.addColorStop(1, "#aacddd"); }
         else if (unavailable) { top.addColorStop(0, "#eceee9"); top.addColorStop(1, "#d9ded7"); }
         else { top.addColorStop(0, "#ffffff"); top.addColorStop(.55, "#fafbf8"); top.addColorStop(1, "#f2f4ef"); }
         ctx.fillStyle = top;
-        ctx.strokeStyle = selected ? "#ff510a" : recommended ? "#e2966c" : unavailable ? "#89968e" : "#173f35";
+        ctx.strokeStyle = selected ? observation ? "#162b43" : "#ff510a" : recommended ? "#e2966c" : unavailable ? "#89968e" : "#173f35";
         ctx.lineWidth = selected ? 2.2 : 1.25;
         ctx.fillRect(0, 0, w, h);
         ctx.strokeRect(.5, .5, Math.max(0, w - 1), Math.max(0, h - 1));
 
-        if (selected) {
+        if (selected && !observation) {
           ctx.strokeStyle = "#fff";
           ctx.lineWidth = 2;
           ctx.strokeRect(2, 2, Math.max(0, w - 4), Math.max(0, h - 4));
@@ -229,13 +243,13 @@ export default function InventoryFloorCanvas({ floor, view, recommendedIds, sele
         }
 
         if (facadeSegments.length === 1 && facadeSegments[0].start === 0 && facadeSegments[0].end === w && Math.max(w, h) > 26) {
-          ctx.fillStyle = selected ? "#ffb28c" : "rgba(242,244,240,.8)";
+          ctx.fillStyle = selected && !observation ? "#ffb28c" : "rgba(242,244,240,.8)";
           ctx.fillRect(w * .44, h + d * .2, Math.max(2, w * .12), Math.max(1, d * .16));
         }
 
         const fontSize = Math.max(6, Math.min(16, Math.min(w * .3, h * .36)));
         if (w >= 8 && h >= 7) {
-          ctx.fillStyle = selected ? "#fff" : unavailable ? "#657269" : "#071411";
+          ctx.fillStyle = selected && !observation ? "#fff" : unavailable ? "#657269" : "#071411";
           ctx.font = `800 ${fontSize}px Arial, sans-serif`;
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
@@ -390,7 +404,7 @@ export default function InventoryFloorCanvas({ floor, view, recommendedIds, sele
     const observer = new ResizeObserver(draw);
     observer.observe(host);
     return () => observer.disconnect();
-  }, [floor, view, recommendedIds, selectedIds, matchingIds]);
+  }, [floor, view, recommendedIds, selectedIds, matchingIds, observations]);
 
   return <canvas ref={canvasRef} className="floor-plan-canvas" aria-hidden="true" />;
 }

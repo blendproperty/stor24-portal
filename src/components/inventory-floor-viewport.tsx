@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent } from "react";
-import InventoryFloorCanvas, { type PlanElement, type PlanView } from "./inventory-floor-canvas";
+import InventoryFloorCanvas, { type PlanElement, type PlanObservations, type PlanView } from "./inventory-floor-canvas";
 
-export function InventoryFloorViewport({ floor, view, selectedIds, matchingIds, onSelect }: {
+export function InventoryFloorViewport({ floor, view, selectedIds, matchingIds, onSelect, observations }: {
   floor: { id: string; name: string; elements: PlanElement[] };
   view: PlanView;
   selectedIds: Set<string>;
   matchingIds: Set<string>;
   onSelect: (id: string) => void;
+  observations?: PlanObservations;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -17,10 +18,10 @@ export function InventoryFloorViewport({ floor, view, selectedIds, matchingIds, 
   const zoomRef = useRef(1);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const gesture = useRef({ x: 0, y: 0, left: 0, top: 0, distance: 0, zoom: 1, moved: false });
-  const baseWidth = size.width < 600 ? Math.max(size.width, 850) : Math.min(size.width, size.height * view.width / view.height);
+  const baseWidth = !observations && size.width < 600 ? Math.max(size.width, 850) : Math.min(size.width, size.height * view.width / view.height);
   const width = baseWidth * zoom;
   const height = width * view.height / view.width;
-  const held = new Set(floor.elements.filter(e => e.unit && ["HELD", "RESERVED"].includes(e.unit.status ?? "") && e.unit.availability === "AVAILABLE").map(e => e.unit!.id));
+  const held = useMemo(() => new Set(floor.elements.filter(e => e.unit && ["HELD", "RESERVED"].includes(e.unit.status ?? "") && e.unit.availability === "AVAILABLE").map(e => e.unit!.id)), [floor]);
 
   useEffect(() => {
     const el = host.current;
@@ -33,7 +34,7 @@ export function InventoryFloorViewport({ floor, view, selectedIds, matchingIds, 
   function changeZoom(value: number, origin?: { x: number; y: number }) {
     const el = host.current;
     if (!el) return;
-    const next = Math.max(1, Math.min(3, value));
+    const next = Math.max(1, Math.min(observations ? 6 : 3, value));
     const ratio = next / zoomRef.current;
     const x = origin?.x ?? el.clientWidth / 2, y = origin?.y ?? el.clientHeight / 2;
     const left = (el.scrollLeft + x) * ratio - x, top = (el.scrollTop + y) * ratio - y;
@@ -79,7 +80,7 @@ export function InventoryFloorViewport({ floor, view, selectedIds, matchingIds, 
   }
 
   return <div className="inventory-plan-explorer">
-    <div className="inventory-plan-heading"><strong>{floor.name}</strong><span>Live availability</span>
+    <div className="inventory-plan-heading"><strong>{floor.name}</strong><span>{observations ? "Padlock observations" : "Live availability"}</span>
       <div className="inventory-plan-controls" role="group" aria-label="Map controls">
         <button type="button" aria-label="Zoom in" onClick={() => changeZoom(zoomRef.current * 1.3)}>+</button>
         <button type="button" aria-label="Zoom out" onClick={() => changeZoom(zoomRef.current / 1.3)}>−</button>
@@ -89,12 +90,12 @@ export function InventoryFloorViewport({ floor, view, selectedIds, matchingIds, 
     <div ref={host} className="inventory-plan-viewport" role="region" aria-label={`${floor.name} unit map`} tabIndex={0}
       onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
       onClickCapture={e => { if (e.detail > 0 && gesture.current.moved) { e.preventDefault(); e.stopPropagation(); } }}>
-      <div className="inventory-plan-surface" role="group" aria-label={`${floor.name} unit availability map`} style={{ width, height }}>
-        <InventoryFloorCanvas floor={floor} view={view} recommendedIds={held} selectedIds={selectedIds} matchingIds={matchingIds}/>
+      <div className="inventory-plan-surface" role="group" aria-label={`${floor.name} ${observations ? "padlock observations" : "unit availability map"}`} style={{ width, height }}>
+        <InventoryFloorCanvas floor={floor} view={view} recommendedIds={held} selectedIds={selectedIds} matchingIds={matchingIds} observations={observations}/>
         {floor.elements.filter(e => e.unit).map(e => <button key={e.id} type="button"
           className="inventory-plan-unit" aria-pressed={selectedIds.has(e.unit!.id)}
-          aria-label={`Unit ${e.unit!.number}, ${e.unit!.availability === "UNAVAILABLE" ? "Closed floor / unavailable" : e.unit!.status}, ${e.unit!.areaSqMetres ?? "unknown"} square metres`}
-          title={`Unit ${e.unit!.number} · ${e.unit!.status}`}
+          aria-label={observations ? `Unit ${e.unit!.number}, ${observations.get(e.unit!.id)?.label ?? "Not checked"}` : `Unit ${e.unit!.number}, ${e.unit!.availability === "UNAVAILABLE" ? "Closed floor / unavailable" : e.unit!.status}, ${e.unit!.areaSqMetres ?? "unknown"} square metres`}
+          title={`Unit ${e.unit!.number} · ${observations?.get(e.unit!.id)?.label ?? e.unit!.status ?? "Not checked"}`}
           style={{ left: `${(e.x-view.x)/view.width*100}%`, top: `${(e.y-view.y)/view.height*100}%`, width: `${e.width/view.width*100}%`, height: `${e.height/view.height*100}%`, transform: `rotate(${e.rotation || 0}deg)` }}
           onFocus={event => { gesture.current.moved = false; const el=host.current; if (!el) return;
             const box=event.currentTarget.getBoundingClientRect(), bounds=el.getBoundingClientRect();
