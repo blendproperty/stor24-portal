@@ -194,6 +194,8 @@ export async function previewMultiMonthInvoice(scope: RequestScope, accountId: s
   return db.$transaction(async tx => { const {company: _company,...result}=await multiSnapshot(tx,scope,accountId,start,count); void _company; return result; },{isolationLevel:"RepeatableRead",timeout:20000});
 }
 export async function postMultiMonthInvoice(scope: RequestScope, accountId: string, start: string, count: number, fingerprint: string) {
+  // Reject future-effective charges before opening a transaction or reading account data.
+  if (multiPeriods(start, count).some(period => periodDates(period).effectiveAt > new Date())) throw new Error("BILLING_EFFECTIVE_DATE_RECOGNITION_REQUIRED");
   return db.$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${accountId} FOR UPDATE`;
     const snapshot=await multiSnapshot(tx,scope,accountId,start,count);
