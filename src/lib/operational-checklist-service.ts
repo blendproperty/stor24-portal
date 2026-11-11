@@ -4,7 +4,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { currentRoleAccess } from "./current-role-access";
 import { facilityWhere, type RequestScope } from "./scope";
 import { floorIsOperational } from "./floor-availability";
-import { CHECKLIST_PURPOSE, checklistCreateSchema, checklistChangeSchema, checklistRecordSchema, checklistTemplates, checklistDates, checklistRows, checklistWeek, validateChecklistSubmission, type ChecklistCreate, type ChecklistChange, type ChecklistRow, type ChecklistTemplate } from "./operational-checklist-policy";
+import { CHECKLIST_PURPOSE, checklistCreateSchema, checklistChangeSchema, checklistNeedsTrolleyCount, checklistRecordSchema, checklistRouteResultReady, checklistTemplates, checklistDates, checklistRows, checklistWeek, validateChecklistSubmission, type ChecklistCreate, type ChecklistChange, type ChecklistRow, type ChecklistTemplate } from "./operational-checklist-policy";
 
 type Client = Prisma.TransactionClient;
 const json = (v: unknown) => JSON.parse(JSON.stringify(v)) as Prisma.InputJsonValue;
@@ -90,14 +90,21 @@ export async function changeOperationalChecklist(scope: RequestScope, raw: Check
       Object.assign(record, source, { sourceAt: now.toISOString(), summary: "", comparisonReference: "", submittedBy: null, submittedAt: null });
       status = "IN_PROGRESS";
     } else if (input.action === "OBSERVE") {
-      if (record.template !== "PADLOCK" || before.status !== "IN_PROGRESS" || !record.sourceAt) throw new Error("CONFLICT");
+      if (!["OPENING", "PADLOCK"].includes(record.template) || before.status !== "IN_PROGRESS" || !record.sourceAt) throw new Error("CONFLICT");
       const index = record.rows.findIndex(row => row.id === input.row.id);
       if (index < 0) throw new Error("CONFLICT");
+      const previous = record.rows[index], result = { ...previous, ...input.row };
+      if (record.template === "PADLOCK") {
+        if (!["VACANT", "OCCUPIED", "OVERLOCKED"].includes(result.state) || result.lockCount === null) throw new Error("CHECKLIST_INCOMPLETE");
+      } else if (!checklistRouteResultReady(result) || input.row.comparisonDiscrepancy !== undefined ||
+        (!checklistNeedsTrolleyCount(result) && result.lockCount !== previous.lockCount)) {
+        throw new Error("CHECKLIST_INCOMPLETE");
+      }
       observationAudit = {
-        before: json({ row: record.rows[index], summary: record.summary, comparisonReference: record.comparisonReference }),
-        after: json({ row: { ...record.rows[index], ...input.row }, summary: input.summary, comparisonReference: input.comparisonReference }),
+        before: json({ row: previous, summary: record.summary, comparisonReference: record.comparisonReference }),
+        after: json({ row: result, summary: input.summary, comparisonReference: input.comparisonReference }),
       };
-      record.rows[index] = { ...record.rows[index], ...input.row };
+      record.rows[index] = result;
       record.summary = input.summary;
       record.comparisonReference = input.comparisonReference;
     } else if (input.action === "SAVE" || input.action === "SUBMIT") {
@@ -107,6 +114,8 @@ export async function changeOperationalChecklist(scope: RequestScope, raw: Check
       record.rows = record.rows.map(row => {
         const result = byId.get(row.id);
         if (!result) throw new Error("CONFLICT");
+        if (record.template === "OPENING" && (result.state !== row.state || result.notes !== row.notes ||
+          result.evidence !== row.evidence || result.lockCount !== row.lockCount)) throw new Error("CHECKLIST_SAVE_EACH");
         const allowed = record.template === "PADLOCK" ? ["PENDING", "VACANT", "OCCUPIED", "OVERLOCKED"] : ["PENDING", "PASS", "ISSUE", "NA"];
         if (!allowed.includes(result.state) || (record.template !== "PADLOCK" && result.comparisonDiscrepancy !== undefined)) throw new Error("CHECKLIST_INCOMPLETE");
         return { ...row, ...result };
