@@ -24,6 +24,10 @@ export const checklistTemplates = {
 export const templateKeySchema = z.enum(["OPENING", "CLOSING", "CLEANING", "MANAGEMENT", "PADLOCK"]);
 export type ChecklistTemplate = z.infer<typeof templateKeySchema>;
 
+export function checklistUsesRoute(template?: ChecklistTemplate): template is "OPENING" | "CLOSING" {
+  return template === "OPENING" || template === "CLOSING";
+}
+
 export function checklistWeek(at: Date | string) {
   const day = new Date(`${southAfricaDateKey(at)}T00:00:00+02:00`);
   const weekday = new Date(`${southAfricaDateKey(at)}T12:00:00Z`).getUTCDay();

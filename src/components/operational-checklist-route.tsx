@@ -7,10 +7,10 @@ import styles from "./operational-checklists.module.css";
 
 const results = { PENDING: "Not checked", PASS: "Pass", ISSUE: "Issue", NA: "Not applicable", VACANT: "Vacant", OCCUPIED: "Occupied", OVERLOCKED: "Overlocked" };
 const choices = ["PASS", "ISSUE", "NA"] as const;
-const groupName = (row: ChecklistRow) => row.label.includes(" · ") ? row.label.split(" · ")[0] : "Other checks";
 const itemName = (row: ChecklistRow) => row.label.includes(" · ") ? row.label.slice(row.label.indexOf(" · ") + 3) : row.label;
 
-export function OperationalChecklistRoute({ rows, saved, changedId, editable, disabled, date, operator, update, save, discard }: {
+export function OperationalChecklistRoute({ template, rows, saved, changedId, editable, disabled, date, operator, update, save, discard }: {
+  template: "OPENING" | "CLOSING";
   rows: ChecklistRow[]; saved: ChecklistRow[]; changedId?: string; editable: boolean; disabled: boolean;
   date: string; operator: string; update: (id: string, patch: Partial<ChecklistRow>) => void;
   save: (row: ChecklistRow) => void; discard: () => void;
@@ -20,6 +20,14 @@ export function OperationalChecklistRoute({ rows, saved, changedId, editable, di
   const [findingsOnly, setFindingsOnly] = useState(false);
   const [selectionBlocked, setSelectionBlocked] = useState(false);
   const editor = useRef<HTMLDivElement>(null), checks = useRef<HTMLDivElement>(null);
+  function groupName(row: ChecklistRow) {
+    if (template === "CLOSING") {
+      const floor = /^Count (ground|first|second) floor trolleys$/.exec(itemName(row))?.[1];
+      return floor ? `${floor[0].toUpperCase()}${floor.slice(1)} floor` : "Evening checks";
+    }
+    const group = row.label.includes(" · ") ? row.label.split(" · ")[0] : "Other checks";
+    return group === "Opening" ? "Office & systems" : group;
+  }
   const findings = saved.filter(row => row.state !== "PENDING" && checklistIssue(row));
   const shown = findingsOnly ? findings : saved.length ? saved : rows;
   const stops = [...new Set(rows.map(groupName))];
@@ -51,7 +59,7 @@ export function OperationalChecklistRoute({ rows, saved, changedId, editable, di
   }
   return <section className={styles.walkRoute} aria-label="Walkthrough route">
     <div className={styles.mapHeading}>
-      <div><h3>Opening walkthrough</h3><p>Choose a stop, tap a check and save what you find.</p></div>
+      <div><h3>{template === "CLOSING" ? "Closing walkthrough" : "Opening walkthrough"}</h3><p>Choose a stop, tap a check and save what you find.</p></div>
       <dl><div><dt>Run date (SAST)</dt><dd>{formatSouthAfricaDate(date)}</dd></div><div><dt>Operator</dt><dd>{operator}</dd></div></dl>
     </div>
     <div className={styles.walkProgress}>
@@ -60,11 +68,11 @@ export function OperationalChecklistRoute({ rows, saved, changedId, editable, di
       <button type="button" className="button button-secondary" aria-pressed={findingsOnly} disabled={disabled || !!changedId}
         onClick={() => setFindingsOnly(value => !value)}>{findingsOnly ? "Show all checks" : `Show findings (${findings.length})`}</button>
     </div>
-    <div className={styles.walkStops} aria-label="Route stops" role="group">
+    <div className={styles.walkStops} data-closing={template === "CLOSING" || undefined} aria-label="Route stops" role="group">
       {[...groups].map(([area, items]) => {
         const count = items.filter(item => item.state !== "PENDING").length;
         return <button type="button" key={area} aria-pressed={group === area} disabled={disabled} onClick={() => select(area, area === group ? active?.id : undefined)}>
-          <span>{stops.indexOf(area) + 1}. {area === "Opening" ? "Office & systems" : area}</span><small>{findingsOnly ? `${items.length} ${items.length === 1 ? "finding" : "findings"}` : `${count} / ${items.length} saved`}</small>
+          <span>{stops.indexOf(area) + 1}. {area}</span><small>{findingsOnly ? `${items.length} ${items.length === 1 ? "finding" : "findings"}` : `${count} / ${items.length} saved`}</small>
         </button>;
       })}
     </div>
