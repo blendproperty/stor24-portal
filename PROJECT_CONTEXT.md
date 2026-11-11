@@ -1,3 +1,9 @@
+## 2026-11-11 — Facebook and Instagram CRM enquiry intake (candidate, not live)
+
+- Implementation: Added a separately scoped social intake candidate for format validation, Facebook/Instagram source-specific CRM leads and follow-up tasks, idempotent submission, and a durable pending email notice to a facility-authorised staff user. The existing lead-SLA worker also processes pending social notices; uncertain sends require review. Design and provider mapping gates are in `docs/WHATCHIMP_SOCIAL_INTAKE.md`. No new credentials or provider routing have been configured.
+- Testing: Local unit checks reject `123` and malformed values and normalize representative SA/international numbers. An isolated PostgreSQL test exercised source separation, invalid input without lead creation, replay, task creation, concurrent notice claims and ambiguous delivery handling. These are synthetic tests, not live provider or inbox verification. Existing WhatsApp intake integration test also passed locally. Further route, security, CI and operational review remain required.
+- Commit and push: See branch history. Merge: Pending. Deployment and configuration: Not deployed or configured. Live production verification: None for this candidate. Existing Facebook phone field accepted `123`; existing social flows do not send to CRM or Katlego. Instagram structured capture, credential scope approval, provider mapping/guards, worker operation, email receipt, Facebook/Instagram end-to-end tests, staff monitoring, UAT, privacy and all prior gates remain open.
+
 ## 2026-11-10 — Staff deletion audit-history and dialog correction (candidate)
 
 - Implementation: Preserve historical audit snapshots without treating their embedded staff IDs as live business assignments. Continue blocking business-record links and business audit actors; retain the concurrency guard for new or changed audit references. Improve deletion dialog spacing and responsive action layout.

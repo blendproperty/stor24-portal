@@ -1,0 +1,53 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { db } from '../../src/lib/db';
+import { keyHash } from '../../src/lib/whatchimp-enquiry-contract';
+import { SOCIAL_INTAKE_DOMAIN, SOCIAL_NOTICE_DOMAIN } from '../../src/lib/whatchimp-social-contract';
+import { captureSocialEnquiry, sendSocialNotice } from '../../src/lib/whatchimp-social-service';
+import { POST } from '../../src/app/api/integrations/whatchimp/social/route';
+
+test('social intake validates, scopes, deduplicates and claims notification once', async () => {
+  assert.equal(process.env.MERCHANDISE_DB_TEST, 'isolated-ci');
+  assert.equal(new URL(process.env.DATABASE_URL!).hostname, 'localhost');
+  const id = randomUUID(), token = `fixture_${id}_${id}`, org = await db.organisation.create({ data: { name: 'Social fixture', slug: id } });
+  try {
+    const facility = await db.facility.create({ data: { organisationId: org.id, code: id, name: 'Fixture Midpoint' } });
+    const user = await db.user.create({ data: { organisationId: org.id, name: 'Fixture staff', email: `${id}@example.invalid` } });
+    const role = await db.role.create({ data: { organisationId: org.id, name: 'Fixture sales', permissions: ['leads.view'] } });
+    await db.roleAssignment.create({ data: { userId: user.id, roleId: role.id, facilityId: facility.id } });
+    const create = (channel: 'facebook' | 'instagram') => db.configurationProfile.create({ data: { organisationId: org.id, facilityId: facility.id, domain: SOCIAL_INTAKE_DOMAIN, name: channel, status: 'READY', config: { enabled: true, channel, botId: '72238', keyHash: keyHash(token + channel), facilityId: facility.id, recipientUserId: user.id } } });
+    const fb = await create('facebook'), ig = await create('instagram');
+    const endpoint = (authorization: string, body: string) => POST(new Request('http://localhost/api/integrations/whatchimp/social', { method: 'POST', headers: { authorization, 'content-type': 'application/x-www-form-urlencoded' }, body }));
+    assert.equal((await endpoint('Bearer wrong', 'action=probe')).status, 401);
+    assert.equal((await endpoint(`Bearer ${token}facebook`, 'action=probe&organisationId=other')).status, 422);
+    const probe = await endpoint(`Bearer ${token}facebook`, 'action=probe');
+    assert.equal((await probe.json()).phase, 'PROBE');
+    const call = (input: Parameters<typeof captureSocialEnquiry>[1]) => captureSocialEnquiry(fb.id, input, keyHash(token + 'facebook'));
+    assert.equal((await call({ action: 'validate', phone: '123' })).phase, 'INVALID_PHONE');
+    assert.equal((await call({ action: 'validate', phone: '082 123 4567' })).phase, 'VALID_PHONE');
+    const start = await call({ action: 'start' }); assert.ok(start.enquiryKey);
+    const data = { action: 'submit' as const, enquiryKey: start.enquiryKey!, name: 'Fixture Person', phone: '082 123 4567', requirements: 'Boxes', startDate: 'Next month' };
+    await assert.rejects(captureSocialEnquiry(ig.id, data, keyHash(token + 'instagram')), /SOCIAL_NOT_FOUND/);
+    assert.equal((await call({ ...data, phone: '123' })).phase, 'INVALID_PHONE');
+    assert.equal(await db.lead.count({ where: { facilityId: facility.id } }), 0);
+    const first = await call(data), again = await call(data);
+    assert.equal(first.phase, 'SUBMITTED'); assert.equal(first.leadReference, again.leadReference);
+    await assert.rejects(call({ ...data, requirements: 'Changed' }), /SOCIAL_ALREADY_SUBMITTED/);
+    const lead = await db.lead.findUniqueOrThrow({ where: { id: first.leadReference! }, include: { customer: true } });
+    assert.equal(lead.source, 'Facebook Messenger'); assert.equal(lead.customer?.phone, '+27821234567');
+    assert.equal(await db.task.count({ where: { organisationId: org.id } }), 1);
+    const notice = await db.configurationProfile.findFirstOrThrow({ where: { organisationId: org.id, domain: SOCIAL_NOTICE_DOMAIN, name: lead.id } });
+    let sent = 0;
+    const send = async (message: { to: string; text: string }) => { sent++; assert.equal(message.to, user.email); assert.ok(!message.text.includes('082')); };
+    await Promise.all([sendSocialNotice(notice.id, send), sendSocialNotice(notice.id, send)]);
+    assert.equal(sent, 1); assert.equal((await db.configurationProfile.findUniqueOrThrow({ where: { id: notice.id } })).status, 'ACCEPTED');
+    const second = await captureSocialEnquiry(ig.id, { action: 'start' }, keyHash(token + 'instagram'));
+    const next = await captureSocialEnquiry(ig.id, { ...data, enquiryKey: second.enquiryKey! }, keyHash(token + 'instagram'));
+    assert.equal((await db.lead.findUniqueOrThrow({ where: { id: next.leadReference! } })).source, 'Instagram');
+    const failed = await db.configurationProfile.findFirstOrThrow({ where: { organisationId: org.id, domain: SOCIAL_NOTICE_DOMAIN, name: next.leadReference! } });
+    await sendSocialNotice(failed.id, async () => { throw Error('ambiguous'); });
+    await sendSocialNotice(failed.id, send);
+    assert.equal(sent, 1); assert.equal((await db.configurationProfile.findUniqueOrThrow({ where: { id: failed.id } })).status, 'REVIEW_REQUIRED');
+  } finally { await db.organisation.delete({ where: { id: org.id } }); await db.$disconnect(); }
+});
