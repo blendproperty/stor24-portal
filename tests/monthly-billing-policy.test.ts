@@ -28,3 +28,17 @@ test("expired discounts and premiums outside coverage are excluded", () => {
   const result = calculateMonthlyBill("2026-02", { ...plan, insuranceEnabled: true, discount: { name: "Expired", type: "FIXED", value: 100, startsPeriod: "2026-01", endsPeriod: "2026-01" } }, [occupancy], { status: "ENDED", monthlyPremium: 100, effectiveFrom: occupancy.startDate, endedAt: new Date("2026-02-01T00:00:00+02:00") });
   assert.equal(result.total, 1150); assert.equal(result.lines.length, 1);
 });
+
+test("confirmed offer presets preserve amounts and hold R1 collection for review", () => {
+  for (const percent of [10,15]) {
+    const offer={...plan,discount:{name:`${percent}% rent discount`,type:"PERCENTAGE" as const,value:percent,startsPeriod:"2026-12",endsPeriod:"2026-12"}};
+    assert.equal(calculateMonthlyBill("2026-12",offer,[occupancy],null).total,1150*(100-percent)/100);
+  }
+  const midMonth={...occupancy,startDate:new Date("2026-11-15T00:00:00+02:00"),monthlyRate:1000};
+  const r1={...plan,discount:{name:"R1 first full month",type:"R1_FIRST_FULL_MONTH" as const,value:1,startsPeriod:"2026-12",endsPeriod:"2026-12"}};
+  assert.equal(calculateMonthlyBill("2026-11",r1,[midMonth],null).total,533.33);
+  assert.throws(()=>calculateMonthlyBill("2026-12",r1,[midMonth],null),/BILLING_PROMOTION_REQUIRES_REVIEW/);
+  assert.throws(()=>calculateMonthlyBill("2027-01",r1,[midMonth],null),/BILLING_PROMOTION_REQUIRES_REVIEW/);
+  assert.equal(billingPlanSchema.safeParse({...r1,discount:{...r1.discount,endsPeriod:"2027-01"}}).success,false);
+  assert.equal(billingPlanSchema.safeParse({...r1,discount:{...r1.discount,value:100}}).success,false);
+});

@@ -9,7 +9,7 @@ import { readInvoiceSchedule, saveInvoiceSchedule } from "../../src/lib/invoice-
 import { southAfricaDateKey } from "../../src/lib/south-africa-time";
 import { runNextMonthInvoices } from "../../src/lib/next-month-invoice-run";
 import { currentBillingPeriod, nextBillingPeriod } from "../../src/lib/monthly-billing-policy";
-import { postMonthlyBilling, previewMultiMonthInvoice, postMultiMonthInvoice, prepareScheduledNextBilling, approveScheduledInvoiceDraft, readScheduledInvoiceDraft, previewMonthlyBilling, previewNextMonthForReview, saveMonthlyBillingPlan } from "../../src/lib/monthly-billing-service";
+import { getMonthlyBillingPlan, postMonthlyBilling, previewMultiMonthInvoice, postMultiMonthInvoice, prepareScheduledNextBilling, approveScheduledInvoiceDraft, readScheduledInvoiceDraft, previewMonthlyBilling, previewNextMonthForReview, saveMonthlyBillingPlan } from "../../src/lib/monthly-billing-service";
 
 test("next month review and guarded scheduled posting", async () => {
  assert.equal(process.env.MERCHANDISE_DB_TEST,"isolated-ci"); assert.equal(new URL(process.env.DATABASE_URL!).hostname,"localhost");
@@ -39,6 +39,15 @@ test("next month review and guarded scheduled posting", async () => {
   await db.tenancy.update({where:{id:tenancy.id},data:{status:"ACTIVE"}});
   await saveMonthlyBillingPlan(scope,account.id,{...plan,discount:{name:"Synthetic offer",type:"PERCENTAGE",value:10,startsPeriod:period,endsPeriod:period}});
   await assert.rejects(previewNextMonthForReview(scope,account.id),/DISCOUNT_POLICY_REVIEW/);
+  const current=currentBillingPeriod();
+  await saveMonthlyBillingPlan(scope,account.id,{...plan,discount:{name:"R1 first full month",type:"R1_FIRST_FULL_MONTH",value:1,startsPeriod:current,endsPeriod:current}});
+  await assert.rejects(previewMonthlyBilling(scope,account.id,current),/PROMOTION_REQUIRES_REVIEW/);
+  await assert.rejects(postMonthlyBilling(scope,account.id,current,"a".repeat(64)),/PROMOTION_REQUIRES_REVIEW/);
+  assert.equal(await db.ledgerEntry.count({where:{accountId:account.id}}),0);
+  await saveMonthlyBillingPlan(scope,account.id,{...plan,discount:{name:"R1 first full month",type:"R1_FIRST_FULL_MONTH",value:1,startsPeriod:period,endsPeriod:period}});
+  assert.equal((await getMonthlyBillingPlan(scope,account.id))?.discount?.type,"R1_FIRST_FULL_MONTH");
+  await assert.rejects(previewNextMonthForReview(scope,account.id),/DISCOUNT_POLICY_REVIEW/);
+  assert.equal(await db.ledgerEntry.count({where:{accountId:account.id}}),0);
   await saveMonthlyBillingPlan(scope,account.id,plan);
   const refreshed=await previewNextMonthForReview(scope,account.id);
   await assert.rejects(prepareScheduledNextBilling(scope,account.id,period,refreshed.fingerprint,seventeenth),/SCHEDULE_DISABLED/);

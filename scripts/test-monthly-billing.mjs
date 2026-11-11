@@ -65,6 +65,17 @@ try {
   assert.equal(calls.filter(c=>c.batch?.action==="status").length,2);
   assert.equal(calls.filter(c=>c.batch?.action==="approve").length,2);
   await page.getByLabel("Customer account").selectOption("cmfixtureaccount000000000001");
+  await page.getByLabel("Apply an agreed rent discount").check();
+  await page.getByLabel("Preloaded offer").selectOption("10");
+  await expect(page.getByLabel("Discount description")).toHaveValue("10% rent discount");
+  await expect(page.getByLabel("Value", {exact:true})).toHaveValue("10");
+  await page.getByLabel("Preloaded offer").selectOption("15");
+  await expect(page.getByLabel("Value", {exact:true})).toHaveValue("15");
+  await page.getByLabel("Preloaded offer").selectOption("R1");
+  await expect(page.getByText("Billing that month and later months is held for finance review", {exact:false})).toBeVisible();
+  await expect(page.getByLabel("Value", {exact:true})).toBeDisabled();
+  await page.getByLabel("Apply an agreed rent discount").uncheck();
+  await page.getByRole("button", { name: "Save approved terms" }).click();
   await page.getByLabel("Billing month", { exact: true }).fill("2026-02");
   await expect(page.getByLabel("Generation date")).toHaveValue("2026-11-17");
   await page.getByLabel("Generation date").fill("2026-11-12");

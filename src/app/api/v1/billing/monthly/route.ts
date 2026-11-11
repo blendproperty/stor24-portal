@@ -34,6 +34,7 @@ function failure(error: unknown) {
     BILLING_TENANCY_NOT_ACTIVE: "Monthly billing requires an active tenancy or an active notice period. Final bills for closed tenancies need a separate review.",
     BILLING_NOTICE_POLICY_REVIEW: "This account is on notice. A manager must review whether it needs an invoice.",
     BILLING_HANDOVER_REVIEW: "The account needs a recorded key handover before next-month review.",
+    BILLING_PROMOTION_REQUIRES_REVIEW: "The recorded R1 offer needs finance review of its collection timing before this month can be billed.",
     BILLING_DISCOUNT_POLICY_REVIEW: "A discount applies next month. Finance must review its treatment.",
     BILLING_FUTURE_PERIOD: "Future months cannot be posted through this workflow.",
   };
