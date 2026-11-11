@@ -10,11 +10,15 @@ import { addCustomerNote, customerHistory } from "../../src/lib/customer-history
 import { compareHistoryEntries, type HistoryEntry } from "../../src/lib/customer-history-policy";
 import type { RequestScope } from "../../src/lib/scope";
 import { buildCustomerHistoryExport } from "../../src/lib/customer-history-export";
+import { inspectReportExport } from "../../src/lib/dlp-policy";
 
 test("isolated PostgreSQL shared customer notebook and scoped history", async t => {
   assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci");
   assert.equal(new URL(process.env.DATABASE_URL!).hostname, "localhost");
   const key = randomUUID();
+  // These references appear in downloads. Keep the fixture outside the payment-card pattern.
+  const fixtureReference = key.replace(/[0-9]/g, digit => String.fromCharCode(103 + Number(digit)));
+  assert.equal(inspectReportExport("customer-contact-history", [{ reference: fixtureReference }]).allowed, true);
   const org = await db.organisation.create({ data: { name: "Synthetic history", slug: key } });
   const other = await db.organisation.create({ data: { name: "Other synthetic org", slug: randomUUID() } });
   const a = await db.facility.create({ data: { organisationId: org.id, code: "A", name: "Midpoint fixture" } });
@@ -23,7 +27,7 @@ test("isolated PostgreSQL shared customer notebook and scoped history", async t 
   const cover = await db.user.create({ data: { passwordHash: "synthetic-not-a-real-password-hash", organisationId: org.id, name: "Covering staff fixture", email: `cover-${key}@example.invalid` } });
   const customer = await db.customer.create({ data: { organisationId: org.id, firstName: "Synthetic", notes: "Original undated summary" } });
   await db.lead.createMany({ data: [a, b].map(f => ({ facilityId: f.id, customerId: customer.id, source: "OTHER" })) });
-  const account = await db.account.create({ data: { customerId: customer.id, accountNumber: key } });
+  const account = await db.account.create({ data: { customerId: customer.id, accountNumber: fixtureReference } });
   await db.tenancy.create({ data: { customerId: customer.id, facilityId: a.id, accountId: account.id, startDate: new Date() } });
   const collection = await db.collectionCase.create({ data: { accountId: account.id } });
   const scope: RequestScope = { userId: staff.id, organisationId: org.id, facilityIds: [a.id], unrestrictedFacilities: false };
@@ -194,7 +198,7 @@ test("isolated PostgreSQL shared customer notebook and scoped history", async t 
     await t.test("source chronology projects booking tenancy document signature ledger and appointment fields within store and financial scope", async () => {
       const type = await db.unitType.create({ data: { facilityId: a.id, name: "History fixture", features: [] } });
       const unit = await db.unit.create({ data: { facilityId: a.id, unitTypeId: type.id, number: "H1", monthlyRate: 100 } });
-      const reservation = await db.reservation.create({ data: { facilityId: a.id, customerId: customer.id, unitId: unit.id, quotedRate: 100, publicReference: `history-${key}`, verificationCodeHash: "NEVER-RETURN" } });
+      const reservation = await db.reservation.create({ data: { facilityId: a.id, customerId: customer.id, unitId: unit.id, quotedRate: 100, publicReference: `history-${fixtureReference}`, verificationCodeHash: "NEVER-RETURN" } });
       const tenancy = await db.tenancy.findUniqueOrThrow({ where: { accountId: account.id } });
       const document = await db.document.create({ data: { tenancyId: tenancy.id, type: "LEASE", storageKey: "NEVER-RETURN", signingToken: `private-${key}`, content: "NEVER-RETURN" } });
       await db.publicReservationLease.create({ data: { reservationId: reservation.id, version: "fixture", paymentMethod: "CARD", content: "NEVER-RETURN", clauses: {}, sha256: "fixture", signingToken: `lease-${key}`, expiresAt: new Date(Date.now() + 86400000), signedAt: new Date(), status: "SIGNED" } });
