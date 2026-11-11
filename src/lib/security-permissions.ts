@@ -18,7 +18,7 @@ export const securityPermissionGroups = [
     ["adjustments.view", "View adjustment requests and records"], ["adjustments.request", "Request or withdraw adjustments"], ["adjustments.approve", "Independently approve adjustments"], ["adjustments.record_refund", "Record externally completed refunds"],
   ] },
   { label: "Billing and debit orders", permissions: [
-    ["billing.view", "View monthly billing and invoices"], ["billing.manage", "Post approved monthly billing"], ["billing.documents.send", "Send reviewed customer documents and notices"],
+    ["billing.view", "View monthly billing and invoices"], ["billing.manage", "Post approved monthly billing"], ["billing.schedule.manage", "Change invoice generation date"], ["billing.documents.send", "Send reviewed customer documents and notices"],
     ["debit_orders.view", "View debit-order runs"], ["debit_orders.manage", "Prepare and review debit-order runs"], ["debit_orders.submit", "Submit approved test debit-order runs"],
   ] },
   { label: "Ledgers and collections", permissions: [

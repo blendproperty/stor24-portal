@@ -5,7 +5,7 @@ import { Prisma } from "../src/generated/prisma/client";
 import { previewMonthlyBilling } from "../src/lib/monthly-billing-service";
 
 test("monthly preview refuses a balance that disagrees with transaction history", async () => {
-  const original = { account: db.account.findFirst, profile: db.configurationProfile.findFirst, schedules: db.configurationProfile.findMany, entries: db.ledgerEntry.findMany, payments: db.payment.findMany };
+  const original = { account: db.account.findFirst, profile: db.configurationProfile.findFirst, schedules: db.configurationProfile.findMany, entries: db.ledgerEntry.findMany, pending: db.scheduledBillingCharge.findFirst, payments: db.payment.findMany };
   const decimal = (value: string) => new Prisma.Decimal(value);
   let balance = "50";
   let entries: unknown[] = [];
@@ -15,6 +15,7 @@ test("monthly preview refuses a balance that disagrees with transaction history"
   db.configurationProfile.findFirst = (async () => ({ status: "READY", config: plan })) as unknown as typeof original.profile;
   db.configurationProfile.findMany = (async () => []) as unknown as typeof original.schedules;
   db.ledgerEntry.findMany = (async () => entries) as unknown as typeof original.entries;
+  db.scheduledBillingCharge.findFirst = (async () => null) as unknown as typeof original.pending;
   db.payment.findMany = (async () => []) as unknown as typeof original.payments;
   const scope = { organisationId: "org", userId: "staff", facilityIds: ["store"], unrestrictedFacilities: false };
   try {
@@ -33,6 +34,7 @@ test("monthly preview refuses a balance that disagrees with transaction history"
     db.configurationProfile.findFirst = original.profile;
     db.configurationProfile.findMany = original.schedules;
     db.ledgerEntry.findMany = original.entries;
+    db.scheduledBillingCharge.findFirst = original.pending;
     db.payment.findMany = original.payments;
   }
 });

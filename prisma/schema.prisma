@@ -855,6 +855,7 @@ model Account {
   currency      String        @default("ZAR")
   tenancy       Tenancy?
   ledgerEntries LedgerEntry[]
+  scheduledBillingCharges ScheduledBillingCharge[]
   payments      Payment[]
   debitInstructions DebitOrderInstruction[]
   adjustments FinancialAdjustment[]
@@ -1119,6 +1120,7 @@ model DebitOrderInstruction {
 }
 
 model LedgerEntry {
+  scheduledBillingCharge ScheduledBillingCharge?
   receiptImportPosting ReceiptImportPosting?
   receiptReallocationSources ReceiptReallocation[] @relation("ReceiptReallocationOriginalEntry")
   receiptReallocationOutgoing ReceiptReallocation? @relation("ReceiptReallocationOutgoingEntry")
@@ -1140,6 +1142,33 @@ model LedgerEntry {
 
   @@unique([accountId, externalRef])
   @@index([accountId, effectiveAt])
+}
+
+// Internal staged charges; no production producer or scheduler is enabled.
+model ScheduledBillingCharge {
+  id String @id @default(cuid())
+  accountId String
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  organisationId String
+  facilityId String
+  externalRef String
+  description String
+  amount Decimal @db.Decimal(14, 2)
+  taxAmount Decimal @db.Decimal(14, 2)
+  effectiveAt DateTime
+  recognisedAt DateTime?
+  ledgerEntryId String? @unique
+  ledgerEntry LedgerEntry? @relation(fields: [ledgerEntryId], references: [id], onDelete: Restrict)
+  invoiceId String?
+  invoice Document? @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  lineType String @default("CHARGE")
+  groupSize Int?
+  groupHash String?
+  createdAt DateTime @default(now())
+
+  @@unique([accountId, externalRef])
+  @@index([recognisedAt, effectiveAt])
+  @@index([invoiceId])
 }
 
 model Payment {
@@ -1274,6 +1303,7 @@ model SettlementBalanceObservation {
 }
 
 model Document {
+  scheduledBillingCharges ScheduledBillingCharge[]
   receiptImportPosting ReceiptImportPosting?
   receiptReallocationSource ReceiptReallocation? @relation("ReceiptReallocationSourceDocument")
   receiptReallocationTarget ReceiptReallocation? @relation("ReceiptReallocationTargetDocument")
@@ -2351,4 +2381,37 @@ model DeletedStaffIdentity {
 model StaffDeletionFence {
   id Int @id
   generation Int @default(0)
+}
+
+// Isolated recognition-worker prototype; no production scheduler is connected.
+model BillingRecognitionLease {
+  organisationId String @id
+  token String
+  expiresAt DateTime
+  updatedAt DateTime @updatedAt
+}
+
+model BillingRecognitionRun {
+  id String @id @default(cuid())
+  organisationId String
+  startedAt DateTime @default(now())
+  finishedAt DateTime?
+  status String
+  processed Int @default(0)
+  held Int @default(0)
+  @@index([organisationId, startedAt])
+}
+
+model BillingRecognitionIssue {
+  id String @id @default(cuid())
+  organisationId String
+  facilityId String
+  accountId String
+  groupKey String
+  representativeId String
+  code String
+  status String @default("HELD")
+  updatedAt DateTime @updatedAt
+  @@unique([organisationId, groupKey])
+  @@index([organisationId, status])
 }
