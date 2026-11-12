@@ -407,6 +407,7 @@ model MapElement {
 }
 
 model Customer {
+  reservationArchivedAt DateTime?
   staffNotes CustomerNote[]
   id                   String             @id @default(cuid())
   organisationId       String
