@@ -3307,3 +3307,6 @@ a.module-card:focus-visible {
 .multi-unit-card p strong { color: var(--ink); }
 .multi-unit-confirm { display: flex; align-items: flex-start; gap: 11px; margin-top: 24px; color: var(--ink); font-size: 13px; line-height: 1.5; }
 @media (max-width: 700px) { .multi-unit-filters, .multi-unit-customer, .multi-unit-fields, .multi-unit-list { grid-template-columns: 1fr; } .multi-unit-heading { align-items: flex-start; } .multi-unit-footer .button { width: 100%; } .multi-unit-card { padding: 16px; } }
+.reservation-selected-unit { display: grid; grid-template-columns: minmax(100px, 1fr) minmax(160px, 1fr) auto; align-items: end; gap: 12px; padding: 14px; margin: 10px 0; border: 1px solid var(--line); border-radius: 12px; }
+.reservation-selected-unit > strong { align-self: center; }
+@media (max-width: 640px) { .reservation-selected-unit { grid-template-columns: 1fr; } }
