@@ -1,7 +1,7 @@
 ## 2026-11-12 — Lead customer search correction candidate
 
-- Implementation: changing the customer search clears the previous results and status immediately, avoiding selection of an old match while a new search is pending or has failed. Existing facility and API permissions are unchanged. The regression is included in CI.
-- Testing: an actual-component browser fixture passed search, query change and failed-search cases without customer writes; focused lint and diff checks passed. Protected exact-head CI and real staff/device acceptance remain required.
+- Implementation: changing the customer search clears the previous results and status immediately, avoiding selection of an old match while a new search is pending or has failed. Changing store clears the previous store's displayed matches and selected customer. Existing facility and API permissions are unchanged. The regression is included in CI.
+- Testing: an actual-component browser fixture passed search, query change, failed-search and store-change selection cases without customer writes; focused lint and diff checks passed. Protected exact-head CI and real staff/device acceptance remain required.
 - Commit and push: candidate branch codex/lead-customer-search-refresh-20261112; consult Git and PR for publication.
 - Merge: not merged. Deployment and configuration: not deployed or changed. Live production verification: not performed.
 - Outstanding: staff UAT and the broader lead capture, customer deduplication, provider, data, finance, training, recovery and approval gates remain open. Billing recognition remains held.

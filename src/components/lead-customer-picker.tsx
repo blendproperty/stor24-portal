@@ -4,6 +4,8 @@ type Customer = {id: string; firstName: string | null; lastName: string | null; 
 export function LeadCustomerPicker({facilityId}: {facilityId: string}) {
   const [mode,setMode] = useState("existing"); const [query,setQuery] = useState("");
   const [customers,setCustomers] = useState<Customer[]>([]); const [selected,setSelected] = useState<Customer | null>(null); const [status,setStatus] = useState("");
+  const [lastFacilityId, setLastFacilityId] = useState(facilityId);
+  if (facilityId !== lastFacilityId) { setLastFacilityId(facilityId); setCustomers([]); setSelected(null); setStatus(""); }
   useEffect(()=> {let active = true; const controller = new AbortController();
     const timer = setTimeout(()=> {if (mode !== "existing" || !facilityId || query.trim().length < 2) {setCustomers([]); return;}
       setStatus("Searching…"); void fetch(`/api/v1/leads/customers?facilityId=${encodeURIComponent(facilityId)}&q=${encodeURIComponent(query)}`, {cache:"no-store",signal:controller.signal})
