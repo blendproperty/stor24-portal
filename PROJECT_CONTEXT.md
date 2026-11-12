@@ -1,3 +1,12 @@
+## 2026-11-12 — Project tracker reconciliation
+
+- Implementation: reconciled existing Asana records without changing application code. Selected/configured transactional email provider is SendGrid, previously recorded as live-verified in the communications parent; selection/configuration subtask 1217529587258187 was marked complete. Booking route 1217529587144920 and reserve/cancel proof 1217529654651100 were already complete and must not be repeated as incomplete tasks.
+- Testing: public /book and website and CRM health endpoints returned HTTP 200 on 12 November. Asana readback confirmed email-provider selection complete, booking route complete, and parent booking and integration-testing tasks still open. Isolated booking/move-in tests are recorded below, with real customer/provider acceptance separate.
+- Commit and push: this reconciliation evidence is added to the existing two-week readiness documentation branch; consult Git and PR #784 for the published revision.
+- Merge: documentation candidate remains unmerged. Previously shipped application releases are unchanged.
+- Deployment and configuration: no deployment, email-provider, payment or billing configuration changed during reconciliation.
+- Live production verification: /book route and health only; no message delivery, CAPTCHA/OTP booking, payment or move-in performed. Provider, finance, UAT, data, training, recovery and approval gates remain open.
+
 ## 2026-11-12 — Booking and move-in isolated validation
 
 - Implementation: validation only; no application or billing changes. CRM source was current main b5c6bcd0ce607c5c77e9e21932eeee553d8c1f2e. Website source was origin/master d11d30fe9e2cd7e2a2dcaf54f16b1f79a6d7a505.
