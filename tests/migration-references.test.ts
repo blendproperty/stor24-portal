@@ -38,6 +38,16 @@ test("migration validator accepts linked facilities with optional customer field
   assert.equal(result.report.counts.units, 2);
 });
 
+test("migration rejects missing facility and unit identifiers", () => {
+  for (const [name, index] of [["facilities", 1], ["facilities", 2], ["unit_types", 2], ["units", 3]] as const) {
+    const record = rows[name].split("\n")[0].split(","); record[index] = "  ";
+    const result = validate({ [name]: [record.join(","), ...rows[name].split("\n").slice(1)].join("\n") });
+    assert.equal(result.status, 1, `${name} field ${index}`);
+    assert.equal(result.report.reconciliation.ready, false);
+    assert.match(result.report.errors.join("\n"), /missing required (name|code|number)/);
+  }
+});
+
 test("migration rejects invalid rental amounts before reporting reconciliation ready", () => {
   for (const [name, index] of [["units", 5], ["tenancies", 7], ["reservations", 5]] as const) {
     for (const amount of ["", "abc", "-1", "1.001", "10000000000", "1e2"]) {

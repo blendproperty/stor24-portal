@@ -25,7 +25,7 @@ Run:
 npm run migration:validate -- "C:\approved\stor24-export" "C:\approved\stor24-export\validation.json"
 ```
 
-The command fails on missing files or columns, duplicate legacy identifiers, blank required relationships and broken facility, unit-type, unit or customer references. Unit and tenancy monthly rates and reservation quotes must be non-negative decimal amounts fitting the database's 12-digit, two-decimal format; zero is permitted and requires business review. A unit must share its unit type's facility; a tenancy or reservation must share its unit's facility. Optional customer contact fields remain optional. Retain `validation.json` as rehearsal evidence. This read-only validation does not import records, validate financial balances or establish production migration acceptance.
+The command fails on missing files or columns, duplicate legacy identifiers, blank required relationships and broken facility, unit-type, unit or customer references. Facility names and codes, unit-type names and unit numbers cannot be blank. Unit and tenancy monthly rates and reservation quotes must be non-negative decimal amounts fitting the database's 12-digit, two-decimal format; zero is permitted and requires business review. A unit must share its unit type's facility; a tenancy or reservation must share its unit's facility. Optional customer contact fields remain optional. Retain `validation.json` as rehearsal evidence. This read-only validation does not import records, validate financial balances or establish production migration acceptance.
 
 ## Rehearsal gates
 
