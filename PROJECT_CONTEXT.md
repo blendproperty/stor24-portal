@@ -1,3 +1,12 @@
+## 2026-11-12 — Two-week readiness and lost-enquiry release evidence
+
+- Implementation: PR #782 records reasons for lost enquiries. This documentation change adds a proposed two-week readiness plan; it does not change application code, provider configuration or the billing hold.
+- Testing: exact-main b5c6bcd0ce607c5c77e9e21932eeee553d8c1f2e passed CI 43212357218, security 43212357235, transactions 43212357568 and restricted-runtime 43212357400. The deployment log reported a healthy container and local HTTP 200. Authenticated lost-enquiry and staff UAT remain outstanding.
+- Commit and push: PR #782 was merged to main as b5c6bcd0ce607c5c77e9e21932eeee553d8c1f2e. This evidence and plan are a separate documentation candidate; consult Git and PR for their publication.
+- Merge: implementation PR #782 merged. The documentation candidate is not yet merged.
+- Deployment and configuration: deployment 43215065145 succeeded for b5c6bcd0; monitor 43215961356 succeeded. An earlier older-revision deployment 43212532021 correctly stopped before SSH because it was no longer current main. No provider settings or billing scheduling were changed by this documentation work.
+- Live production verification: on 12 November CRM and website public health endpoints returned HTTP 200; CRM reported application and database OK. Health and deployment logs do not prove actual customer journeys, provider delivery or staff acceptance. Finance decisions, the billing production hold, UAT, provider, data, physical access, training, recovery and approval gates remain open.
+
 ## 2026-11-12 — STOR24 PMax attribution registration (deployed; live attribution pending)
 
 - Implementation: register verified Google PMax campaign 24452876850 and its `stor24_midrand_pmax` UTM name in the bounded CRM advertising registry. No arbitrary creative or keyword identifiers are accepted. Website registry and consent-gated Google Ads tag changes are in separate website PR #272.
