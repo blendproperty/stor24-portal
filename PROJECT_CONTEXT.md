@@ -1,3 +1,12 @@
+## 2026-11-12 — Recovery and monitoring evidence reconciliation
+
+- Implementation: read-only assessment and Asana evidence refresh for rollback 1217529587991961, monitoring 1217529662549085 and recovery 1217529653254459. Existing procedure remains in docs/PRODUCTION_READINESS_2026-10-04.md; no duplicate runbook or application changes.
+- Testing: monitor 43222094307 succeeded, with adjacent runs around ten minutes apart. The 1 November isolated backup restore 41298766215 succeeded; its log reports 92 tables, two seconds, network none and no production database change. Release deployment logs identify 24078429e as the prior image tag before b5c6bcd0 cutover; source comparison shows one added nullable Lead.lossReason migration. This is not a compatibility or rollback rehearsal for the current release.
+- Commit and push: evidence is added to the existing documentation branch for PR #784; consult Git for the published revision. Asana entries remain open and contain the evidence and remaining gates.
+- Merge: documentation candidate unmerged; no application merge.
+- Deployment and configuration: no deployment, backup, monitoring, provider or billing configuration changed.
+- Live production verification: observed existing successful monitor runs; no forced alert, current backup download, restoration, image switch or recovery drill performed. Independent host-loss recovery and keys, complete backup coverage, RPO/RTO, release-specific rollback compatibility, delivered-alert and stopped-monitor acceptance remain open alongside all finance, provider, data, training and UAT gates.
+
 ## 2026-11-12 — Project tracker reconciliation
 
 - Implementation: reconciled existing Asana records without changing application code. Selected/configured transactional email provider is SendGrid, previously recorded as live-verified in the communications parent; selection/configuration subtask 1217529587258187 was marked complete. Booking route 1217529587144920 and reserve/cancel proof 1217529654651100 were already complete and must not be repeated as incomplete tasks.
