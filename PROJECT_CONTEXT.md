@@ -1,3 +1,11 @@
+## 2026-11-12 — Migration rental-rate preflight candidate
+
+- Implementation: the existing export validator now rejects blank, negative, malformed, over-precision and oversized unit/tenancy monthly rates and reservation quotes before declaring source reconciliation ready. Zero remains permitted for business review; no importer, billing rule or financial posting is changed. The rehearsal guide describes the check.
+- Testing: 17 focused migration tests passed, including invalid amount cases for each source, valid zero and Decimal(12,2) upper boundary, existing references, source protection and CSV cases. No real export or production database was used.
+- Commit and push: candidate branch codex/migration-rate-preflight-20261112; consult Git and PR for publication and protected checks.
+- Merge: not merged. Deployment and configuration: not deployed or configured. Live production verification: not performed.
+- Outstanding: the source owner's authorised export and approved mappings, scope and zero-rate decisions, repeatable importer, target collision checks, reconciliation, rehearsal, finance and business sign-off remain open. Billing recognition remains held; all other provider, data, recovery, training and UAT gates remain open.
+
 ## 2026-11-12 — STOR24 PMax attribution registration (deployed; live attribution pending)
 
 - Implementation: register verified Google PMax campaign 24452876850 and its `stor24_midrand_pmax` UTM name in the bounded CRM advertising registry. No arbitrary creative or keyword identifiers are accepted. Website registry and consent-gated Google Ads tag changes are in separate website PR #272.

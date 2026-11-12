@@ -113,6 +113,11 @@ for (const [name, required] of Object.entries(contracts)) {
 }
 
 const ids = Object.fromEntries(Object.entries(data).map(([name, rows]) => [name, idSet(rows, `${name}.csv`, errors)]));
+for (const [name, field] of [["units", "monthly_rate"], ["tenancies", "monthly_rate"], ["reservations", "quoted_rate"]]) {
+  for (const row of data[name]) {
+    if (!/^\d{1,10}(?:\.\d{1,2})?$/.test(row[field])) errors.push(`${name}.csv: ${row.legacy_id} invalid ${field}; expected a non-negative amount with at most two decimal places`);
+  }
+}
 // One export package targets one organisation; facility codes are unique there.
 requireUniqueKey(data.facilities, ["code"], "facilities.csv", errors);
 requireUniqueKey(data.unit_types, ["facility_legacy_id", "name"], "unit_types.csv", errors);
