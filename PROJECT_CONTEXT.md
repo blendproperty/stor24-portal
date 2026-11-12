@@ -1,3 +1,9 @@
+## 2026-11-12 — STOR24 PMax attribution registration (candidate)
+
+- Implementation: register verified Google PMax campaign 24452876850 and its `stor24_midrand_pmax` UTM name in the bounded CRM advertising registry. No arbitrary creative or keyword identifiers are accepted. Website registry and consent-gated Google Ads tag changes are in separate website PR #272.
+- Testing: three focused attribution and public-contract tests passed, including the PMax campaign ID and unrecognised creative filtering; live paid-click attribution and CRM reconciliation are not proven.
+- Commit and push: candidate branch based on origin/main 2635e45545868c3b24f0f1a5200d04c478be09dd; unrelated worktrees preserved. Merge: pending. Deployment and configuration: not deployed. Live production verification: pending. Existing privacy, provider, human UAT, customer, finance, data, training and approval gates remain open.
+
 ## 2026-11-11 — Multi-unit move-in deployed; staff UAT pending
 
 - Implementation: PR #773 adds selection of up to 20 available units at one store for one existing customer. Staff review each unit's start date, monthly rent, deposit and manually agreed initial charge, plus the shared payment method. Each unit creates its own draft tenancy, account, pending occupancy and signing document. A single database transaction saves the batch; a durable request key and unit locks protect retry and concurrent requests. Signing is prepared and recovered separately for each saved agreement. Reserved bookings continue through their existing path. Same-tab recovery preserves the original request after an uncertain response; if browser recovery data is lost, staff must review existing customer accounts and unit status before starting again.
