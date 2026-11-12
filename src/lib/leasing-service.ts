@@ -269,7 +269,10 @@ export async function createReservation(
   data: Prisma.ReservationUncheckedCreateInput,
 ) {
   await requireFacility(scope, data.facilityId);
-  return db.$transaction(async (tx) => {
+  return db.$transaction(tx => createReservationTransaction(tx, scope, data));
+}
+
+async function createReservationTransaction(tx: Prisma.TransactionClient, scope: RequestScope, data: Prisma.ReservationUncheckedCreateInput) {
     await requireOperationalUnit(tx, data.facilityId, data.unitId);
     const unit = await tx.unit.findFirst({
       where: {
@@ -315,7 +318,16 @@ export async function createReservation(
       data.facilityId,
     );
     return entity;
-  });
+}
+
+export async function createReservationBatch(scope: RequestScope, items: Prisma.ReservationUncheckedCreateInput[]) {
+  if (items.length < 2 || items.length > 20 || items.some(item => item.leadId || item.facilityId !== items[0].facilityId || item.customerId !== items[0].customerId) || new Set(items.map(item => item.unitId)).size !== items.length) throw new Error("CONFLICT");
+  await requireFacility(scope, items[0].facilityId);
+  return db.$transaction(async tx => {
+    const saved = [];
+    for (const item of [...items].sort((a, b) => a.unitId.localeCompare(b.unitId))) saved.push(await createReservationTransaction(tx, scope, item));
+    return saved;
+  }, { timeout: 30000 });
 }
 
 export async function cancelReservation(
