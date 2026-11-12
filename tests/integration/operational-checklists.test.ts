@@ -76,6 +76,28 @@ test("isolated PostgreSQL checklist lifecycle, padlock snapshots, permissions an
       assert.deepEqual(evidence.after, { row: { ...trolley, ...observe.row }, summary: "", comparisonReference: "" });
       await assert.rejects(act(opening.id, csoScope, { action: "SUBMIT", ...await results(opening.id) }), /CHECKLIST_SAVE_EACH/);
     });
+    await t.test("Cleaning preserves the usual roster and saves Sunday extras on the scheduled SAST day", async () => {
+      const plan = { ...base, template: "CLEANING" as const, repeat: "ONCE" as const, occurrences: 1, endAt: "2026-11-07T23:00:00Z" };
+      const saturday = await createOperationalChecklist(scope, { ...plan, startAt: "2026-11-07T21:59:00Z", requestKey: randomUUID() });
+      const sunday = await createOperationalChecklist(scope, { ...plan, startAt: "2026-11-07T22:00:00Z", requestKey: randomUUID() });
+      await act(saturday.id);
+      await act(sunday.id);
+      const usualRows = checklistRecordSchema.parse((await current(saturday.id)).operationalChecklist).rows;
+      const sundayRows = checklistRecordSchema.parse((await current(sunday.id)).operationalChecklist).rows;
+      assert.equal(usualRows.length, 17);
+      assert.equal(sundayRows.length, 19);
+      assert.deepEqual(sundayRows.slice(0, 17), usualRows);
+      assert.deepEqual(sundayRows.slice(17).map(row => row.label), ["Sunday · Clean reception windows", "Sunday · Clean floor in front of office"]);
+      const check = sundayRows[17];
+      const observation = { action: "OBSERVE", row: { id: check.id, state: "ISSUE", lockCount: null, notes: "Window needs another pass", evidence: "Test reference" }, summary: "", comparisonReference: "" };
+      await assert.rejects(act(sunday.id, scope, observation), /FORBIDDEN/);
+      await assert.rejects(act(sunday.id, csoScope, { ...observation, row: { ...observation.row, notes: "" } }), /CHECKLIST_INCOMPLETE/);
+      await act(sunday.id, coverScope, observation);
+      const stored = checklistRecordSchema.parse((await current(sunday.id)).operationalChecklist);
+      assert.deepEqual(stored.rows, sundayRows.map(row => row.id === check.id ? { ...row, ...observation.row } : row));
+      const audit = await db.auditEvent.findFirstOrThrow({ where: { entityId: sunday.id, action: "operationalChecklist.observe" } });
+      assert.equal(audit.actorId, cover.id);
+    });
     await t.test("padlocks use current units, reject inventory drift and retain physical findings without access actions",async()=>{
       const type=await db.unitType.create({data:{facilityId:a.id,name:"5 sqm",areaSqMetres:5}});
       const unit=await db.unit.create({data:{facilityId:a.id,unitTypeId:type.id,number:"01",monthlyRate:100}});

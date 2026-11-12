@@ -1,16 +1,21 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { checklistIssue, checklistNeedsTrolleyCount, checklistRouteResultReady, type ChecklistRow } from "@/lib/operational-checklist-policy";
+import { checklistIssue, checklistNeedsTrolleyCount, checklistRouteResultReady, type ChecklistRouteTemplate, type ChecklistRow } from "@/lib/operational-checklist-policy";
 import { formatSouthAfricaDate } from "@/lib/south-africa-time";
 import styles from "./operational-checklists.module.css";
 
 const results = { PENDING: "Not checked", PASS: "Pass", ISSUE: "Issue", NA: "Not applicable", VACANT: "Vacant", OCCUPIED: "Occupied", OVERLOCKED: "Overlocked" };
 const choices = ["PASS", "ISSUE", "NA"] as const;
+const walkthroughTitles: Record<ChecklistRouteTemplate, string> = {
+  OPENING: "Opening walkthrough",
+  CLOSING: "Closing walkthrough",
+  CLEANING: "Cleaning walkthrough",
+};
 const itemName = (row: ChecklistRow) => row.label.includes(" · ") ? row.label.slice(row.label.indexOf(" · ") + 3) : row.label;
 
 export function OperationalChecklistRoute({ template, rows, saved, changedId, editable, disabled, date, operator, update, save, discard }: {
-  template: "OPENING" | "CLOSING";
+  template: ChecklistRouteTemplate;
   rows: ChecklistRow[]; saved: ChecklistRow[]; changedId?: string; editable: boolean; disabled: boolean;
   date: string; operator: string; update: (id: string, patch: Partial<ChecklistRow>) => void;
   save: (row: ChecklistRow) => void; discard: () => void;
@@ -59,7 +64,7 @@ export function OperationalChecklistRoute({ template, rows, saved, changedId, ed
   }
   return <section className={styles.walkRoute} aria-label="Walkthrough route">
     <div className={styles.mapHeading}>
-      <div><h3>{template === "CLOSING" ? "Closing walkthrough" : "Opening walkthrough"}</h3><p>Choose a stop, tap a check and save what you find.</p></div>
+      <div><h3>{walkthroughTitles[template]}</h3><p>Choose a stop, tap a check and save what you find.</p></div>
       <dl><div><dt>Run date (SAST)</dt><dd>{formatSouthAfricaDate(date)}</dd></div><div><dt>Operator</dt><dd>{operator}</dd></div></dl>
     </div>
     <div className={styles.walkProgress}>
@@ -68,7 +73,7 @@ export function OperationalChecklistRoute({ template, rows, saved, changedId, ed
       <button type="button" className="button button-secondary" aria-pressed={findingsOnly} disabled={disabled || !!changedId}
         onClick={() => setFindingsOnly(value => !value)}>{findingsOnly ? "Show all checks" : `Show findings (${findings.length})`}</button>
     </div>
-    <div className={styles.walkStops} data-closing={template === "CLOSING" || undefined} aria-label="Route stops" role="group">
+    <div className={styles.walkStops} data-four-stops={stops.length === 4 || undefined} aria-label="Route stops" role="group">
       {[...groups].map(([area, items]) => {
         const count = items.filter(item => item.state !== "PENDING").length;
         return <button type="button" key={area} aria-pressed={group === area} disabled={disabled} onClick={() => select(area, area === group ? active?.id : undefined)}>
