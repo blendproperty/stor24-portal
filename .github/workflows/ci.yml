@@ -99,6 +99,7 @@ jobs:
       - run: node scripts/test-merchandise-queue-read.mjs
       - run: node scripts/test-reservations-read-recovery.mjs
       - run: node scripts/test-reservation-create-recovery.mjs
+      - run: node tests/multi-unit-reservation-browser.mjs
       - run: node scripts/test-reservation-lifecycle-recovery.mjs
       - run: node scripts/test-unit-inventory-read-recovery.mjs
       - run: node scripts/test-inventory-save-recovery.mjs
