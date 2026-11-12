@@ -22,7 +22,7 @@ Planning window: 12–26 November 2026. This is a prioritisation of known work, 
 
 ## Scope after the launch decision
 
-Evaluate optional or unapproved work, including advanced reporting, expanded inventory/POS, additional integrations and advertising, against the agreed launch scope. Keep advertising paused until explicitly approved. Do not classify a feature as optional if the business identifies it as essential to operations.
+Evaluate optional or unapproved work, including advanced reporting, expanded inventory/POS, additional integrations and advertising, against the agreed launch scope. Verify actual advertising status and do not change campaigns without approval; website context records an owner-published campaign on 12 November. Do not classify a feature as optional if the business identifies it as essential to operations.
 
 ## Evidence and limits at 12 November
 

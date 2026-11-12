@@ -1,3 +1,12 @@
+## 2026-11-12 — Booking and move-in isolated validation
+
+- Implementation: validation only; no application or billing changes. CRM source was current main b5c6bcd0ce607c5c77e9e21932eeee553d8c1f2e. Website source was origin/master d11d30fe9e2cd7e2a2dcaf54f16b1f79a6d7a505.
+- Testing: 17 targeted CRM booking, reservation, handover screen and multi-unit API checks passed. A disposable local PostgreSQL instance, bootstrapped with the repository's guarded empty-database migration process, passed public rental/viewing creation and origin/replay checks (1), signed reservation handover checks (22 including parent), and multi-unit atomicity/replay/conflict checks (1), run sequentially. A simulated move-in screen passed at 1440, 768, 390 and 320 pixels, including keyboard navigation, held prerequisites and no unexpected writes. Website ownership, disabled checkout and CRM acknowledgement checks passed (10). These are isolated/simulated checks, not one complete live cross-repository journey.
+- Commit and push: evidence is included in the separate two-week readiness documentation branch and website evidence branch; consult Git and PRs for publication.
+- Merge: no application merge from this validation. Documentation candidates require their own review and promotion.
+- Deployment and configuration: no deployment or provider configuration changes. Billing recognition remains held from production.
+- Live production verification: no live booking, OTP, provider message, payment, agreement or move-in was performed. Authorised CAPTCHA/OTP booking-to-CRM, real provider delivery/payment, staff/device UAT, physical access, data, finance, legal, training, recovery and business approvals remain open.
+
 ## 2026-11-12 — Two-week readiness and lost-enquiry release evidence
 
 - Implementation: PR #782 records reasons for lost enquiries. This documentation change adds a proposed two-week readiness plan; it does not change application code, provider configuration or the billing hold.
