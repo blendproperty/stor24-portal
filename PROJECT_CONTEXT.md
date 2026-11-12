@@ -1,8 +1,11 @@
-## 2026-11-12 — STOR24 PMax attribution registration (candidate)
+## 2026-11-12 — STOR24 PMax attribution registration (deployed; live attribution pending)
 
 - Implementation: register verified Google PMax campaign 24452876850 and its `stor24_midrand_pmax` UTM name in the bounded CRM advertising registry. No arbitrary creative or keyword identifiers are accepted. Website registry and consent-gated Google Ads tag changes are in separate website PR #272.
-- Testing: three focused attribution and public-contract tests passed, including the PMax campaign ID and unrecognised creative filtering; live paid-click attribution and CRM reconciliation are not proven.
-- Commit and push: candidate branch based on origin/main 2635e45545868c3b24f0f1a5200d04c478be09dd; unrelated worktrees preserved. Merge: pending. Deployment and configuration: not deployed. Live production verification: pending. Existing privacy, provider, human UAT, customer, finance, data, training and approval gates remain open.
+- Testing: three focused attribution and public-contract tests passed, including the PMax campaign ID and unrecognised creative filtering. PR and exact-merged-main CI, security, transaction and restricted-runtime checks passed. Live paid-click attribution and CRM reconciliation are not proven.
+- Commit and push: candidate b688c2532f51005980a295a1f193467430dfdb89 based on origin/main 2635e45545868c3b24f0f1a5200d04c478be09dd; unrelated worktrees preserved. This is a documentation-only receipt.
+- Merge: PR #778 squash merged as b67070208e821808d6b100fe3298fd2fc1f3d140.
+- Deployment and configuration: Deploy to VPS 43192787901 completed successfully after exact-main release checks; no provider or budget configuration changed.
+- Live production verification: deployment reports success, but a genuine paid-click enquiry, CRM attribution and platform conversion reconciliation remain unverified. Existing privacy, provider, human UAT, customer, finance, data, training and approval gates remain open.
 
 ## 2026-11-11 — Multi-unit move-in deployed; staff UAT pending
 
