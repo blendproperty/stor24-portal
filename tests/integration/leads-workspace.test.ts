@@ -52,7 +52,8 @@ test('lead updates are scoped, concurrent-safe, auditable and cannot fabricate a
  const currentLead=await db.lead.findUniqueOrThrow({where:{id:lead.id}});
  await updateLead(scope,lead.id,{...input,updatedAt:currentLead.updatedAt.toISOString(),stage:'QUOTED',nextActionAt:null,expectedMoveIn:null});
  const cleared=await db.lead.findUniqueOrThrow({where:{id:lead.id}});assert.equal(cleared.expectedMoveIn,null);assert.equal(cleared.nextActionAt,null);assert.ok(!(await leadsWorkspace(scope,true)).leads.some(l=>l.id===lead.id));
- await updateLead(scope,lead.id,{...input,updatedAt:cleared.updatedAt.toISOString(),stage:'LOST'});assert.ok(!(await leadsWorkspace(scope,true)).leads.some(l=>l.id===lead.id));
+ await assert.rejects(updateLead(scope,lead.id,{...input,updatedAt:cleared.updatedAt.toISOString(),stage:'LOST'}),/LEAD_LOSS_REASON_REQUIRED/);
+ await updateLead(scope,lead.id,{...input,updatedAt:cleared.updatedAt.toISOString(),stage:'LOST',lossReason:'Price too high'});const lost=await db.lead.findUniqueOrThrow({where:{id:lead.id}});assert.equal(lost.lossReason,'Price too high');assert.equal(((await db.auditEvent.findFirstOrThrow({where:{entityId:lead.id,action:'lead.updated'},orderBy:{occurredAt:'desc'}})).after as {lossReason:string}).lossReason,'Price too high');assert.equal((await leadsWorkspace(scope)).leads.find(l=>l.id===lead.id)?.lossReason,'Price too high');assert.ok(!(await leadsWorkspace(scope,true)).leads.some(l=>l.id===lead.id));
  // Bulk cancellation is scoped, versioned and atomic, and preserves customers and notes.
  const a=await db.lead.create({data:{facilityId:f.id,source:'Synthetic test A',notes:'Keep requirements',nextActionAt:new Date()}});
  const b=await db.lead.create({data:{facilityId:f.id,source:'Synthetic test B'}});
