@@ -1,3 +1,12 @@
+## 2026-11-12 — Migration preflight validation and tracker reconciliation
+
+- Implementation: validation and tracker reconciliation only. Existing read-only export validator, six operational CSV templates and docs/MIGRATION_REHEARSAL.md were reviewed against main d0b6e4197e39ee8eb2923e90f588a222f34b3488. No importer or production data change was made.
+- Testing: 16 focused synthetic migration checks passed, including references, facility scope, source-byte fingerprints, duplicate business keys, CSV parsing, count evidence and report/source overwrite protection. Tested migration files match current main. No authorised source export or target database was used; validation is not import or financial reconciliation.
+- Commit and push: this evidence is a separate documentation candidate; consult Git and its PR for publication. Asana migration tooling, mappings, first rehearsal and freeze/delta records were updated with evidence and remain open.
+- Merge: no application merge; this documentation candidate is pending review and promotion.
+- Deployment and configuration: no deployment, provider or billing configuration change. Billing recognition remains held.
+- Live production verification: no customer data imported and no production rehearsal performed. Approved operational and financial scope, source export, repeatable importer, mapping, target conflicts, freeze/delta agreement, reconciliation, staff UAT and business sign-off remain open; all existing provider, data, finance, recovery and training gates remain open.
+
 ## 2026-11-12 — STOR24 PMax attribution registration (deployed; live attribution pending)
 
 - Implementation: register verified Google PMax campaign 24452876850 and its `stor24_midrand_pmax` UTM name in the bounded CRM advertising registry. No arbitrary creative or keyword identifiers are accepted. Website registry and consent-gated Google Ads tag changes are in separate website PR #272.
