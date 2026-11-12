@@ -1,3 +1,11 @@
+## 2026-11-12 — Lead customer search correction candidate
+
+- Implementation: changing the customer search clears the previous results and status immediately, avoiding selection of an old match while a new search is pending or has failed. Existing facility and API permissions are unchanged. The regression is included in CI.
+- Testing: an actual-component browser fixture passed search, query change and failed-search cases without customer writes; focused lint and diff checks passed. Protected exact-head CI and real staff/device acceptance remain required.
+- Commit and push: candidate branch codex/lead-customer-search-refresh-20261112; consult Git and PR for publication.
+- Merge: not merged. Deployment and configuration: not deployed or changed. Live production verification: not performed.
+- Outstanding: staff UAT and the broader lead capture, customer deduplication, provider, data, finance, training, recovery and approval gates remain open. Billing recognition remains held.
+
 ## 2026-11-12 — STOR24 PMax attribution registration (deployed; live attribution pending)
 
 - Implementation: register verified Google PMax campaign 24452876850 and its `stor24_midrand_pmax` UTM name in the bounded CRM advertising registry. No arbitrary creative or keyword identifiers are accepted. Website registry and consent-gated Google Ads tag changes are in separate website PR #272.
