@@ -3,7 +3,7 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 
 test("permanent deletion inventory covers staff references and structured records in the schema", async () => {
-  const schema=await readFile("prisma/schema.prisma","utf8"), source=await readFile("src/lib/staff-user-removal.ts","utf8"), migration=await readFile("prisma/migrations/20261110130000_staff_deletion_fence/migration.sql","utf8");
+  const schema=await readFile("prisma/schema.prisma","utf8"), source=await readFile("src/lib/staff-user-removal.ts","utf8"), migration=(await Promise.all(["20261110130000_staff_deletion_fence", "20261113150000_additional_photo_handoff"].map(name => readFile(`prisma/migrations/${name}/migration.sql`,"utf8")))).join("\n");
   const excluded=new Set(["MfaCredential","PasswordResetToken","RoleAssignment","AuditEvent"]);
   for (const model of schema.matchAll(/model\s+(\w+)\s*\{([\s\S]*?)\n\}/g)) {
     const [,name,body]=model;
