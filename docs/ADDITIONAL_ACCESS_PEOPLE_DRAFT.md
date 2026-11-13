@@ -1,6 +1,6 @@
 # Additional authorised people — implementation draft
 
-5 November 2026. A local candidate implements nominations and supervised additional-person photo collection and review. It is not released, configured for production, or connected to HikCentral.
+13 November 2026. Nominations and supervised additional-person photo capture and review are deployed with collection held by policy. They are not configured for live biometric collection or connected to HikCentral.
 
 ## Configuration boundary
 
@@ -32,4 +32,4 @@ Use synthetic data for automated tests covering two people on one booking, a per
 
 ## Status
 
-The local candidate has been committed and pushed for draft review; see PROJECT_CONTEXT.md for the dated test evidence. It has not been merged, deployed, configured or verified live. Legal/privacy review, provider contract and mapping, physical UAT, staff training and business acceptance remain open. This draft does not authorise collecting real additional-user biometric data or changing physical access.
+The tablet capture-to-review code was merged in PR #803 and automatically deployed by guarded run 43409597636 for `da93206ee4608e6c795037220cea5aca1eac5b0c` on 13 November 2026; see PROJECT_CONTEXT.md for dated evidence. The separate notice remains a draft, `ADDITIONAL_ACCESS_POLICIES_JSON` was not enabled by this release, and no HikCentral or door mapping was changed. A live expired-link page and public health response were checked, but real photo collection, runtime role privileges on the new table, provider enrolment, reader entry/removal and staff UAT were not verified. Legal/privacy review, alternative entry, provider retention/deletion, physical installation, training and business acceptance remain open. This draft does not authorise collecting real additional-user biometric data or changing physical access.
