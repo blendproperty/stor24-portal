@@ -51,8 +51,8 @@ async function sendTwilioMessage(kind: "SMS" | "WHATSAPP", to: string, body: str
     if (!response.ok)
       return { ok: false, retryable: response.status >= 500, code: String(payload.code ?? response.status), message: "Twilio rejected the message. Review the provider status." };
     return { ok: true, providerReference: payload.sid ?? "", data: { status: "QUEUED" } };
-  } catch (error) {
-    return { ok: false, retryable: true, code: "NETWORK_ERROR", message: error instanceof Error ? error.message : "Twilio request failed." };
+  } catch {
+    return { ok: false, retryable: true, code: "NETWORK_ERROR", message: "Twilio delivery could not be confirmed. Review the provider record before retrying." };
   }
 }
 

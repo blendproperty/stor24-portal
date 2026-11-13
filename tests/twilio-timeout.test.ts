@@ -32,11 +32,16 @@ test("Twilio SMS and WhatsApp requests have a bounded deadline without automatic
         calls++; assert.equal(init.signal, controller.signal);
         return new Promise<Response>((_resolve, reject) => {
           controller.signal.addEventListener("abort", () => reject(controller.signal.reason), { once: true });
-          queueMicrotask(() => controller.abort(new DOMException("Synthetic deadline", "TimeoutError")));
+          queueMicrotask(() => controller.abort(new DOMException("Synthetic private recipient +27000000001 and token secret-fixture", "TimeoutError")));
         });
       });
       const result = await send(); assert.equal(result.ok, false);
-      if (!result.ok) assert.equal(result.code, "NETWORK_ERROR");
+      if (!result.ok) {
+        assert.equal(result.code, "NETWORK_ERROR");
+        assert.equal(result.retryable, true);
+        assert.equal(result.message, "Twilio delivery could not be confirmed. Review the provider record before retrying.");
+        assert.doesNotMatch(result.message, /secret-fixture|27000000001/);
+      }
       assert.equal(calls, 1); assert.equal(deadlines, 1);
     });
   }
