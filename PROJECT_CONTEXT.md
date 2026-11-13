@@ -13,6 +13,7 @@
 - Testing: an actual-component browser fixture passed search, query change, failed-search and store-change selection cases without customer writes; focused lint and diff checks passed. Protected exact-head CI and real staff/device acceptance remain required.
 - Commit and push: candidate branch codex/lead-customer-search-refresh-20261112; consult Git and PR for publication.
 - 2026-11-13: reconciled this candidate with migration PR #787 merged as ceb7a069, checklist reporting PR #793 merged as 31eead3c, and social intake PR #765 merged as 9b7300f5; all context histories are preserved. Renewed protected checks and production verification remain required.
+- 2026-11-13: preserved subsequent checklist reporting production evidence from PR #794 while refreshing the candidate against main 08e77cea; renewed protected checks remain required.
 - Merge: not merged. Deployment and configuration: not deployed or changed. Live production verification: not performed.
 - Outstanding: staff UAT and the broader lead capture, customer deduplication, provider, data, finance, training, recovery and approval gates remain open. Billing recognition remains held.
 
