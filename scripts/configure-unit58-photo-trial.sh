@@ -20,7 +20,7 @@ if test "$action" = enable; then
   hour=$(date -u +%H)
   test "$hour" -ge 5 && test "$hour" -lt 17 || { echo 'Trial can only start during the daylight test window.'; exit 1; }
   organisation_id=$(docker exec stor24-crm-postgres-1 psql -U stor24 -d stor24_crm -At -v ON_ERROR_STOP=1 -c \
-    "SELECT f.\"organisationId\" FROM \"Reservation\" r JOIN \"Facility\" f ON f.id=r.\"facilityId\" JOIN \"Organisation\" o ON o.id=f.\"organisationId\" JOIN \"Unit\" u ON u.id=r.\"unitId\" JOIN \"PublicReservationLease\" l ON l.\"reservationId\"=r.id WHERE r.id='cmwerdxa2000501qe0lhkr5qw' AND o.slug='stor24' AND u.number='58' AND r.status='ACTIVE' AND l.status='SIGNED' AND l.\"signedPdf\" IS NOT NULL")
+    "SELECT f.\"organisationId\" FROM \"Reservation\" r JOIN \"Facility\" f ON f.id=r.\"facilityId\" JOIN \"Organisation\" o ON o.id=f.\"organisationId\" JOIN \"Unit\" u ON u.id=r.\"unitId\" JOIN \"Tenancy\" t ON t.id=r.\"convertedTenancyId\" JOIN \"Document\" d ON d.\"tenancyId\"=t.id WHERE r.id='cmwerdxa2000501qe0lhkr5qw' AND o.slug='stor24' AND u.number='58' AND r.status='CONVERTED' AND t.status='DRAFT' AND d.type='LEASE_AGREEMENT' AND d.provider='BLENDSIGN' AND d.status='SIGNED' AND d.\"signedAt\" IS NOT NULL")
   [[ "$organisation_id" =~ ^[a-z0-9]+$ ]] || { echo 'Signed Unit 58 booking not found; no configuration changed.'; exit 1; }
   ! grep -q '^ADDITIONAL_ACCESS_POLICIES_JSON=' .env || { echo 'An additional-person policy already exists; no configuration changed.'; exit 1; }
   ends=$(date -u +%Y-%m-%dT17:00:00Z)

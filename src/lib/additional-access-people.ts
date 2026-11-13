@@ -98,7 +98,11 @@ async function requireAdditionalCollection(organisationId: string, database: Pri
 
 async function requireAdditionalBookingEligible(database: Prisma.TransactionClient, organisationId: string, reservationId: string, policy: NonNullable<ReturnType<typeof additionalPersonPolicy>>) {
   if (policy.trialReservationId && policy.trialReservationId !== reservationId) throw new Error("PHOTO_POLICY_PENDING");
-  await requireBookingEligible(database, organisationId, reservationId, Boolean(policy.trialReservationId));
+  if (!policy.trialReservationId) return requireBookingEligible(database, organisationId, reservationId);
+  const reservation = await database.reservation.findFirst({ where: { id: reservationId, status: "CONVERTED", facility: { organisationId } }, include: { unit: true, convertedTenancy: { include: { account: true, occupancies: true, documents: { where: { type: "LEASE_AGREEMENT" } } } } } });
+  const tenancy = reservation?.convertedTenancy;
+  const signed = tenancy?.documents.filter(document => document.provider === "BLENDSIGN" && document.status === "SIGNED" && document.signedAt && document.externalId);
+  if (!reservation || !tenancy || tenancy.status !== "DRAFT" || tenancy.customerId !== reservation.customerId || tenancy.facilityId !== reservation.facilityId || tenancy.account.customerId !== reservation.customerId || tenancy.occupancies.length !== 1 || tenancy.occupancies[0].unitId !== reservation.unitId || tenancy.occupancies[0].status !== "PENDING" || reservation.unit.status !== "RESERVED" || signed?.length !== 1) throw new Error("PHOTO_BOOKING_NOT_READY");
 }
 
 export async function captureAdditionalPhoto(scope: RequestScope, input: { id: string; version: number; policyHash: string; consent: boolean; identityConfirmed: boolean; image: File }) {

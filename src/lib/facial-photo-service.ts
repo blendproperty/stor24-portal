@@ -33,8 +33,8 @@ async function readyToCollect(database: Database, organisationId: string) {
   if (!maintenance || maintenance.completedAt.getTime() < Date.now() - 90 * 60 * 1000) throw new Error("PHOTO_MAINTENANCE_REQUIRED");
   return policy;
 }
-export async function requireBookingEligible(database: Database, organisationId: string, reservationId: string, unpaidPhotoTrial = false) {
-  const state = await reservationReadiness(database, { userId: "customer-photo", organisationId, facilityIds: [], unrestrictedFacilities: true }, reservationId, true, unpaidPhotoTrial);
+export async function requireBookingEligible(database: Database, organisationId: string, reservationId: string) {
+  const state = await reservationReadiness(database, { userId: "customer-photo", organisationId, facilityIds: [], unrestrictedFacilities: true }, reservationId, true);
   if (!state.view.ready) throw new Error("PHOTO_BOOKING_NOT_READY");
   const lease = await database.publicReservationLease.findUnique({ where: { reservationId } });
   if (!lease?.signedPdf || createHash("sha256").update(lease.signedPdf).digest("hex") !== lease.signedPdfSha256 || createHash("sha256").update(lease.content).digest("hex") !== lease.sha256) throw new Error("PHOTO_BOOKING_NOT_READY");
