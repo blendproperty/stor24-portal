@@ -98,6 +98,27 @@ test("isolated PostgreSQL checklist lifecycle, padlock snapshots, permissions an
       const audit = await db.auditEvent.findFirstOrThrow({ where: { entityId: sunday.id, action: "operationalChecklist.observe" } });
       assert.equal(audit.actorId, cover.id);
     });
+    await t.test("Management retains all daily checks and records the Friday tests on the scheduled SAST day", async () => {
+      const plan = { ...base, template: "MANAGEMENT" as const, repeat: "ONCE" as const, occurrences: 1, endAt: "2026-11-05T23:00:00Z" };
+      const thursday = await createOperationalChecklist(scope, { ...plan, startAt: "2026-11-05T21:59:00Z", requestKey: randomUUID() });
+      const friday = await createOperationalChecklist(scope, { ...plan, startAt: "2026-11-05T22:00:00Z", requestKey: randomUUID() });
+      await act(thursday.id);
+      await act(friday.id);
+      const dailyRows = checklistRecordSchema.parse((await current(thursday.id)).operationalChecklist).rows;
+      const fridayRows = checklistRecordSchema.parse((await current(friday.id)).operationalChecklist).rows;
+      assert.equal(dailyRows.length, 19);
+      assert.deepEqual(fridayRows.slice(0, 19), dailyRows);
+      assert.deepEqual(fridayRows.slice(19).map(row => row.label), ["Friday · Test pump room and ICV equipment", "Friday · Test generator"]);
+      const check = fridayRows[19];
+      const observation = { action: "OBSERVE", row: { id: check.id, state: "ISSUE", lockCount: null, notes: "Test pressure fell below target", evidence: "Test reference" }, summary: "", comparisonReference: "" };
+      await assert.rejects(act(friday.id, scope, observation), /FORBIDDEN/);
+      await assert.rejects(act(friday.id, csoScope, { ...observation, row: { ...observation.row, notes: "" } }), /CHECKLIST_INCOMPLETE/);
+      await act(friday.id, coverScope, observation);
+      const stored = checklistRecordSchema.parse((await current(friday.id)).operationalChecklist);
+      assert.deepEqual(stored.rows, fridayRows.map(row => row.id === check.id ? { ...row, ...observation.row } : row));
+      const audit = await db.auditEvent.findFirstOrThrow({ where: { entityId: friday.id, action: "operationalChecklist.observe" } });
+      assert.equal(audit.actorId, cover.id);
+    });
     await t.test("padlocks use current units, reject inventory drift and retain physical findings without access actions",async()=>{
       const type=await db.unitType.create({data:{facilityId:a.id,name:"5 sqm",areaSqMetres:5}});
       const unit=await db.unit.create({data:{facilityId:a.id,unitTypeId:type.id,number:"01",monthlyRate:100}});

@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { checklistIssue, checklistNeedsTrolleyCount, checklistRouteResultReady, type ChecklistRouteTemplate, type ChecklistRow } from "@/lib/operational-checklist-policy";
 import { formatSouthAfricaDate } from "@/lib/south-africa-time";
+import { workbookItemLabel } from "./operational-checklist-sheet";
 import styles from "./operational-checklists.module.css";
 
 const results = { PENDING: "Not checked", PASS: "Pass", ISSUE: "Issue", NA: "Not applicable", VACANT: "Vacant", OCCUPIED: "Occupied", OVERLOCKED: "Overlocked" };
@@ -11,6 +12,7 @@ const walkthroughTitles: Record<ChecklistRouteTemplate, string> = {
   OPENING: "Opening walkthrough",
   CLOSING: "Closing walkthrough",
   CLEANING: "Cleaning walkthrough",
+  MANAGEMENT: "Management walkthrough",
 };
 const itemName = (row: ChecklistRow) => row.label.includes(" · ") ? row.label.slice(row.label.indexOf(" · ") + 3) : row.label;
 
@@ -31,6 +33,7 @@ export function OperationalChecklistRoute({ template, rows, saved, changedId, ed
       return floor ? `${floor[0].toUpperCase()}${floor.slice(1)} floor` : "Evening checks";
     }
     const group = row.label.includes(" · ") ? row.label.split(" · ")[0] : "Other checks";
+    if (template === "MANAGEMENT") return group === "Daily" ? "Daily checks" : group === "Friday" ? "Friday tests" : group;
     return group === "Opening" ? "Office & systems" : group;
   }
   const findings = saved.filter(row => row.state !== "PENDING" && checklistIssue(row));
@@ -73,7 +76,7 @@ export function OperationalChecklistRoute({ template, rows, saved, changedId, ed
       <button type="button" className="button button-secondary" aria-pressed={findingsOnly} disabled={disabled || !!changedId}
         onClick={() => setFindingsOnly(value => !value)}>{findingsOnly ? "Show all checks" : `Show findings (${findings.length})`}</button>
     </div>
-    <div className={styles.walkStops} data-four-stops={stops.length === 4 || undefined} aria-label="Route stops" role="group">
+    <div className={styles.walkStops} data-stops={stops.length} aria-label="Route stops" role="group">
       {[...groups].map(([area, items]) => {
         const count = items.filter(item => item.state !== "PENDING").length;
         return <button type="button" key={area} aria-pressed={group === area} disabled={disabled} onClick={() => select(area, area === group ? active?.id : undefined)}>
@@ -86,11 +89,11 @@ export function OperationalChecklistRoute({ template, rows, saved, changedId, ed
       <div className={styles.walkChecks} ref={checks} tabIndex={-1}>
         <h4>Checks at this stop</h4>
         {groupRows.map(item => <button type="button" key={item.id} disabled={disabled} aria-pressed={active?.id === item.id} onClick={() => select(groupName(item), item.id, true)}>
-          <span>{itemName(item)}</span><small className={styles.walkBadge} data-result={item.state}>{results[item.state]}</small>
+          <span>{workbookItemLabel(template, item.label)}</span><small className={styles.walkBadge} data-result={item.state}>{results[item.state]}</small>
         </button>)}
       </div>
       <div className={styles.mapEditor} ref={editor} tabIndex={-1} aria-label="Selected check" role="region">
-        <h4>{itemName(row)}</h4>
+        <h4>{workbookItemLabel(template, row.label)}</h4>
         <p><span className={styles.walkBadge} data-result={active?.state}>{results[active?.state ?? "PENDING"]}</span>{unsaved && " · Unsaved changes"}</p>
         {editable ? <>
           <fieldset className={styles.walkChoices}><legend>Result</legend>

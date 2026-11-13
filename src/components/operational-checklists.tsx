@@ -170,9 +170,9 @@ export function OperationalChecklists({ kind = "checklists" }: { kind?: "checkli
       {routeTemplate && sheetDate && sheetRows.length > 0 && <OperationalChecklistRoute key={task.id} template={routeTemplate} rows={sheetRows} saved={record.rows} changedId={changedObservation}
         editable={editable} disabled={disabled} date={sheetDate} operator={staffName(record.submittedBy ?? (preparer ? data?.actorId ?? null : task.assigneeId))}
         update={updateRow} save={saveObservation} discard={discardObservation}/>}
-      {routeTemplate && sheetDate && week.length > 0 && <details className={styles.padlockReports}>
+      {routeTemplate && sheetDate && (week.length > 0 || routeTemplate === "MANAGEMENT" && sheetRows.length > 0) && <details className={styles.padlockReports}>
         <summary>View weekly history</summary>
-        <OperationalChecklistSheet rows={record.rows} week={week} startAt={sheetDate} assignee={task.assignee?.name ?? null}
+        <OperationalChecklistSheet rows={task.status === "OPEN" ? sheetRows : record.rows} week={week} startAt={sheetDate} assignee={task.assignee?.name ?? null}
           template={routeTemplate} editable={false} canSwitch={!disabled && !dirty} update={updateRow} openDay={id => void read({ id })}/>
       </details>}
       {!padlocks && !routeTemplate && sheetDate && sheetRows.length > 0 && <>
