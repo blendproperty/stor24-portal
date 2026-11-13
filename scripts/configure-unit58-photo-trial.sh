@@ -27,6 +27,11 @@ if test "$action" = enable; then
   policy=${template/__TRIAL_ENDS_AT__/$ends}
   [[ "$policy" == *'"trialReservationId":"cmwerdxa2000501qe0lhkr5qw"'* ]] || exit 1
   line='ADDITIONAL_ACCESS_POLICIES_JSON={"'"$organisation_id"'":'"$policy"'}'
+elif grep -q '^ADDITIONAL_ACCESS_POLICIES_JSON=' .env; then
+  grep '^ADDITIONAL_ACCESS_POLICIES_JSON=' .env | grep -q '"trialReservationId":"cmwerdxa2000501qe0lhkr5qw"' || { echo 'A different policy is configured; removal refused.'; exit 1; }
+else
+  echo 'Unit 58 photo trial already disabled.'
+  exit 0
 fi
 
 tmp=$(mktemp .env.unit58.XXXXXX)
@@ -42,7 +47,11 @@ if ! IMAGE_TAG="$tag" docker compose --env-file .env -f compose.prod.yml up -d -
   IMAGE_TAG="$tag" docker compose --env-file .env -f compose.prod.yml up -d --no-deps --no-build app
   exit 1
 fi
-container=$(docker compose --env-file .env -f compose.prod.yml ps -q app)
+if ! container=$(docker compose --env-file .env -f compose.prod.yml ps -q app) || test -z "$container"; then
+  mv "$old" .env
+  IMAGE_TAG="$tag" docker compose --env-file .env -f compose.prod.yml up -d --no-deps --no-build app
+  exit 1
+fi
 for attempt in $(seq 1 40); do
   if ! state=$(docker inspect --format '{{.State.Health.Status}}' "$container"); then break; fi
   test "$state" = healthy && break
