@@ -1,8 +1,8 @@
 ## 2026-11-13 — Facebook pricing enquiry follow-up (candidate, not live)
 
 - Implementation: refreshed the social-intake candidate against main and added an exact proxy delegation for its separately authenticated endpoint; neighbouring paths remain protected. No provider flow, credential, staff routing or production configuration was changed.
-- Testing: 16 focused authentication-boundary and social-contract tests passed locally, including rejection of 123. This does not establish provider validation, CRM delivery or staff receipt. Full CI, security review, isolated transaction tests and end-to-end tests remain required.
-- Commit and push: see branch history; remote publication pending. Merge: not promoted. Deployment and configuration: not deployed or configured. Live production verification: none for this candidate.
+- Testing: 16 focused authentication-boundary and social-contract tests passed locally, including rejection of 123. This does not establish provider validation, CRM delivery or staff receipt. Local typecheck was interrupted before a result; full CI, security review, isolated transaction tests and end-to-end tests remain required.
+- Commit and push: candidate e39ecd90 was pushed to codex/social-enquiry-intake-20261111; this evidence update follows it. Merge: not promoted. Deployment and configuration: not deployed or configured. Live production verification: none for this candidate.
 - Outstanding: scoped credential and recipient approval, WhatChimp mapping and failure branches, provider and mailbox delivery, staff monitoring and UAT, real valid/invalid/concurrent enquiries and all prior privacy, provider, data, training and approval gates. The existing Facebook input flow has accepted 123 and requires manual monitoring.
 
 ## 2026-11-11 — Facebook and Instagram CRM enquiry intake (candidate, not live)
