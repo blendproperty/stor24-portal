@@ -8,7 +8,7 @@ let protectedLost="";
 let stage,bookings,patch,reservation,capture,rejectReservation,newLead,refreshFailed;
 let bulk,bulkError=false,bulkRefreshFailed=false,readOnly=false,bulkClosed=new Set(),bulkDeleted=new Set();
 const booking=(extra={})=>({id:'saved/booking',status:'ACTIVE',journey:'RENTAL',quotedRate:1400,convertedTenancyId:null,unit:{number:'101'},publicLease:null,convertedTenancy:null,...extra});
-const make=()=>({leads:[...Array.from({length:8},(_,i)=>({id:`lead${i}`,stage:bulkClosed.has(`lead${i}`)?'LOST':i===0?stage:['NEW','CONTACTED','QUALIFIED','QUOTED','VIEWING_BOOKED','RESERVED','WON','LOST'][i],source:i===7&&protectedLost==='training'?'Staff training only':i%2?'Phone':'PUBLIC_QUOTE_FORM',createdAt:new Date(Date.now()-i*7*86400000).toISOString(),updatedAt:'2026-10-02T08:00:00Z',notes:'Household furniture',expectedMoveIn:'2026-10-15T00:00:00Z',nextActionAt:null,assignedToId:null,assignedTo:null,facility:{id:'store',name:'Midpoint'},desiredUnitType:{name:'10 m²'},customer:{id:`customer${i}`,firstName:`Example ${i+1}`,lastName:'Customer',email:'example@example.invalid',phone:'+27000000000',companyName:null},attribution:null,reservations:i===0?bookings:i===7&&protectedLost==='booking'?[booking({status:'CANCELLED'})]:[]})),...(newLead?[newLead]:[])].filter(l=>!bulkDeleted.has(l.id)),count:newLead?9:8,facilities:[{id:'store',name:'Midpoint',canCreate:true,canManage:!readOnly,canReserve:true}],staff:[{id:'staff',name:'Example Sales Owner',facilityIds:['store']}]});
+const make=()=>({leads:[...Array.from({length:8},(_,i)=>({id:`lead${i}`,lossReason:i===0?patch?.lossReason:null,stage:bulkClosed.has(`lead${i}`)?'LOST':i===0?stage:['NEW','CONTACTED','QUALIFIED','QUOTED','VIEWING_BOOKED','RESERVED','WON','LOST'][i],source:i===7&&protectedLost==='training'?'Staff training only':i%2?'Phone':'PUBLIC_QUOTE_FORM',createdAt:new Date(Date.now()-i*7*86400000).toISOString(),updatedAt:'2026-10-02T08:00:00Z',notes:'Household furniture',expectedMoveIn:'2026-10-15T00:00:00Z',nextActionAt:null,assignedToId:null,assignedTo:null,facility:{id:'store',name:'Midpoint'},desiredUnitType:{name:'10 m²'},customer:{id:`customer${i}`,firstName:`Example ${i+1}`,lastName:'Customer',email:'example@example.invalid',phone:'+27000000000',companyName:null},attribution:null,reservations:i===0?bookings:i===7&&protectedLost==='booking'?[booking({status:'CANCELLED'})]:[]})),...(newLead?[newLead]:[])].filter(l=>!bulkDeleted.has(l.id)),count:newLead?9:8,facilities:[{id:'store',name:'Midpoint',canCreate:true,canManage:!readOnly,canReserve:true}],staff:[{id:'staff',name:'Example Sales Owner',facilityIds:['store']}]});
 const server=createServer(async(req,res)=>{
  if(req.url==='/satoshi.ttf'){res.setHeader('Content-Type','font/ttf');return res.end(await readFile('public/brand/Satoshi-Variable.ttf'));}
  if(req.url==='/app.js'){res.setHeader('Content-Type','text/javascript');return res.end(bundle.outputFiles[0].text);}
@@ -127,6 +127,14 @@ try{
   bulkRefreshFailed=false;refreshFailed=false;bulkClosed.clear();readOnly=true;await page.reload();
   await expect(page.getByRole('button',{name:'Cancel selected tests',exact:true})).toHaveCount(0);
   readOnly=false;await page.reload();
+  await page.getByRole('button',{name:'Example 1 Customer',exact:true}).click();
+  await page.getByLabel('Sales stage',{exact:true}).selectOption('LOST');
+  await page.getByLabel('Reason lost').fill('Price too high');
+  await page.getByRole('button',{name:'Save & continue to unit',exact:true}).click();
+  if(patch.lossReason!=='Price too high'||patch.stage!=='LOST')throw Error('Loss reason was not included in the save');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByLabel('Filter stage',{exact:true}).selectOption('LOST');await page.getByLabel('Search leads').fill('Price too high');await expect(page.locator('.leads-name')).toHaveCount(1);await expect(page.getByText('Price too high',{exact:true})).toBeVisible();
+  stage='NEW';await page.reload();
   console.log(`${width}px: exact multi-selection, filtered select-all, filter reset, review, rejection, cancellation, lost-response recovery, refresh-failure guard and read-only access passed`);
   await page.getByRole('button',{name:'Example 1 Customer',exact:true}).click();
   const nav=page.getByRole('navigation',{name:'Lead to lease progress'});await expect(nav.locator('li')).toHaveCount(4);

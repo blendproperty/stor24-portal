@@ -1,2 +1,20 @@
 # Historical false positive: assignment reads an environment variable, contains no credential.
 ff172d651a6c829501058d6a6cbe98c9bbc6cdb5:scripts/host-heartbeat-policy.mjs:generic-api-key:21
+
+# Exact historical non-credentials reviewed in docs/evidence/HISTORICAL_SECRET_SCAN_TRIAGE_2026-11-11.json.
+521ebc9ce2f306dc6a2ccac66f7ff8e87d98fc3a:tests/meta-conversion-worker.test.ts:generic-api-key:9
+46571315c41ab0017af34fe191fc6db84e6d028c:PROJECT_CONTEXT.md:generic-api-key:7048
+fc6099f987f46f6f87417f4ff3b4a50b1248f55d:tests/encryption-tag-length.test.ts:generic-api-key:43
+0cd8bb3467e7a175757c10d98752f149d13adabb:tests/staff-event-email-policy.test.ts:generic-api-key:12
+0cd8bb3467e7a175757c10d98752f149d13adabb:tests/staff-event-email-policy.test.ts:generic-api-key:14
+ccf1cb83639e5255cdbc341f6cbfea1b85c7f343:tests/integration/netcash-debicheck-attempt-journal.test.ts:generic-api-key:14
+ccf1cb83639e5255cdbc341f6cbfea1b85c7f343:tests/netcash-debicheck-attempt-policy.test.ts:generic-api-key:6
+ccf1cb83639e5255cdbc341f6cbfea1b85c7f343:tests/netcash-debicheck-attempt-policy.test.ts:generic-api-key:7
+db143e3d26650e8b448174cb1844898b13c74752:tests/integration/mri-sandbox-maintenance.test.ts:generic-api-key:9
+eef1dd9527d7bd70f07c63abd10d90bc459a0c70:docs/FAEEZ_MEETING_GAP_REGISTER_2026-10-14.md:generic-api-key:13
+70ed5823020e681b238b61308702f98b7021a291:tests/customer-history.test.ts:generic-api-key:8
+70ed5823020e681b238b61308702f98b7021a291:tests/customer-history.test.ts:generic-api-key:33
+16524e90458d58ece834fa37ae8b946cc430b579:docs/FAEEZ_MEETING_GAP_REGISTER_2026-10-14.md:generic-api-key:11
+7a609c5b14e3a02cfccc4b08ea55b77b34b7b6cf:PROJECT_CONTEXT.md:generic-api-key:7
+f9b27496b962b550ee70d53686c87cb18754870a:tests/integration/walk-in.test.ts:generic-api-key:25
+5ec881765afadeaad10d01cf7c735ff125d8eac9:tests/integration/dlp-transfer.test.ts:generic-api-key:11

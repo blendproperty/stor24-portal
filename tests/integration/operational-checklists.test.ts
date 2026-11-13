@@ -28,15 +28,20 @@ test("isolated PostgreSQL checklist lifecycle, padlock snapshots, permissions an
       await assert.rejects(createOperationalChecklist(csoScope,{...base,requestKey:randomUUID()}),/FORBIDDEN/);
       const future=await createOperationalChecklist(scope,{...base,repeat:"ONCE",occurrences:1,startAt:"2099-01-01T06:00:00Z",endAt:"2099-01-01T08:00:00Z",requestKey:randomUUID()});await assert.rejects(act(future.id),/NOT_DUE/);
     });
-    await t.test("assigned preparer and cover save progress, all rows and independent review required",async()=>{
+    await t.test("Closing saves each check and keeps weekly history and independent review",async()=>{
       await assert.rejects(act(id,scope),/FORBIDDEN/);await act(id);
       await assert.rejects(act(id,csoScope,{action:"SUBMIT",...await results(id),rows:[]}),/CONFLICT/);
-      const old=await current(id);await act(id,coverScope,{action:"SAVE",...await results(id)});
-      await assert.rejects(changeOperationalChecklist(csoScope,{id,expectedUpdatedAt:old.updatedAt.toISOString(),action:"SAVE",...await results(id)} as ChecklistChange),/CONFLICT/);
       const forged=await results(id);forged.rows[0].id="arbitrary";await assert.rejects(act(id,csoScope,{action:"SAVE",...forged}),/CONFLICT/);
       const version=(await current(id)).updatedAt.toISOString(),payload=await results(id);
-      const concurrent=await Promise.allSettled([csoScope,coverScope].map(s=>changeOperationalChecklist(s,{id,expectedUpdatedAt:version,action:"SAVE",...payload} as ChecklistChange)));
+      assert.equal(payload.rows.length, 13);
+      assert.equal(payload.rows.filter(row => row.lockCount !== null).length, 3);
+      await assert.rejects(act(id,csoScope,{action:"SUBMIT",...payload}),/CHECKLIST_SAVE_EACH/);
+      const { rows, ...summaryFields } = payload;
+      const observe = { ...summaryFields, action: "OBSERVE" as const, row: rows[0] };
+      const concurrent=await Promise.allSettled([csoScope,coverScope].map(s=>changeOperationalChecklist(s,{id,expectedUpdatedAt:version,...observe} as ChecklistChange)));
       assert.equal(concurrent.filter(r=>r.status==="fulfilled").length,1);assert.equal(concurrent.filter(r=>r.status==="rejected").length,1);
+      for (const row of rows.slice(1)) await act(id,coverScope,{ ...observe, row });
+      assert.equal(await db.auditEvent.count({where:{entityId:id,action:"operationalChecklist.observe"}}),13);
       await act(id,csoScope,{action:"SUBMIT",...await results(id)});assert.equal((await current(id)).status,"WAITING");
       await assert.rejects(act(id,csoScope,{action:"APPROVE",note:"Self approval"}),/FORBIDDEN/);
       await act(id,scope,{action:"RETURN",note:"Please confirm trolley counts"});assert.equal((await current(id)).status,"IN_PROGRESS");
@@ -47,6 +52,72 @@ test("isolated PostgreSQL checklist lifecycle, padlock snapshots, permissions an
       assert.equal(nextDay.week?.find(day=>day.id===id)?.rows[0]?.state,"PASS");
       const done=await current(id);assert.equal(done.status,"COMPLETED");assert.ok(done.completedAt);assert.equal(checklistRecordSchema.parse(done.operationalChecklist).reviewedBy,manager.id);
       await assert.rejects(act(id,scope,{action:"CANCEL"}),/CONFLICT/);assert.equal(await db.task.count({where:{organisationId:org.id,status:"OPEN",startAt:{lt:new Date("2090-01-01")}}}),2);
+    });
+    await t.test("Opening saves individual checks with counts, reasons and actor evidence", async () => {
+      const opening = await createOperationalChecklist(scope, { ...base, template: "OPENING", repeat: "ONCE", occurrences: 1, requestKey: randomUUID() });
+      await act(opening.id);
+      const started = await current(opening.id);
+      const record = checklistRecordSchema.parse(started.operationalChecklist);
+      assert.equal(record.rows.length, 34);
+      const trolley = record.rows.find(row => row.label === "Ground floor · Count and check trolleys")!;
+      const observe = { action: "OBSERVE" as const, summary: "", comparisonReference: "", row: {
+        id: trolley.id, state: "ISSUE" as const, notes: "Trolley wheel damaged", evidence: "Inspection photo reference", lockCount: 0,
+      } };
+      await assert.rejects(act(opening.id, scope, observe), /FORBIDDEN/);
+      await assert.rejects(act(opening.id, csoScope, { ...observe, row: { ...observe.row, state: "OCCUPIED" } }), /CHECKLIST_INCOMPLETE/);
+      await assert.rejects(act(opening.id, csoScope, { ...observe, row: { ...observe.row, notes: "" } }), /CHECKLIST_INCOMPLETE/);
+      await assert.rejects(act(opening.id, csoScope, { ...observe, row: { ...observe.row, lockCount: null } }), /CHECKLIST_INCOMPLETE/);
+      await act(opening.id, coverScope, observe);
+      await assert.rejects(changeOperationalChecklist(csoScope, { ...observe, id: opening.id, expectedUpdatedAt: started.updatedAt.toISOString() }), /CONFLICT/);
+      const stored = checklistRecordSchema.parse((await current(opening.id)).operationalChecklist);
+      assert.deepEqual(stored.rows, record.rows.map(row => row.id === trolley.id ? { ...trolley, ...observe.row } : row));
+      const evidence = await db.auditEvent.findFirstOrThrow({ where: { entityId: opening.id, action: "operationalChecklist.observe" } });
+      assert.equal(evidence.actorId, cover.id);
+      assert.deepEqual(evidence.after, { row: { ...trolley, ...observe.row }, summary: "", comparisonReference: "" });
+      await assert.rejects(act(opening.id, csoScope, { action: "SUBMIT", ...await results(opening.id) }), /CHECKLIST_SAVE_EACH/);
+    });
+    await t.test("Cleaning preserves the usual roster and saves Sunday extras on the scheduled SAST day", async () => {
+      const plan = { ...base, template: "CLEANING" as const, repeat: "ONCE" as const, occurrences: 1, endAt: "2026-11-07T23:00:00Z" };
+      const saturday = await createOperationalChecklist(scope, { ...plan, startAt: "2026-11-07T21:59:00Z", requestKey: randomUUID() });
+      const sunday = await createOperationalChecklist(scope, { ...plan, startAt: "2026-11-07T22:00:00Z", requestKey: randomUUID() });
+      await act(saturday.id);
+      await act(sunday.id);
+      const usualRows = checklistRecordSchema.parse((await current(saturday.id)).operationalChecklist).rows;
+      const sundayRows = checklistRecordSchema.parse((await current(sunday.id)).operationalChecklist).rows;
+      assert.equal(usualRows.length, 17);
+      assert.equal(sundayRows.length, 19);
+      assert.deepEqual(sundayRows.slice(0, 17), usualRows);
+      assert.deepEqual(sundayRows.slice(17).map(row => row.label), ["Sunday · Clean reception windows", "Sunday · Clean floor in front of office"]);
+      const check = sundayRows[17];
+      const observation = { action: "OBSERVE", row: { id: check.id, state: "ISSUE", lockCount: null, notes: "Window needs another pass", evidence: "Test reference" }, summary: "", comparisonReference: "" };
+      await assert.rejects(act(sunday.id, scope, observation), /FORBIDDEN/);
+      await assert.rejects(act(sunday.id, csoScope, { ...observation, row: { ...observation.row, notes: "" } }), /CHECKLIST_INCOMPLETE/);
+      await act(sunday.id, coverScope, observation);
+      const stored = checklistRecordSchema.parse((await current(sunday.id)).operationalChecklist);
+      assert.deepEqual(stored.rows, sundayRows.map(row => row.id === check.id ? { ...row, ...observation.row } : row));
+      const audit = await db.auditEvent.findFirstOrThrow({ where: { entityId: sunday.id, action: "operationalChecklist.observe" } });
+      assert.equal(audit.actorId, cover.id);
+    });
+    await t.test("Management retains all daily checks and records the Friday tests on the scheduled SAST day", async () => {
+      const plan = { ...base, template: "MANAGEMENT" as const, repeat: "ONCE" as const, occurrences: 1, endAt: "2026-11-05T23:00:00Z" };
+      const thursday = await createOperationalChecklist(scope, { ...plan, startAt: "2026-11-05T21:59:00Z", requestKey: randomUUID() });
+      const friday = await createOperationalChecklist(scope, { ...plan, startAt: "2026-11-05T22:00:00Z", requestKey: randomUUID() });
+      await act(thursday.id);
+      await act(friday.id);
+      const dailyRows = checklistRecordSchema.parse((await current(thursday.id)).operationalChecklist).rows;
+      const fridayRows = checklistRecordSchema.parse((await current(friday.id)).operationalChecklist).rows;
+      assert.equal(dailyRows.length, 19);
+      assert.deepEqual(fridayRows.slice(0, 19), dailyRows);
+      assert.deepEqual(fridayRows.slice(19).map(row => row.label), ["Friday · Test pump room and ICV equipment", "Friday · Test generator"]);
+      const check = fridayRows[19];
+      const observation = { action: "OBSERVE", row: { id: check.id, state: "ISSUE", lockCount: null, notes: "Test pressure fell below target", evidence: "Test reference" }, summary: "", comparisonReference: "" };
+      await assert.rejects(act(friday.id, scope, observation), /FORBIDDEN/);
+      await assert.rejects(act(friday.id, csoScope, { ...observation, row: { ...observation.row, notes: "" } }), /CHECKLIST_INCOMPLETE/);
+      await act(friday.id, coverScope, observation);
+      const stored = checklistRecordSchema.parse((await current(friday.id)).operationalChecklist);
+      assert.deepEqual(stored.rows, fridayRows.map(row => row.id === check.id ? { ...row, ...observation.row } : row));
+      const audit = await db.auditEvent.findFirstOrThrow({ where: { entityId: friday.id, action: "operationalChecklist.observe" } });
+      assert.equal(audit.actorId, cover.id);
     });
     await t.test("padlocks use current units, reject inventory drift and retain physical findings without access actions",async()=>{
       const type=await db.unitType.create({data:{facilityId:a.id,name:"5 sqm",areaSqMetres:5}});

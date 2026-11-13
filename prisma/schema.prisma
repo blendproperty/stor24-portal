@@ -407,6 +407,7 @@ model MapElement {
 }
 
 model Customer {
+  reservationArchivedAt DateTime?
   staffNotes CustomerNote[]
   id                   String             @id @default(cuid())
   organisationId       String
@@ -445,6 +446,7 @@ model Customer {
 }
 
 model Lead {
+  lossReason String?
   enquiryLocation Json?
   productLine String @default("STORAGE")
   businessDetails Json?
@@ -2351,4 +2353,28 @@ model DeletedStaffIdentity {
 model StaffDeletionFence {
   id Int @id
   generation Int @default(0)
+}
+
+model MultiUnitMoveIn {
+  id String @id @default(cuid())
+  organisationId String
+  facilityId String
+  customerId String
+  requestKey String
+  requestHash String
+  items MultiUnitMoveInItem[]
+  createdAt DateTime @default(now())
+  @@unique([organisationId, requestKey])
+}
+
+model MultiUnitMoveInItem {
+  id String @id @default(cuid())
+  batchId String
+  batch MultiUnitMoveIn @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  unitId String
+  unitNumber String
+  documentId String
+  accountId String
+  tenancyId String
+  @@unique([batchId, unitId])
 }

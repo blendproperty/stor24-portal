@@ -84,6 +84,13 @@ test("extended boundaries use isolated PostgreSQL and synthetic records only", a
         assert.equal((await post(own.id)).status, 201);
       }
       assert.equal(await db.customer.count({ where: { id: stranger.id } }), 1);
+      await db.customer.update({ where: { id: own.id }, data: { reservationArchivedAt: new Date() } });
+      const archivedRead = await api.GET();
+      const archivedData = (await archivedRead.json()).data;
+      assert.ok(!archivedData.customers.some((row: Bag) => row.id === own.id));
+      assert.ok(archivedData.reservations.some((row: Bag) => row.customer.id === own.id));
+      await db.customer.update({ where: { id: own.id }, data: { reservationArchivedAt: null } });
+      assert.ok((await (await api.GET()).json()).data.customers.some((row: Bag) => row.id === own.id));
     });
 
     await t.test("move-in cannot acquire hidden customers through a newly created tenancy", async () => {

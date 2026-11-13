@@ -5,9 +5,10 @@ import { z } from "zod";
 import Link from "next/link";
 import { PageHeader } from "./page-header";
 import { StatusPill } from "./status-pill";
-import { checklistHref, checklistIssue, checklistRecordSchema, checklistRows, checklistRowSchema, checklistTemplates, padlockMapSchema, type ChecklistTemplate, type ChecklistRow } from "@/lib/operational-checklist-policy";
+import { checklistHref, checklistIssue, checklistRecordSchema, checklistRows, checklistRowSchema, checklistTemplates, checklistUsesRoute, padlockMapSchema, type ChecklistTemplate, type ChecklistRow } from "@/lib/operational-checklist-policy";
 import { formatSouthAfricaDateTime, southAfricaDateKey } from "@/lib/south-africa-time";
 import { OperationalChecklistSheet, workbookItemLabel } from "./operational-checklist-sheet";
+import { OperationalChecklistRoute } from "./operational-checklist-route";
 import { PadlockCountMap } from "./padlock-count-map";
 import styles from "./operational-checklists.module.css";
 
@@ -87,7 +88,8 @@ export function OperationalChecklists({ kind = "checklists" }: { kind?: "checkli
   }
   function updateRow(id: string, values: Partial<ChecklistRow>) { setRows(old => old.map(r => r.id === id ? { ...r, ...values } : r)); setDirty(true); }
   const disabled = busy || reading || blocked, record = task?.operationalChecklist;
-  const changedUnit = padlocks && record ? rows.find((row, index) => row !== record.rows[index])?.id : undefined;
+  const routeTemplate = checklistUsesRoute(record?.template) ? record.template : null;
+  const changedObservation = (padlocks || routeTemplate) && record ? rows.find((row, index) => row !== record.rows[index])?.id : undefined;
   function saveObservation(row: ChecklistRow) {
     if (!task) return;
     void mutate("PATCH", {
@@ -115,7 +117,7 @@ export function OperationalChecklists({ kind = "checklists" }: { kind?: "checkli
     return <div className={styles.peopleGrid}><label>{assigneeLabel}<select aria-label={assigneeLabel} required value={value.assigneeId} onChange={e => change({ ...value, assigneeId: e.target.value })}><option value="">Choose staff</option>{people(store).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label><label>Absence cover<select aria-label="Absence cover" value={value.coverId} onChange={e => change({ ...value, coverId: e.target.value })}><option value="">No cover assigned</option>{people(store).filter(p => p.id !== value.assigneeId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label><label>Manager / GM reviewer<select aria-label="Manager / GM reviewer" required value={value.reviewerId} onChange={e => change({ ...value, reviewerId: e.target.value })}><option value="">Choose reviewer</option>{people(store,true).filter(p => p.id !== value.assigneeId && p.id !== value.coverId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label></div>;
   }
   return <div className={`page-stack operational-checklist-workspace ${styles.workspace}`}>
-    <PageHeader eyebrow="Operations" title={title} description={padlocks ? "Tap each unit on the facility map, record what you see and submit the weekly count for review." : "Open a scheduled worksheet for opening, closing, cleaning or management checks."} action={<div className="button-row"><Link className="button button-secondary" href="/operations">Operations centre</Link><Link className="button button-secondary" href={padlocks ? "/operations/checklists" : "/operations/padlocks"} onClick={event => { if (dirty && !window.confirm("Leave this sheet without saving your edits?")) event.preventDefault(); }}>{padlocks ? "Checklists" : "Padlock counts"}</Link></div>}/>
+    <PageHeader eyebrow="Operations" title={title} description={padlocks ? "Tap each unit on the facility map, record what you see and submit the weekly count for review." : "Open a scheduled run for opening, closing, cleaning or management checks."} action={<div className="button-row"><Link className="button button-secondary" href="/operations">Operations centre</Link><Link className="button button-secondary" href={padlocks ? "/operations/checklists" : "/operations/padlocks"} onClick={event => { if (dirty && !window.confirm("Leave this run without saving your edits?")) event.preventDefault(); }}>{padlocks ? "Checklists" : "Padlock counts"}</Link></div>}/>
     <div className="button-row"><button className="button button-secondary" disabled={busy || reading} onClick={reload}>Reload saved records</button>{data?.managerFacilityIds.length ? <button className="button button-primary" disabled={disabled || dirty} onClick={() => { requestKey.current = crypto.randomUUID(); setPlan({ template: padlocks ? "PADLOCK" : "OPENING", facilityId: data.managerFacilityIds[0], assigneeId: "", coverId: "", reviewerId: "", date: southAfricaDateKey(new Date()), start: "08:00", end: "09:00", repeat: padlocks ? "WEEKLY" : "ONCE", occurrences: 1 }); }}>{planLabel}</button> : null}</div>
     {reading ? <p role="status">Loading saved records…</p> : null}{message ? <p role="alert">{message}</p> : null}
     {plan && <form aria-label={planLabel} className={`panel panel-spacious ${styles.planner}`} onSubmit={e => { e.preventDefault(); void mutate("POST", { facilityId: plan.facilityId, template: plan.template, assigneeId: plan.assigneeId, coverId: plan.coverId || null, reviewerId: plan.reviewerId, startAt: new Date(`${plan.date}T${plan.start}:00+02:00`).toISOString(), endAt: new Date(`${plan.date}T${plan.end}:00+02:00`).toISOString(), repeat: plan.repeat, occurrences: plan.occurrences, requestKey: requestKey.current }); }}>
@@ -147,11 +149,11 @@ export function OperationalChecklists({ kind = "checklists" }: { kind?: "checkli
       <div className="panel-heading"><div><h2>{task.title}</h2><p>{task.facility.name} · {runStatusLabels[task.status] ?? task.status} · Due {formatSouthAfricaDateTime(task.dueAt)} SAST</p></div><button className="text-button" disabled={busy || dirty} onClick={() => void read({ facilityId: facility,closed })}>Back to runs</button></div>
       <p>{padlocks ? "Counting CSO / staff" : "Responsible"}: {task.assignee?.name ?? "—"} · Cover: {task.cover?.name ?? "None"} · Reviewer: {staffName(record.reviewerId)}</p>
       {task.dueAt && new Date(task.dueAt) < new Date() && !["COMPLETED","CANCELLED"].includes(task.status) && <p role="status">Overdue — this run still needs completion or review.</p>}
-      {!padlocks && record.sourceAt && <p>Inspection list captured {formatSouthAfricaDateTime(record.sourceAt)} SAST. {rows.length - pending}/{rows.length} checked · {issues.length} finding(s).</p>}
+      {!padlocks && !routeTemplate && record.sourceAt && <p>Inspection list captured {formatSouthAfricaDateTime(record.sourceAt)} SAST. {rows.length - pending}/{rows.length} checked · {issues.length} finding(s).</p>}
       {padlocks && <>
         {task.status === "OPEN" && (preparer ? <button className="button button-primary" disabled={disabled} onClick={() => act("START")}>Start padlock count</button> : <p role="status">Waiting for {task.assignee?.name ?? "the assigned CSO"} to start the count.</p>)}
         {(task.status !== "CANCELLED" || rows.length > 0) && <PadlockCountMap key={task.id}
-          layout={data?.padlockMap} rows={rows} saved={record.rows} changedUnit={changedUnit} editable={editable} disabled={disabled}
+          layout={data?.padlockMap} rows={rows} saved={record.rows} changedUnit={changedObservation} editable={editable} disabled={disabled}
           date={record.sourceAt ?? sheetDate ?? null} operator={staffName(record.submittedBy ?? (preparer ? data?.actorId ?? null : task.assigneeId))}
           store={task.facility.name} update={updateRow} save={saveObservation} discard={discardObservation}/>}
         {task.status !== "CANCELLED" && <details className={styles.padlockReports}>
@@ -164,8 +166,16 @@ export function OperationalChecklists({ kind = "checklists" }: { kind?: "checkli
         </details>}
       </>}
       {record.reviewNote && <p><strong>Reviewer feedback:</strong> {record.reviewNote}</p>}
-      {!padlocks && preparer && task.status === "OPEN" && <button className="button button-primary" disabled={disabled} onClick={() => act("START")}>Start inspection</button>}
-      {!padlocks && sheetDate && sheetRows.length > 0 && <>
+      {!padlocks && preparer && task.status === "OPEN" && <button className="button button-primary" disabled={disabled} onClick={() => act("START")}>{routeTemplate ? `Start ${routeTemplate.toLowerCase()} route` : "Start inspection"}</button>}
+      {routeTemplate && sheetDate && sheetRows.length > 0 && <OperationalChecklistRoute key={task.id} template={routeTemplate} rows={sheetRows} saved={record.rows} changedId={changedObservation}
+        editable={editable} disabled={disabled} date={sheetDate} operator={staffName(record.submittedBy ?? (preparer ? data?.actorId ?? null : task.assigneeId))}
+        update={updateRow} save={saveObservation} discard={discardObservation}/>}
+      {routeTemplate && sheetDate && (week.length > 0 || routeTemplate === "MANAGEMENT" && sheetRows.length > 0) && <details className={styles.padlockReports}>
+        <summary>View weekly history</summary>
+        <OperationalChecklistSheet rows={task.status === "OPEN" ? sheetRows : record.rows} week={week} startAt={sheetDate} assignee={task.assignee?.name ?? null}
+          template={routeTemplate} editable={false} canSwitch={!disabled && !dirty} update={updateRow} openDay={id => void read({ id })}/>
+      </details>}
+      {!padlocks && !routeTemplate && sheetDate && sheetRows.length > 0 && <>
         {rows.length > 0 && <div className={styles.sheetFilters}><label>Find item or unit<input value={search} onChange={e => setSearch(e.target.value)}/></label><label><input type="checkbox" checked={onlyIssues} onChange={e => setOnlyIssues(e.target.checked)}/> Show findings only</label></div>}
         <OperationalChecklistSheet
           rows={sheetRows.filter(row => visibleLabels.has(row.label))}
@@ -185,7 +195,7 @@ export function OperationalChecklists({ kind = "checklists" }: { kind?: "checkli
       {rows.length > 0 && <>
       {record.template === "PADLOCK" && <label>Rent roll and collections comparison reference<textarea placeholder="Enter the dates or references of both lists." disabled={!editable} maxLength={1000} value={reference} onChange={e => { setReference(e.target.value); setDirty(true); }}/></label>}
       <label>Summary and escalation to reviewer<textarea disabled={!editable} maxLength={2000} value={summary} onChange={e => { setSummary(e.target.value); setDirty(true); }}/></label>
-      {preparer && task.status === "IN_PROGRESS" && <div className="button-row"><button className="button button-secondary" disabled={disabled || !!changedUnit} onClick={() => act("SAVE")}>Save progress</button><button className="button button-primary" disabled={disabled || pending > 0 || !!changedUnit} onClick={() => act("SUBMIT")}>Submit for manager review</button>{record.template === "PADLOCK" && <button className="text-button" disabled={disabled} onClick={() => { if (window.confirm("Restart with current units? All recorded results in this draft will be cleared; audit history is retained.")) act("RESTART"); }}>Restart with current units</button>}</div>}
+      {preparer && task.status === "IN_PROGRESS" && <div className="button-row"><button className="button button-secondary" disabled={disabled || !!changedObservation} onClick={() => act("SAVE")}>{routeTemplate ? "Save summary" : "Save progress"}</button><button className="button button-primary" disabled={disabled || pending > 0 || !!changedObservation} onClick={() => act("SUBMIT")}>Submit for manager review</button>{record.template === "PADLOCK" && <button className="text-button" disabled={disabled} onClick={() => { if (window.confirm("Restart with current units? All recorded results in this draft will be cleared; audit history is retained.")) act("RESTART"); }}>Restart with current units</button>}</div>}
       </>}
       {record.submittedAt && <p>Submitted by {staffName(record.submittedBy)} · {formatSouthAfricaDateTime(record.submittedAt)} SAST</p>}
       {task.status === "WAITING" && manager && (!padlocks || people(task.facilityId, true).some(person => person.id === data?.actorId)) && record.reviewerId === data?.actorId && record.submittedBy !== data?.actorId && <fieldset disabled={disabled}><legend>Manager review</legend><p>Confirm the findings, evidence and escalation. Sign-off records review; it does not resolve a fault or perform overlocking.</p><label>Review and action note<textarea value={reviewNote} onChange={e => setReviewNote(e.target.value)} minLength={5} maxLength={2000}/></label><div className="button-row"><button className="button button-primary" disabled={reviewNote.trim().length < 5} onClick={() => act("APPROVE")}>Sign off review</button><button className="button button-secondary" disabled={reviewNote.trim().length < 5} onClick={() => act("RETURN")}>Return for correction</button></div></fieldset>}

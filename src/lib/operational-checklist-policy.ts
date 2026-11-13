@@ -24,6 +24,12 @@ export const checklistTemplates = {
 export const templateKeySchema = z.enum(["OPENING", "CLOSING", "CLEANING", "MANAGEMENT", "PADLOCK"]);
 export type ChecklistTemplate = z.infer<typeof templateKeySchema>;
 
+export type ChecklistRouteTemplate = Exclude<ChecklistTemplate, "PADLOCK">;
+
+export function checklistUsesRoute(template?: ChecklistTemplate): template is ChecklistRouteTemplate {
+  return template !== undefined && template !== "PADLOCK";
+}
+
 export function checklistWeek(at: Date | string) {
   const day = new Date(`${southAfricaDateKey(at)}T00:00:00+02:00`);
   const weekday = new Date(`${southAfricaDateKey(at)}T12:00:00Z`).getUTCDay();
@@ -82,7 +88,7 @@ export const checklistChangeSchema = z.discriminatedUnion("action", [
   z.object({ ...identity, action: z.enum(["START", "RESTART", "CANCEL"]) }).strict(),
   z.object({ ...identity, ...reportFields, action: z.enum(["SAVE", "SUBMIT"]), rows: z.array(editableRow).max(1500) }).strict(),
   z.object({ ...identity, ...reportFields, action: z.literal("OBSERVE"), row: editableRow.extend({
-    state: z.enum(["VACANT", "OCCUPIED", "OVERLOCKED"]), lockCount: z.number().int().min(0).max(100),
+    state: z.enum(["PASS", "ISSUE", "NA", "VACANT", "OCCUPIED", "OVERLOCKED"]),
   }) }).strict(),
   z.object({ ...identity, action: z.enum(["APPROVE", "RETURN"]), note: z.string().trim().min(5).max(2000) }).strict(),
   z.object({ ...identity, action: z.literal("ASSIGN"), assigneeId: z.string().cuid(), coverId: z.string().cuid().nullable(), reviewerId: z.string().cuid() }).strict(),
@@ -103,11 +109,21 @@ export function checklistRows(template: ChecklistTemplate, at: Date): ChecklistR
 export function checklistIssue(row: ChecklistRow) {
   return row.expected === "PASS" ? ["ISSUE", "NA"].includes(row.state) : row.expected === "REVIEW" || row.state === "OVERLOCKED" || row.state !== row.expected || row.overlockTask || row.comparisonDiscrepancy === true;
 }
+export function checklistNeedsTrolleyCount(row: ChecklistRow) {
+  return row.label.includes("trolleys");
+}
+export function checklistRouteResultReady(row: ChecklistRow) {
+  return ["PASS", "ISSUE", "NA"].includes(row.state) &&
+    (!checklistNeedsTrolleyCount(row) || row.lockCount !== null) &&
+    (!(checklistIssue(row) || row.state === "NA") || row.notes.trim().length >= 5);
+}
 export function validateChecklistSubmission(record: ChecklistRecord) {
   if (!record.rows.length) throw new Error("CHECKLIST_INCOMPLETE");
   for (const row of record.rows) {
-    const allowed = record.template === "PADLOCK" ? ["VACANT", "OCCUPIED", "OVERLOCKED"] : ["PASS", "ISSUE", "NA"];
-    if (!allowed.includes(row.state) || (record.template === "PADLOCK" || row.label.includes("trolleys")) && row.lockCount === null || (checklistIssue(row) || row.state === "NA") && row.notes.length < 5) throw new Error("CHECKLIST_INCOMPLETE");
+    const ready = record.template === "PADLOCK"
+      ? ["VACANT", "OCCUPIED", "OVERLOCKED"].includes(row.state) && row.lockCount !== null && (!checklistIssue(row) || row.notes.length >= 5)
+      : checklistRouteResultReady(row);
+    if (!ready) throw new Error("CHECKLIST_INCOMPLETE");
   }
   if (record.template === "PADLOCK" && record.comparisonReference.length < 5) throw new Error("CHECKLIST_COMPARISON_REQUIRED");
 }

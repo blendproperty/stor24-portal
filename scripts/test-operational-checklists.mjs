@@ -23,6 +23,7 @@ try {for(const width of [1440,1024,768,390,320]) {
   let task={id:runId,title:"Closing checklist",facilityId:store,assigneeId:cso,coverId:cover,status:"OPEN",startAt:"2026-10-23T06:00:00.000Z",dueAt:"2026-10-23T08:00:00.000Z",updatedAt:"2026-10-23T06:00:00.000Z",completedAt:null,facility:{name:"Synthetic Midpoint"},assignee:{name:"Synthetic CSO"},cover:{name:"Synthetic cover"}};
   const mondayRow={...makeRow("0","Evening · Check all doors are locked"),state:"PASS"};
   const monday={...task,id:"savedMonday",status:"COMPLETED",startAt:"2026-10-19T06:00:00.000Z",dueAt:"2026-10-19T08:00:00.000Z",assignee:{name:"Previous CSO"}};
+  const openingRows = [makeRow("0", "Opening · Disarm alarm"), makeRow("1", "Ground floor · Count and check trolleys")];
   const padlockRows = [makeRow("unit1", "Unit 01", "VACANT"), makeRow("unit2", "Unit 02", "OCCUPIED"), makeRow("unit3", "Unit 03", "VACANT")];
   const unitShape = (id, x, y) => ({ id: `shape-${id}`, type: "UNIT", x, y, width: 170, height: 120, rotation: 0, label: null, unitId: id });
   const padlockMap = { units: padlockRows.map(({id,label}) => ({id,label})), floors: [
@@ -44,7 +45,7 @@ try {for(const width of [1440,1024,768,390,320]) {
       assert.equal(body.template,"CLOSING");assert.equal(body.assigneeId,cso);assert.equal(body.reviewerId,manager);assert.equal(body.coverId,cover);assert.equal(new Date(body.startAt).getUTCHours(),6);assert.equal(body.occurrences,2);
     } else {
       assert.equal(body.expectedUpdatedAt,task.updatedAt);
-      if(body.action==="START"){task.status="IN_PROGRESS";record.rows=record.template === "PADLOCK" ? padlockRows : [makeRow("0","Evening · Check all doors are locked"),makeRow("1","Evening · Count ground floor trolleys")];record.sourceAt="2026-10-23T06:10:00.000Z";}
+      if(body.action==="START"){task.status="IN_PROGRESS";record.rows=record.template === "PADLOCK" ? padlockRows : record.template === "OPENING" ? openingRows : [makeRow("0","Evening · Check all doors are locked"),makeRow("1","Evening · Count ground floor trolleys")];record.sourceAt="2026-10-23T06:10:00.000Z";}
       if(body.action==="OBSERVE"){
         assert.equal(body.rows,undefined);
         assert.ok(record.rows.some(row=>row.id===body.row.id));
@@ -86,7 +87,16 @@ try {for(const width of [1440,1024,768,390,320]) {
   await page.getByRole("button", { name: "Back to runs", exact: true }).click();
   await page.getByRole("button",{name:"Plan checklist",exact:true}).click();const form=page.getByRole("form",{name:"Plan checklist"});
   await form.getByLabel("Checklist",{exact:true}).selectOption("CLOSING");await form.getByLabel("First date (SAST)").fill("2026-10-23");await form.getByLabel("Responsible staff").selectOption(cso);await form.getByLabel("Absence cover").selectOption(cover);await form.getByLabel("Manager / GM reviewer").selectOption(manager);await form.getByLabel("Repeat",{exact:true}).selectOption("DAILY");await form.getByLabel("Total occurrences").fill("2");await form.getByRole("button",{name:"Create planned runs"}).click();await expect(page.getByRole("region",{name:"Checklist record"})).toBeVisible();
-  actor=cso;await page.getByRole("button",{name:"Reload saved records"}).click();await page.getByRole("button",{name:"Start inspection"}).click();await expect(page.getByLabel(/^Result:/)).toHaveCount(2);
+  actor=cso;
+  await page.getByRole("button",{name:"Reload saved records"}).click();
+  const closing = page.getByRole("region",{name:"Walkthrough route"});
+  const check = closing.getByRole("region",{name:"Selected check"});
+  const press = target => touch ? target.tap() : target.click();
+  await expect(closing.getByText("0 of 13 checks saved")).toBeVisible();
+  await expect(closing.getByRole("group",{name:"Route stops"}).getByRole("button")).toHaveCount(4);
+  await press(page.getByRole("button",{name:"Start closing route"}));
+  await expect(closing.getByText("0 of 2 checks saved")).toBeVisible();
+  await page.getByText("View weekly history",{exact:true}).click();
   const sheet=page.getByRole("region",{name:"Weekly checklist sheet"});
   await expect(sheet.locator("thead tr").first().getByRole("columnheader")).toHaveCount(9);
   await expect(sheet.getByRole("button",{name:"Mon",exact:true})).toBeVisible();
@@ -94,12 +104,31 @@ try {for(const width of [1440,1024,768,390,320]) {
   await expect(sheet.getByRole("cell",{name:"Pass",exact:true})).toBeVisible();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await sheet.getByRole("button",{name:"Mon",exact:true}).click();
-  await expect(page.getByLabel(/^Result:/)).toHaveCount(0);
+  await expect(closing.getByText("1 of 1 checks saved")).toBeVisible();
+  await expect(check.getByRole("radio")).toHaveCount(0);
   await expect(sheet.getByRole("cell",{name:"Pass",exact:true})).toBeVisible();
   await sheet.getByRole("button",{name:"Fri",exact:true}).click();
-  await expect(page.getByLabel(/^Result:/)).toHaveCount(2);
-  await expect(page.getByRole("button",{name:"Submit for manager review"})).toBeDisabled();await page.getByLabel(/^Result:/).first().selectOption("ISSUE");await page.getByLabel(/^Comment:/).first().fill("Office door latch sticks; manager notified");await page.locator("summary").filter({hasText:/^Evidence$/}).first().click();await page.getByLabel(/^Evidence reference:/).first().fill("Maintenance photograph reference 23 Oct");await page.getByLabel(/^Result:/).nth(1).selectOption("PASS");await page.getByLabel(/^Trolleys counted:/).fill("3");await page.getByLabel("Summary and escalation to reviewer").fill("Door repair requires manager review");
-  await page.getByRole("button",{name:"Save progress"}).click();await expect(page.getByLabel(/^Comment:/).first()).toHaveValue("Office door latch sticks; manager notified");await page.getByRole("button",{name:"Submit for manager review"}).click();await expect(page.getByRole("button",{name:"Save progress"})).toHaveCount(0);
+  await expect(closing.getByText("0 of 2 checks saved")).toBeVisible();
+  await expect(page.getByRole("button",{name:"Submit for manager review"})).toBeDisabled();
+  await press(check.getByRole("radio",{name:"Issue",exact:true}));
+  await expect(check.getByRole("button",{name:"Save check"})).toBeDisabled();
+  await check.getByLabel("Reason (required)").fill("Office door latch sticks; manager notified");
+  await check.locator("summary").click();
+  await check.getByLabel("Evidence reference (optional)").fill("Maintenance photograph reference 23 Oct");
+  await press(check.getByRole("button",{name:"Save check"}));
+  await expect(closing.getByText("1 of 2 checks saved")).toBeVisible();
+  await press(check.getByRole("button",{name:"Next unchecked"}));
+  await expect(check.getByRole("heading",{name:"Count ground floor trolleys"})).toBeVisible();
+  await press(check.getByRole("radio",{name:"Pass",exact:true}));
+  await expect(check.getByRole("button",{name:"Save check"})).toBeDisabled();
+  await check.getByLabel("Trolleys counted").fill("3");
+  await press(check.getByRole("button",{name:"Save check"}));
+  await expect(closing.getByText("2 of 2 checks saved")).toBeVisible();
+  await page.getByLabel("Summary and escalation to reviewer").fill("Door repair requires manager review");
+  await page.getByRole("button",{name:"Save summary"}).click();
+  await expect(page.getByLabel("Summary and escalation to reviewer")).toHaveValue("Door repair requires manager review");
+  await page.getByRole("button",{name:"Submit for manager review"}).click();
+  await expect(page.getByRole("button",{name:"Save summary"})).toHaveCount(0);
   actor=manager;await page.getByRole("button",{name:"Reload saved records"}).click();await page.getByLabel("Review and action note").fill("Please add the maintenance reference");await page.getByRole("button",{name:"Return for correction"}).click();await expect(page.getByText("Please add the maintenance reference")).toBeVisible();
   actor=cso;await page.getByRole("button",{name:"Reload saved records"}).click();await page.getByRole("button",{name:"Submit for manager review"}).click();actor=manager;await page.getByRole("button",{name:"Reload saved records"}).click();await page.getByLabel("Review and action note").fill("Reviewed evidence; repair assigned separately");await page.getByRole("button",{name:"Sign off review"}).click();await expect(page.getByLabel(/^Result:/)).toHaveCount(0);await page.screenshot({path:`output/checklist-browser/reviewed-${width}.png`,fullPage:true});
   if(width===1440){
@@ -109,10 +138,16 @@ try {for(const width of [1440,1024,768,390,320]) {
     record.rows=items.map((label,i)=>({...makeRow(String(i),`Daily · ${label}`),state:i<7?"PASS":"PENDING"}));
     await page.getByRole("button",{name:"Reload saved records"}).click();
     await expect(page.getByRole("heading",{name:"Management checklist",exact:true})).toBeVisible();
+    const management = page.getByRole("region",{name:"Walkthrough route"});
+    await expect(management.getByText("7 of 19 checks saved")).toBeVisible();
+    await expect(management.getByRole("button",{name:/CCTV display working properly Pass/})).toBeVisible();
+    await expect(management.getByRole("button",{name:/Friday tests/})).toHaveCount(0);
     const workbook=page.getByRole("region",{name:"Weekly checklist sheet"});
+    if (!(await workbook.isVisible())) await page.getByText("View weekly history",{exact:true}).click();
     await expect(workbook.getByRole("rowheader",{name:"Date",exact:true})).toBeVisible();
     await expect(workbook.getByText("Weekly TEST-Friday",{exact:true})).toHaveCount(2);
     await expect(workbook.getByRole("rowheader",{name:"CCTV display working properly",exact:true})).toBeVisible();
+    await expect(workbook.getByLabel(/^Result:/)).toHaveCount(0);
     assert.ok(await workbook.evaluate(region=>{
       const headers=region.querySelectorAll("thead tr:first-child th");
       return headers[0].offsetWidth>3*headers[1].offsetWidth && region.scrollHeight<=region.clientHeight+1;
@@ -210,5 +245,41 @@ try {for(const width of [1440,1024,768,390,320]) {
   await expect(page.getByRole("alert")).toContainText("could not be confirmed");assert.equal(writes,before+1);
   mode="denied";page.once("dialog",d=>d.accept());await page.getByRole("button",{name:"Reload saved records"}).click();
   await expect(map).toHaveCount(0);await expect(page.getByText("Unexpected overlock; refer to the manager.")).toHaveCount(0);
-  assert.deepEqual(errors,[]);await page.close();console.log(`PASS planner, checklist, padlock map taps, saves, fallback and recovery at ${width}px`);
+  mode="ok"; actor=cso;
+  record={...record,template:"OPENING",rows:[],sourceAt:null,reviewNote:"",submittedBy:null,submittedAt:null};
+  task={...task,title:"Opening checklist",status:"OPEN"};
+  await page.goto(`${base}/operations/checklists?id=${runId}`);
+  const walk=page.getByRole("region",{name:"Walkthrough route"}), editor=walk.getByRole("region",{name:"Selected check"});
+  await expect(walk.getByText("0 of 34 checks saved")).toBeVisible();
+  await press(page.getByRole("button",{name:"Start opening route"}));
+  await expect(walk.getByText("0 of 2 checks saved")).toBeVisible();
+  await press(editor.getByRole("radio",{name:"Pass",exact:true}));
+  await press(walk.getByRole("button",{name:/Ground floor/}));
+  await expect(walk.getByText("Save or discard this check before moving to another one.")).toBeVisible();
+  await press(editor.getByRole("button",{name:"Save check"}));
+  await expect(walk.getByText("1 of 2 checks saved")).toBeVisible();
+  await expect(editor.getByRole("heading",{name:"Disarm alarm",exact:true})).toBeVisible();
+  await press(editor.getByRole("button",{name:"Next unchecked"}));
+  await press(editor.getByRole("radio",{name:"Issue",exact:true}));
+  const saveCheck=editor.getByRole("button",{name:"Save check"});
+  await expect(saveCheck).toBeDisabled();
+  await editor.getByLabel("Trolleys counted").fill("0");
+  await expect(saveCheck).toBeDisabled();
+  await editor.getByLabel("Reason (required)").fill("Trolley missing from its bay.");
+  await press(saveCheck);
+  await expect(walk.getByText("2 of 2 checks saved")).toBeVisible();
+  await page.reload();
+  await expect(walk.getByText("2 of 2 checks saved")).toBeVisible();
+  await press(walk.getByRole("button",{name:"Show findings (1)"}));
+  await expect(editor.getByLabel("Trolleys counted")).toHaveValue("0");
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await press(page.getByRole("button",{name:"Submit for manager review"}));
+  await expect(page.getByText(/Submitted by Synthetic CSO/)).toBeVisible();
+  actor=manager;
+  await page.reload();
+  await expect(page.getByRole("group",{name:"Manager review"})).toBeVisible();
+  await press(walk.getByRole("button",{name:"Show findings (1)"}));
+  await expect(editor.getByText(/Trolley missing from its bay/)).toBeVisible();
+  await expect(editor.getByRole("radio")).toHaveCount(0);
+  assert.deepEqual(errors,[]);await page.close();console.log(`PASS Opening route, other checklists, padlock map taps, saves, fallback and recovery at ${width}px`);
 }} finally { await browser.close();server.close(); }
