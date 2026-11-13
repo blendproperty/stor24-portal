@@ -24,6 +24,8 @@ export const checklistTemplates = {
 export const templateKeySchema = z.enum(["OPENING", "CLOSING", "CLEANING", "MANAGEMENT", "PADLOCK"]);
 export type ChecklistTemplate = z.infer<typeof templateKeySchema>;
 
+export const checklistRunStatuses = { OPEN: "Open", IN_PROGRESS: "In progress", WAITING: "Awaiting review", COMPLETED: "Signed off", CANCELLED: "Cancelled" } as const;
+
 export type ChecklistRouteTemplate = Exclude<ChecklistTemplate, "PADLOCK">;
 
 export function checklistUsesRoute(template?: ChecklistTemplate): template is ChecklistRouteTemplate {
