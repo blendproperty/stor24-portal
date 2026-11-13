@@ -67,13 +67,15 @@ const policySchema = z.object({
   consentLabel: z.string().trim().min(15).max(1000),
   approvalReference: z.string().trim().min(1).max(300),
   retentionHours: z.number().int().min(1).max(2160),
-});
+  trialReservationId: z.string().trim().min(1).optional(),
+  trialEndsAt: z.iso.datetime({ offset: true }).optional(),
+}).refine(value => Boolean(value.trialReservationId) === Boolean(value.trialEndsAt));
 
 export function additionalPersonPolicy(organisationId: string) {
   try {
     const policies = JSON.parse(process.env.ADDITIONAL_ACCESS_POLICIES_JSON ?? "{}");
     const policy = policySchema.safeParse(policies[organisationId]);
-    if (!policy.success) return null;
+    if (!policy.success || (policy.data.trialEndsAt && Date.parse(policy.data.trialEndsAt) <= Date.now())) return null;
     return { ...policy.data, hash: createHash("sha256").update(JSON.stringify(policy.data)).digest("hex") };
   } catch { return null; }
 }
@@ -81,7 +83,7 @@ export function additionalPersonPolicy(organisationId: string) {
 export async function listAdditionalPeopleForStaff(scope: RequestScope, reservationId?: string) {
   return db.additionalAccessPerson.findMany({
     where: { status: { not: "REMOVED" }, ...(reservationId ? { reservationId } : {}), reservation: { facility: facilityWhere(scope) } },
-    select: { id: true, name: true, status: true, photoVersion: true, expiresAt: true, reservation: { select: { facilityId: true, facility: { select: { name: true } }, unit: { select: { number: true } } } } },
+    select: { id: true, reservationId: true, name: true, status: true, photoVersion: true, expiresAt: true, reservation: { select: { facilityId: true, facility: { select: { name: true } }, unit: { select: { number: true } } } } },
     orderBy: { createdAt: "asc" }, take: 200,
   });
 }
@@ -92,6 +94,15 @@ async function requireAdditionalCollection(organisationId: string, database: Pri
   if (!policy || !integrationEncryptionConfigured()) throw new Error("PHOTO_POLICY_PENDING");
   if (!maintenance || maintenance.completedAt.getTime() < Date.now() - 90 * 60_000) throw new Error("PHOTO_MAINTENANCE_REQUIRED");
   return policy;
+}
+
+async function requireAdditionalBookingEligible(database: Prisma.TransactionClient, organisationId: string, reservationId: string, policy: NonNullable<ReturnType<typeof additionalPersonPolicy>>) {
+  if (policy.trialReservationId && policy.trialReservationId !== reservationId) throw new Error("PHOTO_POLICY_PENDING");
+  if (!policy.trialReservationId) return requireBookingEligible(database, organisationId, reservationId);
+  const reservation = await database.reservation.findFirst({ where: { id: reservationId, status: "CONVERTED", facility: { organisationId } }, include: { unit: true, convertedTenancy: { include: { account: true, occupancies: true, documents: { where: { type: "LEASE_AGREEMENT" } } } } } });
+  const tenancy = reservation?.convertedTenancy;
+  const signed = tenancy?.documents.filter(document => document.provider === "BLENDSIGN" && document.status === "SIGNED" && document.signedAt && document.externalId);
+  if (!reservation || !tenancy || tenancy.status !== "DRAFT" || tenancy.customerId !== reservation.customerId || tenancy.facilityId !== reservation.facilityId || tenancy.account.customerId !== reservation.customerId || tenancy.occupancies.length !== 1 || tenancy.occupancies[0].unitId !== reservation.unitId || tenancy.occupancies[0].status !== "PENDING" || reservation.unit.status !== "RESERVED" || signed?.length !== 1) throw new Error("PHOTO_BOOKING_NOT_READY");
 }
 
 export async function captureAdditionalPhoto(scope: RequestScope, input: { id: string; version: number; policyHash: string; consent: boolean; identityConfirmed: boolean; image: File }) {
@@ -115,7 +126,7 @@ async function saveAdditionalPhoto(tx: Prisma.TransactionClient, scope: RequestS
   const currentPolicy = await requireAdditionalCollection(scope.organisationId, tx);
   if (currentPolicy.hash !== input.policyHash || !input.consent) throw new Error("PHOTO_CONSENT_REQUIRED");
   if (!input.identityConfirmed) throw new Error("PHOTO_IDENTITY_REQUIRED");
-  await requireBookingEligible(tx, scope.organisationId, candidate.reservationId);
+  await requireAdditionalBookingEligible(tx, scope.organisationId, candidate.reservationId, currentPolicy);
   const version = person.photoVersion + 1, now = new Date();
   await tx.additionalAccessPerson.update({ where: { id: person.id }, data: {
     photoVersion: version, status: "WAITING_REVIEW",
@@ -131,7 +142,7 @@ function handoffHash(token: string) { return createHash("sha256").update(token).
 
 export async function issueAdditionalPhotoHandoff(scope: RequestScope, id: string, version: number, identityConfirmed: boolean) {
   if (!identityConfirmed) throw new Error("PHOTO_IDENTITY_REQUIRED");
-  await requireAdditionalCollection(scope.organisationId);
+  const policy = await requireAdditionalCollection(scope.organisationId);
   const token = randomBytes(32).toString("base64url"), expiresAt = new Date(Date.now() + 5 * 60_000);
   await db.$transaction(async tx => {
     const candidate = await tx.additionalAccessPerson.findFirst({ where: { id, reservation: { facility: facilityWhere(scope) } }, select: { reservationId: true } });
@@ -139,7 +150,7 @@ export async function issueAdditionalPhotoHandoff(scope: RequestScope, id: strin
     await lockBooking(tx, candidate.reservationId);
     const person = await tx.additionalAccessPerson.findFirst({ where: { id, photoVersion: version, status: { in: ["NOMINATED", "REJECTED", "EXPIRED", "APPROVED"] }, reservation: { facility: facilityWhere(scope) } }, include: { reservation: true } });
     if (!person) throw new Error("PHOTO_CHANGED");
-    await requireBookingEligible(tx, scope.organisationId, person.reservationId);
+    await requireAdditionalBookingEligible(tx, scope.organisationId, person.reservationId, policy);
     await tx.additionalPhotoHandoff.deleteMany({ where: { personId: id, usedAt: null } });
     await tx.additionalPhotoHandoff.create({ data: { tokenHash: handoffHash(token), personId: id, photoVersion: version, issuedById: scope.userId, organisationId: scope.organisationId, facilityId: person.reservation.facilityId, expiresAt } });
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: person.reservation.facilityId, actorId: scope.userId, action: "additional_access.handoff_issued", entityType: "AdditionalAccessPerson", entityId: id, after: { version, expiresAt: expiresAt.toISOString(), identityConfirmedByStaff: true } } });
@@ -154,7 +165,7 @@ export async function additionalPhotoHandoff(token: string) {
   const policy = await requireAdditionalCollection(handoff.organisationId);
   const person = await db.additionalAccessPerson.findFirst({ where: { id: handoff.personId, photoVersion: handoff.photoVersion, status: { in: ["NOMINATED", "REJECTED", "EXPIRED", "APPROVED"] }, reservation: { facilityId: handoff.facilityId, facility: { organisationId: handoff.organisationId } } }, select: { name: true, reservationId: true } });
   if (!person) throw new Error("PHOTO_CHANGED");
-  await requireBookingEligible(db, handoff.organisationId, person.reservationId);
+  await requireAdditionalBookingEligible(db, handoff.organisationId, person.reservationId, policy);
   return { name: person.name, notice: policy.notice, consentLabel: policy.consentLabel, retentionHours: policy.retentionHours, policyHash: policy.hash };
 }
 
@@ -188,8 +199,9 @@ export async function previewAdditionalPhoto(scope: RequestScope, id: string, ve
     if (!candidate) throw new Error("NOT_FOUND");
     await lockBooking(tx, candidate.reservationId);
     const person = await tx.additionalAccessPerson.findFirst({ where: { id, reservation: { facility: facilityWhere(scope), status: { in: ["ACTIVE", "CONVERTED"] }, OR: [{ convertedTenancyId: null }, { convertedTenancy: { status: { notIn: ["CLOSED", "CANCELLED"] } } }] } }, include: { reservation: true } });
-    if (!person || person.status !== "WAITING_REVIEW" || person.photoVersion !== version || !person.encryptedImage || !person.expiresAt || person.expiresAt <= new Date() || additionalPersonPolicy(scope.organisationId)?.hash !== person.policyHash) throw new Error("PHOTO_CHANGED");
-    await requireBookingEligible(tx, scope.organisationId, person.reservationId);
+    const policy = additionalPersonPolicy(scope.organisationId);
+    if (!person || person.status !== "WAITING_REVIEW" || person.photoVersion !== version || !person.encryptedImage || !person.expiresAt || person.expiresAt <= new Date() || !policy || policy.hash !== person.policyHash) throw new Error("PHOTO_CHANGED");
+    await requireAdditionalBookingEligible(tx, scope.organisationId, person.reservationId, policy);
     const bytes = decryptPhoto(person.encryptedImage, `additional-person:${id}:photo:${version}`);
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: person.reservation.facilityId, actorId: scope.userId, action: "additional_access.photo_previewed", entityType: "AdditionalAccessPerson", entityId: id, after: { version } } });
     return bytes;
@@ -202,8 +214,9 @@ export async function reviewAdditionalPhoto(scope: RequestScope, id: string, ver
     if (!candidate) throw new Error("NOT_FOUND");
     await lockBooking(tx, candidate.reservationId);
     const person = await tx.additionalAccessPerson.findFirst({ where: { id, reservation: { facility: facilityWhere(scope), status: { in: ["ACTIVE", "CONVERTED"] }, OR: [{ convertedTenancyId: null }, { convertedTenancy: { status: { notIn: ["CLOSED", "CANCELLED"] } } }] } }, include: { reservation: true } });
-    if (!person || person.status !== "WAITING_REVIEW" || person.photoVersion !== version || !person.encryptedImage || !person.expiresAt || person.expiresAt <= new Date() || additionalPersonPolicy(scope.organisationId)?.hash !== person.policyHash) throw new Error("PHOTO_CHANGED");
-    await requireBookingEligible(tx, scope.organisationId, person.reservationId);
+    const policy = additionalPersonPolicy(scope.organisationId);
+    if (!person || person.status !== "WAITING_REVIEW" || person.photoVersion !== version || !person.encryptedImage || !person.expiresAt || person.expiresAt <= new Date() || !policy || policy.hash !== person.policyHash) throw new Error("PHOTO_CHANGED");
+    await requireAdditionalBookingEligible(tx, scope.organisationId, person.reservationId, policy);
     if (decision === "APPROVE" && !await tx.auditEvent.findFirst({ where: { organisationId: scope.organisationId, actorId: scope.userId, entityId: id, action: "additional_access.photo_previewed", after: { path: ["version"], equals: version } } })) throw new Error("PHOTO_PREVIEW_REQUIRED");
     await tx.additionalAccessPerson.update({ where: { id }, data: { status: decision === "APPROVE" ? "APPROVED" : "REJECTED", reviewedAt: new Date(), reviewedById: scope.userId, ...(decision === "REJECT" ? { encryptedImage: null, erasedAt: new Date() } : {}) } });
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: person.reservation.facilityId, actorId: scope.userId, action: `additional_access.photo_${decision.toLowerCase()}`, entityType: "AdditionalAccessPerson", entityId: id, after: { version, providerState: "NOT_CONNECTED" } } });

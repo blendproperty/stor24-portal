@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 
-type Person = { id: string; name: string; status: string; photoVersion: number; expiresAt: string | null; facilityId: string; facilityName: string; unitNumber: string };
-type Policy = { hash: string; notice: string; consentLabel: string; retentionHours: number };
+type Person = { id: string; reservationId: string; name: string; status: string; photoVersion: number; expiresAt: string | null; facilityId: string; facilityName: string; unitNumber: string };
+type Policy = { hash: string; notice: string; consentLabel: string; retentionHours: number; trialReservationId?: string };
 
 export function AdditionalAccessQueue({ people, policy, manageableFacilities }: { people: Person[]; policy: Policy | null; manageableFacilities: string[] | null }) {
   const router = useRouter();
@@ -71,11 +71,12 @@ export function AdditionalAccessQueue({ people, policy, manageableFacilities }: 
     <h2>Additional people</h2>
     <p>Customers nominate people against their booking. Each person must be present to read the notice and consent. Photo review does not activate Hikvision access.</p>
     {!policy && <p>Additional-person photo collection is unavailable until its separate policy is configured.</p>}
+    {policy?.trialReservationId && <p>Photo-only trial for one test booking. This does not enable Hikvision access.</p>}
     {message && <p role="status">{message}</p>}
     {preview && <aside><img src={preview.url} alt="Private access photo" width={240} /><button type="button" onClick={() => setPreview(null)}>Close photo</button></aside>}
     {people.length === 0 && <p>No additional people nominated.</p>}
     {people.map(person => {
-      const canManage = manageableFacilities === null || manageableFacilities.includes(person.facilityId);
+      const canManage = (manageableFacilities === null || manageableFacilities.includes(person.facilityId)) && (!policy?.trialReservationId || policy.trialReservationId === person.reservationId);
       return <article key={person.id}>
         <h3>{person.name}</h3><p>{person.facilityName} · Unit {person.unitNumber} · {person.status.replaceAll("_", " ")} · Access not active</p>
         {canManage && policy && person.status !== "WAITING_REVIEW" && <button className="button button-primary" type="button" disabled={busy} onClick={() => void startHandoff(person)}>Hand customer tablet to {person.name}</button>}
