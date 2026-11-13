@@ -16,6 +16,33 @@
 - Merge: not merged. Deployment and configuration: not deployed or changed. Live production verification: not performed.
 - Outstanding: staff UAT and the broader lead capture, customer deduplication, provider, data, finance, training, recovery and approval gates remain open. Billing recognition remains held.
 
+## 2026-11-13 — Social intake browser fixture correction (candidate)
+
+- Implementation: added the configuration-profile lookup to the isolated screen-design fixture to match the new social notice queue; production behaviour is unchanged.
+- Testing: d9c9c447 CI guided-help run 43365780402 failed at screen-design because its mocked database lacked configurationProfile.findMany; local corrected screen-design passed seven pages at five widths with no writes. Fresh protected checks for the corrected head are required. Candidate d9c9c447 otherwise passed CI validate, transaction, restricted-runtime, security and CodeQL checks. Static security scan ceb7a069..9f2eb684 reported no findings; no live provider, CRM handoff or mailbox delivery is verified.
+- Commit and push: see branch history and remote head. Merge: not promoted. Deployment and configuration: not deployed or configured. Live production verification: none.
+- Outstanding: corrected-head CI and current-base checks, scoped provider credential, Facebook mapping and failure branches, worker and actual staff mailbox receipt, labelled end-to-end tests, staff monitoring and UAT, and all prior privacy, provider, data, training and approval gates. Existing Facebook input can accept 123; monitor the input report manually.
+
+## 2026-11-13 — Facebook enquiry release checks (candidate)
+
+- Implementation: brought the social intake branch forward over main 31eead3c; no provider configuration or live routing changed.
+- Testing: candidate 9f2eb684 passed CI validate, isolated transaction checks, restricted runtime, security checks and CodeQL; guided-help was still running at last observation. Focused ESLint passed. A completed static Codex Security diff scan of ceb7a069..9f2eb684 reviewed eight source surfaces with no reportable findings. The newer merge requires fresh protected checks and any changed-code review; no live provider or mailbox tests have run.
+- Commit and push: consult branch history for the refresh and remote head. Merge: not promoted. Deployment and configuration: not deployed or configured. Live production verification: none.
+- Outstanding: protected checks for the refreshed head, recipient and scoped credential configuration, WhatChimp mapping and error branches, worker and mailbox receipt, labelled valid/invalid/concurrent end-to-end tests, staff monitoring and UAT, and all existing privacy, provider, data, training and approval gates. Continue manual monitoring of the existing Facebook input report, which accepted 123.
+
+## 2026-11-13 — Facebook pricing enquiry follow-up (candidate, not live)
+
+- Implementation: refreshed the social-intake candidate against main and added an exact proxy delegation for its separately authenticated endpoint; neighbouring paths remain protected. No provider flow, credential, staff routing or production configuration was changed.
+- Testing: 16 focused authentication-boundary and social-contract tests passed locally, including rejection of 123. This does not establish provider validation, CRM delivery or staff receipt. Local typecheck was interrupted before a result; full CI, security review, isolated transaction tests and end-to-end tests remain required.
+- Commit and push: candidate e39ecd90 was pushed to codex/social-enquiry-intake-20261111; this evidence update follows it. Merge: not promoted. Deployment and configuration: not deployed or configured. Live production verification: none for this candidate.
+- Outstanding: scoped credential and recipient approval, WhatChimp mapping and failure branches, provider and mailbox delivery, staff monitoring and UAT, real valid/invalid/concurrent enquiries and all prior privacy, provider, data, training and approval gates. The existing Facebook input flow has accepted 123 and requires manual monitoring.
+
+## 2026-11-11 — Facebook and Instagram CRM enquiry intake (candidate, not live)
+
+- Implementation: Added a separately scoped social intake candidate for format validation, Facebook/Instagram source-specific CRM leads and follow-up tasks, idempotent submission, and a durable pending email notice to a facility-authorised staff user. The approved recipient email and current lead permission are checked before sending. The existing lead-SLA worker also processes pending social notices; uncertain sends require review and are listed for authorised staff in Integrations. Internal social profiles are excluded from generic configuration reads and writes. Design and provider mapping gates are in `docs/WHATCHIMP_SOCIAL_INTAKE.md`. No new credentials or provider routing have been configured.
+- Testing: Local unit checks reject `123` and malformed values and normalize representative SA/international numbers. An isolated PostgreSQL test exercised source separation, invalid input without lead creation, replay, task creation, concurrent notice claims, changed recipient address, revoked access and ambiguous delivery handling. These are synthetic tests, not live provider or inbox verification. Existing WhatsApp intake integration test also passed locally. Further route, security, CI and operational review remain required.
+- Commit and push: See branch history. Merge: Pending. Deployment and configuration: Not deployed or configured. Live production verification: None for this candidate. Existing Facebook phone field accepted `123`; existing social flows do not send to CRM or Katlego. Instagram structured capture, credential scope approval, provider mapping/guards, worker operation, email receipt, Facebook/Instagram end-to-end tests, staff monitoring, UAT, privacy and all prior gates remain open.
+
 ## 2026-11-12 — Migration source preflight candidate
 
 - Implementation: the existing export validator now rejects blank facility names/codes, unit-type names and unit numbers, plus blank, negative, malformed, over-precision and oversized unit/tenancy monthly rates and reservation quotes before declaring source reconciliation ready. Zero remains permitted for business review; no importer, billing rule or financial posting is changed. The rehearsal guide describes the checks.
