@@ -8376,3 +8376,10 @@ Validation follow-up: the project typecheck and targeted ESLint for the candidat
 - Commit and push: implementation commit 43f17bf8 pushed to codex/tablet-face-capture-20261113; this evidence update follows on that branch. Merge: pending. Deployment and configuration: not performed. Live production verification: not performed.
 - Outstanding: secure staff-to-customer handoff for primary and additional people, individual consent and approved policy/retention settings, confirmed organisation and door mapping, provider enrollment/distribution/revocation and device deletion with reconciliation, training and physical device UAT. Block24 door index codes 1239, 1244 and 1249 were read from HikCentral; applying them would expand facility access and has not been confirmed or saved. Main Gate was offline when checked.
 
+### Camera release evidence, 13 November 2026
+
+- Implementation and testing: PR #801 retained the isolated camera/file selection change. PR head 44dc614267fc73a041956555725ca181c39c7a7f passed CI 43389194241, security 43389194351, restricted runtime 43389194324 and transactions 43389194174. Local Edge fixture and scoped lint passed as described above.
+- Commit, push and merge: PR #801 was squash-merged to main as fb6e3e6bf8bf02ce518fd909b82e80a5c5b8d462. This evidence supplement is separate from that application commit.
+- Deployment and configuration: main-commit workflow runs had not appeared when checked; deployment not verified. Live production verification: not performed. The primary and additional-person collection holds and all provider, identity, policy, physical-device, training and UAT gates remain open.
+- Provider investigation: HikCentral's installed person-add template includes a faces array; its catalogue lists access-level endpoints under /api/acs/v1/privilege/group, while a search for the old adapter's auth_config endpoint returned no match. Read-only searches for STOR and Block24 organisations returned no matching records. No provider person, access-level or permission was changed.
+
