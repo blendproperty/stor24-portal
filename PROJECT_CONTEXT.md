@@ -8284,3 +8284,14 @@ Validation follow-up: the project typecheck and targeted ESLint for the candidat
 - **Testing:** On disposable local PostgreSQL, 29 synthetic booking contact correction, identity and facial-photo integration tests passed against source `ba9f3217b41235a9eb56494104ac792583543544`. The repository's isolated empty-database bootstrap recovered its known historical migration ordering and applied 95 migrations. The test container was stopped. These are technical tests, not a mailbox, staff, provider or production restore rehearsal.
 - **Commit and push:** evidence candidate pending at this entry. **Merge:** none. **Deployment and configuration:** none. **Live production verification:** none.
 - **Outstanding:** PRIV-06/08/11 and P14 remain open: assigned staff and mailbox intake/acknowledgement, verified identity and deadlines, legal/finance preservation decisions, actual provider/device deletion, backup restore and re-deletion, full case rehearsal, training and business acceptance. All existing privacy, Clarity, legal, provider, data, finance and recovery gates remain. No Microsoft contact was made at Brett's instruction.
+
+
+### 2026-11-13 - PRIV-07 processor and data-flow working inventory
+
+- **Implementation:** Added [source-based processor and data-flow working register](docs/PRIVACY_PROCESSOR_DATA_FLOW_2026-11-13.md) for candidate website and CRM integrations and the outstanding evidence needed for each. In the shared Twilio SMS/WhatsApp provider, network exceptions now return a fixed message rather than arbitrary exception text; the existing failure code and retryable flag are preserved. These are branch changes, not claims about production.
+- **Testing:** Prisma client generation succeeded; focused Twilio deadline, DLP-transfer, notification isolation and WhatsApp claim tests passed (19 tests). The first test attempt preceded Prisma generation and failed to load the generated client; the subsequent run passed. Scoped lint and repository context validation are recorded in the change review.
+- **Commit and push:** To be recorded by the change review and remote branch.
+- **Merge:** Not yet merged.
+- **Deployment and configuration:** No deployment or provider configuration change as part of this branch; Clarity remains enabled for analytics-consenting visitors.
+- **Live production verification:** Not performed for this branch. The inventory is source evidence, not proof of actual deployed use or an approved vendor register.
+- **Outstanding:** PRIV-07 remains open pending Information Officer/vendor-management confirmation of actual recipients and data, roles, locations, subprocessors, agreements, transfer grounds, retention and deletion, and approval of the register. PRIV-06 provider follow-through and Clarity withdrawal/deletion handling remain open. No Microsoft contact was requested. Preserve all other GAPP, provider, legal, operational and acceptance gates.
