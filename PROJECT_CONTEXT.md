@@ -1,3 +1,33 @@
+## 2026-11-13 — WhatChimp support ticket
+
+- Implementation and testing: no runtime change or new Facebook end-to-end test. The previously tested scoped credential remains disabled and requires rotation before use. Direct CRM test and provider-accepted notice evidence are recorded below; inbox receipt remains unverified.
+- Commit and push / merge: this support receipt is in PR #796 pending protected checks and merge. Preserve all concurrent main history.
+- Deployment and configuration: no new deployment or activation. The provider API and Facebook flow remain unverified and unconfigured for production.
+- Live production verification and provider gate: the user submitted the prepared report. WhatChimp's confirmation page stated that the inquiry was received and a support ticket created, with a typical response within 24 hours; no ticket number or support response was shown. A ticket-portal login link was requested. The report described empty {} probe results and the missing named API record without the credential or customer information. Continue manual social-input monitoring; provider response, rotated key, mapping and full Messenger-to-staff tests, mailbox receipt and staff UAT remain open.
+
+## 2026-11-13 — Facebook intake partial production test
+
+- Implementation and merge: social intake PR #765 remains merged; no new runtime code changed in this test.
+- Testing: using the authorised Facebook-scoped credential, the production endpoint returned PROBE, INVALID_PHONE for 123 and VALID_PHONE for the reported South African format. A direct synthetic request created Facebook Messenger lead cmwelb1b1000201rwzvwqhnrk and one follow-up task. Replaying the same submission returned the same reference. The lead and requirements are labelled TEST ONLY; preserve the test record for review and exclude it from business reporting. This was not a Messenger or WhatChimp end-to-end test.
+- Commit and push / merge: this evidence is in the PR #796 branch; verify its protected merge and remote main before claiming promotion.
+- Deployment and configuration: deployed main d27d4ddf via 43375799343. With explicit owner authorisation a dedicated Facebook 72238 Midpoint profile was created and scoped to Katlego; after WhatChimp test requests for both form and JSON returned {} and the named API was absent from the list, that profile was disabled. The test credential appeared in a browser accessibility capture and must be rotated before any future activation. WhatChimp displayed a save confirmation but persistence and functional mapping were not verified. No customer-facing flow was switched.
+- Live production verification: direct synthetic submission produced one CRM lead and one task. The notice is ACCEPTED by the email provider, not confirmed delivered or read; the email itself has a generic subject, while the linked lead is labelled TEST. Timer was active and last worker run succeeded, and Katlego was active with facility-scoped leads access. Actual Facebook capture, provider mapping and error handling, timeout and concurrency checks, mailbox receipt, staff UAT and all prior monitoring, provider, privacy, data, training and approval gates remain open. Continue manual monitoring of social inputs.
+
+## 2026-11-13 — Social intake deployed, configuration pending
+
+- Implementation: PR #765 is contained in main d27d4ddf9ccc6cf7d3c5fe6d8ee7b9a62edaacf0.
+- Testing: main CI 43373847373, security 43373847425 and transaction checks 43373847598 succeeded. These do not establish live provider behaviour.
+- Commit and push / merge: PR #765 squash merged as 9b7300f59df25b78377b542750e9842175abe7a6; later main includes that commit. This documentation update is tracked in PR #796.
+- Deployment and configuration: guarded deployment 43375799343 succeeded for d27d4ddf. The dedicated Facebook credential, WhatChimp mappings and staff routing remain unconfigured; Hostinger console readback: lead-SLA timer active and service success exit 0 at 06:11:14 UTC; Katlego is active with facility-scoped leads.*. Administrative SSH with the documented replacement key was rejected; the Hostinger console was subsequently available. No dedicated social-credential provisioning screen exists.
+- Live production verification: the authenticated Integrations page displays the social notice review panel and no pending or uncertain notices. Deployment success is not a Facebook enquiry or mailbox test. Valid, invalid, duplicate, timeout and concurrent cases, CRM lead and task, provider acceptance, mailbox receipt, staff UAT and all earlier provider, privacy, data, monitoring, training and approval gates remain open. Continue manual monitoring of social inputs.
+
+## 2026-11-13 — Social intake merge and release evidence
+
+- Implementation: the scoped social intake, phone-format validation, CRM lead and follow-up task, durable notification and exact authenticated endpoint delegation were merged. Provider mapping and a separately scoped credential remain unconfigured.
+- Testing: PR #765 head 1a3b3964 passed all required checks, including CI, security, transaction and CodeQL. Screen-design fixture fix passed locally at five widths. Static security diff scan ceb7a069..9f2eb684 found no reportable issues; subsequent social code was unchanged. Merged-main CI run 43369658343, security run 43369658357 and the required transaction checks passed; provider and staff receipt remain untested.
+- Commit and push: candidate branch through 1a3b3964. Merge: PR #765 squash merged as 9b7300f59df25b78377b542750e9842175abe7a6.
+- Deployment and configuration: automatic Deploy to VPS run 43371707528 failed at exact-main release verification with RELEASE_IS_NOT_CURRENT_MAIN after main advanced to documentation commit 08e77cea; SSH and deployment steps did not run. No social credential, routing or provider mapping enabled.
+- Live production verification: none for this integration. Preserve required exact-main CI, security and transaction evidence and normal guarded deployment, scoped credential approval, recipient and worker checks, Facebook mapping/failure branches, valid/invalid/concurrent tests, provider acceptance and mailbox receipt, staff UAT and all privacy, provider, data, training and approval gates. Monitor the existing social input report manually.
 ## 2026-11-13 — Lead customer search deployed and live-verified
 
 - Implementation: PR #789 clears displayed customer matches and status when a search changes, and clears the selection and matches when the store changes. No customer, permission, billing or provider configuration was changed.
