@@ -1,3 +1,11 @@
+## 2026-11-13 — Social intake merge and release evidence
+
+- Implementation: the scoped social intake, phone-format validation, CRM lead and follow-up task, durable notification and exact authenticated endpoint delegation were merged. Provider mapping and a separately scoped credential remain unconfigured.
+- Testing: PR #765 head 1a3b3964 passed all required checks, including CI, security, transaction and CodeQL. Screen-design fixture fix passed locally at five widths. Static security diff scan ceb7a069..9f2eb684 found no reportable issues; subsequent social code was unchanged. Merged-main CI run 43369658343, security run 43369658357 and the required transaction checks passed; provider and staff receipt remain untested.
+- Commit and push: candidate branch through 1a3b3964. Merge: PR #765 squash merged as 9b7300f59df25b78377b542750e9842175abe7a6.
+- Deployment and configuration: automatic Deploy to VPS run 43371707528 failed at exact-main release verification with RELEASE_IS_NOT_CURRENT_MAIN after main advanced to documentation commit 08e77cea; SSH and deployment steps did not run. No social credential, routing or provider mapping enabled.
+- Live production verification: none for this integration. Preserve required exact-main CI, security and transaction evidence and normal guarded deployment, scoped credential approval, recipient and worker checks, Facebook mapping/failure branches, valid/invalid/concurrent tests, provider acceptance and mailbox receipt, staff UAT and all privacy, provider, data, training and approval gates. Monitor the existing social input report manually.
+
 ## 2026-11-13 — Social intake browser fixture correction (candidate)
 
 - Implementation: added the configuration-profile lookup to the isolated screen-design fixture to match the new social notice queue; production behaviour is unchanged.
