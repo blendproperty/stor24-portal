@@ -24,10 +24,10 @@ export const checklistTemplates = {
 export const templateKeySchema = z.enum(["OPENING", "CLOSING", "CLEANING", "MANAGEMENT", "PADLOCK"]);
 export type ChecklistTemplate = z.infer<typeof templateKeySchema>;
 
-export type ChecklistRouteTemplate = "OPENING" | "CLOSING" | "CLEANING";
+export type ChecklistRouteTemplate = Exclude<ChecklistTemplate, "PADLOCK">;
 
 export function checklistUsesRoute(template?: ChecklistTemplate): template is ChecklistRouteTemplate {
-  return template === "OPENING" || template === "CLOSING" || template === "CLEANING";
+  return template !== undefined && template !== "PADLOCK";
 }
 
 export function checklistWeek(at: Date | string) {

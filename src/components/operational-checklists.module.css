@@ -59,7 +59,9 @@
 .walkProgress progress { flex: 1 1 7rem; min-width: 0; height: .65rem; border-radius: 1rem; overflow: hidden; accent-color: #226348; }
 .walkProgress button { width: auto; }
 .walkStops { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .5rem; }
-.walkStops[data-four-stops] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.walkStops[data-stops="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.walkStops[data-stops="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.walkStops[data-stops="1"] { grid-template-columns: minmax(0, 1fr); }
 .walkChecks { display: grid; align-content: start; gap: .35rem; min-width: 0; scroll-margin-top: 4.5rem; }
 .walkStops button, .walkChecks button {
   border: 1px solid var(--border, #cdd8de); border-radius: .55rem; background: #f7f9fa; color: #183341;
@@ -78,7 +80,7 @@
 .walkOptional summary { cursor: pointer; font-size: .85rem; font-weight: 650; }
 .walkOptional label { margin-block-start: .5rem; }
 @container (max-width: 40rem) {
-  .walkStops, .walkStops[data-four-stops] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .walkStops, .walkStops[data-stops="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @container (max-width: 23rem) {
   .walkChecks button { flex-wrap: wrap; }
