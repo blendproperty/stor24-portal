@@ -20,7 +20,7 @@ const reservationInclude = {
 } satisfies Prisma.ReservationInclude;
 
 /** Use the exact booking account. Shopping, test receipts and another unit's payments cannot clear a move-in. */
-export async function reservationReadiness(database: Database, scope: RequestScope, reservationId: string, forPhoto = false) {
+export async function reservationReadiness(database: Database, scope: RequestScope, reservationId: string, forPhoto = false, unpaidPhotoTrial = false) {
   const reservation = await database.reservation.findFirst({
     where: { id: reservationId, facility: facilityWhere(scope), customer: { organisationId: scope.organisationId } },
     include: reservationInclude,
@@ -64,7 +64,7 @@ export async function reservationReadiness(database: Database, scope: RequestSco
   if (!startDate) blockers.push("The agreed move-in date is missing. Review the booking.");
   else if (!forPhoto && startDate > southAfricaDateKey(new Date())) blockers.push(`Key collection starts on ${startDate}.`);
   if (!account || (handedOver ? account.tenancy?.id !== reservation.convertedTenancyId : account.tenancy)) blockers.push("The booking account needs reconciliation before move-in.");
-  if (requiredCents <= 0 || paidCents < requiredCents) blockers.push(testPayment
+  if (!unpaidPhotoTrial && (requiredCents <= 0 || paidCents < requiredCents)) blockers.push(testPayment
     ? "A test payment is recorded. It does not clear the real booking for key collection."
     : "The required booking payment has not been verified in full on this account.");
   if (account?.ledgerEntries.some(entry => entry.type === "REFUND" || entry.type === "REVERSAL")) blockers.push("A refund or reversal requires account review before key collection.");

@@ -104,6 +104,24 @@ test("isolated PostgreSQL private facial photo lifecycle", async t => {
       assert.equal(await db.biometricEnrollment.count({ where: { customerId: f.customer.id } }), 0);
       delete process.env.ADDITIONAL_ACCESS_POLICIES_JSON;
     });
+    await t.test("unpaid photo trial is confined to one signed booking and expires", async () => {
+      const f = await fixture();
+      const another = await db.reservation.create({ data: { facilityId: f.facility.id, customerId: f.customer.id, unitId: f.unit.id, quotedRate: 100, intendedMoveIn: new Date(), status: "ACTIVE" } });
+      const person = await nominateAdditionalAccessPerson(f.session, f.reservation.id, "Trial Person");
+      const otherPerson = await nominateAdditionalAccessPerson(f.session, another.id, "Other Person");
+      await db.ledgerEntry.delete({ where: { id: f.receipt.id } });
+      await db.payment.delete({ where: { id: f.payment.id } });
+      const policy = { enabled: true, version: "ci-trial", notice: "Synthetic photo-only trial notice. No provider enrolment or real customer consent is involved.", consentLabel: "I agree to the synthetic photo-only trial", approvalReference: "CI trial only", retentionHours: 1, trialReservationId: f.reservation.id, trialEndsAt: new Date(Date.now() + 3600000).toISOString() };
+      process.env.ADDITIONAL_ACCESS_POLICIES_JSON = JSON.stringify({ [f.org.id]: policy });
+      await assert.rejects(issueAdditionalPhotoHandoff(f.scope, otherPerson.id, 0, true), /PHOTO_POLICY_PENDING/);
+      const handoff = await issueAdditionalPhotoHandoff(f.scope, person.id, 0, true);
+      assert.equal((await additionalPhotoHandoff(handoff.token)).name, "Trial Person");
+      await db.publicReservationLease.update({ where: { reservationId: f.reservation.id }, data: { signedPdf: null } });
+      await assert.rejects(additionalPhotoHandoff(handoff.token), /PHOTO_BOOKING_NOT_READY/);
+      process.env.ADDITIONAL_ACCESS_POLICIES_JSON = JSON.stringify({ [f.org.id]: { ...policy, trialEndsAt: new Date(Date.now() - 1000).toISOString() } });
+      assert.equal(additionalPersonPolicy(f.org.id), null);
+      delete process.env.ADDITIONAL_ACCESS_POLICIES_JSON;
+    });
     await t.test("owner switch is shared, pinned, audited; tenancy retention and deletion continue while off", async () => {
       const f=await fixture();
       const role=await db.role.create({data:{organisationId:f.org.id,name:"Organisation owner",permissions:["*"]}});
