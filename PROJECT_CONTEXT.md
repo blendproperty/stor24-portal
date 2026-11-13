@@ -1,3 +1,10 @@
+## 2026-11-13 — Social intake browser fixture correction (candidate)
+
+- Implementation: added the configuration-profile lookup to the isolated screen-design fixture to match the new social notice queue; production behaviour is unchanged.
+- Testing: d9c9c447 CI guided-help run 43365780402 failed at screen-design because its mocked database lacked configurationProfile.findMany; local corrected screen-design passed seven pages at five widths with no writes. Fresh protected checks for the corrected head are required. Candidate d9c9c447 otherwise passed CI validate, transaction, restricted-runtime, security and CodeQL checks. Static security scan ceb7a069..9f2eb684 reported no findings; no live provider, CRM handoff or mailbox delivery is verified.
+- Commit and push: see branch history and remote head. Merge: not promoted. Deployment and configuration: not deployed or configured. Live production verification: none.
+- Outstanding: corrected-head CI and current-base checks, scoped provider credential, Facebook mapping and failure branches, worker and actual staff mailbox receipt, labelled end-to-end tests, staff monitoring and UAT, and all prior privacy, provider, data, training and approval gates. Existing Facebook input can accept 123; monitor the input report manually.
+
 ## 2026-11-13 — Facebook enquiry release checks (candidate)
 
 - Implementation: brought the social intake branch forward over main 31eead3c; no provider configuration or live routing changed.
