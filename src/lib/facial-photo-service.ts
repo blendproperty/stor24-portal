@@ -169,6 +169,7 @@ export async function expireFacialPhotos() {
     expired++;
   });
   if (await db.additionalAccessPerson.count({ where: additionalWhere }) > 0) throw new Error("PHOTO_EXPIRY_MORE_DUE");
+  await db.additionalPhotoHandoff.deleteMany({ where: { expiresAt: { lte: new Date() } } });
   await expireLegacyPhotos();
   await db.facialPhotoMaintenance.upsert({ where: { id: "expiry" }, create: { id: "expiry", completedAt: new Date() }, update: { completedAt: new Date() } });
   return expired;

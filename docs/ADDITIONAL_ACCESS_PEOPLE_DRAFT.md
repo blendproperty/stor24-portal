@@ -6,6 +6,8 @@
 
 Additional-person collection is disabled unless an organisation-specific entry exists in `ADDITIONAL_ACCESS_POLICIES_JSON` with `enabled: true`, a version, notice, consent label, approval reference and a retention period in hours. This is separate from the primary-customer policy. No approved wording or production setting is supplied here. The collection also requires the existing encryption key and a recent successful expiry-worker heartbeat. Configuration does not itself constitute legal approval or activate access.
 
+`ADDITIONAL_PERSON_FACIAL_NOTICE_FOR_APPROVAL.md` contains proposed person-facing wording and an explicit decision list for Liezl and the precinct operator. It is a draft and supplies no approval reference or live setting.
+
 Staff must have access management permission for the facility. The screen requires a witnessed confirmation that the nominated person is present and has accepted the displayed notice; the checkbox records the staff operator's attestation, not independent identity verification. Photographs are encrypted and version-bound, removed on withdrawal or rejection and processed by the expiry worker. These controls still require independent review and real staff acceptance before use.
 
 ## Required behaviour

@@ -4,27 +4,24 @@
 
 The CRM owns consent, active-tenancy eligibility, provisioning state, audit and revocation. HikCentral owns the biometric template and door permission. The public website and CMS do not store or process face images in this release.
 
-## Flow
+## Current flow (13 November 2026)
 
-1. An authorised staff member opens **Facial access** and selects an active occupancy.
-2. Staff records explicit biometric consent and uploads a JPEG or PNG photograph (maximum 5 MB).
-3. The server hashes the image for audit/deduplication, but does not persist the image bytes.
-4. The HikCentral provider creates the person, uploads the face and assigns the facility's configured door group.
-5. The CRM marks access active only after all three OpenAPI calls succeed.
-6. Revocation removes the HikCentral permission and updates the occupancy. Move-out invokes the same revocation path automatically.
+The primary customer can submit a photo through their authenticated customer portal. Additional nominated people can use a five-minute, single-use customer-tablet link issued by authorised staff after an in-person identity check. Each person sees their own consent notice and submits their own photo. Photos are encrypted, short-lived and available to staff for private review. Approval or handover records a pending provider request; **it does not enrol a HikCentral person or grant a door permission**.
+
+The existing `HikCentralAccessProvider.enroll` method is not connected to the reviewed queue. Its face and permission endpoint assumptions do not match the installed v3.0.1 API catalog. Do not call it for production enrolment until its contract, journal, readback and revocation path are replaced and tested.
 
 ## Production configuration
 
-Configure the server-only variables documented in `.env.example`. `HIKCENTRAL_FACILITY_CONFIG_JSON` maps CRM facility IDs to HikCentral organisation and door index codes. Never expose the app secret or the facility mapping to the browser.
+Configure the server-only variables documented in `.env.example`. The current CRM settings store an organisation index and door index codes per facility. Never expose the app secret or the facility mapping to the browser. Additional-person capture also requires an approved `ADDITIONAL_ACCESS_POLICIES_JSON` policy, an encryption key and a running photo-expiry worker.
 
-The default OpenAPI paths are common HikCentral Professional paths. Before enabling writes, compare them with the Developer Guide installed alongside the exact HikCentral/OpenAPI release and override any versioned paths using environment variables.
+Before enabling writes, compare the installed v3.0.1 templates for person creation with nested `faces`, access-level assignment, application result, person lookup and deletion. Confirm the real organisation and access-level ID, the exact intended Block24 door scope and the device's online state.
 
 ## Safe activation checklist
 
 - Confirm POPIA consent wording, retention period, deletion process and a non-biometric access alternative with the accountable business owner.
 - Confirm the Midpoint HikCentral organisation index and every intended door index code.
 - Use a dedicated least-privilege OpenAPI key permitted only to manage people, faces and access permissions.
-- Test with one explicitly authorised staff profile first.
+- Test with one explicitly authorised person first, after identity and consent checks.
 - Read the person and permission back in HikCentral before declaring the integration operational.
 - Test revocation and confirm the terminal denies access.
 - Apply the Prisma migration, configure secrets through the deployment environment, then deploy the CRM branch.

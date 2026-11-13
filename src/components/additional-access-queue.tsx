@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element -- Private previews must not enter the image optimiser. */
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import QRCode from "qrcode";
 
 type Person = { id: string; name: string; status: string; photoVersion: number; expiresAt: string | null; facilityId: string; facilityName: string; unitNumber: string };
 type Policy = { hash: string; notice: string; consentLabel: string; retentionHours: number };
@@ -10,6 +11,7 @@ export function AdditionalAccessQueue({ people, policy, manageableFacilities }: 
   const router = useRouter();
   const [busy, setBusy] = useState(false), [message, setMessage] = useState("");
   const [preview, setPreview] = useState<{ id: string; version: number; url: string; expiresAt: string | null } | null>(null);
+  const [handoff, setHandoff] = useState<{ id: string; url: string; qr: string; expiresAt: string } | null>(null);
   useEffect(() => {
     if (!preview) return;
     const timer = setTimeout(() => setPreview(null), Math.min(60000, Math.max(0, preview.expiresAt ? new Date(preview.expiresAt).getTime() - Date.now() : 0)));
@@ -53,6 +55,18 @@ export function AdditionalAccessQueue({ people, policy, manageableFacilities }: 
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not remove photo."); }
     finally { setBusy(false); }
   }
+  async function startHandoff(person: Person) {
+    if (!window.confirm(`I have checked ${person.name}'s identity in person. Create a five-minute capture link for this person?`)) return;
+    setBusy(true); setMessage(""); setHandoff(null);
+    try {
+      const response = await fetch("/api/v1/access/additional-people/handoff", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: person.id, version: person.photoVersion, identityConfirmed: true }) });
+      const result = await response.json(); if (!response.ok) throw new Error(result.error);
+      const url = `${window.location.origin}/access/capture/${result.data.token}`;
+      setHandoff({ id: person.id, url, qr: await QRCode.toDataURL(url, { margin: 2, width: 240 }), expiresAt: result.data.expiresAt });
+      setMessage("Open this link on an unsigned customer tablet. The person must consent and take their own photo.");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not create capture link."); }
+    finally { setBusy(false); }
+  }
   return <section className="panel panel-spacious">
     <h2>Additional people</h2>
     <p>Customers nominate people against their booking. Each person must be present to read the notice and consent. Photo review does not activate Hikvision access.</p>
@@ -64,6 +78,8 @@ export function AdditionalAccessQueue({ people, policy, manageableFacilities }: 
       const canManage = manageableFacilities === null || manageableFacilities.includes(person.facilityId);
       return <article key={person.id}>
         <h3>{person.name}</h3><p>{person.facilityName} · Unit {person.unitNumber} · {person.status.replaceAll("_", " ")} · Access not active</p>
+        {canManage && policy && person.status !== "WAITING_REVIEW" && <button className="button button-primary" type="button" disabled={busy} onClick={() => void startHandoff(person)}>Hand customer tablet to {person.name}</button>}
+        {handoff?.id === person.id && <aside><p>Expires {new Date(handoff.expiresAt).toLocaleTimeString()}. Use a tablet without a staff login.</p><img src={handoff.qr} width={240} height={240} alt="QR code for the private photo capture link" /><p><a href={handoff.url} target="_blank" rel="noreferrer">Open capture link in a separate browser</a></p><button type="button" onClick={() => setHandoff(null)}>Hide link</button></aside>}
         {canManage && policy && person.status !== "WAITING_REVIEW" && <form onSubmit={event => { event.preventDefault(); void capture(event.currentTarget); }}>
           <input type="hidden" name="id" value={person.id} /><input type="hidden" name="version" value={person.photoVersion} /><input type="hidden" name="policyHash" value={policy.hash} />
           <p>{policy.notice}</p><p>Photo retention: {policy.retentionHours} hours.</p>

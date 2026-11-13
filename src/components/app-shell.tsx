@@ -103,7 +103,7 @@ export function AppShell({ children, session, facilityLabel = "Your facilities",
   const router = useRouter();
   const [signOutError, setSignOutError] = useState("");
   const publicPage = pathname === "/mfa-setup" || pathname === "/login" || pathname === "/forgot-password" || pathname.startsWith("/reset-password/") || pathname.startsWith("/invite/") || pathname.startsWith("/setup/");
-  if (publicPage || pathname === "/booking-price-review" || pathname === "/privacy" || pathname === "/paia" || pathname === "/my" || pathname.startsWith("/my/")) return children;
+  if (publicPage || pathname.startsWith("/access/capture/") || pathname === "/booking-price-review" || pathname === "/privacy" || pathname === "/paia" || pathname === "/my" || pathname.startsWith("/my/")) return children;
 
   async function signOut() {
     setSignOutError("");
