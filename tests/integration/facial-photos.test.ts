@@ -9,6 +9,7 @@ import { confirmReservationMoveIn, getReservationMoveInReadiness } from "../../s
 import { facialPhotoPolicy } from "../../src/lib/facial-photo-security";
 import { submitTenantPhoto, tenantPhotoStatus, withdrawTenantPhoto, listFacialPhotos, previewFacialPhoto, reviewFacialPhoto, expireFacialPhotos } from "../../src/lib/facial-photo-service";
 import { additionalPersonPolicy, additionalPhotoHandoff, captureAdditionalPhoto, captureAdditionalPhotoHandoff, issueAdditionalPhotoHandoff, listAdditionalAccessPeople, nominateAdditionalAccessPerson, previewAdditionalPhoto, removeAdditionalAccessPerson, reviewAdditionalPhoto, withdrawAdditionalPhoto } from "../../src/lib/additional-access-people";
+import { startTenantChallenge, tenantSessionForToken, verifyTenantChallenge } from "../../src/lib/tenant-portal-auth";
 
 test("isolated PostgreSQL private facial photo lifecycle", async t => {
   assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci");
@@ -41,6 +42,35 @@ test("isolated PostgreSQL private facial photo lifecycle", async t => {
   }
 
   try {
+    await t.test("signed staff lease verifies its email on first My STOR24 sign-in", async () => {
+      const f = await fixture();
+      await db.customer.update({ where: { id: f.customer.id }, data: { emailVerifiedAt: null } });
+      const old = { provider: process.env.EMAIL_PROVIDER, secret: process.env.AUTH_SECRET, key: process.env.RESEND_API_KEY, from: process.env.EMAIL_FROM };
+      Object.assign(process.env, { EMAIL_PROVIDER: "resend", AUTH_SECRET: "synthetic-only-tenant-auth-secret-20261113", RESEND_API_KEY: "synthetic", EMAIL_FROM: "Synthetic <test@example.invalid>" });
+      let code = "";
+      const transport = t.mock.method(globalThis, "fetch", async (_url: RequestInfo | URL, init?: RequestInit) => {
+        code = JSON.parse(String(init?.body)).text.match(/\b\d{6}\b/)?.[0] ?? "";
+        return Response.json({ id: "synthetic" });
+      });
+      try {
+        const unsignedChallenge = await startTenantChallenge(f.org.slug, f.customer.email!);
+        assert.equal(code, "", "an unverified email without a signed staff lease receives no code");
+        assert.deepEqual((await db.tenantPortalChallenge.findUniqueOrThrow({ where: { id: unsignedChallenge } })).customerIds, []);
+        await db.tenancy.create({ data: { facilityId: f.facility.id, customerId: f.customer.id, accountId: f.account.id, status: "DRAFT", startDate: new Date(), documents: { create: { type: "LEASE_AGREEMENT", provider: "BLENDSIGN", status: "SIGNED", storageKey: "synthetic-only", externalId: randomUUID(), signedAt: new Date() } } } });
+        const challenge = await startTenantChallenge(f.org.slug, f.customer.email!);
+        assert.match(code, /^\d{6}$/);
+        assert.equal((await db.customer.findUniqueOrThrow({ where: { id: f.customer.id } })).emailVerifiedAt, null);
+        await assert.rejects(verifyTenantChallenge(challenge, "000000"), /TENANT_INVALID_CODE/);
+        const token = await verifyTenantChallenge(challenge, code);
+        assert.ok((await db.customer.findUniqueOrThrow({ where: { id: f.customer.id } })).emailVerifiedAt);
+        assert.deepEqual((await tenantSessionForToken(token)).customerIds, [f.customer.id]);
+      } finally {
+        transport.mock.restore();
+        for (const [name, value] of Object.entries({ EMAIL_PROVIDER: old.provider, AUTH_SECRET: old.secret, RESEND_API_KEY: old.key, EMAIL_FROM: old.from })) {
+          if (value === undefined) delete process.env[name]; else process.env[name] = value;
+        }
+      }
+    });
     await t.test("additional nominations are booking-scoped and do not grant access", async () => {
       const f = await fixture();
       const other = await fixture();
