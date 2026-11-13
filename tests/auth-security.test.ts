@@ -20,6 +20,8 @@ test("arrears review worker delegates only its exact path to bearer authenticati
 
 test('WhatChimp intake delegates only its exact path to scoped handler authentication', () => {
   assert.equal(isPublicPathname('/api/integrations/whatchimp/enquiry'), true);
+  assert.equal(isPublicPathname('/api/integrations/whatchimp/social'), true);
+  for (const path of ['/api/integrations/whatchimp/social/private', '/api/integrations/whatchimp/social-extra']) assert.equal(isPublicPathname(path), false);
   for (const path of ['/api/integrations/whatchimp', '/api/integrations/whatchimp/enquiry/private', '/api/integrations/whatchimp/enquiry-extra', '/api/v1/leads']) assert.equal(isPublicPathname(path), false);
 });
 
