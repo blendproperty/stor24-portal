@@ -947,6 +947,22 @@ model AdditionalAccessPerson {
   @@index([reservationId, status])
 }
 
+// A short-lived, single-use link lets the nominated person consent on an unsigned tablet.
+model AdditionalPhotoHandoff {
+  id           String @id @default(cuid())
+  tokenHash    String @unique
+  personId     String
+  photoVersion Int
+  issuedById   String
+  organisationId String
+  facilityId   String
+  expiresAt    DateTime
+  usedAt       DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([personId, expiresAt])
+}
+
 model CollectionCase {
   id String @id @default(cuid())
   accountId String @unique

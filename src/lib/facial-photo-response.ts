@@ -17,6 +17,7 @@ export function facialPhotoError(error: unknown) {
     PERSON_INVALID: [422, "Enter a name between 2 and 100 characters."],
     PERSON_LIMIT: [409, "This booking already has the maximum number of nominations. Contact your store for help."],
     PHOTO_IDENTITY_REQUIRED: [409, "Confirm the nominated person's identity before capturing their photo."],
+    HANDOFF_STAFF_SESSION: [409, "Open this link on a customer tablet without a staff login."],
   };
   const [status, message] = code.includes("FORBIDDEN") ? [403, "You do not have access to this action."] : messages[code] ?? [503, "Facial access is temporarily unavailable. Please try again later."];
   return Response.json({ error: message }, { status, headers: tenantPrivateHeaders });

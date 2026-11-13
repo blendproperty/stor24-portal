@@ -30,6 +30,8 @@ export function isPublicPathname(pathname: string) {
   if (pathname === "/api/integrations/whatchimp/social") return true;
   // Tenant APIs enforce separate tenant sessions; never accept the staff cookie as tenant authentication.
   if (pathname === "/my" || /^\/my\/orders\/[A-Za-z0-9_-]+$/.test(pathname) || pathname.startsWith("/api/tenant/")) return true;
+  // The capture page/API validate a single-use token and reject an active staff session.
+  if (/^\/access\/capture\/[A-Za-z0-9_-]{43}$/.test(pathname) || pathname === "/api/access/capture") return true;
   return publicPagePrefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix)) ||
     publicApiPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix));
 }

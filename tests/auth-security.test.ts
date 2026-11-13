@@ -3,6 +3,12 @@ import test from "node:test";
 import { permissionGranted } from "../src/lib/permissions.ts";
 import { createResetToken, hashResetToken } from "../src/lib/password-reset.ts";
 import { isPublicPathname, proxy } from "../src/proxy.ts";
+
+test("additional photo handoff exempts only the token page and upload handler", () => {
+  assert.equal(isPublicPathname(`/access/capture/${"a".repeat(43)}`), true);
+  assert.equal(isPublicPathname("/api/access/capture"), true);
+  for (const path of ["/access/capture/short", `/access/capture/${"a".repeat(43)}/admin`, "/api/access/capture/admin", "/api/v1/access/additional-people/handoff"]) assert.equal(isPublicPathname(path), false);
+});
 import { NextRequest } from "next/server";
 
 test("staff event worker uses only its exact dedicated credential route; staff pages and descendants remain session protected", () => {
