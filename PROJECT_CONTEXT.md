@@ -1,3 +1,12 @@
+## 2026-11-13 — Lead customer search deployed and live-verified
+
+- Implementation: PR #789 clears displayed customer matches and status when a search changes, and clears the selection and matches when the store changes. No customer, permission, billing or provider configuration was changed.
+- Testing: actual-component browser fixture covered search change, failed search and store change; focused lint passed. Final PR head 29a7108f passed CI 43372138230, security 43372138233, transactions 43372138250 and restricted runtime 43372138260. Exact merged-main d27d4ddf passed CI 43373847373, security 43373847425, transactions 43373847598 and restricted runtime 43373847515.
+- Commit and push: implementation branch codex/lead-customer-search-refresh-20261112 was pushed through 29a7108f. This release receipt is a separate documentation candidate; verify its remote promotion.
+- Merge: PR #789 squash merged as d27d4ddf9ccc6cf7d3c5fe6d8ee7b9a62edaacf0.
+- Deployment and configuration: Deploy to VPS 43375799343 succeeded for d27d4ddf; workflow reported image stor24-crm:d27d4ddf9c healthy, local HTTP 200, no OOM and exit 0. No billing/provider settings changed.
+- Live production verification: at 06:04 UTC CRM public health reported app/database OK. Authenticated owner opened Add enquiry, selected a store and searched an existing customer; changing the search immediately removed the prior match. After selecting the customer, changing store cleared the selection. The dialog was closed without saving an enquiry or altering customer records. Actual staff/device UAT, broader lead-capture acceptance, migration source/data/finance approval and all existing provider, recovery, training and business gates remain open. Billing recognition remains held.
+
 ## 2026-11-13 — Migration preflight release evidence
 
 - Implementation: PR #787 adds missing-identifier and rental-amount validation to the existing export preflight. No importer, customer data or billing recognition change.
