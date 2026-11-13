@@ -26,7 +26,7 @@ try {
   await page.goto(base+"?policy");await expect(page.getByText("Gate activation unavailable",{exact:true})).toBeVisible();
 page.on("pageerror",error=>errors.push(error.message));
   await page.route("**/api/tenant/access-photo**",route=>{
-    if(route.request().method()!=="GET") { tenantWrites.push(route.request().method()); return route.fulfill({status:409,json:{error:"Your booking has changed. Please refresh before continuing."}}); }
+    if(route.request().method()!=="GET") { tenantWrites.push(route.request().method()); assert.match(route.request().postData(), /camera-photo\.png/); return route.fulfill({status:409,json:{error:"Your booking has changed. Please refresh before continuing."}}); }
     return route.fulfill({json:{data:{available,policy:available?{version:"ci",hash:"ci-hash",notice:"Synthetic browser fixture. This is not legal wording or a real consent record.",consentLabel:"Preview only — consent wording awaiting legal approval.",retentionHours:24,alternativeContact:"Speak to the training store."}:null,photo:tenantPhoto}}});
   });
   await page.route("**/api/v1/access/photos**",async route=>{
@@ -50,6 +50,10 @@ page.on("pageerror",error=>errors.push(error.message));
   await page.screenshot({path:'output/facial-access/tenant-redesign-held.png',fullPage:true});
   available=true;await page.reload();await expect(page.locator('input[type="checkbox"]')).not.toBeChecked();
   await expect(page.locator('input[name="policyHash"]')).toHaveValue("ci-hash");
+  await expect(page.getByRole('button',{name:'Submit photograph',exact:true})).toBeDisabled();
+  await expect(page.getByLabel('Take an access photograph')).toHaveAttribute('capture','user');
+  await page.getByLabel('Take an access photograph').setInputFiles({name:'camera-photo.png',mimeType:'image/png',buffer:Buffer.from('fixture')});
+  await expect(page.getByText('camera-photo.png',{exact:true})).toBeVisible();
   for (const width of [1440,768,390,320]) {
     await page.setViewportSize({width,height:1000}); await page.evaluate(()=>document.fonts.ready);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
@@ -66,7 +70,7 @@ page.on("pageerror",error=>errors.push(error.message));
   await page.getByRole('button',{name:'Refresh status',exact:true}).click();
   await expect(page.getByText('Add your photograph',{exact:true})).toBeVisible();
   await expect(page.locator('input[type="checkbox"]')).not.toBeChecked();
-  await page.getByLabel('Choose your access photograph').setInputFiles({name:'training-photo.png',mimeType:'image/png',buffer:Buffer.from('fixture')});
+  await page.getByLabel('Take an access photograph').setInputFiles({name:'camera-photo.png',mimeType:'image/png',buffer:Buffer.from('fixture')});
   await page.locator('input[type="checkbox"]').check();
   await page.getByRole('button',{name:'Submit photograph',exact:true}).click();
   await expect(page.getByRole('alert')).toHaveText('Your booking has changed. Please refresh before continuing.');
