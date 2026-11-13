@@ -28,6 +28,11 @@ export const extendedGuides: WorkflowGuide[] = [
     ["Fill the selected day's cells", "Start the due run if you are the assigned staff member or cover. Enter results, trolley counts and reasons for exceptions in the highlighted day. Save progress before opening another date.", ".operational-checklist-workspace"],
     ["Submit and review independently", "Submit the completed day for the assigned reviewer. They can add a review note and sign off or return it for correction. Record unresolved repairs in the existing maintenance queue.", ".operational-checklist-workspace"],
   ]),
+  guide("checklist-report", "Review saved checklist results", "Facility operations", "/operations/checklists/report", "Checklist report", "Compare Opening, Closing, Cleaning and Management across your permitted stores.", [
+    ["Choose the reporting period", "Open Checklist report from Checklists or Reports. Choose a store, checklist and inclusive scheduled date range in South African time, then select Run report.", "[aria-label='Checklist report filters']"],
+    ["Review runs and issues", "Read the totals by checklist. Expand a scheduled run to check its progress, review status, saved results, counts, reasons and evidence references.", "[aria-labelledby='runs-heading']"],
+    ["Return to the original run", "Use Open checklist run to see the source record. The report is read-only. The assigned reviewer signs off in the checklist workflow.", "[aria-labelledby='runs-heading']"],
+  ]),
   guide("operational-padlocks", "Count padlocks and review discrepancies", "Facility operations", "/operations/padlocks", "Padlock counts", "Assign a CSO to count locks unit by unit, then review the physical findings.", [
     ["Open the assigned count", "Open Padlock counts and choose the permitted store. Check who will count, who covers an absence and who reviews. Signed-off and cancelled records remain available in history.", ".operational-checklist-workspace"],
     ["Plan the CSO and reviewer", "Choose the counting CSO or assigned staff member, an optional cover and a separate eligible manager. Schedule a one-off or a finite weekly series. The unit list is captured when the count starts.", ".operational-checklist-workspace"],
