@@ -1,3 +1,11 @@
+## 2026-11-13 — Social enquiry authentication smoke check
+
+- Implementation: verification only. The Facebook/Instagram social intake was already implemented in PR #765 and included in production deployment 43375799343 and subsequent deployment 43380398553. No provider, permission, application or billing configuration was changed.
+- Testing: on 13 November the live social intake endpoint returned HTTP 401 with private no-store caching for no Authorization header, an invalid short bearer, and a syntactically valid unknown bearer. The unknown bearer was a synthetic value. These bounded checks do not prove credential ownership, full authentication security or valid-provider processing.
+- Commit and push: this evidence is a documentation candidate; consult its branch and PR for publication. Merge: this evidence candidate is not merged; PR #765 was previously merged as 9b7300f5.
+- Deployment and configuration: no deployment or configuration change by this check. Existing deployment evidence applies to the earlier releases; do not infer that current main 126e061a is deployed from this test.
+- Live production verification: the three unauthorised requests were rejected; no valid-key enquiry, real customer, notification or provider message was submitted. Provider credential and mapping, failure/retry branches, real end-to-end CRM handoff and mailbox receipt, staff/device UAT, privacy, data, finance, recovery and approvals remain open. Billing recognition stays held.
+
 ## 2026-11-13 — Lead customer search deployed and live-verified
 
 - Implementation: PR #789 clears displayed customer matches and status when a search changes, and clears the selection and matches when the store changes. No customer, permission, billing or provider configuration was changed.
