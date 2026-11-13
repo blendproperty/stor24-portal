@@ -6,6 +6,7 @@ import { createRequire } from "node:module";
 import { db } from "../../src/lib/db";
 import { createOperationalChecklist, changeOperationalChecklist, operationalChecklists, padlockWalkthrough } from "../../src/lib/operational-checklist-service";
 import { checklistCreateSchema, checklistRecordSchema, CHECKLIST_PURPOSE, type ChecklistChange } from "../../src/lib/operational-checklist-policy";
+import { checklistReport, checklistReportFilters } from "../../src/lib/checklist-report";
 import { getOperationsCalendar } from "../../src/lib/calendar-service";
 
 test("isolated PostgreSQL checklist lifecycle, padlock snapshots, permissions and atomic evidence", async t => {
@@ -250,6 +251,42 @@ test("isolated PostgreSQL checklist lifecycle, padlock snapshots, permissions an
       const output=await build({entryPoints:["src/app/api/v1/operations/tasks/[id]/route.ts"],bundle:true,write:false,platform:"node",format:"cjs",packages:"external",plugins:[{name:"fixture",setup(b){b.onResolve({filter:/^@\/lib\/(db|auth-guards)$/},a=>({path:a.path,namespace:"fixture"}));b.onLoad({filter:/.*/,namespace:"fixture"},a=>({contents:a.path.endsWith('/db')?'export const db=__db;':"export const requirePermission=async()=>__auth;export const requireSession=async()=>__auth;export const authErrorResponse=()=>Response.json({}, {status:500});"}));}}]});
       const loaded={exports:{} as {PATCH:(r:Request,c:{params:Promise<{id:string}>})=>Promise<Response>}};new Function('require','module','exports','__db','__auth',output.outputFiles[0].text)(createRequire(import.meta.url),loaded,loaded.exports,db,{organisationId:org.id,user:{id:manager.id},allowedFacilityIds:[a.id]});
       const response=await loaded.exports.PATCH(new Request('https://example.invalid/task',{method:'PATCH',body:JSON.stringify({status:'OPEN'})}),{params:Promise.resolve({id})});assert.equal(response.status,409);assert.equal((await current(id)).status,"COMPLETED");
+    });
+    await t.test("consolidated reporting uses saved results within the SAST date and facility scope", async () => {
+      const startAt = "2026-11-05T22:00:00Z";
+      const plan = { ...base, startAt, endAt: "2026-11-05T23:00:00Z", repeat: "ONCE" as const, occurrences: 1 };
+      const padlock = await createOperationalChecklist(scope, { ...plan, template: "PADLOCK", requestKey: randomUUID() });
+      const foreignScope = { ...scope, userId: other.id, facilityIds: [b.id] };
+      const foreignCso = await person("Other CSO", csoRole.id, b.id);
+      const foreign = await createOperationalChecklist(foreignScope, { ...plan, facilityId: b.id, assigneeId: foreignCso.id, coverId: null, reviewerId: other.id, requestKey: randomUUID() });
+      const filters = { from: "2026-11-06", to: "2026-11-06", facility: "", template: "" } as const;
+      assert.equal(checklistReportFilters.safeParse({ ...filters, from: "2026-11-07" }).success, false);
+      assert.equal(checklistReportFilters.safeParse({ ...filters, from: "2026-01-01" }).success, false);
+      assert.equal(checklistReportFilters.safeParse({ ...filters, template: "PADLOCK" }).success, false);
+      const report = await checklistReport(scope, filters);
+      assert.equal(report.overLimit, false);
+      assert.ok(report.runs.length >= 1);
+      const run = report.runs.find(row => row.record.template === "MANAGEMENT")!;
+      assert.ok(run);
+      assert.ok(report.runs.every(row => row.facility?.name === "A" && row.date === "2026-11-06"));
+      assert.ok(!report.runs.some(row => row.id === padlock.id));
+      assert.ok(!report.runs.some(row => row.id === foreign.id));
+      assert.equal(run.record.template, "MANAGEMENT");
+      assert.equal(run.date, "2026-11-06");
+      assert.equal(run.record.rows.length, 21);
+      assert.equal(run.issues, 1);
+      assert.equal(run.saved.length, 1);
+      assert.equal(run.saved[0].notes, "Test pressure fell below target");
+      assert.equal(run.saved[0].evidence, "Test reference");
+      assert.equal(run.record.reviewedAt, null);
+      const outside = await checklistReport(scope, { ...filters, facility: b.id });
+      assert.deepEqual(outside.runs, []);
+      const sunday = await checklistReport(scope, { ...filters, from: "2026-11-08", to: "2026-11-08", template: "CLEANING" });
+      assert.deepEqual(sunday.runs?.map(row => [row.record.template, row.record.rows.length, row.issues]), [["CLEANING", 19, 1]]);
+      const october = await checklistReport(scope, { ...filters, from: "2026-10-23", to: "2026-10-23" });
+      assert.deepEqual([...new Set(october.runs?.map(row => row.record.template))].sort(), ["CLOSING", "OPENING"]);
+      assert.equal(october.runs?.find(row => row.id === id)?.status, "COMPLETED");
+      assert.equal(october.runs?.find(row => row.record.template === "OPENING")?.saved[0].lockCount, 0);
     });
   } finally {
     if(constrained)await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_checklist_audit_failure');
