@@ -1,3 +1,12 @@
+## 2026-11-13 — Migration preflight release evidence
+
+- Implementation: PR #787 adds missing-identifier and rental-amount validation to the existing export preflight. No importer, customer data or billing recognition change.
+- Testing: 18 focused migration tests and lint passed. Refreshed PR head d0e05343 passed CI 43361693543, security 43361693559, transactions 43361693647 and restricted runtime 43361693489. Subsequent containing main 31eead3c passed CI 43365640162, security 43365640191, transactions 43365640137 and restricted runtime 43365640172. Synthetic checks do not prove an authorised export or rehearsal.
+- Commit and push: PR #787 branch was pushed through d0e05343. This release receipt is included in the separate lead-search candidate; verify its remote promotion.
+- Merge: PR #787 squash merged as ceb7a069bd18ab0c2d1225d49d30ebd7b0d7ac7c and is included in subsequent main 31eead3c.
+- Deployment and configuration: deployment 43367560762 succeeded for 31eead3c; workflow evidence reported image stor24-crm:31eead3c7 healthy, local HTTP 200 and no OOM. Earlier deployment 43365633013 stopped before SSH when main advanced. No billing or provider configuration changed.
+- Live production verification: at 04:48 UTC the public CRM health endpoint reported application and database OK. The CLI was not run against a live export; its actual host file and authorised-data result were not independently verified. The migration importer, source mapping, data-owner and finance decisions, rehearsal, UAT and all existing provider, recovery, training and approval gates remain open; billing recognition stays held.
+
 ## 2026-11-12 — Lead customer search correction candidate
 
 - Implementation: changing the customer search clears the previous results and status immediately, avoiding selection of an old match while a new search is pending or has failed. Changing store clears the previous store's displayed matches and selected customer. Existing facility and API permissions are unchanged. The regression is included in CI.
