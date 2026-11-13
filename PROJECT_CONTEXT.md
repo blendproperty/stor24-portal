@@ -1,3 +1,10 @@
+## 2026-11-13 — WhatChimp support ticket
+
+- Implementation and testing: no runtime change or new Facebook end-to-end test. The previously tested scoped credential remains disabled and requires rotation before use. Direct CRM test and provider-accepted notice evidence are recorded below; inbox receipt remains unverified.
+- Commit and push / merge: this support receipt is in PR #796 pending protected checks and merge. Preserve all concurrent main history.
+- Deployment and configuration: no new deployment or activation. The provider API and Facebook flow remain unverified and unconfigured for production.
+- Live production verification and provider gate: the user submitted the prepared report. WhatChimp's confirmation page stated that the inquiry was received and a support ticket created, with a typical response within 24 hours; no ticket number or support response was shown. A ticket-portal login link was requested. The report described empty {} probe results and the missing named API record without the credential or customer information. Continue manual social-input monitoring; provider response, rotated key, mapping and full Messenger-to-staff tests, mailbox receipt and staff UAT remain open.
+
 ## 2026-11-13 — Facebook intake partial production test
 
 - Implementation and merge: social intake PR #765 remains merged; no new runtime code changed in this test.
