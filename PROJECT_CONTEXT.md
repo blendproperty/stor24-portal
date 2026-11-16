@@ -1,3 +1,11 @@
+## 2026-11-16 — WhatChimp workspace cutover and outstanding migration gates
+
+- Implementation: no application code changed. Brett explicitly authorised switching the whole WhatChimp workspace; a restricted Facebook test bot was temporarily activated, then both social CRM bots returned to Draft with test keywords removed on his instruction.
+- Testing: provider reported 42 chats and 53 contacts moved and 67 bots activated. One real Facebook test message produced both a generic automated reply and the CRM bot's first question; Brett then stopped further testing. No CRM submission or Instagram real-chat test was performed.
+- Commit and push: this documentation record is a candidate; consult Git and the PR for its exact head and promotion status. Related social handoff evidence PR #829 remains open after a merge timeout.
+- Merge: this cutover record is not yet merged; verify the intended main branch before claiming promotion.
+- Deployment and configuration: WhatChimp reported the workspace switch complete. The switch stopped old-platform replies and activated imported bots. Its warning says campaigns booked on the old platform may still send. No billing setting was changed.
+- Live production verification: provider UI reported the completed switch and 67 activated bots, but this does not prove individual workflows, data completeness or customer outcomes. Imported social FAQ and pricing bots remain Draft with No channel; the newly built Facebook and Instagram CRM bots are Draft with no trigger. Midpoint Hub's active main menu has four provider warnings: the Alistair assignment falls back to the owner, and Functions and two Gym form steps need answer destinations and post-submission bot links checked. Some Midpoint workflows also remained Draft. Review imported bots, channel mappings, overlapping replies, campaigns and actual Midpoint and STOR24 operational workflows; preserve all provider, user acceptance, data, training and approval gates. Billing production hold remains in place.
 ## 2026-11-13 — Lead customer search deployed and live-verified
 
 - Implementation: PR #789 clears displayed customer matches and status when a search changes, and clears the selection and matches when the store changes. No customer, permission, billing or provider configuration was changed.
