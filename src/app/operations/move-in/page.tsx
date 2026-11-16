@@ -18,12 +18,12 @@ export default async function MoveInPage({ searchParams }: { searchParams: Promi
   const scope = await requirePermissionScope("move_in.create");
   const data = await listLeasing(scope);
   const auth = await requireSession();
-  const legacy = await Promise.all(data.tenancies.filter(t=>["DRAFT","ACTIVE","NOTICE_GIVEN"].includes(t.status) && t.documents.some(d=>d.status==="SIGNED")).map(async t=>({
+  const legacy = await Promise.all(data.tenancies.filter(t=>["DRAFT","ACTIVE","NOTICE_GIVEN"].includes(t.status) && t.documents.some(d=>d.status==="SIGNED")).map(async t=>{const readiness=await legacyHandoverReadiness(scope,t.id);return {
     id:t.id,accountId:t.accountId,label:`${t.facility.name} · ${t.occupancies[0]?.unit.number ?? "Unit needs review"} · ${t.customer.companyName || t.customer.firstName || "Customer"}`,
     possibleLeads:data.reservations.some(r=>r.convertedTenancyId===t.id)?[]:data.leads.filter(l=>l.facilityId===t.facilityId&&l.customerId===t.customerId&&l.stage!=="LOST"&&!data.reservations.some(r=>r.leadId===l.id)).map(l=>({id:l.id,label:`${l.source} · ${southAfricaDateKey(l.createdAt)} · ${l.stage.replaceAll("_"," ")}`})),
-    canReviewPhoto:auth.role==="Organisation owner" || auth.user.roleAssignments.some(a=>(!a.facilityId || a.facilityId===t.facilityId)&&hasPermission(a.role.permissions,"access.manage")),
-    ...(await legacyHandoverReadiness(scope,t.id)),
-  })));
+    canReviewPhoto:auth.role==="Organisation owner" || Boolean(readiness.photoPolicy?.trial||readiness.trialPhoto) || auth.user.roleAssignments.some(a=>(!a.facilityId || a.facilityId===t.facilityId)&&hasPermission(a.role.permissions,"access.manage")),
+    ...readiness,
+  }}));
   const reservations = await Promise.all(data.reservations.filter(reservation => reservation.status === "ACTIVE" || (reservation.id === initialReservationId && reservation.status === "CONVERTED")).map(async reservation => ({
     progress: reservation.publicLease?.status === "SIGNED" ? await getMoveInProgress(scope, reservation.id) : undefined,
     canReviewPhoto: auth.role === "Organisation owner" || auth.user.roleAssignments.some(a => (!a.facilityId || a.facilityId === reservation.facilityId) && hasPermission(a.role.permissions, "access.view")),

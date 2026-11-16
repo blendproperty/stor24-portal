@@ -9,6 +9,7 @@ import { southAfricaDateKey } from "@/lib/south-africa-time";
 import { fetchBlendSignArtifact } from "@/lib/blendsign-client";
 import { floorMapSelection, unitIsOperational } from "@/lib/floor-availability";
 import { resolvedPhotoPolicy } from "@/lib/facial-photo-control";
+import { primaryTrialPolicy } from "@/lib/unit58-primary-photo-trial";
 import type { Prisma } from "@/generated/prisma/client";
 
 type Database=Prisma.TransactionClient;
@@ -37,8 +38,8 @@ async function checks(database:Database,scope:RequestScope,id:string) {
 }
 export async function legacyHandoverReadiness(scope:RequestScope,id:string) {
   const state=await checks(db,scope,id);
-  const policy=await resolvedPhotoPolicy(db,scope.organisationId);
-  return {ready:state.ready,handedOver:Boolean(state.handover),blockers:state.blockers,payment:state.payment,documentId:state.document?.id??null,photoPolicy:policy?.enabled?{hash:policy.hash,notice:policy.notice,consentLabel:policy.consentLabel,alternativeContact:policy.alternativeContact}:null,photo:state.tenancy.legacyAccessPhoto?{id:state.tenancy.legacyAccessPhoto.id,version:state.tenancy.legacyAccessPhoto.version,status:state.tenancy.legacyAccessPhoto.status}:null};
+  const trial=await primaryTrialPolicy(db,scope.organisationId,id), policy=trial??await resolvedPhotoPolicy(db,scope.organisationId);
+  return {ready:state.ready,handedOver:Boolean(state.handover),blockers:state.blockers,payment:state.payment,documentId:state.document?.id??null,photoPolicy:policy?.enabled?{hash:policy.hash,notice:policy.notice,consentLabel:policy.consentLabel,alternativeContact:policy.alternativeContact,trial:Boolean(trial)}:null,trialPhoto:state.tenancy.legacyAccessPhoto?.policyVersion.startsWith("unit58-primary-photo-only-trial-")??false,photo:state.tenancy.legacyAccessPhoto?{id:state.tenancy.legacyAccessPhoto.id,version:state.tenancy.legacyAccessPhoto.version,status:state.tenancy.legacyAccessPhoto.status}:null};
 }
 export async function legacySignedArtifactHash(envelopeId:string) {
   const response=await fetchBlendSignArtifact(envelopeId,"signed");

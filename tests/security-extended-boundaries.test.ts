@@ -50,6 +50,26 @@ test("assisted legacy photo capture requires same-origin access management",asyn
   db.denied=false;assert.equal((await route.POST(request('https://fixture.invalid'))).status,201);assert.deepEqual(db.permissionNames,['access.manage','access.manage']);assert.equal(db.calls,1);
 });
 
+test("move-in staff can capture only the exact primary photo trial",async()=>{
+  const database:Bag={calls:0,permissionNames:[],legacyAccessPhoto:{findFirst:async()=>({tenancyId:"other",policyVersion:"unit58-primary-photo-only-trial-2026-11-16"})}};
+  const route=await load("src/app/api/v1/access/legacy-trial-photo/route.ts",database,restricted,{
+    "scope":"export const requirePermissionScope=async p=>{__db.permissionNames.push(p);if(p!=='move_in.create')throw Error('FORBIDDEN');return __auth};export const facilityWhere=()=>({id:'own'});",
+    "unit58-primary-photo-trial":"export const primaryTrialPolicy=async(_db,_org,id)=>id==='unit58'?{enabled:true}:null;",
+    "request-security":"export const sameOrigin=r=>r.headers.get('origin')==='https://fixture.invalid';export const rateLimit=async()=>false;",
+    "dlp-transfer-service":"export const protectDlpResponse=async r=>r;",
+    "legacy-access-photo":"export const submitAssistedLegacyPhoto=async()=>{__db.calls++;return {id:'test'}};export const withdrawAssistedLegacyPhoto=async()=>{__db.calls++};export const previewLegacyPhoto=async()=>{__db.calls++;return new Uint8Array()};export const reviewLegacyPhoto=async()=>{__db.calls++};",
+  });
+  const request=(id:string,origin="https://fixture.invalid")=>{const form=new FormData();form.set('tenancyId',id);form.set('image',new File(['test'],'test.jpg',{type:'image/jpeg'}));return new Request('https://fixture.invalid/api/v1/access/legacy-trial-photo?action=assisted-submit',{method:'POST',headers:{origin},body:form});};
+  assert.equal((await route.POST(request('unit58','https://foreign.invalid'))).status,403);
+  assert.equal((await route.POST(request('other'))).status,403);
+  assert.equal(database.calls,0);
+  assert.equal((await route.POST(request('unit58'))).status,201);
+  assert.equal(database.calls,1);
+  assert.equal((await route.GET(new Request('https://fixture.invalid/api/v1/access/legacy-trial-photo?id=other'))).status,403);
+  assert.equal(database.calls,1);
+  assert.ok(database.permissionNames.every((name:string)=>name==='move_in.create'));
+});
+
 test("reporting and move-in pages use their own permission scope despite unrelated facility/global roles", async () => {
   for (const unrelated of [foreign, null]) {
     const db: Bag = { scopes: [], permissionNames: [], user: { findUnique: async () => ({ id: "actor", organisationId: "org", active: true, roleAssignments: [{ facilityId: own, role: { name: "Scoped", permissions: ["reports.view", "move_in.create"] } }, { facilityId: unrelated, role: { name: "Phone", permissions: ["phone.view"] } }] }) } };
