@@ -67,7 +67,7 @@ export function AdditionalAccessQueue({ people, policy, manageableFacilities }: 
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not create capture link."); }
     finally { setBusy(false); }
   }
-  return <section className="panel panel-spacious">
+  return <section className="panel panel-spacious face-additional">
     <h2>Additional people</h2>
     <p>Customers nominate people against their booking. Each person must be present to read the notice and consent. Photo review does not activate Hikvision access.</p>
     {!policy && <p>Additional-person photo collection is unavailable until its separate policy is configured.</p>}
@@ -77,13 +77,13 @@ export function AdditionalAccessQueue({ people, policy, manageableFacilities }: 
     {people.length === 0 && <p>No additional people nominated.</p>}
     {people.map(person => {
       const canManage = (manageableFacilities === null || manageableFacilities.includes(person.facilityId)) && (!policy?.trialReservationId || policy.trialReservationId === person.reservationId);
-      return <article key={person.id}>
+      return <article className="face-additional-person" key={person.id}>
         <h3>{person.name}</h3><p>{person.facilityName} · Unit {person.unitNumber} · {person.status.replaceAll("_", " ")} · Access not active</p>
         {canManage && policy && person.status !== "WAITING_REVIEW" && <button className="button button-primary" type="button" disabled={busy} onClick={() => void startHandoff(person)}>Hand customer tablet to {person.name}</button>}
         {handoff?.id === person.id && <aside><p>Expires {new Date(handoff.expiresAt).toLocaleTimeString()}. Use a tablet without a staff login.</p><img src={handoff.qr} width={240} height={240} alt="QR code for the private photo capture link" /><p><a href={handoff.url} target="_blank" rel="noreferrer">Open capture link in a separate browser</a></p><button type="button" onClick={() => setHandoff(null)}>Hide link</button></aside>}
-        {canManage && policy && person.status !== "WAITING_REVIEW" && <form onSubmit={event => { event.preventDefault(); void capture(event.currentTarget); }}>
+        {canManage && policy && person.status !== "WAITING_REVIEW" && <form className="face-additional-form" onSubmit={event => { event.preventDefault(); void capture(event.currentTarget); }}>
           <input type="hidden" name="id" value={person.id} /><input type="hidden" name="version" value={person.photoVersion} /><input type="hidden" name="policyHash" value={policy.hash} />
-          <p>{policy.notice}</p><p>Photo retention: {policy.retentionHours} hours.</p>
+          <p className="face-additional-notice">{policy.notice}</p><p>Photo retention: {policy.retentionHours} hours.</p>
           <label>Photo <input name="image" type="file" accept="image/jpeg,image/png" required disabled={busy} /></label>
           <label><input name="consent" type="checkbox" required disabled={busy} /> The person is present, has read the notice and has personally confirmed: {policy.consentLabel}</label>
           <label><input name="identityConfirmed" type="checkbox" required disabled={busy} /> I have checked this person’s identity against the nominated name.</label>
