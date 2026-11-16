@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { facilityWhere, type RequestScope } from "@/lib/scope";
@@ -9,35 +8,12 @@ import { decryptPhoto, encryptPhoto, normaliseFacialPhoto } from "@/lib/facial-p
 import { integrationEncryptionConfigured } from "@/lib/integrations/integration-secret-vault";
 import { legacyPaymentEvidence } from "@/lib/legacy-payment-evidence";
 import { legacySignedArtifactHash } from "@/lib/legacy-handover";
+import { primaryTrialPolicy } from "@/lib/unit58-primary-photo-trial";
 
 type Database = Prisma.TransactionClient;
 type CustomerSession = {organisationId:string;email:string;customerIds:string[]};
 const summary = {id:true,tenancyId:true,version:true,status:true,consentAt:true,expiresAt:true,reviewedAt:true,activationRequestedAt:true,erasedAt:true} as const;
 const binding = (id:string, version:number) => `tenancy:${id}:legacy-photo:${version}`;
-const trialSchema=z.object({enabled:z.literal(true),version:z.string().min(1),notice:z.string().min(40),consentLabel:z.string().min(15),approvalReference:z.string().min(1),alternativeContact:z.string().min(1),retentionHours:z.literal(1),trialReservationId:z.string().min(1),trialEndsAt:z.iso.datetime({offset:true})});
-function configuredPrimaryTrial(organisationId:string) {
-  try {
-    const parsed=trialSchema.safeParse(JSON.parse(process.env.UNIT58_PRIMARY_PHOTO_TRIAL_JSON??"{}")[organisationId]);
-    return parsed.success&&Date.parse(parsed.data.trialEndsAt)>Date.now()?parsed.data:null;
-  } catch { return null; }
-}
-async function primaryTrialPolicy(database:Database,organisationId:string,tenancyId:string) {
-  const policy=configuredPrimaryTrial(organisationId);
-  if(!policy)return null;
-  try {
-    const reservation=await database.reservation.findFirst({where:{id:policy.trialReservationId,convertedTenancyId:tenancyId,status:"CONVERTED",facility:{organisationId}},include:{unit:true,convertedTenancy:{include:{account:true,occupancies:true,documents:{where:{type:"LEASE_AGREEMENT"}}}}}});
-    const tenancy=reservation?.convertedTenancy;
-    const signed=tenancy?.documents.filter(d=>d.provider==="BLENDSIGN"&&d.status==="SIGNED"&&d.signedAt&&d.externalId);
-    if(!reservation||!tenancy||tenancy.status!=="DRAFT"||tenancy.customerId!==reservation.customerId||tenancy.facilityId!==reservation.facilityId||tenancy.account.customerId!==reservation.customerId||tenancy.occupancies.length!==1||tenancy.occupancies[0].unitId!==reservation.unitId||tenancy.occupancies[0].status!=="PENDING"||reservation.unit.status!=="RESERVED"||signed?.length!==1)return null;
-    return {...policy,hash:createHash("sha256").update(JSON.stringify(policy)).digest("hex")};
-  } catch { return null; }
-}
-export async function primaryTrialSnapshot(scope:RequestScope) {
-  const policy=configuredPrimaryTrial(scope.organisationId);
-  if(!policy)return null;
-  const reservation=await db.reservation.findFirst({where:{id:policy.trialReservationId,facility:facilityWhere(scope)},select:{publicReference:true,convertedTenancyId:true,unit:{select:{number:true}},customer:{select:{firstName:true,lastName:true,companyName:true}},convertedTenancy:{select:{legacyAccessPhoto:{select:{status:true,expiresAt:true}}}}}});
-  return reservation?.convertedTenancyId&&await primaryTrialPolicy(db,scope.organisationId,reservation.convertedTenancyId)?{reference:reservation.publicReference,unitNumber:reservation.unit.number,customerName:[reservation.customer.firstName??reservation.customer.companyName??"Customer",reservation.customer.lastName].filter(Boolean).join(" "),photoStatus:reservation.convertedTenancy?.legacyAccessPhoto?.expiresAt&&reservation.convertedTenancy.legacyAccessPhoto.expiresAt<=new Date()?"EXPIRED":reservation.convertedTenancy?.legacyAccessPhoto?.status??"NOT_SUBMITTED",expiresAt:reservation.convertedTenancy?.legacyAccessPhoto?.expiresAt?.toISOString()??null}:null;
-}
 async function lock(tx:Database,id:string) { await tx.$queryRaw`SELECT "id" FROM "Tenancy" WHERE "id" = ${id} FOR UPDATE`; }
 async function customerTenancy(database:Database, session:CustomerSession, id:string) {
   const tenancy=await database.tenancy.findFirst({where:{id,facility:{organisationId:session.organisationId},customer:tenantCustomerScope(session)},include:{documents:true,account:{select:{customerId:true}}}});
@@ -98,18 +74,18 @@ export async function submitAssistedLegacyPhoto(scope:RequestScope,input:{tenanc
     if(!tenancy || tenancy.customerId!==tenancy.account.customerId)throw Error("NOT_FOUND");return tenancy;
   };
   if(!input.customerConsent||!input.identityChecked)throw Error("PHOTO_CONSENT_REQUIRED");
-  const tenancy=await find(db),policy=await policyForCollection(db,scope.organisationId);
+  const tenancy=await find(db),policy=await policyForCollection(db,scope.organisationId,input.tenancyId);
   if(policy.hash!==input.policyHash)throw Error("PHOTO_CONSENT_REQUIRED");
-  if(!eligible(tenancy)||!(await legacyPaymentEvidence(db,tenancy.accountId)).ready)throw Error("PHOTO_BOOKING_NOT_READY");
+  if(!eligible(tenancy)||(!(await primaryTrialPolicy(db,scope.organisationId,input.tenancyId))&&!(await legacyPaymentEvidence(db,tenancy.accountId)).ready))throw Error("PHOTO_BOOKING_NOT_READY");
   const signed=tenancy.documents.find(d=>d.type==="LEASE_AGREEMENT"&&d.status==="SIGNED"&&d.signedAt&&d.provider==="BLENDSIGN"&&d.externalId)!;
   await legacySignedArtifactHash(signed.externalId!);
   const image=await normaliseFacialPhoto(input.image);
   try{return await db.$transaction(async tx=>{
     await tx.$queryRaw`SELECT "id" FROM "Organisation" WHERE "id" = ${scope.organisationId} FOR UPDATE`;
-    await lock(tx,input.tenancyId);const current=await find(tx),currentPolicy=await policyForCollection(tx,scope.organisationId);
+    await lock(tx,input.tenancyId);const current=await find(tx),currentPolicy=await policyForCollection(tx,scope.organisationId,input.tenancyId);
     await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${current.accountId} FOR UPDATE`;
     if(currentPolicy.hash!==input.policyHash)throw Error("PHOTO_CONSENT_REQUIRED");
-    if(!eligible(current)||!current.documents.some(d=>d.id===signed.id&&d.status==="SIGNED"&&d.externalId===signed.externalId)||!(await legacyPaymentEvidence(tx,current.accountId)).ready)throw Error("PHOTO_BOOKING_NOT_READY");
+    if(!eligible(current)||!current.documents.some(d=>d.id===signed.id&&d.status==="SIGNED"&&d.externalId===signed.externalId)||(!(await primaryTrialPolicy(tx,scope.organisationId,input.tenancyId))&&!(await legacyPaymentEvidence(tx,current.accountId)).ready))throw Error("PHOTO_BOOKING_NOT_READY");
     const old=await tx.legacyAccessPhoto.findUnique({where:{tenancyId:input.tenancyId}});if((old?.version??0)!==input.expectedVersion)throw Error("PHOTO_CHANGED");
     const version=(old?.version??0)+1,now=new Date();
     const values={version,status:"WAITING_REVIEW",encryptedImage:encryptPhoto(image,binding(input.tenancyId,version)),imageSha256:createHash("sha256").update(image).digest("hex"),policyVersion:currentPolicy.version,policyHash:currentPolicy.hash,consentNotice:JSON.stringify({notice:currentPolicy.notice,consentLabel:currentPolicy.consentLabel,alternativeContact:currentPolicy.alternativeContact,retentionHours:currentPolicy.retentionHours,approvalReference:currentPolicy.approvalReference}),consentAt:now,expiresAt:currentPolicy.retentionHours===null?null:new Date(now.getTime()+currentPolicy.retentionHours*3600000),reviewedAt:null,reviewedById:null,activationRequestedAt:null,erasedAt:null};

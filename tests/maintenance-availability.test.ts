@@ -29,7 +29,7 @@ test("maintenance status changes are facility scoped and audited", () => {
 
 test("operations portal exposes maintenance creation and lifecycle controls", () => {
   assert.match(workspace, /Create maintenance request/);
-  assert.match(workspace, /updateMaintenance\(item\.id, "IN_PROGRESS"\)/);
-  assert.match(workspace, /updateMaintenance\(item\.id, "COMPLETED"\)/);
-  assert.match(workspace, /updateMaintenance\(item\.id, "CANCELLED"\)/);
+  assert.match(workspace, /updateMaintenance\(item\.id, \{ status: "IN_PROGRESS" \}\)/);
+  assert.match(workspace, /updateMaintenance\(item\.id, \{ status: "COMPLETED" \}\)/);
+  assert.match(workspace, /updateMaintenance\(item\.id, \{ status: "CANCELLED" \}\)/);
 });

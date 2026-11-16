@@ -1644,6 +1644,13 @@ model MaintenanceRequest {
   assignedTo     User?             @relation(fields: [assignedToId], references: [id])
   title          String
   description    String?
+  jobCard            Boolean @default(false)
+  contractor         String?
+  scheduledFor       DateTime?
+  progressNotes      String?
+  completionEvidence String?
+  repairReportedAt   DateTime?
+  verificationNote   String?
   status         MaintenanceStatus @default(OPEN)
   priority       TaskPriority      @default(NORMAL)
   dueAt          DateTime?
