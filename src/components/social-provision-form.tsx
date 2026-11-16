@@ -32,17 +32,19 @@ export function SocialProvisionForm() {
     } catch { setMessage('The result is uncertain. Check the connections before retrying.'); }
     finally { setBusy(false); }
   }
-  return <section className="panel panel-spacious">
+  return <section className="panel panel-spacious social-provision">
     {message && <p role="alert">{message}</p>}
-    <p>Active connections: {connections === null ? 'not checked; reload this page to check' : connections.length ? connections.map(c => `${facilities.find(f => f.id === c.facilityId)?.name || 'Unknown facility'} — ${c.channel} (${c.botId || 'unknown bot'})`).join('; ') : 'none'}.</p>
-    {keys ? <><p>Copy each key privately into its matching WhatChimp request. The keys are shown only here; they cannot be recovered after leaving this page.</p><label>Facebook key<input readOnly value={keys.facebook} /></label><label>Instagram key<input readOnly value={keys.instagram} /></label><button type="button" className="button" onClick={() => setKeys(null)}>Done</button></> : <form onSubmit={create}>
+    <p className="social-provision-status">Active connections: {connections === null ? 'not checked; reload this page to check' : connections.length ? connections.map(c => `${facilities.find(f => f.id === c.facilityId)?.name || 'Unknown facility'} — ${c.channel} (${c.botId || 'unknown bot'})`).join('; ') : 'none'}.</p>
+    {keys ? <div className="social-provision-keys"><p>Copy each key privately into its matching WhatChimp request. The keys are shown only here; they cannot be recovered after leaving this page.</p><label>Facebook key<input readOnly value={keys.facebook} /></label><label>Instagram key<input readOnly value={keys.instagram} /></label><button type="button" className="button" onClick={() => setKeys(null)}>Done</button></div> : <form onSubmit={create}>
       <p>Create separate credentials for lead capture. Each key permits enquiry creation for the selected facility.</p>
+      <div className="social-provision-fields">
       <label>Facility<select required value={facilityId} onChange={e => setFacility(e.target.value)}><option value="">Choose a facility</option>{facilities.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select></label>
       <label>Notification recipient<select required value={recipientUserId} onChange={e => setRecipient(e.target.value)}><option value="">Choose a recipient</option>{users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}</select></label>
       <label>Facebook bot ID<input required value={facebookBotId} onChange={e => setFacebook(e.target.value)} /></label>
       <label>Instagram bot ID<input required value={instagramBotId} onChange={e => setInstagram(e.target.value)} /></label>
-      <button type="submit" className="button button-primary" disabled={busy}>{busy ? 'Creating…' : 'Create separate credentials'}</button>
-      <button type="button" className="button" disabled={busy} onClick={revoke}>Revoke matching credentials</button>
+      </div>
+      <div className="social-provision-actions"><button type="submit" className="button button-primary" disabled={busy}>{busy ? 'Creating…' : 'Create separate credentials'}</button>
+      <button type="button" className="button" disabled={busy} onClick={revoke}>Revoke matching credentials</button></div>
     </form>}
   </section>;
 }
