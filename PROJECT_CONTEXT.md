@@ -8457,3 +8457,9 @@ Validation follow-up: the project typecheck and targeted ESLint for the candidat
 - **Commit and push:** Candidate requires commit, push and remote head readback. **Merge:** Pending exact-head protected checks. **Deployment and configuration:** None from this UI change yet; Unit 58 trial policy remains off. **Live production verification:** Brett reported a successful real customer sign-in, but provider delivery/audit and nomination were not independently read back. No photo, staff approval, HikCentral grant or physical entry has been verified.
 - **Outstanding:** Release this UI correction and have Brett nominate the test participant in My STOR24; then enable the bounded Unit 58 photo-only trial and verify consent, capture, review and deletion without door access. Preserve general Liezl biometric-policy approval, provider retention/deletion, mapping, reader, training and physical UAT gates.
 
+
+## WhatChimp social bot identifier compatibility — 16 November 2026
+- Implementation: social intake configuration accepts legacy numeric bot identifiers and new WhatChimp UUID bot identifiers; authentication, facility and recipient checks are unchanged.
+- Testing: focused contract tests passed locally, covering both identifier formats and malformed values. Full protected CI remains pending.
+- Commit and push: pending. Merge: pending. Deployment and configuration: pending; no new social credentials or profiles created. Live production verification: not performed.
+- Outstanding: review and release the candidate; create separately scoped Facebook and Instagram credentials, configure guarded flows, run no-write and end-to-end tests, confirm actual staff delivery and UAT. Preserve provider cutover, privacy, data, training and approval gates.
