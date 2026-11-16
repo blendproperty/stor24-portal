@@ -8520,6 +8520,15 @@ Validation follow-up: the project typecheck and targeted ESLint for the candidat
 - **Provider draft changes:** Inactive Facebook and Instagram drafts have their START guard linked through name, phone, requirements and preferred move-in questions. Trigger, validation, secure request encoding, submission, phase resets and failure handling remain incomplete.
 - **Outstanding:** Private key issuance and entry, no-write probes, safe character encoding, both live social CRM and notification tests, actual Katlego inbox receipt, provider cutover, staff UAT and approvals remain open. Monitor run 43832205098 failed the host heartbeat with retained SSH-key-change alert; investigate attribution without clearing or suppressing monitoring. Keep billing hold and all other gates.
 
+### 16 November 2026 — social provisioning layout correction release
+
+- **Implementation:** PR #819 reflows the owner credential form and one-time key display into labelled responsive fields with a separate action row. Credential creation and revocation logic is unchanged.
+- **Testing:** Actual-component browser fixture with production stylesheet passed at 1440px and 375px for field positioning, horizontal overflow and key display, plus existing creation, uncertain-result and cancelled-revocation checks; scoped lint and diff checks passed. Exact PR head `11992cc5700f89bc2360acb5d565ed4708b5ceef` and merged main `93a322e5ffb13413d18f0b62e08ce399914b551c` passed protected CI, security, transaction and restricted-runtime checks.
+- **Commit and push:** PR #819 candidate `11992cc5700f89bc2360acb5d565ed4708b5ceef` pushed. **Merge:** squash merged as `93a322e5ffb13413d18f0b62e08ce399914b551c`. PR #817's previous release evidence was incorporated and its duplicate closed.
+- **Deployment and configuration:** [Deploy 43839089088](https://github.com/blendproperty/stor24-portal/actions/runs/43839089088) succeeded at 09:24 UTC. Image `stor24-crm:93a322e5f` healthy, no OOM, server-local HTTP 200. No credentials were issued by the layout correction; billing hold unchanged.
+- **Live production verification:** Public health returned HTTP 200 and database OK at 09:25 UTC. Authenticated desktop screen showed Midpoint, Katlego and complete Facebook and Instagram bot IDs in separate readable fields and separate action buttons. Live mobile and the one-time key state were not exercised; both were checked in the synthetic fixture.
+- **Outstanding:** Secure credential entry, provider mapping and guards, both social CRM handoff tests, Katlego inbox receipt, provider and staff UAT, and host security alert review remain open.
+
 ### 2026-11-16 - Facial-photo notice presentation release
 
 - **Implementation:** [PR #811](https://github.com/blendproperty/stor24-portal/pull/811) opens the existing tenant facial-photo notice by default before the separate required consent choice and adds the PRIV-01/02 source review. Policy wording, policy hash, collection switch and provider settings were unchanged. Its companion website identity change is tracked in website PR #279.
