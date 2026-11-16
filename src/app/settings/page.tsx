@@ -2,6 +2,8 @@ import { Activity, BadgePercent, BellRing, Building2, Cable, FileSignature, KeyR
 import { PageHeader } from "@/components/page-header";
 import { ChangePasswordForm } from "@/components/change-password-form";
 import Link from "next/link";
+import { requireSession } from "@/lib/auth-guards";
+import { MIDPOINT_JOB_CARD_PERMISSION } from "@/lib/maintenance-job-policy";
 import { MfaSettings } from "@/components/mfa-settings";
 
 export const metadata = { title: "Settings" };
@@ -18,19 +20,21 @@ const modules = [
   [BellRing, "Operations alerts", "Manage the people who receive website, backup and recovery notifications.", "/settings/alerts"],
 ] as const;
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  const { permissions } = await requireSession();
+  const jobCardsOnly = permissions.includes(MIDPOINT_JOB_CARD_PERMISSION);
   return (
     <div className="page-stack settings-hub-workspace">
       <PageHeader
-        eyebrow="Administration"
+        eyebrow={jobCardsOnly ? "Personal" : "Administration"}
         title="Settings"
-        description="Configure the shared policies and integrations that drive every facility workflow."
+        description={jobCardsOnly ? "Manage your password and two-step verification." : "Configure the shared policies and integrations that drive every facility workflow."}
       />
-      <section className="module-grid">
+      {!jobCardsOnly && <section className="module-grid">
         {modules.map(([Icon, title, copy, href]) => (
           <Link className="module-card" href={href} key={title}><Icon size={22} /><h3>{title}</h3><p>{copy}</p></Link>
         ))}
-      </section>
+      </section>}
       <section className="panel panel-spacious"><div className="panel-heading"><div><h2>Two-step verification</h2><p className="panel-subtitle">Protect this staff account with an authenticator app and one-time recovery codes.</p></div><ShieldCheck className="positive-icon" /></div><MfaSettings /></section>
       <section className="panel panel-spacious"><div className="panel-heading"><div><h2>Account password</h2><p className="panel-subtitle">Update your password and invalidate all existing sessions.</p></div><ShieldCheck className="positive-icon" /></div><ChangePasswordForm /></section>
     </div>

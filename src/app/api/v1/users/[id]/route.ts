@@ -1,4 +1,5 @@
 import { currentRoleAccess } from "@/lib/current-role-access";
+import { MIDPOINT_JOB_CARD_ROLE, validMidpointJobCardRole } from "@/lib/maintenance-job-policy";
 import { db } from "@/lib/db";
 import { requirePermission } from "@/lib/auth-guards";
 import { updateUserSchema } from "@/lib/validators";
@@ -29,6 +30,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (parsed.data.facilityCode && !facility) return Response.json({ error: { message: "Choose a valid facility." } }, { status: 422 });
   if (role && parsed.data.facilityCode === undefined && !target.roleAssignments.length) return Response.json({ error: { message: "Choose a facility for this user." } }, { status: 409 });
   if (role?.name === "Facility manager" && (parsed.data.facilityCode === null || parsed.data.facilityCode === "" || (parsed.data.facilityCode === undefined && target.roleAssignments.some(a => a.facilityId === null)))) return Response.json({ error: { message: "Choose a facility for a facility manager." } }, { status: 409 });
+  if (role?.name === MIDPOINT_JOB_CARD_ROLE && !validMidpointJobCardRole(target.email, role.permissions, facility)) {
+    return Response.json({ error: { message: "Select Store 1 - Midpoint for Carlo’s job-card role." } }, { status: 422 });
+  }
   await db.$transaction(async (tx) => {
     if (parsed.data.active !== undefined) {
       await tx.user.update({ where: { id }, data: { active: parsed.data.active, sessionVersion: { increment: 1 } } });

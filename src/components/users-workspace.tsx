@@ -59,6 +59,7 @@ export function UsersWorkspace() {
   const [roleOptions, setRoleOptions] = useState<RoleOption[]>([]);
   const [facilities, setFacilities] = useState<FacilityOption[]>([]);
   const [invitationSent, setInvitationSent] = useState(false);
+  const [manualInviteUrl, setManualInviteUrl] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [revokingId, setRevokingId] = useState<string | null>(null);
@@ -101,6 +102,7 @@ export function UsersWorkspace() {
     setBusy(true);
     setError("");
     setInvitationSent(false);
+    setManualInviteUrl("");
     const response = await fetch("/api/v1/invitations", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -120,6 +122,7 @@ export function UsersWorkspace() {
       return;
     }
     setInvitationSent(payload.data.delivery === "SENT");
+    if (payload.data.delivery === "MANUAL") setManualInviteUrl(payload.data.inviteUrl);
     await load();
   }
 
@@ -232,6 +235,7 @@ export function UsersWorkspace() {
             onClick={() => {
               setOpen(true);
               setInvitationSent(false);
+              setManualInviteUrl("");
               setError("");
             }}
           >
@@ -445,7 +449,18 @@ export function UsersWorkspace() {
               Choose the employee&apos;s security level and store access. A
               secure invitation expires in seven days.
             </p>
-            {invitationSent ? (
+            {manualInviteUrl ? (
+              <div className="invite-success">
+                <span><Check size={18} /> Private setup link created</span>
+                <p>Share this link privately with Carlo. It expires in seven days and is shown only here.</p>
+                <button className="button button-secondary" onClick={async () => {
+                  try { await navigator.clipboard.writeText(manualInviteUrl); setNotice("Setup link copied."); }
+                  catch { setNotice("Could not copy the link. Select and copy it from the field."); }
+                }}>Copy private setup link</button>
+                {notice && <p role="status">{notice}</p>}
+                <label>Private setup link<input type="password" readOnly value={manualInviteUrl} /></label>
+              </div>
+            ) : invitationSent ? (
               <div className="invite-success">
                 <span>
                   <Check size={18} /> Invitation created

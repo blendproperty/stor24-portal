@@ -299,6 +299,7 @@ export const createInvitationSchema = z.object({
     "Collections",
     "Finance",
     "Auditor / read only",
+    "Midpoint job card manager",
   ]),
   facilityCode: z.string().trim().max(40).optional(),
 });
