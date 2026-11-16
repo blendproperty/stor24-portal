@@ -10,18 +10,20 @@ import { DailyCloseForm } from "@/components/daily-close-form";
 import { DailyCloseHistory, type DailyCloseRecord } from "@/components/daily-close-history";
 import { MerchandiseOrderQueue } from "@/components/merchandise-order-queue";
 import { StatusPill } from "@/components/status-pill";
+import { MaintenanceJobCard, type JobCardAction, type MaintenanceJob } from "@/components/maintenance-job-card";
+import { MIDPOINT_STORE } from "@/lib/maintenance-job-policy";
 import { StaffHandbookDownload } from "@/components/staff-handbook-download";
 import Link from "next/link";
 import { formatSouthAfricaDateTime } from "@/lib/south-africa-time";
 import { PackageEditorModal, ProductEditorModal, type MerchandisePackage, type MerchandiseProduct } from "@/components/merchandise-editor";
 
 type Task = OperationsQueueTask;
-type Maintenance = { id: string; title: string; status: string; priority: string; unit?: { number: string } | null; facility: { name: string } };
+type Maintenance = MaintenanceJob & { facility: { name: string } };
 type Product = MerchandiseProduct;
 type StoragePackage = MerchandisePackage;
 type Close = DailyCloseRecord;
 type Facility = { id: string; name: string; units: { id: string; number: string; status: string }[] };
-type OperationsData = { tasks: Task[]; maintenance: Maintenance[]; products: Product[]; storagePackages: StoragePackage[]; dailyCloses: Close[]; notes: unknown[]; facilities: Facility[]; dailyCloseFacilityIds?: string[]; taskPage?: OperationsTaskPage };
+type OperationsData = { tasks: Task[]; maintenance: Maintenance[]; jobCards?: MaintenanceJob[]; products: Product[]; storagePackages: StoragePackage[]; dailyCloses: Close[]; notes: unknown[]; facilities: Facility[]; dailyCloseFacilityIds?: string[]; jobCardRole?: "verifier" | "manager" | null; taskPage?: OperationsTaskPage };
 
 export function OperationsWorkspace({ view = "operations", reminders }: { view?: "operations" | "merchandise"; reminders?: ReactNode }) {
   const [data, setData] = useState<OperationsData | null>(null);
@@ -49,6 +51,7 @@ export function OperationsWorkspace({ view = "operations", reminders }: { view?:
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
   const [maintenanceUncertain, setMaintenanceUncertain] = useState(false);
   const [maintenanceFacilityId, setMaintenanceFacilityId] = useState("");
+  const [createsJobCard, setCreatesJobCard] = useState(false);
   const [showProduct, setShowProduct] = useState(false);
   const productCreationRequest = useRef(false);
   const [productCreationMessage, setProductCreationMessage] = useState("");
@@ -250,7 +253,7 @@ export function OperationsWorkspace({ view = "operations", reminders }: { view?:
         method: "POST", signal: controller.signal,
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ kind: "maintenance", payload: {
-          facilityId, unitId: unitId || undefined, title,
+          facilityId, unitId: unitId || undefined, title, jobCard: createsJobCard || undefined,
           description: formData.get("description") || undefined,
           priority: formData.get("priority"),
           dueAt: formData.get("dueAt") ? new Date(String(formData.get("dueAt"))).toISOString() : undefined,
@@ -275,7 +278,7 @@ export function OperationsWorkspace({ view = "operations", reminders }: { view?:
     }
   }
 
-  async function updateMaintenance(id: string, status: "IN_PROGRESS" | "COMPLETED" | "CANCELLED") {
+  async function updateMaintenance(id: string, change: JobCardAction | { status: "IN_PROGRESS" | "COMPLETED" | "CANCELLED" }) {
     if (maintenanceRequest.current || maintenanceUncertain) return;
     maintenanceRequest.current = true;
     setBusy(true);
@@ -285,15 +288,21 @@ export function OperationsWorkspace({ view = "operations", reminders }: { view?:
     try {
       const response = await fetch(`/api/v1/operations/maintenance/${id}`, {
         method: "PATCH", signal: controller.signal,
-        headers: { "content-type": "application/json" }, body: JSON.stringify({ status }),
+        headers: { "content-type": "application/json" }, body: JSON.stringify(change),
       });
       const payload = await response.json();
-      if ([400, 401, 403, 404, 422, 429].includes(response.status)) {
+      if ([400, 401, 403, 404, 409, 422, 429].includes(response.status)) {
         setMaintenanceMessage(typeof payload.error?.message === "string" ? payload.error.message : "Maintenance was not updated. Check your access and try again.");
         return;
       }
-      if (!response.ok || payload.data?.id !== id || payload.data.status !== status) throw new Error("Unconfirmed maintenance change");
-      setData(current => current ? { ...current, maintenance: current.maintenance.map(item => item.id === id ? { ...item, status } : item) } : current);
+      if (!response.ok || payload.data?.id !== id || (!("action" in change) && payload.data.status !== change.status)) throw new Error("Unconfirmed maintenance change");
+      setData(current => current ? {
+        ...current,
+        maintenance: current.maintenance.map(item => item.id === id ? { ...item, status: payload.data.status } : item),
+        jobCards: current.jobCards?.map(item => item.id === id ? {
+          ...item, ...payload.data, unit: item.unit, assignedTo: item.assignedTo,
+        } : item),
+      } : current);
       await load();
     } catch {
       setMaintenanceUncertain(true);
@@ -483,7 +492,9 @@ export function OperationsWorkspace({ view = "operations", reminders }: { view?:
   const taskPage = data?.taskPage;
   const openTasks = taskPage ? taskPage.items.filter(task => taskPage.filters.status !== "active" || !["COMPLETED", "CANCELLED"].includes(task.status)) : data?.tasks.filter(task => !["COMPLETED", "CANCELLED"].includes(task.status)) ?? [];
   const taskActionsBlocked = taskBusy || taskNeedsCheck || loading || readFailed || taskLoading || !!taskReadError;
-  const service = data?.maintenance.filter((item) => !["COMPLETED", "CANCELLED"].includes(item.status)) ?? [];
+  const service = data?.maintenance.filter(item => !["COMPLETED", "CANCELLED"].includes(item.status)) ?? [];
+  const jobCards = data?.jobCards ?? [];
+  const jobCardFacility = data?.jobCardRole === "verifier" ? data.facilities.find(facility => facility.name === MIDPOINT_STORE) : undefined;
   const reorder = data?.products.filter((product) => product.quantityOnHand <= product.reorderPoint) ?? [];
   const productCategories = Array.from(new Set(data?.products.map((product) => product.category) ?? [])).sort();
   const visibleProducts = data?.products.filter((product) => (productCategory === "ALL" || product.category === productCategory) && `${product.name} ${product.sku} ${product.category}`.toLowerCase().includes(productQuery.toLowerCase())) ?? [];
@@ -531,11 +542,21 @@ export function OperationsWorkspace({ view = "operations", reminders }: { view?:
       {!openTasks.length && !taskLoading && !taskReadError && !readFailed ? <div className="empty-state"><CheckCircle2 size={32}/><strong>{taskPage ? "No tasks match these filters" : "No open tasks"}</strong><p>{taskPage ? "Clear a filter or create a new task." : "Create a task to start the facility work queue."}</p></div> : null}
       {taskPage?.nextCursor ? <button className="button button-secondary" disabled={taskBusy || taskLoading || !!taskReadError || readFailed} onClick={() => void loadTaskPage(taskPage.filters, taskPage.nextCursor!)}>Load more tasks</button> : null}
     </section>
-    <section id="operations-maintenance" className="panel panel-spacious"><div className="panel-heading"><div><p className="eyebrow">Store upkeep</p><h2>Maintenance queue</h2><p className="panel-subtitle">Unit and facility requests, separate from the task queue.</p></div><button className="button button-secondary" disabled={busy || maintenanceUncertain} onClick={() => setShowMaintenance(true)}><Plus size={16}/> New request</button></div>
-      <div className="work-list">{service.length ? service.map(item => <div className="work-row" key={item.id}><span className="work-icon work-icon-warning"><Wrench size={18}/></span><span className="work-copy"><strong>{item.title}</strong><small>{item.facility.name}{item.unit ? ` · Unit ${item.unit.number}` : ""}</small></span><StatusPill tone={item.priority === "URGENT" ? "danger" : "warning"}>{item.status}</StatusPill><span className="inline-actions">{item.status !== "IN_PROGRESS" ? <button className="text-button" disabled={busy || maintenanceUncertain} onClick={() => updateMaintenance(item.id, "IN_PROGRESS")}>Start</button> : null}<button className="text-button" disabled={busy || maintenanceUncertain} onClick={() => updateMaintenance(item.id, "COMPLETED")}>Complete</button><button className="text-button" disabled={busy || maintenanceUncertain} onClick={() => updateMaintenance(item.id, "CANCELLED")}>Cancel</button></span></div>) : <div className="empty-state"><Wrench size={32}/><strong>No service requests</strong><p>Unit and facility maintenance will appear here.</p></div>}</div>
+    <section id="operations-maintenance" className="panel panel-spacious"><div className="panel-heading"><div><p className="eyebrow">Store upkeep</p><h2>Maintenance queue</h2><p className="panel-subtitle">Unit and facility requests, separate from the task queue.</p></div><button className="button button-secondary" disabled={busy || maintenanceUncertain} onClick={() => { setCreatesJobCard(false); setShowMaintenance(true); }}><Plus size={16}/> New request</button>
+      {jobCardFacility && <button className="button button-primary" disabled={busy || maintenanceUncertain} onClick={() => {
+        setCreatesJobCard(true);
+        setMaintenanceFacilityId(jobCardFacility.id);
+        setShowMaintenance(true);
+      }}><Plus size={16}/> New Midpoint job card</button>}</div>
+      {(jobCards.length > 0 || data?.jobCardRole) && <div className="work-list">
+        <h3>Midpoint job cards</h3>
+        {jobCards.map(job => <MaintenanceJobCard key={job.id} job={job} role={data?.jobCardRole ?? null} disabled={busy || maintenanceUncertain} update={updateMaintenance} />)}
+        {!jobCards.length && <p>No Midpoint job cards yet.</p>}
+      </div>}
+      <div className="work-list">{service.length ? service.map(item => <div className="work-row" key={item.id}><span className="work-icon work-icon-warning"><Wrench size={18}/></span><span className="work-copy"><strong>{item.title}</strong><small>{item.facility.name}{item.unit ? ` · Unit ${item.unit.number}` : ""}</small></span><StatusPill tone={item.priority === "URGENT" ? "danger" : "warning"}>{item.status}</StatusPill><span className="inline-actions">{item.status !== "IN_PROGRESS" ? <button className="text-button" disabled={busy || maintenanceUncertain} onClick={() => updateMaintenance(item.id, { status: "IN_PROGRESS" })}>Start</button> : null}<button className="text-button" disabled={busy || maintenanceUncertain} onClick={() => updateMaintenance(item.id, { status: "COMPLETED" })}>Complete</button><button className="text-button" disabled={busy || maintenanceUncertain} onClick={() => updateMaintenance(item.id, { status: "CANCELLED" })}>Cancel</button></span></div>) : <div className="empty-state"><Wrench size={32}/><strong>No service requests</strong><p>Unit and facility maintenance will appear here.</p></div>}</div>
     </section>
     <section id="operations-daily-close" className="panel daily-close-panel"><div className="hub-heading"><div><p className="eyebrow">Day-end records</p><h2>End-of-day control</h2><p>Recorded close snapshots and cash variance.</p></div><RefreshCw size={20}/></div><DailyCloseForm facilities={(data?.facilities ?? []).filter(facility => data?.dailyCloseFacilityIds?.includes(facility.id))} unavailable={loading || readFailed} onRecorded={load}/><DailyCloseHistory records={data?.dailyCloses ?? []}/></section>
     {showTask ? <div className="modal-backdrop"><div className="modal-card" role="dialog" aria-modal="true"><p className="eyebrow">Work queue</p><h2>Create operational task</h2><form onSubmit={(event) => { event.preventDefault(); void createTask(new FormData(event.currentTarget)); }} className="invite-form">{taskCreationMessage ? <div role="alert"><p>{taskCreationMessage}</p>{taskCreationUncertain ? <button type="button" className="button button-primary" onClick={() => window.location.reload()}>Reload task list</button> : null}</div> : null}<label>Facility<select name="facilityId" required><option value="">Choose facility</option>{data?.facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}</select></label><label>Title<input name="title" required minLength={2}/></label><label>Description<textarea name="description" rows={4}/></label><label>Priority<select name="priority" defaultValue="NORMAL"><option>LOW</option><option>NORMAL</option><option>HIGH</option><option>URGENT</option></select></label><label>Due date<input name="dueAt" type="datetime-local"/></label><div className="form-actions"><button type="button" className="button button-secondary" onClick={() => setShowTask(false)}>Cancel</button><button className="button button-primary" disabled={busy || taskCreationUncertain || !data?.facilities.length}>{busy ? "Saving…" : "Create task"}</button></div></form></div></div> : null}
-    {showMaintenance ? <div className="modal-backdrop"><div className="modal-card" role="dialog" aria-modal="true"><p className="eyebrow">Unit availability</p><h2>Create maintenance request</h2><p className="panel-subtitle">Selecting a unit immediately removes it from bookable availability until all linked maintenance is complete.</p><form onSubmit={(event) => { event.preventDefault(); void createMaintenance(new FormData(event.currentTarget)); }} className="invite-form">{maintenanceMessage ? <div role="alert"><p>{maintenanceMessage}</p>{maintenanceUncertain ? <button type="button" className="button button-primary" onClick={() => window.location.reload()}>Reload maintenance status</button> : null}</div> : null}<label>Facility<select name="facilityId" required value={maintenanceFacilityId} onChange={(event) => setMaintenanceFacilityId(event.target.value)}><option value="">Choose facility</option>{data?.facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}</select></label><label>Unit (optional)<select name="unitId" defaultValue=""><option value="">Facility-level request</option>{data?.facilities.find((facility) => facility.id === maintenanceFacilityId)?.units.map((unit) => <option key={unit.id} value={unit.id}>Unit {unit.number}{unit.status === "SERVICE" ? " · already in service" : ""}</option>)}</select></label><label>Title<input name="title" required minLength={2}/></label><label>Description<textarea name="description" rows={4}/></label><label>Priority<select name="priority" defaultValue="NORMAL"><option>LOW</option><option>NORMAL</option><option>HIGH</option><option>URGENT</option></select></label><label>Due date<input name="dueAt" type="datetime-local"/></label><div className="form-actions"><button type="button" className="button button-secondary" onClick={() => { setShowMaintenance(false); setMaintenanceFacilityId(""); }}>Cancel</button><button className="button button-primary" disabled={busy || maintenanceUncertain || !maintenanceFacilityId}>{busy ? "Saving…" : "Create request"}</button></div></form></div></div> : null}
+    {showMaintenance ? <div className="modal-backdrop"><div className="modal-card" role="dialog" aria-modal="true"><p className="eyebrow">Unit availability</p><h2>{createsJobCard ? "Create Midpoint job card" : "Create maintenance request"}</h2><p className="panel-subtitle">Selecting a unit immediately removes it from bookable availability until all linked maintenance is complete.</p>{createsJobCard && <p>Carlo manages the repair. Katlego verifies it on site before the job closes.</p>}<form onSubmit={(event) => { event.preventDefault(); void createMaintenance(new FormData(event.currentTarget)); }} className="invite-form">{maintenanceMessage ? <div role="alert"><p>{maintenanceMessage}</p>{maintenanceUncertain ? <button type="button" className="button button-primary" onClick={() => window.location.reload()}>Reload maintenance status</button> : null}</div> : null}<label>Facility<select name="facilityId" required value={maintenanceFacilityId} onChange={(event) => setMaintenanceFacilityId(event.target.value)}><option value="">Choose facility</option>{data?.facilities.filter(facility => !createsJobCard || facility.id === jobCardFacility?.id).map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}</select></label><label>Unit (optional)<select name="unitId" defaultValue=""><option value="">Facility-level request</option>{data?.facilities.find((facility) => facility.id === maintenanceFacilityId)?.units.map((unit) => <option key={unit.id} value={unit.id}>Unit {unit.number}{unit.status === "SERVICE" ? " · already in service" : ""}</option>)}</select></label><label>Title<input name="title" required minLength={2}/></label><label>Description<textarea name="description" rows={4}/></label><label>Priority<select name="priority" defaultValue="NORMAL"><option>LOW</option><option>NORMAL</option><option>HIGH</option><option>URGENT</option></select></label><label>Due date<input name="dueAt" type="datetime-local"/></label><div className="form-actions"><button type="button" className="button button-secondary" onClick={() => { setShowMaintenance(false); setMaintenanceFacilityId(""); }}>Cancel</button><button className="button button-primary" disabled={busy || maintenanceUncertain || !maintenanceFacilityId}>{busy ? "Saving…" : "Create request"}</button></div></form></div></div> : null}
   </div>;
 }
