@@ -1,0 +1,18 @@
+# PRIV-01 and PRIV-02 review — 16 November 2026
+
+Scope: website source `55d65f05e563c67bcf24889cab9479489c555846`, CRM source `b6765344b0501b2dd36d4085c8fcd02766b00f18`, public privacy and PAIA page readback, and a focused source review. This is not legal advice or programme acceptance.
+
+## PRIV-01: notices and requests
+
+- The public [privacy notice](https://stor24.co.za/privacy), edition `stor24-privacy-2026-11-02-v2`, identifies the responsible business, booking and contact purposes, providers, request route, retention limits and that the final biometric policy remains under review. The [PAIA page](https://stor24.co.za/paia) offers a contact route and explicitly says the formal manual is not complete. The booking form links the notice, and the identity-upload form obtains a separate acknowledgement and notice from the CRM policy. These observations do not verify the mailbox, legal accuracy or completeness of the manual.
+- The website identity notice was collapsed by default even though the acknowledgement appeared below it. The candidate website change opens the existing notice by default. It does not change policy text or treat acknowledgement as approval.
+- The public notice says Clarity tracking stops on withdrawal. Earlier bounded live observations documented transition requests containing interaction and DOM-mutation event categories, possibly queued before withdrawal. Refer to the [website investigation](https://github.com/blendproperty/stor24/blob/55d65f05e563c67bcf24889cab9479489c555846/docs/CLARITY_WITHDRAWAL_INVESTIGATION_2026-11-13.md). Privacy review must resolve whether the wording adequately describes queued traffic and provider retention; neither actual provider handling nor individual deletion is established. Clarity remains enabled for consenting visitors; no support contact is requested.
+- Still needed: approved notice and PAIA manual, confirmed responsible contact and request routing, verified purposes and recipient details, retention, cross-border arrangements, and desktop/mobile checks of the released forms and notices. Source links and a functioning mailto link do not prove a request is received or handled.
+
+## PRIV-02: facial photographs
+
+- CRM `interimPhotoPolicy` is marked `INTERIM_AWAITING_REVIEW`. It describes staff review, separate access activation, portal lifecycle removal, and the absence of confirmed provider/device deletion or an established alternative. The owner switch checks technical prerequisites; it does not establish legal approval. Do not turn collection on or off as part of this review.
+- Both reservation and legacy tenant capture use `TenantFacePhoto`; the candidate opens the existing photo notice by default before the unticked consent checkbox. The shared submit services separately require consent and the current policy hash. Staff-assisted capture shows the policy text directly. Additional-person capture is governed by its own policy and approval hold; do not conflate it with the tenant flow.
+- Still needed: responsible reviewer decision on applicable basis and lawful conditions, necessity/proportionality, whether consent is appropriate, a confirmed practical alternative and withdrawal consequences, minors and additional people, approved precise wording, retention and provider/device deletion. Verify the actual live collection settings and conduct authorised staff/customer/device and provider tests before acceptance. Do not claim provider deletion from portal removal.
+
+Both requirements and P14 remain open. Browser fixture tests use synthetic data; they are not evidence of a legal decision, actual informed consent, provider action or production configuration. No personal data or collection settings were changed by this review.
