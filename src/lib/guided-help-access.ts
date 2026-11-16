@@ -93,6 +93,7 @@ export const guideAccessRules: Record<string, Rule> = {
   settings: rule("configuration.view,configuration.manage,users.view,users.manage,integrations.view,integrations.manage", ["", "", "", "", ""]),
   communications: rule("operations.view,communications.view", ["", "@owner", "", "", "operations.manage", "@owner"]),
   integrations: rule("operations.view,integrations.view", ["", "", "operations.manage", "", "integrations.manage,@owner"]),
+  "whatchimp-social": rule("@owner", ["", "", ""], true),
   hikvision: rule("integrations.view,integrations.manage", ["", "", "", ""], true),
   "netcash-settings": rule("integrations.view,integrations.manage", ["", "", "", ""], true),
   phone: rule("phone.view", ["", "operations.view,leads.view,reservations.manage,ledger.view", "operations.manage"]),
