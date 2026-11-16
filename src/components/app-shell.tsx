@@ -39,7 +39,7 @@ import { ConnectivityStatus } from "@/components/connectivity-status";
 import { BrandCorner } from "@/components/brand-corner";
 import { GuidedHelp } from "@/components/guided-help";
 
-import { MIDPOINT_JOB_CARD_PAGE, MIDPOINT_JOB_CARD_PERMISSION } from "@/lib/maintenance-job-policy";
+import { MIDPOINT_JOB_CARD_PAGE, MIDPOINT_JOB_CARD_PERMISSION, MIDPOINT_JOB_CARD_SETTINGS } from "@/lib/maintenance-job-policy";
 import { canVisit, restrictedMessage, type NavigationAccess } from "@/lib/navigation-access";
 
 const sidebarPreferenceKey = "stor24.staff.sidebar-hidden";
@@ -125,6 +125,7 @@ export function AppShell({ children, session, facilityLabel = "Your facilities",
     .toUpperCase() || "ST";
 
   const jobCardsOnly = access.permissions.includes(MIDPOINT_JOB_CARD_PERMISSION);
+  const settingsHref = jobCardsOnly ? MIDPOINT_JOB_CARD_SETTINGS : "/settings";
   const visibleNavigation = navigation.filter(item => jobCardsOnly === (item.href === MIDPOINT_JOB_CARD_PAGE));
   const current = [...visibleNavigation].sort((a, b) => b.href.length - a.href.length).find(item => pathname === item.href || (item.href !== "/" && pathname.startsWith(`${item.href}/`)));
   const sections = jobCardsOnly ? ["Facility operations"] : ["Overview", "Customers & sales", "Facility operations", "Finance", "Insights", "Administration"];
@@ -171,7 +172,7 @@ export function AppShell({ children, session, facilityLabel = "Your facilities",
               "nav-link",
               pathname.startsWith("/settings") && "nav-link-active",
             )}
-            href="/settings"
+            href={settingsHref}
           >
             <Settings size={18} />
             Settings
@@ -193,9 +194,9 @@ export function AppShell({ children, session, facilityLabel = "Your facilities",
           <button type="button" className="sidebar-toggle" aria-controls="staff-sidebar" aria-expanded={!sidebarHidden} aria-label={sidebarHidden ? "Show menu" : "Hide menu"} title={sidebarHidden ? "Show menu" : "Hide menu"} onClick={() => setSidebarHidden(!sidebarHidden)}>
             {sidebarHidden ? <PanelLeftOpen size={19} aria-hidden="true" /> : <PanelLeftClose size={19} aria-hidden="true" />}
           </button>
-          <details key={pathname} className="staff-mobile-nav"><summary>Menu</summary><nav aria-label="Mobile navigation">{sections.map(group => <section key={group}><p className="nav-label">{group}</p>{visibleNavigation.filter(item => item.group === group).map(item => !canVisit(item.href, access) ? <span key={item.href} className="nav-link-restricted" role="link" aria-disabled="true" tabIndex={0} title={restrictedMessage}><item.icon size={17} /><span>{item.label}<small>{restrictedMessage}</small></span><LockKeyhole size={14} /></span> : <Link href={item.href} key={item.href} aria-current={current?.href === item.href ? "page" : undefined}><item.icon size={17} />{item.label}</Link>)}</section>)}<Link href="/settings"><Settings size={17} />Settings</Link></nav></details>
+          <details key={pathname} className="staff-mobile-nav"><summary>Menu</summary><nav aria-label="Mobile navigation">{sections.map(group => <section key={group}><p className="nav-label">{group}</p>{visibleNavigation.filter(item => item.group === group).map(item => !canVisit(item.href, access) ? <span key={item.href} className="nav-link-restricted" role="link" aria-disabled="true" tabIndex={0} title={restrictedMessage}><item.icon size={17} /><span>{item.label}<small>{restrictedMessage}</small></span><LockKeyhole size={14} /></span> : <Link href={item.href} key={item.href} aria-current={current?.href === item.href ? "page" : undefined}><item.icon size={17} />{item.label}</Link>)}</section>)}<Link href={settingsHref}><Settings size={17} />Settings</Link></nav></details>
           <div className="workspace-context"><span>{pathname.startsWith("/settings") ? "Personal" : current?.group ?? "Workspace"}</span><strong>{pathname.startsWith("/settings") ? "Settings" : current?.label ?? "Workspace"}</strong></div>
-          {session && !jobCardsOnly && <GuidedHelp key={session.userId} userId={session.userId} access={access} searchItems={[...navigation, {href:"/settings",label:"Settings",group:"Personal"}, {href:"/operations/move-in",label:"New move-in",group:"Facility operations"}, {href:"/operations/accounts",label:"Customer accounts & payments",group:"Finance"}, {href:"/billing/monthly",label:"Monthly billing",group:"Finance"}, {href:"/billing/settlements",label:"Settlement reconciliation",group:"Finance"}, {href:"/billing/unidentified-receipts",label:"Unidentified payment review",group:"Finance"}, {href:"/billing/receipt-bank-sources",label:"Incoming bank sources",group:"Finance"}, {href:"/billing/debit-orders",label:"Debit-order runs",group:"Finance"}, {href:"/billing/mri",label:"MRI accounting",group:"Finance"}, {href:"/billing/netcash",label:"Netcash payments",group:"Finance"}]} />}
+          {session && <GuidedHelp key={session.userId} userId={session.userId} access={access} searchItems={jobCardsOnly ? [...visibleNavigation, {href:settingsHref,label:"Account security",group:"Personal"}] : [...visibleNavigation, {href:"/settings",label:"Settings",group:"Personal"}, {href:"/operations/move-in",label:"New move-in",group:"Facility operations"}, {href:"/operations/accounts",label:"Customer accounts & payments",group:"Finance"}, {href:"/billing/monthly",label:"Monthly billing",group:"Finance"}, {href:"/billing/settlements",label:"Settlement reconciliation",group:"Finance"}, {href:"/billing/unidentified-receipts",label:"Unidentified payment review",group:"Finance"}, {href:"/billing/receipt-bank-sources",label:"Incoming bank sources",group:"Finance"}, {href:"/billing/debit-orders",label:"Debit-order runs",group:"Finance"}, {href:"/billing/mri",label:"MRI accounting",group:"Finance"}, {href:"/billing/netcash",label:"Netcash payments",group:"Finance"}]} />}
           <div className="top-actions">
             {canVisit("/calendar", access) && <Link className="icon-button" href="/calendar" aria-label="Scheduled work" title="Scheduled work"><CalendarDays size={18} /></Link>}
             <div className="profile">

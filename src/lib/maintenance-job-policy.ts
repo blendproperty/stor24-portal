@@ -3,6 +3,7 @@ export const MIDPOINT_MAINTENANCE_MANAGER = "carlo@blendproperty.co.za";
 export const MIDPOINT_JOB_CARD_ROLE = "Midpoint job card manager";
 export const MIDPOINT_JOB_CARD_PERMISSION = "maintenance.job_cards.manage";
 export const MIDPOINT_JOB_CARD_PAGE = "/operations/job-cards";
+export const MIDPOINT_JOB_CARD_SETTINGS = MIDPOINT_JOB_CARD_PAGE + "/settings";
 export const MIDPOINT_JOB_CARD_API = "/api/v1/operations/job-cards";
 
 export function validMidpointJobCardRole(
@@ -16,8 +17,8 @@ export function validMidpointJobCardRole(
 }
 
 export function jobCardManagerRouteAllowed(path: string, method: string) {
-  if (path === MIDPOINT_JOB_CARD_PAGE || path === "/settings") return method === "GET" || method === "HEAD";
-  if (path === MIDPOINT_JOB_CARD_API) return method === "GET";
+  if (path === MIDPOINT_JOB_CARD_PAGE || path === MIDPOINT_JOB_CARD_SETTINGS) return method === "GET" || method === "HEAD";
+  if (path === MIDPOINT_JOB_CARD_API || path === "/api/v1/guided-help") return method === "GET";
   if (/^\/api\/v1\/operations\/maintenance\/[^/]+$/.test(path)) return method === "PATCH";
   return ["/api/auth/mfa", "/api/auth/logout", "/api/auth/change-password"].includes(path);
 }

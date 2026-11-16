@@ -60,7 +60,7 @@ export function MidpointJobCards() {
   return <>
     <PageHeader eyebrow="Store 1 - Midpoint" title="Midpoint job cards" description="Schedule repairs, record progress and send completed work to Katlego for on-site verification." />
     {message && <p role="status">{message}</p>}
-    <div className="work-list">
+    <div className="work-list" data-guide="midpoint-job-cards">
       {jobs === null && !message && <p>Loading job cards…</p>}
       {jobs?.length === 0 && <p>No Midpoint job cards yet.</p>}
       {jobs?.map(job => <MaintenanceJobCard key={job.id} job={job} role="manager" disabled={busy} update={update} />)}

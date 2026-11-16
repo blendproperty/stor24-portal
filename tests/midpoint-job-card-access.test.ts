@@ -13,7 +13,7 @@ test("Carlo only gets Midpoint cards and personal security settings", () => {
   for (const path of ["/", "/tenants", "/api/v1/operations", "/api/v1/operations/forms", "/api/v1/reports", "/api/v1/payments"]) {
     assert.equal(jobCardManagerRouteAllowed(path, "GET"), false);
   }
-  assert.equal(jobCardManagerRouteAllowed("/settings", "GET"), true);
+  assert.equal(jobCardManagerRouteAllowed("/operations/job-cards/settings", "GET"), true);
   assert.equal(validMidpointJobCardRole("carlo@blendproperty.co.za", access.permissions, { name: "Store 1 - Midpoint", active: false }), false);
   assert.equal(validMidpointJobCardRole("carlo@blendproperty.co.za", [...access.permissions, "operations.view"], { name: "Store 1 - Midpoint", active: true }), false);
 });
