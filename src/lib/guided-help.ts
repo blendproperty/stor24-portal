@@ -72,12 +72,32 @@ export const workflowGuides: WorkflowGuide[] = [
         missing: "You can finish reading this guide without changing any booking." },
     ],
   },
+  {
+    id: "midpoint-job-cards", title: "Manage Midpoint job cards", duration: "3 min",
+    description: "Schedule a Midpoint repair, record progress and pass completed work to Katlego.",
+    steps: [
+      { id: "open", title: "Open the repair job", route: "/operations/job-cards", screen: "Midpoint job cards", target: "midpoint-job-cards",
+        body: "Open the job card Katlego raised and read the fault, priority and unit or facility location. Keep updates on the same card so everyone can see the repair history.",
+        missing: "Open Midpoint job cards and wait for the list to load." },
+      { id: "schedule", title: "Schedule and track the work", route: "/operations/job-cards", screen: "Midpoint job cards", target: "midpoint-job-cards",
+        body: "Enter the contractor, scheduled time and progress notes. Save progress whenever the plan changes and check that the saved information is visible on the card.",
+        missing: "Expand an open job card to see its progress controls." },
+      { id: "report", title: "Report completion for inspection", route: "/operations/job-cards", screen: "Midpoint job cards", target: "midpoint-job-cards",
+        body: "Record what was fixed and add the work order or photo report reference if available. Send the repair to Katlego for inspection. If Katlego returns it, read the inspection notes before updating the card.",
+        missing: "Expand a job card that is ready to be reported for verification." },
+      { id: "security", title: "Keep your account secure", route: "/operations/job-cards/settings", screen: "Account security", target: "job-card-settings",
+        body: "Open Settings to manage your password and authenticator. Keep your recovery codes somewhere private so you can recover your own account if you lose access to your device.",
+        missing: "Open Settings from the Midpoint job-card workspace." },
+    ],
+  },
   ...extendedGuides,
 ];
 
 export type PageHelp = { route: string; title: string; body: string; guideId?: string };
 export const pageHelp: PageHelp[] = [
   { route: "/audit/data-protection", title: "Data protection", body: "Review the report export policy and recent decisions. Use the request reference in System audit to investigate a block without copying sensitive content.", guideId: "data-protection" },
+  { route: "/operations/job-cards", title: "Midpoint job cards", body: "Open a repair, save progress and report completed work to Katlego.", guideId: "midpoint-job-cards" },
+  { route: "/operations/job-cards/settings", title: "Account security", body: "Manage your own password and two-step verification.", guideId: "midpoint-job-cards" },
   ...extendedPageHelp,
   { route: "/operations/move-in", title: "Move in", body: "Start from the correct reservation. Signed bookings use the original agreement, verified payment and date checks before physical key handover.", guideId: "move-in" },
   { route: "/operations/walk-in", title: "Walk-in tablet", body: "Prepare the store, hand over the website booking journey, clear the tablet and continue the exact saved booking through Move In.", guideId: "walk-in-tablet" },

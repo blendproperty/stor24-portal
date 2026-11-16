@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
-import { MIDPOINT_MAINTENANCE_MANAGER, MIDPOINT_STORE, midpointMaintenanceRole } from "@/lib/maintenance-job-policy";
+import { MIDPOINT_JOB_CARD_ROLE, MIDPOINT_MAINTENANCE_MANAGER, MIDPOINT_STORE, midpointMaintenanceRole, validMidpointJobCardRole } from "@/lib/maintenance-job-policy";
 import { sameOrigin } from "@/lib/request-security";
 import { db } from "@/lib/db";
 import { operationsTaskPage } from "@/lib/operations-task-service";
@@ -116,11 +116,11 @@ export async function POST(request: Request) {
         if (jobCard) {
           const staff = await tx.user.findMany({
             where: { organisationId, active: true, email: { equals: MIDPOINT_MAINTENANCE_MANAGER, mode: "insensitive" } },
-            select: { id: true, roleAssignments: { include: { role: true } } },
+            select: { id: true, email: true, roleAssignments: { include: { role: true, facility: true } } },
           });
-          assignedToId = staff.length === 1 &&
-            currentRoleAccess(staff[0].roleAssignments, "operations.view", input.facilityId).allowed &&
-            currentRoleAccess(staff[0].roleAssignments, "operations.manage", input.facilityId).allowed
+          assignedToId = staff.length === 1 && staff[0].roleAssignments.some(assignment =>
+            assignment.facilityId === input.facilityId && assignment.role.name === MIDPOINT_JOB_CARD_ROLE &&
+            validMidpointJobCardRole(staff[0].email, assignment.role.permissions, assignment.facility))
             ? staff[0].id : undefined;
         }
         const maintenance = await tx.maintenanceRequest.create({

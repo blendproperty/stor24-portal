@@ -8,6 +8,7 @@ import {
 import { createInvitationSchema } from "@/lib/validators";
 import { requireOwner } from "@/lib/auth-guards";
 import { emailProvider } from "@/lib/email";
+import { MIDPOINT_JOB_CARD_ROLE, validMidpointJobCardRole } from "@/lib/maintenance-job-policy";
 import { invitationEmail } from "@/lib/invitation-email";
 
 export const dynamic = "force-dynamic";
@@ -85,48 +86,65 @@ export async function POST(request: Request) {
     if (!facility) return Response.json({ error: { code: "FACILITY_REQUIRED", message: "Choose a valid facility for a facility manager." } }, { status: 422 });
   }
 
+  const jobCardInvite = parsed.data.roleName === MIDPOINT_JOB_CARD_ROLE;
+  if (jobCardInvite) {
+    if (!request.headers.has("origin")) return Response.json({ error: { code: "ORIGIN_REJECTED", message: "The request origin is required." } }, { status: 403 });
+    const organisationId = actor.user.organisationId;
+    const [role, facility] = await Promise.all([
+      db.role.findUnique({ where: { organisationId_name: { organisationId, name: MIDPOINT_JOB_CARD_ROLE } } }),
+      parsed.data.facilityCode ? db.facility.findUnique({ where: { organisationId_code: { organisationId, code: parsed.data.facilityCode } } }) : null,
+    ]);
+    if (!role || !validMidpointJobCardRole(parsed.data.email, role.permissions, facility)) {
+      return Response.json({ error: { code: "JOB_CARD_SCOPE_REQUIRED", message: "Choose Carlo’s work email and Store 1 - Midpoint for this role." } }, { status: 422 });
+    }
+  }
+
   const organisation = await db.organisation.findUniqueOrThrow({ where: { id: actor.user.organisationId } });
   await expireOldInvitations();
 
-  const [existingUser, existingInvitation] = await Promise.all([
-    db.user.findUnique({ where: { organisationId_email: { organisationId: organisation.id, email: parsed.data.email } } }),
-    db.userInvitation.findFirst({
-      where: { organisationId: organisation.id, email: parsed.data.email, status: "PENDING" },
-    }),
-  ]);
-
-  if (existingUser) {
-    return Response.json({ error: { code: "USER_EXISTS", message: "This email already belongs to a user account. Delete that account before inviting this email again." } }, { status: 409 });
-  }
-  if (existingInvitation) {
-    return Response.json({ error: { code: "INVITATION_EXISTS", message: "A pending invitation already exists for this email." } }, { status: 409 });
-  }
-
   const token = createInvitationToken();
-  const invitation = await db.userInvitation.create({
-    data: {
-      organisationId: organisation.id,
-      ...parsed.data,
-      facilityCode: parsed.data.facilityCode || null,
-      tokenHash: hashInvitationToken(token),
-      expiresAt: addDays(new Date(), 7),
-      invitedByName: actor.name,
-    },
-  });
+  const result = await db.$transaction(async tx => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${organisation.id + ":" + parsed.data.email}, 0))`;
+    const [existingUser, existingInvitation] = await Promise.all([
+      tx.user.findUnique({ where: { organisationId_email: { organisationId: organisation.id, email: parsed.data.email } } }),
+      tx.userInvitation.findFirst({ where: { organisationId: organisation.id, email: parsed.data.email, status: "PENDING" } }),
+    ]);
+    if (existingUser) return { error: { code: "USER_EXISTS", message: "This email already belongs to a user account. Delete that account before inviting this email again." } };
+    if (existingInvitation) return { error: { code: "INVITATION_EXISTS", message: "A pending invitation already exists for this email." } };
 
-  await db.auditEvent.create({
-    data: {
-      organisationId: organisation.id,
-      action: "user.invitation.created",
-      entityType: "UserInvitation",
-      entityId: invitation.id,
-      actorId: actor.user.id,
-      after: { email: invitation.email, roleName: invitation.roleName, facilityCode: invitation.facilityCode },
-    },
+    const invitation = await tx.userInvitation.create({
+      data: {
+        organisationId: organisation.id,
+        ...parsed.data,
+        facilityCode: parsed.data.facilityCode || null,
+        tokenHash: hashInvitationToken(token),
+        expiresAt: addDays(new Date(), 7),
+        invitedByName: actor.name,
+      },
+    });
+    await tx.auditEvent.create({
+      data: {
+        organisationId: organisation.id,
+        action: "user.invitation.created",
+        entityType: "UserInvitation",
+        entityId: invitation.id,
+        actorId: actor.user.id,
+        after: { email: invitation.email, roleName: invitation.roleName, facilityCode: invitation.facilityCode },
+      },
+    });
+    return { invitation };
   });
+  if (!result.invitation) return Response.json({ error: result.error }, { status: 409 });
+  const { invitation } = result;
 
   const appUrl = process.env.APP_URL || new URL(request.url).origin;
   const inviteUrl = `${appUrl}/invite/${token}`;
+  if (jobCardInvite) {
+    return Response.json(
+      { data: { id: invitation.id, status: invitation.status, expiresAt: invitation.expiresAt.toISOString(), delivery: "MANUAL", inviteUrl } },
+      { status: 201, headers: { "Cache-Control": "private, no-store" } },
+    );
+  }
   try {
     await emailProvider().send({ to: invitation.email, dlp: { organisationId: actor.user.organisationId, actorId: actor.user.id, resourceId: invitation.id, approvedRecipient: invitation.email }, ...invitationEmail({ name: invitation.name, invitedByName: invitation.invitedByName, roleName: invitation.roleName, inviteUrl, expiresAt: invitation.expiresAt }) });
   } catch {

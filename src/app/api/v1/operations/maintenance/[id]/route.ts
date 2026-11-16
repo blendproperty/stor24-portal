@@ -1,7 +1,7 @@
-import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
+import { authErrorResponse, requirePermission, requireSession } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
-import { maintenanceJobActionAllowed, midpointMaintenanceRole } from "@/lib/maintenance-job-policy";
+import { maintenanceJobActionAllowed, midpointMaintenanceRole, MIDPOINT_JOB_CARD_ROLE, validMidpointJobCardRole } from "@/lib/maintenance-job-policy";
 import { sameOrigin } from "@/lib/request-security";
 import { maintenanceJobActionSchema, updateMaintenanceSchema } from "@/lib/validators";
 
@@ -10,12 +10,22 @@ const blockingOccupancyStatuses = ["PENDING", "ACTIVE", "TRANSFERRING", "NOTICE_
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { organisationId, user } = await requirePermission("operations.manage");
+    const { user } = await requireSession();
+    const { organisationId } = user;
     const { id } = await params;
     const body: unknown = await request.json();
-    const before = await db.maintenanceRequest.findFirst({ where: { id, organisationId } });
+    const role = midpointMaintenanceRole(user.email);
+    const assigned = user.roleAssignments.filter(assignment => assignment.role.name === MIDPOINT_JOB_CARD_ROLE);
+    const managerFacility = assigned.length === 1 &&
+      validMidpointJobCardRole(user.email, assigned[0].role.permissions, assigned[0].facility) ? assigned[0].facilityId : null;
+    if (assigned.length && !managerFacility) throw new Error("FORBIDDEN");
+    if (!managerFacility) await requirePermission("operations.manage");
+    const before = await db.maintenanceRequest.findFirst({
+      where: { id, organisationId, ...(managerFacility ? { facilityId: managerFacility, jobCard: true } : {}) },
+    });
     if (!before) return Response.json({ error: { code: "NOT_FOUND", message: "Maintenance request not found." } }, { status: 404 });
-    await requirePermission("operations.manage", before.facilityId);
+    if (!managerFacility) await requirePermission("operations.manage", before.facilityId);
+    if (before.jobCard && role === "manager" && !managerFacility) throw new Error("FORBIDDEN");
 
     let action = "maintenance.status.change";
     let expectedVersion: Date | undefined;
@@ -23,7 +33,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (before.jobCard) {
       if (!sameOrigin(request)) throw new Error("FORBIDDEN");
       const input = maintenanceJobActionSchema.parse(body);
-      const role = midpointMaintenanceRole(user.email);
       if (!maintenanceJobActionAllowed(role, before.status, !!before.repairReportedAt, input.action)) throw new Error("FORBIDDEN");
       expectedVersion = new Date(input.updatedAt);
       action = `maintenance.job_card.${input.action}`;
