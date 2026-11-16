@@ -8504,6 +8504,13 @@ Validation follow-up: the project typecheck and targeted ESLint for the candidat
 - **Commit and push:** See provisioning PR #815 for the reconciled head. **Merge:** pending. **Deployment and configuration:** pending; no credentials issued. **Live production verification:** not performed for this candidate.
 - **Outstanding:** Authenticated provider setup, safe mapping and guards, both social end-to-end tests, Katlego inbox receipt, staff UAT, provider cutover, and host security alert review remain open. Keep the billing production hold.
 
+### 16 November 2026 — social provisioning layout correction candidate
+
+- **Implementation:** Reflowed the social credentials screen into labelled, responsive fields and a separate action row, including its one-time key display. Credential generation, scope and revocation behaviour are unchanged.
+- **Testing:** Actual-component browser fixture uses production stylesheet at 1440 and 375 pixels, verifies fields fit beneath labels and checks horizontal overflow in the form and key display. Existing credential display, uncertain result and cancelled revocation tests passed; scoped lint and diff checks passed. Screenshots used synthetic keys and data.
+- **Commit and push:** Candidate pending promotion. **Merge:** pending. **Deployment and configuration:** not yet deployed. **Live production verification:** not performed for this correction.
+- **Outstanding:** Authenticated social provider setup, safe request encoding, full social handoffs, Katlego inbox verification, provider and staff acceptance, and SSH alert review remain open. Keep billing production hold.
+
 ### 2026-11-16 - Facial-photo notice presentation release
 
 - **Implementation:** [PR #811](https://github.com/blendproperty/stor24-portal/pull/811) opens the existing tenant facial-photo notice by default before the separate required consent choice and adds the PRIV-01/02 source review. Policy wording, policy hash, collection switch and provider settings were unchanged. Its companion website identity change is tracked in website PR #279.
