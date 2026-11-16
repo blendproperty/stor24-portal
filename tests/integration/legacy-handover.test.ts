@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { db } from "../../src/lib/db";
 import { moveIn, completeBlendSignEnvelope, createReservation } from "../../src/lib/leasing-service";
-import { legacyPhotoStatus, submitLegacyPhoto, submitAssistedLegacyPhoto, withdrawAssistedLegacyPhoto, previewLegacyPhoto, reviewLegacyPhoto, withdrawLegacyPhoto, expireLegacyPhotos } from "../../src/lib/legacy-access-photo";
+import { legacyPhotoStatus, primaryTrialSnapshot, submitLegacyPhoto, submitAssistedLegacyPhoto, withdrawAssistedLegacyPhoto, previewLegacyPhoto, reviewLegacyPhoto, withdrawLegacyPhoto, expireLegacyPhotos } from "../../src/lib/legacy-access-photo";
 import { legacyHandoverReadiness, confirmLegacyHandover } from "../../src/lib/legacy-handover";
 import { leadsWorkspace } from "../../src/lib/leads-workspace-service";
 import { marketingWorkspace } from "../../src/lib/marketing-service";
@@ -20,7 +20,7 @@ test("reservation-free signed lease requires real scoped evidence and explicit h
   const key=randomUUID(),org=await db.organisation.create({data:{name:"Synthetic legacy",slug:key}}),facility=await db.facility.create({data:{organisationId:org.id,name:"Synthetic store",code:key}}),staff=await db.user.create({data:{organisationId:org.id,name:"Test staff",email:`staff-${key}@example.invalid`}}),customer=await db.customer.create({data:{organisationId:org.id,firstName:"Test",email:`${key}@example.invalid`,emailVerifiedAt:new Date()}}),unitType=await db.unitType.create({data:{facilityId:facility.id,name:"Test",features:[]}}),unit=await db.unit.create({data:{facilityId:facility.id,unitTypeId:unitType.id,number:key,monthlyRate:100,status:"AVAILABLE"}});
   const scope={organisationId:org.id,userId:staff.id,facilityIds:[facility.id],unrestrictedFacilities:false},session={organisationId:org.id,email:customer.email!,customerIds:[customer.id]};
   const originalLead=await db.lead.create({data:{facilityId:facility.id,customerId:customer.id,source:"Synthetic"}});
-  const old={policy:process.env.FACIAL_ACCESS_POLICIES_JSON,key:process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY,url:process.env.BLENDSIGN_BASE_URL,api:process.env.BLENDSIGN_API_KEY,fetch:globalThis.fetch};
+  const old={policy:process.env.FACIAL_ACCESS_POLICIES_JSON,trial:process.env.UNIT58_PRIMARY_PHOTO_TRIAL_JSON,key:process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY,url:process.env.BLENDSIGN_BASE_URL,api:process.env.BLENDSIGN_API_KEY,fetch:globalThis.fetch};
   try {
     process.env.FACIAL_ACCESS_POLICIES_JSON=JSON.stringify({[org.id]:{enabled:true,version:"test",notice:"Synthetic consent notice with sufficient length for this isolated test.",consentLabel:"I agree to this synthetic test photograph",approvalReference:"TEST ONLY",retentionHours:24,alternativeContact:"Test store"}});process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY="synthetic-encryption-key-only-0123456789";
     process.env.BLENDSIGN_BASE_URL="https://synthetic.invalid";process.env.BLENDSIGN_API_KEY="synthetic";
@@ -77,10 +77,22 @@ test("reservation-free signed lease requires real scoped evidence and explicit h
     const booking=await createReservation(scope,{facilityId:facility.id,customerId:customer.id,unitId:unit2.id,leadId:lead2.id,quotedRate:100});
     const linked=await moveIn(scope,{reservationId:booking.id,facilityId:facility.id,customerId:customer.id,unitId:unit2.id,startDate:new Date(),initialCharge:100,accessState:"PENDING",paymentMethod:"EFT",simulation:true});
     await db.document.update({where:{id:linked.document.id},data:{type:"LEASE_AGREEMENT",externalId:`linked-${key}`,status:"SENT"}});await completeBlendSignEnvelope(`linked-${key}`);
+    process.env.UNIT58_PRIMARY_PHOTO_TRIAL_JSON=JSON.stringify({[org.id]:{enabled:true,version:"synthetic-primary-trial",notice:"Synthetic primary photo-only trial notice with sufficient length and no provider action.",consentLabel:"I agree to this synthetic primary photo test",approvalReference:"CI only",alternativeContact:"Synthetic store",retentionHours:1,trialReservationId:booking.id,trialEndsAt:new Date(Date.now()+3600000).toISOString()}});
+    assert.equal((await primaryTrialSnapshot(scope))?.unitNumber,unit2.number);
+    const trialStatus=await legacyPhotoStatus(session,linked.tenancy.id);assert.equal(trialStatus.available,true);assert.equal(trialStatus.policy?.retentionHours,1);
+    await assert.rejects(submitLegacyPhoto(session,{tenancyId:linked.tenancy.id,policyHash:trialStatus.policy!.hash,consent:false,expectedVersion:0,image}),/PHOTO_CONSENT_REQUIRED/);
+    const trialPhoto=await submitLegacyPhoto(session,{tenancyId:linked.tenancy.id,policyHash:trialStatus.policy!.hash,consent:true,expectedVersion:0,image});
+    assert.ok(trialPhoto.expiresAt&&trialPhoto.expiresAt.getTime()-Date.now()<=3600000);
+    (await previewLegacyPhoto(scope,trialPhoto.id,trialPhoto.version)).fill(0);await reviewLegacyPhoto(scope,trialPhoto.id,trialPhoto.version,"APPROVE");
+    assert.equal((await db.legacyAccessPhoto.findUniqueOrThrow({where:{tenancyId:linked.tenancy.id}})).activationRequestedAt,null);
+    assert.equal((await db.occupancy.findFirstOrThrow({where:{tenancyId:linked.tenancy.id}})).accessState,"PENDING");
+    await withdrawLegacyPhoto(session,linked.tenancy.id,trialPhoto.version);delete process.env.UNIT58_PRIMARY_PHOTO_TRIAL_JSON;
+    assert.equal(await primaryTrialSnapshot(scope),null);
+    assert.equal((await legacyPhotoStatus(session,linked.tenancy.id)).available,false);
     const receipt=await db.payment.create({data:{accountId:linked.tenancy.accountId,status:"SUCCEEDED",amount:100,currency:"ZAR",method:"EFT",idempotencyKey:`linked-receipt-${key}`,processedAt:new Date()}});
     await db.ledgerEntry.create({data:{accountId:linked.tenancy.accountId,type:"PAYMENT",amount:100,description:"Synthetic receipt",effectiveAt:new Date(),externalRef:receipt.idempotencyKey,createdById:staff.id}});
     const linkedStatus=await legacyPhotoStatus(session,linked.tenancy.id);
-    const linkedPhoto=await submitLegacyPhoto(session,{tenancyId:linked.tenancy.id,policyHash:linkedStatus.policy!.hash,consent:true,expectedVersion:0,image});
+    const linkedPhoto=await submitLegacyPhoto(session,{tenancyId:linked.tenancy.id,policyHash:linkedStatus.policy!.hash,consent:true,expectedVersion:trialPhoto.version,image});
     (await previewLegacyPhoto(scope,linkedPhoto.id,linkedPhoto.version)).fill(0);await reviewLegacyPhoto(scope,linkedPhoto.id,linkedPhoto.version,"APPROVE");
     await confirmLegacyHandover(scope,linked.tenancy.id,true);
     assert.equal((await db.lead.findUniqueOrThrow({where:{id:lead2.id}})).stage,"WON");
@@ -105,5 +117,5 @@ test("reservation-free signed lease requires real scoped evidence and explicit h
     await confirmLegacyHandover(scope,assisted.tenancy.id,true);
     assert.equal((await db.customer.findUniqueOrThrow({where:{id:unverified.id}})).emailVerifiedAt,null);
     await db.tenancy.update({where:{id:tenancy.id},data:{status:"CLOSED"}});await expireLegacyPhotos();assert.equal((await db.legacyAccessPhoto.findUniqueOrThrow({where:{tenancyId:tenancy.id}})).encryptedImage,null);
-  } finally {globalThis.fetch=old.fetch;for(const [k,v] of Object.entries({FACIAL_ACCESS_POLICIES_JSON:old.policy,INTEGRATION_CONFIG_ENCRYPTION_KEY:old.key,BLENDSIGN_BASE_URL:old.url,BLENDSIGN_API_KEY:old.api})){if(v===undefined)delete process.env[k];else process.env[k]=v;}await db.$disconnect();}
+  } finally {globalThis.fetch=old.fetch;for(const [k,v] of Object.entries({FACIAL_ACCESS_POLICIES_JSON:old.policy,UNIT58_PRIMARY_PHOTO_TRIAL_JSON:old.trial,INTEGRATION_CONFIG_ENCRYPTION_KEY:old.key,BLENDSIGN_BASE_URL:old.url,BLENDSIGN_API_KEY:old.api})){if(v===undefined)delete process.env[k];else process.env[k]=v;}await db.$disconnect();}
 });

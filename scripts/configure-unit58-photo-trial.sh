@@ -22,13 +22,13 @@ if test "$action" = enable; then
   organisation_id=$(docker exec stor24-crm-postgres-1 psql -U stor24 -d stor24_crm -At -v ON_ERROR_STOP=1 -c \
     "SELECT f.\"organisationId\" FROM \"Reservation\" r JOIN \"Facility\" f ON f.id=r.\"facilityId\" JOIN \"Organisation\" o ON o.id=f.\"organisationId\" JOIN \"Unit\" u ON u.id=r.\"unitId\" JOIN \"Tenancy\" t ON t.id=r.\"convertedTenancyId\" JOIN \"Document\" d ON d.\"tenancyId\"=t.id WHERE r.id='cmwerdxa2000501qe0lhkr5qw' AND o.slug='stor24' AND u.number='58' AND r.status='CONVERTED' AND t.status='DRAFT' AND d.type='LEASE_AGREEMENT' AND d.provider='BLENDSIGN' AND d.status='SIGNED' AND d.\"signedAt\" IS NOT NULL")
   [[ "$organisation_id" =~ ^[a-z0-9]+$ ]] || { echo 'Signed Unit 58 booking not found; no configuration changed.'; exit 1; }
-  ! grep -q '^ADDITIONAL_ACCESS_POLICIES_JSON=' .env || { echo 'An additional-person policy already exists; no configuration changed.'; exit 1; }
+  ! grep -Eq '^(UNIT58_PRIMARY_PHOTO_TRIAL_JSON|ADDITIONAL_ACCESS_POLICIES_JSON)=' .env || { echo 'A photo trial or additional-person policy already exists; no configuration changed.'; exit 1; }
   ends=$(date -u +%Y-%m-%dT17:00:00Z)
   policy=${template/__TRIAL_ENDS_AT__/$ends}
   [[ "$policy" == *'"trialReservationId":"cmwerdxa2000501qe0lhkr5qw"'* ]] || exit 1
-  line='ADDITIONAL_ACCESS_POLICIES_JSON={"'"$organisation_id"'":'"$policy"'}'
-elif grep -q '^ADDITIONAL_ACCESS_POLICIES_JSON=' .env; then
-  grep '^ADDITIONAL_ACCESS_POLICIES_JSON=' .env | grep -q '"trialReservationId":"cmwerdxa2000501qe0lhkr5qw"' || { echo 'A different policy is configured; removal refused.'; exit 1; }
+  line='UNIT58_PRIMARY_PHOTO_TRIAL_JSON={"'"$organisation_id"'":'"$policy"'}'
+elif grep -Eq '^(UNIT58_PRIMARY_PHOTO_TRIAL_JSON|ADDITIONAL_ACCESS_POLICIES_JSON)=' .env; then
+  grep -E '^(UNIT58_PRIMARY_PHOTO_TRIAL_JSON|ADDITIONAL_ACCESS_POLICIES_JSON)=' .env | grep -qv '"trialReservationId":"cmwerdxa2000501qe0lhkr5qw"' && { echo 'A different policy is configured; removal refused.'; exit 1; }
 else
   echo 'Unit 58 photo trial already disabled.'
   exit 0
@@ -38,7 +38,7 @@ tmp=$(mktemp .env.unit58.XXXXXX)
 old=$(mktemp .env.unit58.previous.XXXXXX)
 trap 'rm -f "$tmp" "$old"' EXIT
 cp -p .env "$old"
-grep -v '^ADDITIONAL_ACCESS_POLICIES_JSON=' .env > "$tmp" || true
+grep -Ev '^(UNIT58_PRIMARY_PHOTO_TRIAL_JSON|ADDITIONAL_ACCESS_POLICIES_JSON)=' .env > "$tmp" || true
 if test "$action" = enable; then printf '%s\n' "$line" >> "$tmp"; fi
 chmod 600 "$tmp"
 mv "$tmp" .env
