@@ -231,6 +231,7 @@ export default async function IntegrationsPage() {
         title="Integrations & webhooks"
         description="Live provider state, lease-envelope reconciliation and delivery backlogs. Failures remain visible until resolved."
       />
+      {session.role === 'Organisation owner' && <Link href="/integrations/whatchimp-social">Configure Facebook and Instagram enquiries</Link>}
       <section className="summary-strip">
         <div className="summary-cell">
           <span>Completed leases</span>
