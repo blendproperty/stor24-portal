@@ -29,6 +29,7 @@ page.on("pageerror",error=>errors.push(error.message));
     if(route.request().method()!=="GET") { tenantWrites.push(route.request().method()); assert.match(route.request().postData(), /camera-photo\.png/); return route.fulfill({status:409,json:{error:"Your booking has changed. Please refresh before continuing."}}); }
     return route.fulfill({json:{data:{available,policy:available?{version:"ci",hash:"ci-hash",notice:"Synthetic browser fixture. This is not legal wording or a real consent record.",consentLabel:"Preview only — consent wording awaiting legal approval.",retentionHours:24,alternativeContact:"Speak to the training store."}:null,photo:tenantPhoto}}});
   });
+  await page.route("**/api/tenant/legacy-access-photo**",route=>route.fulfill({json:{data:{available:true,policy:{version:"unit58-primary-photo-only-trial-2026-11-16",hash:"trial-hash",notice:"Synthetic Unit 58 primary photo trial with no provider access.",consentLabel:"I consent to the photo-only trial",retentionHours:1,alternativeContact:"Test store"},photo:null}}}));
   await page.route("**/api/v1/access/photos**",async route=>{
     if(route.request().method()==="POST") {writes.push(route.request().url());return route.fulfill({status:409,json:{error:"This photograph has changed or expired. Refresh before continuing."}});}
     return route.fulfill({contentType:"image/png",body:Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jMioAAAAASUVORK5CYII=","base64")});
@@ -47,6 +48,10 @@ page.on("pageerror",error=>errors.push(error.message));
   await expect(page.getByRole("img")).toHaveCount(0);assert.equal(writes.length,1);
   await page.goto(`${base}?photo&readonly`);await expect(page.getByRole("button",{name:"View privately"})).toHaveCount(0);
   await page.goto(`${base}?tenant`);await expect(page.getByText("Your store will arrange this step with you as part of your move-in.",{exact:false})).toBeVisible();await expect(page.locator('input[type="file"]')).toHaveCount(0);
+  await page.goto(`${base}?primary-trial`);await expect(page.getByText("Test your photograph capture.")).toBeVisible();await expect(page.getByText("This trial does not activate precinct access.")).toBeVisible();await expect(page.getByLabel('Take an access photograph')).toHaveAttribute('capture','user');
+  await page.setViewportSize({width:390,height:1000});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
+  await page.screenshot({path:'output/facial-access/primary-trial-390.png',fullPage:true});
+  await page.goto(`${base}?tenant`);
   await page.screenshot({path:'output/facial-access/tenant-redesign-held.png',fullPage:true});
   available=true;await page.reload();await expect(page.locator('input[type="checkbox"]')).not.toBeChecked();
   await expect(page.locator('input[name="policyHash"]')).toHaveValue("ci-hash");

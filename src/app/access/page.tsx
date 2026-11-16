@@ -11,6 +11,7 @@ import { listAccessDecisions, listIdentityLinks } from "@/lib/mel-integration-st
 import { requirePermissionScope } from "@/lib/scope";
 import { additionalPersonPolicy, listAdditionalPeopleForStaff } from "@/lib/additional-access-people";
 import { AdditionalAccessQueue } from "@/components/additional-access-queue";
+import { primaryTrialSnapshot } from "@/lib/legacy-access-photo";
 
 export const metadata = { title: "Biometric access" };
 export const dynamic = "force-dynamic";
@@ -27,6 +28,7 @@ export default async function AccessPage({ searchParams }: { searchParams: Promi
   const photos = await listFacialPhotos(scope, reservation);
   const additionalPeople = await listAdditionalPeopleForStaff(scope, reservation);
   const additionalPolicy = additionalPersonPolicy(scope.organisationId);
+  const primaryTrial = await primaryTrialSnapshot(scope);
   let manageableFacilities: string[] | null = [];
   try { manageableFacilities = (await requirePermission("access.manage")).allowedFacilityIds; }
   catch (error) { if (!(error instanceof Error) || error.message !== "FORBIDDEN") throw error; }
@@ -34,6 +36,13 @@ export default async function AccessPage({ searchParams }: { searchParams: Promi
     <PageHeader eyebrow="Physical security" title="Facial access" description="Private photographs, staff review and a clear record of what still needs to be verified." />
     {reservation && <a className="button button-secondary" href={`/operations/move-in?reservation=${encodeURIComponent(reservation)}`}>Back to move-in checks</a>}
     <PhotoCollectionControl initial={control} />
+    {primaryTrial && <section className="face-primary-trial" aria-label="Unit 58 primary customer photo trial">
+      <span className="face-eyebrow">UNIT {primaryTrial.unitNumber} · PHOTO ONLY</span>
+      <h2>Start with the account holder</h2>
+      <p><strong>{primaryTrial.customerName}</strong> takes their own photo in My STOR24. Staff review it in Move-in. Additional-person capture remains unavailable during this first test.</p>
+      <p className="face-primary-trial-status">Primary photo: {primaryTrial.photoStatus.replaceAll("_", " ").toLowerCase()}. No door access is granted.</p>
+      <div className="face-primary-trial-actions">{primaryTrial.reference && <a className="button button-secondary" href={`/my?booking=${encodeURIComponent(primaryTrial.reference)}&step=access-photo`} target="_blank" rel="noopener noreferrer">Open customer capture link</a>}<a className="button button-secondary" href="/operations/move-in">Review primary photo in Move-in</a></div>
+    </section>}
     <FacialPhotoQueue policyConfigured={control.enabled} manageableFacilities={manageableFacilities} photos={photos.map(photo => ({ id: photo.id, version: photo.version, status: photo.status, expiresAt: photo.expiresAt?.toISOString() ?? null, facilityId: photo.reservation.facilityId, facilityName: photo.reservation.facility.name, unitNumber: photo.reservation.unit.number, customerName: [photo.reservation.customer.firstName ?? photo.reservation.customer.companyName ?? "Customer", photo.reservation.customer.lastName].filter(Boolean).join(" ") }))} />
     <AdditionalAccessQueue people={additionalPeople.map(person => ({ id: person.id, reservationId: person.reservationId, name: person.name, status: person.status, photoVersion: person.photoVersion, expiresAt: person.expiresAt?.toISOString() ?? null, facilityId: person.reservation.facilityId, facilityName: person.reservation.facility.name, unitNumber: person.reservation.unit.number }))} policy={additionalPolicy ? { hash: additionalPolicy.hash, notice: additionalPolicy.notice, consentLabel: additionalPolicy.consentLabel, retentionHours: additionalPolicy.retentionHours, trialReservationId: additionalPolicy.trialReservationId } : null} manageableFacilities={manageableFacilities} />
     <BiometricAccessWorkspace

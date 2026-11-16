@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { AdditionalAccessPeople } from "../../src/components/additional-access-people";
 import { AdditionalAccessQueue } from "../../src/components/additional-access-queue";
+import "../../src/styles/facial-access.css";
 
 const params = new URLSearchParams(location.search);
 const person = { id: "synthetic", name: "Example Person", status: "WAITING_REVIEW", photoVersion: 1, expiresAt: "2099-01-01T00:00:00Z", facilityId: "store", facilityName: "Example Store", unitNumber: "101" };

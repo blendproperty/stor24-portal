@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { facilityWhere, type RequestScope } from "@/lib/scope";
@@ -13,6 +14,30 @@ type Database = Prisma.TransactionClient;
 type CustomerSession = {organisationId:string;email:string;customerIds:string[]};
 const summary = {id:true,tenancyId:true,version:true,status:true,consentAt:true,expiresAt:true,reviewedAt:true,activationRequestedAt:true,erasedAt:true} as const;
 const binding = (id:string, version:number) => `tenancy:${id}:legacy-photo:${version}`;
+const trialSchema=z.object({enabled:z.literal(true),version:z.string().min(1),notice:z.string().min(40),consentLabel:z.string().min(15),approvalReference:z.string().min(1),alternativeContact:z.string().min(1),retentionHours:z.literal(1),trialReservationId:z.string().min(1),trialEndsAt:z.iso.datetime({offset:true})});
+function configuredPrimaryTrial(organisationId:string) {
+  try {
+    const parsed=trialSchema.safeParse(JSON.parse(process.env.UNIT58_PRIMARY_PHOTO_TRIAL_JSON??"{}")[organisationId]);
+    return parsed.success&&Date.parse(parsed.data.trialEndsAt)>Date.now()?parsed.data:null;
+  } catch { return null; }
+}
+async function primaryTrialPolicy(database:Database,organisationId:string,tenancyId:string) {
+  const policy=configuredPrimaryTrial(organisationId);
+  if(!policy)return null;
+  try {
+    const reservation=await database.reservation.findFirst({where:{id:policy.trialReservationId,convertedTenancyId:tenancyId,status:"CONVERTED",facility:{organisationId}},include:{unit:true,convertedTenancy:{include:{account:true,occupancies:true,documents:{where:{type:"LEASE_AGREEMENT"}}}}}});
+    const tenancy=reservation?.convertedTenancy;
+    const signed=tenancy?.documents.filter(d=>d.provider==="BLENDSIGN"&&d.status==="SIGNED"&&d.signedAt&&d.externalId);
+    if(!reservation||!tenancy||tenancy.status!=="DRAFT"||tenancy.customerId!==reservation.customerId||tenancy.facilityId!==reservation.facilityId||tenancy.account.customerId!==reservation.customerId||tenancy.occupancies.length!==1||tenancy.occupancies[0].unitId!==reservation.unitId||tenancy.occupancies[0].status!=="PENDING"||reservation.unit.status!=="RESERVED"||signed?.length!==1)return null;
+    return {...policy,hash:createHash("sha256").update(JSON.stringify(policy)).digest("hex")};
+  } catch { return null; }
+}
+export async function primaryTrialSnapshot(scope:RequestScope) {
+  const policy=configuredPrimaryTrial(scope.organisationId);
+  if(!policy)return null;
+  const reservation=await db.reservation.findFirst({where:{id:policy.trialReservationId,facility:facilityWhere(scope)},select:{publicReference:true,convertedTenancyId:true,unit:{select:{number:true}},customer:{select:{firstName:true,lastName:true,companyName:true}},convertedTenancy:{select:{legacyAccessPhoto:{select:{status:true,expiresAt:true}}}}}});
+  return reservation?.convertedTenancyId&&await primaryTrialPolicy(db,scope.organisationId,reservation.convertedTenancyId)?{reference:reservation.publicReference,unitNumber:reservation.unit.number,customerName:[reservation.customer.firstName??reservation.customer.companyName??"Customer",reservation.customer.lastName].filter(Boolean).join(" "),photoStatus:reservation.convertedTenancy?.legacyAccessPhoto?.expiresAt&&reservation.convertedTenancy.legacyAccessPhoto.expiresAt<=new Date()?"EXPIRED":reservation.convertedTenancy?.legacyAccessPhoto?.status??"NOT_SUBMITTED",expiresAt:reservation.convertedTenancy?.legacyAccessPhoto?.expiresAt?.toISOString()??null}:null;
+}
 async function lock(tx:Database,id:string) { await tx.$queryRaw`SELECT "id" FROM "Tenancy" WHERE "id" = ${id} FOR UPDATE`; }
 async function customerTenancy(database:Database, session:CustomerSession, id:string) {
   const tenancy=await database.tenancy.findFirst({where:{id,facility:{organisationId:session.organisationId},customer:tenantCustomerScope(session)},include:{documents:true,account:{select:{customerId:true}}}});
@@ -22,23 +47,23 @@ async function customerTenancy(database:Database, session:CustomerSession, id:st
 function eligible(tenancy:Pick<Awaited<ReturnType<typeof customerTenancy>>,"status"|"documents">) {
   return ["DRAFT","ACTIVE","NOTICE_GIVEN"].includes(tenancy.status) && tenancy.documents.filter(d=>d.type==="LEASE_AGREEMENT" && d.status==="SIGNED" && d.signedAt && d.provider==="BLENDSIGN" && d.externalId).length===1;
 }
-async function policyForCollection(database:Database,organisationId:string) {
-  const policy=await resolvedPhotoPolicy(database,organisationId);
+async function policyForCollection(database:Database,organisationId:string,tenancyId?:string) {
+  const policy=tenancyId?await primaryTrialPolicy(database,organisationId,tenancyId)??await resolvedPhotoPolicy(database,organisationId):await resolvedPhotoPolicy(database,organisationId);
   if(!policy?.enabled || !integrationEncryptionConfigured()) throw Error("PHOTO_POLICY_PENDING");
   const worker=await database.facialPhotoMaintenance.findUnique({where:{id:"expiry"}});
   if(!worker || worker.completedAt.getTime()<Date.now()-90*60*1000)throw Error("PHOTO_MAINTENANCE_REQUIRED");
   return policy;
 }
 export async function legacyPhotoStatus(session:CustomerSession,id:string) {
-  const tenancy=await customerTenancy(db,session,id), policy=await resolvedPhotoPolicy(db,session.organisationId);
-  let available=false; try {await policyForCollection(db,session.organisationId);available=eligible(tenancy) && (await legacyPaymentEvidence(db,tenancy.accountId)).ready;} catch { /* Status remains readable when collection is paused. */ }
+  const tenancy=await customerTenancy(db,session,id), trial=await primaryTrialPolicy(db,session.organisationId,id), policy=trial??await resolvedPhotoPolicy(db,session.organisationId);
+  let available=false; try {await policyForCollection(db,session.organisationId,id);available=eligible(tenancy) && (Boolean(trial)||(await legacyPaymentEvidence(db,tenancy.accountId)).ready);} catch { /* Status remains readable when collection is paused. */ }
   const photo=await db.legacyAccessPhoto.findUnique({where:{tenancyId:id},select:summary});
   return {available,policy:policy?{version:policy.version,hash:policy.hash,notice:policy.notice,consentLabel:policy.consentLabel,retentionHours:policy.retentionHours,alternativeContact:policy.alternativeContact}:null,photo:photo && photo.expiresAt && photo.expiresAt<=new Date()?{...photo,status:"EXPIRED"}:photo};
 }
 export async function submitLegacyPhoto(session:CustomerSession,input:{tenancyId:string;policyHash:string;consent:boolean;expectedVersion:number;image:File}) {
   const tenancy=await customerTenancy(db,session,input.tenancyId);
-  if(!eligible(tenancy) || !(await legacyPaymentEvidence(db,tenancy.accountId)).ready)throw Error("PHOTO_BOOKING_NOT_READY");
-  const policy=await policyForCollection(db,session.organisationId);
+  if(!eligible(tenancy) || (!(await primaryTrialPolicy(db,session.organisationId,input.tenancyId))&&!(await legacyPaymentEvidence(db,tenancy.accountId)).ready))throw Error("PHOTO_BOOKING_NOT_READY");
+  const policy=await policyForCollection(db,session.organisationId,input.tenancyId);
   if(!input.consent || input.policyHash!==policy.hash)throw Error("PHOTO_CONSENT_REQUIRED");
   const signed=tenancy.documents.find(d=>d.type==="LEASE_AGREEMENT" && d.status==="SIGNED" && d.signedAt && d.provider==="BLENDSIGN" && d.externalId)!;
   await legacySignedArtifactHash(signed.externalId!);
@@ -46,9 +71,9 @@ export async function submitLegacyPhoto(session:CustomerSession,input:{tenancyId
   try { return await db.$transaction(async tx=>{
     await tx.$queryRaw`SELECT "id" FROM "Organisation" WHERE "id" = ${session.organisationId} FOR UPDATE`;
     await lock(tx,input.tenancyId);
-    const currentTenancy=await customerTenancy(tx,session,input.tenancyId), currentPolicy=await policyForCollection(tx,session.organisationId);
+    const currentTenancy=await customerTenancy(tx,session,input.tenancyId), currentPolicy=await policyForCollection(tx,session.organisationId,input.tenancyId);
     await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${currentTenancy.accountId} FOR UPDATE`;
-    if(!eligible(currentTenancy) || !currentTenancy.documents.some(d=>d.id===signed.id && d.status==="SIGNED" && d.externalId===signed.externalId) || !(await legacyPaymentEvidence(tx,currentTenancy.accountId)).ready)throw Error("PHOTO_BOOKING_NOT_READY");
+    if(!eligible(currentTenancy) || !currentTenancy.documents.some(d=>d.id===signed.id && d.status==="SIGNED" && d.externalId===signed.externalId) || (!(await primaryTrialPolicy(tx,session.organisationId,input.tenancyId))&&!(await legacyPaymentEvidence(tx,currentTenancy.accountId)).ready))throw Error("PHOTO_BOOKING_NOT_READY");
     if(currentPolicy.hash!==input.policyHash)throw Error("PHOTO_CONSENT_REQUIRED");
     const old=await tx.legacyAccessPhoto.findUnique({where:{tenancyId:input.tenancyId}});
     if((old?.version??0)!==input.expectedVersion)throw Error("PHOTO_CHANGED");
@@ -106,16 +131,16 @@ async function staffPhoto(tx:Database,scope:RequestScope,id:string) {
 }
 export async function previewLegacyPhoto(scope:RequestScope,id:string,version:number) {
   return db.$transaction(async tx=>{const first=await staffPhoto(tx,scope,id);await lock(tx,first.tenancyId);const photo=await staffPhoto(tx,scope,id);
-    if(photo.version!==version||photo.status!=="WAITING_REVIEW"||!photo.encryptedImage||(photo.expiresAt&&photo.expiresAt<=new Date())||!eligible(photo.tenancy)||(await resolvedPhotoPolicy(tx,scope.organisationId))?.hash!==photo.policyHash)throw Error("PHOTO_CHANGED");
+    if(photo.version!==version||photo.status!=="WAITING_REVIEW"||!photo.encryptedImage||(photo.expiresAt&&photo.expiresAt<=new Date())||!eligible(photo.tenancy)||(await primaryTrialPolicy(tx,scope.organisationId,photo.tenancyId)??await resolvedPhotoPolicy(tx,scope.organisationId))?.hash!==photo.policyHash)throw Error("PHOTO_CHANGED");
     const bytes=decryptPhoto(photo.encryptedImage,binding(photo.tenancyId,version));
     await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:photo.tenancy.facilityId,actorId:scope.userId,action:"legacy_photo.previewed",entityType:"LegacyAccessPhoto",entityId:id,after:{version}}});return bytes;
   });
 }
 export async function reviewLegacyPhoto(scope:RequestScope,id:string,version:number,decision:"APPROVE"|"REJECT") {
   await db.$transaction(async tx=>{const first=await staffPhoto(tx,scope,id);await lock(tx,first.tenancyId);const photo=await staffPhoto(tx,scope,id);
-    if(photo.version!==version||photo.status!=="WAITING_REVIEW"||!photo.encryptedImage||(photo.expiresAt&&photo.expiresAt<=new Date())||!eligible(photo.tenancy)||(await resolvedPhotoPolicy(tx,scope.organisationId))?.hash!==photo.policyHash)throw Error("PHOTO_CHANGED");
+    if(photo.version!==version||photo.status!=="WAITING_REVIEW"||!photo.encryptedImage||(photo.expiresAt&&photo.expiresAt<=new Date())||!eligible(photo.tenancy)||(await primaryTrialPolicy(tx,scope.organisationId,photo.tenancyId)??await resolvedPhotoPolicy(tx,scope.organisationId))?.hash!==photo.policyHash)throw Error("PHOTO_CHANGED");
     if(decision==="APPROVE" && !await tx.auditEvent.findFirst({where:{organisationId:scope.organisationId,facilityId:photo.tenancy.facilityId,actorId:scope.userId,entityType:"LegacyAccessPhoto",entityId:id,action:"legacy_photo.previewed",after:{path:["version"],equals:version}}}))throw Error("PHOTO_PREVIEW_REQUIRED");
-    const handover=decision==="APPROVE" ? await tx.auditEvent.findFirst({where:{organisationId:scope.organisationId,facilityId:photo.tenancy.facilityId,entityType:"Tenancy",entityId:photo.tenancyId,action:"tenancy.key_handover_confirmed"}}) : null;
+    const handover=decision==="APPROVE" && !(await primaryTrialPolicy(tx,scope.organisationId,photo.tenancyId)) ? await tx.auditEvent.findFirst({where:{organisationId:scope.organisationId,facilityId:photo.tenancy.facilityId,entityType:"Tenancy",entityId:photo.tenancyId,action:"tenancy.key_handover_confirmed"}}) : null;
     await tx.legacyAccessPhoto.update({where:{id},data:{status:decision==="APPROVE"?(handover?"PENDING_PROVIDER":"APPROVED"):"REJECTED",reviewedById:scope.userId,reviewedAt:new Date(),activationRequestedAt:handover?new Date():null,...(decision==="REJECT"?{encryptedImage:null,erasedAt:new Date()}:{})}});
     await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:photo.tenancy.facilityId,actorId:scope.userId,action:decision==="APPROVE"?"legacy_photo.approved":"legacy_photo.rejected",entityType:"LegacyAccessPhoto",entityId:id,after:{version}}});
   });

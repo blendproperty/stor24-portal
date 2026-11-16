@@ -2,18 +2,20 @@ import { build } from "esbuild";
 import { chromium, expect } from "@playwright/test";
 import { createServer } from "node:http";
 import assert from "node:assert/strict";
+import { mkdir } from "node:fs/promises";
 
 const bundle = await build({
-  entryPoints: ["tests/browser/additional-access-fixture.jsx"], bundle: true, write: false, format: "esm", jsx: "automatic",
+  entryPoints: ["tests/browser/additional-access-fixture.jsx"], bundle: true, write: false, outdir: "out", format: "esm", jsx: "automatic",
   plugins: [{ name: "navigation-fixture", setup(builder) {
     builder.onResolve({ filter: /^next\/navigation$/ }, () => ({ path: "navigation", namespace: "fixture" }));
     builder.onLoad({ filter: /.*/, namespace: "fixture" }, () => ({ contents: "export const useRouter = () => ({refresh: () => {}});", loader: "js" }));
   } }],
 });
 const server = createServer((req, res) => {
-  if (req.url === "/fixture.js") { res.setHeader("Content-Type", "text/javascript"); return res.end(bundle.outputFiles[0].text); }
+  if (req.url === "/fixture.js") { res.setHeader("Content-Type", "text/javascript"); return res.end(bundle.outputFiles.find(file => file.path.endsWith(".js")).text); }
+  if (req.url === "/fixture.css") { res.setHeader("Content-Type", "text/css"); return res.end(bundle.outputFiles.find(file => file.path.endsWith(".css")).text); }
   res.setHeader("Content-Type", "text/html");
-  res.end('<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><div id="root"></div><script type="module" src="/fixture.js"></script></body></html>');
+  res.end('<html><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/fixture.css"></head><body><div id="root"></div><script type="module" src="/fixture.js"></script></body></html>');
 });
 await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
 const browser = await chromium.launch(process.env.PLAYWRIGHT_CHANNEL ? { channel: process.env.PLAYWRIGHT_CHANNEL } : {});
@@ -38,6 +40,12 @@ try {
   await expect(page.getByRole("button", { name: "View privately" })).toHaveCount(0);
   await expect(page.locator('input[type="file"]')).toHaveCount(0);
   await page.goto(base + "?policy");
+  assert.equal(await page.locator(".face-additional-form").first().evaluate(element => getComputedStyle(element).display), "grid");
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await mkdir("output/facial-access", { recursive: true });
+  await page.screenshot({ path: "output/facial-access/additional-390.png", fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 800 });
   await expect(page.getByRole("button", { name: "Approve photo" })).toBeDisabled();
   await page.getByRole("button", { name: "View privately" }).click();
   await expect(page.getByRole("img", { name: "Private access photo" })).toBeVisible();
