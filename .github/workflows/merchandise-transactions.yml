@@ -166,6 +166,7 @@ jobs:
         run: npx tsx scripts/test-synthetic-restore.ts
         env:
           POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+      - run: npx tsx --test tests/integration/blendsign-webhook-safety.test.ts
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
