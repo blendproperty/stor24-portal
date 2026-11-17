@@ -58,5 +58,9 @@ test("owner can review and safely reassign an outstanding task", async () => {
     assert.equal((await post(target.id, covered.id, recipient.id, covered.updatedAt.toISOString())).status, 200);
     const savedCover = await db.task.findUniqueOrThrow({ where: { id: covered.id } });
     assert.equal(savedCover.coverId, recipient.id); assert.equal(savedCover.coverAcknowledgedAt, null);
+    const race = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Race", assigneeId: target.id } });
+    const concurrent = await Promise.all([post(target.id, race.id, recipient.id, race.updatedAt.toISOString()), post(target.id, race.id, recipient.id, race.updatedAt.toISOString())]);
+    assert.deepEqual(concurrent.map(response => response.status).sort(), [200, 409]);
+    assert.equal(await db.auditEvent.count({ where: { entityId: race.id, action: "staff.task_reassigned" } }), 1);
   } finally { await db.$disconnect(); }
 });
