@@ -32,7 +32,7 @@ export async function GET() {
       take: 100,
     }),
     db.user.findMany({
-      where: { organisationId: organisation.id },
+      where: { organisationId: organisation.id, retiredAt: null },
       include: { roleAssignments: { include: { role: true, facility: true } }, mfaCredential: { select: { enabledAt: true } } },
       orderBy: { name: "asc" },
       take: 100,

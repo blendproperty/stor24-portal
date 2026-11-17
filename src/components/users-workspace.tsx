@@ -41,7 +41,7 @@ type UserRow = {
 
 type RoleOption = { name: string; permissions: string[] };
 type FacilityOption = { name: string; code: string };
-type RemovalTask = { id: string; title: string; purpose: string; status: string; updatedAt: string; facility: { name: string } | null; assigneeId: string | null; coverId: string | null; reviewerId: string | null };
+type RemovalTask = { id: string; kind: "TASK" | "LEAD"; title: string; purpose: string; status: string; updatedAt: string; facility: { name: string } | null; assigneeId: string | null; coverId: string | null; reviewerId: string | null };
 
 const roles = [
   ["Organisation owner", "Full portfolio control"],
@@ -204,11 +204,11 @@ export function UsersWorkspace() {
     if (!removalUser || !replacementId) return;
     setBusy(true); setError("");
     try {
-      const response = await fetch(`/api/v1/users/${removalUser.id}/work`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ taskId: task.id, replacementId, updatedAt: task.updatedAt }) });
+      const response = await fetch(`/api/v1/users/${removalUser.id}/work`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ taskId: task.id, kind: task.kind, replacementId, updatedAt: task.updatedAt }) });
       const payload = await response.json();
       if (!response.ok) { setError(payload.error?.message ?? "The task could not be reassigned."); return; }
       await openRemoval(removalUser);
-      setNotice("Task reassigned. Its previous cover acknowledgement was cleared.");
+      setNotice(task.kind === "LEAD" ? "Enquiry reassigned." : "Task reassigned. Its previous cover acknowledgement was cleared where applicable.");
     } catch { setError("The result is uncertain. Close and reopen this review before trying again."); }
     finally { setBusy(false); }
   }
@@ -566,9 +566,9 @@ export function UsersWorkspace() {
       ) : null}
       {removalUser ? <div className="modal-backdrop" role="presentation"><div className="modal-card user-removal-dialog" role="dialog" aria-modal="true" aria-labelledby="removal-title">
         <h2 id="removal-title">Permanently delete {removalUser.name}?</h2>
-        <p>Deactivate the user first, then show inactive users to delete their account. Deletion removes the account and credentials and frees {removalUser.email} for a new invitation. This cannot be undone. Deletion remains blocked while business records are linked.</p>
-        <h3>Outstanding assigned tasks</h3>
-        {removalTasks === null ? <p>Loading tasks…</p> : removalTasks.length ? <><label>Reassign to <select value={replacementId} onChange={event => setReplacementId(event.target.value)}><option value="">Choose a user</option>{persistedUsers.filter(user => user.active && user.id !== removalUser.id).map(user => <option key={user.id} value={user.id}>{user.name}</option>)}</select></label><ul>{removalTasks.map(task => <li key={task.id}><strong>{task.title}</strong> · {task.facility?.name ?? "All facilities"} · {task.status} {task.assigneeId === removalUser.id ? "· Assignee" : task.coverId === removalUser.id ? "· Cover" : "· Reviewer"} {(["GENERAL", "AGREED_FOLLOWUP", "OPERATIONAL_CHECKLIST"].includes(task.purpose)) ? <button type="button" className="text-button" disabled={busy || !replacementId} onClick={() => void transferTask(task)}>Reassign</button> : <span>· Requires separate review before transfer</span>}</li>)}</ul>{workTruncated ? <p>Only the first 200 tasks are shown. Reopen the review after transferring tasks to see the rest.</p> : null}</> : <p>No outstanding assigned tasks found.</p>}
+        <p>Deactivate the user first, then show inactive users to delete their account. Deletion removes their sign-in and credentials and frees {removalUser.email} for a new invitation. This cannot be undone. Their name and identity may be retained without access to preserve historical records. Outstanding tasks must be reassigned first. Any outstanding price-approval codes linked to the account will be cancelled.</p>
+        <h3>Outstanding tasks and enquiries</h3>
+        {removalTasks === null ? <p>Loading work…</p> : removalTasks.length ? <><label>Reassign to <select value={replacementId} onChange={event => setReplacementId(event.target.value)}><option value="">Choose a user</option>{persistedUsers.filter(user => user.active && user.id !== removalUser.id).map(user => <option key={user.id} value={user.id}>{user.name}</option>)}</select></label><ul>{removalTasks.map(task => <li key={`${task.kind}:${task.id}`}><strong>{task.title}</strong> · {task.facility?.name ?? "All facilities"} · {task.status} {task.assigneeId === removalUser.id ? "· Assignee" : task.coverId === removalUser.id ? "· Cover" : "· Reviewer"} {(["GENERAL", "AGREED_FOLLOWUP", "OPERATIONAL_CHECKLIST", "LEAD"].includes(task.purpose)) ? <button type="button" className="text-button" disabled={busy || !replacementId} onClick={() => void transferTask(task)}>Reassign</button> : <span>· Requires separate review before transfer</span>}</li>)}</ul>{workTruncated ? <p>Only the first 200 records are shown. Reopen the review after transferring work to see the rest.</p> : null}</> : <p>No outstanding tasks or enquiries found.</p>}
         {error ? <p className="form-error" role="alert">{error}</p> : null}
         <div className="user-removal-actions"><button className="button button-secondary" disabled={busy} onClick={() => { removalReview.current++; setRemovalUser(null); setError(""); }}>Cancel</button>
         <button className="button button-primary" disabled={busy} onClick={deleteUser}>{busy ? "Deleting..." : "Permanently delete user"}</button></div>

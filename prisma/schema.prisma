@@ -1338,6 +1338,7 @@ model User {
   name                String
   passwordHash        String?
   active              Boolean              @default(true)
+  retiredAt           DateTime?
   sessionVersion      Int                  @default(0)
   passwordChangedAt   DateTime?
   roleAssignments     RoleAssignment[]
@@ -2373,6 +2374,7 @@ model PriceApprovalChallenge {
 // Opaque IDs prevent stale writers from relinking a deleted staff account.
 model DeletedStaffIdentity {
   id String @id
+  retained Boolean @default(false)
 }
 
 model StaffDeletionFence {

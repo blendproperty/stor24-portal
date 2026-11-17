@@ -6,7 +6,7 @@ import { sameOrigin } from "@/lib/request-security";
 import { changeOperationalChecklist } from "@/lib/operational-checklist-service";
 import { checklistRecordSchema } from "@/lib/operational-checklist-policy";
 
-const transfer = z.object({ taskId: z.string().cuid(), replacementId: z.string().cuid(), updatedAt: z.iso.datetime() }).strict();
+const transfer = z.object({ taskId: z.string().cuid(), replacementId: z.string().cuid(), updatedAt: z.iso.datetime(), kind: z.enum(["TASK", "LEAD"]).default("TASK") }).strict();
 const supported = ["GENERAL", "AGREED_FOLLOWUP"];
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
@@ -15,12 +15,13 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     const { id } = await context.params;
     const target = await db.user.findFirst({ where: { id, organisationId: actor.user.organisationId }, select: { id: true } });
     if (!target) return Response.json({ error: { message: "User not found." } }, { status: 404 });
-    const tasks = await db.task.findMany({
+    const [tasks, leads] = await Promise.all([db.task.findMany({
       where: { organisationId: actor.user.organisationId, status: { notIn: ["COMPLETED", "CANCELLED"] }, OR: [{ assigneeId: id }, { coverId: id }, { purpose: "OPERATIONAL_CHECKLIST", operationalChecklist: { path: ["reviewerId"], equals: id } }] },
       select: { id: true, title: true, purpose: true, status: true, updatedAt: true, facilityId: true, facility: { select: { name: true } }, assigneeId: true, coverId: true, operationalChecklist: true },
       orderBy: { id: "asc" }, take: 201,
-    });
-    return Response.json({ data: tasks.slice(0, 200).map(({ operationalChecklist, ...task }) => ({ ...task, reviewerId: task.purpose === "OPERATIONAL_CHECKLIST" ? checklistRecordSchema.safeParse(operationalChecklist).data?.reviewerId ?? null : null })), truncated: tasks.length > 200 }, { headers: { "Cache-Control": "private, no-store" } });
+    }), db.lead.findMany({ where: { facility: { organisationId: actor.user.organisationId }, assignedToId: id, stage: { not: "LOST" } }, select: { id: true, stage: true, updatedAt: true, assignedToId: true, facility: { select: { name: true } }, customer: { select: { firstName: true, lastName: true, companyName: true } } }, orderBy: { id: "asc" }, take: 201 })]);
+    const rows = [...tasks.map(({ operationalChecklist, ...task }) => ({ ...task, kind: "TASK", reviewerId: task.purpose === "OPERATIONAL_CHECKLIST" ? checklistRecordSchema.safeParse(operationalChecklist).data?.reviewerId ?? null : null })), ...leads.map(lead => ({ ...lead, kind: "LEAD", title: `Enquiry · ${lead.customer?.companyName || [lead.customer?.firstName, lead.customer?.lastName].filter(Boolean).join(" ") || "Unlinked"} · ${lead.id}`, purpose: "LEAD", status: lead.stage, assigneeId: lead.assignedToId, coverId: null, reviewerId: null }))];
+    return Response.json({ data: rows.slice(0, 200), truncated: rows.length > 200 }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) { return authErrorResponse(error); }
 }
 
@@ -31,7 +32,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const input = transfer.parse(await request.json());
     const { id } = await context.params;
     if (id === input.replacementId) return Response.json({ error: { message: "Choose another user." } }, { status: 422 });
-    const checklist = await db.task.findFirst({ where: { id: input.taskId, organisationId: actor.user.organisationId, purpose: "OPERATIONAL_CHECKLIST" } });
+    const checklist = input.kind === "TASK" ? await db.task.findFirst({ where: { id: input.taskId, organisationId: actor.user.organisationId, purpose: "OPERATIONAL_CHECKLIST" } }) : null;
     if (checklist) {
       if (!await db.user.findFirst({ where: { id, organisationId: actor.user.organisationId }, select: { id: true } })) return Response.json({ error: { message: "User not found." } }, { status: 404 });
       const record = checklistRecordSchema.safeParse(checklist.operationalChecklist);
@@ -48,6 +49,15 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       const target = await tx.user.findFirst({ where: { id, organisationId: current.organisationId } });
       const replacement = await tx.user.findFirst({ where: { id: input.replacementId, organisationId: current.organisationId, active: true }, include: { roleAssignments: { include: { role: true } } } });
       if (!target || !replacement || !replacement.passwordHash) return "user";
+      if (input.kind === "LEAD") {
+        const lead = await tx.lead.findFirst({ where: { id: input.taskId, facility: { organisationId: current.organisationId } } });
+        if (!lead || lead.stage === "LOST" || lead.assignedToId !== id || lead.updatedAt.toISOString() !== input.updatedAt) return "changed";
+        if (!currentRoleAccess(replacement.roleAssignments.filter(a => a.role.organisationId === current.organisationId), "leads.view", lead.facilityId).allowed) return "access";
+        const changed = await tx.lead.updateMany({ where: { id: lead.id, assignedToId: id, updatedAt: lead.updatedAt, stage: lead.stage }, data: { assignedToId: replacement.id, updatedAt: new Date(Math.max(Date.now(), lead.updatedAt.getTime() + 1)) } });
+        if (changed.count !== 1) return "changed";
+        await tx.auditEvent.create({ data: { organisationId: current.organisationId, facilityId: lead.facilityId, actorId: current.id, action: "staff.lead_reassigned", entityType: "Lead", entityId: lead.id, before: { assignedToId: id }, after: { assignedToId: replacement.id } } });
+        return "ok";
+      }
       const task = await tx.task.findFirst({ where: { id: input.taskId, organisationId: current.organisationId } });
       if (!task || !supported.includes(task.purpose) || ["COMPLETED", "CANCELLED"].includes(task.status) || (task.assigneeId !== id && task.coverId !== id) || task.updatedAt.toISOString() !== input.updatedAt) return "changed";
       const access = currentRoleAccess(replacement.roleAssignments.filter(a => a.role.organisationId === current.organisationId), "operations.view", task.facilityId ?? undefined);

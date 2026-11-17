@@ -12,7 +12,7 @@ const server = createServer(async (req, res) => {
     res.setHeader("Content-Type", "application/json");
     if (req.url.endsWith("/work")) {
       if (req.method === "POST") { let body = ""; for await (const chunk of req) body += chunk; const data = JSON.parse(body); if (data.taskId !== "task" || data.replacementId !== "replacement") { res.statusCode = 400; res.end("{}"); return; } transferred = true; res.end(JSON.stringify({ data: { reassigned: true } })); }
-      else res.end(JSON.stringify({ data: transferred ? [] : [{ id: "task", title: "Call customer", purpose: "GENERAL", status: "OPEN", updatedAt: "2026-11-17T00:00:00.000Z", facility: { name: "Midpoint" }, assigneeId: "target", coverId: null }], truncated: false }));
+      else res.end(JSON.stringify({ data: transferred ? [] : [{ id: "task", kind: "TASK", title: "Call customer", purpose: "GENERAL", status: "OPEN", updatedAt: "2026-11-17T00:00:00.000Z", facility: { name: "Midpoint" }, assigneeId: "target", coverId: null }], truncated: false }));
     } else res.end(JSON.stringify({ data: [], users: [{ id: "target", name: "Target", email: "target@example.invalid", role: "Staff", scope: "Midpoint", permissions: [], active: false }, { id: "replacement", name: "Replacement", email: "replacement@example.invalid", role: "Staff", scope: "Midpoint", permissions: [], active: true }], roles: [], facilities: [] }));
     return;
   }
@@ -32,7 +32,7 @@ try {
     await expect(dialog.getByRole("button", { name: "Reassign" })).toBeDisabled();
     await dialog.getByLabel("Reassign to").selectOption("replacement");
     await dialog.getByRole("button", { name: "Reassign" }).click();
-    await expect(dialog.getByText("No outstanding assigned tasks found.")).toBeVisible();
+    await expect(dialog.getByText("No outstanding tasks or enquiries found.")).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Permanently delete user" })).toBeVisible();
     await page.close();
   }

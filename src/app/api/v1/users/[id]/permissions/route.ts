@@ -13,7 +13,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const parsed = schema.safeParse(await request.json());
   if (!parsed.success) return Response.json({ error: { message: "Check the selected permissions." } }, { status: 422 });
   const { id } = await context.params;
-  const target = await db.user.findFirst({ where: { id, organisationId: actor.user.organisationId }, include: { roleAssignments: { include: { role: true } } } });
+  const target = await db.user.findFirst({ where: { id, organisationId: actor.user.organisationId, retiredAt: null }, include: { roleAssignments: { include: { role: true } } } });
   if (!target) return Response.json({ error: { message: "Employee not found." } }, { status: 404 });
   if (target.roleAssignments.some((assignment) => assignment.role.name === "Organisation owner")) return Response.json({ error: { message: "Owner permissions cannot be reduced. Assign another security level first." } }, { status: 409 });
 
