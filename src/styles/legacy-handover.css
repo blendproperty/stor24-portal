@@ -1,3 +1,4 @@
+.handover-check .legacy-photo-confirmation { margin:14px 0 0; padding:14px 16px; border:1px solid #b9d7c3; border-radius:10px; background:#ebf7ee; color:#174e30; font-size:14px; font-weight:700; }
 .legacy-photo-capture { margin:20px 0; overflow:hidden; border:1px solid #d6e0d7; border-radius:16px; background:#fff; color:#173528; }
 .legacy-photo-capture > summary { display:flex; align-items:center; gap:14px; min-height:72px; padding:16px 20px; cursor:pointer; font-size:18px; font-weight:700; list-style:none; }
 .legacy-photo-capture > summary::-webkit-details-marker { display:none; }
@@ -24,5 +25,6 @@
 .legacy-photo-camera:focus-within,.legacy-photo-upload:focus-within,.legacy-photo-capture > summary:focus-visible { outline:3px solid #a43e0e; outline-offset:3px; }
 .legacy-photo-camera:has(input:disabled),.legacy-photo-upload:has(input:disabled) { opacity:.6; }
 .handover-check .legacy-photo-selected { margin:12px 0; font-size:13px; font-weight:600; overflow-wrap:anywhere; }
+.handover-check .legacy-photo-error { margin:12px 0 0; padding:12px 14px; border-radius:9px; background:#fff0e6; color:#933b13; font-size:13px; }
 .legacy-photo-step > .button { min-height:48px; padding-inline:22px; }
 @media(max-width:700px) { .legacy-photo-body { padding:14px; } .legacy-photo-step { padding:16px; } .legacy-photo-actions { grid-template-columns:1fr; } .legacy-photo-camera,.legacy-photo-upload { min-height:76px; } .legacy-photo-step > .button { width:100%; } }

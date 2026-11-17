@@ -118,7 +118,7 @@ if (process.env.PREVIEW_ONLY) {
    await expect(page.getByRole('button',{name:'Next',exact:true})).toBeDisabled();
    assert.equal(await page.locator('.unit-table tbody tr').count(),20);
    const next = page.getByRole('button',{name:'Next',exact:true});
-   const bounds = await next.boundingBox(); assert.ok(bounds.y>=0 && bounds.y+bounds.height<=900);
+   await expect(page.locator('.move-in-navigation')).toHaveCSS('position','static');
    await page.getByRole('radio',{name:'Select unit 1',exact:true}).check();
    await expect(next).toBeEnabled();
    await page.getByRole('button',{name:'Next page',exact:true}).click();
