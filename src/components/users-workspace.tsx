@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Check,
   Link2,
@@ -16,6 +16,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { securityPermissionGroups } from "@/lib/security-permissions";
 import { formatSouthAfricaDate } from "@/lib/south-africa-time";
+import { scheduledWorkPurposes } from "@/lib/scheduled-work-policy";
 
 type Invitation = {
   id: string;
@@ -41,6 +42,7 @@ type UserRow = {
 
 type RoleOption = { name: string; permissions: string[] };
 type FacilityOption = { name: string; code: string };
+type RemovalTask = { id: string; kind: "TASK" | "LEAD"; title: string; purpose: string; status: string; updatedAt: string; facility: { name: string } | null; assigneeId: string | null; coverId: string | null; reviewerId: string | null };
 
 const roles = [
   ["Organisation owner", "Full portfolio control"],
@@ -66,6 +68,10 @@ export function UsersWorkspace() {
   const [busy, setBusy] = useState(false);
   const [resetUser, setResetUser] = useState<UserRow | null>(null);
   const [removalUser, setRemovalUser] = useState<UserRow | null>(null);
+  const [removalTasks, setRemovalTasks] = useState<RemovalTask[] | null>(null);
+  const [workTruncated, setWorkTruncated] = useState(false);
+  const [replacementId, setReplacementId] = useState("");
+  const removalReview = useRef(0);
   const [showInactive, setShowInactive] = useState(false);
   const [temporaryPassword, setTemporaryPassword] = useState("");
   const [permissionUser, setPermissionUser] = useState<UserRow | null>(null);
@@ -181,6 +187,30 @@ export function UsersWorkspace() {
       await load();
       setNotice("User permanently deleted. Their email can be invited again.");
     } catch { setError("The result is uncertain. Refresh the user list to check before trying again."); }
+    finally { setBusy(false); }
+  }
+
+  async function openRemoval(user: UserRow) {
+    const review = ++removalReview.current;
+    setError(""); setRemovalUser(user); setRemovalTasks(null); setReplacementId("");
+    try {
+      const response = await fetch(`/api/v1/users/${user.id}/work`, { cache: "no-store" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error?.message ?? "Could not load work.");
+      if (review === removalReview.current) { setRemovalTasks(payload.data); setWorkTruncated(payload.truncated); }
+    } catch { if (review === removalReview.current) setError("Could not load outstanding tasks. Close and reopen this review to try again."); }
+  }
+
+  async function transferTask(task: RemovalTask) {
+    if (!removalUser || !replacementId) return;
+    setBusy(true); setError("");
+    try {
+      const response = await fetch(`/api/v1/users/${removalUser.id}/work`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ taskId: task.id, kind: task.kind, replacementId, updatedAt: task.updatedAt }) });
+      const payload = await response.json();
+      if (!response.ok) { setError(payload.error?.message ?? "The task could not be reassigned."); return; }
+      await openRemoval(removalUser);
+      setNotice(task.kind === "LEAD" ? "Enquiry reassigned." : "Task reassigned. Its previous cover acknowledgement was cleared where applicable.");
+    } catch { setError("The result is uncertain. Close and reopen this review before trying again."); }
     finally { setBusy(false); }
   }
 
@@ -388,7 +418,7 @@ export function UsersWorkspace() {
                       >
                         {user.active === false ? "Reactivate" : "Deactivate"}
                       </button>
-                      <button className="text-button text-button-danger" onClick={() => { setError(""); setRemovalUser(user); }}>Delete user</button>
+                      <button className="text-button text-button-danger" onClick={() => void openRemoval(user)}>Delete user</button>
                     </div>
                   </td>
                 </tr>
@@ -537,9 +567,11 @@ export function UsersWorkspace() {
       ) : null}
       {removalUser ? <div className="modal-backdrop" role="presentation"><div className="modal-card user-removal-dialog" role="dialog" aria-modal="true" aria-labelledby="removal-title">
         <h2 id="removal-title">Permanently delete {removalUser.name}?</h2>
-        <p>Deactivate the user first, then show inactive users to delete their account. Deletion removes the account and credentials and frees {removalUser.email} for a new invitation. This cannot be undone. Deletion is blocked if business records are still linked to the user. Existing audit entries remain, but their user link is removed.</p>
+        <p>Deactivate the user first, then show inactive users to delete their account. Deletion removes their sign-in and credentials and frees {removalUser.email} for a new invitation. This cannot be undone. Their name and identity may be retained without access to preserve historical records. Outstanding tasks must be reassigned first. Any outstanding price-approval codes linked to the account will be cancelled.</p>
+        <h3>Outstanding tasks and enquiries</h3>
+        {removalTasks === null ? <p>Loading work…</p> : removalTasks.length ? <><label>Reassign to <select value={replacementId} onChange={event => setReplacementId(event.target.value)}><option value="">Choose a user</option>{persistedUsers.filter(user => user.active && user.id !== removalUser.id).map(user => <option key={user.id} value={user.id}>{user.name}</option>)}</select></label><ul>{removalTasks.map(task => <li key={`${task.kind}:${task.id}`}><strong>{task.title}</strong> · {task.facility?.name ?? "All facilities"} · {task.status} {task.assigneeId === removalUser.id ? "· Assignee" : task.coverId === removalUser.id ? "· Cover" : "· Reviewer"} {([...scheduledWorkPurposes, "GENERAL", "AGREED_FOLLOWUP", "OPERATIONAL_CHECKLIST", "LEAD"] as string[]).includes(task.purpose) ? <button type="button" className="text-button" disabled={busy || !replacementId} onClick={() => void transferTask(task)}>Reassign</button> : <span>· Requires separate review before transfer</span>}</li>)}</ul>{workTruncated ? <p>Only the first 200 records are shown. Reopen the review after transferring work to see the rest.</p> : null}</> : <p>No outstanding tasks or enquiries found.</p>}
         {error ? <p className="form-error" role="alert">{error}</p> : null}
-        <div className="user-removal-actions"><button className="button button-secondary" disabled={busy} onClick={() => { setRemovalUser(null); setError(""); }}>Cancel</button>
+        <div className="user-removal-actions"><button className="button button-secondary" disabled={busy} onClick={() => { removalReview.current++; setRemovalUser(null); setError(""); }}>Cancel</button>
         <button className="button button-primary" disabled={busy} onClick={deleteUser}>{busy ? "Deleting..." : "Permanently delete user"}</button></div>
       </div></div> : null}
       {resetUser ? <div className="modal-backdrop" role="presentation"><div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="reset-title">

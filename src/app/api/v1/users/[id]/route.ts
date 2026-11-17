@@ -13,7 +13,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const owner = currentRoleAccess(actor.user.roleAssignments).owner;
   if (parsed.data.roleName && !owner) return Response.json({ error: { message: "Only a Super Admin (Organisation owner) may change security roles." } }, { status: 403 });
   const { id } = await context.params;
-  const target = await db.user.findFirst({ where: { id, organisationId: actor.user.organisationId }, include: { roleAssignments: { include: { role: true } } } });
+  const target = await db.user.findFirst({ where: { id, organisationId: actor.user.organisationId, retiredAt: null }, include: { roleAssignments: { include: { role: true } } } });
   if (!target) return Response.json({ error: { message: "User not found." } }, { status: 404 });
   if (actor.allowedFacilityIds !== null && (!target.roleAssignments.length || target.roleAssignments.some(assignment => !assignment.facilityId || !actor.allowedFacilityIds!.includes(assignment.facilityId)))) return Response.json({ error: { message: "User is outside your permitted facilities." } }, { status: 403 });
   if (!owner && currentRoleAccess(target.roleAssignments, "data.personal_export").allowed) return Response.json({ error: { message: "Only a Super Admin may change access for a personal-data export administrator." } }, { status: 403 });

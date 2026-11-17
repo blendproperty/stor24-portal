@@ -138,6 +138,7 @@ export async function changeOperationalChecklist(scope: RequestScope, raw: Check
       await assignments(tx, scope, { ...input, facilityId: before.facilityId, template: record.template });
       if (input.reviewerId === record.submittedBy) throw new Error("CHECKLIST_REVIEWER_REQUIRED");
       record.reviewerId = input.reviewerId; data.assigneeId = input.assigneeId; data.coverId = input.coverId;
+      if (input.assigneeId !== before.assigneeId || input.coverId !== before.coverId) data.coverAcknowledgedAt = null;
     } else if (input.action === "CANCEL") status = "CANCELLED";
     const saved = await tx.task.updateMany({ where: { id: before.id, updatedAt: before.updatedAt, status: before.status }, data: { ...data, status, operationalChecklist: json(record), completedAt: status === "COMPLETED" ? now : null, updatedAt: new Date(Math.max(now.getTime(), before.updatedAt.getTime() + 1)) } });
     if (saved.count !== 1) throw new Error("CONFLICT");

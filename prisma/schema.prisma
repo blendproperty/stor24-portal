@@ -1338,6 +1338,7 @@ model User {
   name                String
   passwordHash        String?
   active              Boolean              @default(true)
+  retiredAt           DateTime?
   sessionVersion      Int                  @default(0)
   passwordChangedAt   DateTime?
   roleAssignments     RoleAssignment[]
@@ -2053,6 +2054,9 @@ model AuditEvent {
   facility       Facility?    @relation(fields: [facilityId], references: [id], onDelete: SetNull)
   actorId        String?
   actor          User?        @relation(fields: [actorId], references: [id])
+  deletedActorId String?
+  deletedActorName String?
+  deletedActorEmail String?
   action         String
   entityType     String
   entityId       String
@@ -2371,6 +2375,7 @@ model PriceApprovalChallenge {
 // Opaque IDs prevent stale writers from relinking a deleted staff account.
 model DeletedStaffIdentity {
   id String @id
+  retained Boolean @default(false)
 }
 
 model StaffDeletionFence {

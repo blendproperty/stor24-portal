@@ -1,0 +1,98 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { randomUUID } from "node:crypto";
+import { build } from "esbuild";
+import { createRequire } from "node:module";
+import { db } from "../../src/lib/db";
+
+test("linked staff removal retains historical identity and prevents new access or links", async () => {
+  assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci");
+  assert.equal(new URL(process.env.DATABASE_URL!).hostname, "localhost");
+  const key = randomUUID();
+  const org = await db.organisation.create({ data: { name: "Retired staff test", slug: key } });
+  const other = await db.organisation.create({ data: { name: "Foreign test", slug: `${key}-other` } });
+  const facility = await db.facility.create({ data: { organisationId: org.id, name: "Store", code: `S-${key}` } });
+  const owner = await db.user.create({ data: { organisationId: org.id, name: "Owner", email: `owner-${key}@example.invalid`, passwordHash: "synthetic" } });
+  const target = await db.user.create({ data: { organisationId: org.id, name: "Original actor", email: `target-${key}@example.invalid`, passwordHash: "synthetic", active: false } });
+  const ownerRole = await db.role.create({ data: { organisationId: org.id, name: "Organisation owner", permissions: ["*"] } });
+  const staffRole = await db.role.create({ data: { organisationId: org.id, name: "Staff", permissions: ["operations.view"] } });
+  await db.roleAssignment.create({ data: { userId: owner.id, roleId: ownerRole.id } });
+  await db.roleAssignment.create({ data: { userId: target.id, roleId: staffRole.id, facilityId: facility.id } });
+  await db.mfaCredential.create({ data: { userId: target.id, secretEncrypted: "synthetic", recoveryCodeHashes: [] } });
+  await db.passwordResetToken.create({ data: { userId: target.id, organisationId: org.id, tokenHash: key, expiresAt: new Date(Date.now() + 60000) } });
+  const invitation = await db.userInvitation.create({ data: { organisationId: org.id, email: target.email, name: target.name, roleName: "Staff", invitedByName: owner.name, tokenHash: `invite-${key}`, expiresAt: new Date(Date.now() + 60000) } });
+  const prior = await db.auditEvent.create({ data: { organisationId: org.id, actorId: target.id, action: "business.approved", entityType: "Test", entityId: key, after: { original: "unchanged" } } });
+  const task = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Completed", status: "COMPLETED", assigneeId: target.id, createdById: target.id } });
+  const outstanding = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Outstanding", assigneeId: target.id } });
+  const openLead = await db.lead.create({ data: { facilityId: facility.id, source: "TEST", assignedToId: target.id } });
+  const lostLead = await db.lead.create({ data: { facilityId: facility.id, source: "TEST", stage: "LOST", assignedToId: target.id } });
+  const training = await db.moveInTrainingRun.create({ data: { organisationId: org.id, facilityId: facility.id, userId: target.id, generation: 1, state: {} } });
+  const amendment = await db.reservationPriceAmendment.create({ data: { organisationId: org.id, facilityId: facility.id, reservationId: key, sourceFingerprint: "source", quoteFingerprint: "quote", originalEncrypted: "original", proposedEncrypted: "proposal", requestKey: key, requestHash: "hash", proposedById: target.id, expiresAt: new Date(Date.now() + 60000) } });
+  const challenge = await db.priceApprovalChallenge.create({ data: { id: key, organisationId: org.id, facilityId: facility.id, amendmentId: amendment.id, revision: 0, quoteFingerprint: "quote", requestedById: target.id, approverId: owner.id, requesterSessionVersion: 0, requesterSessionHash: "session", approverSessionVersion: 0, contactVersion: "contact", codeHash: "hash", reference: "reference", expiresAt: new Date(Date.now() + 60000), status: "SENT" } });
+  const out = await build({ entryPoints: ["src/app/api/v1/users/[id]/permanent-delete/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "fixture", setup(b) {
+    b.onResolve({ filter: /^@\/(lib\/(db|session)|generated\/prisma\/client)$/ }, a => ({ path: a.path, namespace: "fixture" }));
+    b.onLoad({ filter: /.*/, namespace: "fixture" }, a => ({ contents: a.path.endsWith("/db") ? "export const db=__db;" : a.path.endsWith("/session") ? "export const getSession=async()=>__session();" : "import {sqltag,join} from '@prisma/client/runtime/client';export const Prisma={sql:sqltag,join};", resolveDir: process.cwd() }));
+  } }] });
+  const mod = { exports: {} as { DELETE: (r: Request, c: { params: Promise<{ id: string }> }) => Promise<Response> } };
+  const session = { userId: owner.id, sessionVersion: owner.sessionVersion, mfaVerified: true };
+  new Function("require", "module", "exports", "__db", "__session", out.outputFiles[0].text)(createRequire(import.meta.url), mod, mod.exports, db, () => session);
+  const remove = () => mod.exports.DELETE(new Request("https://example.invalid/api", { method: "DELETE", headers: { origin: "https://example.invalid" } }), { params: Promise.resolve({ id: target.id }) });
+  try {
+    assert.equal((await remove()).status, 409);
+    await db.task.update({ where: { id: outstanding.id }, data: { assigneeId: owner.id } });
+    assert.equal((await remove()).status, 409);
+    await db.lead.update({ where: { id: openLead.id }, data: { assignedToId: owner.id } });
+    const foreignAudit = await db.auditEvent.create({ data: { organisationId: other.id, actorId: target.id, action: "test.foreign", entityType: "Test", entityId: key } });
+    assert.equal((await remove()).status, 409);
+    await db.auditEvent.delete({ where: { id: foreignAudit.id } });
+    await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_retired_history_audit_failure CHECK (false) NOT VALID');
+    try {
+      assert.equal((await remove()).status, 500);
+      assert.equal((await db.user.findUniqueOrThrow({ where: { id: target.id } })).retiredAt, null);
+      assert.equal((await db.priceApprovalChallenge.findUniqueOrThrow({ where: { id: challenge.id } })).status, "SENT");
+      assert.equal(await db.roleAssignment.count({ where: { userId: target.id } }), 1);
+    } finally { await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_retired_history_audit_failure'); }
+    let snapshotReady!: () => void, resumeWriter!: () => void;
+    const ready = new Promise<void>(resolve => { snapshotReady = resolve; });
+    const resume = new Promise<void>(resolve => { resumeWriter = resolve; });
+    const writer = db.$transaction(async tx => {
+      await tx.task.findUniqueOrThrow({ where: { id: task.id } });
+      snapshotReady(); await resume;
+      await tx.task.update({ where: { id: task.id }, data: { status: "OPEN" } });
+    }, { isolationLevel: "RepeatableRead", timeout: 20000 });
+    const rejectedWriter = writer.then(() => false, () => true);
+    await ready;
+    try { assert.equal((await remove()).status, 200); } finally { resumeWriter(); }
+    assert.equal(await rejectedWriter, true);
+    const retired = await db.user.findUniqueOrThrow({ where: { id: target.id } });
+    assert.ok(retired.retiredAt); assert.equal(retired.name, target.name); assert.equal(retired.passwordHash, null); assert.equal(retired.active, false); assert.notEqual(retired.email, target.email);
+    assert.equal(await db.roleAssignment.count({ where: { userId: target.id } }), 0);
+    assert.equal(await db.mfaCredential.count({ where: { userId: target.id } }), 0);
+    assert.equal(await db.passwordResetToken.count({ where: { userId: target.id } }), 0);
+    assert.equal((await db.userInvitation.findUniqueOrThrow({ where: { id: invitation.id } })).status, "REVOKED");
+    const oldAudit = await db.auditEvent.findUniqueOrThrow({ where: { id: prior.id } });
+    assert.equal(oldAudit.actorId, target.id); assert.equal(oldAudit.deletedActorEmail, target.email); assert.deepEqual(oldAudit.after, { original: "unchanged" });
+    assert.equal((await db.task.findUniqueOrThrow({ where: { id: task.id } })).createdById, target.id);
+    assert.equal((await db.lead.findUniqueOrThrow({ where: { id: lostLead.id } })).assignedToId, target.id);
+    await db.lead.update({ where: { id: lostLead.id }, data: { assignedToId: target.id, notes: "Historical note" } });
+    await assert.rejects(db.lead.create({ data: { facilityId: facility.id, source: "TEST", assignedToId: target.id } }));
+    await assert.rejects(db.lead.update({ where: { id: lostLead.id }, data: { stage: "NEW" } }));
+    await db.lead.update({ where: { id: lostLead.id }, data: { stage: "NEW", assignedToId: owner.id } });
+    assert.equal((await db.moveInTrainingRun.findUniqueOrThrow({ where: { id: training.id } })).userId, target.id);
+    assert.equal((await db.reservationPriceAmendment.findUniqueOrThrow({ where: { id: amendment.id } })).proposedById, target.id);
+    assert.equal((await db.priceApprovalChallenge.findUniqueOrThrow({ where: { id: challenge.id } })).status, "CANCELLED");
+    await db.reservationPriceAmendment.update({ where: { id: amendment.id }, data: { reviewedById: owner.id } });
+    await db.moveInTrainingRun.update({ where: { id: training.id }, data: { userId: target.id, version: { increment: 1 } } });
+    await db.task.update({ where: { id: task.id }, data: { createdById: target.id, title: "Historical title" } });
+    await assert.rejects(db.task.update({ where: { id: task.id }, data: { status: "OPEN" } }));
+    await db.task.update({ where: { id: task.id }, data: { status: "OPEN", assigneeId: owner.id } });
+    await db.auditEvent.create({ data: { organisationId: org.id, actorId: owner.id, action: "test.history", entityType: "Task", entityId: task.id, after: { previousActor: target.id } } });
+    await assert.rejects(db.user.update({ where: { id: target.id }, data: { active: true } }));
+    await assert.rejects(db.roleAssignment.create({ data: { userId: target.id, roleId: staffRole.id } }));
+    await assert.rejects(db.task.create({ data: { organisationId: org.id, title: "Stale", assigneeId: target.id } }));
+    await assert.rejects(db.auditEvent.create({ data: { organisationId: org.id, actorId: target.id, action: "stale", entityType: "Test", entityId: key } }));
+    const invited = await db.user.create({ data: { organisationId: org.id, name: "New account", email: target.email } });
+    assert.notEqual(invited.id, target.id);
+    assert.equal((await remove()).status, 404);
+  } finally { await db.$disconnect(); }
+});
