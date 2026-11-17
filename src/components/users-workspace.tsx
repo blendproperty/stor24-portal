@@ -69,7 +69,8 @@ export function UsersWorkspace() {
   const [resetUser, setResetUser] = useState<UserRow | null>(null);
   const [removalUser, setRemovalUser] = useState<UserRow | null>(null);
   const [removalTasks, setRemovalTasks] = useState<RemovalTask[] | null>(null);
-  const [workTruncated, setWorkTruncated] = useState(false);
+  const [workCursor, setWorkCursor] = useState("");
+  const [nextWorkCursor, setNextWorkCursor] = useState<string | null>(null);
   const [replacementId, setReplacementId] = useState("");
   const removalReview = useRef(0);
   const [showInactive, setShowInactive] = useState(false);
@@ -190,14 +191,14 @@ export function UsersWorkspace() {
     finally { setBusy(false); }
   }
 
-  async function openRemoval(user: UserRow) {
+  async function openRemoval(user: UserRow, cursor = "") {
     const review = ++removalReview.current;
-    setError(""); setRemovalUser(user); setRemovalTasks(null); setReplacementId("");
+    setError(""); setRemovalUser(user); setRemovalTasks(null); setWorkCursor(cursor); if (!cursor) setReplacementId("");
     try {
-      const response = await fetch(`/api/v1/users/${user.id}/work`, { cache: "no-store" });
+      const response = await fetch(`/api/v1/users/${user.id}/work${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`, { cache: "no-store" });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error?.message ?? "Could not load work.");
-      if (review === removalReview.current) { setRemovalTasks(payload.data); setWorkTruncated(payload.truncated); }
+      if (review === removalReview.current) { setRemovalTasks(payload.data); setNextWorkCursor(payload.nextCursor); }
     } catch { if (review === removalReview.current) setError("Could not load outstanding tasks. Close and reopen this review to try again."); }
   }
 
@@ -208,7 +209,7 @@ export function UsersWorkspace() {
       const response = await fetch(`/api/v1/users/${removalUser.id}/work`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ taskId: task.id, kind: task.kind, replacementId, updatedAt: task.updatedAt }) });
       const payload = await response.json();
       if (!response.ok) { setError(payload.error?.message ?? "The task could not be reassigned."); return; }
-      await openRemoval(removalUser);
+      await openRemoval(removalUser, workCursor);
       setNotice(task.kind === "LEAD" ? "Enquiry reassigned." : task.kind === "COLLECTION" ? "Collections case reassigned." : "Task reassigned. Its previous cover acknowledgement was cleared where applicable.");
     } catch { setError("The result is uncertain. Close and reopen this review before trying again."); }
     finally { setBusy(false); }
@@ -569,7 +570,7 @@ export function UsersWorkspace() {
         <h2 id="removal-title">Permanently delete {removalUser.name}?</h2>
         <p>Deactivate the user first, then show inactive users to delete their account. Deletion removes their sign-in and credentials and frees {removalUser.email} for a new invitation. This cannot be undone. Their name and identity may be retained without access to preserve historical records. Outstanding tasks must be reassigned first. Any outstanding price-approval codes linked to the account will be cancelled.</p>
         <h3>Outstanding work</h3>
-        {removalTasks === null ? <p>Loading work…</p> : removalTasks.length ? <><label>Reassign to <select value={replacementId} onChange={event => setReplacementId(event.target.value)}><option value="">Choose a user</option>{persistedUsers.filter(user => user.active && user.id !== removalUser.id).map(user => <option key={user.id} value={user.id}>{user.name}</option>)}</select></label><ul>{removalTasks.map(task => <li key={`${task.kind}:${task.id}`}><strong>{task.title}</strong> · {task.facility?.name ?? "All facilities"} · {task.status} {(task.assigneeId === removalUser.id || (task.purpose === "OPERATIONAL_FORM" && !task.assigneeId && task.createdById === removalUser.id)) ? "· Assignee" : task.coverId === removalUser.id ? "· Cover" : "· Reviewer"} {([...scheduledWorkPurposes, "GENERAL", "AGREED_FOLLOWUP", "OPERATIONAL_CHECKLIST", "OPERATIONAL_FORM", "ARREARS_ACCESS_REVIEW", "ARREARS_ESCALATION_REVIEW", "LEAD", "COLLECTION"] as string[]).includes(task.purpose) ? <button type="button" className="text-button" disabled={busy || !replacementId} onClick={() => void transferTask(task)}>Reassign</button> : <span>· Requires separate review before transfer</span>}</li>)}</ul>{workTruncated ? <p>Only the first 200 records are shown. Reopen the review after transferring work to see the rest.</p> : null}</> : <p>No supported outstanding work found.</p>}
+        {removalTasks === null ? <p>Loading work…</p> : removalTasks.length ? <><label>Reassign to <select value={replacementId} onChange={event => setReplacementId(event.target.value)}><option value="">Choose a user</option>{persistedUsers.filter(user => user.active && user.id !== removalUser.id).map(user => <option key={user.id} value={user.id}>{user.name}</option>)}</select></label><ul>{removalTasks.map(task => <li key={`${task.kind}:${task.id}`}><strong>{task.title}</strong> · {task.facility?.name ?? "All facilities"} · {task.status} {(task.assigneeId === removalUser.id || (task.purpose === "OPERATIONAL_FORM" && !task.assigneeId && task.createdById === removalUser.id)) ? "· Assignee" : task.coverId === removalUser.id ? "· Cover" : "· Reviewer"} {([...scheduledWorkPurposes, "GENERAL", "AGREED_FOLLOWUP", "OPERATIONAL_CHECKLIST", "OPERATIONAL_FORM", "ARREARS_ACCESS_REVIEW", "ARREARS_ESCALATION_REVIEW", "LEAD", "COLLECTION"] as string[]).includes(task.purpose) ? <button type="button" className="text-button" disabled={busy || !replacementId} onClick={() => void transferTask(task)}>Reassign</button> : <span>· Requires separate review before transfer</span>}</li>)}</ul>{workCursor ? <button type="button" disabled={busy} onClick={() => void openRemoval(removalUser)}>First page</button> : null}{nextWorkCursor ? <button type="button" disabled={busy} onClick={() => void openRemoval(removalUser, nextWorkCursor)}>More work</button> : null}</> : <><p>No outstanding work on this page.</p>{workCursor ? <button type="button" disabled={busy} onClick={() => void openRemoval(removalUser)}>First page</button> : null}{nextWorkCursor ? <button type="button" disabled={busy} onClick={() => void openRemoval(removalUser, nextWorkCursor)}>More work</button> : null}</>}
         {error ? <p className="form-error" role="alert">{error}</p> : null}
         <div className="user-removal-actions"><button className="button button-secondary" disabled={busy} onClick={() => { removalReview.current++; setRemovalUser(null); setError(""); }}>Cancel</button>
         <button className="button button-primary" disabled={busy} onClick={deleteUser}>{busy ? "Deleting..." : "Permanently delete user"}</button></div>

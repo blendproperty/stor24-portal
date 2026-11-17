@@ -54,6 +54,15 @@ test("owner can review and safely reassign an outstanding task", async () => {
     session = { userId: owner.id, sessionVersion: owner.sessionVersion, mfaVerified: true };
     const preview = await mod.exports.GET(new Request("https://example.invalid/api"), context(target.id));
     assert.equal(preview.status, 200); const previewText = await preview.text(); assert.ok(previewText.length < 25000); assert.equal(JSON.parse(previewText).data.length, 11);
+    await db.task.createMany({ data: Array.from({ length: 201 }, (_, i) => ({ organisationId: org.id, title: `Page ${i}`, purpose: "UNSUPPORTED", assigneeId: target.id })) });
+    const firstPage = await (await mod.exports.GET(new Request("https://example.invalid/api"), context(target.id))).json();
+    assert.equal(firstPage.data.length, 200); assert.ok(firstPage.nextCursor);
+    const secondPage = await (await mod.exports.GET(new Request(`https://example.invalid/api?cursor=${encodeURIComponent(firstPage.nextCursor)}`), context(target.id))).json();
+    assert.ok(secondPage.data.some((row: { kind: string }) => row.kind === "LEAD"));
+    assert.ok(secondPage.data.some((row: { kind: string }) => row.kind === "COLLECTION"));
+    assert.equal(secondPage.nextCursor, null);
+    assert.equal((await mod.exports.GET(new Request("https://example.invalid/api?cursor=invalid"), context(target.id))).status, 400);
+    await db.task.deleteMany({ where: { organisationId: org.id, purpose: "UNSUPPORTED" } });
     assert.equal((await mod.exports.GET(new Request("https://example.invalid/api"), context(foreign.id))).status, 404);
     session = { userId: unprivileged.id, sessionVersion: unprivileged.sessionVersion, mfaVerified: true };
     assert.equal((await post(target.id, task.id, recipient.id, task.updatedAt.toISOString())).status, 403);
