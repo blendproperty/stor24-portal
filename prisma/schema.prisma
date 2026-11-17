@@ -923,6 +923,22 @@ model LegacyAccessPhoto {
   @@index([status, expiresAt])
 }
 
+// The customer sees only a short-lived photo page on the separate Counter origin.
+model LegacyPhotoHandoff {
+  id String @id @default(cuid())
+  tokenHash String @unique
+  tenancyId String
+  photoVersion Int
+  issuedById String
+  organisationId String
+  facilityId String
+  expiresAt DateTime
+  usedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([tenancyId, expiresAt])
+}
+
 // Nominations do not grant access and cannot substitute for the person's consent.
 model AdditionalAccessPerson {
   id            String @id @default(cuid())

@@ -67,8 +67,17 @@ export async function withdrawLegacyPhoto(session:CustomerSession,id:string,vers
     await tx.auditEvent.create({data:{organisationId:session.organisationId,facilityId:tenancy.facilityId,action:"legacy_photo.consent_withdrawn",entityType:"LegacyAccessPhoto",entityId:photo.id,after:{version}}});
   });
 }
+export async function assistedLegacyPhotoDetails(scope:RequestScope,tenancyId:string) {
+  const tenancy=await db.tenancy.findFirst({where:{id:tenancyId,facility:facilityWhere(scope),customer:{organisationId:scope.organisationId}},include:{documents:true,account:{select:{customerId:true}},customer:{select:{firstName:true,lastName:true,companyName:true}},occupancies:{include:{unit:{select:{number:true}}}}}});
+  if(!tenancy || tenancy.customerId!==tenancy.account.customerId)throw Error("NOT_FOUND");
+  const policy=await policyForCollection(db,scope.organisationId,tenancyId);
+  if(!eligible(tenancy)||(!(await primaryTrialPolicy(db,scope.organisationId,tenancyId))&&!(await legacyPaymentEvidence(db,tenancy.accountId)).ready))throw Error("PHOTO_BOOKING_NOT_READY");
+  const photo=await db.legacyAccessPhoto.findUnique({where:{tenancyId},select:{version:true}});
+  return {name:tenancy.customer.companyName||[tenancy.customer.firstName,tenancy.customer.lastName].filter(Boolean).join(" ")||"Customer",unitNumber:tenancy.occupancies[0]?.unit.number??"",policy,version:photo?.version??0};
+}
+
 /** Assisted capture is for a customer physically present with their original ID. */
-export async function submitAssistedLegacyPhoto(scope:RequestScope,input:{tenancyId:string;policyHash:string;customerConsent:boolean;identityChecked:boolean;expectedVersion:number;image:File}) {
+export async function submitAssistedLegacyPhoto(scope:RequestScope,input:{tenancyId:string;policyHash:string;customerConsent:boolean;identityChecked:boolean;expectedVersion:number;image:File;handoffId?:string}) {
   const find=async (database:Database)=>{
     const tenancy=await database.tenancy.findFirst({where:{id:input.tenancyId,facility:facilityWhere(scope),customer:{organisationId:scope.organisationId}},include:{documents:true,account:{select:{customerId:true}}}});
     if(!tenancy || tenancy.customerId!==tenancy.account.customerId)throw Error("NOT_FOUND");return tenancy;
@@ -87,10 +96,12 @@ export async function submitAssistedLegacyPhoto(scope:RequestScope,input:{tenanc
     if(currentPolicy.hash!==input.policyHash)throw Error("PHOTO_CONSENT_REQUIRED");
     if(!eligible(current)||!current.documents.some(d=>d.id===signed.id&&d.status==="SIGNED"&&d.externalId===signed.externalId)||(!(await primaryTrialPolicy(tx,scope.organisationId,input.tenancyId))&&!(await legacyPaymentEvidence(tx,current.accountId)).ready))throw Error("PHOTO_BOOKING_NOT_READY");
     const old=await tx.legacyAccessPhoto.findUnique({where:{tenancyId:input.tenancyId}});if((old?.version??0)!==input.expectedVersion)throw Error("PHOTO_CHANGED");
+    if(input.handoffId){const used=await tx.legacyPhotoHandoff.updateMany({where:{id:input.handoffId,tenancyId:input.tenancyId,photoVersion:input.expectedVersion,issuedById:scope.userId,organisationId:scope.organisationId,facilityId:current.facilityId,usedAt:null,expiresAt:{gt:new Date()}},data:{usedAt:new Date()}});if(used.count!==1)throw Error("PHOTO_CHANGED");}
     const version=(old?.version??0)+1,now=new Date();
     const values={version,status:"WAITING_REVIEW",encryptedImage:encryptPhoto(image,binding(input.tenancyId,version)),imageSha256:createHash("sha256").update(image).digest("hex"),policyVersion:currentPolicy.version,policyHash:currentPolicy.hash,consentNotice:JSON.stringify({notice:currentPolicy.notice,consentLabel:currentPolicy.consentLabel,alternativeContact:currentPolicy.alternativeContact,retentionHours:currentPolicy.retentionHours,approvalReference:currentPolicy.approvalReference}),consentAt:now,expiresAt:currentPolicy.retentionHours===null?null:new Date(now.getTime()+currentPolicy.retentionHours*3600000),reviewedAt:null,reviewedById:null,activationRequestedAt:null,erasedAt:null};
     const photo=await tx.legacyAccessPhoto.upsert({where:{tenancyId:input.tenancyId},create:{tenancyId:input.tenancyId,...values},update:values,select:summary});
-    await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:current.facilityId,actorId:scope.userId,action:"legacy_photo.assisted_customer_submitted",entityType:"LegacyAccessPhoto",entityId:photo.id,after:{customerId:current.customerId,tenancyId:input.tenancyId,version,policyHash:currentPolicy.hash,policyVersion:currentPolicy.version,identityCheckedInPerson:true,customerConsentInPerson:true,consentAt:now.toISOString(),expiresAt:values.expiresAt?.toISOString()??null}}});return photo;
+    await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:current.facilityId,actorId:scope.userId,action:"legacy_photo.assisted_customer_submitted",entityType:"LegacyAccessPhoto",entityId:photo.id,after:{customerId:current.customerId,tenancyId:input.tenancyId,version,policyHash:currentPolicy.hash,policyVersion:currentPolicy.version,identityCheckedInPerson:true,customerConsentInPerson:true,consentAt:now.toISOString(),expiresAt:values.expiresAt?.toISOString()??null}}});
+    if(input.handoffId)await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:current.facilityId,actorId:scope.userId,action:"legacy_photo.handoff_completed",entityType:"Tenancy",entityId:input.tenancyId,after:{version,customerConsent:true}}});return photo;
   });}finally{image.fill(0);}
 }
 export async function withdrawAssistedLegacyPhoto(scope:RequestScope,tenancyId:string,version:number,identityChecked:boolean) {
