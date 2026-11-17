@@ -1,3 +1,11 @@
+## 2026-11-17 — Staff work transfer (incomplete candidate)
+
+- Implementation: Draft PR #838 adds an owner-only review of outstanding assigned tasks and per-task reassignment for GENERAL and AGREED_FOLLOWUP tasks. It checks the replacement's active account and operations access for the facility, rejects stale versions and duplicate assignee/cover, clears cover acknowledgement, and records the transfer in the audit transaction. Other task purposes are shown for separate review. The audit attribution candidate is also included. Linked business history still blocks account deletion; reassignment of other work types and safe removal of linked users are not implemented.
+- Testing: Isolated PostgreSQL integration exercise passed owner and cross-origin checks, cross-organisation and insufficient-access rejection, stale and unsupported task rejection, audit failure rollback, successful assignee and cover transfers, and preservation of task creator. Actual-component browser checks passed at 1440, 390 and 320 pixels; existing user dialog fixture and focused lint passed. Exact-head hosted CI, concurrency review and full linked-account deletion tests remain required.
+- Commit and push: Draft PR #838; see branch history and remote head for this candidate.
+- Merge: Not merged.
+- Deployment and configuration: Not deployed; no production data or configuration changed.
+- Live production verification: None. Completion requires safe treatment of all linked business history and remaining types of outstanding work, integration and security review, deployment, and live verification. Staff/device UAT and all prior provider, data, finance, training, recovery and approval gates remain open.
 ## 2026-11-17 — Staff removal audit attribution (partial candidate)
 
 - Implementation: Candidate adds original actor ID and name snapshots to audit entries before the existing permitted staff-account deletion, and displays the saved name in the system audit, data-protection audit and visual audit report. The existing business-record dependency block and deletion fence remain in force. Reassignment and deletion of linked staff have not been implemented; this does not resolve Brett's reported blocker.
