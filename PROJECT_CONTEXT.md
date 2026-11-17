@@ -8677,3 +8677,13 @@ Validation follow-up: the project typecheck and targeted ESLint for the candidat
 - **Testing:** An isolated PostgreSQL 16 database bootstrapped all 99 migrations successfully through `20261117100000_legacy_photo_handoff`. The focused legacy-handover integration test and the five staff-deletion-fence checks passed. The staff-reference inventory test passed. An earlier raw `prisma migrate deploy` on a fresh database stopped at a historical package-artwork migration; the repository's supported `bootstrap-empty-database.mjs` path succeeded. Protected checks on the corrected head are still pending.
 - **Commit and push:** Correction pending. **Merge:** Pending. **Deployment and configuration:** Pending. **Live production verification:** Pending.
 - **Outstanding:** Run protected checks on the corrected head before merging; then deploy and verify the Counter and CRM together. Physical tablet, actual photo review/erasure, HikCentral, legal approval, training and UAT gates remain open.
+
+
+## 2026-11-17 — STOR24 whole-system integration map for Mark
+
+- Implementation: documentation only; mapped CRM, provider interfaces, reporting, facility and finance workflows alongside CRM, public website, CMS and BlendSign. [Integration inventory](docs/STOR24_Integration_Inventory_2026-11-17.md) and [overview image](docs/STOR24_Whole_System_Map_2026-11-17.png).
+- Testing: cross-checked canonical source and dated release evidence; the 24-item map passed content/layout assertions and visual review. No application tests or vendor actions were run for this documentation change.
+- Commit and push: prepared on `codex/stor24-system-map-20261117`; the branch commit and remote readback identify this record. Merge: not promoted to the production branch.
+- Deployment and configuration: no application deployment, provider settings, billing, consent or access change.
+- Live production verification: on 17 November at 14:32 SAST, public website health returned HTTP 200 with CMS/CRM dependency checks passing; CRM health returned HTTP 200 with app, database and merchandise expiry healthy. No fresh integrated provider, finance, customer or staff acceptance test was performed.
+- Outstanding: WhatChimp live social routing/post-cutover retest, Netcash onboarding/live collection and settlement, MRI posting/mapping, HikCentral reader and MEL approval, policy/legal, data, recovery, staff/device UAT, training and business sign-off remain open as applicable. No tracker work in scope.
