@@ -5,9 +5,10 @@ import { currentRoleAccess } from "@/lib/current-role-access";
 import { sameOrigin } from "@/lib/request-security";
 import { changeOperationalChecklist } from "@/lib/operational-checklist-service";
 import { checklistRecordSchema } from "@/lib/operational-checklist-policy";
+import { scheduledWorkPurposes } from "@/lib/scheduled-work-policy";
 
 const transfer = z.object({ taskId: z.string().cuid(), replacementId: z.string().cuid(), updatedAt: z.iso.datetime(), kind: z.enum(["TASK", "LEAD"]).default("TASK") }).strict();
-const supported = ["GENERAL", "AGREED_FOLLOWUP"];
+const supported: string[] = ["GENERAL", "AGREED_FOLLOWUP", ...scheduledWorkPurposes];
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   try {

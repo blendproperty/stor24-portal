@@ -67,7 +67,7 @@ test("permanent user deletion frees email while preserving linked business recor
       finally{await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_user_delete_audit_failure');}
       assert.equal((await call(target.id)).status,200);
       assert.equal(await db.user.findUnique({where:{id:target.id}}),null);assert.equal(await db.passwordResetToken.findUnique({where:{id:reset.id}}),null);
-      const prior=await db.auditEvent.findUniqueOrThrow({where:{id:priorAudit.id}});assert.equal(prior.actorId,null);assert.equal(prior.deletedActorId,target.id);assert.equal(prior.deletedActorName,target.name);
+      const prior=await db.auditEvent.findUniqueOrThrow({where:{id:priorAudit.id}});assert.equal(prior.actorId,null);assert.equal(prior.deletedActorId,target.id);assert.equal(prior.deletedActorName,target.name);assert.equal(prior.deletedActorEmail,target.email);
       const retained=await db.auditEvent.findUniqueOrThrow({where:{id:historicalAudit.id}}); assert.equal(retained.actorId,null); assert.deepEqual(retained.after,{userId:target.id});
       await assert.rejects(db.auditEvent.create({data:{organisationId:org.id,action:"test",entityType:"User",entityId:"fixture",after:{userId:target.id}}}));
       assert.equal((await db.userInvitation.findUniqueOrThrow({where:{id:oldInvite.id}})).status,"REVOKED");

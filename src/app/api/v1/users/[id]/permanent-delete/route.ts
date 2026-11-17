@@ -38,7 +38,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
       const outstanding = await tx.task.count({ where: { status: { notIn: ["COMPLETED", "CANCELLED"] }, OR: [{ assigneeId: id }, { coverId: id }] } });
       if (outstanding) return { kind: "linked" as const, dependencies: ["outstanding tasks"] };
       if (await tx.lead.count({ where: { assignedToId: id, stage: { not: "LOST" } } })) return { kind: "linked" as const, dependencies: ["outstanding enquiries"] };
-      await tx.auditEvent.updateMany({ where: { actorId: id }, data: { deletedActorId: id, deletedActorName: target.name } });
+      await tx.auditEvent.updateMany({ where: { actorId: id }, data: { deletedActorId: id, deletedActorName: target.name, deletedActorEmail: target.email } });
       await tx.staffDeletionFence.update({ where: { id: 1 }, data: { generation: { increment: 1 } } });
       await tx.userInvitation.updateMany({ where: { organisationId: target.organisationId, email: target.email, status: "PENDING" }, data: { status: "REVOKED", revokedAt: new Date() } });
       if (dependencies.length) {

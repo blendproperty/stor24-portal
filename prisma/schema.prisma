@@ -2056,6 +2056,7 @@ model AuditEvent {
   actor          User?        @relation(fields: [actorId], references: [id])
   deletedActorId String?
   deletedActorName String?
+  deletedActorEmail String?
   action         String
   entityType     String
   entityId       String

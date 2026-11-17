@@ -26,6 +26,7 @@ test("owner can review and safely reassign an outstanding task", async () => {
   const checklist = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Opening", purpose: "OPERATIONAL_CHECKLIST", assigneeId: target.id, coverAcknowledgedAt: new Date(), operationalChecklist: { version: 1, template: "OPENING", reviewerId: owner.id, rows: [], sourceAt: null, sourceHash: null, comparisonReference: "", summary: "", submittedBy: null, submittedAt: null, reviewNote: "", reviewedBy: null, reviewedAt: null } } });
   const review = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Review", purpose: "OPERATIONAL_CHECKLIST", assigneeId: owner.id, operationalChecklist: { version: 1, template: "PADLOCK", reviewerId: target.id, rows: [], sourceAt: null, sourceHash: null, comparisonReference: "", summary: "", submittedBy: null, submittedAt: null, reviewNote: "", reviewedBy: null, reviewedAt: null } } });
   const covered = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Follow-up", purpose: "AGREED_FOLLOWUP", assigneeId: owner.id, coverId: target.id, coverAcknowledgedAt: new Date() } });
+  const scheduled = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Meeting", purpose: "MEETING", assigneeId: target.id } });
   const lead = await db.lead.create({ data: { facilityId: facility.id, source: "TEST", assignedToId: target.id } });
   let session: unknown = { userId: owner.id, sessionVersion: owner.sessionVersion, mfaVerified: true };
   const out = await build({ entryPoints: ["src/app/api/v1/users/[id]/work/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "fixture", setup(b) {
@@ -42,7 +43,7 @@ test("owner can review and safely reassign an outstanding task", async () => {
     assert.equal((await mod.exports.GET(new Request("https://example.invalid/api"), context(target.id))).status, 401);
     session = { userId: owner.id, sessionVersion: owner.sessionVersion, mfaVerified: true };
     const preview = await mod.exports.GET(new Request("https://example.invalid/api"), context(target.id));
-    assert.equal(preview.status, 200); assert.equal((await preview.json()).data.length, 6);
+    assert.equal(preview.status, 200); assert.equal((await preview.json()).data.length, 7);
     assert.equal((await mod.exports.GET(new Request("https://example.invalid/api"), context(foreign.id))).status, 404);
     session = { userId: unprivileged.id, sessionVersion: unprivileged.sessionVersion, mfaVerified: true };
     assert.equal((await post(target.id, task.id, recipient.id, task.updatedAt.toISOString())).status, 403);
@@ -53,6 +54,8 @@ test("owner can review and safely reassign an outstanding task", async () => {
     assert.equal((await post(target.id, lead.id, manager.id, lead.updatedAt.toISOString(), "https://example.invalid", "LEAD")).status, 409);
     assert.equal((await post(target.id, lead.id, recipient.id, lead.updatedAt.toISOString(), "https://example.invalid", "LEAD")).status, 200);
     assert.equal((await db.lead.findUniqueOrThrow({ where: { id: lead.id } })).assignedToId, recipient.id);
+    assert.equal((await post(target.id, scheduled.id, recipient.id, scheduled.updatedAt.toISOString())).status, 200);
+    assert.equal((await db.task.findUniqueOrThrow({ where: { id: scheduled.id } })).assigneeId, recipient.id);
     assert.equal((await post(target.id, restricted.id, recipient.id, restricted.updatedAt.toISOString())).status, 409);
     assert.equal((await post(target.id, checklist.id, owner.id, checklist.updatedAt.toISOString())).status, 409);
     assert.equal((await post(target.id, checklist.id, recipient.id, checklist.updatedAt.toISOString())).status, 200);

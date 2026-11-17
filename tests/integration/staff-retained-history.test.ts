@@ -71,7 +71,7 @@ test("linked staff removal retains historical identity and prevents new access o
     assert.equal(await db.passwordResetToken.count({ where: { userId: target.id } }), 0);
     assert.equal((await db.userInvitation.findUniqueOrThrow({ where: { id: invitation.id } })).status, "REVOKED");
     const oldAudit = await db.auditEvent.findUniqueOrThrow({ where: { id: prior.id } });
-    assert.equal(oldAudit.actorId, target.id); assert.deepEqual(oldAudit.after, { original: "unchanged" });
+    assert.equal(oldAudit.actorId, target.id); assert.equal(oldAudit.deletedActorEmail, target.email); assert.deepEqual(oldAudit.after, { original: "unchanged" });
     assert.equal((await db.task.findUniqueOrThrow({ where: { id: task.id } })).createdById, target.id);
     assert.equal((await db.lead.findUniqueOrThrow({ where: { id: lostLead.id } })).assignedToId, target.id);
     await db.lead.update({ where: { id: lostLead.id }, data: { assignedToId: target.id, notes: "Historical note" } });
