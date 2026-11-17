@@ -52,7 +52,18 @@ test("linked staff removal retains historical identity and prevents new access o
       assert.equal((await db.priceApprovalChallenge.findUniqueOrThrow({ where: { id: challenge.id } })).status, "SENT");
       assert.equal(await db.roleAssignment.count({ where: { userId: target.id } }), 1);
     } finally { await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_retired_history_audit_failure'); }
-    assert.equal((await remove()).status, 200);
+    let snapshotReady!: () => void, resumeWriter!: () => void;
+    const ready = new Promise<void>(resolve => { snapshotReady = resolve; });
+    const resume = new Promise<void>(resolve => { resumeWriter = resolve; });
+    const writer = db.$transaction(async tx => {
+      await tx.task.findUniqueOrThrow({ where: { id: task.id } });
+      snapshotReady(); await resume;
+      await tx.task.update({ where: { id: task.id }, data: { status: "OPEN" } });
+    }, { isolationLevel: "RepeatableRead", timeout: 20000 });
+    const rejectedWriter = writer.then(() => false, () => true);
+    await ready;
+    try { assert.equal((await remove()).status, 200); } finally { resumeWriter(); }
+    assert.equal(await rejectedWriter, true);
     const retired = await db.user.findUniqueOrThrow({ where: { id: target.id } });
     assert.ok(retired.retiredAt); assert.equal(retired.name, target.name); assert.equal(retired.passwordHash, null); assert.equal(retired.active, false); assert.notEqual(retired.email, target.email);
     assert.equal(await db.roleAssignment.count({ where: { userId: target.id } }), 0);
@@ -65,12 +76,16 @@ test("linked staff removal retains historical identity and prevents new access o
     assert.equal((await db.lead.findUniqueOrThrow({ where: { id: lostLead.id } })).assignedToId, target.id);
     await db.lead.update({ where: { id: lostLead.id }, data: { assignedToId: target.id, notes: "Historical note" } });
     await assert.rejects(db.lead.create({ data: { facilityId: facility.id, source: "TEST", assignedToId: target.id } }));
+    await assert.rejects(db.lead.update({ where: { id: lostLead.id }, data: { stage: "NEW" } }));
+    await db.lead.update({ where: { id: lostLead.id }, data: { stage: "NEW", assignedToId: owner.id } });
     assert.equal((await db.moveInTrainingRun.findUniqueOrThrow({ where: { id: training.id } })).userId, target.id);
     assert.equal((await db.reservationPriceAmendment.findUniqueOrThrow({ where: { id: amendment.id } })).proposedById, target.id);
     assert.equal((await db.priceApprovalChallenge.findUniqueOrThrow({ where: { id: challenge.id } })).status, "CANCELLED");
     await db.reservationPriceAmendment.update({ where: { id: amendment.id }, data: { reviewedById: owner.id } });
     await db.moveInTrainingRun.update({ where: { id: training.id }, data: { userId: target.id, version: { increment: 1 } } });
     await db.task.update({ where: { id: task.id }, data: { createdById: target.id, title: "Historical title" } });
+    await assert.rejects(db.task.update({ where: { id: task.id }, data: { status: "OPEN" } }));
+    await db.task.update({ where: { id: task.id }, data: { status: "OPEN", assigneeId: owner.id } });
     await db.auditEvent.create({ data: { organisationId: org.id, actorId: owner.id, action: "test.history", entityType: "Task", entityId: task.id, after: { previousActor: target.id } } });
     await assert.rejects(db.user.update({ where: { id: target.id }, data: { active: true } }));
     await assert.rejects(db.roleAssignment.create({ data: { userId: target.id, roleId: staffRole.id } }));
