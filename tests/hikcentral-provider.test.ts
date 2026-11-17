@@ -74,3 +74,19 @@ test("HTTP success without an explicit provider success code is not proof", asyn
   }) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "ci", appSecret: "ci", facilities: {} });
   assert.equal((await provider.health()).ok, false);
 });
+
+test("door discovery reads the provider IDs for all three Block24 access points", async () => {
+  const names = ["Block24 Main Gate_Door_1", "Block24 Entrance_Door_1", "Block24 Exit_Door_1"];
+  const provider = new HikCentralAccessProvider((async (_url, init) => {
+    assert.deepEqual(JSON.parse(String(init?.body)), { pageNo: 1, pageSize: 100 });
+    return Response.json({ code: "0", data: { list: names.map((name, i) => ({ name, indexCode: String(1000 + i) })) } });
+  }) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", facilities: {} });
+  const result = await provider.listDoors();
+  assert.equal(result.ok, true);
+  if (result.ok) assert.deepEqual(result.data.doors.map((door) => door.name), names);
+});
+
+test("door discovery fails closed when HikCentral omits a door ID", async () => {
+  const provider = new HikCentralAccessProvider((async () => Response.json({ code: "0", data: { list: [{ name: "Block24 Main Gate_Door_1" }] } })) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", facilities: {} });
+  assert.equal((await provider.listDoors()).ok, false);
+});
