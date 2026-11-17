@@ -805,11 +805,18 @@ export async function attachBlendSignEnvelope(
 
 export async function completeBlendSignEnvelope(envelopeId: string) {
   return db.$transaction(async (tx) => {
+    const initial = await tx.document.findUnique({
+      where: { externalId: envelopeId },
+      include: { tenancy: { include: { occupancies: true, facility: true } } },
+    });
+    if (!initial) throw new Error("NOT_FOUND");
+    await tx.$queryRaw`SELECT "id" FROM "Facility" WHERE "id" = ${initial.tenancy.facilityId} FOR UPDATE`;
     const document = await tx.document.findUnique({
       where: { externalId: envelopeId },
       include: { tenancy: { include: { occupancies: true, facility: true } } },
     });
     if (!document) throw new Error("NOT_FOUND");
+    if (document.tenancy.facilityId !== initial.tenancy.facilityId) throw new Error("CONFLICT");
     if (document.status === "SIGNED")
       return {
         tenancyId: document.tenancyId,
