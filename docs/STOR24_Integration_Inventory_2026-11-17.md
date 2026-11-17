@@ -19,10 +19,10 @@ CMS supplies website content. BlendSign supplies agreement and signing evidence.
 
 | Scope | Evidence status | What exists and what remains |
 | --- | --- | --- |
-| WhatChimp · WhatsApp | PARTIAL | Assistant → CRM lead intake proven on a controlled enquiry before cutover. Recheck workflows after migration. |
-| WhatChimp · Facebook & Instagram | TEST | Both draft flows reached CRM in previews. Bots inactive; real channel-to-staff checks open. |
-| Twilio · SMS & WhatsApp | PARTIAL | OTP, templates, delivery status and inbound replies. Lifecycle/arrears automation separately gated. |
-| Email & n8n | PARTIAL | Transactional notices and monitoring email. Legacy quote → n8n route exists; current live use unverified. |
+| WhatChimp · WhatsApp | PARTIAL | The enquiry bot is active in the new workspace. CRM intake was proven before migration; a fresh end-to-end enquiry is due. |
+| WhatChimp · Facebook & Instagram | HOLD | Both CRM links are active and the controlled previews reached CRM. Provider bots are Draft with no keyword. Resolve overlapping replies before a real-channel pilot. |
+| Twilio SMS / WhatsApp & email | LIVE | Live CRM history shows reservation SMS delivered, WhatsApp read and email sent. Automatic WhatsApp lifecycle and arrears messaging have separate gates. |
+| Website → CRM leads | LIVE | Real Google Search and Facebook ad enquiries saved in CRM. The legacy n8n quote route is separate; current use unverified. |
 
 ## 03 Payments & accounting
 
@@ -70,6 +70,21 @@ CMS supplies website content. BlendSign supplies agreement and signing evidence.
 - **BlendSign:** CRM requests signing, validates completion and retains artifacts; BlendSign owns the envelope, signatures/certificate, delivery and sealing. Public/staff lease routes and signed-artifact proof do not approve the legal terms or prove every template, signatory, transfer and completed-copy workflow.
 - **Marketing and website processing:** Google reCAPTCHA protects relevant public flows. GA4, Google Ads, Google Search Console, Microsoft Clarity, Meta Pixel/Conversions API and Meta ad reporting are documented; consent, deduplication, accepted provider attribution, privacy requests and retention stay in scope. GTM Preview is distinct from publishing. Public content reads through the website from Payload; CMS has its own data and editorial permissions. Public health is not a live marketing test.
 - **Operations and resilience:** Inventory, pricing/discounts, deposits, leasing and operational forms, staff accounts/MFA, reporting/CSV, lead follow-up, private documents and outboxes run through CRM boundaries. Stock/merchandise expiry, worker/report scheduling, notifications, PostgreSQL backups and restore checks have distinct evidence. Do not infer complete migration, isolated full-host recovery, off-server backup acceptance, insurance underwriting/activation, legal/privacy approval, physical UAT, training or general readiness. Legacy SiteLink/source data is a migration/preflight stream; no live legacy synchronization is asserted. OneDrive backup evidence, if configured, is neither full recovery coverage nor host-loss proof.
+
+## Messaging readback and acceptance plan
+
+Read-only checks on **17 November, around 14:42 SAST**:
+
+- The new WhatChimp dashboard lists the STOR24 WhatsApp welcome, enquiry and staff-routing bots as Active. The WhatsApp CRM enquiry has an enquiry/quote trigger. No post-cutover customer-to-CRM journey was submitted in this audit.
+- The new dashboard shows the STOR24 Messenger and Instagram CRM enquiry bots assigned to the respective channels, in Draft, with no keyword. Imported social FAQ/pricing drafts shown in the inventory had no channel. The earlier double-reply symptom is documented; its source has not been independently isolated. Do not disable an older fallback by assumption.
+- The production CRM shows active Midpoint Facebook and Instagram connections and no pending or uncertain social enquiry email notices. Both WhatChimp POST routes reject empty unauthenticated requests with HTTP 401 and private, no-store responses; this checks authentication only.
+- In the CRM's 13 November reservation confirmation history, WhatsApp was marked Read, SMS Delivered and email Sent. The integrations page reports Email/Twilio connected. The same page shows automatic WhatsApp customer messages Disabled even though provider, templates and server safety gate are ready. Email Sent is not inbox receipt. Reviewed arrears campaigns and unattended lifecycle sends are outside the pilot.
+
+Controlled acceptance, one channel at a time:
+
+1. **WhatsApp first.** From an owner-controlled test handset, use the existing enquiry trigger. Submit one clearly labelled test enquiry. Verify one confirmation, exactly one CRM lead with the correct source and Midpoint facility, the expected staff handoff/follow-up and confirmation from the approved staff recipient where a notice is expected. If the bot acknowledges an enquiry but no lead exists, stop and examine provider request and CRM phase before retrying.
+2. **Messenger, then Instagram.** First inspect Meta's page/account automated replies and WhatChimp channel defaults for an overlapping route. Keep imported FAQ/pricing bots untouched. With authorisation for the pilot, enable only the named CRM draft on one channel with a unique temporary exact-match keyword. Test from an owner-controlled account; prove a single bot response, rejection of malformed phone input without saving, one labelled valid lead, one follow-up task, repeat without a duplicate lead, and staff inbox receipt. Stop on overlapping replies, missed receipt or unexpected customer traffic. Restore prior bot status and remove the pilot keyword after each run until a separate public rollout is agreed.
+3. **Keep the evidence clean.** Record redacted channel, timestamps, result and QA disposition; exclude labelled tests from business reporting, and continue manual social inbox monitoring until the pilot passes. No public routing or broad messaging automation is implied by a test.
 
 ## Evidence reviewed
 

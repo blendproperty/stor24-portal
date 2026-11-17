@@ -8687,3 +8687,13 @@ Validation follow-up: the project typecheck and targeted ESLint for the candidat
 - Deployment and configuration: no application deployment, provider settings, billing, consent or access change.
 - Live production verification: on 17 November at 14:32 SAST, public website health returned HTTP 200 with CMS/CRM dependency checks passing; CRM health returned HTTP 200 with app, database and merchandise expiry healthy. No fresh integrated provider, finance, customer or staff acceptance test was performed.
 - Outstanding: WhatChimp live social routing/post-cutover retest, Netcash onboarding/live collection and settlement, MRI posting/mapping, HikCentral reader and MEL approval, policy/legal, data, recovery, staff/device UAT, training and business sign-off remain open as applicable. No tracker work in scope.
+
+
+## 2026-11-17 — Messaging and lead capture readiness readback
+
+- Implementation: documentation only. Corrected the whole-system map, recorded a channel-by-channel readback and prepared the three controlled tests. Prior release history is preserved.
+- Testing: rerendered and visually checked the 24-item map. Two empty unauthenticated WhatChimp POST requests returned 401 with private, no-store responses; source exits before lookup or mutation. No application code changed.
+- Commit and push: documentation follow-up on `codex/stor24-system-map-20261117`; remote branch and canonical context checked at handoff. Merge: not promoted to main.
+- Deployment and configuration: none. No provider routing, triggers, credentials, messages, notices, leads or tasks changed.
+- Live production verification: WhatChimp's new dashboard showed STOR24 WhatsApp enquiry/welcome/staff-routing Active and the assigned Messenger and Instagram CRM bots Draft with no keyword. CRM showed both Midpoint connections active and no pending or uncertain social notices. Recent reservation history records WhatsApp Read, SMS Delivered and email Sent; automatic WhatsApp customer messaging was Disabled with readiness shown.
+- Outstanding: prepare-only requested; run one approved owner-controlled labelled WhatsApp enquiry, trace overlapping social replies, then run exact-match Messenger and Instagram pilots individually with rollback and approved staff inbox proof. No general bot activation or Twilio lifecycle/arrears enablement. Preserve provider, privacy, training, operational and UAT gates.
