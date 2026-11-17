@@ -5,7 +5,7 @@ import sharp from "sharp";
 import { build } from "esbuild";
 import { createRequire } from "node:module";
 import { db } from "../../src/lib/db";
-import { createOperationalForm,changeOperationalForm,operationalForms } from "../../src/lib/operational-form-service";
+import { createOperationalForm,changeOperationalForm,operationalForms,reassignOperationalForm } from "../../src/lib/operational-form-service";
 import { formRecordSchema,type FormChange } from "../../src/lib/operational-form-policy";
 
 test("operational form lifecycle, current scope, photo validation and held actions on isolated PostgreSQL",async t => {
@@ -15,9 +15,12 @@ test("operational form lifecycle, current scope, photo validation and held actio
   try {
     const store = await db.facility.create({ data:{ organisationId:org.id,name:"A",code:"A" } }),otherStore = await db.facility.create({ data:{ organisationId:org.id,name:"B",code:"B" } });
     const managerRole = await db.role.create({ data:{ organisationId:org.id,name:"Manager",permissions:["operations.view","operations.manage"] } }),csoRole = await db.role.create({ data:{ organisationId:org.id,name:"CSO",permissions:["operations.view"] } });
+    const ownerRole = await db.role.create({ data:{ organisationId:org.id,name:"Organisation owner",permissions:["*"] } });
+    const owner = await db.user.create({ data:{ organisationId:org.id,name:"Owner",email:`${randomUUID()}@example.invalid`,passwordHash:"synthetic-not-a-password",roleAssignments:{create:{roleId:ownerRole.id}} } });
     const person = async (name:string,roleId:string,facilityId=store.id) => db.user.create({ data:{ organisationId:org.id,name,email:`${randomUUID()}@example.invalid`,passwordHash:"synthetic-not-a-password",roleAssignments:{ create:{ roleId,facilityId } } } });
     const preparer = await person("Preparer",csoRole.id),reviewer = await person("Reviewer",managerRole.id),other = await person("Other",managerRole.id,otherStore.id);
     const scope = { organisationId:org.id,userId:preparer.id,facilityIds:[store.id],unrestrictedFacilities:false },manager = { ...scope,userId:reviewer.id };
+    const ownerScope = { ...scope,userId:owner.id,unrestrictedFacilities:true };
     const input = { facilityId:store.id,kind:"MAINTENANCE",requestKey:randomUUID() };
     const current = (id:string) => db.task.findUniqueOrThrow({ where:{id} });
     const act = async(id:string,actor=scope,patch:Record<string,unknown>={}) => changeOperationalForm(actor,{ id,expectedUpdatedAt:(await current(id)).updatedAt.toISOString(),...patch } as FormChange);
@@ -30,6 +33,28 @@ test("operational form lifecycle, current scope, photo validation and held actio
     });
     const values={priority:"1",discovered:"2026-10-30",area:"Reception",issue:"Synthetic leak",action:"Inspect and quote",maintenanceReference:"Existing maintenance queue reference"};
     const save = { action:"SAVE",values,photos:[],reviewerId:reviewer.id };
+    await t.test("form handover keeps creator attribution and excludes all editors from review",async() => {
+      const replacement = await person("Replacement",csoRole.id), replacementScope = { ...scope,userId:replacement.id };
+      const draft=await createOperationalForm(scope,{...input,requestKey:randomUUID()});
+      await act(draft.id,scope,save);
+      await assert.rejects(reassignOperationalForm(ownerScope,draft.id,preparer.id,replacement.id,(await current(draft.id)).updatedAt.toISOString(),owner.sessionVersion + 1),/FORBIDDEN/);
+      await reassignOperationalForm(ownerScope,draft.id,preparer.id,replacement.id,(await current(draft.id)).updatedAt.toISOString(),owner.sessionVersion);
+      const handed=await current(draft.id);assert.equal(handed.createdById,preparer.id);assert.equal(handed.assigneeId,replacement.id);
+      await assert.rejects(act(draft.id,scope,save),/FORBIDDEN/);
+      await act(draft.id,replacementScope,save);
+      const grant=await db.roleAssignment.create({data:{userId:preparer.id,roleId:managerRole.id,facilityId:store.id}});
+      try { await assert.rejects(reassignOperationalForm(ownerScope,draft.id,reviewer.id,preparer.id,(await current(draft.id)).updatedAt.toISOString(),owner.sessionVersion),/FORM_REVIEWER_REQUIRED/); }
+      finally { await db.roleAssignment.delete({where:{id:grant.id}}); }
+      const formerEditor=await person("Former editor",managerRole.id);
+      await db.auditEvent.create({data:{organisationId:org.id,entityType:"Task",entityId:draft.id,action:"operationalForm.save",deletedActorId:formerEditor.id}});
+      await assert.rejects(reassignOperationalForm(ownerScope,draft.id,reviewer.id,formerEditor.id,(await current(draft.id)).updatedAt.toISOString(),owner.sessionVersion),/FORM_REVIEWER_REQUIRED/);
+      const unknown=await db.auditEvent.create({data:{organisationId:org.id,entityType:"Task",entityId:draft.id,action:"operationalForm.save"}});
+      const alternateReviewer=await person("Alternate reviewer",managerRole.id);
+      await assert.rejects(reassignOperationalForm(ownerScope,draft.id,reviewer.id,alternateReviewer.id,(await current(draft.id)).updatedAt.toISOString(),owner.sessionVersion),/FORM_REVIEWER_REQUIRED/);
+      await db.auditEvent.delete({where:{id:unknown.id}});
+      await act(draft.id,replacementScope,{...save,action:"SUBMIT"});
+      await act(draft.id,manager,{action:"REVIEW",note:"Independent review complete"});
+    });
     await t.test("photos are decoded and stripped, changed saves conflict, and another store cannot review",async() => {
       const data=await sharp({create:{width:24,height:24,channels:3,background:"red"}}).jpeg().toBuffer();
       await assert.rejects(act(id,scope,{...save,photos:[{name:"invalid.jpg",data:"data:image/jpeg;base64,AAAA"}]}),/INVALID_PHOTO/);
@@ -47,7 +72,7 @@ test("operational form lifecycle, current scope, photo validation and held actio
       await act(id,scope,{...save,action:"SUBMIT"});await act(id,manager,{action:"REVIEW",note:"Reviewed record; repairs require separate work"});
       assert.equal((await current(id)).status,"COMPLETED");assert.equal(formRecordSchema.parse((await current(id)).operationalForm).reviewedBy,reviewer.id);
       await assert.rejects(act(id,manager,{action:"CANCEL",note:"Cannot rewrite closed evidence"}),/CONFLICT/);
-      assert.equal((await operationalForms(manager,{closed:true})).tasks?.length,1);
+      assert.equal((await operationalForms(manager,{closed:true})).tasks?.some(row=>row.id===id),true);
     });
     await t.test("capture and publication gates cannot be bypassed through the service",async() => {
       for(const kind of ["ATTENDANCE","VISITOR","DEBIT_AUTHORITY"]) await assert.rejects(createOperationalForm(manager,{...input,kind,requestKey:randomUUID()}),/APPROVAL_REQUIRED/);

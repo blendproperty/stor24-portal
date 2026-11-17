@@ -66,13 +66,23 @@ export async function createOperationalChecklist(scope: RequestScope, raw: Check
   }, { timeout: 30000 });
 }
 
-export async function changeOperationalChecklist(scope: RequestScope, raw: ChecklistChange, now = new Date()) {
+export async function changeOperationalChecklist(scope: RequestScope, raw: ChecklistChange, now = new Date(), ownerSessionVersion?: number) {
   const input = checklistChangeSchema.parse(raw);
   return db.$transaction(async tx => {
-    await tx.$queryRaw`SELECT "id" FROM "Task" WHERE "id"=${input.id} AND "organisationId"=${scope.organisationId} FOR UPDATE`;
+    if (ownerSessionVersion !== undefined) {
+      if (input.action !== "ASSIGN") throw new Error("FORBIDDEN");
+      const [{ acquired }] = await tx.$queryRaw<{ acquired: boolean }[]>`SELECT pg_try_advisory_xact_lock(143, 2441) AS acquired`;
+      if (!acquired) throw new Error("CONFLICT");
+      const cover = input.coverId ?? scope.userId;
+      const locked = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "User" WHERE "organisationId"=${scope.organisationId} AND "id" IN (${scope.userId},${input.assigneeId},${cover},${input.reviewerId}) ORDER BY "id" FOR UPDATE SKIP LOCKED`;
+      if (locked.length !== new Set([scope.userId, input.assigneeId, cover, input.reviewerId]).size) throw new Error("CONFLICT");
+      const tasks = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "Task" WHERE "id"=${input.id} AND "organisationId"=${scope.organisationId} FOR UPDATE SKIP LOCKED`;
+      if (!tasks.length) throw new Error("CONFLICT");
+    } else await tx.$queryRaw`SELECT "id" FROM "Task" WHERE "id"=${input.id} AND "organisationId"=${scope.organisationId} FOR UPDATE`;
     const before = await tx.task.findFirst({ where: { id: input.id, organisationId: scope.organisationId, facility: facilityWhere(scope), purpose: CHECKLIST_PURPOSE } });
     if (!before?.facilityId) throw new Error("NOT_FOUND");
     const actor = await staff(tx, scope, scope.userId, before.facilityId);
+    if (ownerSessionVersion !== undefined && (!actor.passwordHash || actor.sessionVersion !== ownerSessionVersion || !currentRoleAccess(actor.roleAssignments).owner)) throw new Error("FORBIDDEN");
     const manager = currentRoleAccess(actor.roleAssignments.filter(a => a.role.organisationId === scope.organisationId), "operations.manage", before.facilityId).allowed;
     if (before.updatedAt.toISOString() !== input.expectedUpdatedAt || ["COMPLETED", "CANCELLED"].includes(before.status)) throw new Error("CONFLICT");
     const record = checklistRecordSchema.parse(before.operationalChecklist);
@@ -145,7 +155,7 @@ export async function changeOperationalChecklist(scope: RequestScope, raw: Check
     const audit = observationAudit ?? { before: json(before), after: json(await tx.task.findUniqueOrThrow({ where: { id: before.id } })) };
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: before.facilityId, actorId: scope.userId, action: `operationalChecklist.${input.action.toLowerCase()}`, entityType: "Task", entityId: before.id, ...audit } });
     return before.id;
-  }, { timeout: 30000 });
+  }, { timeout: 30000, ...(ownerSessionVersion === undefined ? {} : { isolationLevel: "Serializable" as const }) });
 }
 
 export async function padlockWalkthrough(scope: RequestScope, id: string) {

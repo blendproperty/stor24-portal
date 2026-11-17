@@ -8,7 +8,7 @@ import { FORM_PURPOSE, formCreateSchema, formChangeSchema, formRecordSchema, for
 
 const json = (v: unknown) => JSON.parse(JSON.stringify(v)) as Prisma.InputJsonValue;
 const hash = (v: unknown) => createHash("sha256").update(JSON.stringify(v)).digest("hex");
-const summarySelect = { id: true, title: true, facilityId: true, createdById: true, status: true, updatedAt: true, createdAt: true, facility: { select: { name: true } }, assignee: { select: { name: true } } } as const;
+const summarySelect = { id: true, title: true, facilityId: true, createdById: true, assigneeId: true, status: true, updatedAt: true, createdAt: true, facility: { select: { name: true } }, assignee: { select: { name: true } } } as const;
 async function actor(tx: Prisma.TransactionClient, scope: RequestScope) {
   const user = await tx.user.findFirst({ where: { id: scope.userId, organisationId: scope.organisationId, active: true }, include: { roleAssignments: { include: { role: true } } } });
   if (!user) throw Error("FORBIDDEN");
@@ -17,6 +17,9 @@ async function actor(tx: Prisma.TransactionClient, scope: RequestScope) {
 function access(user: Awaited<ReturnType<typeof actor>>, organisationId: string, facilityId: string, permission = "operations.view") {
   const roles = user.roleAssignments.filter(r => r.role.organisationId === organisationId);
   return ["operations.view",permission].every(p => currentRoleAccess(roles,p,facilityId).allowed);
+}
+async function formEditor(tx: Prisma.TransactionClient, organisationId: string, id: string, userId: string, creatorId: string | null) {
+  return userId === creatorId || !!await tx.auditEvent.findFirst({ where: { organisationId, entityType: "Task", entityId: id, OR: [{ actorId: userId }, { deletedActorId: userId }, { actorId: null, deletedActorId: null }], action: { in: ["operationalForm.create", "operationalForm.save", "operationalForm.submit"] } }, select: { id: true } });
 }
 const auditRecord = (record: OperationalFormRecord) => ({ ...record, photos: record.photos.map(p => ({ name: p.name, sha256: hash(p.data) })) });
 export async function createOperationalForm(scope: RequestScope, raw: unknown) {
@@ -69,13 +72,13 @@ export async function changeOperationalForm(scope: RequestScope, raw: FormChange
     if (before.updatedAt.toISOString() !== input.expectedUpdatedAt || ["COMPLETED","CANCELLED"].includes(before.status)) throw Error("CONFLICT");
     let status = before.status;
     if ("values" in input) {
-      if (before.createdById !== scope.userId || !["OPEN","IN_PROGRESS"].includes(status)) throw Error("FORBIDDEN");
+      if ((before.assigneeId ?? before.createdById) !== scope.userId || !["OPEN","IN_PROGRESS"].includes(status)) throw Error("FORBIDDEN");
       if (input.action === "SUBMIT" && template.hold) throw Error("FORM_APPROVAL_REQUIRED");
       validateFormValues(record.kind,input.values,input.action === "SUBMIT");
       if (input.photos.length && !["MAINTENANCE","CERTIFICATE","ADJUDICATION"].includes(record.kind)) throw Error("FORM_INVALID_PHOTO");
       if (input.reviewerId) {
         const reviewer = await actor(tx,{ ...scope,userId: input.reviewerId });
-        if (reviewer.id === scope.userId || !access(reviewer,scope.organisationId,before.facilityId,"operations.manage")) throw Error("FORM_REVIEWER_REQUIRED");
+        if (reviewer.id === scope.userId || await formEditor(tx,scope.organisationId,before.id,reviewer.id,before.createdById) || !access(reviewer,scope.organisationId,before.facilityId,"operations.manage")) throw Error("FORM_REVIEWER_REQUIRED");
       }
       if (input.action === "SUBMIT" && !input.reviewerId) throw Error("FORM_REVIEWER_REQUIRED");
       record.values = input.values; record.photos = await normalisePhotos(input.photos,record.photos); record.reviewerId = input.reviewerId;
@@ -85,7 +88,7 @@ export async function changeOperationalForm(scope: RequestScope, raw: FormChange
       if (input.action === "CANCEL") status = "CANCELLED";
       else {
         if (template.hold) throw Error("FORM_APPROVAL_REQUIRED");
-        if (status !== "WAITING" || record.reviewerId !== scope.userId || before.createdById === scope.userId) throw Error("FORBIDDEN");
+        if (status !== "WAITING" || record.reviewerId !== scope.userId || before.assigneeId === scope.userId || await formEditor(tx,scope.organisationId,before.id,scope.userId,before.createdById)) throw Error("FORBIDDEN");
         validateFormValues(record.kind,record.values,true);
         status = input.action === "REVIEW" ? "COMPLETED" : "IN_PROGRESS";
         if (input.action === "REVIEW") { record.reviewedAt = new Date().toISOString(); record.reviewedBy = scope.userId; }
@@ -100,13 +103,39 @@ export async function changeOperationalForm(scope: RequestScope, raw: FormChange
     return { id: before.id };
   }, { timeout: 30000 });
 }
+
+export async function reassignOperationalForm(scope: RequestScope, id: string, targetId: string, replacementId: string, expectedUpdatedAt: string, sessionVersion: number) {
+  return db.$transaction(async tx => {
+    const [{ acquired }] = await tx.$queryRaw<{ acquired: boolean }[]>`SELECT pg_try_advisory_xact_lock(143, 2441) AS acquired`;
+    if (!acquired) throw Error("CONFLICT");
+    const lockedUsers = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "User" WHERE "organisationId"=${scope.organisationId} AND "id" IN (${scope.userId},${replacementId}) ORDER BY "id" FOR UPDATE SKIP LOCKED`;
+    if (lockedUsers.length !== new Set([scope.userId, replacementId]).size) throw Error("CONFLICT");
+    const lockedTask = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "Task" WHERE "id"=${id} AND "organisationId"=${scope.organisationId} FOR UPDATE SKIP LOCKED`;
+    if (!lockedTask.length) throw Error("CONFLICT");
+    const before = await tx.task.findFirst({ where: { id, organisationId: scope.organisationId, facility: facilityWhere(scope), purpose: FORM_PURPOSE } });
+    if (!before?.facilityId || before.updatedAt.toISOString() !== expectedUpdatedAt || ["COMPLETED", "CANCELLED"].includes(before.status)) throw Error("CONFLICT");
+    const manager = await actor(tx, scope), replacement = await actor(tx, { ...scope, userId: replacementId });
+    if (!manager.passwordHash || manager.sessionVersion !== sessionVersion || !currentRoleAccess(manager.roleAssignments).owner || !access(manager, scope.organisationId, before.facilityId, "operations.manage")) throw Error("FORBIDDEN");
+    const record = formRecordSchema.parse(before.operationalForm), editor = before.assigneeId ?? before.createdById;
+    if (editor !== targetId && record.reviewerId !== targetId) throw Error("CONFLICT");
+    const nextEditor = editor === targetId ? replacementId : editor;
+    const nextReviewer = record.reviewerId === targetId ? replacementId : record.reviewerId;
+    if (!nextEditor || nextEditor === nextReviewer || !access(replacement, scope.organisationId, before.facilityId, record.reviewerId === targetId || record.kind !== "MAINTENANCE" ? "operations.manage" : "operations.view")) throw Error("FORM_REVIEWER_REQUIRED");
+    if (nextReviewer && await formEditor(tx, scope.organisationId, id, nextReviewer, before.createdById)) throw Error("FORM_REVIEWER_REQUIRED");
+    record.reviewerId = nextReviewer;
+    const updated = await tx.task.updateMany({ where: { id, updatedAt: before.updatedAt, status: before.status }, data: { assigneeId: nextEditor, operationalForm: json(record), updatedAt: new Date(Math.max(Date.now(), before.updatedAt.getTime() + 1)) } });
+    if (updated.count !== 1) throw Error("CONFLICT");
+    await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: before.facilityId, actorId: scope.userId, entityType: "Task", entityId: id, action: "operationalForm.reassigned", before: { assigneeId: before.assigneeId, reviewerId: formRecordSchema.parse(before.operationalForm).reviewerId }, after: { assigneeId: nextEditor, reviewerId: nextReviewer } } });
+    return { id };
+  }, { isolationLevel: "Serializable", timeout: 30000 });
+}
 export async function operationalForms(scope: RequestScope, query: { id?: string; facilityId?: string; cursor?: string; closed?: boolean }) {
   return db.$transaction(async tx => {
     const user = await actor(tx,scope);
     const facilities = (await tx.facility.findMany({ where: facilityWhere(scope),select: { id: true,name: true },orderBy: { name: "asc" } })).filter(f => access(user,scope.organisationId,f.id));
     if (query.facilityId && !facilities.some(f => f.id === query.facilityId)) throw Error("FORBIDDEN");
     const managerFacilityIds = facilities.filter(f => access(user,scope.organisationId,f.id,"operations.manage")).map(f => f.id);
-    const base: Prisma.TaskWhereInput = { organisationId: scope.organisationId,purpose: FORM_PURPOSE,facilityId: { in: facilities.filter(f => !query.facilityId || f.id === query.facilityId).map(f => f.id) },OR: [{ facilityId: { in: managerFacilityIds } },{ createdById: scope.userId }] };
+    const base: Prisma.TaskWhereInput = { organisationId: scope.organisationId,purpose: FORM_PURPOSE,facilityId: { in: facilities.filter(f => !query.facilityId || f.id === query.facilityId).map(f => f.id) },OR: [{ facilityId: { in: managerFacilityIds } },{ assigneeId: scope.userId },{ assigneeId: null, createdById: scope.userId }] };
     const staff = await tx.user.findMany({ where: { organisationId: scope.organisationId,active: true },include: { roleAssignments: { include: { role: true } } },take: 1001 });
     if (staff.length > 1000) throw Error("FORM_LIMIT");
     const meta = { actorId: scope.userId,facilities,managerFacilityIds,reviewers: staff.filter(u => u.id !== scope.userId).map(u => ({ id: u.id,name: u.name,facilityIds: facilities.filter(f => access(u,scope.organisationId,f.id,"operations.manage")).map(f => f.id) })).filter(u => u.facilityIds.length) };

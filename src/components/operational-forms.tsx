@@ -9,7 +9,7 @@ import { formRecordSchema,formTemplate,operationalFormTemplates,type Operational
 import { formatSouthAfricaDateTime } from "@/lib/south-africa-time";
 import styles from "./operational-forms.module.css";
 
-const summary = z.object({ id: z.string(),title: z.string(),facilityId: z.string(),createdById: z.string().nullable(),status: z.string(),updatedAt: z.string(),createdAt: z.string(),facility: z.object({ name: z.string() }),assignee: z.object({ name: z.string() }).nullable() });
+const summary = z.object({ id: z.string(),title: z.string(),facilityId: z.string(),createdById: z.string().nullable(),assigneeId: z.string().nullable().optional(),status: z.string(),updatedAt: z.string(),createdAt: z.string(),facility: z.object({ name: z.string() }),assignee: z.object({ name: z.string() }).nullable() });
 const pageSchema = z.object({ actorId: z.string(),facilities: z.array(z.object({ id: z.string(),name: z.string() })),managerFacilityIds: z.array(z.string()),reviewers: z.array(z.object({ id: z.string(),name: z.string(),facilityIds: z.array(z.string()) })),tasks: z.array(summary).optional(),nextCursor: z.string().nullable().optional(),task: summary.extend({ operationalForm: formRecordSchema }).optional() });
 type PageData = z.infer<typeof pageSchema>;
 type Detail = NonNullable<PageData["task"]>;
@@ -73,7 +73,7 @@ export function OperationalForms() {
     finally { setBusy(false); }
   }
   const disabled = busy || reading || blocked,template = formTemplate(record?.kind ?? kind),manager = !!data?.managerFacilityIds.includes(task?.facilityId ?? facility);
-  const editable = !!task && task.createdById === data?.actorId && ["OPEN","IN_PROGRESS"].includes(task.status),reviewer = !!task && task.status === "WAITING" && record?.reviewerId === data?.actorId && manager;
+  const editable = !!task && (task.assigneeId ?? task.createdById) === data?.actorId && ["OPEN","IN_PROGRESS"].includes(task.status),reviewer = !!task && task.status === "WAITING" && record?.reviewerId === data?.actorId && manager;
   const change = (field: string,value: string) => { if (record) { setRecord({ ...record,values: { ...record.values,[field]: value } });setDirty(true); } };
   function action(action: "SAVE"|"SUBMIT"|"REVIEW"|"RETURN"|"CANCEL") {
     if (!task || !record) return;

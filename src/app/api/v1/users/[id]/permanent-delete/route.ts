@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireOwner, authErrorResponse } from "@/lib/auth-guards";
 import { userRemovalDependencies } from "@/lib/staff-user-removal";
 import { sameOrigin } from "@/lib/request-security";
+import { canRetainTaskData } from "@/lib/staff-retained-task-data";
 
 export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
@@ -14,17 +15,23 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     const result = await db.$transaction(async tx => {
       const [{ acquired }] = await tx.$queryRaw<{ acquired: boolean }[]>`SELECT pg_try_advisory_xact_lock(143, 2441) AS acquired`;
       if (!acquired) return { kind: "busy" as const };
-      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${actor.user.id} FOR UPDATE`;
+      const actorLock = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "User" WHERE "id" = ${actor.user.id} FOR UPDATE SKIP LOCKED`;
+      if (!actorLock.length) return { kind: "busy" as const };
       const current = await tx.user.findUnique({ where: { id: actor.user.id }, include: { roleAssignments: { include: { role: true } } } });
       if (!current?.active || !current.passwordHash || current.sessionVersion !== actor.user.sessionVersion || !currentRoleAccess(current.roleAssignments).owner) throw new Error("FORBIDDEN");
-      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${id} AND "organisationId" = ${actor.user.organisationId} FOR UPDATE`;
+      const targetLock = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "User" WHERE "id" = ${id} AND "organisationId" = ${actor.user.organisationId} FOR UPDATE SKIP LOCKED`;
       const target = await tx.user.findFirst({ where: { id, organisationId: actor.user.organisationId } });
       if (!target) return { kind: "missing" as const };
+      if (!targetLock.length) return { kind: "busy" as const };
       if (target.retiredAt) return { kind: "missing" as const };
       if (target.active) return { kind: "active" as const };
       const dependencies = await userRemovalDependencies(tx, id);
       const retainedTypes = ["Business audit event", "Lead", "ReservationPriceAmendment", "Task", "MoveInTrainingRun", "PriceApprovalChallenge"];
-      const unsupported = dependencies.filter(type => !retainedTypes.includes(type));
+      const unsupported = dependencies.filter(type => !retainedTypes.includes(type) && type !== "Task data");
+      if (dependencies.includes("Task data")) {
+        const records = await tx.$queryRaw<{ organisationId: string; purpose: string; status: string; operationalForm: unknown; operationalChecklist: unknown }[]>`SELECT "organisationId", "purpose", "status", "operationalForm", "operationalChecklist" FROM "Task" WHERE position(${id} in "operationalForm"::text) > 0 OR position(${id} in "operationalChecklist"::text) > 0 LIMIT 501`;
+        if (records.length > 500 || records.some(record => record.organisationId !== target.organisationId || !canRetainTaskData(record, id))) unsupported.push("Task data");
+      }
       if (unsupported.length) return { kind: "linked" as const, dependencies: unsupported };
       const foreign = await Promise.all([
         tx.auditEvent.count({ where: { actorId: id, organisationId: { not: target.organisationId } } }),
@@ -35,7 +42,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
         tx.priceApprovalChallenge.count({ where: { organisationId: { not: target.organisationId }, OR: [{ requestedById: id }, { approverId: id }] } }),
       ]);
       if (foreign.some(count => count > 0)) return { kind: "linked" as const, dependencies: ["records requiring administrative review"] };
-      const outstanding = await tx.task.count({ where: { status: { notIn: ["COMPLETED", "CANCELLED"] }, OR: [{ assigneeId: id }, { coverId: id }] } });
+      const outstanding = await tx.task.count({ where: { status: { notIn: ["COMPLETED", "CANCELLED"] }, OR: [{ assigneeId: id }, { coverId: id }, { purpose: "OPERATIONAL_FORM", assigneeId: null, createdById: id }] } });
       if (outstanding) return { kind: "linked" as const, dependencies: ["outstanding tasks"] };
       if (await tx.lead.count({ where: { assignedToId: id, stage: { not: "LOST" } } })) return { kind: "linked" as const, dependencies: ["outstanding enquiries"] };
       await tx.auditEvent.updateMany({ where: { actorId: id }, data: { deletedActorId: id, deletedActorName: target.name, deletedActorEmail: target.email } });

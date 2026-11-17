@@ -4,6 +4,8 @@ import { randomUUID } from "node:crypto";
 import { build } from "esbuild";
 import { createRequire } from "node:module";
 import { db } from "../../src/lib/db";
+import type { Prisma } from "../../src/generated/prisma/client";
+import { createOperationalForm, changeOperationalForm, reassignOperationalForm } from "../../src/lib/operational-form-service";
 
 test("linked staff removal retains historical identity and prevents new access or links", async () => {
   assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci");
@@ -18,12 +20,24 @@ test("linked staff removal retains historical identity and prevents new access o
   const staffRole = await db.role.create({ data: { organisationId: org.id, name: "Staff", permissions: ["operations.view"] } });
   await db.roleAssignment.create({ data: { userId: owner.id, roleId: ownerRole.id } });
   await db.roleAssignment.create({ data: { userId: target.id, roleId: staffRole.id, facilityId: facility.id } });
+  const successor = await db.user.create({ data: { organisationId: org.id, name: "Successor", email: `successor-${key}@example.invalid`, passwordHash: "synthetic", roleAssignments: { create: { roleId: staffRole.id, facilityId: facility.id } } } });
+  await db.user.update({ where: { id: target.id }, data: { active: true } });
+  const targetScope = { organisationId: org.id, userId: target.id, facilityIds: [facility.id], unrestrictedFacilities: false };
+  const ownerScope = { ...targetScope, userId: owner.id, unrestrictedFacilities: true };
+  const successorScope = { ...targetScope, userId: successor.id };
+  const liveForm = await createOperationalForm(targetScope, { facilityId: facility.id, kind: "MAINTENANCE", requestKey: randomUUID() });
+  const values = { priority: "1", discovered: "2026-11-17", area: "Test", issue: "Test issue", action: "Inspect" };
+  await changeOperationalForm(targetScope, { id: liveForm.id, expectedUpdatedAt: (await db.task.findUniqueOrThrow({ where: { id: liveForm.id } })).updatedAt.toISOString(), action: "SAVE", values, photos: [], reviewerId: owner.id });
+  await db.user.update({ where: { id: target.id }, data: { active: false } });
+  await reassignOperationalForm(ownerScope, liveForm.id, target.id, successor.id, (await db.task.findUniqueOrThrow({ where: { id: liveForm.id } })).updatedAt.toISOString(), owner.sessionVersion);
   await db.mfaCredential.create({ data: { userId: target.id, secretEncrypted: "synthetic", recoveryCodeHashes: [] } });
   await db.passwordResetToken.create({ data: { userId: target.id, organisationId: org.id, tokenHash: key, expiresAt: new Date(Date.now() + 60000) } });
   const invitation = await db.userInvitation.create({ data: { organisationId: org.id, email: target.email, name: target.name, roleName: "Staff", invitedByName: owner.name, tokenHash: `invite-${key}`, expiresAt: new Date(Date.now() + 60000) } });
   const prior = await db.auditEvent.create({ data: { organisationId: org.id, actorId: target.id, action: "business.approved", entityType: "Test", entityId: key, after: { original: "unchanged" } } });
   const task = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Completed", status: "COMPLETED", assigneeId: target.id, createdById: target.id } });
   const outstanding = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Outstanding", assigneeId: target.id } });
+  const form = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Form", purpose: "OPERATIONAL_FORM", createdById: target.id } });
+  const historicalChecklist = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Completed checklist", purpose: "OPERATIONAL_CHECKLIST", status: "COMPLETED", operationalChecklist: { version: 1, template: "OPENING", reviewerId: target.id, rows: [], sourceAt: null, sourceHash: null, comparisonReference: "", summary: "", submittedBy: target.id, submittedAt: null, reviewNote: "", reviewedBy: target.id, reviewedAt: null } } });
   const openLead = await db.lead.create({ data: { facilityId: facility.id, source: "TEST", assignedToId: target.id } });
   const lostLead = await db.lead.create({ data: { facilityId: facility.id, source: "TEST", stage: "LOST", assignedToId: target.id } });
   const training = await db.moveInTrainingRun.create({ data: { organisationId: org.id, facilityId: facility.id, userId: target.id, generation: 1, state: {} } });
@@ -40,6 +54,8 @@ test("linked staff removal retains historical identity and prevents new access o
   try {
     assert.equal((await remove()).status, 409);
     await db.task.update({ where: { id: outstanding.id }, data: { assigneeId: owner.id } });
+    assert.equal((await remove()).status, 409);
+    await db.task.update({ where: { id: form.id }, data: { status: "COMPLETED" } });
     assert.equal((await remove()).status, 409);
     await db.lead.update({ where: { id: openLead.id }, data: { assignedToId: owner.id } });
     const foreignAudit = await db.auditEvent.create({ data: { organisationId: other.id, actorId: target.id, action: "test.foreign", entityType: "Test", entityId: key } });
@@ -86,7 +102,19 @@ test("linked staff removal retains historical identity and prevents new access o
     await db.task.update({ where: { id: task.id }, data: { createdById: target.id, title: "Historical title" } });
     await assert.rejects(db.task.update({ where: { id: task.id }, data: { status: "OPEN" } }));
     await db.task.update({ where: { id: task.id }, data: { status: "OPEN", assigneeId: owner.id } });
+    await db.task.update({ where: { id: task.id }, data: { purpose: "OPERATIONAL_FORM" } });
+    await assert.rejects(db.task.update({ where: { id: form.id }, data: { status: "OPEN" } }));
     await db.auditEvent.create({ data: { organisationId: org.id, actorId: owner.id, action: "test.history", entityType: "Task", entityId: task.id, after: { previousActor: target.id } } });
+    const originalChecklist = (await db.task.findUniqueOrThrow({ where: { id: historicalChecklist.id } })).operationalChecklist as Record<string, unknown>;
+    await db.task.update({ where: { id: historicalChecklist.id }, data: { operationalChecklist: { ...originalChecklist, summary: "Updated" } as Prisma.InputJsonObject } });
+    await assert.rejects(db.task.update({ where: { id: historicalChecklist.id }, data: { operationalChecklist: { ...originalChecklist, summary: target.id } as Prisma.InputJsonObject } }));
+    await assert.rejects(db.task.update({ where: { id: historicalChecklist.id }, data: { operationalChecklist: { ...originalChecklist, [target.id]: "new key" } as Prisma.InputJsonObject } }));
+    await assert.rejects(db.task.update({ where: { id: historicalChecklist.id }, data: { status: "OPEN" } }));
+    await db.task.update({ where: { id: historicalChecklist.id }, data: { status: "OPEN", operationalChecklist: { ...originalChecklist, reviewerId: owner.id, summary: "Updated" } as Prisma.InputJsonObject } });
+    const version = async () => (await db.task.findUniqueOrThrow({ where: { id: liveForm.id } })).updatedAt.toISOString();
+    await changeOperationalForm(successorScope, { id: liveForm.id, expectedUpdatedAt: await version(), action: "SUBMIT", values, photos: [], reviewerId: owner.id });
+    await changeOperationalForm(ownerScope, { id: liveForm.id, expectedUpdatedAt: await version(), action: "REVIEW", note: "Independent review complete" });
+    assert.equal((await db.task.findUniqueOrThrow({ where: { id: liveForm.id } })).createdById, target.id);
     await assert.rejects(db.user.update({ where: { id: target.id }, data: { active: true } }));
     await assert.rejects(db.roleAssignment.create({ data: { userId: target.id, roleId: staffRole.id } }));
     await assert.rejects(db.task.create({ data: { organisationId: org.id, title: "Stale", assigneeId: target.id } }));

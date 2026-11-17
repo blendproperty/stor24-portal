@@ -17,17 +17,26 @@ test("owner can review and safely reassign an outstanding task", async () => {
   const ownerRole = await db.role.create({ data: { organisationId: org.id, name: "Organisation owner", permissions: ["*"] } });
   const staffRole = await db.role.create({ data: { organisationId: org.id, name: "Staff", permissions: ["operations.view", "leads.view"] } });
   const manager = await makeUser(org.id, "manager");
+  const collector = await makeUser(org.id, "collector");
   const managerRole = await db.role.create({ data: { organisationId: org.id, name: "Manager", permissions: ["operations.view", "operations.manage"] } });
+  const collectorRole = await db.role.create({ data: { organisationId: org.id, name: "Collector", permissions: ["operations.view", "operations.manage", "collections.view", "collections.manage"] } });
   await db.roleAssignment.create({ data: { userId: owner.id, roleId: ownerRole.id } });
   await db.roleAssignment.create({ data: { userId: recipient.id, roleId: staffRole.id, facilityId: facility.id } });
   await db.roleAssignment.create({ data: { userId: manager.id, roleId: managerRole.id, facilityId: facility.id } });
+  await db.roleAssignment.create({ data: { userId: collector.id, roleId: collectorRole.id, facilityId: facility.id } });
   const task = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Outstanding", purpose: "GENERAL", assigneeId: target.id, createdById: target.id, coverAcknowledgedAt: new Date() } });
   const restricted = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Checklist", purpose: "OPERATIONAL_CHECKLIST", assigneeId: target.id } });
   const checklist = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Opening", purpose: "OPERATIONAL_CHECKLIST", assigneeId: target.id, coverAcknowledgedAt: new Date(), operationalChecklist: { version: 1, template: "OPENING", reviewerId: owner.id, rows: [], sourceAt: null, sourceHash: null, comparisonReference: "", summary: "", submittedBy: null, submittedAt: null, reviewNote: "", reviewedBy: null, reviewedAt: null } } });
   const review = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Review", purpose: "OPERATIONAL_CHECKLIST", assigneeId: owner.id, operationalChecklist: { version: 1, template: "PADLOCK", reviewerId: target.id, rows: [], sourceAt: null, sourceHash: null, comparisonReference: "", summary: "", submittedBy: null, submittedAt: null, reviewNote: "", reviewedBy: null, reviewedAt: null } } });
+  const form = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Form", purpose: "OPERATIONAL_FORM", assigneeId: target.id, createdById: target.id, operationalForm: { version: 1, kind: "MAINTENANCE", values: {}, photos: [], reviewerId: owner.id, submittedAt: null, reviewedAt: null, reviewedBy: null, reviewNote: "" } } });
   const covered = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Follow-up", purpose: "AGREED_FOLLOWUP", assigneeId: owner.id, coverId: target.id, coverAcknowledgedAt: new Date() } });
   const scheduled = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Meeting", purpose: "MEETING", assigneeId: target.id } });
+  const arrears = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Arrears review", purpose: "ARREARS_ESCALATION_REVIEW", assigneeId: target.id } });
   const lead = await db.lead.create({ data: { facilityId: facility.id, source: "TEST", assignedToId: target.id } });
+  const customer = await db.customer.create({ data: { organisationId: org.id, firstName: "Synthetic" } });
+  const account = await db.account.create({ data: { customerId: customer.id, accountNumber: `TEST-${key}` } });
+  await db.tenancy.create({ data: { facilityId: facility.id, customerId: customer.id, accountId: account.id, startDate: new Date() } });
+  const collection = await db.collectionCase.create({ data: { accountId: account.id, ownerId: target.id } });
   let session: unknown = { userId: owner.id, sessionVersion: owner.sessionVersion, mfaVerified: true };
   const out = await build({ entryPoints: ["src/app/api/v1/users/[id]/work/route.ts"], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "fixture", setup(b) {
     b.onResolve({ filter: /^@\/(lib\/(db|session)|generated\/prisma\/client)$/ }, a => ({ path: a.path, namespace: "fixture" }));
@@ -37,13 +46,13 @@ test("owner can review and safely reassign an outstanding task", async () => {
   const mod = { exports: {} as { GET: (r: Request, c: { params: Promise<{ id: string }> }) => Promise<Response>; POST: (r: Request, c: { params: Promise<{ id: string }> }) => Promise<Response> } };
   new Function("require", "module", "exports", "__db", "__session", out.outputFiles[0].text)(createRequire(import.meta.url), mod, mod.exports, db, () => session);
   const context = (id: string) => ({ params: Promise.resolve({ id }) });
-  const post = (id: string, taskId: string, replacementId: string, updatedAt: string, origin = "https://example.invalid", kind: "TASK" | "LEAD" = "TASK") => mod.exports.POST(new Request("https://example.invalid/api", { method: "POST", headers: { origin, "content-type": "application/json" }, body: JSON.stringify({ taskId, replacementId, updatedAt, kind }) }), context(id));
+  const post = (id: string, taskId: string, replacementId: string, updatedAt: string, origin = "https://example.invalid", kind: "TASK" | "LEAD" | "COLLECTION" = "TASK") => mod.exports.POST(new Request("https://example.invalid/api", { method: "POST", headers: { origin, "content-type": "application/json" }, body: JSON.stringify({ taskId, replacementId, updatedAt, kind }) }), context(id));
   try {
     session = null;
     assert.equal((await mod.exports.GET(new Request("https://example.invalid/api"), context(target.id))).status, 401);
     session = { userId: owner.id, sessionVersion: owner.sessionVersion, mfaVerified: true };
     const preview = await mod.exports.GET(new Request("https://example.invalid/api"), context(target.id));
-    assert.equal(preview.status, 200); assert.equal((await preview.json()).data.length, 7);
+    assert.equal(preview.status, 200); assert.equal((await preview.json()).data.length, 10);
     assert.equal((await mod.exports.GET(new Request("https://example.invalid/api"), context(foreign.id))).status, 404);
     session = { userId: unprivileged.id, sessionVersion: unprivileged.sessionVersion, mfaVerified: true };
     assert.equal((await post(target.id, task.id, recipient.id, task.updatedAt.toISOString())).status, 403);
@@ -54,8 +63,24 @@ test("owner can review and safely reassign an outstanding task", async () => {
     assert.equal((await post(target.id, lead.id, manager.id, lead.updatedAt.toISOString(), "https://example.invalid", "LEAD")).status, 409);
     assert.equal((await post(target.id, lead.id, recipient.id, lead.updatedAt.toISOString(), "https://example.invalid", "LEAD")).status, 200);
     assert.equal((await db.lead.findUniqueOrThrow({ where: { id: lead.id } })).assignedToId, recipient.id);
+    assert.equal((await post(target.id, collection.id, recipient.id, collection.updatedAt.toISOString(), "https://example.invalid", "COLLECTION")).status, 409);
+    let locked!: () => void, release!: () => void;
+    const accountLocked = new Promise<void>(resolve => { locked = resolve; }), resume = new Promise<void>(resolve => { release = resolve; });
+    const writer = db.$transaction(async tx => { await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id"=${account.id} FOR UPDATE`; locked(); await resume; }, { timeout: 20000 });
+    await accountLocked;
+    try { assert.equal((await post(target.id, collection.id, collector.id, collection.updatedAt.toISOString(), "https://example.invalid", "COLLECTION")).status, 409); }
+    finally { release(); await writer; }
+    assert.equal((await post(target.id, collection.id, collector.id, collection.updatedAt.toISOString(), "https://example.invalid", "COLLECTION")).status, 200);
+    const movedCase = await db.collectionCase.findUniqueOrThrow({ where: { id: collection.id } }); assert.equal(movedCase.ownerId, collector.id); assert.equal(movedCase.revision, collection.revision + 1);
     assert.equal((await post(target.id, scheduled.id, recipient.id, scheduled.updatedAt.toISOString())).status, 200);
     assert.equal((await db.task.findUniqueOrThrow({ where: { id: scheduled.id } })).assigneeId, recipient.id);
+    assert.equal((await post(target.id, arrears.id, recipient.id, arrears.updatedAt.toISOString())).status, 409);
+    assert.equal((await post(target.id, arrears.id, collector.id, arrears.updatedAt.toISOString())).status, 200);
+    assert.equal((await db.task.findUniqueOrThrow({ where: { id: arrears.id } })).assigneeId, collector.id);
+    assert.equal((await post(target.id, form.id, owner.id, form.updatedAt.toISOString())).status, 409);
+    assert.equal((await post(target.id, form.id, recipient.id, form.updatedAt.toISOString())).status, 200);
+    const handedForm = await db.task.findUniqueOrThrow({ where: { id: form.id } });
+    assert.equal(handedForm.assigneeId, recipient.id); assert.equal(handedForm.createdById, target.id);
     assert.equal((await post(target.id, restricted.id, recipient.id, restricted.updatedAt.toISOString())).status, 409);
     assert.equal((await post(target.id, checklist.id, owner.id, checklist.updatedAt.toISOString())).status, 409);
     assert.equal((await post(target.id, checklist.id, recipient.id, checklist.updatedAt.toISOString())).status, 200);

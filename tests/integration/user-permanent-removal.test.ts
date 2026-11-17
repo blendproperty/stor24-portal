@@ -43,6 +43,14 @@ test("permanent user deletion frees email while preserving linked business recor
       assert.equal((await call(target.id)).status,409);
       await db.user.update({where:{id:target.id},data:{active:false,sessionVersion:{increment:1}}});
     });
+    await t.test("deletion does not wait while an account update holds the user row",async()=>{
+      let ready!:()=>void,release!:()=>void;
+      const locked=new Promise<void>(r=>{ready=r}),resume=new Promise<void>(r=>{release=r});
+      const writer=db.$transaction(async tx=>{await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id"=${target.id} FOR UPDATE`;ready();await resume;},{timeout:20000});
+      await locked;
+      try { const response=await call(target.id);assert.equal(response.status,409);assert.match((await response.json()).error.message,/processing another change/); }
+      finally { release();await writer; }
+    });
     await t.test("deletion fails closed while an unrelated business writer holds the fence",async()=>{
       let ready!:()=>void,release!:()=>void;
       const written=new Promise<void>(r=>{ready=r}),resume=new Promise<void>(r=>{release=r});

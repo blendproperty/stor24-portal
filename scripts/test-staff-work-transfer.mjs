@@ -32,7 +32,7 @@ try {
     await expect(dialog.getByRole("button", { name: "Reassign" })).toBeDisabled();
     await dialog.getByLabel("Reassign to").selectOption("replacement");
     await dialog.getByRole("button", { name: "Reassign" }).click();
-    await expect(dialog.getByText("No outstanding tasks or enquiries found.")).toBeVisible();
+    await expect(dialog.getByText("No supported outstanding work found.")).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Permanently delete user" })).toBeVisible();
     await page.close();
   }
