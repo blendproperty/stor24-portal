@@ -2,7 +2,7 @@
 
 - Implementation: Candidate adds original actor ID and name snapshots to audit entries before the existing permitted staff-account deletion, and displays the saved name in the system audit, data-protection audit and visual audit report. The existing business-record dependency block and deletion fence remain in force. Reassignment and deletion of linked staff have not been implemented; this does not resolve Brett's reported blocker.
 - Testing: Prisma client generated and a disposable local PostgreSQL 16 database bootstrapped with all migrations. The staff deletion integration suite passed 5/5 including snapshot retention and transaction rollback; the deletion fence suite passed 5/5 separately. An initial combined run failed due to concurrent suites contending for the existing global fence, and both suites passed when rerun separately as in CI. Focused lint and git diff --check passed. After Next route types were generated, the full local typecheck was interrupted before a result; protected CI remains pending.
-- Commit and push: See branch history and remote for this candidate; no promotion is implied.
+- Commit and push: Draft PR #838 tracks branch codex/staff-reassignment-20261117; it is explicitly incomplete and must not be promoted as the requested solution.
 - Merge: Not merged.
 - Deployment and configuration: Not deployed; no production configuration or account changed.
 - Live production verification: None. Linked-account transfer, preservation of operational and historical identity references, staff/device UAT and all existing provider, data, finance, training, recovery and approval gates remain open.
