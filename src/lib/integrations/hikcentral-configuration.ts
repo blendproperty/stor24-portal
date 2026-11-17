@@ -149,6 +149,21 @@ export async function loadHikCentralRuntimeConfiguration(organisationId: string,
   };
 }
 
+export async function discoverHikCentralDoors(scope: RequestScope, facilityId: string) {
+  await requireFacility(scope, facilityId);
+  const company = await companyConnection(scope.organisationId);
+  const credentials = (company?.config ?? {}) as StoredCredentials;
+  if (!configuredString(credentials.endpoint) || !configuredString(credentials.appKeyEncrypted) || !configuredString(credentials.appSecretEncrypted)) throw new Error("CONFIG_REQUIRED:HIKCENTRAL_CREDENTIALS");
+  const provider = new HikCentralAccessProvider(fetch, {
+    baseUrl: credentials.endpoint,
+    appKey: decryptIntegrationSecret(credentials.appKeyEncrypted),
+    appSecret: decryptIntegrationSecret(credentials.appSecretEncrypted),
+    facilities: {},
+    ...(configuredString(credentials.pinnedCertSha256Fingerprint) ? { pinnedCertSha256: credentials.pinnedCertSha256Fingerprint } : {}),
+  });
+  return provider.listDoors();
+}
+
 export async function testHikCentralConnection(scope: RequestScope, facilityId: string) {
   await requireFacility(scope, facilityId);
   const company = await companyConnection(scope.organisationId);

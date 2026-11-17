@@ -238,6 +238,24 @@ export class HikCentralAccessProvider {
     } catch (error) { return providerFailure(error); }
   }
 
+  async listDoors(): Promise<ProviderResult<{ doors: { indexCode: string; name: string }[] }>> {
+    try {
+      const doors: { indexCode: string; name: string }[] = [];
+      for (let pageNo = 1; pageNo <= 50; pageNo++) {
+        const data = await this.post("/artemis/api/resource/v1/acsDoor/acsDoorList", { pageNo, pageSize: 100 });
+        if (!Array.isArray(data.list)) throw new Error("HikCentral returned an invalid door list.");
+        for (const item of data.list) {
+          if (!item || typeof item !== "object") throw new Error("HikCentral returned an invalid door.");
+          const door = item as Record<string, unknown>;
+          if (typeof door.indexCode !== "string" || typeof door.name !== "string") throw new Error("HikCentral returned a door without a name or index code.");
+          doors.push({ indexCode: door.indexCode, name: door.name });
+        }
+        if (data.list.length < 100) return { ok: true, providerReference: "hikcentral", data: { doors } };
+      }
+      throw new Error("HikCentral door list exceeded 5,000 entries.");
+    } catch (error) { return providerFailure(error); }
+  }
+
   async enroll(input: HikCentralEnrollmentInput): Promise<ProviderResult<{ personId: string; personCode: string }>> {
     try {
       const config = this.facilityConfig(input.facilityId);
