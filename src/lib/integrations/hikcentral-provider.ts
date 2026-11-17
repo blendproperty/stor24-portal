@@ -247,8 +247,8 @@ export class HikCentralAccessProvider {
         for (const item of data.list) {
           if (!item || typeof item !== "object") throw new Error("HikCentral returned an invalid door.");
           const door = item as Record<string, unknown>;
-          if (typeof door.indexCode !== "string" || typeof door.name !== "string") throw new Error("HikCentral returned a door without a name or index code.");
-          doors.push({ indexCode: door.indexCode, name: door.name });
+          if (typeof door.doorIndexCode !== "string" || typeof door.doorName !== "string") throw new Error("HikCentral returned a door without a name or index code.");
+          doors.push({ indexCode: door.doorIndexCode, name: door.doorName });
         }
         if (data.list.length < 100) return { ok: true, providerReference: "hikcentral", data: { doors } };
       }
