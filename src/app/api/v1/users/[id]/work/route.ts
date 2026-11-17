@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { requireOwner, authErrorResponse } from "@/lib/auth-guards";
 import { currentRoleAccess } from "@/lib/current-role-access";
 import { sameOrigin } from "@/lib/request-security";
+import { changeOperationalChecklist } from "@/lib/operational-checklist-service";
+import { checklistRecordSchema } from "@/lib/operational-checklist-policy";
 
 const transfer = z.object({ taskId: z.string().cuid(), replacementId: z.string().cuid(), updatedAt: z.iso.datetime() }).strict();
 const supported = ["GENERAL", "AGREED_FOLLOWUP"];
@@ -14,11 +16,11 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     const target = await db.user.findFirst({ where: { id, organisationId: actor.user.organisationId }, select: { id: true } });
     if (!target) return Response.json({ error: { message: "User not found." } }, { status: 404 });
     const tasks = await db.task.findMany({
-      where: { organisationId: actor.user.organisationId, status: { notIn: ["COMPLETED", "CANCELLED"] }, OR: [{ assigneeId: id }, { coverId: id }] },
-      select: { id: true, title: true, purpose: true, status: true, updatedAt: true, facilityId: true, facility: { select: { name: true } }, assigneeId: true, coverId: true },
+      where: { organisationId: actor.user.organisationId, status: { notIn: ["COMPLETED", "CANCELLED"] }, OR: [{ assigneeId: id }, { coverId: id }, { purpose: "OPERATIONAL_CHECKLIST", operationalChecklist: { path: ["reviewerId"], equals: id } }] },
+      select: { id: true, title: true, purpose: true, status: true, updatedAt: true, facilityId: true, facility: { select: { name: true } }, assigneeId: true, coverId: true, operationalChecklist: true },
       orderBy: { id: "asc" }, take: 201,
     });
-    return Response.json({ data: tasks.slice(0, 200), truncated: tasks.length > 200 }, { headers: { "Cache-Control": "private, no-store" } });
+    return Response.json({ data: tasks.slice(0, 200).map(({ operationalChecklist, ...task }) => ({ ...task, reviewerId: task.purpose === "OPERATIONAL_CHECKLIST" ? checklistRecordSchema.safeParse(operationalChecklist).data?.reviewerId ?? null : null })), truncated: tasks.length > 200 }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) { return authErrorResponse(error); }
 }
 
@@ -29,6 +31,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const input = transfer.parse(await request.json());
     const { id } = await context.params;
     if (id === input.replacementId) return Response.json({ error: { message: "Choose another user." } }, { status: 422 });
+    const checklist = await db.task.findFirst({ where: { id: input.taskId, organisationId: actor.user.organisationId, purpose: "OPERATIONAL_CHECKLIST" } });
+    if (checklist) {
+      if (!await db.user.findFirst({ where: { id, organisationId: actor.user.organisationId }, select: { id: true } })) return Response.json({ error: { message: "User not found." } }, { status: 404 });
+      const record = checklistRecordSchema.safeParse(checklist.operationalChecklist);
+      if (!record.success || !checklist.assigneeId || checklist.updatedAt.toISOString() !== input.updatedAt || (checklist.assigneeId !== id && checklist.coverId !== id && record.data.reviewerId !== id)) return Response.json({ error: { message: "The checklist changed. Refresh the review and try again." } }, { status: 409 });
+      await changeOperationalChecklist({ userId: actor.user.id, organisationId: actor.user.organisationId, facilityIds: [], unrestrictedFacilities: true }, { id: checklist.id, action: "ASSIGN", expectedUpdatedAt: input.updatedAt, assigneeId: checklist.assigneeId === id ? input.replacementId : checklist.assigneeId, coverId: checklist.coverId === id ? input.replacementId : checklist.coverId, reviewerId: record.data.reviewerId === id ? input.replacementId : record.data.reviewerId });
+      return Response.json({ data: { reassigned: true } }, { headers: { "Cache-Control": "no-store" } });
+    }
     const result = await db.$transaction(async tx => {
       const [{ acquired }] = await tx.$queryRaw<{ acquired: boolean }[]>`SELECT pg_try_advisory_xact_lock(143, 2441) AS acquired`;
       if (!acquired) return "busy";
@@ -52,5 +62,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     }, { isolationLevel: "Serializable", timeout: 10000 });
     if (result !== "ok") return Response.json({ error: { message: result === "access" ? "The replacement cannot view work at this facility." : result === "duplicate" ? "The same person cannot be both assignee and cover." : result === "busy" ? "Another change is in progress. Try again shortly." : "The user or task changed. Refresh the review and try again." } }, { status: 409 });
     return Response.json({ data: { reassigned: true } }, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) { return authErrorResponse(error); }
+  } catch (error) {
+    if (error instanceof Error && ["CONFLICT", "CHECKLIST_REVIEWER_REQUIRED", "CHECKLIST_PADLOCK_REVIEWER_REQUIRED", "NOT_FOUND"].includes(error.message)) return Response.json({ error: { message: "The checklist changed or the replacement does not meet its independent-review requirements. Refresh and choose an eligible person." } }, { status: 409 });
+    return authErrorResponse(error);
+  }
 }
