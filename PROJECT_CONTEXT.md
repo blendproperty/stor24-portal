@@ -1,3 +1,11 @@
+## 2026-11-17 — Staff removal audit attribution (partial candidate)
+
+- Implementation: Candidate adds original actor ID and name snapshots to audit entries before the existing permitted staff-account deletion, and displays the saved name in the system audit, data-protection audit and visual audit report. The existing business-record dependency block and deletion fence remain in force. Reassignment and deletion of linked staff have not been implemented; this does not resolve Brett's reported blocker.
+- Testing: Prisma client generated and a disposable local PostgreSQL 16 database bootstrapped with all migrations. The staff deletion integration suite passed 5/5 including snapshot retention and transaction rollback; the deletion fence suite passed 5/5 separately. An initial combined run failed due to concurrent suites contending for the existing global fence, and both suites passed when rerun separately as in CI. Focused lint and git diff --check passed. Full typecheck and protected CI remain subject to their actual results.
+- Commit and push: See branch history and remote for this candidate; no promotion is implied.
+- Merge: Not merged.
+- Deployment and configuration: Not deployed; no production configuration or account changed.
+- Live production verification: None. Linked-account transfer, preservation of operational and historical identity references, staff/device UAT and all existing provider, data, finance, training, recovery and approval gates remain open.
 ## 2026-11-13 — Lead customer search deployed and live-verified
 
 - Implementation: PR #789 clears displayed customer matches and status when a search changes, and clears the selection and matches when the store changes. No customer, permission, billing or provider configuration was changed.

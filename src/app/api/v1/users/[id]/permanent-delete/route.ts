@@ -23,6 +23,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
       if (target.active) return { kind: "active" as const };
       const dependencies = await userRemovalDependencies(tx, id);
       if (dependencies.length) return { kind: "linked" as const, dependencies };
+      await tx.auditEvent.updateMany({ where: { actorId: id }, data: { deletedActorId: id, deletedActorName: target.name } });
       await tx.staffDeletionFence.update({ where: { id: 1 }, data: { generation: { increment: 1 } } });
       await tx.deletedStaffIdentity.create({ data: { id } });
       await tx.userInvitation.updateMany({ where: { organisationId: target.organisationId, email: target.email, status: "PENDING" }, data: { status: "REVOKED", revokedAt: new Date() } });

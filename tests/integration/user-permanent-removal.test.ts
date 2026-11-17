@@ -69,11 +69,11 @@ test("permanent user deletion frees email while preserving linked business recor
     });
     await t.test("audit failure rolls back; success removes account and credential, retains audit and frees the exact email",async()=>{
       await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_user_delete_audit_failure CHECK (false) NOT VALID');
-      try{assert.equal((await call(target.id)).status,500);assert.ok(await db.user.findUnique({where:{id:target.id}}));assert.ok(await db.passwordResetToken.findUnique({where:{id:reset.id}}));assert.equal((await db.userInvitation.findUniqueOrThrow({where:{id:oldInvite.id}})).status,"PENDING");}
+      try{assert.equal((await call(target.id)).status,500);assert.ok(await db.user.findUnique({where:{id:target.id}}));assert.ok(await db.passwordResetToken.findUnique({where:{id:reset.id}}));assert.equal((await db.userInvitation.findUniqueOrThrow({where:{id:oldInvite.id}})).status,"PENDING");const audit=await db.auditEvent.findUniqueOrThrow({where:{id:priorAudit.id}});assert.equal(audit.actorId,target.id);assert.equal(audit.deletedActorId,null);assert.equal(audit.deletedActorName,null);}
       finally{await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT ci_user_delete_audit_failure');}
       assert.equal((await call(target.id)).status,200);
       assert.equal(await db.user.findUnique({where:{id:target.id}}),null);assert.equal(await db.passwordResetToken.findUnique({where:{id:reset.id}}),null);
-      assert.equal((await db.auditEvent.findUniqueOrThrow({where:{id:priorAudit.id}})).actorId,null);
+      const prior=await db.auditEvent.findUniqueOrThrow({where:{id:priorAudit.id}});assert.equal(prior.actorId,null);assert.equal(prior.deletedActorId,target.id);assert.equal(prior.deletedActorName,target.name);
       const retained=await db.auditEvent.findUniqueOrThrow({where:{id:historicalAudit.id}}); assert.equal(retained.actorId,null); assert.deepEqual(retained.after,{userId:target.id});
       await assert.rejects(db.auditEvent.create({data:{organisationId:org.id,action:"test",entityType:"User",entityId:"fixture",after:{userId:target.id}}}));
       assert.equal((await db.userInvitation.findUniqueOrThrow({where:{id:oldInvite.id}})).status,"REVOKED");
