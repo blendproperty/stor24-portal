@@ -1,3 +1,12 @@
+## 2026-11-17 — BlendSign callback concurrency release
+
+- Implementation: PR #849 serializes completion using the existing facility lock, rechecks the signed document, requests retry for simultaneous inbox creation and prevents a late failure from overwriting success. The earlier provider-side idempotency and outage task was already completed in August and remains recorded separately.
+- Testing: isolated PostgreSQL reproduced duplicate completion audit entries before the fix. Invalid signatures, failure and retry, concurrent distinct events, same-event collision and retry, and pending-handover state passed after the fix. Closed-floor and legacy-handover regression tests, scoped lint and typecheck passed. PR head 1c5b3703 passed CI 44081585537, security 44081585710, transactions 44081585515 and restricted runtime 44081585486. Exact-main commit b23999e6 passed CI 44084408969, security 44084408870, transactions 44084408949 and restricted runtime 44084408837.
+- Commit and push: implementation branch codex/blendsign-webhook-safety-20261117, PR #849. This release record is a separate documentation candidate.
+- Merge: PR #849 squash merged as b23999e66d0404f912e9721d5ceaae6d379571e1. The release record's own promotion must be checked separately.
+- Deployment and configuration: Deploy to VPS 44087433694 succeeded; image stor24-crm:b23999e66 was healthy with no OOM and local HTTP 200 at 12:56 UTC. Billing production hold was not changed.
+- Live production verification: at 12:57 UTC public /api/health returned app/database OK and an invalid synthetic webhook signature returned 401. No real signed event, provider retry or customer lease was submitted. Actual provider retry, staff acceptance, business sign-off and all existing provider, finance, data, recovery and training gates remain open.
+
 ## 2026-11-16 — WhatChimp workspace cutover and outstanding migration gates
 
 - Implementation: no application code changed. Brett explicitly authorised switching the whole WhatChimp workspace; a restricted Facebook test bot was temporarily activated, then both social CRM bots returned to Draft with test keywords removed on his instruction.
