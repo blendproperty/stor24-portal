@@ -60,6 +60,7 @@ export async function userRemovalDependencies(tx: Prisma.TransactionClient, user
     tx.legacyAccessPhoto.findFirst({ where: { reviewedById: userId }, select: { id: true } }),
     tx.additionalAccessPerson.findFirst({ where: { reviewedById: userId }, select: { id: true } }),
     tx.additionalPhotoHandoff.findFirst({ where: { issuedById: userId }, select: { id: true } }),
+    tx.legacyPhotoHandoff.findFirst({ where: { issuedById: userId }, select: { id: true } }),
     tx.collectionCase.findFirst({ where: { ownerId: userId }, select: { id: true } }),
     tx.collectionActivity.findFirst({ where: { actorId: userId }, select: { id: true } }),
     tx.collectionPromise.findFirst({ where: { createdById: userId }, select: { id: true } }),
@@ -94,6 +95,6 @@ export async function userRemovalDependencies(tx: Prisma.TransactionClient, user
     tx.receiptImportPosting.findFirst({ where: { postedById: userId }, select: { id: true } }),
     tx.priceApprovalChallenge.findFirst({ where: { OR: [{ requestedById: userId }, { approverId: userId }] }, select: { id: true } }),
   ]);
-  const names = ["Business audit event", "Lead", "ReservationPriceAmendment", "BiometricEnrollment", "IntegrationIdentityLink", "AccessDecision", "InsuranceEnrollment", "FacialPhotoSubmission", "LegacyAccessPhoto", "AdditionalAccessPerson", "AdditionalPhotoHandoff", "CollectionCase", "CollectionActivity", "CollectionPromise", "ReceiptReallocation", "FinancialAdjustment", "DebitOrderRun", "LedgerEntry", "SettlementStatement", "SettlementLine", "SettlementBankImport", "SettlementBalanceObservation", "Task", "StaffOperationalAcknowledgement", "ArrivalHandover", "UnitNote", "MaintenanceRequest", "StockMovement", "DailyClose", "SavedReport", "ReportHistoryImport", "ReportRun", "IdentityDocument", "MoveInTrainingControl", "MoveInTrainingRun", "FacialPhotoControl", "MarketingActivity", "WalkInVisit", "CustomerNote", "UnidentifiedReceiptIntake", "UnidentifiedReceiptMatchProposal", "ReceiptBankSourceProfile", "ReceiptImportPosting", "PriceApprovalChallenge"];
+  const names = ["Business audit event", "Lead", "ReservationPriceAmendment", "BiometricEnrollment", "IntegrationIdentityLink", "AccessDecision", "InsuranceEnrollment", "FacialPhotoSubmission", "LegacyAccessPhoto", "AdditionalAccessPerson", "AdditionalPhotoHandoff", "LegacyPhotoHandoff", "CollectionCase", "CollectionActivity", "CollectionPromise", "ReceiptReallocation", "FinancialAdjustment", "DebitOrderRun", "LedgerEntry", "SettlementStatement", "SettlementLine", "SettlementBankImport", "SettlementBalanceObservation", "Task", "StaffOperationalAcknowledgement", "ArrivalHandover", "UnitNote", "MaintenanceRequest", "StockMovement", "DailyClose", "SavedReport", "ReportHistoryImport", "ReportRun", "IdentityDocument", "MoveInTrainingControl", "MoveInTrainingRun", "FacialPhotoControl", "MarketingActivity", "WalkInVisit", "CustomerNote", "UnidentifiedReceiptIntake", "UnidentifiedReceiptMatchProposal", "ReceiptBankSourceProfile", "ReceiptImportPosting", "PriceApprovalChallenge"];
   return [...names.filter((_, index) => matches[index] !== null), ...jsonMatches.map(match => match.type)];
 }
