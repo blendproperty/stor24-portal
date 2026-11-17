@@ -29,6 +29,7 @@ test("owner can review and safely reassign an outstanding task", async () => {
   const checklist = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Opening", purpose: "OPERATIONAL_CHECKLIST", assigneeId: target.id, coverAcknowledgedAt: new Date(), operationalChecklist: { version: 1, template: "OPENING", reviewerId: owner.id, rows: [], sourceAt: null, sourceHash: null, comparisonReference: "", summary: "", submittedBy: null, submittedAt: null, reviewNote: "", reviewedBy: null, reviewedAt: null } } });
   const review = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Review", purpose: "OPERATIONAL_CHECKLIST", assigneeId: owner.id, operationalChecklist: { version: 1, template: "PADLOCK", reviewerId: target.id, rows: [], sourceAt: null, sourceHash: null, comparisonReference: "", summary: "", submittedBy: null, submittedAt: null, reviewNote: "", reviewedBy: null, reviewedAt: null } } });
   const form = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Form", purpose: "OPERATIONAL_FORM", assigneeId: target.id, createdById: target.id, operationalForm: { version: 1, kind: "MAINTENANCE", values: {}, photos: [], reviewerId: owner.id, submittedAt: null, reviewedAt: null, reviewedBy: null, reviewNote: "" } } });
+  const largeForm = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Photo form", purpose: "OPERATIONAL_FORM", assigneeId: recipient.id, createdById: owner.id, operationalForm: { version: 1, kind: "MAINTENANCE", values: {}, photos: [{ name: "synthetic.jpg", data: `data:image/jpeg;base64,${"A".repeat(400000)}` }], reviewerId: target.id, submittedAt: null, reviewedAt: null, reviewedBy: null, reviewNote: "" } } });
   const covered = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Follow-up", purpose: "AGREED_FOLLOWUP", assigneeId: owner.id, coverId: target.id, coverAcknowledgedAt: new Date() } });
   const scheduled = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Meeting", purpose: "MEETING", assigneeId: target.id } });
   const arrears = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Arrears review", purpose: "ARREARS_ESCALATION_REVIEW", assigneeId: target.id } });
@@ -52,7 +53,7 @@ test("owner can review and safely reassign an outstanding task", async () => {
     assert.equal((await mod.exports.GET(new Request("https://example.invalid/api"), context(target.id))).status, 401);
     session = { userId: owner.id, sessionVersion: owner.sessionVersion, mfaVerified: true };
     const preview = await mod.exports.GET(new Request("https://example.invalid/api"), context(target.id));
-    assert.equal(preview.status, 200); assert.equal((await preview.json()).data.length, 10);
+    assert.equal(preview.status, 200); const previewText = await preview.text(); assert.ok(previewText.length < 25000); assert.equal(JSON.parse(previewText).data.length, 11);
     assert.equal((await mod.exports.GET(new Request("https://example.invalid/api"), context(foreign.id))).status, 404);
     session = { userId: unprivileged.id, sessionVersion: unprivileged.sessionVersion, mfaVerified: true };
     assert.equal((await post(target.id, task.id, recipient.id, task.updatedAt.toISOString())).status, 403);
@@ -61,6 +62,12 @@ test("owner can review and safely reassign an outstanding task", async () => {
     assert.equal((await post(target.id, task.id, foreign.id, task.updatedAt.toISOString())).status, 409);
     assert.equal((await post(target.id, task.id, unprivileged.id, task.updatedAt.toISOString())).status, 409);
     assert.equal((await post(target.id, lead.id, manager.id, lead.updatedAt.toISOString(), "https://example.invalid", "LEAD")).status, 409);
+    let leadReady!: () => void, releaseLead!: () => void;
+    const leadLocked = new Promise<void>(resolve => { leadReady = resolve; }), resumeLead = new Promise<void>(resolve => { releaseLead = resolve; });
+    const leadWriter = db.$transaction(async tx => { await tx.$queryRaw`SELECT "id" FROM "Lead" WHERE "id"=${lead.id} FOR UPDATE`; leadReady(); await resumeLead; }, { timeout: 20000 });
+    await leadLocked;
+    try { assert.equal((await post(target.id, lead.id, recipient.id, lead.updatedAt.toISOString(), "https://example.invalid", "LEAD")).status, 409); }
+    finally { releaseLead(); await leadWriter; }
     assert.equal((await post(target.id, lead.id, recipient.id, lead.updatedAt.toISOString(), "https://example.invalid", "LEAD")).status, 200);
     assert.equal((await db.lead.findUniqueOrThrow({ where: { id: lead.id } })).assignedToId, recipient.id);
     assert.equal((await post(target.id, collection.id, recipient.id, collection.updatedAt.toISOString(), "https://example.invalid", "COLLECTION")).status, 409);
@@ -81,6 +88,7 @@ test("owner can review and safely reassign an outstanding task", async () => {
     assert.equal((await post(target.id, form.id, recipient.id, form.updatedAt.toISOString())).status, 200);
     const handedForm = await db.task.findUniqueOrThrow({ where: { id: form.id } });
     assert.equal(handedForm.assigneeId, recipient.id); assert.equal(handedForm.createdById, target.id);
+    assert.equal((await post(target.id, largeForm.id, manager.id, largeForm.updatedAt.toISOString())).status, 200);
     assert.equal((await post(target.id, restricted.id, recipient.id, restricted.updatedAt.toISOString())).status, 409);
     assert.equal((await post(target.id, checklist.id, owner.id, checklist.updatedAt.toISOString())).status, 409);
     assert.equal((await post(target.id, checklist.id, recipient.id, checklist.updatedAt.toISOString())).status, 200);
@@ -90,6 +98,12 @@ test("owner can review and safely reassign an outstanding task", async () => {
     assert.equal((await post(target.id, review.id, manager.id, review.updatedAt.toISOString())).status, 200);
     assert.equal(((await db.task.findUniqueOrThrow({ where: { id: review.id } })).operationalChecklist as { reviewerId: string }).reviewerId, manager.id);
     assert.equal((await post(target.id, task.id, recipient.id, new Date(0).toISOString())).status, 409);
+    let taskReady!: () => void, releaseTask!: () => void;
+    const taskLocked = new Promise<void>(resolve => { taskReady = resolve; }), resumeTask = new Promise<void>(resolve => { releaseTask = resolve; });
+    const taskWriter = db.$transaction(async tx => { await tx.$queryRaw`SELECT "id" FROM "Task" WHERE "id"=${task.id} FOR UPDATE`; taskReady(); await resumeTask; }, { timeout: 20000 });
+    await taskLocked;
+    try { assert.equal((await post(target.id, task.id, recipient.id, task.updatedAt.toISOString())).status, 409); }
+    finally { releaseTask(); await taskWriter; }
     assert.equal((await post(target.id, covered.id, owner.id, covered.updatedAt.toISOString())).status, 409);
     await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_work_transfer_failure CHECK (false) NOT VALID');
     try { assert.equal((await post(target.id, task.id, recipient.id, task.updatedAt.toISOString())).status, 500); assert.equal((await db.task.findUniqueOrThrow({ where: { id: task.id } })).assigneeId, target.id); }

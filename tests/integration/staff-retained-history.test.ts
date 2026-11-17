@@ -6,6 +6,8 @@ import { createRequire } from "node:module";
 import { db } from "../../src/lib/db";
 import type { Prisma } from "../../src/generated/prisma/client";
 import { createOperationalForm, changeOperationalForm, reassignOperationalForm } from "../../src/lib/operational-form-service";
+import { changeOperationalChecklist } from "../../src/lib/operational-checklist-service";
+import { staffIdentityIds } from "../../src/lib/staff-identity";
 
 test("linked staff removal retains historical identity and prevents new access or links", async () => {
   assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci");
@@ -28,16 +30,17 @@ test("linked staff removal retains historical identity and prevents new access o
   const liveForm = await createOperationalForm(targetScope, { facilityId: facility.id, kind: "MAINTENANCE", requestKey: randomUUID() });
   const values = { priority: "1", discovered: "2026-11-17", area: "Test", issue: "Test issue", action: "Inspect" };
   await changeOperationalForm(targetScope, { id: liveForm.id, expectedUpdatedAt: (await db.task.findUniqueOrThrow({ where: { id: liveForm.id } })).updatedAt.toISOString(), action: "SAVE", values, photos: [], reviewerId: owner.id });
+  await db.passwordResetToken.create({ data: { userId: target.id, organisationId: org.id, tokenHash: key, expiresAt: new Date(Date.now() + 60000) } });
   await db.user.update({ where: { id: target.id }, data: { active: false } });
   await reassignOperationalForm(ownerScope, liveForm.id, target.id, successor.id, (await db.task.findUniqueOrThrow({ where: { id: liveForm.id } })).updatedAt.toISOString(), owner.sessionVersion);
   await db.mfaCredential.create({ data: { userId: target.id, secretEncrypted: "synthetic", recoveryCodeHashes: [] } });
-  await db.passwordResetToken.create({ data: { userId: target.id, organisationId: org.id, tokenHash: key, expiresAt: new Date(Date.now() + 60000) } });
   const invitation = await db.userInvitation.create({ data: { organisationId: org.id, email: target.email, name: target.name, roleName: "Staff", invitedByName: owner.name, tokenHash: `invite-${key}`, expiresAt: new Date(Date.now() + 60000) } });
   const prior = await db.auditEvent.create({ data: { organisationId: org.id, actorId: target.id, action: "business.approved", entityType: "Test", entityId: key, after: { original: "unchanged" } } });
   const task = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Completed", status: "COMPLETED", assigneeId: target.id, createdById: target.id } });
   const outstanding = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Outstanding", assigneeId: target.id } });
   const form = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Form", purpose: "OPERATIONAL_FORM", createdById: target.id } });
-  const historicalChecklist = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Completed checklist", purpose: "OPERATIONAL_CHECKLIST", status: "COMPLETED", operationalChecklist: { version: 1, template: "OPENING", reviewerId: target.id, rows: [], sourceAt: null, sourceHash: null, comparisonReference: "", summary: "", submittedBy: target.id, submittedAt: null, reviewNote: "", reviewedBy: target.id, reviewedAt: null } } });
+  const historicalChecklist = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Completed checklist", purpose: "OPERATIONAL_CHECKLIST", status: "COMPLETED", assigneeId: successor.id, operationalChecklist: { version: 1, template: "OPENING", reviewerId: target.id, rows: [], sourceAt: null, sourceHash: null, comparisonReference: "", summary: "", submittedBy: target.id, submittedAt: null, reviewNote: "", reviewedBy: target.id, reviewedAt: null } } });
+  const photoForm = await db.task.create({ data: { organisationId: org.id, facilityId: facility.id, title: "Historical photo form", purpose: "OPERATIONAL_FORM", status: "COMPLETED", operationalForm: { version: 1, kind: "MAINTENANCE", values: {}, photos: [{ name: "synthetic.jpg", data: `data:image/jpeg;base64,${"A".repeat(400000)}` }], reviewerId: target.id, submittedAt: null, reviewedAt: null, reviewedBy: target.id, reviewNote: "" } } });
   const openLead = await db.lead.create({ data: { facilityId: facility.id, source: "TEST", assignedToId: target.id } });
   const lostLead = await db.lead.create({ data: { facilityId: facility.id, source: "TEST", stage: "LOST", assignedToId: target.id } });
   const training = await db.moveInTrainingRun.create({ data: { organisationId: org.id, facilityId: facility.id, userId: target.id, generation: 1, state: {} } });
@@ -61,6 +64,17 @@ test("linked staff removal retains historical identity and prevents new access o
     const foreignAudit = await db.auditEvent.create({ data: { organisationId: other.id, actorId: target.id, action: "test.foreign", entityType: "Test", entityId: key } });
     assert.equal((await remove()).status, 409);
     await db.auditEvent.delete({ where: { id: foreignAudit.id } });
+    for (const table of ["RoleAssignment", "PriceApprovalChallenge"] as const) {
+      let ready!: () => void, release!: () => void;
+      const locked = new Promise<void>(resolve => { ready = resolve; }), resume = new Promise<void>(resolve => { release = resolve; });
+      const holder = db.$transaction(async tx => {
+        if (table === "RoleAssignment") await tx.$queryRaw`SELECT "id" FROM "RoleAssignment" WHERE "userId"=${target.id} FOR UPDATE`;
+        else await tx.$queryRaw`SELECT "id" FROM "PriceApprovalChallenge" WHERE "id"=${challenge.id} FOR UPDATE`;
+        ready(); await resume;
+      }, { timeout: 20000 });
+      await locked;
+      try { assert.equal((await remove()).status, 409); } finally { release(); await holder; }
+    }
     await db.$executeRawUnsafe('ALTER TABLE "AuditEvent" ADD CONSTRAINT ci_retired_history_audit_failure CHECK (false) NOT VALID');
     try {
       assert.equal((await remove()).status, 500);
@@ -95,8 +109,11 @@ test("linked staff removal retains historical identity and prevents new access o
     await assert.rejects(db.lead.update({ where: { id: lostLead.id }, data: { stage: "NEW" } }));
     await db.lead.update({ where: { id: lostLead.id }, data: { stage: "NEW", assignedToId: owner.id } });
     assert.equal((await db.moveInTrainingRun.findUniqueOrThrow({ where: { id: training.id } })).userId, target.id);
+    assert.equal(((await db.task.findUniqueOrThrow({ where: { id: photoForm.id } })).operationalForm as { photos: { data: string }[] }).photos[0].data.length, 400023);
     assert.equal((await db.reservationPriceAmendment.findUniqueOrThrow({ where: { id: amendment.id } })).proposedById, target.id);
     assert.equal((await db.priceApprovalChallenge.findUniqueOrThrow({ where: { id: challenge.id } })).status, "CANCELLED");
+    const cancelAudit = await db.auditEvent.findFirstOrThrow({ where: { entityId: challenge.id, action: "price_approval.cancelled_for_user_removal" } });
+    assert.deepEqual(cancelAudit.before, { status: "SENT", providerRef: null, attempts: 0 });
     await db.reservationPriceAmendment.update({ where: { id: amendment.id }, data: { reviewedById: owner.id } });
     await db.moveInTrainingRun.update({ where: { id: training.id }, data: { userId: target.id, version: { increment: 1 } } });
     await db.task.update({ where: { id: task.id }, data: { createdById: target.id, title: "Historical title" } });
@@ -117,10 +134,20 @@ test("linked staff removal retains historical identity and prevents new access o
     assert.equal((await db.task.findUniqueOrThrow({ where: { id: liveForm.id } })).createdById, target.id);
     await assert.rejects(db.user.update({ where: { id: target.id }, data: { active: true } }));
     await assert.rejects(db.roleAssignment.create({ data: { userId: target.id, roleId: staffRole.id } }));
+    await assert.rejects(db.passwordResetToken.create({ data: { userId: target.id, organisationId: org.id, tokenHash: `stale-${key}`, expiresAt: new Date(Date.now() + 60000) } }));
     await assert.rejects(db.task.create({ data: { organisationId: org.id, title: "Stale", assigneeId: target.id } }));
     await assert.rejects(db.auditEvent.create({ data: { organisationId: org.id, actorId: target.id, action: "stale", entityType: "Test", entityId: key } }));
-    const invited = await db.user.create({ data: { organisationId: org.id, name: "New account", email: target.email } });
+    const managerRole = await db.role.create({ data: { organisationId: org.id, name: "Reviewer", permissions: ["operations.view", "operations.manage"] } });
+    const invited = await db.user.create({ data: { organisationId: org.id, name: "New account", email: target.email, passwordHash: "synthetic", roleAssignments: { create: { roleId: managerRole.id, facilityId: facility.id } } } });
     assert.notEqual(invited.id, target.id);
+    const identities = await db.$transaction(tx => staffIdentityIds(tx, org.id, invited.id));
+    assert.ok(identities.includes(target.id));
+    const formToReview = await createOperationalForm(successorScope, { facilityId: facility.id, kind: "MAINTENANCE", requestKey: randomUUID() });
+    await changeOperationalForm(successorScope, { id: formToReview.id, expectedUpdatedAt: (await db.task.findUniqueOrThrow({ where: { id: formToReview.id } })).updatedAt.toISOString(), action: "SAVE", values, photos: [], reviewerId: owner.id });
+    await db.auditEvent.create({ data: { organisationId: org.id, actorId: owner.id, deletedActorId: target.id, action: "operationalForm.save", entityType: "Task", entityId: formToReview.id } });
+    await assert.rejects(reassignOperationalForm(ownerScope, formToReview.id, owner.id, invited.id, (await db.task.findUniqueOrThrow({ where: { id: formToReview.id } })).updatedAt.toISOString(), owner.sessionVersion), /FORM_REVIEWER_REQUIRED/);
+    const check = await db.task.findUniqueOrThrow({ where: { id: historicalChecklist.id } });
+    await assert.rejects(changeOperationalChecklist(ownerScope, { id: check.id, action: "ASSIGN", expectedUpdatedAt: check.updatedAt.toISOString(), assigneeId: successor.id, coverId: null, reviewerId: invited.id }), /CHECKLIST_REVIEWER_REQUIRED/);
     assert.equal((await remove()).status, 404);
   } finally { await db.$disconnect(); }
 });

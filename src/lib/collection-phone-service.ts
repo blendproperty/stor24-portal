@@ -4,6 +4,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { db } from "./db";
 import type { RequestScope } from "./scope";
 import { arrearsAuthority } from "./arrears-authority";
+import { staffIdentityIds } from "./staff-identity";
 import { collectionPhoneSource } from "./collections-service";
 import { phoneCommand, phonePayload, smsPayload, approvedWhatsAppPayload, type PhonePayload } from "./collection-phone-policy";
 import { noticeHash } from "./collection-notice-policy";
@@ -118,7 +119,8 @@ export async function actPhoneNotice(scope: RequestScope, raw: unknown) {
     if (!old || old.fingerprint !== source.fingerprint || noticeHash(old.payload) !== noticeHash(fresh.payload)) throw Error("COLLECTION_PHONE_CHANGED");
     await arrearsAuthority(tx, scope, source.facilityId, permissions, old.creatorId);
     if (command.action === "approve") {
-      if (old.status !== "DRAFT" || old.contributors.includes(scope.userId) || !command.reference) throw Error("COLLECTION_PHONE_APPROVAL");
+      const identities = await staffIdentityIds(tx, scope.organisationId, scope.userId);
+      if (old.status !== "DRAFT" || old.contributors.some(id => identities.includes(id)) || !command.reference) throw Error("COLLECTION_PHONE_APPROVAL");
       const next: Stored = { ...old, status: "APPROVED", revision: randomUUID(), approvedBy: scope.userId, approvedAt: new Date().toISOString(), reference: command.reference };
       await save(tx, next, true); await record(tx, scope, next, "approved"); return { attempted: false as const, state: next };
     }

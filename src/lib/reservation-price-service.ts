@@ -13,6 +13,7 @@ import {formatSouthAfricaDateTime} from "./south-africa-time";
 import type {ReportParameters} from "./reporting";
 import {southAfricaDateKey} from "./south-africa-time";
 import {requireOperationalUnit} from "./floor-availability-service";
+import {staffIdentityIds} from "./staff-identity";
 import {confirmedFailedPricePayment,reservationPriceSendSchema,negotiatedMonthlyRate,reservationPricePreparationSchema,proposedReservationPrice,reservationPriceBlockers,reservationPriceProposalSchema,reservationPriceDecisionSchema,reservationPriceAcceptanceSchema,type ReservationPriceProposal,type ReservationPriceDecision,type ReservationPriceAcceptance,reservationPriceNotice} from "./reservation-price-policy";
 
 type Tx=Prisma.TransactionClient;
@@ -124,7 +125,8 @@ export async function decideReservationPriceInTransaction(tx:Tx,scope:RequestSco
     const actor=await tx.user.findFirst({where:{id:scope.userId,organisationId:scope.organisationId,active:true},select:{name:true}});if(!actor)throw Error("FORBIDDEN");
     const reference=`${actor.name.slice(0,120)} | ${data.decision} | ${item.id} v${data.revision}`;
     const changed=await tx.reservationPriceAmendment.updateMany({where:{id:item.id,revision:data.revision,status:item.status},data:{status:data.decision,revision:{increment:1},reviewedById:scope.userId,reviewedAt:new Date(),reviewReference:reference}});if(changed.count!==1)throw Error("CONFLICT");
-    await audit(tx,scope.organisationId,item.facilityId,scope.userId,item.id,data.decision.toLowerCase(),{reservationId:item.reservationId,revision:data.revision+1,quoteFingerprint:item.quoteFingerprint,reference,approvalMethod:delegation?"MANAGER_WHATSAPP_OTP":"SIGNED_IN",proposedById:item.proposedById,selfApproved:item.proposedById===scope.userId,...delegation,financialPosting:false});return {id:item.id};
+    const actorIds=await staffIdentityIds(tx,scope.organisationId,scope.userId);
+    await audit(tx,scope.organisationId,item.facilityId,scope.userId,item.id,data.decision.toLowerCase(),{reservationId:item.reservationId,revision:data.revision+1,quoteFingerprint:item.quoteFingerprint,reference,approvalMethod:delegation?"MANAGER_WHATSAPP_OTP":"SIGNED_IN",proposedById:item.proposedById,selfApproved:actorIds.includes(item.proposedById),...delegation,financialPosting:false});return {id:item.id};
 }
 
 export async function sendReservationPriceReview(scope:RequestScope,input:unknown){

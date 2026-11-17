@@ -5,6 +5,7 @@ import { currentRoleAccess } from "./current-role-access";
 import { facilityWhere, type RequestScope } from "./scope";
 import { floorIsOperational } from "./floor-availability";
 import { CHECKLIST_PURPOSE, checklistCreateSchema, checklistChangeSchema, checklistNeedsTrolleyCount, checklistRecordSchema, checklistRouteResultReady, checklistTemplates, checklistDates, checklistRows, checklistUsesRoute, checklistWeek, validateChecklistSubmission, type ChecklistCreate, type ChecklistChange, type ChecklistRow, type ChecklistTemplate } from "./operational-checklist-policy";
+import { staffIdentityIds } from "./staff-identity";
 
 type Client = Prisma.TransactionClient;
 const json = (v: unknown) => JSON.parse(JSON.stringify(v)) as Prisma.InputJsonValue;
@@ -138,7 +139,7 @@ export async function changeOperationalChecklist(scope: RequestScope, raw: Check
       }
     } else if (input.action === "APPROVE" || input.action === "RETURN") {
       if (record.template === "PADLOCK" && !canReviewPadlocks(actor, scope.organisationId, before.facilityId)) throw new Error("FORBIDDEN");
-      if (before.status !== "WAITING" || record.reviewerId !== scope.userId || record.submittedBy === scope.userId) throw new Error("FORBIDDEN");
+      if (before.status !== "WAITING" || record.reviewerId !== scope.userId || (record.submittedBy && (await staffIdentityIds(tx, scope.organisationId, scope.userId)).includes(record.submittedBy))) throw new Error("FORBIDDEN");
       validateChecklistSubmission(record);
       record.reviewNote = input.note;
       if (input.action === "APPROVE") {
@@ -146,7 +147,7 @@ export async function changeOperationalChecklist(scope: RequestScope, raw: Check
       } else { status = "IN_PROGRESS"; record.submittedAt = null; record.submittedBy = null; }
     } else if (input.action === "ASSIGN") {
       await assignments(tx, scope, { ...input, facilityId: before.facilityId, template: record.template });
-      if (input.reviewerId === record.submittedBy) throw new Error("CHECKLIST_REVIEWER_REQUIRED");
+      if (record.submittedBy && (await staffIdentityIds(tx, scope.organisationId, input.reviewerId)).includes(record.submittedBy)) throw new Error("CHECKLIST_REVIEWER_REQUIRED");
       record.reviewerId = input.reviewerId; data.assigneeId = input.assigneeId; data.coverId = input.coverId;
       if (input.assigneeId !== before.assigneeId || input.coverId !== before.coverId) data.coverAcknowledgedAt = null;
     } else if (input.action === "CANCEL") status = "CANCELLED";

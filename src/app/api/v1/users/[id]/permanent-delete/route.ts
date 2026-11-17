@@ -29,7 +29,11 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
       const retainedTypes = ["Business audit event", "Lead", "ReservationPriceAmendment", "Task", "MoveInTrainingRun", "PriceApprovalChallenge"];
       const unsupported = dependencies.filter(type => !retainedTypes.includes(type) && type !== "Task data");
       if (dependencies.includes("Task data")) {
-        const records = await tx.$queryRaw<{ organisationId: string; purpose: string; status: string; operationalForm: unknown; operationalChecklist: unknown }[]>`SELECT "organisationId", "purpose", "status", "operationalForm", "operationalChecklist" FROM "Task" WHERE position(${id} in "operationalForm"::text) > 0 OR position(${id} in "operationalChecklist"::text) > 0 LIMIT 501`;
+        const records = await tx.$queryRaw<{ organisationId: string; purpose: string; status: string; operationalForm: unknown; operationalChecklist: unknown; unexpectedReference: boolean }[]>`SELECT "organisationId", "purpose", "status"::text AS "status",
+          CASE WHEN "operationalForm" IS NULL THEN NULL ELSE jsonb_build_object('version',"operationalForm"->'version','kind',"operationalForm"->'kind','values','{}'::jsonb,'photos','[]'::jsonb,'reviewerId',"operationalForm"->'reviewerId','submittedAt',"operationalForm"->'submittedAt','reviewedAt',"operationalForm"->'reviewedAt','reviewedBy',"operationalForm"->'reviewedBy','reviewNote','') END AS "operationalForm",
+          CASE WHEN "operationalChecklist" IS NULL THEN NULL ELSE jsonb_build_object('version',"operationalChecklist"->'version','template',"operationalChecklist"->'template','reviewerId',"operationalChecklist"->'reviewerId','rows','[]'::jsonb,'sourceAt',"operationalChecklist"->'sourceAt','sourceHash',"operationalChecklist"->'sourceHash','comparisonReference','','summary','','submittedBy',"operationalChecklist"->'submittedBy','submittedAt',"operationalChecklist"->'submittedAt','reviewNote','','reviewedBy',"operationalChecklist"->'reviewedBy','reviewedAt',"operationalChecklist"->'reviewedAt') END AS "operationalChecklist",
+          (position(${id} in COALESCE(("operationalForm" - 'reviewerId' - 'reviewedBy')::text,'')) > 0 OR position(${id} in COALESCE(("operationalChecklist" - 'reviewerId' - 'submittedBy' - 'reviewedBy')::text,'')) > 0) AS "unexpectedReference"
+          FROM "Task" WHERE position(${id} in "operationalForm"::text) > 0 OR position(${id} in "operationalChecklist"::text) > 0 LIMIT 501`;
         if (records.length > 500 || records.some(record => record.organisationId !== target.organisationId || !canRetainTaskData(record, id))) unsupported.push("Task data");
       }
       if (unsupported.length) return { kind: "linked" as const, dependencies: unsupported };
@@ -45,11 +49,27 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
       const outstanding = await tx.task.count({ where: { status: { notIn: ["COMPLETED", "CANCELLED"] }, OR: [{ assigneeId: id }, { coverId: id }, { purpose: "OPERATIONAL_FORM", assigneeId: null, createdById: id }] } });
       if (outstanding) return { kind: "linked" as const, dependencies: ["outstanding tasks"] };
       if (await tx.lead.count({ where: { assignedToId: id, stage: { not: "LOST" } } })) return { kind: "linked" as const, dependencies: ["outstanding enquiries"] };
+      const [roleCount, resetCount, mfaCount, inviteCount, auditCount, challengeCount] = await Promise.all([
+        tx.roleAssignment.count({ where: { userId: id } }), tx.passwordResetToken.count({ where: { userId: id } }), tx.mfaCredential.count({ where: { userId: id } }),
+        tx.userInvitation.count({ where: { organisationId: target.organisationId, email: target.email, status: "PENDING" } }), tx.auditEvent.count({ where: { actorId: id } }),
+        tx.priceApprovalChallenge.count({ where: { organisationId: target.organisationId, OR: [{ requestedById: id }, { approverId: id }], status: { in: ["SENDING", "SENT", "REVIEW_REQUIRED"] } } }),
+      ]);
+      if (challengeCount > 500) return { kind: "linked" as const, dependencies: ["too many price approval challenges; administrative review required"] };
+      const [roles, resets, mfa, invites, audits, challenges] = await Promise.all([
+        tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "RoleAssignment" WHERE "userId"=${id} FOR UPDATE SKIP LOCKED`,
+        tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "PasswordResetToken" WHERE "userId"=${id} FOR UPDATE SKIP LOCKED`,
+        tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "MfaCredential" WHERE "userId"=${id} FOR UPDATE SKIP LOCKED`,
+        tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "UserInvitation" WHERE "organisationId"=${target.organisationId} AND "email"=${target.email} AND "status"='PENDING' FOR UPDATE SKIP LOCKED`,
+        tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "AuditEvent" WHERE "actorId"=${id} FOR UPDATE SKIP LOCKED`,
+        tx.$queryRaw<{ id: string; status: string; providerRef: string | null; attempts: number }[]>`SELECT "id", "status", "providerRef", "attempts" FROM "PriceApprovalChallenge" WHERE "organisationId"=${target.organisationId} AND ("requestedById"=${id} OR "approverId"=${id}) AND "status" IN ('SENDING','SENT','REVIEW_REQUIRED') FOR UPDATE SKIP LOCKED`,
+      ]);
+      if (roles.length !== roleCount || resets.length !== resetCount || mfa.length !== mfaCount || invites.length !== inviteCount || audits.length !== auditCount || challenges.length !== challengeCount) return { kind: "busy" as const };
       await tx.auditEvent.updateMany({ where: { actorId: id }, data: { deletedActorId: id, deletedActorName: target.name, deletedActorEmail: target.email } });
       await tx.staffDeletionFence.update({ where: { id: 1 }, data: { generation: { increment: 1 } } });
       await tx.userInvitation.updateMany({ where: { organisationId: target.organisationId, email: target.email, status: "PENDING" }, data: { status: "REVOKED", revokedAt: new Date() } });
       if (dependencies.length) {
         await tx.priceApprovalChallenge.updateMany({ where: { organisationId: target.organisationId, OR: [{ requestedById: id }, { approverId: id }], status: { in: ["SENDING", "SENT", "REVIEW_REQUIRED"] } }, data: { status: "CANCELLED" } });
+        for (const challenge of challenges) await tx.auditEvent.create({ data: { organisationId: target.organisationId, actorId: actor.user.id, action: "price_approval.cancelled_for_user_removal", entityType: "PriceApprovalChallenge", entityId: challenge.id, before: { status: challenge.status, providerRef: challenge.providerRef, attempts: challenge.attempts }, after: { status: "CANCELLED" } } });
         await tx.mfaCredential.deleteMany({ where: { userId: id } });
         await tx.passwordResetToken.deleteMany({ where: { userId: id } });
         await tx.roleAssignment.deleteMany({ where: { userId: id } });
@@ -58,7 +78,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
         await tx.user.delete({ where: { id } });
       }
       await tx.auditEvent.create({ data: { organisationId: target.organisationId, actorId: actor.user.id, action: "user.account.deleted", entityType: "User", entityId: id, after: { identityRetained: dependencies.length > 0 } } });
-      await tx.deletedStaffIdentity.create({ data: { id, retained: dependencies.length > 0 } });
+      await tx.deletedStaffIdentity.create({ data: { id, retained: dependencies.length > 0, organisationId: dependencies.length ? target.organisationId : null, originalEmail: dependencies.length ? target.email.trim().toLowerCase() : null } });
       return { kind: "deleted" as const };
     }, { isolationLevel: "ReadCommitted", timeout: 6000 });
     if (result.kind === "busy") return Response.json({ error: { message: "The system is processing another change. Please try deleting this user again shortly." } }, { status: 409 });

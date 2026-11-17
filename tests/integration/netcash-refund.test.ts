@@ -39,6 +39,13 @@ test('isolated native refund preparation, explicit hold and independently review
  async function prepared(){const f=await fixture(),preview=await previewNetcashRefund(f.scope,f.input),record=await prepareNetcashRefund(f.scope,{...f.input,previewHash:preview.previewHash,reference:'Synthetic native preparation',confirmed:true});return{...f,preview,record};}
  async function action(f:Awaited<ReturnType<typeof prepared>>,record:{id:string;revision:number},action:Parameters<typeof actOnNetcashRefund>[1]['action'],scope=f.reviewScope){return actOnNetcashRefund(scope,{facilityId:f.facility.id,id:record.id,revision:record.revision,action,reference:'Synthetic independently checked '+action,confirmed:true});}
  try{
+  await t.test('reinviting a preparer email cannot create an independent refund reviewer',async()=>{
+   const f=await prepared(),old=await db.user.findUniqueOrThrow({where:{id:f.scope.userId}});
+   await db.user.update({where:{id:old.id},data:{active:false,passwordHash:null,email:`retired+${old.id}@identity.invalid`,retiredAt:new Date()}});
+   await db.deletedStaffIdentity.create({data:{id:old.id,retained:true,organisationId:f.org.id,originalEmail:old.email.toLowerCase()}});
+   const returned=await db.user.create({data:{organisationId:f.org.id,name:'Synthetic returning preparer',email:old.email,roleAssignments:{create:{roleId:f.role.id,facilityId:f.facility.id}}}});
+   await assert.rejects(action(f,f.record,'review',{...f.scope,userId:returned.id}),/NETCASH_REFUND_INDEPENDENT_REVIEW/);
+  });
   await t.test('preview and save are read-only financially, idempotent, and do not block an actual manual payout',async()=>{
    const f=await prepared();assert.equal(f.record.manualPayoutHeld,false);assert.equal(f.record.providerAttempted,false);
    assert.equal((await prepareNetcashRefund(f.scope,{...f.input,previewHash:f.preview.previewHash,reference:'Synthetic native preparation',confirmed:true})).id,f.record.id);

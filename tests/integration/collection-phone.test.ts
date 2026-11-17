@@ -54,6 +54,18 @@ test("isolated phone notices: real claims, authority, consent and immutable revi
   }
   const send = (f: Fixture, n: NonNullable<Awaited<ReturnType<typeof previewPhoneNotice>>["notice"]>, channel: "SMS" | "WHATSAPP" = "SMS") => actPhoneNotice(f.a, { action: "send", accountId: f.account.id, channel, id: n.id, revision: n.revision, confirm: true });
   try {
+    await t.test("a returning contributor cannot independently approve a changed notice", async () => {
+      const f = await fixture();
+      await prepare(f);
+      await db.customer.update({ where: { id: f.customer.id }, data: { phone: "+27821234568", phoneVerifiedAt: new Date() } });
+      const refreshed = await previewPhoneNotice(f.b, f.account.id, "SMS"); assert.deepEqual(refreshed.blockers, []);
+      const draft = (await actPhoneNotice(f.b, { action: "prepare", accountId: f.account.id, channel: "SMS", fingerprint: refreshed.source.fingerprint })).notice!;
+      const old = f.users[0];
+      await db.user.update({ where: { id: old.id }, data: { active: false, passwordHash: null, email: `retired+${old.id}@identity.invalid`, retiredAt: new Date() } });
+      await db.deletedStaffIdentity.create({ data: { id: old.id, retained: true, organisationId: f.org.id, originalEmail: old.email.toLowerCase() } });
+      const returned = await db.user.create({ data: { organisationId: f.org.id, name: "Returning contributor", email: old.email, roleAssignments: { create: { roleId: f.role.id, facilityId: f.facility.id } } } });
+      await assert.rejects(actPhoneNotice({ ...f.a, userId: returned.id }, { action: "approve", accountId: f.account.id, channel: "SMS", id: draft.id, revision: draft.revision, reference: "Synthetic review" }), /COLLECTION_PHONE_APPROVAL/);
+    });
     await t.test("a UUID-shaped account with a card-like digit run stays DLP-held without provider replay", async () => {
       const f = await fixture(), count = sends;
       await db.account.update({ where: { id: f.account.id }, data: { accountNumber: `PHONE-CI-aaaaaaaa-aaaa-4aaa-8111-111111111112-${f.account.accountNumber}` } });

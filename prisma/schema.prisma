@@ -2376,6 +2376,9 @@ model PriceApprovalChallenge {
 model DeletedStaffIdentity {
   id String @id
   retained Boolean @default(false)
+  organisationId String?
+  originalEmail String?
+  @@index([organisationId, originalEmail])
 }
 
 model StaffDeletionFence {

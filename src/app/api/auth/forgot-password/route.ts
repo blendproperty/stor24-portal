@@ -16,11 +16,16 @@ export async function POST(request: Request) {
   const user = await db.user.findFirst({ where: { email: parsed.data.email, active: true } });
   if (!user) return Response.json(generic);
   const token = createResetToken();
-  await db.$transaction([
-    db.passwordResetToken.updateMany({ where: { userId: user.id, usedAt: null }, data: { usedAt: new Date() } }),
-    db.passwordResetToken.create({ data: { userId: user.id, organisationId: user.organisationId, tokenHash: hashResetToken(token), expiresAt: addMinutes(new Date(), 30) } }),
-    db.auditEvent.create({ data: { organisationId: user.organisationId, action: "user.password_reset.requested", entityType: "User", entityId: user.id, ipHash: privacyHash(requestIp(request)) } }),
-  ]);
+  const issued = await db.$transaction(async tx => {
+    await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id"=${user.id} FOR UPDATE`;
+    const current = await tx.user.findFirst({ where: { id: user.id, organisationId: user.organisationId, email: user.email, active: true, retiredAt: null } });
+    if (!current) return false;
+    await tx.passwordResetToken.updateMany({ where: { userId: user.id, usedAt: null }, data: { usedAt: new Date() } });
+    await tx.passwordResetToken.create({ data: { userId: user.id, organisationId: user.organisationId, tokenHash: hashResetToken(token), expiresAt: addMinutes(new Date(), 30) } });
+    await tx.auditEvent.create({ data: { organisationId: user.organisationId, action: "user.password_reset.requested", entityType: "User", entityId: user.id, ipHash: privacyHash(requestIp(request)) } });
+    return true;
+  });
+  if (!issued) return Response.json(generic);
   const appUrl = process.env.APP_URL || new URL(request.url).origin;
   try { await emailProvider().send({ to: user.email, dlp: { organisationId: user.organisationId, resourceId: user.id, approvedRecipient: user.email }, ...passwordResetEmail({ name: user.name, resetUrl: `${appUrl.replace(/\/$/, "")}/reset-password/${token}` }) }); } catch { console.error("Password reset email delivery failed; review required."); }
   return Response.json(generic);

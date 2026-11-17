@@ -10,5 +10,7 @@ test("retained task data accepts known historical attribution and rejects live o
   assert.equal(canRetainTaskData({ ...task, operationalChecklist: { ...base, reviewerId: user } }, user), false);
   assert.equal(canRetainTaskData({ ...task, status: "COMPLETED", operationalChecklist: { ...base, reviewerId: user } }, user), true);
   assert.equal(canRetainTaskData({ ...task, operationalChecklist: { ...base, summary: user } }, user), false);
+  assert.equal(canRetainTaskData({ ...task, unexpectedReference: true }, user), false);
+  assert.equal(canRetainTaskData({ ...task, operationalChecklist: { ...base, submittedBy: `prefix-${user}` } }, user), false);
   assert.equal(canRetainTaskData({ ...task, purpose: "UNKNOWN" }, user), false);
 });

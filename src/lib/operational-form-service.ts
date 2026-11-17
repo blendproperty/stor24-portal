@@ -4,6 +4,7 @@ import { db } from "./db";
 import { currentRoleAccess } from "./current-role-access";
 import { facilityWhere, type RequestScope } from "./scope";
 import type { Prisma } from "@/generated/prisma/client";
+import { staffIdentityIds } from "./staff-identity";
 import { FORM_PURPOSE, formCreateSchema, formChangeSchema, formRecordSchema, formTemplate, initialFormValues, validateFormValues, type FormChange, type OperationalFormRecord } from "./operational-form-policy";
 
 const json = (v: unknown) => JSON.parse(JSON.stringify(v)) as Prisma.InputJsonValue;
@@ -19,7 +20,8 @@ function access(user: Awaited<ReturnType<typeof actor>>, organisationId: string,
   return ["operations.view",permission].every(p => currentRoleAccess(roles,p,facilityId).allowed);
 }
 async function formEditor(tx: Prisma.TransactionClient, organisationId: string, id: string, userId: string, creatorId: string | null) {
-  return userId === creatorId || !!await tx.auditEvent.findFirst({ where: { organisationId, entityType: "Task", entityId: id, OR: [{ actorId: userId }, { deletedActorId: userId }, { actorId: null, deletedActorId: null }], action: { in: ["operationalForm.create", "operationalForm.save", "operationalForm.submit"] } }, select: { id: true } });
+  const ids = await staffIdentityIds(tx, organisationId, userId);
+  return (creatorId !== null && ids.includes(creatorId)) || !!await tx.auditEvent.findFirst({ where: { organisationId, entityType: "Task", entityId: id, OR: [{ actorId: { in: ids } }, { deletedActorId: { in: ids } }, { actorId: null, deletedActorId: null }], action: { in: ["operationalForm.create", "operationalForm.save", "operationalForm.submit"] } }, select: { id: true } });
 }
 const auditRecord = (record: OperationalFormRecord) => ({ ...record, photos: record.photos.map(p => ({ name: p.name, sha256: hash(p.data) })) });
 export async function createOperationalForm(scope: RequestScope, raw: unknown) {

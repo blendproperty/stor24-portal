@@ -2,6 +2,7 @@ import type {Prisma,ConfigurationProfile} from '@/generated/prisma/client';
 import {db} from '@/lib/db';
 import type {RequestScope} from '@/lib/scope';
 import {currentRoleAccess} from '@/lib/current-role-access';
+import {staffIdentityIds} from '@/lib/staff-identity';
 import {cardSourceHash} from './card-autopay-enrollment-policy';
 import {currentNetcashRefundSource} from './netcash-refund-source';
 import {NETCASH_REFUND_DOMAIN,refundRecordId,refundRecordSchema,readRefundRecord,sealRefundRecord,transitionRefundRecord,projectRefundRecord,type NetcashRefundRecord} from './netcash-refund-policy';
@@ -96,6 +97,8 @@ export async function actOnNetcashRefund(scope:RequestScope,input:{facilityId:st
    const adjustment=await tx.financialAdjustment.findFirst({where:{id:value.source.adjustmentId,organisationId:scope.organisationId,facilityId:input.facilityId,accountId:value.source.accountId,kind:'REFUND',status:'APPROVED',postedAt:null,ledgerEntryId:null,documentId:null,payoutReference:null,payoutDate:null}});
    if(!adjustment||await tx.auditEvent.count({where:{organisationId:scope.organisationId,entityType:'ConfigurationProfile',entityId:value.id,action:{startsWith:'netcash.refund_provider_'}}}))throw Error('NETCASH_REFUND_PROVIDER_OUTCOME_REVIEW');
   }
+  const identities=await staffIdentityIds(tx,scope.organisationId,scope.userId);
+  if ((['review','reject','reserve'].includes(input.action) && identities.includes(value.preparedById)) || (input.action==='approve-release' && value.releaseRequest && identities.includes(value.releaseRequest.actorId))) throw Error('NETCASH_REFUND_INDEPENDENT_REVIEW');
   return save(tx,scope,transitionRefundRecord(value,input.action,scope.userId,input.reference),input.action);
  },transaction);
 }
