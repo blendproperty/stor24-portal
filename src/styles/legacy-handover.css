@@ -1,30 +1,10 @@
 .handover-check .legacy-photo-confirmation { margin:14px 0 0; padding:14px 16px; border:1px solid #b9d7c3; border-radius:10px; background:#ebf7ee; color:#174e30; font-size:14px; font-weight:700; }
-.legacy-photo-capture { margin:20px 0; overflow:hidden; border:1px solid #d6e0d7; border-radius:16px; background:#fff; color:#173528; }
-.legacy-photo-capture > summary { display:flex; align-items:center; gap:14px; min-height:72px; padding:16px 20px; cursor:pointer; font-size:18px; font-weight:700; list-style:none; }
-.legacy-photo-capture > summary::-webkit-details-marker { display:none; }
-.legacy-photo-capture > summary svg { flex:none; color:#d64b0a; }
-.legacy-photo-capture > summary small { display:block; margin-top:3px; color:#586a5e; font-size:12px; font-weight:400; }
-.legacy-photo-capture[open] > summary { border-bottom:1px solid #e2e9e2; background:#f5f8f4; }
-.legacy-photo-body { padding:20px; }
-.handover-check .legacy-photo-intro { max-width:66ch; margin:0 0 20px; color:#334b3b; font-size:14px; }
-.legacy-photo-form { display:grid; gap:18px; }
-.legacy-photo-step { min-width:0; padding:20px; border:1px solid #e0e8e0; border-radius:12px; background:#fff; }
-.legacy-photo-step h4 { margin:0 0 12px; font-size:17px; line-height:1.3; }
-.handover-check .legacy-photo-step > p { margin:0 0 14px; font-size:13px; }
-.legacy-photo-checkbox { display:flex; align-items:flex-start; gap:12px; max-width:70ch; font-size:14px; line-height:1.55; }
-.legacy-photo-checkbox input { flex:none; width:20px; height:20px; margin:1px 0 0; accent-color:#17613c; }
-.legacy-photo-notice { max-width:70ch; margin:0 0 16px; padding:16px; border:1px solid #e1e8df; border-radius:10px; background:#f7f9f5; }
-.legacy-photo-notice strong { font-size:14px; }
-.handover-check .legacy-photo-notice p { margin:9px 0 0; color:#3e5445; font-size:13px; line-height:1.6; white-space:pre-wrap; overflow-wrap:anywhere; }
-.legacy-photo-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; max-width:700px; }
-.legacy-photo-camera,.legacy-photo-upload { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; min-height:122px; padding:16px; border:2px solid #d64b0a; border-radius:12px; background:#fff5ed; text-align:center; cursor:pointer; }
-.legacy-photo-camera strong { font-size:18px; }
-.legacy-photo-camera span,.legacy-photo-upload span { font-size:13px; }
-.legacy-photo-upload { border:1px solid #cbd8ce; background:#fff; color:#294a35; }
-.legacy-photo-camera input,.legacy-photo-upload input { position:absolute; inset:0; width:100%; height:100%; margin:0; opacity:0; cursor:pointer; }
-.legacy-photo-camera:focus-within,.legacy-photo-upload:focus-within,.legacy-photo-capture > summary:focus-visible { outline:3px solid #a43e0e; outline-offset:3px; }
-.legacy-photo-camera:has(input:disabled),.legacy-photo-upload:has(input:disabled) { opacity:.6; }
-.handover-check .legacy-photo-selected { margin:12px 0; font-size:13px; font-weight:600; overflow-wrap:anywhere; }
-.handover-check .legacy-photo-error { margin:12px 0 0; padding:12px 14px; border-radius:9px; background:#fff0e6; color:#933b13; font-size:13px; }
-.legacy-photo-step > .button { min-height:48px; padding-inline:22px; }
-@media(max-width:700px) { .legacy-photo-body { padding:14px; } .legacy-photo-step { padding:16px; } .legacy-photo-actions { grid-template-columns:1fr; } .legacy-photo-camera,.legacy-photo-upload { min-height:76px; } .legacy-photo-step > .button { width:100%; } }
+.legacy-photo-handoff { margin:20px 0; padding:20px; border:1px solid #d6e0d7; border-radius:16px; background:#f7f9f5; color:#173528; }
+.legacy-photo-handoff h4 { margin:0 0 8px; font-size:18px; }
+.legacy-photo-handoff p { max-width:68ch; margin:0 0 16px; line-height:1.5; }
+.legacy-photo-handoff form { display:grid; gap:14px; justify-items:start; }
+.legacy-photo-handoff label { display:flex; align-items:flex-start; gap:10px; max-width:70ch; }
+.legacy-photo-handoff label input { width:20px; height:20px; flex:none; margin-top:1px; }
+.legacy-photo-handoff-ready { margin-top:20px; padding:16px; border:1px solid #b9d7c3; border-radius:10px; background:#fff; }
+.legacy-photo-handoff-ready img { display:block; max-width:100%; height:auto; }
+@media(max-width:700px) { .legacy-photo-handoff { padding:16px; } .legacy-photo-handoff .button { width:100%; } }
