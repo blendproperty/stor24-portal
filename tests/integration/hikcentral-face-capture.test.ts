@@ -45,6 +45,7 @@ test("customer-scoped Counter face capture needs consent and review before one p
       return Response.json({ code: "0", data: "" });
     }) as typeof fetch;
     const prepared = await issueHikCentralFaceHandoff(scope, { customerId: customer.id, facilityId: facility.id, version: 0 });
+    assert.ok(new Date(prepared.expiresAt).getTime() - Date.now() > 19 * 60_000);
     const details = await hikCentralFaceHandoff(prepared.token);
     assert.equal(details.purpose, "hikcentral"); assert.equal(details.unitNumber, "");
     const bytes = await sharp({ create: { width: 200, height: 200, channels: 3, background: "#777777" } }).jpeg().toBuffer();

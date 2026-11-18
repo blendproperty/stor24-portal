@@ -70,7 +70,7 @@ export async function issueHikCentralFaceHandoff(scope: RequestScope, input: { f
     const verified = await provider.personById(personId);
     if (!verified.ok || (customer.lastName && verified.data.familyName && verified.data.familyName.trim().toLowerCase() !== customer.lastName.trim().toLowerCase())) throw Error("HIKCENTRAL_PERSON_LOOKUP_FAILED");
   } else await assertNoExistingPerson(provider, customer);
-  const token = randomBytes(32).toString("base64url"), expiresAt = new Date(Date.now() + 5 * 60_000);
+  const token = randomBytes(32).toString("base64url"), expiresAt = new Date(Date.now() + 20 * 60_000);
   await db.$transaction(async tx => {
     await lockCustomer(tx, customer.id);
     const linked = await faceTarget(tx, scope, customer.id);
