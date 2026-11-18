@@ -126,10 +126,17 @@ test("HikCentral user ID is included in the signed request headers", async () =>
   assert.equal(observed, true);
 });
 
-test("unverified legacy person and permission adapter cannot send provider writes", async () => {
+test("unverified legacy person adapter cannot send provider writes", async () => {
   const provider = new HikCentralAccessProvider((async () => { throw Error("unexpected provider write"); }) as typeof fetch);
   assert.equal((await provider.enroll({ facilityId: "f", personCode: "p", givenName: "A", familyName: "B", faceBase64: "AA==", validFrom: new Date() })).ok, false);
-  assert.equal((await provider.revoke({ facilityId: "f", personId: "p" })).ok, false);
+});
+
+test("existing revocation caller still receives an explicit provider result", async () => {
+  const provider = new HikCentralAccessProvider((async (url) => {
+    assert.match(String(url), /auth_config\/delete$/);
+    return Response.json({ code: "0", data: {} });
+  }) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", userId: "stor24-api", facilities: { f: { organisationIndexCode: "org", doorIndexCodes: ["1"] } } });
+  assert.equal((await provider.revoke({ facilityId: "f", personId: "1150" })).ok, true);
 });
 
 test("person creation sends the face with the documented person request and keeps the returned ID", async () => {

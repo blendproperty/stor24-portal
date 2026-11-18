@@ -339,7 +339,13 @@ export class HikCentralAccessProvider {
   }
 
   async revoke(input: { facilityId: string; personId: string }): Promise<ProviderResult<{ revoked: true }>> {
-    void input;
-    return { ok: false, retryable: false, code: "UNVERIFIED_PROVIDER_CONTRACT", message: "Revocation requires the staged HikCentral integration." };
+    try {
+      const config = this.facilityConfig(input.facilityId);
+      await this.post(process.env.HIKCENTRAL_PERMISSION_DELETE_PATH ?? "/artemis/api/acps/v1/auth_config/delete", {
+        personIds: [input.personId],
+        resourceInfos: config.doorIndexCodes.map((resourceIndexCode) => ({ resourceIndexCode, resourceType: "door" })),
+      });
+      return { ok: true, providerReference: input.personId, data: { revoked: true } };
+    } catch (error) { return providerFailure(error); }
   }
 }
