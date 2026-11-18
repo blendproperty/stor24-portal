@@ -947,7 +947,7 @@ model HikCentralFaceCapture {
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   organisationId String
   facilityId String
-  personId String
+  personId String?
   version Int @default(1)
   status String @default("WAITING_REVIEW")
   encryptedImage String? @db.Text
@@ -973,7 +973,7 @@ model HikCentralFaceHandoff {
   customerId String
   organisationId String
   facilityId String
-  personId String
+  personId String?
   photoVersion Int
   issuedById String
   expiresAt DateTime

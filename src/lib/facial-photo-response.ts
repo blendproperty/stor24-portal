@@ -18,8 +18,11 @@ export function facialPhotoError(error: unknown) {
     PERSON_LIMIT: [409, "This booking already has the maximum number of nominations. Contact your store for help."],
     PHOTO_IDENTITY_REQUIRED: [409, "Confirm the nominated person's identity before capturing their photo."],
     HANDOFF_STAFF_SESSION: [409, "Open this link on a customer tablet without a staff login."],
-    HIKCENTRAL_PERSON_LINK_REQUIRED: [409, "Link this customer to their existing HikCentral person before preparing a photo."],
+    HIKCENTRAL_PERSON_LINK_REQUIRED: [409, "This customer's HikCentral identity needs manager review before a photo visit."],
     HIKCENTRAL_PERSON_LOOKUP_FAILED: [502, "HikCentral could not confirm the linked person. Check the API connection and person ID."],
+    HIKCENTRAL_PERSON_DETAILS_REQUIRED: [409, "Add the customer's first and last name in STOR24 before preparing a HikCentral photo."],
+    HIKCENTRAL_DEPARTMENT_REQUIRED: [409, "The STOR24 department could not be confirmed in HikCentral. Ask the integration manager to check it."],
+    HIKCENTRAL_PERSON_REVIEW_REQUIRED: [409, "HikCentral may already have this person. Ask the integration manager to review the record before sending the photo."],
   };
   const [status, message] = code.includes("FORBIDDEN") ? [403, "You do not have access to this action."] : messages[code] ?? [503, "Facial access is temporarily unavailable. Please try again later."];
   return Response.json({ error: message }, { status, headers: tenantPrivateHeaders });

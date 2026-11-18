@@ -169,7 +169,7 @@ test("person creation sends the face with the documented person request and keep
     calls.push({ path: String(url), body: JSON.parse(String(init?.body)) });
     return Response.json({ code: "0", data: "1150" });
   }) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", userId: "stor24-api", facilities: { f: { organisationIndexCode: "org", doorIndexCodes: ["1", "2", "3"] } } });
-  const result = await provider.createPersonWithFace({ facilityId: "f", personCode: "S24A1", givenName: "Test", familyName: "Person", faceBase64: "AQID" });
+  const result = await provider.createPersonWithFace({ organisationIndexCode: "org", personCode: "S24A1", givenName: "Test", familyName: "Person", faceBase64: "AQID" });
   assert.equal(result.ok, true);
   assert.deepEqual(calls, [{ path: "https://example.invalid/artemis/api/resource/v1/person/single/add", body: { personCode: "S24A1", personGivenName: "Test", personFamilyName: "Person", orgIndexCode: "org", faces: [{ faceData: "AQID" }] } }]);
   if (result.ok) assert.equal(result.data.personId, "1150");

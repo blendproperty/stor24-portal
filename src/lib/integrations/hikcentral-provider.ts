@@ -331,13 +331,12 @@ export class HikCentralAccessProvider {
     } catch (error) { return providerFailure(error); }
   }
 
-  async createPersonWithFace(input: Pick<HikCentralEnrollmentInput, "facilityId" | "personCode" | "givenName" | "familyName" | "faceBase64">): Promise<ProviderResult<{ personId: string }>> {
+  async createPersonWithFace(input: Pick<HikCentralEnrollmentInput, "personCode" | "givenName" | "familyName" | "faceBase64"> & { organisationIndexCode: string }): Promise<ProviderResult<{ personId: string }>> {
     try {
-      if (!/^[A-Za-z0-9]{1,16}$/.test(input.personCode) || !input.faceBase64) throw new Error("HikCentral person code or face is invalid.");
-      const config = this.facilityConfig(input.facilityId);
+      if (!/^[A-Za-z0-9]{1,16}$/.test(input.personCode) || !input.faceBase64 || !input.organisationIndexCode) throw new Error("HikCentral person code, department or face is invalid.");
       const data = await this.post("/artemis/api/resource/v1/person/single/add", {
         personCode: input.personCode, personGivenName: input.givenName, personFamilyName: input.familyName,
-        orgIndexCode: config.organisationIndexCode, faces: [{ faceData: input.faceBase64 }],
+        orgIndexCode: input.organisationIndexCode, faces: [{ faceData: input.faceBase64 }],
       });
       if (typeof data !== "string" || !data) throw new Error("HikCentral did not return its new person ID.");
       return { ok: true, providerReference: data, data: { personId: data } };
