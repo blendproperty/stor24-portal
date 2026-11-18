@@ -131,3 +131,29 @@ test("unverified legacy person and permission adapter cannot send provider write
   assert.equal((await provider.enroll({ facilityId: "f", personCode: "p", givenName: "A", familyName: "B", faceBase64: "AA==", validFrom: new Date() })).ok, false);
   assert.equal((await provider.revoke({ facilityId: "f", personId: "p" })).ok, false);
 });
+
+test("person creation sends the face with the documented person request and keeps the returned ID", async () => {
+  const calls: { path: string; body: unknown }[] = [];
+  const provider = new HikCentralAccessProvider((async (url, init) => {
+    calls.push({ path: String(url), body: JSON.parse(String(init?.body)) });
+    return Response.json({ code: "0", data: "1150" });
+  }) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", userId: "stor24-api", facilities: { f: { organisationIndexCode: "org", doorIndexCodes: ["1", "2", "3"] } } });
+  const result = await provider.createPersonWithFace({ facilityId: "f", personCode: "S24A1", givenName: "Test", familyName: "Person", faceBase64: "AQID" });
+  assert.equal(result.ok, true);
+  assert.deepEqual(calls, [{ path: "https://example.invalid/artemis/api/resource/v1/person/single/add", body: { personCode: "S24A1", personGivenName: "Test", personFamilyName: "Person", orgIndexCode: "org", faces: [{ faceData: "AQID" }] } }]);
+  if (result.ok) assert.equal(result.data.personId, "1150");
+});
+
+test("access-level assignment is separate from person creation and requires membership readback", async () => {
+  const paths: string[] = [];
+  const provider = new HikCentralAccessProvider((async (url, init) => {
+    paths.push(String(url));
+    const body = JSON.parse(String(init?.body));
+    if (String(url).endsWith("addPersons")) { assert.deepEqual(body, { privilegeGroupId: "L1", type: 1, list: [{ id: "1150" }] }); return Response.json({ code: "0", data: "" }); }
+    assert.deepEqual(body, { privilegeGroupId: "L1", type: 1, pageNo: 1, pageSize: 100 });
+    return Response.json({ code: "0", data: { list: [{ id: "1150" }] } });
+  }) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", userId: "stor24-api", facilities: {} });
+  assert.equal((await provider.addPersonToAccessLevel("L1", "1150")).ok, true);
+  assert.deepEqual((await provider.accessLevelHasPerson("L1", "1150")), { ok: true, providerReference: "L1", data: { member: true } });
+  assert.equal(paths.length, 2);
+});
