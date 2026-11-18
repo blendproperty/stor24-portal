@@ -252,10 +252,13 @@ export class HikCentralAccessProvider {
         for (const item of data.list) {
           if (!item || typeof item !== "object") throw new Error("HikCentral returned an invalid door.");
           const door = item as Record<string, unknown>;
-          if (typeof door.doorIndexCode !== "string" || typeof door.doorName !== "string") throw new Error("HikCentral returned a door without a name or index code.");
+          if (typeof door.doorIndexCode !== "string" || !door.doorIndexCode || typeof door.doorName !== "string" || !door.doorName) continue;
           doors.push({ indexCode: door.doorIndexCode, name: door.doorName });
         }
-        if (data.list.length < 100) return { ok: true, providerReference: "hikcentral", data: { doors } };
+        if (data.list.length < 100) {
+          if (!doors.length) throw new Error("HikCentral returned no doors with both a name and index code.");
+          return { ok: true, providerReference: "hikcentral", data: { doors } };
+        }
       }
       throw new Error("HikCentral door list exceeded 5,000 entries.");
     } catch (error) { return providerFailure(error); }
@@ -269,9 +272,9 @@ export class HikCentralAccessProvider {
     } catch (error) { return providerFailure(error); }
   }
 
-  async listAccessLevels(): Promise<ProviderResult<{ levels: { id: string; name: string; resourceIds: string[] }[] }>> {
+  async listAccessLevels(): Promise<ProviderResult<{ levels: { id: string; name: string; resourceIds: string[]; resourceNames: string[] }[] }>> {
     try {
-      const levels: { id: string; name: string; resourceIds: string[] }[] = [];
+      const levels: { id: string; name: string; resourceIds: string[]; resourceNames: string[] }[] = [];
       for (let pageNo = 1; pageNo <= 50; pageNo++) {
         const data = await this.post("/artemis/api/acs/v1/privilege/group", { pageNo, pageSize: 100, type: 1 }) as { list?: unknown };
         if (!Array.isArray(data.list)) throw new Error("HikCentral returned an invalid access-level list.");
@@ -279,16 +282,35 @@ export class HikCentralAccessProvider {
           if (!item || typeof item !== "object") throw new Error("HikCentral returned an invalid access level.");
           const level = item as Record<string, unknown>;
           if (typeof level.privilegeGroupId !== "string" || typeof level.privilegeGroupName !== "string" || !Array.isArray(level.ElementList)) throw new Error("HikCentral returned an access level without its resource list.");
-          const resourceIds = level.ElementList.map((entry: unknown) => {
+          const resources = level.ElementList.map((entry: unknown) => {
             const element = (entry as { Element?: { ID?: unknown } })?.Element ?? entry as { ID?: unknown };
             if (typeof element?.ID !== "number" && typeof element?.ID !== "string") throw new Error("HikCentral returned an access level without a resource ID.");
-            return String(element.ID);
+            const name = (element as { BaseInfo?: { Name?: unknown } }).BaseInfo?.Name;
+            return { id: String(element.ID), name: typeof name === "string" ? name : "" };
           });
-          levels.push({ id: level.privilegeGroupId, name: level.privilegeGroupName, resourceIds });
+          levels.push({ id: level.privilegeGroupId, name: level.privilegeGroupName, resourceIds: resources.map(item => item.id), resourceNames: resources.map(item => item.name) });
         }
         if (data.list.length < 100) return { ok: true, providerReference: "hikcentral", data: { levels } };
       }
       throw new Error("HikCentral access-level list exceeded 5,000 entries.");
+    } catch (error) { return providerFailure(error); }
+  }
+
+  async listOrganizations(): Promise<ProviderResult<{ organizations: { indexCode: string; name: string; parentIndexCode: string | null }[] }>> {
+    try {
+      const organizations: { indexCode: string; name: string; parentIndexCode: string | null }[] = [];
+      for (let pageNo = 1; pageNo <= 50; pageNo++) {
+        const data = await this.post("/artemis/api/resource/v1/org/orgList", { pageNo, pageSize: 100 }) as { list?: unknown };
+        if (!Array.isArray(data.list)) throw new Error("HikCentral returned an invalid organization list.");
+        for (const item of data.list) {
+          if (!item || typeof item !== "object") throw new Error("HikCentral returned an invalid organization.");
+          const org = item as Record<string, unknown>;
+          if (typeof org.orgIndexCode !== "string" || typeof org.orgName !== "string") throw new Error("HikCentral returned an organization without an ID or name.");
+          organizations.push({ indexCode: org.orgIndexCode, name: org.orgName, parentIndexCode: typeof org.parentOrgIndexCode === "string" ? org.parentOrgIndexCode : null });
+        }
+        if (data.list.length < 100) return { ok: true, providerReference: "hikcentral", data: { organizations } };
+      }
+      throw new Error("HikCentral organization list exceeded 5,000 entries.");
     } catch (error) { return providerFailure(error); }
   }
 

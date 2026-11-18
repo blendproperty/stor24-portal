@@ -79,7 +79,7 @@ test("door discovery reads the provider IDs for all three Block24 access points"
   const names = ["Block24 Main Gate_Door_1", "Block24 Entrance_Door_1", "Block24 Exit_Door_1"];
   const provider = new HikCentralAccessProvider((async (_url, init) => {
     assert.deepEqual(JSON.parse(String(init?.body)), { pageNo: 1, pageSize: 100 });
-    return Response.json({ code: "0", data: { list: names.map((doorName, i) => ({ doorName, doorIndexCode: String(1000 + i) })) } });
+    return Response.json({ code: "0", data: { list: [{ doorName: "unnamed-id" }, ...names.map((doorName, i) => ({ doorName, doorIndexCode: String(1000 + i) }))] } });
   }) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", facilities: {} });
   const result = await provider.listDoors();
   assert.equal(result.ok, true);
@@ -97,13 +97,22 @@ test("access inspection reads the installed version and access-level resources w
     calls.push(String(url));
     return Response.json({ code: "0", data: String(url).endsWith("/version")
       ? { produceName: "HikCentral Professional", softVersion: "3.1.1" }
-      : { list: [{ privilegeGroupId: "12", privilegeGroupName: "Block24", ElementList: [{ Element: { ID: 101 } }, { Element: { ID: 102 } }, { Element: { ID: 103 } }] }] } });
+      : { list: [{ privilegeGroupId: "12", privilegeGroupName: "Block24", ElementList: [{ Element: { ID: 101, BaseInfo: { Name: "Block24 Main Gate_Door_1" } } }, { Element: { ID: 102, BaseInfo: { Name: "Block24 Entrance_Door_1" } } }, { Element: { ID: 103, BaseInfo: { Name: "Block24 Exit_Door_1" } } }] }] } });
   }) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", userId: "stor24-api", facilities: {} });
   assert.deepEqual((await provider.version()), { ok: true, providerReference: "hikcentral", data: { product: "HikCentral Professional", version: "3.1.1" } });
   const levels = await provider.listAccessLevels();
   assert.equal(levels.ok, true);
-  if (levels.ok) assert.deepEqual(levels.data.levels, [{ id: "12", name: "Block24", resourceIds: ["101", "102", "103"] }]);
+  if (levels.ok) assert.deepEqual(levels.data.levels, [{ id: "12", name: "Block24", resourceIds: ["101", "102", "103"], resourceNames: ["Block24 Main Gate_Door_1", "Block24 Entrance_Door_1", "Block24 Exit_Door_1"] }]);
   assert.deepEqual(calls, ["https://example.invalid/artemis/api/common/v1/version", "https://example.invalid/artemis/api/acs/v1/privilege/group"]);
+});
+
+test("department inspection reads provider index codes without making changes", async () => {
+  const provider = new HikCentralAccessProvider((async (url, init) => {
+    assert.match(String(url), /\/org\/orgList$/);
+    assert.deepEqual(JSON.parse(String(init?.body)), { pageNo: 1, pageSize: 100 });
+    return Response.json({ code: "0", data: { list: [{ orgIndexCode: "root", orgName: "Root", parentOrgIndexCode: "0" }, { orgIndexCode: "stor24", orgName: "STOR24", parentOrgIndexCode: "root" }] } });
+  }) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", userId: "admin", facilities: {} });
+  assert.deepEqual(await provider.listOrganizations(), { ok: true, providerReference: "hikcentral", data: { organizations: [{ indexCode: "root", name: "Root", parentIndexCode: "0" }, { indexCode: "stor24", name: "STOR24", parentIndexCode: "root" }] } });
 });
 
 test("person and access-level reads require the HikCentral user ID", async () => {
