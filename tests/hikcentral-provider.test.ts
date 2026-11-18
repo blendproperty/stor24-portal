@@ -179,3 +179,15 @@ test("access-level assignment is separate from person creation and requires memb
   assert.deepEqual((await provider.accessLevelHasPerson("L1", "1150")), { ok: true, providerReference: "L1", data: { member: true } });
   assert.equal(paths.length, 2);
 });
+
+test("an existing person face update targets that person and refuses invalid image data", async () => {
+  const calls: unknown[] = [];
+  const provider = new HikCentralAccessProvider((async (_url, init) => {
+    calls.push(JSON.parse(String(init?.body)));
+    return Response.json({ code: "0", data: "" });
+  }) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", userId: "stor24-api", facilities: {} });
+  assert.equal((await provider.updatePersonFace("1150", "AQID")).ok, true);
+  assert.deepEqual(calls, [{ personId: "1150", faceData: "AQID" }]);
+  assert.equal((await provider.updatePersonFace("1150", "not an image")).ok, false);
+  assert.equal(calls.length, 1);
+});

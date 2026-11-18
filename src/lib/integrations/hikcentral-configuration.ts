@@ -178,6 +178,12 @@ export async function inspectHikCentralAccess(scope: RequestScope, facilityId: s
   return { ok: true as const, providerReference: "hikcentral", data: { version: version.ok ? version.data : null, versionError: version.ok ? null : version.message, accessLevels: accessLevels.data.levels } };
 }
 
+export async function lookupHikCentralPerson(scope: RequestScope, facilityId: string, personCode: string) {
+  await requireFacility(scope, facilityId);
+  const provider = new HikCentralAccessProvider(fetch, await loadHikCentralRuntimeConfiguration(scope.organisationId, facilityId));
+  return provider.personByCode(personCode);
+}
+
 export async function testHikCentralConnection(scope: RequestScope, facilityId: string) {
   await requireFacility(scope, facilityId);
   const company = await companyConnection(scope.organisationId);

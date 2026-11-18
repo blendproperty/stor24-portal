@@ -12,6 +12,8 @@ import { requirePermissionScope } from "@/lib/scope";
 import { additionalPersonPolicy, listAdditionalPeopleForStaff } from "@/lib/additional-access-people";
 import { AdditionalAccessQueue } from "@/components/additional-access-queue";
 import { primaryTrialSnapshot } from "@/lib/unit58-primary-photo-trial";
+import { db } from "@/lib/db";
+import { HikCentralExistingPersonLink } from "@/components/hikcentral-existing-person-link";
 
 export const metadata = { title: "Biometric access" };
 export const dynamic = "force-dynamic";
@@ -32,6 +34,13 @@ export default async function AccessPage({ searchParams }: { searchParams: Promi
   let manageableFacilities: string[] | null = [];
   try { manageableFacilities = (await requirePermission("access.manage")).allowedFacilityIds; }
   catch (error) { if (!(error instanceof Error) || error.message !== "FORBIDDEN") throw error; }
+  let canLinkExistingPerson = false;
+  try { canLinkExistingPerson = manageableFacilities === null && (await requirePermissionScope("integrations.manage")).unrestrictedFacilities; }
+  catch (error) { if (!(error instanceof Error) || error.message !== "FORBIDDEN") throw error; }
+  const [linkCustomers, linkFacilities] = canLinkExistingPerson ? await Promise.all([
+    db.customer.findMany({ where: { organisationId: scope.organisationId }, select: { id: true, firstName: true, lastName: true, companyName: true }, orderBy: { updatedAt: "desc" } }),
+    db.facility.findMany({ where: { organisationId: scope.organisationId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+  ]) : [[], []];
   return <div className="page-stack face-page">
     <PageHeader eyebrow="Physical security" title="Facial access" description="Private photographs, staff review and a clear record of what still needs to be verified." />
     {reservation && <a className="button button-secondary" href={`/operations/move-in?reservation=${encodeURIComponent(reservation)}`}>Back to move-in checks</a>}
@@ -48,6 +57,7 @@ export default async function AccessPage({ searchParams }: { searchParams: Promi
     <BiometricAccessWorkspace
       enrollments={enrollments.map((item) => ({ id: item.id, customerName: `${item.customer.firstName ?? item.customer.companyName ?? "Customer"} ${item.customer.lastName ?? ""}`.trim(), facilityName: item.facility.name, unitNumber: item.occupancy.unit.number, status: item.status, consentAt: item.consentAt.toISOString(), provisionedAt: item.provisionedAt?.toISOString() ?? null }))}
     />
+    {canLinkExistingPerson ? <HikCentralExistingPersonLink customers={linkCustomers.map(customer => ({ id: customer.id, name: customer.companyName || [customer.firstName, customer.lastName].filter(Boolean).join(" ") || "Unnamed customer" }))} facilities={linkFacilities} /> : null}
     <details className="face-provider-records"><summary>Provider records <span>Identity links and access decisions</span></summary><MelIntegrationStatus
       identityLinks={identityLinks.map((link) => ({
         id: link.id,

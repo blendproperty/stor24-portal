@@ -292,11 +292,11 @@ export class HikCentralAccessProvider {
     } catch (error) { return providerFailure(error); }
   }
 
-  async personByCode(personCode: string): Promise<ProviderResult<{ personId: string; personCode: string; organisationIndexCode: string }>> {
+  async personByCode(personCode: string): Promise<ProviderResult<{ personId: string; personCode: string; organisationIndexCode: string; givenName: string; familyName: string }>> {
     try {
       const data = await this.post("/artemis/api/resource/v1/person/personCode/personInfo", { personCode }) as Record<string, unknown>;
       if (typeof data.personId !== "string" || data.personCode !== personCode || typeof data.orgIndexCode !== "string") throw new Error("HikCentral returned an unexpected person identity.");
-      return { ok: true, providerReference: data.personId, data: { personId: data.personId, personCode, organisationIndexCode: data.orgIndexCode } };
+      return { ok: true, providerReference: data.personId, data: { personId: data.personId, personCode, organisationIndexCode: data.orgIndexCode, givenName: typeof data.personGivenName === "string" ? data.personGivenName : "", familyName: typeof data.personFamilyName === "string" ? data.personFamilyName : "" } };
     } catch (error) { return providerFailure(error); }
   }
 
@@ -310,6 +310,14 @@ export class HikCentralAccessProvider {
       });
       if (typeof data !== "string" || !data) throw new Error("HikCentral did not return its new person ID.");
       return { ok: true, providerReference: data, data: { personId: data } };
+    } catch (error) { return providerFailure(error); }
+  }
+
+  async updatePersonFace(personId: string, faceBase64: string): Promise<ProviderResult<{ accepted: true }>> {
+    try {
+      if (!personId || personId.length > 100 || !faceBase64 || faceBase64.length > 7 * 1024 * 1024 || !/^[A-Za-z0-9+/]+={0,2}$/.test(faceBase64) || Buffer.from(faceBase64, "base64").length > 5 * 1024 * 1024) throw new Error("HikCentral person or face is invalid.");
+      await this.post("/artemis/api/resource/v1/person/face/update", { personId, faceData: faceBase64 });
+      return { ok: true, providerReference: personId, data: { accepted: true } };
     } catch (error) { return providerFailure(error); }
   }
 

@@ -6,12 +6,9 @@ import { leasingCustomerWhere } from "@/lib/leasing-service";
  * Read-only queries backing the Stage 6 MEL/HikCentral integration status
  * panel (see docs/MEL_INTEGRATION_STATUS_2026-09-15.md). This module has no
  * write path: nothing here creates, updates or deletes an
- * IntegrationIdentityLink or AccessDecision row. Those rows are only ever
- * created by src/lib/access-decision-service.ts (not yet wired into any live
- * caller) and by whatever future identity-linking flow lands with a real MEL
- * provider agreement. Until then, both queries below will typically return
- * empty results — that is expected and is surfaced honestly in the UI rather
- * than implied to be a fault.
+ * IntegrationIdentityLink or AccessDecision row. Existing HikCentral persons
+ * can be linked to a customer through the separate checked staff action;
+ * that link is not a door grant. Access decisions still have no live consumer.
  */
 
 export async function listIdentityLinks(scope: RequestScope) {
