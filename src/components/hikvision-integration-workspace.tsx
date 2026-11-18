@@ -85,11 +85,10 @@ export function HikvisionIntegrationWorkspace() {
     finally { setBusy(""); }
   }
 
-  function addBlock24Doors() {
+  function useBlock24Doors() {
     if (block24Doors.length !== 3 || !doorCodesField.current) return;
-    const existing = doorCodesField.current.value.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean);
-    doorCodesField.current.value = [...new Set([...existing, ...block24Doors.map((door) => door.indexCode)])].join("\n");
-    setNotice("Three Block24 codes added to the form. Save the mapping after checking the facility.");
+    doorCodesField.current.value = block24Doors.map((door) => door.indexCode).join("\n");
+    setNotice("Draft door list replaced with the three Block24 doors. Confirm the real department and any approved Midpoint route before saving.");
   }
 
   return <div className="page-stack provider-config-workspace">
@@ -127,7 +126,7 @@ export function HikvisionIntegrationWorkspace() {
         </div>
         {temporaryMapping ? <p className="safe-config-note" role="alert">TEMP-CONNECTION-TEST is a placeholder, not a verified HikCentral department. The saved door list predates the three Block24 readers. Check the live department and doors before using this mapping for a person.</p> : null}
         <p className="field-help">Use HikCentral index codes, not the visible door names. Duplicate codes are removed automatically.</p>
-        <div className="hikvision-actions"><button type="button" className="button button-secondary" disabled={!canManage || !facilityId || busy === "discover-doors"} onClick={() => void discoverDoors()}>{busy === "discover-doors" ? "Finding doors…" : "Find Block24 door IDs"}</button>{block24Doors.length === 3 ? <button type="button" className="button button-secondary" onClick={addBlock24Doors}>Add all three to mapping</button> : null}</div>
+        <div className="hikvision-actions"><button type="button" className="button button-secondary" disabled={!canManage || !facilityId || busy === "discover-doors"} onClick={() => void discoverDoors()}>{busy === "discover-doors" ? "Finding doors…" : "Find Block24 door IDs"}</button>{block24Doors.length === 3 ? <button type="button" className="button button-secondary" onClick={useBlock24Doors}>Replace draft with Block24 doors</button> : null}</div>
         {discoveredDoors.length ? <div className="field-help" aria-live="polite">{block24Doors.length === 3 ? block24Doors.map((door) => <div key={door.indexCode}>{door.name}: <code>{door.indexCode}</code></div>) : "All three Block24 doors were not found in the live HikCentral door list. Confirm their names and IDs before saving."}</div> : null}
         <div className="hikvision-actions"><button className="button button-secondary" disabled={!canManage || !facilityId || busy === "save-mapping"}>{busy === "save-mapping" ? "Saving…" : "Save mapping"}</button><button type="button" className="button button-primary" disabled={!canManage || !facilityId || busy === "test-connection"} onClick={() => void call("POST", { action: "test-connection", facilityId }, "HikCentral door-list connection verified. Person and gate access are not yet verified.")}><RefreshCw size={15}/>{busy === "test-connection" ? "Testing…" : "Test connection"}</button><button type="button" className="button button-secondary" disabled={!canManage || !facilityId || Boolean(busy)} onClick={() => void inspectAccess()}>{busy === "inspect-access" ? "Checking…" : "Check version and access levels"}</button></div>
         {accessInspection ? <div className="field-help" aria-live="polite"><strong>{accessInspection.version ? `${accessInspection.version.product} ${accessInspection.version.version}` : "Platform version unavailable"}</strong>{accessInspection.versionError ? <div>{accessInspection.versionError}</div> : null}<div>{accessInspection.organizations.length} HikCentral departments found. Use the verified STOR24 department index code above; this check does not create one.</div>{accessInspection.organizationError ? <div>{accessInspection.organizationError}</div> : accessInspection.organizations.map(org => <div key={org.indexCode}>{org.name}: <code>{org.indexCode}</code></div>)}<div>{accessInspection.accessLevels.length} access levels found. Check the three Block24 resources before enrolment.</div>{accessInspection.accessLevels.map((level) => <div key={level.id}>{level.name} ({level.id}): {level.resourceIds.map((id, index) => `${level.resourceNames[index] || "name unavailable"} (${id})`).join(", ") || "no resources"}</div>)}</div> : null}

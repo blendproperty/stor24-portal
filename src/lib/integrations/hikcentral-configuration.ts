@@ -30,7 +30,7 @@ const credentialsSchema = z.object({
 
 const mappingSchema = z.object({
   facilityId: z.string().cuid(),
-  organisationIndexCode: z.string().trim().min(1).max(200),
+  organisationIndexCode: z.string().trim().min(1).max(200).refine((code) => !/^TEMP-/i.test(code), "Use a verified HikCentral organisation index code."),
   doorIndexCodes: z.array(z.string().trim().min(1).max(200)).min(1).max(200).transform((items) => [...new Set(items)]),
 });
 
