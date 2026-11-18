@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { db } from "../../src/lib/db";
 import { captureHikCentralFaceHandoff, decideHikCentralFace, hikCentralFaceHandoff, issueHikCentralFaceHandoff, previewHikCentralFace, expireHikCentralFaceCaptures } from "../../src/lib/hikcentral-face-capture";
+import { loadHikCentralRuntimeConfiguration } from "../../src/lib/integrations/hikcentral-configuration";
 import { encryptIntegrationSecret } from "../../src/lib/integrations/integration-secret-vault";
 
 test("customer-scoped Counter face capture needs consent and review before one provider update", async () => {
@@ -24,7 +25,8 @@ test("customer-scoped Counter face capture needs consent and review before one p
     await db.facialPhotoMaintenance.upsert({ where: { id: "expiry" }, create: { id: "expiry", completedAt: new Date() }, update: { completedAt: new Date() } });
     const credentials = { endpoint: "https://hikcentral.example.invalid", userId: "admin", appKeyEncrypted: encryptIntegrationSecret("synthetic-key"), appSecretEncrypted: encryptIntegrationSecret("synthetic-secret") };
     await db.integrationConnection.create({ data: { organisationId: org.id, category: "ACCESS_CONTROL", provider: "HIKCENTRAL", status: "CONFIGURED", config: credentials } });
-    await db.integrationConnection.create({ data: { organisationId: org.id, facilityId: facility.id, category: "ACCESS_CONTROL", provider: "HIKCENTRAL", status: "CONFIGURED", config: { organisationIndexCode: "synthetic-org", doorIndexCodes: ["synthetic-door"] } } });
+    await assert.rejects(loadHikCentralRuntimeConfiguration(org.id, facility.id), /CONFIG_REQUIRED:HIKCENTRAL_FACILITY_MAPPING/);
+    assert.deepEqual((await loadHikCentralRuntimeConfiguration(org.id)).facilities, {});
     const scope = { organisationId: org.id, userId: staff.id, facilityIds: [], unrestrictedFacilities: true };
     const calls: string[] = [];
     let failNextFaceUpdate = false;
