@@ -48,11 +48,16 @@ export default async function AccessPage({ searchParams }: { searchParams: Promi
     db.facility.findMany({ where: facilityWhere(captureScope), select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]) : [[], []];
   return <div className="page-stack face-page">
-    <PageHeader eyebrow="Physical security" title="Facial access" description="Private photographs, staff review and a clear record of what still needs to be verified." />
+    <PageHeader eyebrow="Physical security" title="Facial access" description="Prepare a private tablet photo visit, then review the customer's photo before sending it to HikCentral." />
     {reservation && <a className="button button-secondary" href={`/operations/move-in?reservation=${encodeURIComponent(reservation)}`}>Back to move-in checks</a>}
-    {captureScope ? <HikCentralFaceCaptureWorkspace people={capturePeople.map(link => ({ customerId: link.customerId, customerName: link.customer.companyName || [link.customer.firstName, link.customer.lastName].filter(Boolean).join(" ") || "Customer", personId: link.hikCentralPersonId!, photo: link.customer.hikCentralFaceCapture ? { id: link.customer.hikCentralFaceCapture.id, version: link.customer.hikCentralFaceCapture.version, status: link.customer.hikCentralFaceCapture.status, consentAt: link.customer.hikCentralFaceCapture.consentAt.toISOString(), providerAcceptedAt: link.customer.hikCentralFaceCapture.providerAcceptedAt?.toISOString() ?? null } : null }))} facilities={captureFacilities} canSend={canLinkExistingPerson} /> : null}
+    <ol className="face-journey" aria-label="Customer photo steps">
+      <li><span>1</span><div><strong>Match the customer</strong><p>Staff link their existing HikCentral person after checking the original ID. Skip this if already linked.</p></div></li>
+      <li><span>2</span><div><strong>Take the photo on the tablet</strong><p>Staff prepare a QR code. The customer scans it, agrees and takes their own photo.</p></div></li>
+      <li><span>3</span><div><strong>Review and send</strong><p>Staff review the saved image before sending it to HikCentral.</p></div></li>
+    </ol>
     {canLinkExistingPerson ? <HikCentralExistingPersonLink customers={linkCustomers.map(customer => ({ id: customer.id, name: customer.companyName || [customer.firstName, customer.lastName].filter(Boolean).join(" ") || "Unnamed customer" }))} facilities={linkFacilities} /> : null}
-    <PhotoCollectionControl initial={control} />
+    {captureScope ? <HikCentralFaceCaptureWorkspace people={capturePeople.map(link => ({ customerId: link.customerId, customerName: link.customer.companyName || [link.customer.firstName, link.customer.lastName].filter(Boolean).join(" ") || "Customer", personId: link.hikCentralPersonId!, photo: link.customer.hikCentralFaceCapture ? { id: link.customer.hikCentralFaceCapture.id, version: link.customer.hikCentralFaceCapture.version, status: link.customer.hikCentralFaceCapture.status, consentAt: link.customer.hikCentralFaceCapture.consentAt.toISOString(), providerAcceptedAt: link.customer.hikCentralFaceCapture.providerAcceptedAt?.toISOString() ?? null } : null }))} facilities={captureFacilities} canSend={canLinkExistingPerson} /> : null}
+    <details className="face-provider-records face-settings" open={!control.enabled}><summary>Photo collection settings <span>{control.enabled ? "On — owner controls and interim rules" : "Off — photo uploads are paused"}</span></summary><PhotoCollectionControl initial={control} /></details>
     <details className="face-provider-records face-legacy-workflows" open={Boolean(reservation)}><summary>Other photo and access workflows <span>Booking photo reviews, additional people and earlier access records</span></summary><div className="page-stack">
     {primaryTrial && <section className="face-primary-trial" aria-label="Unit 58 primary customer photo trial">
       <span className="face-eyebrow">UNIT {primaryTrial.unitNumber} · PHOTO ONLY</span>
