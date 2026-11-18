@@ -948,6 +948,8 @@ model HikCentralFaceCapture {
   organisationId String
   facilityId String
   personId String?
+  firstNameSnapshot String?
+  lastNameSnapshot String?
   version Int @default(1)
   status String @default("WAITING_REVIEW")
   encryptedImage String? @db.Text
@@ -974,6 +976,8 @@ model HikCentralFaceHandoff {
   organisationId String
   facilityId String
   personId String?
+  firstNameSnapshot String?
+  lastNameSnapshot String?
   photoVersion Int
   issuedById String
   expiresAt DateTime

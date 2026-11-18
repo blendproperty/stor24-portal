@@ -99,6 +99,9 @@ test("customer-scoped Counter face capture needs consent and review before one p
       return Response.json({ code: "0", data: "2001" });
     }) as typeof fetch;
     const newHandoff = await issueHikCentralFaceHandoff(scope, { customerId: newcomer.id, facilityId: facility.id, version: 0 });
+    await db.customer.update({ where: { id: newcomer.id }, data: { firstName: "Changed" } });
+    await assert.rejects(hikCentralFaceHandoff(newHandoff.token), /PHOTO_CHANGED/);
+    await db.customer.update({ where: { id: newcomer.id }, data: { firstName: "Jane" } });
     const newDetails = await hikCentralFaceHandoff(newHandoff.token);
     assert.match(newDetails.notice, /create your person record/);
     await captureHikCentralFaceHandoff(newHandoff.token, { policyHash: newDetails.policyHash, consent: true, image });
@@ -106,6 +109,10 @@ test("customer-scoped Counter face capture needs consent and review before one p
     assert.equal(newPhoto.personId, null);
     assert.equal(await db.integrationIdentityLink.findUnique({ where: { customerId: newcomer.id } }), null);
     (await previewHikCentralFace(scope, newPhoto.id, newPhoto.version)).fill(0);
+    await db.customer.update({ where: { id: newcomer.id }, data: { lastName: "Changed" } });
+    await assert.rejects(decideHikCentralFace(scope, newPhoto.id, newPhoto.version, "SEND"), /PHOTO_CHANGED/);
+    assert.equal(newPersonCalls.filter(path => path.endsWith("/person/single/add")).length, 0);
+    await db.customer.update({ where: { id: newcomer.id }, data: { lastName: "Tester" } });
     assert.deepEqual(await decideHikCentralFace(scope, newPhoto.id, newPhoto.version, "SEND"), { status: "PROVIDER_ACCEPTED" });
     const linked = await db.integrationIdentityLink.findUniqueOrThrow({ where: { customerId: newcomer.id } });
     assert.equal(linked.hikCentralPersonId, "2001");
@@ -122,18 +129,19 @@ test("customer-scoped Counter face capture needs consent and review before one p
       const path = String(url);
       if (path.endsWith("/person/advance/personList")) return Response.json({ code: "0", data: { total: 0, list: [] } });
       if (path.endsWith("/org/orgList")) return Response.json({ code: "0", data: { list: [{ orgIndexCode: "97", orgName: "STOR24" }] } });
-      if (path.endsWith("/person/personCode/personInfo")) return Response.json({ code: "0", data: { personId: "2002", personCode: hikCentralCustomerCode(org.id, possibleDuplicate.id), orgIndexCode: "97", personGivenName: "Bob", personFamilyName: "Tester" } });
+      if (path.endsWith("/person/single/add")) { duplicateWrites++; return Response.json({ code: "1001", msg: "Person code already exists" }); }
       duplicateWrites++;
-      throw Error("A possible duplicate must never trigger a provider write");
+      throw Error("A duplicate rejection must never trigger another provider write");
     }) as typeof fetch;
     const duplicateHandoff = await issueHikCentralFaceHandoff(scope, { customerId: possibleDuplicate.id, facilityId: facility.id, version: 0 });
     const duplicateDetails = await hikCentralFaceHandoff(duplicateHandoff.token);
     await captureHikCentralFaceHandoff(duplicateHandoff.token, { policyHash: duplicateDetails.policyHash, consent: true, image });
     const duplicatePhoto = await db.hikCentralFaceCapture.findUniqueOrThrow({ where: { customerId: possibleDuplicate.id } });
     (await previewHikCentralFace(scope, duplicatePhoto.id, duplicatePhoto.version)).fill(0);
-    await assert.rejects(decideHikCentralFace(scope, duplicatePhoto.id, duplicatePhoto.version, "SEND"), /HIKCENTRAL_PERSON_REVIEW_REQUIRED/);
-    assert.equal(duplicateWrites, 0);
-    assert.equal((await db.hikCentralFaceCapture.findUniqueOrThrow({ where: { id: duplicatePhoto.id } })).status, "WAITING_REVIEW");
+    assert.deepEqual(await decideHikCentralFace(scope, duplicatePhoto.id, duplicatePhoto.version, "SEND"), { status: "PROVIDER_UNCERTAIN" });
+    assert.equal(duplicateWrites, 1);
+    assert.equal((await db.hikCentralFaceCapture.findUniqueOrThrow({ where: { id: duplicatePhoto.id } })).status, "PROVIDER_UNCERTAIN");
+    assert.equal(await db.integrationIdentityLink.findUnique({ where: { customerId: possibleDuplicate.id } }), null);
 
     const alreadyAtHikCentral = await db.customer.create({ data: { organisationId: org.id, firstName: "Brett Test", lastName: "Dovey" } });
     globalThis.fetch = (async (url) => {

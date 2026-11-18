@@ -44,6 +44,11 @@ async function faceTarget(database: Database, scope: RequestScope, customerId: s
   return { customer, personId: link?.hikCentralPersonId ?? null };
 }
 
+function sameCustomerName(customer: { firstName: string | null; lastName: string | null }, snapshot: { firstNameSnapshot: string | null; lastNameSnapshot: string | null; personId: string | null }) {
+  if (!snapshot.firstNameSnapshot && !snapshot.lastNameSnapshot) return !!snapshot.personId; // Legacy linked handoffs predate name snapshots.
+  return customer.firstName?.trim() === snapshot.firstNameSnapshot && customer.lastName?.trim() === snapshot.lastNameSnapshot;
+}
+
 async function assertNoExistingPerson(provider: HikCentralAccessProvider, customer: { firstName: string | null; lastName: string | null }) {
   const familyName = customer.lastName!.trim();
   const found = await provider.peopleByName(familyName);
@@ -70,9 +75,9 @@ export async function issueHikCentralFaceHandoff(scope: RequestScope, input: { f
     await lockCustomer(tx, customer.id);
     const linked = await faceTarget(tx, scope, customer.id);
     const existing = await tx.hikCentralFaceCapture.findUnique({ where: { customerId: customer.id } });
-    if (linked.personId !== personId || (existing?.version ?? 0) !== input.version || existing && ["WAITING_REVIEW", "SENDING", "PROVIDER_UNCERTAIN"].includes(existing.status)) throw Error("PHOTO_CHANGED");
+    if (linked.personId !== personId || linked.customer.firstName?.trim() !== customer.firstName?.trim() || linked.customer.lastName?.trim() !== customer.lastName?.trim() || (existing?.version ?? 0) !== input.version || existing && ["WAITING_REVIEW", "SENDING", "PROVIDER_UNCERTAIN"].includes(existing.status)) throw Error("PHOTO_CHANGED");
     await tx.hikCentralFaceHandoff.deleteMany({ where: { customerId: customer.id, usedAt: null } });
-    const handoff = await tx.hikCentralFaceHandoff.create({ data: { tokenHash: tokenHash(token), customerId: customer.id, organisationId: scope.organisationId, facilityId: input.facilityId, personId, photoVersion: input.version, issuedById: scope.userId, expiresAt } });
+    const handoff = await tx.hikCentralFaceHandoff.create({ data: { tokenHash: tokenHash(token), customerId: customer.id, organisationId: scope.organisationId, facilityId: input.facilityId, personId, firstNameSnapshot: customer.firstName?.trim() ?? null, lastNameSnapshot: customer.lastName?.trim() ?? null, photoVersion: input.version, issuedById: scope.userId, expiresAt } });
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: input.facilityId, actorId: scope.userId, action: "hikcentral_face.handoff_issued", entityType: "HikCentralFaceHandoff", entityId: handoff.id, after: { customerId: customer.id, personId, version: input.version, identityCheckedInPerson: true, expiresAt: expiresAt.toISOString() } } });
   });
   return { token, expiresAt: expiresAt.toISOString() };
@@ -87,7 +92,7 @@ async function activeHandoff(token: string) {
   if (!issuer || !access.allowed) throw Error("FORBIDDEN");
   const scope: RequestScope = { userId: issuer.id, organisationId: handoff.organisationId, facilityIds: access.allowedFacilityIds ?? [], unrestrictedFacilities: access.allowedFacilityIds === null };
   const { customer, personId } = await faceTarget(db, scope, handoff.customerId);
-  if (personId !== handoff.personId || ((await db.hikCentralFaceCapture.findUnique({ where: { customerId: customer.id } }))?.version ?? 0) !== handoff.photoVersion) throw Error("PHOTO_CHANGED");
+  if (personId !== handoff.personId || !sameCustomerName(customer, handoff) || ((await db.hikCentralFaceCapture.findUnique({ where: { customerId: customer.id } }))?.version ?? 0) !== handoff.photoVersion) throw Error("PHOTO_CHANGED");
   return { handoff, scope, customer };
 }
 
@@ -108,9 +113,9 @@ export async function captureHikCentralFaceHandoff(token: string, input: { polic
       const linked = await faceTarget(tx, scope, customer.id);
       const tokenRow = await tx.hikCentralFaceHandoff.findUnique({ where: { id: handoff.id } });
       const existing = await tx.hikCentralFaceCapture.findUnique({ where: { customerId: customer.id } });
-      if (current.hash !== input.policyHash || linked.personId !== handoff.personId || !tokenRow || tokenRow.usedAt || tokenRow.expiresAt <= new Date() || (existing?.version ?? 0) !== handoff.photoVersion || existing && ["WAITING_REVIEW", "SENDING", "PROVIDER_UNCERTAIN"].includes(existing.status)) throw Error("PHOTO_CHANGED");
+      if (current.hash !== input.policyHash || linked.personId !== handoff.personId || !sameCustomerName(linked.customer, handoff) || !tokenRow || tokenRow.usedAt || tokenRow.expiresAt <= new Date() || (existing?.version ?? 0) !== handoff.photoVersion || existing && ["WAITING_REVIEW", "SENDING", "PROVIDER_UNCERTAIN"].includes(existing.status)) throw Error("PHOTO_CHANGED");
       const now = new Date(), version = handoff.photoVersion + 1;
-      const values = { organisationId: scope.organisationId, facilityId: handoff.facilityId, personId: handoff.personId, version, status: "WAITING_REVIEW", encryptedImage: encryptPhoto(image, binding(customer.id, version)), imageSha256: createHash("sha256").update(image).digest("hex"), policyVersion: current.version, policyHash: current.hash, consentNotice: JSON.stringify(current), consentAt: now, expiresAt: new Date(now.getTime() + current.retentionHours * 3600_000), reviewedAt: null, transferStartedAt: null, providerAcceptedAt: null, erasedAt: null };
+      const values = { organisationId: scope.organisationId, facilityId: handoff.facilityId, personId: handoff.personId, firstNameSnapshot: handoff.firstNameSnapshot, lastNameSnapshot: handoff.lastNameSnapshot, version, status: "WAITING_REVIEW", encryptedImage: encryptPhoto(image, binding(customer.id, version)), imageSha256: createHash("sha256").update(image).digest("hex"), policyVersion: current.version, policyHash: current.hash, consentNotice: JSON.stringify(current), consentAt: now, expiresAt: new Date(now.getTime() + current.retentionHours * 3600_000), reviewedAt: null, transferStartedAt: null, providerAcceptedAt: null, erasedAt: null };
       const photo = await tx.hikCentralFaceCapture.upsert({ where: { customerId: customer.id }, create: { customerId: customer.id, ...values }, update: values });
       await tx.hikCentralFaceHandoff.update({ where: { id: handoff.id }, data: { usedAt: now } });
       await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: handoff.facilityId, actorId: scope.userId, action: "hikcentral_face.customer_submitted", entityType: "HikCentralFaceCapture", entityId: photo.id, after: { customerId: customer.id, personId: handoff.personId, version, imageSha256: values.imageSha256, policyHash: current.hash, consentAt: now.toISOString(), expiresAt: values.expiresAt.toISOString() } } });
@@ -149,8 +154,6 @@ export async function decideHikCentralFace(scope: RequestScope, id: string, vers
       const matches = organizations.ok ? organizations.data.organizations.filter(item => item.name.trim().toUpperCase() === "STOR24") : [];
       if (matches.length !== 1 || !matches[0].indexCode || /^TEMP-/i.test(matches[0].indexCode)) throw Error("HIKCENTRAL_DEPARTMENT_REQUIRED");
       newPersonDepartment = matches[0].indexCode;
-      const existing = await provider.personByCode(hikCentralCustomerCode(scope.organisationId, candidate.customerId));
-      if (existing.ok) throw Error("HIKCENTRAL_PERSON_REVIEW_REQUIRED");
     }
   }
   const photo = await db.$transaction(async tx => {
@@ -158,7 +161,7 @@ export async function decideHikCentralFace(scope: RequestScope, id: string, vers
     await lockCustomer(tx, first.customerId);
     const current = await staffPhoto(tx, scope, id);
     const linked = await faceTarget(tx, scope, current.customerId);
-    if (current.version !== version || current.status !== "WAITING_REVIEW" || !current.encryptedImage || current.expiresAt <= new Date() || linked.personId !== current.personId) throw Error("PHOTO_CHANGED");
+    if (current.version !== version || current.status !== "WAITING_REVIEW" || !current.encryptedImage || current.expiresAt <= new Date() || linked.personId !== current.personId || !sameCustomerName(linked.customer, current)) throw Error("PHOTO_CHANGED");
     if (decision === "SEND") {
       if ((await currentPolicy(tx, scope.organisationId)).hash !== current.policyHash) throw Error("PHOTO_CONSENT_REQUIRED");
       const previewed = await tx.auditEvent.findFirst({ where: { organisationId: scope.organisationId, actorId: scope.userId, entityType: "HikCentralFaceCapture", entityId: id, action: "hikcentral_face.previewed", after: { path: ["version"], equals: version } } });
@@ -178,11 +181,10 @@ export async function decideHikCentralFace(scope: RequestScope, id: string, vers
     try {
       const provider = new HikCentralAccessProvider(fetch, await loadHikCentralRuntimeConfiguration(scope.organisationId));
       if (newPersonCode && newPersonDepartment) {
-        const customer = await requireLeasingCustomer(scope, photo.customerId);
-        const result = await provider.createPersonWithFace({ organisationIndexCode: newPersonDepartment, personCode: newPersonCode, givenName: customer.firstName!.trim(), familyName: customer.lastName!.trim(), faceBase64: image.toString("base64") });
+        const result = await provider.createPersonWithFace({ organisationIndexCode: newPersonDepartment, personCode: newPersonCode, givenName: photo.firstNameSnapshot!, familyName: photo.lastNameSnapshot!, faceBase64: image.toString("base64") });
         if (result.ok) {
           const readback = await provider.personByCode(newPersonCode);
-          accepted = readback.ok && readback.data.personId === result.data.personId && readback.data.organisationIndexCode === newPersonDepartment && readback.data.givenName.trim().toLowerCase() === customer.firstName!.trim().toLowerCase() && readback.data.familyName.trim().toLowerCase() === customer.lastName!.trim().toLowerCase();
+          accepted = readback.ok && readback.data.personId === result.data.personId && readback.data.organisationIndexCode === newPersonDepartment && readback.data.givenName.trim().toLowerCase() === photo.firstNameSnapshot!.toLowerCase() && readback.data.familyName.trim().toLowerCase() === photo.lastNameSnapshot!.toLowerCase();
           if (accepted) resolvedPersonId = result.data.personId;
         }
       } else if (photo.personId) {
@@ -194,15 +196,17 @@ export async function decideHikCentralFace(scope: RequestScope, id: string, vers
       }
     } finally { image.fill(0); }
   } catch { /* A timeout may have occurred after HikCentral accepted the photo. Never retry blindly. */ }
-  const status = accepted ? "PROVIDER_ACCEPTED" : "PROVIDER_UNCERTAIN";
+  let status = accepted ? "PROVIDER_ACCEPTED" : "PROVIDER_UNCERTAIN";
   await db.$transaction(async tx => {
     await lockCustomer(tx, photo.customerId);
     if (accepted && newPersonCode && resolvedPersonId) {
       const target = await faceTarget(tx, scope, photo.customerId);
-      if (target.personId !== null || await tx.integrationIdentityLink.findFirst({ where: { organisationId: scope.organisationId, hikCentralPersonId: resolvedPersonId, customerId: { not: photo.customerId } } })) throw Error("HIKCENTRAL_PERSON_REVIEW_REQUIRED");
-      const now = new Date();
-      const link = await tx.integrationIdentityLink.upsert({ where: { customerId: photo.customerId }, create: { organisationId: scope.organisationId, customerId: photo.customerId, hikCentralPersonId: resolvedPersonId, status: "ACTIVE", linkedAt: now, resolvedById: scope.userId, resolutionNotes: "Created in STOR24 HikCentral department after staff ID check and customer face consent" }, update: { hikCentralPersonId: resolvedPersonId, status: "ACTIVE", linkedAt: now, resolvedById: scope.userId, resolutionNotes: "Created in STOR24 HikCentral department after staff ID check and customer face consent" } });
-      await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: photo.facilityId, actorId: scope.userId, action: "integration.hikcentral.person_created", entityType: "IntegrationIdentityLink", entityId: link.id, after: { customerId: photo.customerId, personId: resolvedPersonId, personCode: newPersonCode, organisationIndexCode: newPersonDepartment, faceCaptureId: id } } });
+      if (target.personId !== null || !sameCustomerName(target.customer, photo) || await tx.integrationIdentityLink.findFirst({ where: { organisationId: scope.organisationId, hikCentralPersonId: resolvedPersonId, customerId: { not: photo.customerId } } })) { accepted = false; status = "PROVIDER_UNCERTAIN"; }
+      else {
+        const now = new Date();
+        const link = await tx.integrationIdentityLink.upsert({ where: { customerId: photo.customerId }, create: { organisationId: scope.organisationId, customerId: photo.customerId, hikCentralPersonId: resolvedPersonId, status: "ACTIVE", linkedAt: now, resolvedById: scope.userId, resolutionNotes: "Created in STOR24 HikCentral department after staff ID check and customer face consent" }, update: { hikCentralPersonId: resolvedPersonId, status: "ACTIVE", linkedAt: now, resolvedById: scope.userId, resolutionNotes: "Created in STOR24 HikCentral department after staff ID check and customer face consent" } });
+        await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: photo.facilityId, actorId: scope.userId, action: "integration.hikcentral.person_created", entityType: "IntegrationIdentityLink", entityId: link.id, after: { customerId: photo.customerId, personId: resolvedPersonId, personCode: newPersonCode, organisationIndexCode: newPersonDepartment, faceCaptureId: id } } });
+      }
     }
     const updated = await tx.hikCentralFaceCapture.updateMany({ where: { id, version, status: "SENDING" }, data: { status, ...(accepted ? { personId: resolvedPersonId, encryptedImage: null, erasedAt: new Date(), providerAcceptedAt: new Date() } : {}) } });
     if (updated.count !== 1) throw Error("PHOTO_CHANGED");
