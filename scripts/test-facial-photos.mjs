@@ -37,7 +37,7 @@ page.on("pageerror",error=>errors.push(error.message));
   await mkdir("output/facial-access",{recursive:true});
   for(const width of [1440,390]) {
     await page.setViewportSize({width,height:1000});await page.goto(base);await page.evaluate(()=>document.fonts.ready);
-    await expect(page.getByText("No customer photographs queued")).toBeVisible();
+    await expect(page.getByText("No booking photographs queued")).toBeVisible();
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
     assert.equal(await page.locator(".face-steps p").first().evaluate(el=>getComputedStyle(el).fontWeight),"400");
     await page.screenshot({path:`output/facial-access/${width}.png`,fullPage:true});
