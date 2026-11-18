@@ -83,6 +83,7 @@ test("customer-scoped Counter face capture needs consent and review before one p
     globalThis.fetch = (async (url, init) => {
       const path = String(url);
       newPersonCalls.push(path);
+      if (path.endsWith("/person/advance/personList")) return Response.json({ code: "0", data: { total: 0, list: [] } });
       if (path.endsWith("/org/orgList")) return Response.json({ code: "0", data: { list: [{ orgIndexCode: "97", orgName: "STOR24", parentOrgIndexCode: "1" }] } });
       if (path.endsWith("/person/personCode/personInfo")) return created
         ? Response.json({ code: "0", data: { personId: "2001", personCode, orgIndexCode: "97", personGivenName: "Jane", personFamilyName: "Tester" } })
@@ -119,6 +120,7 @@ test("customer-scoped Counter face capture needs consent and review before one p
     let duplicateWrites = 0;
     globalThis.fetch = (async (url) => {
       const path = String(url);
+      if (path.endsWith("/person/advance/personList")) return Response.json({ code: "0", data: { total: 0, list: [] } });
       if (path.endsWith("/org/orgList")) return Response.json({ code: "0", data: { list: [{ orgIndexCode: "97", orgName: "STOR24" }] } });
       if (path.endsWith("/person/personCode/personInfo")) return Response.json({ code: "0", data: { personId: "2002", personCode: hikCentralCustomerCode(org.id, possibleDuplicate.id), orgIndexCode: "97", personGivenName: "Bob", personFamilyName: "Tester" } });
       duplicateWrites++;
@@ -132,6 +134,14 @@ test("customer-scoped Counter face capture needs consent and review before one p
     await assert.rejects(decideHikCentralFace(scope, duplicatePhoto.id, duplicatePhoto.version, "SEND"), /HIKCENTRAL_PERSON_REVIEW_REQUIRED/);
     assert.equal(duplicateWrites, 0);
     assert.equal((await db.hikCentralFaceCapture.findUniqueOrThrow({ where: { id: duplicatePhoto.id } })).status, "WAITING_REVIEW");
+
+    const alreadyAtHikCentral = await db.customer.create({ data: { organisationId: org.id, firstName: "Brett Test", lastName: "Dovey" } });
+    globalThis.fetch = (async (url) => {
+      assert.match(String(url), /\/person\/advance\/personList$/);
+      return Response.json({ code: "0", data: { total: 1, list: [{ personId: "1150", personGivenName: "Brett", personFamilyName: "Dovey" }] } });
+    }) as typeof fetch;
+    await assert.rejects(issueHikCentralFaceHandoff(scope, { customerId: alreadyAtHikCentral.id, facilityId: facility.id, version: 0 }), /HIKCENTRAL_PERSON_REVIEW_REQUIRED/);
+    assert.equal(await db.hikCentralFaceHandoff.count({ where: { customerId: alreadyAtHikCentral.id } }), 0);
   } finally {
     globalThis.fetch = previousFetch;
     if (previousKey === undefined) delete process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY; else process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY = previousKey;

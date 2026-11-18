@@ -40,8 +40,16 @@ async function faceTarget(database: Database, scope: RequestScope, customerId: s
   const customer = await requireLeasingCustomer(scope, customerId, database);
   const link = await database.integrationIdentityLink.findUnique({ where: { customerId } });
   if (link && (link.organisationId !== scope.organisationId || ["DUPLICATE_SUSPECTED", "SUPERSEDED"].includes(link.status) || (link.hikCentralPersonId && link.status !== "ACTIVE"))) throw Error("HIKCENTRAL_PERSON_LINK_REQUIRED");
-  if (!link?.hikCentralPersonId && (!customer.firstName?.trim() || !customer.lastName?.trim())) throw Error("HIKCENTRAL_PERSON_DETAILS_REQUIRED");
+  if (!link?.hikCentralPersonId && (customer.type !== "INDIVIDUAL" || !customer.firstName?.trim() || !customer.lastName?.trim())) throw Error("HIKCENTRAL_PERSON_DETAILS_REQUIRED");
   return { customer, personId: link?.hikCentralPersonId ?? null };
+}
+
+async function assertNoExistingPerson(provider: HikCentralAccessProvider, customer: { firstName: string | null; lastName: string | null }) {
+  const familyName = customer.lastName!.trim();
+  const found = await provider.peopleByName(familyName);
+  if (!found.ok) throw Error("HIKCENTRAL_PERSON_REVIEW_REQUIRED");
+  const givenName = customer.firstName!.trim().split(/\s+/)[0].toLowerCase();
+  if (found.data.people.some(person => person.familyName.trim().toLowerCase() === familyName.toLowerCase() && person.givenName.trim().split(/\s+/)[0].toLowerCase() === givenName)) throw Error("HIKCENTRAL_PERSON_REVIEW_REQUIRED");
 }
 
 async function lockCustomer(database: Database, customerId: string) {
@@ -56,7 +64,7 @@ export async function issueHikCentralFaceHandoff(scope: RequestScope, input: { f
   if (personId) {
     const verified = await provider.personById(personId);
     if (!verified.ok || (customer.lastName && verified.data.familyName && verified.data.familyName.trim().toLowerCase() !== customer.lastName.trim().toLowerCase())) throw Error("HIKCENTRAL_PERSON_LOOKUP_FAILED");
-  }
+  } else await assertNoExistingPerson(provider, customer);
   const token = randomBytes(32).toString("base64url"), expiresAt = new Date(Date.now() + 5 * 60_000);
   await db.$transaction(async tx => {
     await lockCustomer(tx, customer.id);
@@ -136,6 +144,7 @@ export async function decideHikCentralFace(scope: RequestScope, id: string, vers
     const candidate = await staffPhoto(db, scope, id);
     if (!candidate.personId) {
       const provider = new HikCentralAccessProvider(fetch, await loadHikCentralRuntimeConfiguration(scope.organisationId));
+      await assertNoExistingPerson(provider, await requireLeasingCustomer(scope, candidate.customerId));
       const organizations = await provider.listOrganizations();
       const matches = organizations.ok ? organizations.data.organizations.filter(item => item.name.trim().toUpperCase() === "STOR24") : [];
       if (matches.length !== 1 || !matches[0].indexCode || /^TEMP-/i.test(matches[0].indexCode)) throw Error("HIKCENTRAL_DEPARTMENT_REQUIRED");

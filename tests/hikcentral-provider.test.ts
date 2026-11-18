@@ -210,3 +210,12 @@ test("face transfer readback confirms the exact person ID without treating a dif
   const wrong = new HikCentralAccessProvider((async () => Response.json({ code: "0", data: { personId: "1151", personCode: "5118710783" } })) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", userId: "admin", facilities: {} });
   assert.equal((await wrong.personById("1150")).ok, false);
 });
+
+test("person name search uses paged read-only provider results to guard duplicate creation", async () => {
+  const provider = new HikCentralAccessProvider((async (url, init) => {
+    assert.match(String(url), /\/person\/advance\/personList$/);
+    assert.deepEqual(JSON.parse(String(init?.body)), { pageNo: 1, pageSize: 100, personName: "Dovey" });
+    return Response.json({ code: "0", data: { total: 1, list: [{ personId: "1150", personGivenName: "Brett", personFamilyName: "Dovey" }] } });
+  }) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", userId: "admin", facilities: {} });
+  assert.deepEqual(await provider.peopleByName("Dovey"), { ok: true, providerReference: "hikcentral", data: { people: [{ personId: "1150", givenName: "Brett", familyName: "Dovey" }] } });
+});

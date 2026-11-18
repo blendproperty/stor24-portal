@@ -20,7 +20,7 @@ export function facialPhotoError(error: unknown) {
     HANDOFF_STAFF_SESSION: [409, "Open this link on a customer tablet without a staff login."],
     HIKCENTRAL_PERSON_LINK_REQUIRED: [409, "This customer's HikCentral identity needs manager review before a photo visit."],
     HIKCENTRAL_PERSON_LOOKUP_FAILED: [502, "HikCentral could not confirm the linked person. Check the API connection and person ID."],
-    HIKCENTRAL_PERSON_DETAILS_REQUIRED: [409, "Add the customer's first and last name in STOR24 before preparing a HikCentral photo."],
+    HIKCENTRAL_PERSON_DETAILS_REQUIRED: [409, "Use an individual STOR24 customer with a first and last name before preparing a HikCentral photo."],
     HIKCENTRAL_DEPARTMENT_REQUIRED: [409, "The STOR24 department could not be confirmed in HikCentral. Ask the integration manager to check it."],
     HIKCENTRAL_PERSON_REVIEW_REQUIRED: [409, "HikCentral may already have this person. Ask the integration manager to review the record before sending the photo."],
   };

@@ -331,6 +331,25 @@ export class HikCentralAccessProvider {
     } catch (error) { return providerFailure(error); }
   }
 
+  async peopleByName(name: string): Promise<ProviderResult<{ people: { personId: string; givenName: string; familyName: string }[] }>> {
+    try {
+      if (!name.trim() || name.length > 32) throw new Error("HikCentral person search name is invalid.");
+      const people: { personId: string; givenName: string; familyName: string }[] = [];
+      for (let pageNo = 1; pageNo <= 50; pageNo++) {
+        const data = await this.post("/artemis/api/resource/v1/person/advance/personList", { pageNo, pageSize: 100, personName: name }) as { list?: unknown; total?: unknown };
+        if (!Array.isArray(data.list) || typeof data.total !== "number") throw new Error("HikCentral returned an invalid person search.");
+        for (const item of data.list) {
+          if (!item || typeof item !== "object") throw new Error("HikCentral returned an invalid person.");
+          const person = item as Record<string, unknown>;
+          if (typeof person.personId !== "string" || typeof person.personGivenName !== "string" || typeof person.personFamilyName !== "string") throw new Error("HikCentral returned incomplete person names.");
+          people.push({ personId: person.personId, givenName: person.personGivenName, familyName: person.personFamilyName });
+        }
+        if (people.length >= data.total || data.list.length < 100) return { ok: true, providerReference: "hikcentral", data: { people } };
+      }
+      throw new Error("HikCentral person search exceeded 5,000 entries.");
+    } catch (error) { return providerFailure(error); }
+  }
+
   async createPersonWithFace(input: Pick<HikCentralEnrollmentInput, "personCode" | "givenName" | "familyName" | "faceBase64"> & { organisationIndexCode: string }): Promise<ProviderResult<{ personId: string }>> {
     try {
       if (!/^[A-Za-z0-9]{1,16}$/.test(input.personCode) || !input.faceBase64 || !input.organisationIndexCode) throw new Error("HikCentral person code, department or face is invalid.");
