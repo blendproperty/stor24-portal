@@ -51,7 +51,9 @@ export default async function AccessPage({ searchParams }: { searchParams: Promi
     <PageHeader eyebrow="Physical security" title="Facial access" description="Private photographs, staff review and a clear record of what still needs to be verified." />
     {reservation && <a className="button button-secondary" href={`/operations/move-in?reservation=${encodeURIComponent(reservation)}`}>Back to move-in checks</a>}
     {captureScope ? <HikCentralFaceCaptureWorkspace people={capturePeople.map(link => ({ customerId: link.customerId, customerName: link.customer.companyName || [link.customer.firstName, link.customer.lastName].filter(Boolean).join(" ") || "Customer", personId: link.hikCentralPersonId!, photo: link.customer.hikCentralFaceCapture ? { id: link.customer.hikCentralFaceCapture.id, version: link.customer.hikCentralFaceCapture.version, status: link.customer.hikCentralFaceCapture.status, consentAt: link.customer.hikCentralFaceCapture.consentAt.toISOString(), providerAcceptedAt: link.customer.hikCentralFaceCapture.providerAcceptedAt?.toISOString() ?? null } : null }))} facilities={captureFacilities} canSend={canLinkExistingPerson} /> : null}
+    {canLinkExistingPerson ? <HikCentralExistingPersonLink customers={linkCustomers.map(customer => ({ id: customer.id, name: customer.companyName || [customer.firstName, customer.lastName].filter(Boolean).join(" ") || "Unnamed customer" }))} facilities={linkFacilities} /> : null}
     <PhotoCollectionControl initial={control} />
+    <details className="face-provider-records" open={Boolean(reservation)}><summary>Other photo and access workflows <span>Booking photo reviews, additional people and earlier access records</span></summary><div className="page-stack">
     {primaryTrial && <section className="face-primary-trial" aria-label="Unit 58 primary customer photo trial">
       <span className="face-eyebrow">UNIT {primaryTrial.unitNumber} · PHOTO ONLY</span>
       <h2>Start with the account holder</h2>
@@ -64,7 +66,7 @@ export default async function AccessPage({ searchParams }: { searchParams: Promi
     <BiometricAccessWorkspace
       enrollments={enrollments.map((item) => ({ id: item.id, customerName: `${item.customer.firstName ?? item.customer.companyName ?? "Customer"} ${item.customer.lastName ?? ""}`.trim(), facilityName: item.facility.name, unitNumber: item.occupancy.unit.number, status: item.status, consentAt: item.consentAt.toISOString(), provisionedAt: item.provisionedAt?.toISOString() ?? null }))}
     />
-    {canLinkExistingPerson ? <HikCentralExistingPersonLink customers={linkCustomers.map(customer => ({ id: customer.id, name: customer.companyName || [customer.firstName, customer.lastName].filter(Boolean).join(" ") || "Unnamed customer" }))} facilities={linkFacilities} /> : null}
+    </div></details>
     <details className="face-provider-records"><summary>Provider records <span>Identity links and access decisions</span></summary><MelIntegrationStatus
       identityLinks={identityLinks.map((link) => ({
         id: link.id,
