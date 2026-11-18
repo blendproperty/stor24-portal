@@ -47,7 +47,7 @@ export async function issueHikCentralFaceHandoff(scope: RequestScope, input: { f
   await requireFacility(scope, input.facilityId);
   await currentPolicy(db, scope.organisationId);
   const { customer, personId } = await linkedCustomer(db, scope, input.customerId);
-  const provider = new HikCentralAccessProvider(fetch, await loadHikCentralRuntimeConfiguration(scope.organisationId, input.facilityId));
+  const provider = new HikCentralAccessProvider(fetch, await loadHikCentralRuntimeConfiguration(scope.organisationId));
   const verified = await provider.personById(personId);
   if (!verified.ok || (customer.lastName && verified.data.familyName && verified.data.familyName.trim().toLowerCase() !== customer.lastName.trim().toLowerCase())) throw Error("HIKCENTRAL_PERSON_LOOKUP_FAILED");
   const token = randomBytes(32).toString("base64url"), expiresAt = new Date(Date.now() + 5 * 60_000);
@@ -145,7 +145,7 @@ export async function decideHikCentralFace(scope: RequestScope, id: string, vers
   try {
     const image = decryptPhoto(photo.encryptedImage!, binding(photo.customerId, version));
     try {
-      const provider = new HikCentralAccessProvider(fetch, await loadHikCentralRuntimeConfiguration(scope.organisationId, photo.facilityId));
+      const provider = new HikCentralAccessProvider(fetch, await loadHikCentralRuntimeConfiguration(scope.organisationId));
       const result = await provider.updatePersonFace(photo.personId, image.toString("base64"));
       if (result.ok) {
         const readback = await provider.personById(photo.personId);

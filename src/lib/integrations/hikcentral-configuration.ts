@@ -133,21 +133,25 @@ export async function saveHikCentralMapping(scope: RequestScope, input: unknown)
   return connection;
 }
 
-export async function loadHikCentralRuntimeConfiguration(organisationId: string, facilityId: string): Promise<HikCentralProviderConfiguration> {
+export async function loadHikCentralRuntimeConfiguration(organisationId: string, facilityId?: string): Promise<HikCentralProviderConfiguration> {
   const [company, mapping] = await Promise.all([
     companyConnection(organisationId),
-    db.integrationConnection.findFirst({ where: { organisationId, facilityId, category: HIKCENTRAL_CATEGORY, provider: HIKCENTRAL_PROVIDER } }),
+    facilityId ? db.integrationConnection.findFirst({ where: { organisationId, facilityId, category: HIKCENTRAL_CATEGORY, provider: HIKCENTRAL_PROVIDER } }) : null,
   ]);
   const credentials = (company?.config ?? {}) as StoredCredentials;
   const facility = (mapping?.config ?? {}) as StoredMapping;
   if (!configuredString(credentials.endpoint) || !configuredString(credentials.appKeyEncrypted) || !configuredString(credentials.appSecretEncrypted)) throw new Error("CONFIG_REQUIRED:HIKCENTRAL_CREDENTIALS");
-  if (!configuredString(facility.organisationIndexCode) || !Array.isArray(facility.doorIndexCodes) || !facility.doorIndexCodes.length) throw new Error("CONFIG_REQUIRED:HIKCENTRAL_FACILITY_MAPPING");
+  const facilities: HikCentralProviderConfiguration["facilities"] = {};
+  if (facilityId) {
+    if (!configuredString(facility.organisationIndexCode) || !Array.isArray(facility.doorIndexCodes) || !facility.doorIndexCodes.length) throw new Error("CONFIG_REQUIRED:HIKCENTRAL_FACILITY_MAPPING");
+    facilities[facilityId] = { organisationIndexCode: facility.organisationIndexCode, doorIndexCodes: facility.doorIndexCodes.filter(configuredString) };
+  }
   return {
     baseUrl: credentials.endpoint,
     appKey: decryptIntegrationSecret(credentials.appKeyEncrypted),
     appSecret: decryptIntegrationSecret(credentials.appSecretEncrypted),
     ...(configuredString(credentials.userId) ? { userId: credentials.userId } : {}),
-    facilities: { [facilityId]: { organisationIndexCode: facility.organisationIndexCode, doorIndexCodes: facility.doorIndexCodes.filter(configuredString) } },
+    facilities,
     ...(configuredString(credentials.pinnedCertSha256Fingerprint) ? { pinnedCertSha256: credentials.pinnedCertSha256Fingerprint } : {}),
     ...(configuredString(credentials.regionIndexCode) ? { regionIndexCodes: [credentials.regionIndexCode] } : {}),
   };
@@ -180,7 +184,7 @@ export async function inspectHikCentralAccess(scope: RequestScope, facilityId: s
 
 export async function lookupHikCentralPerson(scope: RequestScope, facilityId: string, personCode: string) {
   await requireFacility(scope, facilityId);
-  const provider = new HikCentralAccessProvider(fetch, await loadHikCentralRuntimeConfiguration(scope.organisationId, facilityId));
+  const provider = new HikCentralAccessProvider(fetch, await loadHikCentralRuntimeConfiguration(scope.organisationId));
   return provider.personByCode(personCode);
 }
 
