@@ -200,3 +200,13 @@ test("an existing person face update targets that person and refuses invalid ima
   assert.equal((await provider.updatePersonFace("1150", "not an image")).ok, false);
   assert.equal(calls.length, 1);
 });
+
+test("face transfer readback confirms the exact person ID without treating a different person as success", async () => {
+  const provider = new HikCentralAccessProvider((async (_url, init) => {
+    assert.deepEqual(JSON.parse(String(init?.body)), { personId: "1150" });
+    return Response.json({ code: "0", data: { personId: "1150", personCode: "5118710783", personGivenName: "Brett", personFamilyName: "Dovey" } });
+  }) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", userId: "admin", facilities: {} });
+  assert.deepEqual(await provider.personById("1150"), { ok: true, providerReference: "1150", data: { personId: "1150", personCode: "5118710783", givenName: "Brett", familyName: "Dovey" } });
+  const wrong = new HikCentralAccessProvider((async () => Response.json({ code: "0", data: { personId: "1151", personCode: "5118710783" } })) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", userId: "admin", facilities: {} });
+  assert.equal((await wrong.personById("1150")).ok, false);
+});

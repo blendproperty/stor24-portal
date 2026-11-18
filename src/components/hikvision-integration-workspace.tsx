@@ -13,7 +13,7 @@ type Door = { indexCode: string; name: string };
 type AccessInspection = { version: { product: string; version: string } | null; versionError: string | null; accessLevels: { id: string; name: string; resourceIds: string[]; resourceNames: string[] }[]; organizations: { indexCode: string; name: string; parentIndexCode: string | null }[]; organizationError: string | null };
 
 function statusTone(status: string) { return status === "CONNECTED" ? "positive" : status === "DEGRADED" ? "warning" : "neutral"; }
-function statusLabel(status: string) { return status === "CONNECTED" ? "Connected" : status === "DEGRADED" ? "Connection failed" : status === "CONFIGURED" ? "Ready to test" : "Configuration required"; }
+function statusLabel(status: string) { return status === "CONNECTED" ? "Door API reachable" : status === "DEGRADED" ? "Connection failed" : status === "CONFIGURED" ? "Ready to test" : "Configuration required"; }
 
 export function HikvisionIntegrationWorkspace() {
   const [configuration, setConfiguration] = useState<Configuration | null>(null);
@@ -39,6 +39,7 @@ export function HikvisionIntegrationWorkspace() {
     return () => { cancelled = true; };
   }, []);
   const facility = useMemo(() => configuration?.facilities.find((item) => item.id === facilityId), [configuration, facilityId]);
+  const temporaryMapping = facility?.organisationIndexCode.toUpperCase().startsWith("TEMP-") ?? false;
   const block24Doors = discoveredDoors.filter((door) => ["Block24 Main Gate_Door_1", "Block24 Entrance_Door_1", "Block24 Exit_Door_1"].includes(door.name));
 
   async function call(method: "PUT" | "POST", body: Record<string, unknown>, success: string) {
@@ -98,7 +99,7 @@ export function HikvisionIntegrationWorkspace() {
     <section className="summary-strip">
       <div className="summary-cell"><span>Provider</span><strong>Hikvision</strong></div>
       <div className="summary-cell"><span>Company credentials</span><strong>{configuration?.company.appSecretConfigured ? "Saved" : "Required"}</strong></div>
-      <div className="summary-cell"><span>Mapped facilities</span><strong>{configuration?.facilities.filter((item) => item.organisationIndexCode && item.doorIndexCodes.length).length ?? 0}/{configuration?.facilities.length ?? 0}</strong></div>
+      <div className="summary-cell"><span>Saved mappings</span><strong>{configuration?.facilities.filter((item) => item.organisationIndexCode && !item.organisationIndexCode.toUpperCase().startsWith("TEMP-") && item.doorIndexCodes.length).length ?? 0}/{configuration?.facilities.length ?? 0}</strong></div>
       <div className="summary-cell"><span>Connection state</span><strong>{statusLabel(facility?.status ?? configuration?.company.status ?? "DISCONNECTED")}</strong></div>
     </section>
     <section className="hikvision-layout">
@@ -124,6 +125,7 @@ export function HikvisionIntegrationWorkspace() {
           <label>HikCentral organisation index code<input name="organisationIndexCode" required defaultValue={facility?.organisationIndexCode ?? ""} disabled={!canManage}/></label>
           <label>Door index codes<textarea ref={doorCodesField} name="doorIndexCodes" required rows={6} defaultValue={facility?.doorIndexCodes.join("\n") ?? ""} placeholder={'One door code per line\ne.g. midpoint-main-entry'} disabled={!canManage}/></label>
         </div>
+        {temporaryMapping ? <p className="safe-config-note" role="alert">TEMP-CONNECTION-TEST is a placeholder, not a verified HikCentral department. The saved door list predates the three Block24 readers. Check the live department and doors before using this mapping for a person.</p> : null}
         <p className="field-help">Use HikCentral index codes, not the visible door names. Duplicate codes are removed automatically.</p>
         <div className="hikvision-actions"><button type="button" className="button button-secondary" disabled={!canManage || !facilityId || busy === "discover-doors"} onClick={() => void discoverDoors()}>{busy === "discover-doors" ? "Finding doors…" : "Find Block24 door IDs"}</button>{block24Doors.length === 3 ? <button type="button" className="button button-secondary" onClick={addBlock24Doors}>Add all three to mapping</button> : null}</div>
         {discoveredDoors.length ? <div className="field-help" aria-live="polite">{block24Doors.length === 3 ? block24Doors.map((door) => <div key={door.indexCode}>{door.name}: <code>{door.indexCode}</code></div>) : "All three Block24 doors were not found in the live HikCentral door list. Confirm their names and IDs before saving."}</div> : null}

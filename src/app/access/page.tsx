@@ -2,18 +2,19 @@ import { FacialPhotoQueue } from "@/components/facial-photo-queue";
 import { listFacialPhotos } from "@/lib/facial-photo-service";
 import { photoControlSnapshot } from "@/lib/facial-photo-control";
 import { PhotoCollectionControl } from "@/components/photo-collection-control";
-import { requirePermission } from "@/lib/auth-guards";
 import { BiometricAccessWorkspace } from "@/components/biometric-access-workspace";
 import { MelIntegrationStatus } from "@/components/mel-integration-status";
 import { PageHeader } from "@/components/page-header";
 import { listBiometricAccess } from "@/lib/biometric-access-service";
 import { listAccessDecisions, listIdentityLinks } from "@/lib/mel-integration-status-service";
-import { requirePermissionScope } from "@/lib/scope";
+import { facilityWhere, requirePermissionScope, type RequestScope } from "@/lib/scope";
+import { leasingCustomerWhere } from "@/lib/leasing-customer-scope";
 import { additionalPersonPolicy, listAdditionalPeopleForStaff } from "@/lib/additional-access-people";
 import { AdditionalAccessQueue } from "@/components/additional-access-queue";
 import { primaryTrialSnapshot } from "@/lib/unit58-primary-photo-trial";
 import { db } from "@/lib/db";
 import { HikCentralExistingPersonLink } from "@/components/hikcentral-existing-person-link";
+import { HikCentralFaceCaptureWorkspace } from "@/components/hikcentral-face-capture-workspace";
 
 export const metadata = { title: "Biometric access" };
 export const dynamic = "force-dynamic";
@@ -32,7 +33,8 @@ export default async function AccessPage({ searchParams }: { searchParams: Promi
   const additionalPolicy = additionalPersonPolicy(scope.organisationId);
   const primaryTrial = await primaryTrialSnapshot(scope);
   let manageableFacilities: string[] | null = [];
-  try { manageableFacilities = (await requirePermission("access.manage")).allowedFacilityIds; }
+  let captureScope: RequestScope | null = null;
+  try { captureScope = await requirePermissionScope("access.manage"); manageableFacilities = captureScope.unrestrictedFacilities ? null : captureScope.facilityIds; }
   catch (error) { if (!(error instanceof Error) || error.message !== "FORBIDDEN") throw error; }
   let canLinkExistingPerson = false;
   try { canLinkExistingPerson = manageableFacilities === null && (await requirePermissionScope("integrations.manage")).unrestrictedFacilities; }
@@ -41,9 +43,14 @@ export default async function AccessPage({ searchParams }: { searchParams: Promi
     db.customer.findMany({ where: { organisationId: scope.organisationId }, select: { id: true, firstName: true, lastName: true, companyName: true }, orderBy: { updatedAt: "desc" } }),
     db.facility.findMany({ where: { organisationId: scope.organisationId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]) : [[], []];
+  const [capturePeople, captureFacilities] = captureScope ? await Promise.all([
+    db.integrationIdentityLink.findMany({ where: { organisationId: scope.organisationId, status: "ACTIVE", hikCentralPersonId: { not: null }, customer: leasingCustomerWhere(captureScope, captureScope.facilityIds) }, include: { customer: { include: { hikCentralFaceCapture: true } } }, orderBy: { updatedAt: "desc" } }),
+    db.facility.findMany({ where: facilityWhere(captureScope), select: { id: true, name: true }, orderBy: { name: "asc" } }),
+  ]) : [[], []];
   return <div className="page-stack face-page">
     <PageHeader eyebrow="Physical security" title="Facial access" description="Private photographs, staff review and a clear record of what still needs to be verified." />
     {reservation && <a className="button button-secondary" href={`/operations/move-in?reservation=${encodeURIComponent(reservation)}`}>Back to move-in checks</a>}
+    {captureScope ? <HikCentralFaceCaptureWorkspace people={capturePeople.map(link => ({ customerId: link.customerId, customerName: link.customer.companyName || [link.customer.firstName, link.customer.lastName].filter(Boolean).join(" ") || "Customer", personId: link.hikCentralPersonId!, photo: link.customer.hikCentralFaceCapture ? { id: link.customer.hikCentralFaceCapture.id, version: link.customer.hikCentralFaceCapture.version, status: link.customer.hikCentralFaceCapture.status, consentAt: link.customer.hikCentralFaceCapture.consentAt.toISOString(), providerAcceptedAt: link.customer.hikCentralFaceCapture.providerAcceptedAt?.toISOString() ?? null } : null }))} facilities={captureFacilities} canSend={canLinkExistingPerson} /> : null}
     <PhotoCollectionControl initial={control} />
     {primaryTrial && <section className="face-primary-trial" aria-label="Unit 58 primary customer photo trial">
       <span className="face-eyebrow">UNIT {primaryTrial.unitNumber} · PHOTO ONLY</span>

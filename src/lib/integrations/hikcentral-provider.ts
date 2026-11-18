@@ -322,6 +322,15 @@ export class HikCentralAccessProvider {
     } catch (error) { return providerFailure(error); }
   }
 
+  async personById(personId: string): Promise<ProviderResult<{ personId: string; personCode: string; givenName: string; familyName: string }>> {
+    try {
+      if (!personId || personId.length > 64) throw new Error("HikCentral person ID is invalid.");
+      const data = await this.post("/artemis/api/resource/v1/person/personId/personInfo", { personId }) as Record<string, unknown>;
+      if (data.personId !== personId || typeof data.personCode !== "string") throw new Error("HikCentral returned a different person.");
+      return { ok: true, providerReference: personId, data: { personId, personCode: data.personCode, givenName: typeof data.personGivenName === "string" ? data.personGivenName : "", familyName: typeof data.personFamilyName === "string" ? data.personFamilyName : "" } };
+    } catch (error) { return providerFailure(error); }
+  }
+
   async createPersonWithFace(input: Pick<HikCentralEnrollmentInput, "facilityId" | "personCode" | "givenName" | "familyName" | "faceBase64">): Promise<ProviderResult<{ personId: string }>> {
     try {
       if (!/^[A-Za-z0-9]{1,16}$/.test(input.personCode) || !input.faceBase64) throw new Error("HikCentral person code or face is invalid.");
