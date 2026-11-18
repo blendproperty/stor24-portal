@@ -1,0 +1,2 @@
+ALTER TABLE "HikCentralFaceCapture" DROP CONSTRAINT "HikCentralFaceCapture_status_check";
+ALTER TABLE "HikCentralFaceCapture" ADD CONSTRAINT "HikCentralFaceCapture_status_check" CHECK ("status" IN ('WAITING_REVIEW','SENDING','PROVIDER_ACCEPTED','PROVIDER_UNCERTAIN','PROVIDER_REMOVED','REJECTED','WITHDRAWN','EXPIRED'));
