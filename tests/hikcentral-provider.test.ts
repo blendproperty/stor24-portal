@@ -169,7 +169,7 @@ test("person creation sends the face with the documented person request and keep
     calls.push({ path: String(url), body: JSON.parse(String(init?.body)) });
     return Response.json({ code: "0", data: "1150" });
   }) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", userId: "stor24-api", facilities: { f: { organisationIndexCode: "org", doorIndexCodes: ["1", "2", "3"] } } });
-  const result = await provider.createPersonWithFace({ facilityId: "f", personCode: "S24A1", givenName: "Test", familyName: "Person", faceBase64: "AQID" });
+  const result = await provider.createPersonWithFace({ organisationIndexCode: "org", personCode: "S24A1", givenName: "Test", familyName: "Person", faceBase64: "AQID" });
   assert.equal(result.ok, true);
   assert.deepEqual(calls, [{ path: "https://example.invalid/artemis/api/resource/v1/person/single/add", body: { personCode: "S24A1", personGivenName: "Test", personFamilyName: "Person", orgIndexCode: "org", faces: [{ faceData: "AQID" }] } }]);
   if (result.ok) assert.equal(result.data.personId, "1150");
@@ -209,4 +209,13 @@ test("face transfer readback confirms the exact person ID without treating a dif
   assert.deepEqual(await provider.personById("1150"), { ok: true, providerReference: "1150", data: { personId: "1150", personCode: "5118710783", givenName: "Brett", familyName: "Dovey" } });
   const wrong = new HikCentralAccessProvider((async () => Response.json({ code: "0", data: { personId: "1151", personCode: "5118710783" } })) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", userId: "admin", facilities: {} });
   assert.equal((await wrong.personById("1150")).ok, false);
+});
+
+test("person name search uses paged read-only provider results to guard duplicate creation", async () => {
+  const provider = new HikCentralAccessProvider((async (url, init) => {
+    assert.match(String(url), /\/person\/advance\/personList$/);
+    assert.deepEqual(JSON.parse(String(init?.body)), { pageNo: 1, pageSize: 100, personName: "Dovey" });
+    return Response.json({ code: "0", data: { total: 1, list: [{ personId: "1150", personGivenName: "Brett", personFamilyName: "Dovey" }] } });
+  }) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", userId: "admin", facilities: {} });
+  assert.deepEqual(await provider.peopleByName("Dovey"), { ok: true, providerReference: "hikcentral", data: { people: [{ personId: "1150", givenName: "Brett", familyName: "Dovey" }] } });
 });

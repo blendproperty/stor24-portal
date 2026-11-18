@@ -3,7 +3,7 @@ import test from "node:test";
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { db } from "../../src/lib/db";
-import { captureHikCentralFaceHandoff, decideHikCentralFace, hikCentralFaceHandoff, issueHikCentralFaceHandoff, previewHikCentralFace, expireHikCentralFaceCaptures } from "../../src/lib/hikcentral-face-capture";
+import { captureHikCentralFaceHandoff, decideHikCentralFace, hikCentralCustomerCode, hikCentralFaceHandoff, issueHikCentralFaceHandoff, previewHikCentralFace, expireHikCentralFaceCaptures } from "../../src/lib/hikcentral-face-capture";
 import { loadHikCentralRuntimeConfiguration } from "../../src/lib/integrations/hikcentral-configuration";
 import { encryptIntegrationSecret } from "../../src/lib/integrations/integration-secret-vault";
 
@@ -74,6 +74,82 @@ test("customer-scoped Counter face capture needs consent and review before one p
     await db.hikCentralFaceCapture.update({ where: { id: photo.id }, data: { expiresAt: new Date(0) } });
     await expireHikCentralFaceCaptures();
     assert.equal((await db.hikCentralFaceCapture.findUniqueOrThrow({ where: { id: photo.id } })).encryptedImage, null);
+
+    const newcomer = await db.customer.create({ data: { organisationId: org.id, firstName: "Jane", lastName: "Tester" } });
+    const personCode = hikCentralCustomerCode(org.id, newcomer.id);
+    assert.match(personCode, /^S24[A-Z0-9]{13}$/);
+    let created = false;
+    const newPersonCalls: string[] = [];
+    globalThis.fetch = (async (url, init) => {
+      const path = String(url);
+      newPersonCalls.push(path);
+      if (path.endsWith("/person/advance/personList")) return Response.json({ code: "0", data: { total: 0, list: [] } });
+      if (path.endsWith("/org/orgList")) return Response.json({ code: "0", data: { list: [{ orgIndexCode: "97", orgName: "STOR24", parentOrgIndexCode: "1" }] } });
+      if (path.endsWith("/person/personCode/personInfo")) return created
+        ? Response.json({ code: "0", data: { personId: "2001", personCode, orgIndexCode: "97", personGivenName: "Jane", personFamilyName: "Tester" } })
+        : Response.json({ code: "1001", msg: "Person not found" });
+      assert.match(path, /\/person\/single\/add$/);
+      const body = JSON.parse(String(init?.body));
+      assert.equal(body.personCode, personCode);
+      assert.equal(body.orgIndexCode, "97");
+      assert.equal(body.personGivenName, "Jane");
+      assert.equal(body.personFamilyName, "Tester");
+      assert.ok(Buffer.from(body.faces[0].faceData, "base64").subarray(0, 2).equals(Buffer.from([0xff, 0xd8])));
+      created = true;
+      return Response.json({ code: "0", data: "2001" });
+    }) as typeof fetch;
+    const newHandoff = await issueHikCentralFaceHandoff(scope, { customerId: newcomer.id, facilityId: facility.id, version: 0 });
+    await db.customer.update({ where: { id: newcomer.id }, data: { firstName: "Changed" } });
+    await assert.rejects(hikCentralFaceHandoff(newHandoff.token), /PHOTO_CHANGED/);
+    await db.customer.update({ where: { id: newcomer.id }, data: { firstName: "Jane" } });
+    const newDetails = await hikCentralFaceHandoff(newHandoff.token);
+    assert.match(newDetails.notice, /create your person record/);
+    await captureHikCentralFaceHandoff(newHandoff.token, { policyHash: newDetails.policyHash, consent: true, image });
+    const newPhoto = await db.hikCentralFaceCapture.findUniqueOrThrow({ where: { customerId: newcomer.id } });
+    assert.equal(newPhoto.personId, null);
+    assert.equal(await db.integrationIdentityLink.findUnique({ where: { customerId: newcomer.id } }), null);
+    (await previewHikCentralFace(scope, newPhoto.id, newPhoto.version)).fill(0);
+    await db.customer.update({ where: { id: newcomer.id }, data: { lastName: "Changed" } });
+    await assert.rejects(decideHikCentralFace(scope, newPhoto.id, newPhoto.version, "SEND"), /PHOTO_CHANGED/);
+    assert.equal(newPersonCalls.filter(path => path.endsWith("/person/single/add")).length, 0);
+    await db.customer.update({ where: { id: newcomer.id }, data: { lastName: "Tester" } });
+    assert.deepEqual(await decideHikCentralFace(scope, newPhoto.id, newPhoto.version, "SEND"), { status: "PROVIDER_ACCEPTED" });
+    const linked = await db.integrationIdentityLink.findUniqueOrThrow({ where: { customerId: newcomer.id } });
+    assert.equal(linked.hikCentralPersonId, "2001");
+    assert.equal(linked.status, "ACTIVE");
+    const stored = await db.hikCentralFaceCapture.findUniqueOrThrow({ where: { customerId: newcomer.id } });
+    assert.equal(stored.personId, "2001");
+    assert.equal(stored.encryptedImage, null);
+    assert.equal(newPersonCalls.filter(path => path.endsWith("/person/single/add")).length, 1);
+    assert.equal(newPersonCalls.filter(path => path.includes("/privilege/")).length, 0);
+
+    const possibleDuplicate = await db.customer.create({ data: { organisationId: org.id, firstName: "Bob", lastName: "Tester" } });
+    let duplicateWrites = 0;
+    globalThis.fetch = (async (url) => {
+      const path = String(url);
+      if (path.endsWith("/person/advance/personList")) return Response.json({ code: "0", data: { total: 0, list: [] } });
+      if (path.endsWith("/org/orgList")) return Response.json({ code: "0", data: { list: [{ orgIndexCode: "97", orgName: "STOR24" }] } });
+      if (path.endsWith("/person/single/add")) { duplicateWrites++; return Response.json({ code: "1001", msg: "Person code already exists" }); }
+      duplicateWrites++;
+      throw Error("A duplicate rejection must never trigger another provider write");
+    }) as typeof fetch;
+    const duplicateHandoff = await issueHikCentralFaceHandoff(scope, { customerId: possibleDuplicate.id, facilityId: facility.id, version: 0 });
+    const duplicateDetails = await hikCentralFaceHandoff(duplicateHandoff.token);
+    await captureHikCentralFaceHandoff(duplicateHandoff.token, { policyHash: duplicateDetails.policyHash, consent: true, image });
+    const duplicatePhoto = await db.hikCentralFaceCapture.findUniqueOrThrow({ where: { customerId: possibleDuplicate.id } });
+    (await previewHikCentralFace(scope, duplicatePhoto.id, duplicatePhoto.version)).fill(0);
+    assert.deepEqual(await decideHikCentralFace(scope, duplicatePhoto.id, duplicatePhoto.version, "SEND"), { status: "PROVIDER_UNCERTAIN" });
+    assert.equal(duplicateWrites, 1);
+    assert.equal((await db.hikCentralFaceCapture.findUniqueOrThrow({ where: { id: duplicatePhoto.id } })).status, "PROVIDER_UNCERTAIN");
+    assert.equal(await db.integrationIdentityLink.findUnique({ where: { customerId: possibleDuplicate.id } }), null);
+
+    const alreadyAtHikCentral = await db.customer.create({ data: { organisationId: org.id, firstName: "Brett Test", lastName: "Dovey" } });
+    globalThis.fetch = (async (url) => {
+      assert.match(String(url), /\/person\/advance\/personList$/);
+      return Response.json({ code: "0", data: { total: 1, list: [{ personId: "1150", personGivenName: "Brett", personFamilyName: "Dovey" }] } });
+    }) as typeof fetch;
+    await assert.rejects(issueHikCentralFaceHandoff(scope, { customerId: alreadyAtHikCentral.id, facilityId: facility.id, version: 0 }), /HIKCENTRAL_PERSON_REVIEW_REQUIRED/);
+    assert.equal(await db.hikCentralFaceHandoff.count({ where: { customerId: alreadyAtHikCentral.id } }), 0);
   } finally {
     globalThis.fetch = previousFetch;
     if (previousKey === undefined) delete process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY; else process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY = previousKey;
