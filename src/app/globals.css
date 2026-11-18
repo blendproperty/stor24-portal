@@ -3326,12 +3326,38 @@ a.module-card:focus-visible {
   .social-provision-actions { flex-direction: column; align-items: stretch; }
 }
 
-.hikcentral-person-link .form-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin:18px 0; }
-.hikcentral-person-link .field { display:grid; align-content:start; gap:7px; min-width:0; font-size:13px; font-weight:650; }
-.hikcentral-person-link .field :is(input,select) { width:100%; min-width:0; min-height:44px; padding:10px 12px; border:1px solid #cbd5db; border-radius:9px; background:#fff; color:var(--ink); font:inherit; }
+.face-page .page-header h1 { font-size:clamp(32px,3vw,42px); }
+.face-page .page-header p { font-size:15px; line-height:1.5; }
+.face-journey { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; padding:0; margin:0; list-style:none; }
+.face-journey li { display:flex; align-items:flex-start; gap:14px; padding:19px; border:1px solid #d9e2dc; border-radius:14px; background:#fff; }
+.face-journey li>span { display:grid; place-items:center; flex:none; width:34px; height:34px; border-radius:50%; background:#ec5e16; color:#fff; font-size:15px; font-weight:800; }
+.face-journey strong { display:block; font-size:16px; line-height:1.25; }
+.face-journey p { margin:6px 0 0; color:#53665b; font-size:14px; line-height:1.45; }
+.face-step-label { display:block; margin-bottom:7px; color:#a84313; font-size:12px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
+.face-page :is(.hikcentral-person-link,.hikcentral-capture) .panel-heading h2 { font-size:24px; line-height:1.2; }
+.face-page :is(.hikcentral-person-link,.hikcentral-capture) .panel-subtitle { max-width:80ch; font-size:15px; line-height:1.5; }
+.face-page :is(.hikcentral-person-link,.hikcentral-capture) .form-grid { display:grid; gap:16px; margin:22px 0; }
+.hikcentral-person-link .form-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.hikcentral-capture .form-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.face-page :is(.hikcentral-person-link,.hikcentral-capture) .field { display:grid; align-content:start; gap:8px; min-width:0; font-size:14px; font-weight:700; }
+.face-page :is(.hikcentral-person-link,.hikcentral-capture) .field :is(input,select) { width:100%; min-width:0; min-height:48px; padding:10px 12px; border:1px solid #cbd5db; border-radius:9px; background:#fff; color:var(--ink); font:500 15px "Satoshi Handover",Arial,sans-serif; }
+.face-page :is(.hikcentral-person-link,.hikcentral-capture) .button { min-height:44px; font-size:14px; }
 .hikcentral-link-preview { display:grid; gap:10px; margin-top:18px; padding:18px; border:1px solid #d9e7df; border-radius:12px; background:#f4f8f4; overflow-wrap:anywhere; }
-.hikcentral-link-preview p { margin:0; font-size:13px; }
-.hikcentral-link-preview label { display:flex; align-items:flex-start; gap:10px; font-size:13px; line-height:1.5; }
+.hikcentral-link-preview p { margin:0; font-size:14px; line-height:1.5; }
+.hikcentral-link-preview label { display:flex; align-items:flex-start; gap:10px; font-size:14px; line-height:1.5; }
 .hikcentral-link-preview input[type=checkbox] { flex:none; width:18px; height:18px; margin-top:2px; }
 .hikcentral-link-preview .button { margin-top:4px; }
-@media(max-width:800px) { .hikcentral-person-link .form-grid { grid-template-columns:1fr; } .hikcentral-person-link .button { width:100%; justify-content:center; } }
+.face-next-step { padding:20px; border:1px solid #e8d5bd; border-radius:12px; background:#fff7ed; }
+.face-next-step strong { display:block; font-size:17px; }
+.face-next-step p { margin:6px 0 0; font-size:14px; line-height:1.5; }
+.face-handoff { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; gap:24px; padding:20px; border:1px solid #c5ddcd; border-radius:12px; background:#fff; }
+.face-handoff h3,.face-review-block h3 { margin:0 0 8px; font-size:19px; }
+.face-handoff ol { margin:0 0 12px; padding-left:22px; font-size:14px; line-height:1.6; }
+.face-handoff img { max-width:100%; height:auto; }
+.face-review-block { display:grid; gap:12px; padding-top:18px; border-top:1px solid #d9e7df; }
+.face-review-block>div { display:grid; gap:14px; justify-items:start; }
+.face-page .face-provider-records summary { font-size:16px; font-weight:700; }
+.face-page .face-provider-records summary span { font-size:13px; }
+.face-page .face-settings .face-workspace { border:0; padding:20px 0 0; box-shadow:none; }
+@media(max-width:900px) { .face-journey { grid-template-columns:1fr; } .hikcentral-capture .form-grid { grid-template-columns:1fr; } }
+@media(max-width:800px) { .hikcentral-person-link .form-grid { grid-template-columns:1fr; } .face-page :is(.hikcentral-person-link,.hikcentral-capture) .button { width:100%; justify-content:center; } .face-handoff { grid-template-columns:1fr; } }
