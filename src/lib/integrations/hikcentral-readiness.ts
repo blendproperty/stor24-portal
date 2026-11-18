@@ -19,12 +19,12 @@ type HikCentralReadinessInput = {
 
 export function hikCentralReadiness(configuration: HikCentralReadinessInput) {
   const credentialsReady = Boolean(configuration.company.endpoint && configuration.company.appKeyConfigured && configuration.company.appSecretConfigured);
-  const mappedFacilities = configuration.facilities.filter((facility) => facility.organisationIndexCode && facility.doorIndexCodes.length);
+  const mappedFacilities = configuration.facilities.filter((facility) => facility.organisationIndexCode && !facility.organisationIndexCode.toUpperCase().startsWith("TEMP-") && facility.doorIndexCodes.length);
   const connectedFacilities = mappedFacilities.filter((facility) => facility.status === "CONNECTED");
   const failedFacility = mappedFacilities.find((facility) => facility.status === "DEGRADED" || facility.status === "FAILED");
 
   if (configuration.company.status === "CONNECTED" && connectedFacilities.length) {
-    return { state: "Connected", detail: `${connectedFacilities.length} facility connection${connectedFacilities.length === 1 ? "" : "s"} verified`, tone: "positive" } as const;
+    return { state: "Door API reachable", detail: `${connectedFacilities.length} facility door-list connection${connectedFacilities.length === 1 ? "" : "s"} verified; face upload and reader access require separate checks`, tone: "positive" } as const;
   }
   if (configuration.company.status === "DEGRADED" || configuration.company.status === "FAILED" || failedFacility) {
     return { state: "Connection failed", detail: failedFacility?.failureMessage || configuration.company.failureMessage || "The latest HikCentral live test failed", tone: "warning" } as const;

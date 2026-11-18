@@ -175,6 +175,8 @@ test("global credential save and facility mapping retain their distinct legitima
     assert.notEqual(writes[0].config.appSecretEncrypted, "synthetic-secret");
     await service.saveHikCentralMapping(restricted, { facilityId: own, organisationIndexCode: "synthetic", doorIndexCodes: ["door"] });
     assert.equal(writes.length, 2); assert.equal(writes[1].facilityId, own);
+    await assert.rejects(service.saveHikCentralMapping(restricted, { facilityId: own, organisationIndexCode: "TEMP-CONNECTION-TEST", doorIndexCodes: ["door"] }), /Use a verified HikCentral organisation index code/);
+    assert.equal(writes.length, 2);
     await assert.rejects(service.saveHikCentralMapping(restricted, { facilityId: foreign, organisationIndexCode: "synthetic", doorIndexCodes: ["door"] }), /FACILITY_FORBIDDEN/);
     assert.equal(writes.length, 2);
   } finally { if (previous === undefined) delete process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY; else process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY = previous; }

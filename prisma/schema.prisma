@@ -438,6 +438,7 @@ model Customer {
   biometricEnrollments BiometricEnrollment[]
   merchandiseRequests  TenantMerchandiseRequest[]
   integrationIdentityLink IntegrationIdentityLink?
+  hikCentralFaceCapture HikCentralFaceCapture?
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
@@ -937,6 +938,49 @@ model LegacyPhotoHandoff {
   createdAt DateTime @default(now())
 
   @@index([tenancyId, expiresAt])
+}
+
+// The provider face belongs to a person/customer, independent of bookings and units.
+model HikCentralFaceCapture {
+  id String @id @default(cuid())
+  customerId String @unique
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  organisationId String
+  facilityId String
+  personId String
+  version Int @default(1)
+  status String @default("WAITING_REVIEW")
+  encryptedImage String? @db.Text
+  imageSha256 String
+  policyVersion String
+  policyHash String
+  consentNotice String @db.Text
+  consentAt DateTime
+  expiresAt DateTime
+  reviewedAt DateTime?
+  transferStartedAt DateTime?
+  providerAcceptedAt DateTime?
+  erasedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, expiresAt])
+}
+
+model HikCentralFaceHandoff {
+  id String @id @default(cuid())
+  tokenHash String @unique
+  customerId String
+  organisationId String
+  facilityId String
+  personId String
+  photoVersion Int
+  issuedById String
+  expiresAt DateTime
+  usedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([customerId, expiresAt])
 }
 
 // Nominations do not grant access and cannot substitute for the person's consent.

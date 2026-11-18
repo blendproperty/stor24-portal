@@ -225,7 +225,7 @@ test("isolated PostgreSQL connected customer journey", async t => {
       assert.equal(statement.rows.length, 2 + initialRent.lines.length);
       const rentCharges = await db.ledgerEntry.findMany({ where: { accountId: account.id, externalRef: { startsWith: "RENT-" } } });
       assert.equal(rentCharges.length, initialRent.lines.length);
-      assert.equal(rentCharges.reduce((sum, entry) => sum + Number(entry.amount), 0), initialRent.total);
+      assert.equal(rentCharges.reduce((sum, entry) => sum + Math.round(Number(entry.amount) * 100), 0), Math.round(initialRent.total * 100));
       assert.equal(await db.payment.count({ where: { accountId: account.id } }), 1);
       await expireIdentityDocuments();
       assert.equal((await db.identityDocument.findUniqueOrThrow({ where: { id: documentId } })).encryptedPages, null);

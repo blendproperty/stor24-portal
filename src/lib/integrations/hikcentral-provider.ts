@@ -7,12 +7,13 @@ import type { ProviderResult } from "@/lib/integrations/providers";
 
 type FetchLike = typeof fetch;
 type FacilityAccessConfig = { organisationIndexCode: string; doorIndexCodes: string[] };
-type HikCentralJsonResponse = { code?: string | number; msg?: string; data?: Record<string, unknown> };
+type HikCentralJsonResponse = { code?: string | number; msg?: string; data?: unknown };
 
 export type HikCentralProviderConfiguration = {
   baseUrl: string;
   appKey: string;
   appSecret: string;
+  userId?: string;
   facilities: Record<string, FacilityAccessConfig>;
   /**
    * Optional SHA-256 fingerprint (colon-separated hex, e.g. "AA:BB:...") of the exact
@@ -56,11 +57,12 @@ export function hikCentralSignature(input: {
   appSecret: string;
   timestamp: string;
   nonce: string;
+  userId?: string;
 }) {
   const contentType = "application/json";
   const accept = "*/*";
   const contentMd5 = createHash("md5").update(input.body).digest("base64");
-  const signedHeaders = `x-ca-key:${input.appKey}\nx-ca-nonce:${input.nonce}\nx-ca-timestamp:${input.timestamp}\n`;
+  const signedHeaders = `${input.userId ? `userid:${input.userId}\n` : ""}x-ca-key:${input.appKey}\nx-ca-nonce:${input.nonce}\nx-ca-timestamp:${input.timestamp}\n`;
   const canonical = `${input.method.toUpperCase()}\n${accept}\n${contentMd5}\n${contentType}\n${signedHeaders}${input.path}`;
   return {
     contentMd5,
@@ -189,7 +191,9 @@ export class HikCentralAccessProvider {
     const body = JSON.stringify(payload);
     const timestamp = Date.now().toString();
     const nonce = randomUUID();
-    const { contentMd5, signature } = hikCentralSignature({ method: "POST", path, body, appKey, appSecret, timestamp, nonce });
+    const userId = this.configuration?.userId;
+    if (path !== "/artemis/api/resource/v1/acsDoor/acsDoorList" && !userId) throw new Error("CONFIG_REQUIRED:HIKCENTRAL_USER_ID");
+    const { contentMd5, signature } = hikCentralSignature({ method: "POST", path, body, appKey, appSecret, timestamp, nonce, userId });
     const headers = {
       Accept: "*/*",
       "Content-Type": "application/json",
@@ -199,6 +203,7 @@ export class HikCentralAccessProvider {
       "X-Ca-Timestamp": timestamp,
       "X-Ca-Signature-Headers": "x-ca-key,x-ca-nonce,x-ca-timestamp",
       "X-Ca-Signature": signature,
+      ...(userId ? { userId, "X-Ca-Signature-Headers": "userid,x-ca-key,x-ca-nonce,x-ca-timestamp" } : {}),
     };
 
     const pinnedFingerprint = this.configuration?.pinnedCertSha256?.trim();
@@ -242,40 +247,134 @@ export class HikCentralAccessProvider {
     try {
       const doors: { indexCode: string; name: string }[] = [];
       for (let pageNo = 1; pageNo <= 50; pageNo++) {
-        const data = await this.post("/artemis/api/resource/v1/acsDoor/acsDoorList", { pageNo, pageSize: 100 });
+        const data = await this.post("/artemis/api/resource/v1/acsDoor/acsDoorList", { pageNo, pageSize: 100 }) as { list?: unknown };
         if (!Array.isArray(data.list)) throw new Error("HikCentral returned an invalid door list.");
         for (const item of data.list) {
           if (!item || typeof item !== "object") throw new Error("HikCentral returned an invalid door.");
           const door = item as Record<string, unknown>;
-          if (typeof door.doorIndexCode !== "string" || typeof door.doorName !== "string") throw new Error("HikCentral returned a door without a name or index code.");
+          if (typeof door.doorIndexCode !== "string" || !door.doorIndexCode || typeof door.doorName !== "string" || !door.doorName) continue;
           doors.push({ indexCode: door.doorIndexCode, name: door.doorName });
         }
-        if (data.list.length < 100) return { ok: true, providerReference: "hikcentral", data: { doors } };
+        if (data.list.length < 100) {
+          if (!doors.length) throw new Error("HikCentral returned no doors with both a name and index code.");
+          return { ok: true, providerReference: "hikcentral", data: { doors } };
+        }
       }
       throw new Error("HikCentral door list exceeded 5,000 entries.");
     } catch (error) { return providerFailure(error); }
   }
 
-  async enroll(input: HikCentralEnrollmentInput): Promise<ProviderResult<{ personId: string; personCode: string }>> {
+  async version(): Promise<ProviderResult<{ product: string; version: string }>> {
     try {
-      const config = this.facilityConfig(input.facilityId);
-      const person = await this.post(process.env.HIKCENTRAL_PERSON_ADD_PATH ?? "/artemis/api/resource/v1/person/single/add", {
-        personCode: input.personCode,
-        personGivenName: input.givenName,
-        personFamilyName: input.familyName,
-        orgIndexCode: config.organisationIndexCode,
-      });
-      const personId = String(person.personId ?? person.indexCode ?? "");
-      if (!personId) throw new Error("HikCentral did not return a person identifier.");
-      await this.post(process.env.HIKCENTRAL_FACE_ADD_PATH ?? "/artemis/api/resource/v1/face/single/add", { personId, faceData: input.faceBase64 });
-      await this.post(process.env.HIKCENTRAL_PERMISSION_ADD_PATH ?? "/artemis/api/acps/v1/auth_config/add", {
-        personIds: [personId],
-        resourceInfos: config.doorIndexCodes.map((resourceIndexCode) => ({ resourceIndexCode, resourceType: "door" })),
-        startTime: input.validFrom.toISOString(),
-        endTime: (input.validUntil ?? new Date("2099-12-31T21:59:59.000Z")).toISOString(),
-      });
-      return { ok: true, providerReference: personId, data: { personId, personCode: input.personCode } };
+      const data = await this.post("/artemis/api/common/v1/version", {}) as Record<string, unknown>;
+      if (typeof data.produceName !== "string" || typeof data.softVersion !== "string") throw new Error("HikCentral did not return its software version.");
+      return { ok: true, providerReference: "hikcentral", data: { product: data.produceName, version: data.softVersion } };
     } catch (error) { return providerFailure(error); }
+  }
+
+  async listAccessLevels(): Promise<ProviderResult<{ levels: { id: string; name: string; resourceIds: string[]; resourceNames: string[] }[] }>> {
+    try {
+      const levels: { id: string; name: string; resourceIds: string[]; resourceNames: string[] }[] = [];
+      for (let pageNo = 1; pageNo <= 50; pageNo++) {
+        const data = await this.post("/artemis/api/acs/v1/privilege/group", { pageNo, pageSize: 100, type: 1 }) as { list?: unknown };
+        if (!Array.isArray(data.list)) throw new Error("HikCentral returned an invalid access-level list.");
+        for (const item of data.list) {
+          if (!item || typeof item !== "object") throw new Error("HikCentral returned an invalid access level.");
+          const level = item as Record<string, unknown>;
+          if (typeof level.privilegeGroupId !== "string" || typeof level.privilegeGroupName !== "string" || !Array.isArray(level.ElementList)) throw new Error("HikCentral returned an access level without its resource list.");
+          const resources = level.ElementList.map((entry: unknown) => {
+            const element = (entry as { Element?: { ID?: unknown } })?.Element ?? entry as { ID?: unknown };
+            if (typeof element?.ID !== "number" && typeof element?.ID !== "string") throw new Error("HikCentral returned an access level without a resource ID.");
+            const name = (element as { BaseInfo?: { Name?: unknown } }).BaseInfo?.Name;
+            return { id: String(element.ID), name: typeof name === "string" ? name : "" };
+          });
+          levels.push({ id: level.privilegeGroupId, name: level.privilegeGroupName, resourceIds: resources.map(item => item.id), resourceNames: resources.map(item => item.name) });
+        }
+        if (data.list.length < 100) return { ok: true, providerReference: "hikcentral", data: { levels } };
+      }
+      throw new Error("HikCentral access-level list exceeded 5,000 entries.");
+    } catch (error) { return providerFailure(error); }
+  }
+
+  async listOrganizations(): Promise<ProviderResult<{ organizations: { indexCode: string; name: string; parentIndexCode: string | null }[] }>> {
+    try {
+      const organizations: { indexCode: string; name: string; parentIndexCode: string | null }[] = [];
+      for (let pageNo = 1; pageNo <= 50; pageNo++) {
+        const data = await this.post("/artemis/api/resource/v1/org/orgList", { pageNo, pageSize: 100 }) as { list?: unknown };
+        if (!Array.isArray(data.list)) throw new Error("HikCentral returned an invalid organization list.");
+        for (const item of data.list) {
+          if (!item || typeof item !== "object") throw new Error("HikCentral returned an invalid organization.");
+          const org = item as Record<string, unknown>;
+          if (typeof org.orgIndexCode !== "string" || typeof org.orgName !== "string") throw new Error("HikCentral returned an organization without an ID or name.");
+          organizations.push({ indexCode: org.orgIndexCode, name: org.orgName, parentIndexCode: typeof org.parentOrgIndexCode === "string" ? org.parentOrgIndexCode : null });
+        }
+        if (data.list.length < 100) return { ok: true, providerReference: "hikcentral", data: { organizations } };
+      }
+      throw new Error("HikCentral organization list exceeded 5,000 entries.");
+    } catch (error) { return providerFailure(error); }
+  }
+
+  async personByCode(personCode: string): Promise<ProviderResult<{ personId: string; personCode: string; organisationIndexCode: string; givenName: string; familyName: string }>> {
+    try {
+      const data = await this.post("/artemis/api/resource/v1/person/personCode/personInfo", { personCode }) as Record<string, unknown>;
+      if (typeof data.personId !== "string" || data.personCode !== personCode || typeof data.orgIndexCode !== "string") throw new Error("HikCentral returned an unexpected person identity.");
+      return { ok: true, providerReference: data.personId, data: { personId: data.personId, personCode, organisationIndexCode: data.orgIndexCode, givenName: typeof data.personGivenName === "string" ? data.personGivenName : "", familyName: typeof data.personFamilyName === "string" ? data.personFamilyName : "" } };
+    } catch (error) { return providerFailure(error); }
+  }
+
+  async personById(personId: string): Promise<ProviderResult<{ personId: string; personCode: string; givenName: string; familyName: string }>> {
+    try {
+      if (!personId || personId.length > 64) throw new Error("HikCentral person ID is invalid.");
+      const data = await this.post("/artemis/api/resource/v1/person/personId/personInfo", { personId }) as Record<string, unknown>;
+      if (data.personId !== personId || typeof data.personCode !== "string") throw new Error("HikCentral returned a different person.");
+      return { ok: true, providerReference: personId, data: { personId, personCode: data.personCode, givenName: typeof data.personGivenName === "string" ? data.personGivenName : "", familyName: typeof data.personFamilyName === "string" ? data.personFamilyName : "" } };
+    } catch (error) { return providerFailure(error); }
+  }
+
+  async createPersonWithFace(input: Pick<HikCentralEnrollmentInput, "facilityId" | "personCode" | "givenName" | "familyName" | "faceBase64">): Promise<ProviderResult<{ personId: string }>> {
+    try {
+      if (!/^[A-Za-z0-9]{1,16}$/.test(input.personCode) || !input.faceBase64) throw new Error("HikCentral person code or face is invalid.");
+      const config = this.facilityConfig(input.facilityId);
+      const data = await this.post("/artemis/api/resource/v1/person/single/add", {
+        personCode: input.personCode, personGivenName: input.givenName, personFamilyName: input.familyName,
+        orgIndexCode: config.organisationIndexCode, faces: [{ faceData: input.faceBase64 }],
+      });
+      if (typeof data !== "string" || !data) throw new Error("HikCentral did not return its new person ID.");
+      return { ok: true, providerReference: data, data: { personId: data } };
+    } catch (error) { return providerFailure(error); }
+  }
+
+  async updatePersonFace(personId: string, faceBase64: string): Promise<ProviderResult<{ accepted: true }>> {
+    try {
+      if (!personId || personId.length > 100 || !faceBase64 || faceBase64.length > 7 * 1024 * 1024 || !/^[A-Za-z0-9+/]+={0,2}$/.test(faceBase64) || Buffer.from(faceBase64, "base64").length > 5 * 1024 * 1024) throw new Error("HikCentral person or face is invalid.");
+      await this.post("/artemis/api/resource/v1/person/face/update", { personId, faceData: faceBase64 });
+      return { ok: true, providerReference: personId, data: { accepted: true } };
+    } catch (error) { return providerFailure(error); }
+  }
+
+  async addPersonToAccessLevel(privilegeGroupId: string, personId: string): Promise<ProviderResult<{ accepted: true }>> {
+    try {
+      await this.post("/artemis/api/acs/v1/privilege/group/single/addPersons", { privilegeGroupId, type: 1, list: [{ id: personId }] });
+      return { ok: true, providerReference: privilegeGroupId, data: { accepted: true } };
+    } catch (error) { return providerFailure(error); }
+  }
+
+  async accessLevelHasPerson(privilegeGroupId: string, personId: string): Promise<ProviderResult<{ member: boolean }>> {
+    try {
+      for (let pageNo = 1; pageNo <= 50; pageNo++) {
+        const data = await this.post("/artemis/api/acs/v1/privilege/group/single/personList", { privilegeGroupId, type: 1, pageNo, pageSize: 100 }) as { list?: unknown };
+        if (!Array.isArray(data.list)) throw new Error("HikCentral returned an invalid access-level person list.");
+        if (data.list.some((item) => item && typeof item === "object" && (item as { id?: unknown }).id === personId)) return { ok: true, providerReference: privilegeGroupId, data: { member: true } };
+        if (data.list.length < 100) return { ok: true, providerReference: privilegeGroupId, data: { member: false } };
+      }
+      throw new Error("HikCentral access-level person list exceeded 5,000 entries.");
+    } catch (error) { return providerFailure(error); }
+  }
+
+  async enroll(input: HikCentralEnrollmentInput): Promise<ProviderResult<{ personId: string; personCode: string }>> {
+    void input;
+    // shortcut: the old three-call contract is unverified; replace only with a staged consumer and provider readback.
+    return { ok: false, retryable: false, code: "UNVERIFIED_PROVIDER_CONTRACT", message: "Facial enrolment requires the staged HikCentral integration." };
   }
 
   async revoke(input: { facilityId: string; personId: string }): Promise<ProviderResult<{ revoked: true }>> {
