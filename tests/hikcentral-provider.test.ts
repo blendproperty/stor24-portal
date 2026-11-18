@@ -113,6 +113,21 @@ test("person and access-level reads require the HikCentral user ID", async () =>
   if (!result.ok) assert.equal(result.code, "CONFIG_REQUIRED");
 });
 
+test("an ungranted version endpoint does not prevent authorised access-level reads", async () => {
+  const calls: string[] = [];
+  const provider = new HikCentralAccessProvider((async (url) => {
+    calls.push(String(url));
+    return Response.json(String(url).endsWith("/version")
+      ? { code: "1028", msg: "API not authorised" }
+      : { code: "0", data: { list: [{ privilegeGroupId: "12", privilegeGroupName: "Block24", ElementList: [] }] } });
+  }) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", userId: "admin", facilities: {} });
+  const levels = await provider.listAccessLevels();
+  const version = await provider.version();
+  assert.equal(levels.ok, true);
+  assert.equal(version.ok, false);
+  assert.deepEqual(calls.map((url) => url.split("/artemis")[1]), ["/api/acs/v1/privilege/group", "/api/common/v1/version"]);
+});
+
 test("HikCentral user ID is included in the signed request headers", async () => {
   let observed = false;
   const provider = new HikCentralAccessProvider((async (_url, init) => {
