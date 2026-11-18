@@ -164,6 +164,16 @@ export async function discoverHikCentralDoors(scope: RequestScope, facilityId: s
   return provider.listDoors();
 }
 
+export async function inspectHikCentralAccess(scope: RequestScope, facilityId: string) {
+  await requireFacility(scope, facilityId);
+  const provider = new HikCentralAccessProvider(fetch, await loadHikCentralRuntimeConfiguration(scope.organisationId, facilityId));
+  const version = await provider.version();
+  if (!version.ok) return version;
+  const accessLevels = await provider.listAccessLevels();
+  if (!accessLevels.ok) return accessLevels;
+  return { ok: true as const, providerReference: "hikcentral", data: { version: version.data, accessLevels: accessLevels.data.levels } };
+}
+
 export async function testHikCentralConnection(scope: RequestScope, facilityId: string) {
   await requireFacility(scope, facilityId);
   const company = await companyConnection(scope.organisationId);

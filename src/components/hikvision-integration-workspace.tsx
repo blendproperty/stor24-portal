@@ -10,6 +10,7 @@ type CompanyConfiguration = { endpoint: string; appKeyConfigured: boolean; appSe
 type FacilityConfiguration = { id: string; name: string; code: string; organisationIndexCode: string; doorIndexCodes: string[]; status: string; lastHealthAt: string | null; lastSuccessAt: string | null; failureMessage: string | null };
 type Configuration = { encryptionReady: boolean; company: CompanyConfiguration; facilities: FacilityConfiguration[] };
 type Door = { indexCode: string; name: string };
+type AccessInspection = { version: { product: string; version: string }; accessLevels: { id: string; name: string; resourceIds: string[] }[] };
 
 function statusTone(status: string) { return status === "CONNECTED" ? "positive" : status === "DEGRADED" ? "warning" : "neutral"; }
 function statusLabel(status: string) { return status === "CONNECTED" ? "Connected" : status === "DEGRADED" ? "Connection failed" : status === "CONFIGURED" ? "Ready to test" : "Configuration required"; }
@@ -23,6 +24,7 @@ export function HikvisionIntegrationWorkspace() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [discoveredDoors, setDiscoveredDoors] = useState<Door[]>([]);
+  const [accessInspection, setAccessInspection] = useState<AccessInspection | null>(null);
   const doorCodesField = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -71,6 +73,17 @@ export function HikvisionIntegrationWorkspace() {
     finally { setBusy(""); }
   }
 
+  async function inspectAccess() {
+    setBusy("inspect-access"); setError(""); setAccessInspection(null);
+    try {
+      const response = await fetch("/api/v1/integrations/hikvision", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "inspect-access", facilityId }) });
+      const payload = await response.json();
+      if (!response.ok || !payload.data?.ok) throw new Error(payload.error?.message ?? payload.data?.message ?? "HikCentral access lookup failed.");
+      setAccessInspection(payload.data.data);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "HikCentral access lookup failed."); }
+    finally { setBusy(""); }
+  }
+
   function addBlock24Doors() {
     if (block24Doors.length !== 3 || !doorCodesField.current) return;
     const existing = doorCodesField.current.value.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean);
@@ -79,7 +92,7 @@ export function HikvisionIntegrationWorkspace() {
   }
 
   return <div className="page-stack provider-config-workspace">
-    <PageHeader eyebrow="Company setup · Integrations" title="Hikvision access control" description="Configure the access connection and review enrolment, permissions and revocation controls." />
+    <PageHeader eyebrow="Company setup · Integrations" title="Hikvision access control" description="Check the HikCentral connection and map the facility doors. Facial enrolment and live gate access require separate provider verification." />
     {error ? <p className="form-error" role="alert">{error}</p> : null}{notice ? <p className="form-success"><CheckCircle2 size={16}/>{notice}</p> : null}
     {!configuration?.encryptionReady ? <p className="safe-config-note"><LockKeyhole size={17}/>Secure credential storage is not enabled on the server yet. Add the encryption key before entering the HikCentral App Key or App Secret.</p> : null}
     <section className="summary-strip">
@@ -104,7 +117,7 @@ export function HikvisionIntegrationWorkspace() {
         <div className="form-footer"><button className="button button-primary" disabled={!canManageCompany || !configuration?.encryptionReady || busy === "save-credentials"}>{busy === "save-credentials" ? "Saving…" : "Save credentials"}</button></div>
       </form>
       <form action={saveMapping} className="panel panel-spacious company-form" key={facility?.id ?? "none"}>
-        <div className="panel-heading"><div><p className="eyebrow">Facility mapping</p><h2>Organisation and doors</h2><p className="panel-subtitle">Only the doors listed here will be granted to customers at the selected facility.</p></div><Link2 className="positive-icon"/></div>
+        <div className="panel-heading"><div><p className="eyebrow">Facility mapping</p><h2>Organisation and doors</h2><p className="panel-subtitle">These are the intended doors for this facility. Saving them does not grant access to a person.</p></div><Link2 className="positive-icon"/></div>
         <label className="facility-picker hikvision-facility-picker"><span>Facility</span><select value={facilityId} onChange={(event) => { setFacilityId(event.target.value); setDiscoveredDoors([]); setNotice(""); setError(""); }}>{configuration?.facilities.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
         <div className="field-grid">
           <label>HikCentral organisation index code<input name="organisationIndexCode" required defaultValue={facility?.organisationIndexCode ?? ""} disabled={!canManage}/></label>
@@ -113,7 +126,8 @@ export function HikvisionIntegrationWorkspace() {
         <p className="field-help">Use HikCentral index codes, not the visible door names. Duplicate codes are removed automatically.</p>
         <div className="hikvision-actions"><button type="button" className="button button-secondary" disabled={!canManage || !facilityId || busy === "discover-doors"} onClick={() => void discoverDoors()}>{busy === "discover-doors" ? "Finding doors…" : "Find Block24 door IDs"}</button>{block24Doors.length === 3 ? <button type="button" className="button button-secondary" onClick={addBlock24Doors}>Add all three to mapping</button> : null}</div>
         {discoveredDoors.length ? <div className="field-help" aria-live="polite">{block24Doors.length === 3 ? block24Doors.map((door) => <div key={door.indexCode}>{door.name}: <code>{door.indexCode}</code></div>) : "All three Block24 doors were not found in the live HikCentral door list. Confirm their names and IDs before saving."}</div> : null}
-        <div className="hikvision-actions"><button className="button button-secondary" disabled={!canManage || !facilityId || busy === "save-mapping"}>{busy === "save-mapping" ? "Saving…" : "Save mapping"}</button><button type="button" className="button button-primary" disabled={!canManage || !facilityId || busy === "test-connection"} onClick={() => void call("POST", { action: "test-connection", facilityId }, "HikCentral connection verified for this facility.")}><RefreshCw size={15}/>{busy === "test-connection" ? "Testing…" : "Test connection"}</button></div>
+        <div className="hikvision-actions"><button className="button button-secondary" disabled={!canManage || !facilityId || busy === "save-mapping"}>{busy === "save-mapping" ? "Saving…" : "Save mapping"}</button><button type="button" className="button button-primary" disabled={!canManage || !facilityId || busy === "test-connection"} onClick={() => void call("POST", { action: "test-connection", facilityId }, "HikCentral door-list connection verified. Person and gate access are not yet verified.")}><RefreshCw size={15}/>{busy === "test-connection" ? "Testing…" : "Test connection"}</button><button type="button" className="button button-secondary" disabled={!canManage || !facilityId || Boolean(busy)} onClick={() => void inspectAccess()}>{busy === "inspect-access" ? "Checking…" : "Check version and access levels"}</button></div>
+        {accessInspection ? <div className="field-help" aria-live="polite"><strong>{accessInspection.version.product} {accessInspection.version.version}</strong><div>{accessInspection.accessLevels.length} access levels found. Confirm which resources represent the three Block24 doors before enrolment.</div>{accessInspection.accessLevels.map((level) => <div key={level.id}>{level.name} ({level.id}): {level.resourceIds.join(", ") || "no resources"}</div>)}</div> : null}
         <div className="hikvision-health"><StatusPill tone={statusTone(facility?.status ?? "DISCONNECTED")}>{statusLabel(facility?.status ?? "DISCONNECTED")}</StatusPill><span>{facility?.lastSuccessAt ? `Last successful check ${new Date(facility.lastSuccessAt).toLocaleString("en-ZA")}` : facility?.failureMessage ?? "No successful live check yet."}</span></div>
       </form>
     </section>

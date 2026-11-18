@@ -7,7 +7,7 @@ import type { ProviderResult } from "@/lib/integrations/providers";
 
 type FetchLike = typeof fetch;
 type FacilityAccessConfig = { organisationIndexCode: string; doorIndexCodes: string[] };
-type HikCentralJsonResponse = { code?: string | number; msg?: string; data?: Record<string, unknown> };
+type HikCentralJsonResponse = { code?: string | number; msg?: string; data?: unknown };
 
 export type HikCentralProviderConfiguration = {
   baseUrl: string;
@@ -242,7 +242,7 @@ export class HikCentralAccessProvider {
     try {
       const doors: { indexCode: string; name: string }[] = [];
       for (let pageNo = 1; pageNo <= 50; pageNo++) {
-        const data = await this.post("/artemis/api/resource/v1/acsDoor/acsDoorList", { pageNo, pageSize: 100 });
+        const data = await this.post("/artemis/api/resource/v1/acsDoor/acsDoorList", { pageNo, pageSize: 100 }) as { list?: unknown };
         if (!Array.isArray(data.list)) throw new Error("HikCentral returned an invalid door list.");
         for (const item of data.list) {
           if (!item || typeof item !== "object") throw new Error("HikCentral returned an invalid door.");
@@ -256,36 +256,45 @@ export class HikCentralAccessProvider {
     } catch (error) { return providerFailure(error); }
   }
 
-  async enroll(input: HikCentralEnrollmentInput): Promise<ProviderResult<{ personId: string; personCode: string }>> {
+  async version(): Promise<ProviderResult<{ product: string; version: string }>> {
     try {
-      const config = this.facilityConfig(input.facilityId);
-      const person = await this.post(process.env.HIKCENTRAL_PERSON_ADD_PATH ?? "/artemis/api/resource/v1/person/single/add", {
-        personCode: input.personCode,
-        personGivenName: input.givenName,
-        personFamilyName: input.familyName,
-        orgIndexCode: config.organisationIndexCode,
-      });
-      const personId = String(person.personId ?? person.indexCode ?? "");
-      if (!personId) throw new Error("HikCentral did not return a person identifier.");
-      await this.post(process.env.HIKCENTRAL_FACE_ADD_PATH ?? "/artemis/api/resource/v1/face/single/add", { personId, faceData: input.faceBase64 });
-      await this.post(process.env.HIKCENTRAL_PERMISSION_ADD_PATH ?? "/artemis/api/acps/v1/auth_config/add", {
-        personIds: [personId],
-        resourceInfos: config.doorIndexCodes.map((resourceIndexCode) => ({ resourceIndexCode, resourceType: "door" })),
-        startTime: input.validFrom.toISOString(),
-        endTime: (input.validUntil ?? new Date("2099-12-31T21:59:59.000Z")).toISOString(),
-      });
-      return { ok: true, providerReference: personId, data: { personId, personCode: input.personCode } };
+      const data = await this.post("/artemis/api/common/v1/version", {}) as Record<string, unknown>;
+      if (typeof data.produceName !== "string" || typeof data.softVersion !== "string") throw new Error("HikCentral did not return its software version.");
+      return { ok: true, providerReference: "hikcentral", data: { product: data.produceName, version: data.softVersion } };
     } catch (error) { return providerFailure(error); }
   }
 
-  async revoke(input: { facilityId: string; personId: string }): Promise<ProviderResult<{ revoked: true }>> {
+  async listAccessLevels(): Promise<ProviderResult<{ levels: { id: string; name: string; resourceIds: string[] }[] }>> {
     try {
-      const config = this.facilityConfig(input.facilityId);
-      await this.post(process.env.HIKCENTRAL_PERMISSION_DELETE_PATH ?? "/artemis/api/acps/v1/auth_config/delete", {
-        personIds: [input.personId],
-        resourceInfos: config.doorIndexCodes.map((resourceIndexCode) => ({ resourceIndexCode, resourceType: "door" })),
-      });
-      return { ok: true, providerReference: input.personId, data: { revoked: true } };
+      const levels: { id: string; name: string; resourceIds: string[] }[] = [];
+      for (let pageNo = 1; pageNo <= 50; pageNo++) {
+        const data = await this.post("/artemis/api/acs/v1/privilege/group", { pageNo, pageSize: 100, type: 1 }) as { list?: unknown };
+        if (!Array.isArray(data.list)) throw new Error("HikCentral returned an invalid access-level list.");
+        for (const item of data.list) {
+          if (!item || typeof item !== "object") throw new Error("HikCentral returned an invalid access level.");
+          const level = item as Record<string, unknown>;
+          if (typeof level.privilegeGroupId !== "string" || typeof level.privilegeGroupName !== "string" || !Array.isArray(level.ElementList)) throw new Error("HikCentral returned an access level without its resource list.");
+          const resourceIds = level.ElementList.map((entry: unknown) => {
+            const element = (entry as { Element?: { ID?: unknown } })?.Element ?? entry as { ID?: unknown };
+            if (typeof element?.ID !== "number" && typeof element?.ID !== "string") throw new Error("HikCentral returned an access level without a resource ID.");
+            return String(element.ID);
+          });
+          levels.push({ id: level.privilegeGroupId, name: level.privilegeGroupName, resourceIds });
+        }
+        if (data.list.length < 100) return { ok: true, providerReference: "hikcentral", data: { levels } };
+      }
+      throw new Error("HikCentral access-level list exceeded 5,000 entries.");
     } catch (error) { return providerFailure(error); }
+  }
+
+  async enroll(input: HikCentralEnrollmentInput): Promise<ProviderResult<{ personId: string; personCode: string }>> {
+    void input;
+    // shortcut: the old three-call contract is unverified; replace only with a staged consumer and provider readback.
+    return { ok: false, retryable: false, code: "UNVERIFIED_PROVIDER_CONTRACT", message: "Facial enrolment requires the staged HikCentral integration." };
+  }
+
+  async revoke(input: { facilityId: string; personId: string }): Promise<ProviderResult<{ revoked: true }>> {
+    void input;
+    return { ok: false, retryable: false, code: "UNVERIFIED_PROVIDER_CONTRACT", message: "Revocation requires the staged HikCentral integration." };
   }
 }

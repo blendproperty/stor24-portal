@@ -90,3 +90,24 @@ test("door discovery fails closed when HikCentral omits a door ID", async () => 
   const provider = new HikCentralAccessProvider((async () => Response.json({ code: "0", data: { list: [{ doorName: "Block24 Main Gate_Door_1" }] } })) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", facilities: {} });
   assert.equal((await provider.listDoors()).ok, false);
 });
+
+test("access inspection reads the installed version and access-level resources without writing", async () => {
+  const calls: string[] = [];
+  const provider = new HikCentralAccessProvider((async (url) => {
+    calls.push(String(url));
+    return Response.json({ code: "0", data: String(url).endsWith("/version")
+      ? { produceName: "HikCentral Professional", softVersion: "3.1.1" }
+      : { list: [{ privilegeGroupId: "12", privilegeGroupName: "Block24", ElementList: [{ Element: { ID: 101 } }, { Element: { ID: 102 } }, { Element: { ID: 103 } }] }] } });
+  }) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", facilities: {} });
+  assert.deepEqual((await provider.version()), { ok: true, providerReference: "hikcentral", data: { product: "HikCentral Professional", version: "3.1.1" } });
+  const levels = await provider.listAccessLevels();
+  assert.equal(levels.ok, true);
+  if (levels.ok) assert.deepEqual(levels.data.levels, [{ id: "12", name: "Block24", resourceIds: ["101", "102", "103"] }]);
+  assert.deepEqual(calls, ["https://example.invalid/artemis/api/common/v1/version", "https://example.invalid/artemis/api/acs/v1/privilege/group"]);
+});
+
+test("unverified legacy person and permission adapter cannot send provider writes", async () => {
+  const provider = new HikCentralAccessProvider((async () => { throw Error("unexpected provider write"); }) as typeof fetch);
+  assert.equal((await provider.enroll({ facilityId: "f", personCode: "p", givenName: "A", familyName: "B", faceBase64: "AA==", validFrom: new Date() })).ok, false);
+  assert.equal((await provider.revoke({ facilityId: "f", personId: "p" })).ok, false);
+});
