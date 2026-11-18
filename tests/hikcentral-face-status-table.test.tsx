@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { renderToStaticMarkup } from "react-dom/server";
+import { HikCentralFaceCaptureWorkspace } from "../src/components/hikcentral-face-capture-workspace";
+
+test("customer table separates saved photos, provider acceptance and door access", () => {
+  const html = renderToStaticMarkup(<HikCentralFaceCaptureWorkspace canSend people={[
+    { customerId: "john", customerName: "John Test Wayne", personId: "S24EXAMPLE", linkStatus: "ACTIVE", photo: { id: "photo", version: 1, status: "PROVIDER_ACCEPTED", consentAt: "2026-11-18T12:00:00Z", providerAcceptedAt: "2026-11-18T12:01:00Z" } },
+    { customerId: "new", customerName: "New Customer", personId: null, linkStatus: null, photo: null },
+  ]} facilities={[{ id: "facility", name: "Store 1" }]} />);
+  assert.match(html, /John Test Wayne/);
+  assert.match(html, /Accepted by HikCentral/);
+  assert.match(html, /S24EXAMPLE/);
+  assert.match(html, /New Customer/);
+  assert.match(html, /Not captured/);
+  assert.match(html, /does not confirm door rights or reader distribution/);
+});
