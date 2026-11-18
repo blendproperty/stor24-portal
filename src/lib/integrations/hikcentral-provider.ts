@@ -13,6 +13,7 @@ export type HikCentralProviderConfiguration = {
   baseUrl: string;
   appKey: string;
   appSecret: string;
+  userId?: string;
   facilities: Record<string, FacilityAccessConfig>;
   /**
    * Optional SHA-256 fingerprint (colon-separated hex, e.g. "AA:BB:...") of the exact
@@ -56,11 +57,12 @@ export function hikCentralSignature(input: {
   appSecret: string;
   timestamp: string;
   nonce: string;
+  userId?: string;
 }) {
   const contentType = "application/json";
   const accept = "*/*";
   const contentMd5 = createHash("md5").update(input.body).digest("base64");
-  const signedHeaders = `x-ca-key:${input.appKey}\nx-ca-nonce:${input.nonce}\nx-ca-timestamp:${input.timestamp}\n`;
+  const signedHeaders = `${input.userId ? `userid:${input.userId}\n` : ""}x-ca-key:${input.appKey}\nx-ca-nonce:${input.nonce}\nx-ca-timestamp:${input.timestamp}\n`;
   const canonical = `${input.method.toUpperCase()}\n${accept}\n${contentMd5}\n${contentType}\n${signedHeaders}${input.path}`;
   return {
     contentMd5,
@@ -189,7 +191,9 @@ export class HikCentralAccessProvider {
     const body = JSON.stringify(payload);
     const timestamp = Date.now().toString();
     const nonce = randomUUID();
-    const { contentMd5, signature } = hikCentralSignature({ method: "POST", path, body, appKey, appSecret, timestamp, nonce });
+    const userId = this.configuration?.userId;
+    if (path !== "/artemis/api/resource/v1/acsDoor/acsDoorList" && !userId) throw new Error("CONFIG_REQUIRED:HIKCENTRAL_USER_ID");
+    const { contentMd5, signature } = hikCentralSignature({ method: "POST", path, body, appKey, appSecret, timestamp, nonce, userId });
     const headers = {
       Accept: "*/*",
       "Content-Type": "application/json",
@@ -199,6 +203,7 @@ export class HikCentralAccessProvider {
       "X-Ca-Timestamp": timestamp,
       "X-Ca-Signature-Headers": "x-ca-key,x-ca-nonce,x-ca-timestamp",
       "X-Ca-Signature": signature,
+      ...(userId ? { userId, "X-Ca-Signature-Headers": "userid,x-ca-key,x-ca-nonce,x-ca-timestamp" } : {}),
     };
 
     const pinnedFingerprint = this.configuration?.pinnedCertSha256?.trim();

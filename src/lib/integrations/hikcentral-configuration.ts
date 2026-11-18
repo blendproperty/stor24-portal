@@ -11,6 +11,7 @@ export const HIKCENTRAL_PROVIDER = "HIKCENTRAL";
 
 const credentialsSchema = z.object({
   endpoint: z.url().max(500),
+  userId: z.string().trim().min(1).max(32).regex(/^[^'\/:*?"<>|]+$/).optional(),
   appKey: z.string().trim().min(1).max(500).optional(),
   appSecret: z.string().trim().min(1).max(1000).optional(),
   // Not a secret: identifies a specific TLS certificate so we can pin to it when the
@@ -33,7 +34,7 @@ const mappingSchema = z.object({
   doorIndexCodes: z.array(z.string().trim().min(1).max(200)).min(1).max(200).transform((items) => [...new Set(items)]),
 });
 
-type StoredCredentials = { endpoint?: unknown; appKeyEncrypted?: unknown; appSecretEncrypted?: unknown; pinnedCertSha256Fingerprint?: unknown; regionIndexCode?: unknown };
+type StoredCredentials = { endpoint?: unknown; userId?: unknown; appKeyEncrypted?: unknown; appSecretEncrypted?: unknown; pinnedCertSha256Fingerprint?: unknown; regionIndexCode?: unknown };
 type StoredMapping = { organisationIndexCode?: unknown; doorIndexCodes?: unknown };
 
 function safeEndpoint(value: string) {
@@ -62,6 +63,7 @@ export async function listHikCentralConfiguration(scope: RequestScope) {
     encryptionReady: integrationEncryptionConfigured(),
     company: {
       endpoint: configuredString(credentials.endpoint) ? credentials.endpoint : "",
+      userId: configuredString(credentials.userId) ? credentials.userId : "",
       appKeyConfigured: configuredString(credentials.appKeyEncrypted),
       appSecretConfigured: configuredString(credentials.appSecretEncrypted),
       pinnedCertSha256Fingerprint: configuredString(credentials.pinnedCertSha256Fingerprint) ? credentials.pinnedCertSha256Fingerprint : "",
@@ -105,6 +107,7 @@ export async function saveHikCentralCredentials(scope: RequestScope, input: unkn
     : configuredString(oldConfig.regionIndexCode) ? oldConfig.regionIndexCode : undefined;
   const config = {
     endpoint,
+    userId: parsed.userId ?? (configuredString(oldConfig.userId) ? oldConfig.userId : undefined),
     appKeyEncrypted,
     appSecretEncrypted,
     ...(pinnedCertSha256Fingerprint ? { pinnedCertSha256Fingerprint } : {}),
@@ -143,6 +146,7 @@ export async function loadHikCentralRuntimeConfiguration(organisationId: string,
     baseUrl: credentials.endpoint,
     appKey: decryptIntegrationSecret(credentials.appKeyEncrypted),
     appSecret: decryptIntegrationSecret(credentials.appSecretEncrypted),
+    ...(configuredString(credentials.userId) ? { userId: credentials.userId } : {}),
     facilities: { [facilityId]: { organisationIndexCode: facility.organisationIndexCode, doorIndexCodes: facility.doorIndexCodes.filter(configuredString) } },
     ...(configuredString(credentials.pinnedCertSha256Fingerprint) ? { pinnedCertSha256: credentials.pinnedCertSha256Fingerprint } : {}),
     ...(configuredString(credentials.regionIndexCode) ? { regionIndexCodes: [credentials.regionIndexCode] } : {}),
@@ -158,6 +162,7 @@ export async function discoverHikCentralDoors(scope: RequestScope, facilityId: s
     baseUrl: credentials.endpoint,
     appKey: decryptIntegrationSecret(credentials.appKeyEncrypted),
     appSecret: decryptIntegrationSecret(credentials.appSecretEncrypted),
+    ...(configuredString(credentials.userId) ? { userId: credentials.userId } : {}),
     facilities: {},
     ...(configuredString(credentials.pinnedCertSha256Fingerprint) ? { pinnedCertSha256: credentials.pinnedCertSha256Fingerprint } : {}),
   });

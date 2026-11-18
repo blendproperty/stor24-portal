@@ -6,7 +6,7 @@ import { CheckCircle2, KeyRound, Link2, LockKeyhole, RefreshCw, ShieldCheck } fr
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 
-type CompanyConfiguration = { endpoint: string; appKeyConfigured: boolean; appSecretConfigured: boolean; pinnedCertSha256Fingerprint: string; regionIndexCode: string; status: string; lastHealthAt: string | null; lastSuccessAt: string | null; failureMessage: string | null };
+type CompanyConfiguration = { endpoint: string; userId: string; appKeyConfigured: boolean; appSecretConfigured: boolean; pinnedCertSha256Fingerprint: string; regionIndexCode: string; status: string; lastHealthAt: string | null; lastSuccessAt: string | null; failureMessage: string | null };
 type FacilityConfiguration = { id: string; name: string; code: string; organisationIndexCode: string; doorIndexCodes: string[]; status: string; lastHealthAt: string | null; lastSuccessAt: string | null; failureMessage: string | null };
 type Configuration = { encryptionReady: boolean; company: CompanyConfiguration; facilities: FacilityConfiguration[] };
 type Door = { indexCode: string; name: string };
@@ -53,7 +53,7 @@ export function HikvisionIntegrationWorkspace() {
   function saveCredentials(formData: FormData) {
     const pinnedCertSha256Fingerprint = String(formData.get("pinnedCertSha256Fingerprint") ?? "").trim();
     const regionIndexCode = String(formData.get("regionIndexCode") ?? "").trim();
-    void call("PUT", { action: "save-credentials", payload: { endpoint: String(formData.get("endpoint") ?? ""), appKey: String(formData.get("appKey") ?? "") || undefined, appSecret: String(formData.get("appSecret") ?? "") || undefined, pinnedCertSha256Fingerprint: pinnedCertSha256Fingerprint || undefined, regionIndexCode: regionIndexCode || undefined } }, "HikCentral credentials saved securely. Test a facility connection next.");
+    void call("PUT", { action: "save-credentials", payload: { endpoint: String(formData.get("endpoint") ?? ""), userId: String(formData.get("userId") ?? "").trim() || undefined, appKey: String(formData.get("appKey") ?? "") || undefined, appSecret: String(formData.get("appSecret") ?? "") || undefined, pinnedCertSha256Fingerprint: pinnedCertSha256Fingerprint || undefined, regionIndexCode: regionIndexCode || undefined } }, "HikCentral credentials saved securely. Test a facility connection next.");
   }
 
   function saveMapping(formData: FormData) {
@@ -106,6 +106,7 @@ export function HikvisionIntegrationWorkspace() {
         <div className="panel-heading"><div><p className="eyebrow">Company connection</p><h2>HikCentral OpenAPI credentials</h2><p className="panel-subtitle">Secrets are encrypted before storage and are never returned to this page.</p></div><KeyRound className="positive-icon"/></div>
         <div className="field-grid">
           <label>HikCentral server address<input name="endpoint" type="url" required placeholder="https://hikcentral.example.co.za" defaultValue={configuration?.company.endpoint ?? ""} disabled={!canManageCompany}/></label>
+          <label>HikCentral API user ID<input name="userId" type="text" maxLength={32} placeholder="User ID supplied for OpenAPI" defaultValue={configuration?.company.userId ?? ""} disabled={!canManageCompany}/></label>
           <label>App Key<input name="appKey" type="password" autoComplete="new-password" placeholder={configuration?.company.appKeyConfigured ? "Saved — leave blank to keep" : "Enter App Key"} disabled={!canManageCompany}/></label>
           <label>App Secret<input name="appSecret" type="password" autoComplete="new-password" placeholder={configuration?.company.appSecretConfigured ? "Saved — leave blank to keep" : "Enter App Secret"} disabled={!canManageCompany}/></label>
           <label>TLS certificate pin (SHA-256 fingerprint) — optional<input name="pinnedCertSha256Fingerprint" type="text" spellCheck={false} placeholder="AA:BB:CC:...(32 byte pairs)" defaultValue={configuration?.company.pinnedCertSha256Fingerprint ?? ""} disabled={!canManageCompany}/></label>

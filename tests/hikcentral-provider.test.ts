@@ -98,12 +98,32 @@ test("access inspection reads the installed version and access-level resources w
     return Response.json({ code: "0", data: String(url).endsWith("/version")
       ? { produceName: "HikCentral Professional", softVersion: "3.1.1" }
       : { list: [{ privilegeGroupId: "12", privilegeGroupName: "Block24", ElementList: [{ Element: { ID: 101 } }, { Element: { ID: 102 } }, { Element: { ID: 103 } }] }] } });
-  }) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", facilities: {} });
+  }) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", userId: "stor24-api", facilities: {} });
   assert.deepEqual((await provider.version()), { ok: true, providerReference: "hikcentral", data: { product: "HikCentral Professional", version: "3.1.1" } });
   const levels = await provider.listAccessLevels();
   assert.equal(levels.ok, true);
   if (levels.ok) assert.deepEqual(levels.data.levels, [{ id: "12", name: "Block24", resourceIds: ["101", "102", "103"] }]);
   assert.deepEqual(calls, ["https://example.invalid/artemis/api/common/v1/version", "https://example.invalid/artemis/api/acs/v1/privilege/group"]);
+});
+
+test("person and access-level reads require the HikCentral user ID", async () => {
+  const provider = new HikCentralAccessProvider((async () => { throw Error("missing user ID sent to provider"); }) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", facilities: {} });
+  const result = await provider.version();
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.code, "CONFIG_REQUIRED");
+});
+
+test("HikCentral user ID is included in the signed request headers", async () => {
+  let observed = false;
+  const provider = new HikCentralAccessProvider((async (_url, init) => {
+    const headers = new Headers(init?.headers);
+    assert.equal(headers.get("userid"), "stor24-api");
+    assert.equal(headers.get("x-ca-signature-headers"), "userid,x-ca-key,x-ca-nonce,x-ca-timestamp");
+    observed = true;
+    return Response.json({ code: "0", data: { produceName: "HikCentral Professional", softVersion: "3.1.1" } });
+  }) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", userId: "stor24-api", facilities: {} });
+  assert.equal((await provider.version()).ok, true);
+  assert.equal(observed, true);
 });
 
 test("unverified legacy person and permission adapter cannot send provider writes", async () => {
