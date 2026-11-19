@@ -1,6 +1,7 @@
 ## 2026-11-19 — Midpoint ground-floor numbering format
 
 - **Implementation:** Brett reports manually renumbering units 10–99 to 010–099 in the platform. The crosswalk now records 001–099, preserving 100–530; the original October mapping is retained as `numbering-crosswalk-historical-20261027.csv`. Units 001–009 were already shown in that format before this task.
+- **Shareable map:** On 2026-11-19 a ground-floor PNG and A3/A4 PDFs were rendered locally from the public map. Both PDFs were checked to contain all 142 unit numbers once; layout was visually inspected. These files are local output, not deployed or included in this PR. Physical signage remains unverified.
 - **Testing:** Crosswalk has 530 unique destination numbers. Public booking API readback on 2026-11-19 returned 142 ground-floor units; all 142 IDs and numbers matched the original ID mapping with the requested zero padding, including 90 numbers 010–099 and no two-digit 10–99. All 142 linked public map labels matched their unit numbers. Brett supplied a screenshot of a database count query returning zero for Midpoint two-digit numbers; the screenshot alone does not prove the query text or its scope.
 - **Commit and push:** Documentation candidate; consult Git for the exact commit and remote status.
 - **Merge:** Documentation promotion must be verified separately; the platform data change was made manually.
