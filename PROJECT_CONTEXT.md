@@ -8923,3 +8923,10 @@ Validation follow-up: the project typecheck and targeted ESLint for the candidat
 - **Deployment and configuration:** No candidate deployment or access mapping change. **Live production verification:** No new live grant, lock, restoration or physical reader evidence.
 - **Outstanding:** Pass replacement protected checks, merge and deploy, then verify the narrow Midpoint face IDs, safe exit, installed provider API and actual reader behaviour before enabling automatic access. Privacy, retention, debit-order evidence and wider UAT gates remain.
 
+### 2026-11-19 - CommonJS route-fixture follow-up for PR #865
+
+- **Implementation:** The same Prisma file-URL fixture was shared by the 20 integration files that bundle route modules as CommonJS. It replaces repeated direct `esbuild.build` imports and changes no production runtime or access configuration.
+- **Testing:** The next merchandise run `44445907891` passed security boundaries but stopped at communication-log search with the same generated Prisma path error. After the shared fixture, isolated PostgreSQL security boundaries passed 24/24 and communication search, extended security and unit-rate adjustment passed 15/15. TypeScript and scoped ESLint passed locally. The complete protected run on this revision is pending.
+- **Commit and push:** Follow-up pending commit and push. **Merge:** PR #865 remains open. **Deployment and configuration:** None for this follow-up. **Live production verification:** None for automatic access.
+- **Outstanding:** Complete protected checks and release, then verify provider group scope, exact Midpoint visitor face points, safe egress, real-person consent and all reader effects before any live grants. Privacy, retention, debit-order and wider UAT gates remain.
+
