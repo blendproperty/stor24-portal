@@ -7,13 +7,15 @@ import { captureHikCentralFaceHandoff, decideHikCentralFace, hikCentralCustomerC
 import { loadHikCentralRuntimeConfiguration, saveHikCentralMapping } from "../../src/lib/integrations/hikcentral-configuration";
 import { reconcileDeletedHikCentralPerson } from "../../src/lib/hikcentral-person-link";
 import { encryptIntegrationSecret } from "../../src/lib/integrations/integration-secret-vault";
-import { approveCustomerFaceAccessRestoration, approveCustomerFaceVisit, processHikCentralAccessLocks, reconcileCustomerFaceAccess, revokeCustomerFaceVisit, setCustomerFaceManualLock } from "../../src/lib/hikcentral-customer-access";
+import { approveCustomerFaceAccessRestoration, approveCustomerFaceVisit, confirmHikCentralSiteEmpty, hikCentralSiteClearance, processHikCentralAccessLocks, reconcileCustomerFaceAccess, revokeCustomerFaceVisit, setCustomerFaceManualLock } from "../../src/lib/hikcentral-customer-access";
 import { MIDPOINT_NON_TENANT_DOORS, STOR24_FACE_DOORS } from "../../src/lib/integrations/hikcentral-door-scope";
+import { disableHikCentralLockPolicy, hikCentralLockPolicy, saveHikCentralLockPolicy } from "../../src/lib/hikcentral-lock-policy";
 
 test("customer-scoped Counter face capture needs consent and review before one provider update", async () => {
   assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci");
   assert.ok(["localhost", "127.0.0.1"].includes(new URL(process.env.DATABASE_URL!).hostname));
   const previousKey = process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY, previousFetch = globalThis.fetch;
+  const previousTwilio = [process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN, process.env.TWILIO_SMS_FROM, process.env.AUTH_SECRET];
   process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY = "isolated-hikcentral-face-test-encryption-key";
   const key = randomUUID();
   try {
@@ -85,7 +87,7 @@ test("customer-scoped Counter face capture needs consent and review before one p
     let created = false;
     const newPersonCalls: string[] = [];
     const members = new Set<string>();
-    const writes: string[] = [];
+    const writes: string[] = [], smsWrites: string[] = [];
     globalThis.fetch = (async (url, init) => {
       const path = String(url);
       newPersonCalls.push(path);
@@ -130,7 +132,7 @@ test("customer-scoped Counter face capture needs consent and review before one p
     await assert.rejects(approveCustomerFaceVisit(scope, newcomer.id, facility.id, false), /HIKCENTRAL_VISIT_NOT_READY/);
     const visit = await approveCustomerFaceVisit(scope, newcomer.id, facility.id, true);
     assert.ok(visit.expiresAt.getTime() > Date.now() + 60 * 60_000);
-    await db.integrationConnection.create({ data: { organisationId: org.id, facilityId: facility.id, category: "ACCESS_CONTROL", provider: "HIKCENTRAL", status: "CONFIGURED", config: { organisationIndexCode: "97", doorIndexCodes: STOR24_FACE_DOORS, accessLevelIds: ["12", "7"], freeEgressConfirmed: true } } });
+    await db.integrationConnection.create({ data: { organisationId: org.id, facilityId: facility.id, category: "ACCESS_CONTROL", provider: "HIKCENTRAL", status: "CONFIGURED", config: { organisationIndexCode: "97", doorIndexCodes: STOR24_FACE_DOORS, accessLevelIds: ["12", "7"], nightlyClearanceRequired: true } } });
     assert.deepEqual(await decideHikCentralFace(scope, newPhoto.id, newPhoto.version, "SEND"), { status: "PROVIDER_ACCEPTED" });
     const linked = await db.integrationIdentityLink.findUniqueOrThrow({ where: { customerId: newcomer.id } });
     assert.equal(linked.hikCentralPersonId, "2001");
@@ -150,7 +152,9 @@ test("customer-scoped Counter face capture needs consent and review before one p
       return tenancy;
     }
     globalThis.fetch = (async (url, init) => {
-      const path = String(url), body = JSON.parse(String(init?.body));
+      const path = String(url);
+      if (path.startsWith("https://api.twilio.com/")) { smsWrites.push(String(init?.body)); return Response.json({ sid: `SM${smsWrites.length}` }); }
+      const body = JSON.parse(String(init?.body));
       if (path.endsWith("/privilege/group")) return Response.json({ code: "0", data: { list: [
         { privilegeGroupId: "12", privilegeGroupName: "Block24", ElementList: [1239, 1244, 1249].map(ID => ({ Element: { ID } })) },
         { privilegeGroupId: "7", privilegeGroupName: "DRIVERS", ElementList: MIDPOINT_NON_TENANT_DOORS.map(ID => ({ Element: { ID } })) },
@@ -163,12 +167,18 @@ test("customer-scoped Counter face capture needs consent and review before one p
     }) as typeof fetch;
     assert.equal((await reconcileCustomerFaceAccess(scope, newcomer.id, facility.id)).status, "GRANTED");
     assert.deepEqual(writes, ["add:12", "add:7"]);
-    assert.equal((await revokeCustomerFaceVisit(scope, newcomer.id, facility.id)).status, "REVOKED");
+    const day = new Date("2026-11-19T10:00:00Z"), night = new Date("2026-11-19T17:01:00Z");
+    assert.equal((await revokeCustomerFaceVisit(scope, newcomer.id, facility.id, day)).status, "DEFERRED");
+    assert.deepEqual(writes, ["add:12", "add:7"]);
+    assert.equal((await confirmHikCentralSiteEmpty(scope, facility.id, day).then(() => "allowed", () => "closed")), "closed");
+    assert.equal((await confirmHikCentralSiteEmpty(scope, facility.id, night)).confirmed, true);
+    assert.equal((await hikCentralSiteClearance(scope, facility.id, new Date(night.getTime() + 11 * 60_000))).confirmed, false);
+    assert.equal((await reconcileCustomerFaceAccess(scope, newcomer.id, facility.id, night)).status, "REVOKED");
     assert.deepEqual(writes, ["add:12", "add:7", "delete:12", "delete:7"]);
     const firstTenancy = await activeUnit("one");
     assert.equal((await reconcileCustomerFaceAccess(scope, newcomer.id, facility.id)).status, "GRANTED");
     assert.deepEqual(writes.slice(-2), ["add:12", "add:7"]);
-    await assert.rejects(saveHikCentralMapping(scope, { facilityId: facility.id, organisationIndexCode: "97", doorIndexCodes: [...STOR24_FACE_DOORS].reverse(), accessLevelIds: ["12", "7"], freeEgressConfirmed: true }), /HIKCENTRAL_ACTIVE_GRANTS_REVIEW_REQUIRED/);
+    await assert.rejects(saveHikCentralMapping(scope, { facilityId: facility.id, organisationIndexCode: "97", doorIndexCodes: [...STOR24_FACE_DOORS].reverse(), accessLevelIds: ["12", "7"], nightlyClearanceRequired: true }), /HIKCENTRAL_ACTIVE_GRANTS_REVIEW_REQUIRED/);
     assert.equal((await reconcileCustomerFaceAccess(scope, newcomer.id, facility.id)).status, "GRANTED");
     assert.equal(writes.length, 6);
     const secondTenancy = await activeUnit("two");
@@ -176,10 +186,26 @@ test("customer-scoped Counter face capture needs consent and review before one p
     assert.equal((await reconcileCustomerFaceAccess(scope, newcomer.id, facility.id)).status, "GRANTED");
     assert.equal(writes.length, 6);
     await db.collectionCase.create({ data: { accountId: secondTenancy.accountId, terms: { dueDays: 0, allocation: "OLDEST_DUE_FIRST", approvalReference: "Synthetic approved terms", overrides: [] } } });
-    await db.ledgerEntry.create({ data: { accountId: secondTenancy.accountId, type: "CHARGE", amount: 100, description: "Synthetic rent", effectiveAt: new Date("2026-10-01") } });
+    const charge = await db.ledgerEntry.create({ data: { accountId: secondTenancy.accountId, type: "CHARGE", amount: 100, description: "Synthetic rent", effectiveAt: new Date("2026-10-01") } });
     await db.account.update({ where: { id: secondTenancy.accountId }, data: { balance: 100 } });
-    assert.equal((await processHikCentralAccessLocks()).locked, 1);
+    assert.equal((await processHikCentralAccessLocks(night)).locked, 0);
+    await assert.rejects(saveHikCentralLockPolicy({ ...scope, unrestrictedFacilities: false, facilityIds: [facility.id] }, { facilityId: facility.id, approvalReference: "Synthetic legal approval", warningText: "Synthetic warning for account {account}: face entry may stop after {lockDate} if payment remains overdue.", lockedText: "Synthetic account {account} face entry is locked; please contact STOR24 about payment.", noticeHours: 1 }), /FORBIDDEN/);
+    await saveHikCentralLockPolicy(scope, { facilityId: facility.id, approvalReference: "Synthetic legal approval", warningText: "Synthetic warning for account {account}: face entry may stop after {lockDate} if payment remains overdue.", lockedText: "Synthetic account {account} face entry is locked; please contact STOR24 about payment.", noticeHours: 1 });
+    process.env.TWILIO_ACCOUNT_SID = "ACsynthetic"; process.env.TWILIO_AUTH_TOKEN = "synthetic-test-token"; process.env.TWILIO_SMS_FROM = "+27110000000"; process.env.AUTH_SECRET = "synthetic-dlp-key-for-isolated-testing";
+    await db.customer.update({ where: { id: newcomer.id }, data: { phone: "+27820000000", phoneVerifiedAt: new Date() } });
+    assert.equal((await processHikCentralAccessLocks(night)).locked, 0);
+    assert.equal(smsWrites.length, 1);
+    assert.equal((await processHikCentralAccessLocks(night)).locked, 0);
+    assert.equal(smsWrites.length, 1);
+    const warning = await db.communicationLog.findFirstOrThrow({ where: { customerId: newcomer.id, messageType: "FACE_ACCESS_LOCK_WARNING" } });
+    assert.equal((warning.metadata as { sourceChargeId?: string }).sourceChargeId, charge.id);
+    assert.equal(warning.deliveredAt, null);
+    await db.communicationLog.update({ where: { id: warning.id }, data: { deliveredAt: new Date("2026-11-19T16:00:00Z") } });
+    assert.equal((await processHikCentralAccessLocks(day)).locked, 0);
+    assert.deepEqual(writes.slice(-2), ["add:12", "add:7"]);
+    assert.equal((await processHikCentralAccessLocks(night)).locked, 1);
     assert.deepEqual(writes.slice(-2), ["delete:12", "delete:7"]);
+    assert.equal(smsWrites.length, 2);
     await assert.rejects(approveCustomerFaceAccessRestoration(scope, newcomer.id, facility.id), /HIKCENTRAL_RESTORATION_NOT_READY/);
     const paid = await db.payment.create({ data: { accountId: secondTenancy.accountId, amount: 100, method: "EFT", status: "SUCCEEDED", idempotencyKey: randomUUID() } });
     await db.ledgerEntry.create({ data: { accountId: secondTenancy.accountId, type: "PAYMENT", amount: 100, description: "Synthetic verified receipt", effectiveAt: new Date(), externalRef: paid.idempotencyKey } });
@@ -187,14 +213,17 @@ test("customer-scoped Counter face capture needs consent and review before one p
     await db.account.update({ where: { id: secondTenancy.accountId }, data: { balance: 0 } });
     assert.equal((await processHikCentralAccessLocks()).restored, 1);
     assert.deepEqual(writes.slice(-2), ["add:12", "add:7"]);
-    assert.equal((await setCustomerFaceManualLock(scope, newcomer.id, facility.id, true, "Manager hold for review")).status, "LOCKED");
+    assert.equal((await setCustomerFaceManualLock(scope, newcomer.id, facility.id, true, "Manager hold for review", day)).status, "DEFERRED");
+    assert.equal((await processHikCentralAccessLocks(night)).locked, 1);
     assert.deepEqual(writes.slice(-2), ["delete:12", "delete:7"]);
     assert.equal((await processHikCentralAccessLocks()).restored, 0);
     assert.equal((await setCustomerFaceManualLock(scope, newcomer.id, facility.id, false, "Manager cleared review")).status, "GRANTED");
     assert.deepEqual(writes.slice(-2), ["add:12", "add:7"]);
     await db.tenancy.update({ where: { id: secondTenancy.id }, data: { status: "CLOSED" } });
-    assert.equal((await reconcileCustomerFaceAccess(scope, newcomer.id, facility.id)).status, "REVOKED");
+    assert.equal((await reconcileCustomerFaceAccess(scope, newcomer.id, facility.id, night)).status, "REVOKED");
     assert.deepEqual(writes.slice(-2), ["delete:12", "delete:7"]);
+    await disableHikCentralLockPolicy(scope, facility.id);
+    assert.equal(await hikCentralLockPolicy(org.id, facility.id), null);
 
     let providerPersonDeleted = false;
     globalThis.fetch = (async (url) => {
@@ -240,6 +269,7 @@ test("customer-scoped Counter face capture needs consent and review before one p
     assert.equal(await db.hikCentralFaceHandoff.count({ where: { customerId: alreadyAtHikCentral.id } }), 0);
   } finally {
     globalThis.fetch = previousFetch;
+    for (const [index, name] of ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_SMS_FROM", "AUTH_SECRET"].entries()) if (previousTwilio[index] === undefined) delete process.env[name]; else process.env[name] = previousTwilio[index];
     if (previousKey === undefined) delete process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY; else process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY = previousKey;
     await db.$disconnect();
   }

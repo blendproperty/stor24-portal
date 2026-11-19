@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     const url = new URL(request.url), customerId = url.searchParams.get("customerId") ?? "", facilityId = url.searchParams.get("facilityId") ?? "";
     if (!customerId || !facilityId) throw Error("PHOTO_INVALID");
     const state = await customerFaceAccessReadiness(scope, customerId, facilityId);
-    return Response.json({ data: { eligible: state.eligible, approvalExpiresAt: state.approvalExpiresAt, arrearsLocked: state.arrearsLocked, manuallyLocked: state.manuallyLocked, restorationReady: state.restorationReady, blockers: state.blockers, grants: state.grants.map(item => ({ accessLevelId: item.accessLevelId, status: item.status, grantedAt: item.grantedAt, revokedAt: item.revokedAt, lastError: item.lastError })) } }, { headers: tenantPrivateHeaders });
+    return Response.json({ data: { eligible: state.eligible, approvalExpiresAt: state.approvalExpiresAt, arrearsLocked: state.arrearsLocked, manuallyLocked: state.manuallyLocked, accessLocked: state.accessLocked, restorationReady: state.restorationReady, blockers: state.blockers, grants: state.grants.map(item => ({ accessLevelId: item.accessLevelId, status: item.status, grantedAt: item.grantedAt, revokedAt: item.revokedAt, lastError: item.lastError })) } }, { headers: tenantPrivateHeaders });
   } catch (error) { return facialPhotoError(error); }
 }
 
