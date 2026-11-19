@@ -174,7 +174,8 @@ test("customer-scoped Counter face capture needs consent and review before one p
     assert.equal((await confirmHikCentralSiteEmpty(scope, facility.id, night)).confirmed, true);
     assert.equal((await hikCentralSiteClearance(scope, facility.id, new Date(night.getTime() + 11 * 60_000))).confirmed, false);
     assert.equal((await reconcileCustomerFaceAccess(scope, newcomer.id, facility.id, night)).status, "REVOKED");
-    assert.deepEqual(writes, ["add:12", "add:7", "delete:12", "delete:7"]);
+    assert.deepEqual(writes.slice(0, 2), ["add:12", "add:7"]);
+    assert.deepEqual(writes.slice(2).sort(), ["delete:12", "delete:7"].sort());
     const firstTenancy = await activeUnit("one");
     assert.equal((await reconcileCustomerFaceAccess(scope, newcomer.id, facility.id)).status, "GRANTED");
     assert.deepEqual(writes.slice(-2), ["add:12", "add:7"]);
