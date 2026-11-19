@@ -5,6 +5,7 @@ import sharp from "sharp";
 import { db } from "../../src/lib/db";
 import { captureHikCentralFaceHandoff, decideHikCentralFace, hikCentralCustomerCode, hikCentralFaceHandoff, issueHikCentralFaceHandoff, previewHikCentralFace, expireHikCentralFaceCaptures } from "../../src/lib/hikcentral-face-capture";
 import { loadHikCentralRuntimeConfiguration } from "../../src/lib/integrations/hikcentral-configuration";
+import { reconcileDeletedHikCentralPerson } from "../../src/lib/hikcentral-person-link";
 import { encryptIntegrationSecret } from "../../src/lib/integrations/integration-secret-vault";
 
 test("customer-scoped Counter face capture needs consent and review before one provider update", async () => {
@@ -123,6 +124,20 @@ test("customer-scoped Counter face capture needs consent and review before one p
     assert.equal(stored.encryptedImage, null);
     assert.equal(newPersonCalls.filter(path => path.endsWith("/person/single/add")).length, 1);
     assert.equal(newPersonCalls.filter(path => path.includes("/privilege/")).length, 0);
+
+    let providerPersonDeleted = false;
+    globalThis.fetch = (async (url) => {
+      const path = String(url);
+      if (path.endsWith("/person/personId/personInfo")) return providerPersonDeleted ? Response.json({ code: "1001", msg: "Person not found" }) : Response.json({ code: "0", data: { personId: "2001", personCode, personGivenName: "Jane", personFamilyName: "Tester" } });
+      if (path.endsWith("/person/advance/personList")) return Response.json({ code: "0", data: { total: 0, list: [] } });
+      throw Error(`Unexpected provider request: ${path}`);
+    }) as typeof fetch;
+    await assert.rejects(reconcileDeletedHikCentralPerson(scope, { facilityId: facility.id, customerId: newcomer.id, expectedPersonId: "2001" }), /HIKCENTRAL_PERSON_STILL_EXISTS/);
+    providerPersonDeleted = true;
+    assert.deepEqual(await reconcileDeletedHikCentralPerson(scope, { facilityId: facility.id, customerId: newcomer.id, expectedPersonId: "2001" }), { customerId: newcomer.id, previousPersonId: "2001", status: "PROVIDER_REMOVED" });
+    assert.equal((await db.integrationIdentityLink.findUniqueOrThrow({ where: { customerId: newcomer.id } })).hikCentralPersonId, null);
+    assert.equal((await db.hikCentralFaceCapture.findUniqueOrThrow({ where: { customerId: newcomer.id } })).status, "PROVIDER_REMOVED");
+    assert.ok((await issueHikCentralFaceHandoff(scope, { customerId: newcomer.id, facilityId: facility.id, version: stored.version })).token);
 
     const possibleDuplicate = await db.customer.create({ data: { organisationId: org.id, firstName: "Bob", lastName: "Tester" } });
     let duplicateWrites = 0;
