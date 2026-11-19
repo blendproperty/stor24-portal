@@ -440,6 +440,8 @@ model Customer {
   integrationIdentityLink IntegrationIdentityLink?
   hikCentralFaceCapture HikCentralFaceCapture?
   hikCentralAccessGrants HikCentralAccessGrant[]
+  hikCentralAccessApproval HikCentralAccessApproval[]
+  hikCentralAccessLocks HikCentralAccessLock[]
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
@@ -777,6 +779,43 @@ model HikCentralAccessGrant {
 
   @@unique([customerId, facilityId, accessLevelId])
   @@index([organisationId, facilityId, status])
+}
+
+model HikCentralAccessApproval {
+  id             String   @id @default(cuid())
+  organisationId String
+  facilityId     String
+  customerId     String
+  customer       Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  approvedById   String
+  reason         String
+  photoId        String
+  photoVersion   Int
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([customerId, facilityId])
+  @@index([organisationId, facilityId, expiresAt])
+}
+
+model HikCentralAccessLock {
+  id             String   @id @default(cuid())
+  organisationId String
+  facilityId     String
+  customerId     String
+  customer       Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  lockedAt       DateTime
+  lockedById     String
+  unlockedAt     DateTime?
+  unlockedById   String?
+  reason         String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([customerId, facilityId])
+  @@index([organisationId, facilityId, lockedAt])
 }
 
 // Central, provider-independent record of an access decision. Deliberately
