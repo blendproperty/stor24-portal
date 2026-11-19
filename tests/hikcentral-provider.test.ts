@@ -225,6 +225,16 @@ test("face transfer readback confirms the exact person ID without treating a dif
   assert.equal((await wrong.personById("1150")).ok, false);
 });
 
+test("deleted person readback is distinct from a provider lookup failure", async () => {
+  const configuration = { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", userId: "admin", facilities: {} };
+  const missing = new HikCentralAccessProvider((async () => Response.json({ code: "1001", msg: "Person not found" })) as typeof fetch, configuration);
+  const denied = new HikCentralAccessProvider((async () => Response.json({ code: "1001", msg: "Permission denied" })) as typeof fetch, configuration);
+  assert.deepEqual(await missing.personById("1150"), { ok: false, retryable: false, code: "HIKCENTRAL_PERSON_NOT_FOUND", message: "HikCentral person was not found." });
+  const deniedResult = await denied.personById("1150");
+  assert.equal(deniedResult.ok, false);
+  if (!deniedResult.ok) assert.notEqual(deniedResult.code, "HIKCENTRAL_PERSON_NOT_FOUND");
+});
+
 test("person name search uses paged read-only provider results to guard duplicate creation", async () => {
   const provider = new HikCentralAccessProvider((async (url, init) => {
     assert.match(String(url), /\/person\/advance\/personList$/);

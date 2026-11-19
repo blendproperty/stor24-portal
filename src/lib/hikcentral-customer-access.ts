@@ -105,7 +105,7 @@ export async function approveCustomerFaceVisit(scope: RequestScope, customerId: 
   await requireLeasingCustomer(scope, customerId);
   if (!scope.userId || !photoMatchesId || await db.tenancy.count({ where: { customerId } })) throw Error("HIKCENTRAL_VISIT_NOT_READY");
   const photo = await db.hikCentralFaceCapture.findUnique({ where: { customerId } });
-  if (!photo || photo.facilityId !== facilityId || photo.status !== "WAITING_REVIEW" || photo.expiresAt <= new Date()) throw Error("HIKCENTRAL_VISIT_NOT_READY");
+  if (!photo || photo.facilityId !== facilityId || !(photo.status === "WAITING_REVIEW" ? photo.expiresAt > new Date() : photo.status === "PROVIDER_ACCEPTED" && photo.providerAcceptedAt && photo.providerAcceptedAt > new Date(Date.now() - 2 * 60 * 60_000))) throw Error("HIKCENTRAL_VISIT_NOT_READY");
   const preview = await db.auditEvent.findFirst({ where: { organisationId: scope.organisationId, actorId: scope.userId, entityType: "HikCentralFaceCapture", entityId: photo.id, action: "hikcentral_face.previewed", after: { path: ["version"], equals: photo.version } } });
   if (!preview) throw Error("PHOTO_PREVIEW_REQUIRED");
   const existing = await db.hikCentralAccessApproval.findUnique({ where: { customerId_facilityId: { customerId, facilityId } } });
@@ -113,6 +113,7 @@ export async function approveCustomerFaceVisit(scope: RequestScope, customerId: 
   const expiresAt = new Date(Date.now() + 2 * 60 * 60_000);
   const approval = await db.hikCentralAccessApproval.upsert({ where: { customerId_facilityId: { customerId, facilityId } }, create: { organisationId: scope.organisationId, facilityId, customerId, approvedById: scope.userId, reason: "Supervised customer face-reader visit", photoId: photo.id, photoVersion: photo.version, expiresAt }, update: { approvedById: scope.userId, reason: "Supervised customer face-reader visit", photoId: photo.id, photoVersion: photo.version, expiresAt, revokedAt: null } });
   await db.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId, actorId: scope.userId, action: "hikcentral_face.visit_approved", entityType: "HikCentralAccessApproval", entityId: approval.id, after: { customerId, photoId: photo.id, photoVersion: photo.version, expiresAt: expiresAt.toISOString() } } });
+  if (photo.status === "PROVIDER_ACCEPTED") await reconcileCustomerFaceAccess(scope, customerId, facilityId);
   return { expiresAt };
 }
 
