@@ -165,7 +165,7 @@ export function HikvisionIntegrationWorkspace() {
       </form>
       <form action={saveMapping} className="panel panel-spacious company-form" key={facility?.id ?? "none"}>
         <div className="panel-heading"><div><p className="eyebrow">Facility mapping</p><h2>Organisation and doors</h2><p className="panel-subtitle">These are the intended doors for this facility. Saving them does not grant access to a person.</p></div><Link2 className="positive-icon"/></div>
-        <label className="facility-picker hikvision-facility-picker"><span>Facility</span><select value={facilityId} onChange={(event) => { setFacilityId(event.target.value); setDiscoveredDoors([]); setAccessInspection(null); setNotice(""); setError(""); }}>{configuration?.facilities.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
+        <label className="facility-picker hikvision-facility-picker"><span>Facility</span><select value={facilityId} onChange={(event) => { setFacilityId(event.target.value); setDiscoveredDoors([]); setAccessInspection(null); setLockPolicy(null); setNotice(""); setError(""); }}>{configuration?.facilities.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
         <div className="field-grid">
           <label>HikCentral organisation index code<input ref={organisationField} name="organisationIndexCode" required defaultValue={facility?.organisationIndexCode ?? ""} disabled={!canManage}/></label>
           <label>Door index codes<textarea ref={doorCodesField} name="doorIndexCodes" required rows={6} defaultValue={facility?.doorIndexCodes.join("\n") ?? ""} placeholder={'One door code per line\ne.g. midpoint-main-entry'} disabled={!canManage}/></label>
