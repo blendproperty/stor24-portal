@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { build } from "esbuild";
+import { build } from "./build-commonjs";
 import { createRequire } from "node:module";
 import { db } from "../../src/lib/db";
 import { communicationLogPage } from "../../src/lib/communication-log-service";

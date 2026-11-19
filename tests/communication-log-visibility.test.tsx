@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { build } from "esbuild";
+import { build } from "./integration/build-commonjs";
 import { createRequire } from "node:module";
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 function matches(row: Row, where: Row = {}): boolean {

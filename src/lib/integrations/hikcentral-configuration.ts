@@ -32,10 +32,12 @@ const mappingSchema = z.object({
   facilityId: z.string().cuid(),
   organisationIndexCode: z.string().trim().min(1).max(200).refine((code) => !/^TEMP-/i.test(code), "Use a verified HikCentral organisation index code."),
   doorIndexCodes: z.array(z.string().trim().min(1).max(200)).min(1).max(200).transform((items) => [...new Set(items)]),
-});
+  accessLevelIds: z.array(z.string().trim().min(1).max(64)).max(2).refine((items) => (items.length === 0 || items.length === 2) && new Set(items).size === items.length).optional(),
+  freeEgressConfirmed: z.boolean().optional(),
+}).refine((value) => !value.accessLevelIds?.length || (value.freeEgressConfirmed === true && value.doorIndexCodes.length === 5 && ["1239", "1244", "1249"].every(id => value.doorIndexCodes.includes(id))), "Confirm free exit and map exactly three Block24 doors and two Midpoint visitor face doors before enabling both access levels.");
 
 type StoredCredentials = { endpoint?: unknown; userId?: unknown; appKeyEncrypted?: unknown; appSecretEncrypted?: unknown; pinnedCertSha256Fingerprint?: unknown; regionIndexCode?: unknown };
-type StoredMapping = { organisationIndexCode?: unknown; doorIndexCodes?: unknown };
+type StoredMapping = { organisationIndexCode?: unknown; doorIndexCodes?: unknown; accessLevelIds?: unknown; freeEgressConfirmed?: unknown };
 
 function safeEndpoint(value: string) {
   const url = new URL(value);
@@ -80,6 +82,8 @@ export async function listHikCentralConfiguration(scope: RequestScope) {
         ...facility,
         organisationIndexCode: configuredString(config.organisationIndexCode) ? config.organisationIndexCode : "",
         doorIndexCodes: Array.isArray(config.doorIndexCodes) ? config.doorIndexCodes.filter(configuredString) : [],
+        accessLevelIds: Array.isArray(config.accessLevelIds) ? config.accessLevelIds.filter(configuredString) : [],
+        freeEgressConfirmed: config.freeEgressConfirmed === true,
         status: connection?.status ?? "DISCONNECTED",
         lastHealthAt: connection?.lastHealthAt?.toISOString() ?? null,
         lastSuccessAt: connection?.lastSuccessAt?.toISOString() ?? null,
@@ -124,12 +128,16 @@ export async function saveHikCentralMapping(scope: RequestScope, input: unknown)
   const parsed = mappingSchema.parse(input);
   const facility = await requireFacility(scope, parsed.facilityId);
   const existing = await db.integrationConnection.findFirst({ where: { organisationId: scope.organisationId, facilityId: facility.id, category: HIKCENTRAL_CATEGORY, provider: HIKCENTRAL_PROVIDER } });
-  const config = { organisationIndexCode: parsed.organisationIndexCode, doorIndexCodes: parsed.doorIndexCodes };
+  const config = { organisationIndexCode: parsed.organisationIndexCode, doorIndexCodes: parsed.doorIndexCodes, accessLevelIds: parsed.accessLevelIds ?? [], freeEgressConfirmed: parsed.freeEgressConfirmed === true };
+  const old = (existing?.config ?? {}) as StoredMapping;
+  if (old.organisationIndexCode !== config.organisationIndexCode || JSON.stringify(old.doorIndexCodes ?? []) !== JSON.stringify(config.doorIndexCodes) || JSON.stringify(old.accessLevelIds ?? []) !== JSON.stringify(config.accessLevelIds) || old.freeEgressConfirmed !== config.freeEgressConfirmed) {
+    if (await db.hikCentralAccessGrant.count({ where: { organisationId: scope.organisationId, facilityId: facility.id, status: { in: ["PENDING", "GRANTED", "LOCKED", "REVOKE_PENDING", "REVIEW_REQUIRED"] } } })) throw Error("HIKCENTRAL_ACTIVE_GRANTS_REVIEW_REQUIRED");
+  }
   const connection = existing
     ? await db.integrationConnection.update({ where: { id: existing.id }, data: { status: "CONFIGURED", config, failureCode: null, failureMessage: null } })
     : await db.integrationConnection.create({ data: { organisationId: scope.organisationId, facilityId: facility.id, category: HIKCENTRAL_CATEGORY, provider: HIKCENTRAL_PROVIDER, status: "CONFIGURED", config } });
   const previous = (existing?.config ?? {}) as StoredMapping;
-  await db.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: facility.id, actorId: scope.userId, action: "integration.hikcentral.mapping.updated", entityType: "IntegrationConnection", entityId: connection.id, before: existing ? { organisationIndexCode: previous.organisationIndexCode ?? null, doorIndexCodes: previous.doorIndexCodes ?? [] } : undefined, after: config } });
+  await db.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: facility.id, actorId: scope.userId, action: "integration.hikcentral.mapping.updated", entityType: "IntegrationConnection", entityId: connection.id, before: existing ? { organisationIndexCode: previous.organisationIndexCode ?? null, doorIndexCodes: previous.doorIndexCodes ?? [], accessLevelIds: previous.accessLevelIds ?? [] } : undefined, after: config } });
   return connection;
 }
 

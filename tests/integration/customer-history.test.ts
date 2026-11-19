@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID, createHash } from "node:crypto";
-import { build } from "esbuild";
+import { build } from "./build-commonjs";
 import { createRequire } from "node:module";
 import { PDFDocument } from "pdf-lib";
 import ExcelJS from "exceljs";

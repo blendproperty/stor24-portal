@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import test from "node:test";
-import { build } from "esbuild";
+import { build } from "./build-commonjs";
 import { db } from "../../src/lib/db";
 import { MIDPOINT_JOB_CARD_PERMISSION, MIDPOINT_JOB_CARD_ROLE, MIDPOINT_MAINTENANCE_MANAGER, MIDPOINT_STORE } from "../../src/lib/maintenance-job-policy";
 

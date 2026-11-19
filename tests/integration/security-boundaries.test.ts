@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { build } from "esbuild";
+import { build } from "./build-commonjs";
 import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "../../src/generated/prisma/client";
@@ -10,6 +10,7 @@ import { requireFacility } from "../../src/lib/scope";
 import { createCustomer, createLead, requireLeasingCustomer } from "../../src/lib/leasing-service";
 import { listIdentityLinks } from "../../src/lib/mel-integration-status-service";
 import { listCommunicationLogs } from "../../src/lib/communication-log-service";
+
 
 test("isolated PostgreSQL security boundaries and safe staff projections", async t => {
   assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci");

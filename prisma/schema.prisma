@@ -439,6 +439,7 @@ model Customer {
   merchandiseRequests  TenantMerchandiseRequest[]
   integrationIdentityLink IntegrationIdentityLink?
   hikCentralFaceCapture HikCentralFaceCapture?
+  hikCentralAccessGrants HikCentralAccessGrant[]
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
@@ -756,6 +757,26 @@ model IntegrationIdentityLink {
   @@unique([organisationId, melIntegrationLinkId])
   @@index([organisationId, status])
   @@index([hikCentralPersonId])
+}
+
+model HikCentralAccessGrant {
+  id             String   @id @default(cuid())
+  organisationId String
+  facilityId     String
+  customerId     String
+  customer       Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  personId       String
+  accessLevelId  String
+  status         String   @default("PENDING")
+  lastError      String?
+  grantedAt      DateTime?
+  revokedAt      DateTime?
+  lastCheckedAt  DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([customerId, facilityId, accessLevelId])
+  @@index([organisationId, facilityId, status])
 }
 
 // Central, provider-independent record of an access decision. Deliberately

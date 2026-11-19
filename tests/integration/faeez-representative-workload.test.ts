@@ -6,7 +6,7 @@ import { createServer } from "node:http";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { build } from "esbuild";
+import { build } from "./build-commonjs";
 import { db } from "../../src/lib/db";
 import { databaseLimits } from "../../src/lib/database-limits";
 

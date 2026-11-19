@@ -64,6 +64,8 @@ export async function reconcileDeletedHikCentralPerson(scope: RequestScope, inpu
     const current = await tx.integrationIdentityLink.findUnique({ where: { customerId: customer.id } });
     const currentPhoto = await tx.hikCentralFaceCapture.findUnique({ where: { customerId: customer.id } });
     if (current?.id !== link.id || current.hikCentralPersonId !== input.expectedPersonId || current.status !== "ACTIVE" || currentPhoto?.id !== photo.id || currentPhoto.personId !== input.expectedPersonId || currentPhoto.status !== "PROVIDER_ACCEPTED") throw Error("HIKCENTRAL_LINK_REVIEW_REQUIRED");
+    if (await tx.hikCentralAccessGrant.count({ where: { customerId: customer.id, personId: input.expectedPersonId, status: { not: "REVOKED" } } })) throw Error("HIKCENTRAL_ACCESS_REVIEW_REQUIRED");
+    await tx.hikCentralAccessGrant.deleteMany({ where: { customerId: customer.id, personId: input.expectedPersonId, status: "REVOKED" } });
     await tx.hikCentralFaceHandoff.deleteMany({ where: { customerId: customer.id, usedAt: null } });
     await tx.integrationIdentityLink.update({ where: { id: link.id }, data: { hikCentralPersonId: null, status: "PENDING", resolutionNotes: "Previously linked HikCentral person absent in provider reconciliation" } });
     await tx.hikCentralFaceCapture.update({ where: { id: photo.id }, data: { personId: null, status: "PROVIDER_REMOVED" } });

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Isolated delegates model only the exercised authorization boundaries. */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { build } from "esbuild";
+import { build } from "./integration/build-commonjs";
 import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
 import { newIdentityAccess } from "../src/lib/booking-access";
@@ -166,6 +166,7 @@ test("global credential save and facility mapping retain their distinct legitima
   const db = {
     facility: { findFirst: async ({ where }: Bag) => where.AND[0].id === own && where.AND[1].organisationId === "org" ? { id: own } : null },
     integrationConnection: { findFirst: async () => null, create: async ({ data }: Bag) => { writes.push(data); return { id: "connection", ...data }; } },
+    hikCentralAccessGrant: { count: async () => 0 },
     auditEvent: { create: async () => ({}) },
   };
   try {
