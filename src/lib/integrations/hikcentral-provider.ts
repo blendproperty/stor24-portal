@@ -215,7 +215,7 @@ export class HikCentralAccessProvider {
           json: await boundedProviderJson(response),
         }));
 
-    if (ok && path.endsWith("/person/personId/personInfo") && String(json.code) === "1001" && /not found/i.test(json.msg ?? "")) throw new Error("HIKCENTRAL_PERSON_NOT_FOUND");
+    if (ok && ["/person/personId/personInfo", "/person/personCode/personInfo"].some(suffix => path.endsWith(suffix)) && String(json.code) === "1001" && /not found/i.test(json.msg ?? "")) throw new Error("HIKCENTRAL_PERSON_NOT_FOUND");
     if (!ok || String(json.code) !== "0") throw new Error(`HikCentral request was not confirmed (HTTP ${status}).`);
     return json.data ?? {};
   }
@@ -320,7 +320,7 @@ export class HikCentralAccessProvider {
       const data = await this.post("/artemis/api/resource/v1/person/personCode/personInfo", { personCode }) as Record<string, unknown>;
       if (typeof data.personId !== "string" || data.personCode !== personCode || typeof data.orgIndexCode !== "string") throw new Error("HikCentral returned an unexpected person identity.");
       return { ok: true, providerReference: data.personId, data: { personId: data.personId, personCode, organisationIndexCode: data.orgIndexCode, givenName: typeof data.personGivenName === "string" ? data.personGivenName : "", familyName: typeof data.personFamilyName === "string" ? data.personFamilyName : "" } };
-    } catch (error) { return providerFailure(error); }
+    } catch (error) { return error instanceof Error && error.message === "HIKCENTRAL_PERSON_NOT_FOUND" ? { ok: false, retryable: false, code: error.message, message: "HikCentral person was not found." } : providerFailure(error); }
   }
 
   async personById(personId: string): Promise<ProviderResult<{ personId: string; personCode: string; givenName: string; familyName: string }>> {
