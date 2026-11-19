@@ -230,6 +230,8 @@ export async function decideHikCentralFace(scope: RequestScope, id: string, vers
       if (typeof testReason === "string") {
         if (!scope.unrestrictedFacilities || !resolvedPersonId) throw Error("HIKCENTRAL_TEST_GRANT_NOT_READY");
         await approveCustomerFaceVisit(scope, photo.customerId, photo.facilityId, false, { expectedPersonId: resolvedPersonId, reason: testReason });
+        const grants = (await customerFaceAccessReadiness(scope, photo.customerId, photo.facilityId)).grants;
+        if (grants.length !== 2 || grants.some(grant => grant.status !== "GRANTED" || grant.personId !== resolvedPersonId)) throw Error("HIKCENTRAL_GRANT_UNCONFIRMED");
         accessStatus = "GRANTED";
       } else await reconcileCustomerFaceAccess(scope, photo.customerId, photo.facilityId);
     } catch (error) {
