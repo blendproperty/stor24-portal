@@ -7,7 +7,8 @@ import { captureHikCentralFaceHandoff, decideHikCentralFace, hikCentralCustomerC
 import { loadHikCentralRuntimeConfiguration, saveHikCentralMapping } from "../../src/lib/integrations/hikcentral-configuration";
 import { reconcileDeletedHikCentralPerson } from "../../src/lib/hikcentral-person-link";
 import { encryptIntegrationSecret } from "../../src/lib/integrations/integration-secret-vault";
-import { approveCustomerFaceAccessRestoration, processHikCentralAccessLocks, reconcileCustomerFaceAccess } from "../../src/lib/hikcentral-customer-access";
+import { approveCustomerFaceAccessRestoration, approveCustomerFaceVisit, processHikCentralAccessLocks, reconcileCustomerFaceAccess, revokeCustomerFaceVisit, setCustomerFaceManualLock } from "../../src/lib/hikcentral-customer-access";
+import { MIDPOINT_NON_TENANT_DOORS, STOR24_FACE_DOORS } from "../../src/lib/integrations/hikcentral-door-scope";
 
 test("customer-scoped Counter face capture needs consent and review before one provider update", async () => {
   assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci");
@@ -83,9 +84,19 @@ test("customer-scoped Counter face capture needs consent and review before one p
     assert.match(personCode, /^S24[A-Z0-9]{13}$/);
     let created = false;
     const newPersonCalls: string[] = [];
+    const members = new Set<string>();
+    const writes: string[] = [];
     globalThis.fetch = (async (url, init) => {
       const path = String(url);
       newPersonCalls.push(path);
+      const groupBody = JSON.parse(String(init?.body));
+      if (path.endsWith("/privilege/group")) return Response.json({ code: "0", data: { list: [
+        { privilegeGroupId: "12", privilegeGroupName: "Block24", ElementList: [1239, 1244, 1249].map(ID => ({ Element: { ID } })) },
+        { privilegeGroupId: "7", privilegeGroupName: "DRIVERS", ElementList: MIDPOINT_NON_TENANT_DOORS.map(ID => ({ Element: { ID } })) },
+      ] } });
+      if (path.endsWith("/person/personId/personInfo")) return Response.json({ code: "0", data: { personId: "2001", personCode, personGivenName: "Jane", personFamilyName: "Tester" } });
+      if (path.endsWith("/privilege/group/single/personList")) return Response.json({ code: "0", data: { list: members.has(groupBody.privilegeGroupId) ? [{ id: "2001" }] : [] } });
+      if (path.endsWith("/privilege/group/single/addPersons")) { writes.push(`add:${groupBody.privilegeGroupId}`); members.add(groupBody.privilegeGroupId); return Response.json({ code: "0", data: "" }); }
       if (path.endsWith("/person/advance/personList")) return Response.json({ code: "0", data: { total: 0, list: [] } });
       if (path.endsWith("/org/orgList")) return Response.json({ code: "0", data: { list: [{ orgIndexCode: "97", orgName: "STOR24", parentOrgIndexCode: "1" }] } });
       if (path.endsWith("/person/personCode/personInfo")) return created
@@ -116,6 +127,10 @@ test("customer-scoped Counter face capture needs consent and review before one p
     await assert.rejects(decideHikCentralFace(scope, newPhoto.id, newPhoto.version, "SEND"), /PHOTO_CHANGED/);
     assert.equal(newPersonCalls.filter(path => path.endsWith("/person/single/add")).length, 0);
     await db.customer.update({ where: { id: newcomer.id }, data: { lastName: "Tester" } });
+    await assert.rejects(approveCustomerFaceVisit(scope, newcomer.id, facility.id, false), /HIKCENTRAL_VISIT_NOT_READY/);
+    const visit = await approveCustomerFaceVisit(scope, newcomer.id, facility.id, true);
+    assert.ok(visit.expiresAt.getTime() > Date.now() + 60 * 60_000);
+    await db.integrationConnection.create({ data: { organisationId: org.id, facilityId: facility.id, category: "ACCESS_CONTROL", provider: "HIKCENTRAL", status: "CONFIGURED", config: { organisationIndexCode: "97", doorIndexCodes: STOR24_FACE_DOORS, accessLevelIds: ["12", "7"], freeEgressConfirmed: true } } });
     assert.deepEqual(await decideHikCentralFace(scope, newPhoto.id, newPhoto.version, "SEND"), { status: "PROVIDER_ACCEPTED" });
     const linked = await db.integrationIdentityLink.findUniqueOrThrow({ where: { customerId: newcomer.id } });
     assert.equal(linked.hikCentralPersonId, "2001");
@@ -124,10 +139,8 @@ test("customer-scoped Counter face capture needs consent and review before one p
     assert.equal(stored.personId, "2001");
     assert.equal(stored.encryptedImage, null);
     assert.equal(newPersonCalls.filter(path => path.endsWith("/person/single/add")).length, 1);
-    assert.equal(newPersonCalls.filter(path => path.includes("/privilege/")).length, 0);
+    assert.deepEqual(writes, ["add:12", "add:7"]);
 
-    assert.deepEqual((await reconcileCustomerFaceAccess(scope, newcomer.id, facility.id)).status, "NOT_ELIGIBLE");
-    await db.integrationConnection.create({ data: { organisationId: org.id, facilityId: facility.id, category: "ACCESS_CONTROL", provider: "HIKCENTRAL", status: "CONFIGURED", config: { organisationIndexCode: "97", doorIndexCodes: ["1239", "1244", "1249", "701", "702"], accessLevelIds: ["12", "77"], freeEgressConfirmed: true } } });
     const unitType = await db.unitType.create({ data: { facilityId: facility.id, name: "Synthetic unit", features: [] } });
     async function activeUnit(number: string) {
       const unit = await db.unit.create({ data: { facilityId: facility.id, unitTypeId: unitType.id, number, monthlyRate: 100 } });
@@ -136,14 +149,11 @@ test("customer-scoped Counter face capture needs consent and review before one p
       await db.auditEvent.create({ data: { organisationId: org.id, facilityId: facility.id, actorId: staff.id, action: "tenancy.key_handover_confirmed", entityType: "Tenancy", entityId: tenancy.id } });
       return tenancy;
     }
-    const firstTenancy = await activeUnit("one");
-    const members = new Set<string>();
-    const writes: string[] = [];
     globalThis.fetch = (async (url, init) => {
       const path = String(url), body = JSON.parse(String(init?.body));
       if (path.endsWith("/privilege/group")) return Response.json({ code: "0", data: { list: [
         { privilegeGroupId: "12", privilegeGroupName: "Block24", ElementList: [1239, 1244, 1249].map(ID => ({ Element: { ID } })) },
-        { privilegeGroupId: "77", privilegeGroupName: "STOR24 visitor faces", ElementList: [701, 702].map(ID => ({ Element: { ID } })) },
+        { privilegeGroupId: "7", privilegeGroupName: "DRIVERS", ElementList: MIDPOINT_NON_TENANT_DOORS.map(ID => ({ Element: { ID } })) },
       ] } });
       if (path.endsWith("/person/personId/personInfo")) return Response.json({ code: "0", data: { personId: "2001", personCode, personGivenName: "Jane", personFamilyName: "Tester" } });
       if (path.endsWith("/privilege/group/single/personList")) return Response.json({ code: "0", data: { list: members.has(body.privilegeGroupId) ? [{ id: "2001" }] : [] } });
@@ -152,29 +162,39 @@ test("customer-scoped Counter face capture needs consent and review before one p
       throw Error(`Unexpected HikCentral call ${path}`);
     }) as typeof fetch;
     assert.equal((await reconcileCustomerFaceAccess(scope, newcomer.id, facility.id)).status, "GRANTED");
-    assert.deepEqual(writes, ["add:12", "add:77"]);
-    await assert.rejects(saveHikCentralMapping(scope, { facilityId: facility.id, organisationIndexCode: "97", doorIndexCodes: ["1239", "1244", "1249", "701", "703"], accessLevelIds: ["12", "77"], freeEgressConfirmed: true }), /HIKCENTRAL_ACTIVE_GRANTS_REVIEW_REQUIRED/);
+    assert.deepEqual(writes, ["add:12", "add:7"]);
+    assert.equal((await revokeCustomerFaceVisit(scope, newcomer.id, facility.id)).status, "REVOKED");
+    assert.deepEqual(writes, ["add:12", "add:7", "delete:12", "delete:7"]);
+    const firstTenancy = await activeUnit("one");
     assert.equal((await reconcileCustomerFaceAccess(scope, newcomer.id, facility.id)).status, "GRANTED");
-    assert.equal(writes.length, 2);
+    assert.deepEqual(writes.slice(-2), ["add:12", "add:7"]);
+    await assert.rejects(saveHikCentralMapping(scope, { facilityId: facility.id, organisationIndexCode: "97", doorIndexCodes: [...STOR24_FACE_DOORS].reverse(), accessLevelIds: ["12", "7"], freeEgressConfirmed: true }), /HIKCENTRAL_ACTIVE_GRANTS_REVIEW_REQUIRED/);
+    assert.equal((await reconcileCustomerFaceAccess(scope, newcomer.id, facility.id)).status, "GRANTED");
+    assert.equal(writes.length, 6);
     const secondTenancy = await activeUnit("two");
     await db.tenancy.update({ where: { id: firstTenancy.id }, data: { status: "CLOSED" } });
     assert.equal((await reconcileCustomerFaceAccess(scope, newcomer.id, facility.id)).status, "GRANTED");
-    assert.equal(writes.length, 2);
+    assert.equal(writes.length, 6);
     await db.collectionCase.create({ data: { accountId: secondTenancy.accountId, terms: { dueDays: 0, allocation: "OLDEST_DUE_FIRST", approvalReference: "Synthetic approved terms", overrides: [] } } });
     await db.ledgerEntry.create({ data: { accountId: secondTenancy.accountId, type: "CHARGE", amount: 100, description: "Synthetic rent", effectiveAt: new Date("2026-10-01") } });
     await db.account.update({ where: { id: secondTenancy.accountId }, data: { balance: 100 } });
     assert.equal((await processHikCentralAccessLocks()).locked, 1);
-    assert.deepEqual(writes, ["add:12", "add:77", "delete:12", "delete:77"]);
+    assert.deepEqual(writes.slice(-2), ["delete:12", "delete:7"]);
     await assert.rejects(approveCustomerFaceAccessRestoration(scope, newcomer.id, facility.id), /HIKCENTRAL_RESTORATION_NOT_READY/);
     const paid = await db.payment.create({ data: { accountId: secondTenancy.accountId, amount: 100, method: "EFT", status: "SUCCEEDED", idempotencyKey: randomUUID() } });
     await db.ledgerEntry.create({ data: { accountId: secondTenancy.accountId, type: "PAYMENT", amount: 100, description: "Synthetic verified receipt", effectiveAt: new Date(), externalRef: paid.idempotencyKey } });
     await db.auditEvent.create({ data: { organisationId: org.id, facilityId: facility.id, actorId: staff.id, action: "payment.posted", entityType: "Payment", entityId: paid.id } });
     await db.account.update({ where: { id: secondTenancy.accountId }, data: { balance: 0 } });
-    assert.equal((await approveCustomerFaceAccessRestoration(scope, newcomer.id, facility.id)).status, "GRANTED");
-    assert.deepEqual(writes, ["add:12", "add:77", "delete:12", "delete:77", "add:12", "add:77"]);
+    assert.equal((await processHikCentralAccessLocks()).restored, 1);
+    assert.deepEqual(writes.slice(-2), ["add:12", "add:7"]);
+    assert.equal((await setCustomerFaceManualLock(scope, newcomer.id, facility.id, true, "Manager hold for review")).status, "LOCKED");
+    assert.deepEqual(writes.slice(-2), ["delete:12", "delete:7"]);
+    assert.equal((await processHikCentralAccessLocks()).restored, 0);
+    assert.equal((await setCustomerFaceManualLock(scope, newcomer.id, facility.id, false, "Manager cleared review")).status, "GRANTED");
+    assert.deepEqual(writes.slice(-2), ["add:12", "add:7"]);
     await db.tenancy.update({ where: { id: secondTenancy.id }, data: { status: "CLOSED" } });
     assert.equal((await reconcileCustomerFaceAccess(scope, newcomer.id, facility.id)).status, "REVOKED");
-    assert.deepEqual(writes.slice(-2), ["delete:12", "delete:77"]);
+    assert.deepEqual(writes.slice(-2), ["delete:12", "delete:7"]);
 
     let providerPersonDeleted = false;
     globalThis.fetch = (async (url) => {

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { HikCentralAccessProvider, type HikCentralProviderConfiguration } from "@/lib/integrations/hikcentral-provider";
+import { STOR24_FACE_DOORS } from "@/lib/integrations/hikcentral-door-scope";
 import { decryptIntegrationSecret, encryptIntegrationSecret, integrationEncryptionConfigured } from "@/lib/integrations/integration-secret-vault";
 import type { RequestScope } from "@/lib/scope";
 import { requireFacility } from "@/lib/scope";
@@ -34,7 +35,7 @@ const mappingSchema = z.object({
   doorIndexCodes: z.array(z.string().trim().min(1).max(200)).min(1).max(200).transform((items) => [...new Set(items)]),
   accessLevelIds: z.array(z.string().trim().min(1).max(64)).max(2).refine((items) => (items.length === 0 || items.length === 2) && new Set(items).size === items.length).optional(),
   freeEgressConfirmed: z.boolean().optional(),
-}).refine((value) => !value.accessLevelIds?.length || (value.freeEgressConfirmed === true && value.doorIndexCodes.length === 5 && ["1239", "1244", "1249"].every(id => value.doorIndexCodes.includes(id))), "Confirm free exit and map exactly three Block24 doors and two Midpoint visitor face doors before enabling both access levels.");
+}).refine((value) => !value.accessLevelIds?.length || (value.freeEgressConfirmed === true && value.doorIndexCodes.length === STOR24_FACE_DOORS.length && STOR24_FACE_DOORS.every(id => value.doorIndexCodes.includes(id))), "Confirm free exit and map exactly three Block24 doors and the thirteen approved Midpoint non-tenant doors before enabling both access levels.");
 
 type StoredCredentials = { endpoint?: unknown; userId?: unknown; appKeyEncrypted?: unknown; appSecretEncrypted?: unknown; pinnedCertSha256Fingerprint?: unknown; regionIndexCode?: unknown };
 type StoredMapping = { organisationIndexCode?: unknown; doorIndexCodes?: unknown; accessLevelIds?: unknown; freeEgressConfirmed?: unknown };

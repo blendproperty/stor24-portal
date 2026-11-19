@@ -54,6 +54,8 @@ export async function userRemovalDependencies(tx: Prisma.TransactionClient, user
     tx.reservationPriceAmendment.findFirst({ where: { OR: [{ proposedById: userId }, { reviewedById: userId }] }, select: { id: true } }),
     tx.biometricEnrollment.findFirst({ where: { consentRecordedById: userId }, select: { id: true } }),
     tx.integrationIdentityLink.findFirst({ where: { resolvedById: userId }, select: { id: true } }),
+    tx.hikCentralAccessApproval.findFirst({ where: { approvedById: userId }, select: { id: true } }),
+    tx.hikCentralAccessLock.findFirst({ where: { OR: [{ lockedById: userId }, { unlockedById: userId }] }, select: { id: true } }),
     tx.accessDecision.findFirst({ where: { requestedById: userId }, select: { id: true } }),
     tx.insuranceEnrollment.findFirst({ where: { createdById: userId }, select: { id: true } }),
     tx.facialPhotoSubmission.findFirst({ where: { reviewedById: userId }, select: { id: true } }),

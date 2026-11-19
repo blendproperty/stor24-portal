@@ -1,0 +1,3 @@
+export const BLOCK24_FACE_DOORS = ["1239", "1244", "1249"];
+export const MIDPOINT_NON_TENANT_DOORS = ["135", "140", "145", "150", "155", "161", "166", "789", "836", "841", "846", "989", "1004"];
+export const STOR24_FACE_DOORS = [...BLOCK24_FACE_DOORS, ...MIDPOINT_NON_TENANT_DOORS];
