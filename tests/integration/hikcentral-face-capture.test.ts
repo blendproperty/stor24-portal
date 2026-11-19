@@ -115,6 +115,7 @@ test("customer-scoped Counter face capture needs consent and review before one p
       return Response.json({ code: "0", data: "2001" });
     }) as typeof fetch;
     await db.integrationConnection.create({ data: { organisationId: org.id, facilityId: facility.id, category: "ACCESS_CONTROL", provider: "HIKCENTRAL", status: "CONFIGURED", config: { organisationIndexCode: "97", doorIndexCodes: STOR24_FACE_DOORS, accessLevelIds: ["12", "7"], nightlyClearanceRequired: true } } });
+    await assert.rejects(issueHikCentralFaceHandoff({ ...scope, unrestrictedFacilities: false, facilityIds: [facility.id] }, { customerId: newcomer.id, facilityId: facility.id, version: 0, syntheticTest: true, syntheticTestReason: "Automatic virtual lead test" }), /HIKCENTRAL_TEST_GRANT_NOT_READY/);
     const newHandoff = await issueHikCentralFaceHandoff(scope, { customerId: newcomer.id, facilityId: facility.id, version: 0, syntheticTest: true, syntheticTestReason: "Automatic virtual lead test" });
     await db.customer.update({ where: { id: newcomer.id }, data: { firstName: "Changed" } });
     await assert.rejects(hikCentralFaceHandoff(newHandoff.token), /PHOTO_CHANGED/);
