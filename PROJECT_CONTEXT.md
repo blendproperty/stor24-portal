@@ -8930,3 +8930,10 @@ Validation follow-up: the project typecheck and targeted ESLint for the candidat
 - **Commit and push:** Follow-up pending commit and push. **Merge:** PR #865 remains open. **Deployment and configuration:** None for this follow-up. **Live production verification:** None for automatic access.
 - **Outstanding:** Complete protected checks and release, then verify provider group scope, exact Midpoint visitor face points, safe egress, real-person consent and all reader effects before any live grants. Privacy, retention, debit-order and wider UAT gates remain.
 
+### 2026-11-19 - PR #865 final fixture validation candidate
+
+- **Implementation:** Four CommonJS route-fixture tests in the unit suite now use the shared generated-Prisma file-URL build helper. The synthetic mapping fixture includes the new access-grant count, so it can exercise legitimate mapping authority without a real database. Production access behaviour did not change in this patch.
+- **Testing:** The preceding PR head's merchandise transaction run `44446397078`, security run `44446397198` and restricted-runtime run `44446397084` passed. CI `44446397112` failed its unit step in the four route-fixture files due to the same CommonJS Prisma path; locally those 20 focused tests passed after the patch, and the full `npm test` passed 1,175 with 14 skips, zero failures. TypeScript, scoped ESLint and `git diff --check` passed. Final protected checks are pending on the next push.
+- **Commit and push:** Final fixture patch pending commit and push. **Merge:** PR #865 open. **Deployment and configuration:** No live deployment or access mapping change. **Live production verification:** No automatic door grant, lock or restoration yet.
+- **Outstanding:** Pass final protected checks, merge, deploy and verify the code release. Exact Midpoint visitor face IDs, narrow group, safe exit, installed API behaviour, real-person reader UAT, privacy/retention and debit-order failure evidence remain required before live automatic rights.
+

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { build } from "esbuild";
+import { build } from "./integration/build-commonjs";
 import { createRequire } from "node:module";
 import { moveOutSchema } from "../src/lib/validators";
 
