@@ -230,12 +230,16 @@ test("deleted person readback is distinct from a provider lookup failure", async
   const missing = new HikCentralAccessProvider((async () => Response.json({ code: "1001", msg: "Person not found" })) as typeof fetch, configuration);
   const denied = new HikCentralAccessProvider((async () => Response.json({ code: "1001", msg: "Permission denied" })) as typeof fetch, configuration);
   assert.deepEqual(await missing.personById("1150"), { ok: false, retryable: false, code: "HIKCENTRAL_PERSON_NOT_FOUND", message: "HikCentral person was not found." });
+  assert.deepEqual(await missing.personByCode("S24TEST123"), { ok: false, retryable: false, code: "HIKCENTRAL_PERSON_NOT_FOUND", message: "HikCentral person was not found." });
   const deniedResult = await denied.personById("1150");
   assert.equal(deniedResult.ok, false);
   if (!deniedResult.ok) assert.notEqual(deniedResult.code, "HIKCENTRAL_PERSON_NOT_FOUND");
+  const deniedCode = await denied.personByCode("S24TEST123");
+  assert.equal(deniedCode.ok, false);
+  if (!deniedCode.ok) assert.notEqual(deniedCode.code, "HIKCENTRAL_PERSON_NOT_FOUND");
 });
 
-test("person name search uses paged read-only provider results to guard duplicate creation", async () => {
+test("person name search uses paged read-only provider results", async () => {
   const provider = new HikCentralAccessProvider((async (url, init) => {
     assert.match(String(url), /\/person\/advance\/personList$/);
     assert.deepEqual(JSON.parse(String(init?.body)), { pageNo: 1, pageSize: 100, personName: "Dovey" });

@@ -53,12 +53,10 @@ function sameCustomerName(customer: { firstName: string | null; lastName: string
   return customer.firstName?.trim() === snapshot.firstNameSnapshot && customer.lastName?.trim() === snapshot.lastNameSnapshot;
 }
 
-async function assertNoExistingPerson(provider: HikCentralAccessProvider, customer: { firstName: string | null; lastName: string | null }) {
-  const familyName = customer.lastName!.trim();
-  const found = await provider.peopleByName(familyName);
-  if (!found.ok) throw Error("HIKCENTRAL_PERSON_REVIEW_REQUIRED");
-  const givenName = customer.firstName!.trim().split(/\s+/)[0].toLowerCase();
-  if (found.data.people.some(person => person.familyName.trim().toLowerCase() === familyName.toLowerCase() && person.givenName.trim().split(/\s+/)[0].toLowerCase() === givenName)) throw Error("HIKCENTRAL_PERSON_REVIEW_REQUIRED");
+async function assertNoExistingCustomerCode(provider: HikCentralAccessProvider, organisationId: string, customerId: string) {
+  const found = await provider.personByCode(hikCentralCustomerCode(organisationId, customerId));
+  if (found.ok) throw Error("HIKCENTRAL_PERSON_REVIEW_REQUIRED");
+  if (found.code !== "HIKCENTRAL_PERSON_NOT_FOUND") throw Error("HIKCENTRAL_PERSON_LOOKUP_FAILED");
 }
 
 async function lockCustomer(database: Database, customerId: string) {
@@ -78,7 +76,7 @@ export async function issueHikCentralFaceHandoff(scope: RequestScope, input: { f
   if (personId) {
     const verified = await provider.personById(personId);
     if (!verified.ok || (customer.lastName && verified.data.familyName && verified.data.familyName.trim().toLowerCase() !== customer.lastName.trim().toLowerCase())) throw Error("HIKCENTRAL_PERSON_LOOKUP_FAILED");
-  } else await assertNoExistingPerson(provider, customer);
+  } else await assertNoExistingCustomerCode(provider, scope.organisationId, customer.id);
   const token = randomBytes(32).toString("base64url"), expiresAt = new Date(Date.now() + 20 * 60_000);
   await db.$transaction(async tx => {
     await lockCustomer(tx, customer.id);
@@ -162,7 +160,7 @@ export async function decideHikCentralFace(scope: RequestScope, id: string, vers
     const candidate = await staffPhoto(db, scope, id);
     if (!candidate.personId) {
       const provider = new HikCentralAccessProvider(fetch, await loadHikCentralRuntimeConfiguration(scope.organisationId));
-      await assertNoExistingPerson(provider, await requireLeasingCustomer(scope, candidate.customerId));
+      await assertNoExistingCustomerCode(provider, scope.organisationId, candidate.customerId);
       const organizations = await provider.listOrganizations();
       const matches = organizations.ok ? organizations.data.organizations.filter(item => item.name.trim().toUpperCase() === "STOR24") : [];
       if (matches.length !== 1 || !matches[0].indexCode || /^TEMP-/i.test(matches[0].indexCode)) throw Error("HIKCENTRAL_DEPARTMENT_REQUIRED");
