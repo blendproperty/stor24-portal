@@ -11,6 +11,7 @@ import { floorMapSelection, unitIsOperational } from "@/lib/floor-availability";
 import { resolvedPhotoPolicy } from "@/lib/facial-photo-control";
 import { primaryTrialPolicy } from "@/lib/unit58-primary-photo-trial";
 import type { Prisma } from "@/generated/prisma/client";
+import { reconcileCustomerFaceAccess } from "@/lib/hikcentral-customer-access";
 
 type Database=Prisma.TransactionClient;
 async function scoped(database:Database,scope:RequestScope,id:string) {
@@ -54,7 +55,7 @@ export async function confirmLegacyHandover(scope:RequestScope,id:string,identit
   const initial=await checks(db,scope,id);if(initial.handover)return {tenancyId:id,idempotent:true};
   if(!initial.ready||!initial.document?.externalId||initial.tenancy.occupancies.length!==1)throw Error("MOVE_IN_NOT_READY");
   const artifactHash=await legacySignedArtifactHash(initial.document.externalId);
-  return db.$transaction(async tx=>{
+  const completed = await db.$transaction(async tx=>{
     await requireOperationalUnit(tx,initial.tenancy.facilityId,initial.tenancy.occupancies[0].unitId);
     await tx.$queryRaw`SELECT "id" FROM "Tenancy" WHERE "id" = ${id} FOR UPDATE`;
     await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${initial.tenancy.accountId} FOR UPDATE`;
@@ -75,4 +76,9 @@ export async function confirmLegacyHandover(scope:RequestScope,id:string,identit
     await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:state.tenancy.facilityId,actorId:scope.userId,action:"tenancy.key_handover_confirmed",entityType:"Tenancy",entityId:id,after:{leadId,reservationId:reservation?.id??null,accountId:state.tenancy.accountId,documentId:state.document!.id,signedArtifactSha256:artifactHash,paymentIds:state.payment.paymentIds,requiredAmount:state.payment.requiredAmount,paidAmount:state.payment.paidAmount,photoId:state.tenancy.legacyAccessPhoto!.id,photoVersion:state.tenancy.legacyAccessPhoto!.version,identityCheckedInPerson:true,accessState:"PENDING"}}});
     return {tenancyId:id,idempotent:false};
   });
+  if (!completed.idempotent) {
+    try { await reconcileCustomerFaceAccess(scope, initial.tenancy.customerId, initial.tenancy.facilityId); }
+    catch (error) { await db.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: initial.tenancy.facilityId, actorId: scope.userId, action: "hikcentral_face.access_reconcile_failed", entityType: "Tenancy", entityId: id, after: { customerId: initial.tenancy.customerId, code: error instanceof Error ? error.message : "UNKNOWN" } } }); }
+  }
+  return completed;
 }

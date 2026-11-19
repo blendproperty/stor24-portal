@@ -98,6 +98,15 @@ function accessReviewFor(account: Account, result: ReturnType<typeof evaluate>, 
   const unreviewedPayment = account.payments.filter(payment => !isTestPayment(payment)).some(payment => payment.status === "FAILED" || ["SUCCEEDED", "PARTIALLY_REFUNDED", "REFUNDED", "REVERSED"].includes(payment.status) && !account.ledgerEntries.some(entry => result.verifiedReceiptIds.includes(entry.id) && (entry.externalRef === payment.idempotencyKey || (entry.metadata as { paymentId?: string } | null)?.paymentId === payment.id)));
   return arrearsAccessReview({ asOf, paymentMethod: account.tenancy?.paymentMethod ?? null, active: account.tenancy?.status === "ACTIVE", issue: result.ageing.issue, hold: result.hold ?? (unreviewedPayment ? "A failed or unposted payment outcome needs authoritative reconciliation review before access-review preparation." : null), charges: result.ageing.charges });
 }
+/** Read-only financial proof for facial lock decisions; debit failures remain held until their authoritative event is available. */
+export async function verifiedArrearsAccessReview(scope: RequestScope, accountId: string, asOf = southAfricaDateKey(new Date())) {
+  return db.$transaction(async tx => {
+    const account = await accountFor(tx, scope, accountId);
+    const proof = await receiptEvidence(tx, scope, [account]);
+    const evaluated = evaluate(account, asOf, proof), review = accessReviewFor(account, evaluated, asOf);
+    return { ...review, paymentCleared: evaluated.ageing.overdue === 0 && !evaluated.ageing.issue && !evaluated.hold && !review.blockers.some(blocker => blocker.includes("failed or unposted payment")) };
+  });
+}
 export async function collectionsWorkspace(scope: RequestScope, asOf: string, options: { reviewSchedules?: boolean } = {}) {
   dateKey.parse(asOf); if (asOf > southAfricaDateKey(new Date())) throw new Error("COLLECTION_DATE");
   return db.$transaction(async tx => {

@@ -377,6 +377,14 @@ export class HikCentralAccessProvider {
     } catch (error) { return providerFailure(error); }
   }
 
+  async removePersonFromAccessLevel(privilegeGroupId: string, personId: string): Promise<ProviderResult<{ accepted: true }>> {
+    try {
+      if (!privilegeGroupId || !personId || privilegeGroupId.length > 64 || personId.length > 64) throw new Error("HikCentral access level or person is invalid.");
+      await this.post("/artemis/api/acs/v1/privilege/group/single/deletePersons", { privilegeGroupId, type: 1, list: [{ id: personId }] });
+      return { ok: true, providerReference: privilegeGroupId, data: { accepted: true } };
+    } catch (error) { return providerFailure(error); }
+  }
+
   async accessLevelHasPerson(privilegeGroupId: string, personId: string): Promise<ProviderResult<{ member: boolean }>> {
     try {
       for (let pageNo = 1; pageNo <= 50; pageNo++) {

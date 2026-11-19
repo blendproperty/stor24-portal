@@ -3344,8 +3344,14 @@ a.module-card:focus-visible {
 .face-customer-table caption { padding:16px 18px; background:#f4f8f4; color:#3c5546; text-align:left; font-weight:600; line-height:1.45; }
 .face-customer-table th,.face-customer-table td { padding:12px 18px; border-top:1px solid #e5ebe7; vertical-align:middle; }
 .face-customer-table thead th { color:#4c6255; font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
-.face-customer-table tbody tr[aria-selected=true] { background:#fff7ed; }
+.face-customer-table tbody tr[aria-selected=true] { background:#fff1e5; box-shadow:inset 4px 0 #e34b0a; }
 .face-customer-table td:nth-child(3) { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; overflow-wrap:anywhere; }
+.face-status { display:inline-flex; align-items:center; min-height:28px; padding:4px 10px; border-radius:999px; font-weight:700; line-height:1.25; }
+.face-status--success { background:#e4f5e9; color:#176837; }
+.face-status--warning { background:#fff0db; color:#8b4700; }
+.face-status--danger { background:#fbe8e7; color:#a22c25; }
+.face-status--neutral { background:#edf1f3; color:#52616b; }
+.face-customer-table [aria-current=true] { background:#e34b0a; color:#fff; border-color:#e34b0a; }
 .face-customer-table-wrap>p { padding:12px 18px; margin:0; color:#53665b; font-size:13px; }
 .face-page :is(.hikcentral-person-link,.hikcentral-capture) .field { display:grid; align-content:start; gap:8px; min-width:0; font-size:14px; font-weight:700; }
 .face-page :is(.hikcentral-person-link,.hikcentral-capture) .field :is(input,select) { width:100%; min-width:0; min-height:48px; padding:10px 12px; border:1px solid #cbd5db; border-radius:9px; background:#fff; color:var(--ink); font:500 15px "Satoshi Handover",Arial,sans-serif; }

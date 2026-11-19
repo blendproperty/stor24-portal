@@ -15,6 +15,7 @@ import { assertMoveOutDatePolicy } from "@/lib/move-out-date-policy";
 import { welcomeTenantWhenReady } from "@/lib/tenant-welcome-email";
 import { facilityWhere, requireFacility, type RequestScope } from "@/lib/scope";
 import { revokeBiometricAccess } from "@/lib/biometric-access-service";
+import { reconcileCustomerFaceAccess } from "@/lib/hikcentral-customer-access";
 import { sendWhatsAppTemplate } from "@/lib/whatsapp";
 import {
   LEASE_CLAUSE_KEYS,
@@ -1279,6 +1280,10 @@ export async function moveOut(
     );
     return { entity, releasedUnits };
   });
+  try { await reconcileCustomerFaceAccess(scope, existing.customerId, existing.facilityId); }
+  catch (error) {
+    await db.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: existing.facilityId, actorId: scope.userId, action: "hikcentral_face.access_reconcile_failed", entityType: "Tenancy", entityId: existing.id, after: { customerId: existing.customerId, code: error instanceof Error ? error.message : "UNKNOWN" } } });
+  }
   const notification = await db.tenancy.findUnique({
     where: { id: result.entity.id },
     include: {

@@ -189,6 +189,20 @@ test("access-level assignment is separate from person creation and requires memb
   assert.equal(paths.length, 2);
 });
 
+test("access-level removal uses the installed deletePersons contract and requires absence readback", async () => {
+  const calls: string[] = [];
+  const provider = new HikCentralAccessProvider((async (url, init) => {
+    calls.push(String(url));
+    const body = JSON.parse(String(init?.body));
+    if (String(url).endsWith("deletePersons")) { assert.deepEqual(body, { privilegeGroupId: "L1", type: 1, list: [{ id: "1150" }] }); return Response.json({ code: "0", data: "" }); }
+    assert.deepEqual(body, { privilegeGroupId: "L1", type: 1, pageNo: 1, pageSize: 100 });
+    return Response.json({ code: "0", data: { list: [] } });
+  }) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", userId: "stor24-api", facilities: {} });
+  assert.equal((await provider.removePersonFromAccessLevel("L1", "1150")).ok, true);
+  assert.deepEqual((await provider.accessLevelHasPerson("L1", "1150")), { ok: true, providerReference: "L1", data: { member: false } });
+  assert.equal(calls.length, 2);
+});
+
 test("an existing person face update targets that person and refuses invalid image data", async () => {
   const calls: unknown[] = [];
   const provider = new HikCentralAccessProvider((async (_url, init) => {

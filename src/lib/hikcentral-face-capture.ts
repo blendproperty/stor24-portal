@@ -8,6 +8,7 @@ import { HikCentralAccessProvider } from "@/lib/integrations/hikcentral-provider
 import { integrationEncryptionConfigured } from "@/lib/integrations/integration-secret-vault";
 import { requireLeasingCustomer } from "@/lib/leasing-customer-scope";
 import { requireFacility, type RequestScope } from "@/lib/scope";
+import { reconcileCustomerFaceAccess } from "@/lib/hikcentral-customer-access";
 
 type Database = Prisma.TransactionClient;
 const tokenHash = (token: string) => createHash("sha256").update(token).digest("hex");
@@ -212,6 +213,10 @@ export async function decideHikCentralFace(scope: RequestScope, id: string, vers
     if (updated.count !== 1) throw Error("PHOTO_CHANGED");
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: photo.facilityId, actorId: scope.userId, action: accepted ? "hikcentral_face.api_accepted_person_readback" : "hikcentral_face.provider_uncertain", entityType: "HikCentralFaceCapture", entityId: id, after: { customerId: photo.customerId, personId: resolvedPersonId, version, deviceApplied: false } } });
   });
+  if (accepted) {
+    try { await reconcileCustomerFaceAccess(scope, photo.customerId, photo.facilityId); }
+    catch (error) { await db.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: photo.facilityId, actorId: scope.userId, action: "hikcentral_face.access_reconcile_failed", entityType: "HikCentralFaceCapture", entityId: id, after: { customerId: photo.customerId, code: error instanceof Error ? error.message : "UNKNOWN" } } }); }
+  }
   return { status };
 }
 

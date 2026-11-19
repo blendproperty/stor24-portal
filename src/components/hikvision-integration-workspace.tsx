@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 
 type CompanyConfiguration = { endpoint: string; userId: string; appKeyConfigured: boolean; appSecretConfigured: boolean; pinnedCertSha256Fingerprint: string; regionIndexCode: string; status: string; lastHealthAt: string | null; lastSuccessAt: string | null; failureMessage: string | null };
-type FacilityConfiguration = { id: string; name: string; code: string; organisationIndexCode: string; doorIndexCodes: string[]; status: string; lastHealthAt: string | null; lastSuccessAt: string | null; failureMessage: string | null };
+type FacilityConfiguration = { id: string; name: string; code: string; organisationIndexCode: string; doorIndexCodes: string[]; accessLevelIds: string[]; freeEgressConfirmed: boolean; status: string; lastHealthAt: string | null; lastSuccessAt: string | null; failureMessage: string | null };
 type Configuration = { encryptionReady: boolean; company: CompanyConfiguration; facilities: FacilityConfiguration[] };
 type Door = { indexCode: string; name: string };
 type AccessInspection = { version: { product: string; version: string } | null; versionError: string | null; accessLevels: { id: string; name: string; resourceIds: string[]; resourceNames: string[] }[]; organizations: { indexCode: string; name: string; parentIndexCode: string | null }[]; organizationError: string | null };
@@ -59,7 +59,8 @@ export function HikvisionIntegrationWorkspace() {
 
   function saveMapping(formData: FormData) {
     const doorIndexCodes = String(formData.get("doorIndexCodes") ?? "").split(/[\n,]+/).map((item) => item.trim()).filter(Boolean);
-    void call("PUT", { action: "save-mapping", payload: { facilityId, organisationIndexCode: String(formData.get("organisationIndexCode") ?? ""), doorIndexCodes } }, "Facility and door mapping saved. Test the connection before using facial access.");
+    const accessLevelIds = String(formData.get("accessLevelIds") ?? "").split(/[\n,]+/).map((item) => item.trim()).filter(Boolean);
+    void call("PUT", { action: "save-mapping", payload: { facilityId, organisationIndexCode: String(formData.get("organisationIndexCode") ?? ""), doorIndexCodes, accessLevelIds, freeEgressConfirmed: formData.get("freeEgressConfirmed") === "on" } }, "Facility and door mapping saved. Check the exact access-level resources before granting facial access.");
   }
 
   async function discoverDoors() {
@@ -123,9 +124,11 @@ export function HikvisionIntegrationWorkspace() {
         <div className="field-grid">
           <label>HikCentral organisation index code<input name="organisationIndexCode" required defaultValue={facility?.organisationIndexCode ?? ""} disabled={!canManage}/></label>
           <label>Door index codes<textarea ref={doorCodesField} name="doorIndexCodes" required rows={6} defaultValue={facility?.doorIndexCodes.join("\n") ?? ""} placeholder={'One door code per line\ne.g. midpoint-main-entry'} disabled={!canManage}/></label>
+          <label>Face access level IDs<textarea name="accessLevelIds" rows={2} defaultValue={facility?.accessLevelIds.join("\n") ?? ""} placeholder={'Block24 level ID\nMidpoint visitor face level ID'} disabled={!canManage}/></label>
         </div>
+        <label className="field-help"><input type="checkbox" name="freeEgressConfirmed" defaultChecked={facility?.freeEgressConfirmed ?? false} disabled={!canManage} /> Site security confirmed people can leave Midpoint and Block24 without facial permission after access is removed.</label>
         {temporaryMapping ? <p className="safe-config-note" role="alert">TEMP-CONNECTION-TEST is a placeholder, not a verified HikCentral department. The saved door list predates the three Block24 readers. Check the live department and doors before using this mapping for a person.</p> : null}
-        <p className="field-help">Use HikCentral index codes, not the visible door names. Duplicate codes are removed automatically.</p>
+        <p className="field-help">Enter the three Block24 face doors and the main Midpoint visitor face entrance and exit. Add the two narrow HikCentral access level IDs; each level is checked against its actual door resources before any automatic grant. Leave the level IDs empty until the Midpoint face readers are identified.</p>
         <div className="hikvision-actions"><button type="button" className="button button-secondary" disabled={!canManage || !facilityId || busy === "discover-doors"} onClick={() => void discoverDoors()}>{busy === "discover-doors" ? "Finding doors…" : "Find Block24 door IDs"}</button>{block24Doors.length === 3 ? <button type="button" className="button button-secondary" onClick={useBlock24Doors}>Replace draft with Block24 doors</button> : null}</div>
         {discoveredDoors.length ? <div className="field-help" aria-live="polite">{block24Doors.length === 3 ? block24Doors.map((door) => <div key={door.indexCode}>{door.name}: <code>{door.indexCode}</code></div>) : "All three Block24 doors were not found in the live HikCentral door list. Confirm their names and IDs before saving."}</div> : null}
         <div className="hikvision-actions"><button className="button button-secondary" disabled={!canManage || !facilityId || busy === "save-mapping"}>{busy === "save-mapping" ? "Saving…" : "Save mapping"}</button><button type="button" className="button button-primary" disabled={!canManage || !facilityId || busy === "test-connection"} onClick={() => void call("POST", { action: "test-connection", facilityId }, "HikCentral door-list connection verified. Person and gate access are not yet verified.")}><RefreshCw size={15}/>{busy === "test-connection" ? "Testing…" : "Test connection"}</button><button type="button" className="button button-secondary" disabled={!canManage || !facilityId || Boolean(busy)} onClick={() => void inspectAccess()}>{busy === "inspect-access" ? "Checking…" : "Check version and access levels"}</button></div>
