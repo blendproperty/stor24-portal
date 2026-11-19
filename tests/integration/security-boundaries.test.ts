@@ -58,7 +58,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
       const load = async (entry: string) => {
         const output = await build({ entryPoints: [entry], bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "isolated-messaging", setup(builder) {
           builder.onResolve({ filter: /^@\/lib\/(db|session|integrations\/twilio-provider)$/ }, args => ({ path: args.path, namespace: "fixture" }));
-          builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : args.path.endsWith("/session") ? "export const getSession=async()=>__session;" : "export class TwilioWhatsAppProvider { sendTemplate(...args) { return __provider(...args); } }" }));
+          builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : args.path.endsWith("/session") ? "export const getSession=async()=>__session;" : "export class TwilioWhatsAppProvider { sendTemplate(...args) { return __provider(...args); } } export const normalizeTwilioRecipient=(value)=>value; export class TwilioSmsProvider { send() { throw Error('Unexpected SMS send'); } }" }));
         } }] });
         const loaded = { exports: {} as { POST: (request: Request) => Promise<Response> } };
         new Function("require", "module", "exports", "__db", "__session", "__provider", output.outputFiles[0].text)(createRequire(import.meta.url), loaded, loaded.exports, db, { userId: user.id, sessionVersion: user.sessionVersion, mfaVerified: true }, provider);
