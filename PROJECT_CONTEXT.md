@@ -1,11 +1,12 @@
-## 2026-11-19 — Midpoint unit-number format candidate
+## 2026-11-19 — Midpoint ground-floor numbering format
 
-- **Implementation:** Requested format is 010–099 for the existing units 10–99. The separate `docs/operations/unit-numbering-20261027/numbering-crosswalk-proposed-20261119.csv` is a proposed mapping based on the historical crosswalk; it retains the historical source numbers and shows 001–009 in accordance with the live inventory display observed today. The original October crosswalk and verification receipt remain historical evidence.
-- **Testing:** The proposed file has 530 rows, unique destination numbers and ground-floor destinations 001–142. Live display showed 001–009 and 10; all 90 affected live records, relationships and labels have not yet been verified.
-- **Commit and push:** Candidate; consult Git for current publication status.
-- **Merge:** Not merged.
-- **Deployment and configuration:** No production renumbering performed in this task. SSH authentication failed; Hostinger lists the n8n-labelled VPS at the same IP as the configured STOR24 server; no web-console session was opened. The existing application provides an audited batch renumbering workflow.
-- **Live production verification:** New 010–099 numbers have not been applied or verified. Physical signage, issued documents, provider integrations, staff/device acceptance, training and existing business, data, recovery and approval gates remain open. The 2026-10-27 verification reflects that date and does not verify this candidate.
+- **Implementation:** Brett reports manually renumbering units 10–99 to 010–099 in the platform. The crosswalk now records 001–099, preserving 100–530; the original October mapping is retained as `numbering-crosswalk-historical-20261027.csv`. Units 001–009 were already shown in that format before this task.
+- **Testing:** Crosswalk has 530 unique destination numbers. Public booking API readback on 2026-11-19 returned 142 ground-floor units; all 142 IDs and numbers matched the original ID mapping with the requested zero padding, including 90 numbers 010–099 and no two-digit 10–99. All 142 linked public map labels matched their unit numbers. Brett supplied a screenshot of a database count query returning zero for Midpoint two-digit numbers; the screenshot alone does not prove the query text or its scope.
+- **Commit and push:** Documentation candidate; consult Git for the exact commit and remote status.
+- **Merge:** Documentation promotion must be verified separately; the platform data change was made manually.
+- **Deployment and configuration:** Brett reports the manual platform change; no application deployment was performed for this work. The original brett-admin SSH key was successfully used; sudo access was not authenticated. A replacement public key was reportedly added through Hostinger but has not been independently verified or tested; review its authorization and any security alert separately.
+- **Live production verification:** Public booking feed and linked map labels verified as above. No independent privileged database audit or verification of reservations, issued documents, provider integrations or physical signage was performed. Staff/device UAT, physical label checks, communications, recovery and all existing data, provider, training and approval gates remain open.
+
 ## 2026-11-17 — BlendSign callback concurrency release
 
 - Implementation: PR #849 serializes completion using the existing facility lock, rechecks the signed document, requests retry for simultaneous inbox creation and prevents a late failure from overwriting success. The earlier provider-side idempotency and outage task was already completed in August and remains recorded separately.
