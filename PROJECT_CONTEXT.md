@@ -8915,3 +8915,11 @@ Validation follow-up: the project typecheck and targeted ESLint for the candidat
 - **Live production verification:** None for automatic grants, locks or restoration. The earlier John (test) Wayne screen photograph and provider person are API transport evidence only; they do not validate a real face reader. Brett's earlier Block24 Main Gate recognition used his pre-existing HikCentral face and manual access assignment.
 - **Outstanding:** Finish protected release checks and deployment, confirm the exact Midpoint visitor face-reader IDs and safe exit route, then configure and physically test a consenting real person's grant/lock/restore at all readers. Validate the installed HikCentral delete-persons contract and device distribution. Debit-order lock timing remains held until an authoritative customer failure event is ingested. Final Liezl policy, backup/provider/device erasure, staff training and broader UAT remain open.
 
+### 2026-11-19 - Face access PR #865 protected-check follow-up
+
+- **Implementation:** The existing CommonJS route-fixture loader in `tests/integration/security-boundaries.test.ts` now supplies a file URL for the bundled Prisma client's `import.meta.url`; no production runtime code changed in this follow-up.
+- **Testing:** The first PR #865 merchandise run `44445541722` failed 14 security-boundary tests because esbuild left generated Prisma `import.meta.url` undefined inside CommonJS evaluation. The isolated PostgreSQL rerun passed all 24 security-boundary tests after the fixture fix. On the preceding PR head, restricted-runtime run `44445542067` and security run `44445541795` passed; CI run `44445541876` was still running at this receipt. Replacement protected checks are pending.
+- **Commit and push:** Fixture follow-up pending commit and push. **Merge:** PR #865 remains open.
+- **Deployment and configuration:** No candidate deployment or access mapping change. **Live production verification:** No new live grant, lock, restoration or physical reader evidence.
+- **Outstanding:** Pass replacement protected checks, merge and deploy, then verify the narrow Midpoint face IDs, safe exit, installed provider API and actual reader behaviour before enabling automatic access. Privacy, retention, debit-order evidence and wider UAT gates remain.
+

@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { build } from "esbuild";
+import { build as esbuild, type BuildOptions } from "esbuild";
 import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { Prisma } from "../../src/generated/prisma/client";
 import { db } from "../../src/lib/db";
 import { buildReportRows } from "../../src/lib/report-data-service";
@@ -10,6 +12,9 @@ import { requireFacility } from "../../src/lib/scope";
 import { createCustomer, createLead, requireLeasingCustomer } from "../../src/lib/leasing-service";
 import { listIdentityLinks } from "../../src/lib/mel-integration-status-service";
 import { listCommunicationLogs } from "../../src/lib/communication-log-service";
+
+// The generated Prisma client uses import.meta.url; these route fixtures execute as CommonJS.
+const build = (options: BuildOptions) => esbuild({ ...options, define: { ...options.define, "import.meta.url": JSON.stringify(pathToFileURL(resolve("src/generated/prisma/client.ts")).href) } });
 
 test("isolated PostgreSQL security boundaries and safe staff projections", async t => {
   assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci");
