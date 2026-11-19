@@ -65,7 +65,7 @@ async function load(entry: string, state: ReturnType<typeof fixture>) {
       builder.onResolve({ filter: /^@\/lib\/(db|session)$/ }, args => ({ path: args.path, namespace: "fixture" }));
       builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__fixture.db;" : "export const getSession=async()=>__fixture.session;" }));
       builder.onResolve({ filter: /^@\/lib\/integrations\/twilio-provider$/ }, args => ({ path: args.path, namespace: "provider" }));
-      builder.onLoad({ filter: /.*/, namespace: "provider" }, () => ({ contents: "export class TwilioWhatsAppProvider { async sendTemplate(...args) { __fixture.sends.push(args); return {ok:true,providerReference:'synthetic-message'}; } }" }));
+      builder.onLoad({ filter: /.*/, namespace: "provider" }, () => ({ contents: "export class TwilioWhatsAppProvider { async sendTemplate(...args) { __fixture.sends.push(args); return {ok:true,providerReference:'synthetic-message'}; } } export const normalizeTwilioRecipient=(value)=>value; export class TwilioSmsProvider { send() { throw Error('Unexpected SMS send'); } }" }));
     } }],
   });
   const loaded = { exports: {} as Row };

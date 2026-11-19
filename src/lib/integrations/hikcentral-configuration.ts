@@ -34,11 +34,11 @@ const mappingSchema = z.object({
   organisationIndexCode: z.string().trim().min(1).max(200).refine((code) => !/^TEMP-/i.test(code), "Use a verified HikCentral organisation index code."),
   doorIndexCodes: z.array(z.string().trim().min(1).max(200)).min(1).max(200).transform((items) => [...new Set(items)]),
   accessLevelIds: z.array(z.string().trim().min(1).max(64)).max(2).refine((items) => (items.length === 0 || items.length === 2) && new Set(items).size === items.length).optional(),
-  freeEgressConfirmed: z.boolean().optional(),
-}).refine((value) => !value.accessLevelIds?.length || (value.freeEgressConfirmed === true && value.doorIndexCodes.length === STOR24_FACE_DOORS.length && STOR24_FACE_DOORS.every(id => value.doorIndexCodes.includes(id))), "Confirm free exit and map exactly three Block24 doors and the thirteen approved Midpoint non-tenant doors before enabling both access levels.");
+  nightlyClearanceRequired: z.boolean().optional(),
+}).refine((value) => !value.accessLevelIds?.length || (value.nightlyClearanceRequired === true && value.doorIndexCodes.length === STOR24_FACE_DOORS.length && STOR24_FACE_DOORS.every(id => value.doorIndexCodes.includes(id))), "Confirm nightly empty-site clearance and map exactly three Block24 doors and the thirteen approved Midpoint non-tenant doors before enabling both access levels.");
 
 type StoredCredentials = { endpoint?: unknown; userId?: unknown; appKeyEncrypted?: unknown; appSecretEncrypted?: unknown; pinnedCertSha256Fingerprint?: unknown; regionIndexCode?: unknown };
-type StoredMapping = { organisationIndexCode?: unknown; doorIndexCodes?: unknown; accessLevelIds?: unknown; freeEgressConfirmed?: unknown };
+type StoredMapping = { organisationIndexCode?: unknown; doorIndexCodes?: unknown; accessLevelIds?: unknown; nightlyClearanceRequired?: unknown };
 
 function safeEndpoint(value: string) {
   const url = new URL(value);
@@ -84,7 +84,7 @@ export async function listHikCentralConfiguration(scope: RequestScope) {
         organisationIndexCode: configuredString(config.organisationIndexCode) ? config.organisationIndexCode : "",
         doorIndexCodes: Array.isArray(config.doorIndexCodes) ? config.doorIndexCodes.filter(configuredString) : [],
         accessLevelIds: Array.isArray(config.accessLevelIds) ? config.accessLevelIds.filter(configuredString) : [],
-        freeEgressConfirmed: config.freeEgressConfirmed === true,
+        nightlyClearanceRequired: config.nightlyClearanceRequired === true,
         status: connection?.status ?? "DISCONNECTED",
         lastHealthAt: connection?.lastHealthAt?.toISOString() ?? null,
         lastSuccessAt: connection?.lastSuccessAt?.toISOString() ?? null,
@@ -129,9 +129,9 @@ export async function saveHikCentralMapping(scope: RequestScope, input: unknown)
   const parsed = mappingSchema.parse(input);
   const facility = await requireFacility(scope, parsed.facilityId);
   const existing = await db.integrationConnection.findFirst({ where: { organisationId: scope.organisationId, facilityId: facility.id, category: HIKCENTRAL_CATEGORY, provider: HIKCENTRAL_PROVIDER } });
-  const config = { organisationIndexCode: parsed.organisationIndexCode, doorIndexCodes: parsed.doorIndexCodes, accessLevelIds: parsed.accessLevelIds ?? [], freeEgressConfirmed: parsed.freeEgressConfirmed === true };
+  const config = { organisationIndexCode: parsed.organisationIndexCode, doorIndexCodes: parsed.doorIndexCodes, accessLevelIds: parsed.accessLevelIds ?? [], nightlyClearanceRequired: parsed.nightlyClearanceRequired === true };
   const old = (existing?.config ?? {}) as StoredMapping;
-  if (old.organisationIndexCode !== config.organisationIndexCode || JSON.stringify(old.doorIndexCodes ?? []) !== JSON.stringify(config.doorIndexCodes) || JSON.stringify(old.accessLevelIds ?? []) !== JSON.stringify(config.accessLevelIds) || old.freeEgressConfirmed !== config.freeEgressConfirmed) {
+  if (old.organisationIndexCode !== config.organisationIndexCode || JSON.stringify(old.doorIndexCodes ?? []) !== JSON.stringify(config.doorIndexCodes) || JSON.stringify(old.accessLevelIds ?? []) !== JSON.stringify(config.accessLevelIds) || old.nightlyClearanceRequired !== config.nightlyClearanceRequired) {
     if (await db.hikCentralAccessGrant.count({ where: { organisationId: scope.organisationId, facilityId: facility.id, status: { in: ["PENDING", "GRANTED", "LOCKED", "REVOKE_PENDING", "REVIEW_REQUIRED"] } } })) throw Error("HIKCENTRAL_ACTIVE_GRANTS_REVIEW_REQUIRED");
   }
   const connection = existing

@@ -15,6 +15,7 @@ import { primaryTrialSnapshot } from "@/lib/unit58-primary-photo-trial";
 import { db } from "@/lib/db";
 import { HikCentralExistingPersonLink } from "@/components/hikcentral-existing-person-link";
 import { HikCentralFaceCaptureWorkspace } from "@/components/hikcentral-face-capture-workspace";
+import { HikCentralSiteClearance } from "@/components/hikcentral-site-clearance";
 
 export const metadata = { title: "Biometric access" };
 export const dynamic = "force-dynamic";
@@ -56,6 +57,7 @@ export default async function AccessPage({ searchParams }: { searchParams: Promi
       <li><span>3</span><div><strong>Review and send</strong><p>Staff review the saved image before sending it to HikCentral.</p></div></li>
     </ol>
     {captureScope ? <HikCentralFaceCaptureWorkspace people={capturePeople.map(customer => ({ customerId: customer.id, customerName: [customer.firstName, customer.lastName].filter(Boolean).join(" "), personId: customer.integrationIdentityLink?.hikCentralPersonId ?? null, linkStatus: customer.integrationIdentityLink?.status ?? null, accessGrants: customer.hikCentralAccessGrants, photo: customer.hikCentralFaceCapture ? { id: customer.hikCentralFaceCapture.id, version: customer.hikCentralFaceCapture.version, status: customer.hikCentralFaceCapture.status, consentAt: customer.hikCentralFaceCapture.consentAt.toISOString(), providerAcceptedAt: customer.hikCentralFaceCapture.providerAcceptedAt?.toISOString() ?? null } : null }))} facilities={captureFacilities} canSend={canLinkExistingPerson} /> : null}
+    {captureScope ? <HikCentralSiteClearance facilities={captureFacilities} /> : null}
     {canLinkExistingPerson ? <details className="face-provider-records"><summary>Already in HikCentral? <span>Manager: link an existing person without creating a duplicate</span></summary><HikCentralExistingPersonLink customers={linkCustomers.map(customer => ({ id: customer.id, name: customer.companyName || [customer.firstName, customer.lastName].filter(Boolean).join(" ") || "Unnamed customer" }))} facilities={linkFacilities} /></details> : null}
     <details className="face-provider-records face-settings" open={!control.enabled}><summary>Photo collection settings <span>{control.enabled ? "On — owner controls and interim rules" : "Off — photo uploads are paused"}</span></summary><PhotoCollectionControl initial={control} /></details>
     <details className="face-provider-records face-legacy-workflows" open={Boolean(reservation)}><summary>Booking and additional-person workflows <span>Separate from the HikCentral customer photo table above</span></summary><div className="page-stack">
