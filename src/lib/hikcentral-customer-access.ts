@@ -66,7 +66,7 @@ export async function customerFaceAccessReadiness(scope: RequestScope, customerI
     financialEvidenceUnavailable ? "Payment evidence could not be checked" : null,
     !mapped ? "Block24 and Midpoint non-tenant readers or nightly site clearance are not fully configured" : null,
   ].filter((value): value is string => Boolean(value));
-  return { eligible: blockers.length === 0, accessClearance: (activeTenancy || approvedVisit) && !arrearsLocked && !manuallyLocked, approvalExpiresAt: approvedVisit ? approval.expiresAt : null, arrearsLocked, arrearsNoticePending, financialLockSourceChargeId, warningCandidates, manuallyLocked, accessLocked: arrearsLocked || manuallyLocked, restorationReady: activeTenancy && paymentCleared && !financialEvidenceUnavailable && !manuallyLocked, blockers, personId: link?.hikCentralPersonId ?? null, grants, mapping: mapped ? { accessLevelIds: config.accessLevelIds as string[], doorIndexCodes: config.doorIndexCodes as string[] } : null };
+  return { eligible: blockers.length === 0, accessClearance: (activeTenancy || approvedVisit) && !arrearsLocked && !manuallyLocked, approvalExpiresAt: approvedVisit ? approval.expiresAt : null, syntheticTestActive: approvedVisit && approval.reason.startsWith("Synthetic API assignment test:"), arrearsLocked, arrearsNoticePending, financialLockSourceChargeId, warningCandidates, manuallyLocked, accessLocked: arrearsLocked || manuallyLocked, restorationReady: activeTenancy && paymentCleared && !financialEvidenceUnavailable && !manuallyLocked, blockers, personId: link?.hikCentralPersonId ?? null, grants, mapping: mapped ? { accessLevelIds: config.accessLevelIds as string[], doorIndexCodes: config.doorIndexCodes as string[] } : null };
 }
 
 export async function hikCentralSiteClearance(scope: RequestScope, facilityId: string, now = new Date()) {
@@ -100,19 +100,27 @@ export async function setCustomerFaceManualLock(scope: RequestScope, customerId:
   return reconcileCustomerFaceAccess(scope, customerId, facilityId, now);
 }
 
-export async function approveCustomerFaceVisit(scope: RequestScope, customerId: string, facilityId: string, photoMatchesId: boolean) {
+export async function approveCustomerFaceVisit(scope: RequestScope, customerId: string, facilityId: string, photoMatchesId: boolean, syntheticTest?: { expectedPersonId: string; reason: string }) {
   await requireFacility(scope, facilityId);
   await requireLeasingCustomer(scope, customerId);
-  if (!scope.userId || !photoMatchesId || await db.tenancy.count({ where: { customerId } })) throw Error("HIKCENTRAL_VISIT_NOT_READY");
+  if (!scope.userId || (!photoMatchesId && !syntheticTest) || await db.tenancy.count({ where: { customerId } })) throw Error("HIKCENTRAL_VISIT_NOT_READY");
   const photo = await db.hikCentralFaceCapture.findUnique({ where: { customerId } });
-  if (!photo || photo.facilityId !== facilityId || photo.status !== "WAITING_REVIEW" || photo.expiresAt <= new Date()) throw Error("HIKCENTRAL_VISIT_NOT_READY");
-  const preview = await db.auditEvent.findFirst({ where: { organisationId: scope.organisationId, actorId: scope.userId, entityType: "HikCentralFaceCapture", entityId: photo.id, action: "hikcentral_face.previewed", after: { path: ["version"], equals: photo.version } } });
+  if (!photo || photo.facilityId !== facilityId || !(syntheticTest ? photo.status === "PROVIDER_ACCEPTED" : photo.status === "WAITING_REVIEW" ? photo.expiresAt > new Date() : photo.status === "PROVIDER_ACCEPTED" && photo.providerAcceptedAt && photo.providerAcceptedAt > new Date(Date.now() - 2 * 60 * 60_000))) throw Error("HIKCENTRAL_VISIT_NOT_READY");
+  if (syntheticTest) {
+    const link = await db.integrationIdentityLink.findUnique({ where: { customerId } });
+    const readiness = await customerFaceAccessReadiness(scope, customerId, facilityId);
+    if (!scope.unrestrictedFacilities || photo.status !== "PROVIDER_ACCEPTED" || !syntheticTest.expectedPersonId || syntheticTest.expectedPersonId !== photo.personId || link?.hikCentralPersonId !== photo.personId || link.status !== "ACTIVE" || syntheticTest.reason.trim().length < 8 || syntheticTest.reason.trim().length > 200 || readiness.grants.some(item => item.status !== "REVOKED") || readiness.blockers.some(item => item !== "No active handed-over tenancy or current manager-approved visit")) throw Error("HIKCENTRAL_TEST_GRANT_NOT_READY");
+  }
+  const preview = await db.auditEvent.findFirst({ where: { organisationId: scope.organisationId, ...(!syntheticTest ? { actorId: scope.userId } : {}), entityType: "HikCentralFaceCapture", entityId: photo.id, action: "hikcentral_face.previewed", after: { path: ["version"], equals: photo.version } } });
   if (!preview) throw Error("PHOTO_PREVIEW_REQUIRED");
   const existing = await db.hikCentralAccessApproval.findUnique({ where: { customerId_facilityId: { customerId, facilityId } } });
   if (existing && !existing.revokedAt && existing.expiresAt > new Date()) throw Error("HIKCENTRAL_VISIT_ALREADY_APPROVED");
-  const expiresAt = new Date(Date.now() + 2 * 60 * 60_000);
-  const approval = await db.hikCentralAccessApproval.upsert({ where: { customerId_facilityId: { customerId, facilityId } }, create: { organisationId: scope.organisationId, facilityId, customerId, approvedById: scope.userId, reason: "Supervised customer face-reader visit", photoId: photo.id, photoVersion: photo.version, expiresAt }, update: { approvedById: scope.userId, reason: "Supervised customer face-reader visit", photoId: photo.id, photoVersion: photo.version, expiresAt, revokedAt: null } });
-  await db.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId, actorId: scope.userId, action: "hikcentral_face.visit_approved", entityType: "HikCentralAccessApproval", entityId: approval.id, after: { customerId, photoId: photo.id, photoVersion: photo.version, expiresAt: expiresAt.toISOString() } } });
+  // shortcut: the approval table requires an expiry; synthetic grants use a distant sentinel until manually revoked.
+  const expiresAt = syntheticTest ? new Date("9999-12-31T23:59:59.000Z") : new Date(Date.now() + 120 * 60_000);
+  const reason = syntheticTest ? `Synthetic API assignment test: ${syntheticTest.reason.trim()}` : "Supervised customer face-reader visit";
+  const approval = await db.hikCentralAccessApproval.upsert({ where: { customerId_facilityId: { customerId, facilityId } }, create: { organisationId: scope.organisationId, facilityId, customerId, approvedById: scope.userId, reason, photoId: photo.id, photoVersion: photo.version, expiresAt }, update: { approvedById: scope.userId, reason, photoId: photo.id, photoVersion: photo.version, expiresAt, revokedAt: null } });
+  await db.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId, actorId: scope.userId, action: syntheticTest ? "hikcentral_face.synthetic_test_approved" : "hikcentral_face.visit_approved", entityType: "HikCentralAccessApproval", entityId: approval.id, after: { customerId, photoId: photo.id, photoVersion: photo.version, expiresAt: expiresAt.toISOString(), ...(syntheticTest ? { personId: syntheticTest.expectedPersonId, reason: syntheticTest.reason.trim() } : {}) } } });
+  if (photo.status === "PROVIDER_ACCEPTED") await reconcileCustomerFaceAccess(scope, customerId, facilityId);
   return { expiresAt };
 }
 
@@ -220,6 +228,7 @@ export async function processHikCentralAccessLocks(now = new Date()) {
     const scope: RequestScope = { userId: "", organisationId: row.organisationId, facilityIds: [], unrestrictedFacilities: true };
     try {
       const readiness = await customerFaceAccessReadiness(scope, row.customerId, row.facilityId, now);
+      if (readiness.syntheticTestActive) continue;
       for (const candidate of readiness.warningCandidates) await sendHikCentralLockWarning(scope, row.customerId, row.facilityId, candidate, now);
       if (readiness.accessLocked || !readiness.accessClearance) {
         const result = await reconcileCustomerFaceAccess(scope, row.customerId, row.facilityId, now);

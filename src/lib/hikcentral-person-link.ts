@@ -54,7 +54,9 @@ export async function reconcileDeletedHikCentralPerson(scope: RequestScope, inpu
   const photo = await db.hikCentralFaceCapture.findUnique({ where: { customerId: customer.id } });
   if (!photo || photo.facilityId !== input.facilityId || photo.personId !== input.expectedPersonId || photo.status !== "PROVIDER_ACCEPTED" || photo.encryptedImage) throw Error("HIKCENTRAL_LINK_REVIEW_REQUIRED");
   const provider = new HikCentralAccessProvider(fetch, await loadHikCentralRuntimeConfiguration(scope.organisationId));
-  if ((await provider.personById(input.expectedPersonId)).ok) throw Error("HIKCENTRAL_PERSON_STILL_EXISTS");
+  const lookup = await provider.personById(input.expectedPersonId);
+  if (lookup.ok) throw Error("HIKCENTRAL_PERSON_STILL_EXISTS");
+  if (lookup.code !== "HIKCENTRAL_PERSON_NOT_FOUND") throw Error("HIKCENTRAL_PERSON_LOOKUP_FAILED");
   const matches = await provider.peopleByName(customer.lastName.trim());
   if (!matches.ok) throw Error("HIKCENTRAL_PERSON_LOOKUP_FAILED");
   const firstName = customer.firstName?.trim().split(/\s+/)[0].toLowerCase();

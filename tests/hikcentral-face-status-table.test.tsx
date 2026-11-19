@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { HikCentralFaceCaptureWorkspace } from "../src/components/hikcentral-face-capture-workspace";
 
 test("customer table separates saved photos, provider acceptance and door access", () => {
-  const html = renderToStaticMarkup(<HikCentralFaceCaptureWorkspace canSend people={[
+  const html = renderToStaticMarkup(<HikCentralFaceCaptureWorkspace canSend canSyntheticTest people={[
     { customerId: "john", customerName: "John Test Wayne", personId: "S24EXAMPLE", linkStatus: "ACTIVE", photo: { id: "photo", version: 1, status: "PROVIDER_ACCEPTED", consentAt: "2026-11-18T12:00:00Z", providerAcceptedAt: "2026-11-18T12:01:00Z" } },
     { customerId: "new", customerName: "New Customer", personId: null, linkStatus: null, photo: null },
     { customerId: "reset", customerName: "Reset Customer", personId: null, linkStatus: "PENDING", photo: { id: "removed", version: 1, status: "PROVIDER_REMOVED", consentAt: "2026-11-18T12:00:00Z", providerAcceptedAt: "2026-11-18T12:01:00Z" } },

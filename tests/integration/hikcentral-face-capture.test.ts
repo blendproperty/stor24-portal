@@ -129,9 +129,6 @@ test("customer-scoped Counter face capture needs consent and review before one p
     await assert.rejects(decideHikCentralFace(scope, newPhoto.id, newPhoto.version, "SEND"), /PHOTO_CHANGED/);
     assert.equal(newPersonCalls.filter(path => path.endsWith("/person/single/add")).length, 0);
     await db.customer.update({ where: { id: newcomer.id }, data: { lastName: "Tester" } });
-    await assert.rejects(approveCustomerFaceVisit(scope, newcomer.id, facility.id, false), /HIKCENTRAL_VISIT_NOT_READY/);
-    const visit = await approveCustomerFaceVisit(scope, newcomer.id, facility.id, true);
-    assert.ok(visit.expiresAt.getTime() > Date.now() + 60 * 60_000);
     await db.integrationConnection.create({ data: { organisationId: org.id, facilityId: facility.id, category: "ACCESS_CONTROL", provider: "HIKCENTRAL", status: "CONFIGURED", config: { organisationIndexCode: "97", doorIndexCodes: STOR24_FACE_DOORS, accessLevelIds: ["12", "7"], nightlyClearanceRequired: true } } });
     assert.deepEqual(await decideHikCentralFace(scope, newPhoto.id, newPhoto.version, "SEND"), { status: "PROVIDER_ACCEPTED" });
     const linked = await db.integrationIdentityLink.findUniqueOrThrow({ where: { customerId: newcomer.id } });
@@ -141,6 +138,16 @@ test("customer-scoped Counter face capture needs consent and review before one p
     assert.equal(stored.personId, "2001");
     assert.equal(stored.encryptedImage, null);
     assert.equal(newPersonCalls.filter(path => path.endsWith("/person/single/add")).length, 1);
+    assert.equal(writes.length, 0);
+    await db.hikCentralFaceCapture.update({ where: { id: stored.id }, data: { providerAcceptedAt: new Date(Date.now() - 3 * 60 * 60_000) } });
+    await assert.rejects(approveCustomerFaceVisit(scope, newcomer.id, facility.id, false), /HIKCENTRAL_VISIT_NOT_READY/);
+    await assert.rejects(approveCustomerFaceVisit(scope, newcomer.id, facility.id, false, { expectedPersonId: "wrong", reason: "Provider assignment pilot" }), /HIKCENTRAL_TEST_GRANT_NOT_READY/);
+    const visit = await approveCustomerFaceVisit(scope, newcomer.id, facility.id, false, { expectedPersonId: "2001", reason: "Provider assignment pilot" });
+    assert.equal(visit.expiresAt.getUTCFullYear(), 9999);
+    assert.equal((await customerFaceAccessReadiness(scope, newcomer.id, facility.id, new Date("2027-11-19T12:00:00Z"))).syntheticTestActive, true);
+    assert.equal((await db.hikCentralAccessApproval.findUniqueOrThrow({ where: { customerId_facilityId: { customerId: newcomer.id, facilityId: facility.id } } })).reason, "Synthetic API assignment test: Provider assignment pilot");
+    assert.deepEqual(writes, ["add:12", "add:7"]);
+    assert.equal((await processHikCentralAccessLocks(new Date("2027-11-19T17:01:00Z"))).revoked, 0);
     assert.deepEqual(writes, ["add:12", "add:7"]);
 
     const unitType = await db.unitType.create({ data: { facilityId: facility.id, name: "Synthetic unit", features: [] } });
@@ -230,13 +237,18 @@ test("customer-scoped Counter face capture needs consent and review before one p
     assert.equal(await hikCentralLockPolicy(org.id, facility.id), null);
 
     let providerPersonDeleted = false;
+    let providerLookupFailed = false;
     globalThis.fetch = (async (url) => {
       const path = String(url);
-      if (path.endsWith("/person/personId/personInfo")) return providerPersonDeleted ? Response.json({ code: "1001", msg: "Person not found" }) : Response.json({ code: "0", data: { personId: "2001", personCode, personGivenName: "Jane", personFamilyName: "Tester" } });
+      if (path.endsWith("/person/personId/personInfo")) return providerLookupFailed ? Response.json({ code: "1001", msg: "Permission denied" }) : providerPersonDeleted ? Response.json({ code: "1001", msg: "Person not found" }) : Response.json({ code: "0", data: { personId: "2001", personCode, personGivenName: "Jane", personFamilyName: "Tester" } });
       if (path.endsWith("/person/advance/personList")) return Response.json({ code: "0", data: { total: 0, list: [] } });
       throw Error(`Unexpected provider request: ${path}`);
     }) as typeof fetch;
     await assert.rejects(reconcileDeletedHikCentralPerson(scope, { facilityId: facility.id, customerId: newcomer.id, expectedPersonId: "2001" }), /HIKCENTRAL_PERSON_STILL_EXISTS/);
+    providerLookupFailed = true;
+    await assert.rejects(reconcileDeletedHikCentralPerson(scope, { facilityId: facility.id, customerId: newcomer.id, expectedPersonId: "2001" }), /HIKCENTRAL_PERSON_LOOKUP_FAILED/);
+    assert.equal((await db.integrationIdentityLink.findUniqueOrThrow({ where: { customerId: newcomer.id } })).hikCentralPersonId, "2001");
+    providerLookupFailed = false;
     providerPersonDeleted = true;
     assert.deepEqual(await reconcileDeletedHikCentralPerson(scope, { facilityId: facility.id, customerId: newcomer.id, expectedPersonId: "2001" }), { customerId: newcomer.id, previousPersonId: "2001", status: "PROVIDER_REMOVED" });
     assert.equal((await db.integrationIdentityLink.findUniqueOrThrow({ where: { customerId: newcomer.id } })).hikCentralPersonId, null);
