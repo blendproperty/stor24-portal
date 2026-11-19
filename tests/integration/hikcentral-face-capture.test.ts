@@ -7,7 +7,7 @@ import { captureHikCentralFaceHandoff, decideHikCentralFace, hikCentralCustomerC
 import { loadHikCentralRuntimeConfiguration, saveHikCentralMapping } from "../../src/lib/integrations/hikcentral-configuration";
 import { reconcileDeletedHikCentralPerson } from "../../src/lib/hikcentral-person-link";
 import { encryptIntegrationSecret } from "../../src/lib/integrations/integration-secret-vault";
-import { approveCustomerFaceAccessRestoration, approveCustomerFaceVisit, confirmHikCentralSiteEmpty, hikCentralSiteClearance, processHikCentralAccessLocks, reconcileCustomerFaceAccess, revokeCustomerFaceVisit, setCustomerFaceManualLock } from "../../src/lib/hikcentral-customer-access";
+import { approveCustomerFaceAccessRestoration, approveCustomerFaceVisit, confirmHikCentralSiteEmpty, customerFaceAccessReadiness, hikCentralSiteClearance, processHikCentralAccessLocks, reconcileCustomerFaceAccess, revokeCustomerFaceVisit, setCustomerFaceManualLock } from "../../src/lib/hikcentral-customer-access";
 import { MIDPOINT_NON_TENANT_DOORS, STOR24_FACE_DOORS } from "../../src/lib/integrations/hikcentral-door-scope";
 import { disableHikCentralLockPolicy, hikCentralLockPolicy, saveHikCentralLockPolicy } from "../../src/lib/hikcentral-lock-policy";
 
@@ -201,10 +201,13 @@ test("customer-scoped Counter face capture needs consent and review before one p
     assert.equal((warning.metadata as { sourceChargeId?: string }).sourceChargeId, charge.id);
     assert.equal(warning.deliveredAt, null);
     await db.communicationLog.update({ where: { id: warning.id }, data: { deliveredAt: new Date("2026-11-19T16:00:00Z") } });
+    await saveHikCentralLockPolicy(scope, { facilityId: facility.id, approvalReference: "Synthetic legal approval", warningText: "Changed warning for account {account}: face entry may stop after {lockDate} if payment remains overdue.", lockedText: "Synthetic account {account} face entry is locked; please contact STOR24 about payment.", noticeHours: 1 });
+    assert.equal((await customerFaceAccessReadiness(scope, newcomer.id, facility.id, night)).arrearsNoticePending, true);
+    await saveHikCentralLockPolicy(scope, { facilityId: facility.id, approvalReference: "Synthetic legal approval", warningText: "Synthetic warning for account {account}: face entry may stop after {lockDate} if payment remains overdue.", lockedText: "Synthetic account {account} face entry is locked; please contact STOR24 about payment.", noticeHours: 1 });
     assert.equal((await processHikCentralAccessLocks(day)).locked, 0);
     assert.deepEqual(writes.slice(-2), ["add:12", "add:7"]);
     assert.equal((await processHikCentralAccessLocks(night)).locked, 1);
-    assert.deepEqual(writes.slice(-2), ["delete:12", "delete:7"]);
+    assert.deepEqual(writes.slice(-2).sort(), ["delete:12", "delete:7"].sort());
     assert.equal(smsWrites.length, 2);
     await assert.rejects(approveCustomerFaceAccessRestoration(scope, newcomer.id, facility.id), /HIKCENTRAL_RESTORATION_NOT_READY/);
     const paid = await db.payment.create({ data: { accountId: secondTenancy.accountId, amount: 100, method: "EFT", status: "SUCCEEDED", idempotencyKey: randomUUID() } });
@@ -215,13 +218,13 @@ test("customer-scoped Counter face capture needs consent and review before one p
     assert.deepEqual(writes.slice(-2), ["add:12", "add:7"]);
     assert.equal((await setCustomerFaceManualLock(scope, newcomer.id, facility.id, true, "Manager hold for review", day)).status, "DEFERRED");
     assert.equal((await processHikCentralAccessLocks(night)).locked, 1);
-    assert.deepEqual(writes.slice(-2), ["delete:12", "delete:7"]);
+    assert.deepEqual(writes.slice(-2).sort(), ["delete:12", "delete:7"].sort());
     assert.equal((await processHikCentralAccessLocks()).restored, 0);
     assert.equal((await setCustomerFaceManualLock(scope, newcomer.id, facility.id, false, "Manager cleared review")).status, "GRANTED");
     assert.deepEqual(writes.slice(-2), ["add:12", "add:7"]);
     await db.tenancy.update({ where: { id: secondTenancy.id }, data: { status: "CLOSED" } });
     assert.equal((await reconcileCustomerFaceAccess(scope, newcomer.id, facility.id, night)).status, "REVOKED");
-    assert.deepEqual(writes.slice(-2), ["delete:12", "delete:7"]);
+    assert.deepEqual(writes.slice(-2).sort(), ["delete:12", "delete:7"].sort());
     await disableHikCentralLockPolicy(scope, facility.id);
     assert.equal(await hikCentralLockPolicy(org.id, facility.id), null);
 

@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { hikCentralLockPolicy } from "@/lib/hikcentral-lock-policy";
+import { hikCentralLockPolicy, hikCentralLockPolicyHash } from "@/lib/hikcentral-lock-policy";
 import { normalizeTwilioRecipient, TwilioSmsProvider } from "@/lib/integrations/twilio-provider";
 import { sendNotificationOnce } from "@/lib/notification-delivery";
 import type { RequestScope } from "@/lib/scope";
@@ -18,8 +18,9 @@ export async function sendHikCentralLockWarning(scope: RequestScope, customerId:
   const recipient = await target(scope, customerId, candidate.sourceChargeId);
   if (!recipient) return false;
   const text = policy.warningText.replaceAll("{account}", recipient.accountNumber).replaceAll("{lockDate}", `${candidate.reviewOn} after 19:00 SAST, once Block24 is empty`);
-  const idempotencyKey = `face-lock-warning:${scope.organisationId}:${facilityId}:${candidate.sourceChargeId}`;
-  return sendNotificationOnce({ organisationId: scope.organisationId, facilityId, customerId, templateId: null, channel: "SMS", messageType: "FACE_ACCESS_LOCK_WARNING", recipient: recipient.phone, idempotencyKey, provider: "twilio", payload: { text, sourceChargeId: candidate.sourceChargeId, approvalReference: policy.approvalReference }, evidence: { sourceChargeId: candidate.sourceChargeId, approvalReference: policy.approvalReference }, send: () => new TwilioSmsProvider().send({ recipient: recipient.phone, body: text }, { organisationId: scope.organisationId, facilityId, idempotencyKey }) });
+  const evidence = { sourceChargeId: candidate.sourceChargeId, approvalReference: policy.approvalReference, policyHash: hikCentralLockPolicyHash(policy) };
+  const idempotencyKey = `face-lock-warning:${scope.organisationId}:${facilityId}:${candidate.sourceChargeId}:${evidence.policyHash.slice(0, 16)}`;
+  return sendNotificationOnce({ organisationId: scope.organisationId, facilityId, customerId, templateId: null, channel: "SMS", messageType: "FACE_ACCESS_LOCK_WARNING", recipient: recipient.phone, idempotencyKey, provider: "twilio", payload: { text, ...evidence }, evidence, send: () => new TwilioSmsProvider().send({ recipient: recipient.phone, body: text }, { organisationId: scope.organisationId, facilityId, idempotencyKey }) });
 }
 
 export async function sendHikCentralLockedNotice(scope: RequestScope, customerId: string, facilityId: string, sourceChargeId: string) {
@@ -27,6 +28,7 @@ export async function sendHikCentralLockedNotice(scope: RequestScope, customerId
   const recipient = policy ? await target(scope, customerId, sourceChargeId) : null;
   if (!policy || !recipient) return false;
   const text = policy.lockedText.replaceAll("{account}", recipient.accountNumber);
-  const idempotencyKey = `face-locked:${scope.organisationId}:${facilityId}:${sourceChargeId}`;
-  return sendNotificationOnce({ organisationId: scope.organisationId, facilityId, customerId, templateId: null, channel: "SMS", messageType: "FACE_ACCESS_LOCKED", recipient: recipient.phone, idempotencyKey, provider: "twilio", payload: { text, sourceChargeId, approvalReference: policy.approvalReference }, evidence: { sourceChargeId, approvalReference: policy.approvalReference }, send: () => new TwilioSmsProvider().send({ recipient: recipient.phone, body: text }, { organisationId: scope.organisationId, facilityId, idempotencyKey }) });
+  const evidence = { sourceChargeId, approvalReference: policy.approvalReference, policyHash: hikCentralLockPolicyHash(policy) };
+  const idempotencyKey = `face-locked:${scope.organisationId}:${facilityId}:${sourceChargeId}:${evidence.policyHash.slice(0, 16)}`;
+  return sendNotificationOnce({ organisationId: scope.organisationId, facilityId, customerId, templateId: null, channel: "SMS", messageType: "FACE_ACCESS_LOCKED", recipient: recipient.phone, idempotencyKey, provider: "twilio", payload: { text, ...evidence }, evidence, send: () => new TwilioSmsProvider().send({ recipient: recipient.phone, body: text }, { organisationId: scope.organisationId, facilityId, idempotencyKey }) });
 }

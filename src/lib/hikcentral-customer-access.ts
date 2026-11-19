@@ -6,7 +6,7 @@ import { requireFacility, type RequestScope } from "@/lib/scope";
 import { requireLeasingCustomer } from "@/lib/leasing-customer-scope";
 import { verifiedArrearsAccessReview } from "@/lib/collections-service";
 import { hikCentralOvernightWindow } from "@/lib/hikcentral-overnight-window";
-import { hikCentralLockPolicy } from "@/lib/hikcentral-lock-policy";
+import { hikCentralLockPolicy, hikCentralLockPolicyHash } from "@/lib/hikcentral-lock-policy";
 import { southAfricaDateKey } from "@/lib/south-africa-time";
 import { sendHikCentralLockedNotice, sendHikCentralLockWarning } from "@/lib/hikcentral-lock-notifications";
 
@@ -46,7 +46,7 @@ export async function customerFaceAccessReadiness(scope: RequestScope, customerI
       if (!review.paymentCleared && review.sourceChargeId && review.reviewOn && review.blockers.every(item => item.startsWith("Seven calendar days have not elapsed"))) warningCandidates.push({ accountId: tenancy.accountId, sourceChargeId: review.sourceChargeId, reviewOn: review.reviewOn });
       if (review.eligible) {
         const notices = await db.communicationLog.findMany({ where: { organisationId: scope.organisationId, facilityId, customerId, messageType: "FACE_ACCESS_LOCK_WARNING", status: "SUCCEEDED", deliveredAt: { not: null } }, orderBy: { deliveredAt: "desc" }, take: 10, select: { metadata: true, deliveredAt: true } });
-        const noticeReady = !!lockPolicy && notices.some(notice => { const evidence = notice.metadata as { sourceChargeId?: unknown; approvalReference?: unknown } | null; return evidence?.sourceChargeId === review.sourceChargeId && evidence.approvalReference === lockPolicy.approvalReference && !!notice.deliveredAt && notice.deliveredAt.getTime() <= now.getTime() - lockPolicy.noticeHours * 60 * 60_000; });
+        const noticeReady = !!lockPolicy && notices.some(notice => { const evidence = notice.metadata as { sourceChargeId?: unknown; approvalReference?: unknown; policyHash?: unknown } | null; return evidence?.sourceChargeId === review.sourceChargeId && evidence.approvalReference === lockPolicy.approvalReference && evidence.policyHash === hikCentralLockPolicyHash(lockPolicy) && !!notice.deliveredAt && notice.deliveredAt.getTime() <= now.getTime() - lockPolicy.noticeHours * 60 * 60_000; });
         if (noticeReady) { arrearsLocked = true; financialLockSourceChargeId = review.sourceChargeId; } else arrearsNoticePending = true;
       }
       if (!review.paymentCleared) paymentCleared = false;

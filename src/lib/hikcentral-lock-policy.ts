@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { createHash } from "node:crypto";
 import { db } from "@/lib/db";
 import { requireFacility, type RequestScope } from "@/lib/scope";
 
@@ -12,6 +13,10 @@ const schema = z.object({
 
 const name = "STOR24 face access non-payment notices";
 const domain = "HIKCENTRAL_FACE_LOCK_POLICY";
+
+export function hikCentralLockPolicyHash(policy: z.infer<typeof schema>) {
+  return createHash("sha256").update(JSON.stringify(policy)).digest("hex");
+}
 
 export async function hikCentralLockPolicy(organisationId: string, facilityId: string) {
   const row = await db.configurationProfile.findFirst({ where: { organisationId, facilityId, domain, name, status: "APPROVED" } });

@@ -12,7 +12,7 @@ export async function sendNotificationOnce(input: {
   templateId: string | null; channel: "EMAIL" | "SMS";
   messageType: "RESERVATION_CONFIRMED" | "VIEWING_BOOKED" | "BOOKING_PRICE_REVIEW" | "FACE_ACCESS_LOCK_WARNING" | "FACE_ACCESS_LOCKED";
   recipient: string; idempotencyKey: string; provider: string;
-  payload: unknown; evidence?: { sourceChargeId: string; approvalReference: string }; send: () => Promise<Attempt>;
+  payload: unknown; evidence?: { sourceChargeId: string; approvalReference: string; policyHash: string }; send: () => Promise<Attempt>;
 }): Promise<boolean> {
   const payloadHash = createHash("sha256").update(JSON.stringify(input.payload)).digest("hex");
   const recipientHash = privacyHash(input.recipient);
