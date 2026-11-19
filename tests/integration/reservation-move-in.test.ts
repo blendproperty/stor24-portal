@@ -10,6 +10,8 @@ import { moveIn } from "../../src/lib/leasing-service";
 import { recordReservationReceipt } from "../../src/lib/reservation-payment";
 import { settleVerifiedBookingPayment } from "../../src/lib/payments/booking-payment-settlement";
 import { testPaymentReviewAccounts } from "../../src/lib/payments/test-payment-review";
+import { encryptIntegrationSecret } from "../../src/lib/integrations/integration-secret-vault";
+import { BLOCK24_FACE_DOORS, MIDPOINT_NON_TENANT_DOORS, STOR24_FACE_DOORS } from "../../src/lib/integrations/hikcentral-door-scope";
 
 test("isolated PostgreSQL signed reservation handover", async t => {
   assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci");
@@ -41,6 +43,35 @@ test("isolated PostgreSQL signed reservation handover", async t => {
     assert.equal((await db.unit.findUniqueOrThrow({ where: { id: f.unit.id } })).status, "RESERVED");
   }
   try {
+    await t.test("an accepted customer face receives both narrow levels when keys are handed over", async () => {
+      const f = await fixture();
+      const previousFetch = globalThis.fetch, previousKey = process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY;
+      process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY = "isolated-hikcentral-handover-test-key";
+      const members = new Set<string>(), writes: string[] = [];
+      try {
+        await db.integrationConnection.create({ data: { organisationId: f.org.id, category: "ACCESS_CONTROL", provider: "HIKCENTRAL", status: "CONFIGURED", config: { endpoint: "https://hikcentral.example.invalid", userId: "admin", appKeyEncrypted: encryptIntegrationSecret("synthetic-key"), appSecretEncrypted: encryptIntegrationSecret("synthetic-secret") } } });
+        await db.integrationConnection.create({ data: { organisationId: f.org.id, facilityId: f.facility.id, category: "ACCESS_CONTROL", provider: "HIKCENTRAL", status: "CONFIGURED", config: { organisationIndexCode: "97", doorIndexCodes: STOR24_FACE_DOORS, accessLevelIds: ["12", "7"], freeEgressConfirmed: true } } });
+        await db.integrationIdentityLink.create({ data: { organisationId: f.org.id, customerId: f.customer.id, hikCentralPersonId: "2001", status: "ACTIVE", linkedAt: new Date() } });
+        await db.hikCentralFaceCapture.create({ data: { organisationId: f.org.id, facilityId: f.facility.id, customerId: f.customer.id, personId: "2001", status: "PROVIDER_ACCEPTED", imageSha256: "a".repeat(64), policyVersion: "test", policyHash: "b".repeat(64), consentNotice: "Synthetic consent", consentAt: new Date(), expiresAt: new Date(Date.now() + 3600_000), providerAcceptedAt: new Date() } });
+        globalThis.fetch = (async (url, init) => {
+          const path = String(url), body = JSON.parse(String(init?.body));
+          if (path.endsWith("/privilege/group")) return Response.json({ code: "0", data: { list: [{ privilegeGroupId: "12", privilegeGroupName: "Block24", ElementList: BLOCK24_FACE_DOORS.map(ID => ({ Element: { ID } })) }, { privilegeGroupId: "7", privilegeGroupName: "DRIVERS", ElementList: MIDPOINT_NON_TENANT_DOORS.map(ID => ({ Element: { ID } })) }] } });
+          if (path.endsWith("/person/personId/personInfo")) return Response.json({ code: "0", data: { personId: "2001", personCode: "S24TEST", personGivenName: "Synthetic", personFamilyName: "Customer" } });
+          if (path.endsWith("/privilege/group/single/personList")) return Response.json({ code: "0", data: { list: members.has(body.privilegeGroupId) ? [{ id: "2001" }] : [] } });
+          if (path.endsWith("/privilege/group/single/addPersons")) { members.add(body.privilegeGroupId); writes.push(body.privilegeGroupId); return Response.json({ code: "0", data: "" }); }
+          throw Error(`Unexpected HikCentral call ${path}`);
+        }) as typeof fetch;
+        const first = await confirmReservationMoveIn(f.scope, f.reservation.id);
+        assert.equal(first.idempotent, false);
+        assert.deepEqual(writes, ["12", "7"]);
+        assert.equal(await db.hikCentralAccessGrant.count({ where: { customerId: f.customer.id, status: "GRANTED" } }), 2);
+        assert.equal((await confirmReservationMoveIn(f.scope, f.reservation.id)).idempotent, true);
+        assert.deepEqual(writes, ["12", "7"]);
+      } finally {
+        globalThis.fetch = previousFetch;
+        if (previousKey === undefined) delete process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY; else process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY = previousKey;
+      }
+    });
     await t.test("invalid saved pricing returns a blocker and cannot hand over a paid signed booking", async () => {
       const f = await fixture();
       for (const quotedRate of [0, -100, 20000001]) {
