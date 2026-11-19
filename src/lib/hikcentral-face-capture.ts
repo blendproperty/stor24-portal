@@ -68,7 +68,10 @@ async function lockCustomer(database: Database, customerId: string) {
 export async function issueHikCentralFaceHandoff(scope: RequestScope, input: { facilityId: string; customerId: string; version: number; syntheticTest?: boolean; syntheticTestReason?: string }) {
   await requireFacility(scope, input.facilityId);
   if (input.syntheticTest && (!scope.unrestrictedFacilities || !input.syntheticTestReason || input.syntheticTestReason.trim().length < 8 || input.syntheticTestReason.trim().length > 200)) throw Error("HIKCENTRAL_TEST_GRANT_NOT_READY");
-  if (input.syntheticTest && (await db.tenancy.count({ where: { customerId: input.customerId } }) || !(await customerFaceAccessReadiness(scope, input.customerId, input.facilityId)).mapping)) throw Error("HIKCENTRAL_TEST_GRANT_NOT_READY");
+  if (input.syntheticTest) {
+    const readiness = await customerFaceAccessReadiness(scope, input.customerId, input.facilityId);
+    if (await db.tenancy.count({ where: { customerId: input.customerId } }) || !readiness.mapping || readiness.approvalExpiresAt || readiness.grants.some(grant => grant.status !== "REVOKED")) throw Error("HIKCENTRAL_TEST_GRANT_NOT_READY");
+  }
   await currentPolicy(db, scope.organisationId);
   const { customer, personId } = await faceTarget(db, scope, input.customerId);
   const provider = new HikCentralAccessProvider(fetch, await loadHikCentralRuntimeConfiguration(scope.organisationId));
