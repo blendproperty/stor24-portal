@@ -389,10 +389,10 @@ export class HikCentralAccessProvider {
   async accessLevelHasPerson(privilegeGroupId: string, personId: string): Promise<ProviderResult<{ member: boolean }>> {
     try {
       for (let pageNo = 1; pageNo <= 50; pageNo++) {
-        const data = await this.post("/artemis/api/acs/v1/privilege/group/single/personList", { privilegeGroupId, type: 1, pageNo, pageSize: 100 }) as { list?: unknown };
+        const data = await this.post("/artemis/api/acs/v1/privilege/group/single/personList", { privilegeGroupId, type: 1, pageNo, pageSize: 500 }) as { list?: unknown };
         if (!Array.isArray(data.list)) throw new Error("HikCentral returned an invalid access-level person list.");
         if (data.list.some((item) => item && typeof item === "object" && (item as { id?: unknown }).id === personId)) return { ok: true, providerReference: privilegeGroupId, data: { member: true } };
-        if (data.list.length < 100) return { ok: true, providerReference: privilegeGroupId, data: { member: false } };
+        if (data.list.length < 500) return { ok: true, providerReference: privilegeGroupId, data: { member: false } };
       }
       throw new Error("HikCentral access-level person list exceeded 5,000 entries.");
     } catch (error) { return providerFailure(error); }

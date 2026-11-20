@@ -181,7 +181,7 @@ test("access-level assignment is separate from person creation and requires memb
     paths.push(String(url));
     const body = JSON.parse(String(init?.body));
     if (String(url).endsWith("addPersons")) { assert.deepEqual(body, { privilegeGroupId: "L1", type: 1, list: [{ id: "1150" }] }); return Response.json({ code: "0", data: "" }); }
-    assert.deepEqual(body, { privilegeGroupId: "L1", type: 1, pageNo: 1, pageSize: 100 });
+    assert.deepEqual(body, { privilegeGroupId: "L1", type: 1, pageNo: 1, pageSize: 500 });
     return Response.json({ code: "0", data: { list: [{ id: "1150" }] } });
   }) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", userId: "stor24-api", facilities: {} });
   assert.equal((await provider.addPersonToAccessLevel("L1", "1150")).ok, true);
@@ -195,12 +195,25 @@ test("access-level removal uses the installed deletePersons contract and require
     calls.push(String(url));
     const body = JSON.parse(String(init?.body));
     if (String(url).endsWith("deletePersons")) { assert.deepEqual(body, { privilegeGroupId: "L1", type: 1, list: [{ id: "1150" }] }); return Response.json({ code: "0", data: "" }); }
-    assert.deepEqual(body, { privilegeGroupId: "L1", type: 1, pageNo: 1, pageSize: 100 });
+    assert.deepEqual(body, { privilegeGroupId: "L1", type: 1, pageNo: 1, pageSize: 500 });
     return Response.json({ code: "0", data: { list: [] } });
   }) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", userId: "stor24-api", facilities: {} });
   assert.equal((await provider.removePersonFromAccessLevel("L1", "1150")).ok, true);
   assert.deepEqual((await provider.accessLevelHasPerson("L1", "1150")), { ok: true, providerReference: "L1", data: { member: false } });
   assert.equal(calls.length, 2);
+});
+
+test("large access levels use HikCentral's 500-person pages for membership readback", async () => {
+  const pages: number[] = [];
+  const provider = new HikCentralAccessProvider((async (_url, init) => {
+    const body = JSON.parse(String(init?.body));
+    assert.equal(body.pageSize, 500);
+    pages.push(body.pageNo);
+    const start = (body.pageNo - 1) * 500;
+    return Response.json({ code: "0", data: { list: Array.from({ length: Math.min(500, 1525 - start) }, (_, index) => ({ id: String(start + index) })) } });
+  }) as typeof fetch, { baseUrl: "https://example.invalid", appKey: "key", appSecret: "secret", userId: "stor24-api", facilities: {} });
+  assert.deepEqual((await provider.accessLevelHasPerson("L1", "1524")), { ok: true, providerReference: "L1", data: { member: true } });
+  assert.deepEqual(pages, [1, 2, 3, 4]);
 });
 
 test("an existing person face update targets that person and refuses invalid image data", async () => {
