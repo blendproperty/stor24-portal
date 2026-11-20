@@ -1,3 +1,12 @@
+## 2026-11-20 — Midpoint second-floor clockwise renumbering
+
+- **Implementation:** User requested the same sequence as the first floor starting at 337. All 194 second-floor units were renumbered 337–530 via the existing platform batch; crosswalk records prior and revised numbers. Local PNG and A3/A4 PDFs were generated; they are not deployed assets.
+- **Testing:** All 194 original and revised numbers were unique. Before applying, every live second-floor map position matched its corresponding live first-floor position, with numbering offset by 194. The batch entries were checked, the platform preview showed 194 changes and 194 map labels, and both PDFs contained 337–530 exactly once; the map was visually reviewed.
+- **Commit and push:** Documentation candidate; consult Git for its current remote head.
+- **Merge:** Documentation promotion is separate from the applied data change and remains to be verified.
+- **Deployment and configuration:** Authenticated inventory workflow returned “194 units renumbered without changing the saved map layout.” No application deployment or floor-opening configuration change.
+- **Live production verification:** Authenticated second-floor map displayed 194 unique numbers 337–530; sampled positions 337, 338, 339, 354, 403 and 530 matched the generated map. The floor remained under construction. Full database relation checks, physical signage, staff/device acceptance, historical documents, provider, data, training and approval gates remain open.
+
 ## 2026-11-20 — Midpoint first-floor clockwise renumbering
 
 - **Implementation:** Brett authorised the first-floor sequence starting at the indoor unit closest to the ground-floor 001 position. The platform batch renumbered all 194 first-floor units, from 143 to 336. Current unit 260 became 143; the crosswalk records the full prior-to-revised mapping. Map and A3/A4 PDF exports are local, not deployed assets.
