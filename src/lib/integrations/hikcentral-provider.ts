@@ -215,7 +215,7 @@ export class HikCentralAccessProvider {
           json: await boundedProviderJson(response),
         }));
 
-    if (ok && ["/person/personId/personInfo", "/person/personCode/personInfo"].some(suffix => path.endsWith(suffix)) && String(json.code) === "1001" && /not found/i.test(json.msg ?? "")) throw new Error("HIKCENTRAL_PERSON_NOT_FOUND");
+    if (ok && ["/person/personId/personInfo", "/person/personCode/personInfo"].some(suffix => path.endsWith(suffix)) && ((String(json.code) === "1001" && /not found/i.test(json.msg ?? "")) || (String(json.code) === "128" && json.msg === "The request resource does not exist"))) throw new Error("HIKCENTRAL_PERSON_NOT_FOUND");
     if (!ok || String(json.code) !== "0") throw new Error(`HikCentral request was not confirmed (HTTP ${status}).`);
     return json.data ?? {};
   }

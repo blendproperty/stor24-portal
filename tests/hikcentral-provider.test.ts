@@ -250,6 +250,8 @@ test("deleted person readback is distinct from a provider lookup failure", async
   const deniedCode = await denied.personByCode("S24TEST123");
   assert.equal(deniedCode.ok, false);
   if (!deniedCode.ok) assert.notEqual(deniedCode.code, "HIKCENTRAL_PERSON_NOT_FOUND");
+  const missingOnInstalledGateway = new HikCentralAccessProvider((async () => Response.json({ code: "128", msg: "The request resource does not exist", data: "" })) as typeof fetch, configuration);
+  assert.deepEqual(await missingOnInstalledGateway.personByCode("S24TEST123"), { ok: false, retryable: false, code: "HIKCENTRAL_PERSON_NOT_FOUND", message: "HikCentral person was not found." });
 });
 
 test("person name search uses paged read-only provider results", async () => {
