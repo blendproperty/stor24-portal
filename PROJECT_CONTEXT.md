@@ -1,3 +1,12 @@
+## 2026-11-20 — Midpoint first-floor clockwise renumbering
+
+- **Implementation:** Brett authorised the first-floor sequence starting at the indoor unit closest to the ground-floor 001 position. The platform batch renumbered all 194 first-floor units, from 143 to 336. Current unit 260 became 143; the crosswalk records the full prior-to-revised mapping. Map and A3/A4 PDF exports are local, not deployed assets.
+- **Testing:** All 194 proposed destinations and prior numbers were unique; the platform preview reported 194 changes and 194 linked labels and passed its collision checks. All form entries were compared with the proposed mapping before apply. Both PDFs were checked to contain 143–336 once and the map was visually reviewed. The source layout was the 27 October snapshot; only selected current positions were compared, not a full current geometry audit.
+- **Commit and push:** Documentation candidate; consult Git for current branch and exact publication status.
+- **Merge:** Documentation promotion remains separate from the live data change and must be verified.
+- **Deployment and configuration:** Applied through the existing authenticated inventory renumbering workflow; the platform returned “194 units renumbered without changing the saved map layout.” No code deployment, floor opening or provider configuration change.
+- **Live production verification:** Immediately after the batch, the authenticated first-floor map displayed 194 unique unit numbers 143–336; sampled positions 143, 144, 145, 160, 209 and 336 matched the revised plan. The floor remained under construction. Full database relationship checks, physical signage, staff/device acceptance, historical documents, provider, data, training and approval gates remain open.
+
 ## 2026-11-20 — Midpoint first-floor numbering map
 
 - **Implementation:** Created a local shareable PNG and A3/A4 PDFs from the 27 October 2026 first-floor inventory and map snapshot. The crosswalk records units 143–336. No application code or production records changed.
