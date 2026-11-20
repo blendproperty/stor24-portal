@@ -9108,8 +9108,8 @@ Validation follow-up: the project typecheck and targeted ESLint for the candidat
 
 - Implementation: Facial access now offers staff a company selector and a named-person form. Each authorised person is an individual STOR24 record linked to the company, so the existing private tablet consent, photo review and HikCentral person creation flow can be reused. Company tenancy handover, occupancy and verified arrears determine that person's door eligibility; handover and move-out reconciliation reaches the linked people. Company billing notices remain addressed to the company. The migration adds the company-person relation; no provider setting or live person was changed by this code work.
 - Testing: Prisma client generation and schema validation passed. Focused ESLint, TypeScript, production build, HikCentral access-level test, and an isolated PostgreSQL migration plus HikCentral face integration test passed. The integration test covered staff scoping, person authorisation, company association and handed-over tenancy eligibility with synthetic records. Protected CI remains to be confirmed.
-- Commit and push: candidate branch `codex/company-facial-people-20261120`; not yet committed or pushed at this record.
-- Merge: not merged.
+- Commit and push: implementation and this candidate record were committed as `68780c1129c87878cb6a3e1f6da682019d577ae9` on `codex/company-facial-people-20261120` and pushed to origin. [PR #883](https://github.com/blendproperty/stor24-portal/pull/883) is open; this dated evidence update is a follow-up commit on that branch.
+- Merge: PR #883 is not merged at this record.
 - Deployment and configuration: not deployed; no live HikCentral or STOR24 configuration changed.
 - Live production verification: not performed. Staff tablet capture, a real company representative's consent and identity check, HikCentral face acceptance, access-level readback and physical reader UAT remain open. Existing lockout policy approval and all wider provider, data, training and release gates remain open.
 
