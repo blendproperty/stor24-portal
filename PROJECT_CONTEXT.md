@@ -1,3 +1,12 @@
+## 2026-11-20 — Midpoint first-floor numbering map
+
+- **Implementation:** Created a local shareable PNG and A3/A4 PDFs from the 27 October 2026 first-floor inventory and map snapshot. The crosswalk records units 143–336. No application code or production records changed.
+- **Testing:** The snapshot contains 194 linked first-floor units, each with a matching map label; crosswalk coverage is 143–336. Both generated PDFs were checked for all 194 numbers once, and the rendered map was visually reviewed. The current live inventory and physical labels were not checked.
+- **Commit and push:** This documentation is a candidate on the numbering branch; consult Git for its exact remote status. The image and PDFs are local output and are not in the repository.
+- **Merge:** Documentation promotion is pending; verify the target branch separately.
+- **Deployment and configuration:** None for this image.
+- **Live production verification:** None for the first-floor image. Physical signage, current map changes, staff acceptance and existing data, provider, training and approval gates remain open.
+
 ## 2026-11-19 — Midpoint ground-floor numbering format
 
 - **Implementation:** Brett reports manually renumbering units 10–99 to 010–099 in the platform. The crosswalk now records 001–099, preserving 100–530; the original October mapping is retained as `numbering-crosswalk-historical-20261027.csv`. Units 001–009 were already shown in that format before this task.
