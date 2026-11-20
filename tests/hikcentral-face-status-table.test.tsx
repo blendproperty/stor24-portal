@@ -5,9 +5,9 @@ import { HikCentralFaceCaptureWorkspace } from "../src/components/hikcentral-fac
 
 test("customer table separates saved photos, provider acceptance and door access", () => {
   const html = renderToStaticMarkup(<HikCentralFaceCaptureWorkspace canSend canSyntheticTest people={[
-    { customerId: "john", customerName: "John Test Wayne", personId: "S24EXAMPLE", linkStatus: "ACTIVE", photo: { id: "photo", version: 1, status: "PROVIDER_ACCEPTED", consentAt: "2026-11-18T12:00:00Z", providerAcceptedAt: "2026-11-18T12:01:00Z" } },
+    { customerId: "john", customerName: "John Test Wayne", personId: "S24EXAMPLE", linkStatus: "ACTIVE", photo: { id: "photo", version: 1, status: "PROVIDER_ACCEPTED", consentAt: "2026-11-18T12:00:00Z", providerAcceptedAt: "2026-11-18T12:01:00Z", syntheticTest: false } },
     { customerId: "new", customerName: "New Customer", personId: null, linkStatus: null, photo: null },
-    { customerId: "reset", customerName: "Reset Customer", personId: null, linkStatus: "PENDING", photo: { id: "removed", version: 1, status: "PROVIDER_REMOVED", consentAt: "2026-11-18T12:00:00Z", providerAcceptedAt: "2026-11-18T12:01:00Z" } },
+    { customerId: "reset", customerName: "Reset Customer", personId: null, linkStatus: "PENDING", photo: { id: "removed", version: 1, status: "PROVIDER_REMOVED", consentAt: "2026-11-18T12:00:00Z", providerAcceptedAt: "2026-11-18T12:01:00Z", syntheticTest: false } },
     { customerId: "locked", customerName: "Locked Customer", personId: "2001", linkStatus: "ACTIVE", photo: null, accessGrants: [{ facilityId: "facility", status: "LOCKED" }] },
     { customerId: "manual", customerName: "Manual Customer", personId: "2002", linkStatus: "ACTIVE", photo: null, accessGrants: [{ facilityId: "facility", status: "EXTERNAL" }] },
   ]} facilities={[{ id: "facility", name: "Store 1" }]} />);

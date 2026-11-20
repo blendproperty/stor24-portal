@@ -215,7 +215,7 @@ export class HikCentralAccessProvider {
           json: await boundedProviderJson(response),
         }));
 
-    if (ok && path.endsWith("/person/personId/personInfo") && String(json.code) === "1001" && /not found/i.test(json.msg ?? "")) throw new Error("HIKCENTRAL_PERSON_NOT_FOUND");
+    if (ok && ["/person/personId/personInfo", "/person/personCode/personInfo"].some(suffix => path.endsWith(suffix)) && ((String(json.code) === "1001" && /not found/i.test(json.msg ?? "")) || (String(json.code) === "128" && json.msg === "The request resource does not exist"))) throw new Error("HIKCENTRAL_PERSON_NOT_FOUND");
     if (!ok || String(json.code) !== "0") throw new Error(`HikCentral request was not confirmed (HTTP ${status}).`);
     return json.data ?? {};
   }
@@ -320,7 +320,7 @@ export class HikCentralAccessProvider {
       const data = await this.post("/artemis/api/resource/v1/person/personCode/personInfo", { personCode }) as Record<string, unknown>;
       if (typeof data.personId !== "string" || data.personCode !== personCode || typeof data.orgIndexCode !== "string") throw new Error("HikCentral returned an unexpected person identity.");
       return { ok: true, providerReference: data.personId, data: { personId: data.personId, personCode, organisationIndexCode: data.orgIndexCode, givenName: typeof data.personGivenName === "string" ? data.personGivenName : "", familyName: typeof data.personFamilyName === "string" ? data.personFamilyName : "" } };
-    } catch (error) { return providerFailure(error); }
+    } catch (error) { return error instanceof Error && error.message === "HIKCENTRAL_PERSON_NOT_FOUND" ? { ok: false, retryable: false, code: error.message, message: "HikCentral person was not found." } : providerFailure(error); }
   }
 
   async personById(personId: string): Promise<ProviderResult<{ personId: string; personCode: string; givenName: string; familyName: string }>> {
@@ -389,10 +389,10 @@ export class HikCentralAccessProvider {
   async accessLevelHasPerson(privilegeGroupId: string, personId: string): Promise<ProviderResult<{ member: boolean }>> {
     try {
       for (let pageNo = 1; pageNo <= 50; pageNo++) {
-        const data = await this.post("/artemis/api/acs/v1/privilege/group/single/personList", { privilegeGroupId, type: 1, pageNo, pageSize: 100 }) as { list?: unknown };
+        const data = await this.post("/artemis/api/acs/v1/privilege/group/single/personList", { privilegeGroupId, type: 1, pageNo, pageSize: 500 }) as { list?: unknown };
         if (!Array.isArray(data.list)) throw new Error("HikCentral returned an invalid access-level person list.");
         if (data.list.some((item) => item && typeof item === "object" && (item as { id?: unknown }).id === personId)) return { ok: true, providerReference: privilegeGroupId, data: { member: true } };
-        if (data.list.length < 100) return { ok: true, providerReference: privilegeGroupId, data: { member: false } };
+        if (data.list.length < 500) return { ok: true, providerReference: privilegeGroupId, data: { member: false } };
       }
       throw new Error("HikCentral access-level person list exceeded 5,000 entries.");
     } catch (error) { return providerFailure(error); }

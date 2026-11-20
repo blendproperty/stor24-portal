@@ -10,6 +10,11 @@ test("facility-restricted leasing users only receive customers linked to permitt
       { leads: { some: { facilityId: { in: ["facility-a"] } } } },
       { reservations: { some: { facilityId: { in: ["facility-a"] } } } },
       { tenancies: { some: { facilityId: { in: ["facility-a"] } } } },
+      { accessCompany: { OR: [
+        { leads: { some: { facilityId: { in: ["facility-a"] } } } },
+        { reservations: { some: { facilityId: { in: ["facility-a"] } } } },
+        { tenancies: { some: { facilityId: { in: ["facility-a"] } } } },
+      ] } },
     ],
   });
 });

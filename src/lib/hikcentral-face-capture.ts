@@ -8,7 +8,7 @@ import { HikCentralAccessProvider } from "@/lib/integrations/hikcentral-provider
 import { integrationEncryptionConfigured } from "@/lib/integrations/integration-secret-vault";
 import { requireLeasingCustomer } from "@/lib/leasing-customer-scope";
 import { requireFacility, type RequestScope } from "@/lib/scope";
-import { reconcileCustomerFaceAccess } from "@/lib/hikcentral-customer-access";
+import { approveCustomerFaceVisit, customerFaceAccessReadiness, reconcileCustomerFaceAccess } from "@/lib/hikcentral-customer-access";
 
 type Database = Prisma.TransactionClient;
 const tokenHash = (token: string) => createHash("sha256").update(token).digest("hex");
@@ -26,6 +26,9 @@ const policy = {
   approvalReference: "Owner-authorised controlled field test; final policy review pending",
 };
 const policyHash = createHash("sha256").update(JSON.stringify(policy)).digest("hex");
+function handoffNotice(current: typeof policy, syntheticTestReason: string | null) {
+  return syntheticTestReason ? { ...current, notice: `${current.notice} This is an authorised virtual-person access test. After staff review and HikCentral acceptance, STOR24 will assign the configured Block24 and Midpoint access levels automatically. The photograph is fictional and cannot verify physical face recognition.`, consentLabel: "I am the authorised test operator. This is a fictional photograph for a controlled live API access test; no real person's consent or identity is being claimed.", syntheticTestReason } : current;
+}
 
 async function currentPolicy(database: Database, organisationId: string) {
   const [control, maintenance] = await Promise.all([
@@ -50,27 +53,33 @@ function sameCustomerName(customer: { firstName: string | null; lastName: string
   return customer.firstName?.trim() === snapshot.firstNameSnapshot && customer.lastName?.trim() === snapshot.lastNameSnapshot;
 }
 
-async function assertNoExistingPerson(provider: HikCentralAccessProvider, customer: { firstName: string | null; lastName: string | null }) {
-  const familyName = customer.lastName!.trim();
-  const found = await provider.peopleByName(familyName);
-  if (!found.ok) throw Error("HIKCENTRAL_PERSON_REVIEW_REQUIRED");
-  const givenName = customer.firstName!.trim().split(/\s+/)[0].toLowerCase();
-  if (found.data.people.some(person => person.familyName.trim().toLowerCase() === familyName.toLowerCase() && person.givenName.trim().split(/\s+/)[0].toLowerCase() === givenName)) throw Error("HIKCENTRAL_PERSON_REVIEW_REQUIRED");
+async function assertNoExistingCustomerCode(provider: HikCentralAccessProvider, organisationId: string, customerId: string) {
+  const found = await provider.personByCode(hikCentralCustomerCode(organisationId, customerId));
+  if (found.ok) throw Error("HIKCENTRAL_PERSON_REVIEW_REQUIRED");
+  if (found.code !== "HIKCENTRAL_PERSON_NOT_FOUND") throw Error("HIKCENTRAL_PERSON_LOOKUP_FAILED");
 }
 
 async function lockCustomer(database: Database, customerId: string) {
   await database.$queryRaw`SELECT "id" FROM "Customer" WHERE "id" = ${customerId} FOR UPDATE`;
 }
 
-export async function issueHikCentralFaceHandoff(scope: RequestScope, input: { facilityId: string; customerId: string; version: number }) {
+export async function issueHikCentralFaceHandoff(scope: RequestScope, input: { facilityId: string; customerId: string; version: number; syntheticTest?: boolean; syntheticTestReason?: string }) {
   await requireFacility(scope, input.facilityId);
+  if (input.syntheticTest && (!scope.unrestrictedFacilities || !input.syntheticTestReason || input.syntheticTestReason.trim().length < 8 || input.syntheticTestReason.trim().length > 200)) throw Error("HIKCENTRAL_TEST_GRANT_NOT_READY");
+  if (input.syntheticTest) {
+    const readiness = await customerFaceAccessReadiness(scope, input.customerId, input.facilityId);
+    if (await db.tenancy.count({ where: { customerId: input.customerId } }) || !readiness.mapping || readiness.approvalExpiresAt || readiness.grants.some(grant => grant.status !== "REVOKED")) throw Error("HIKCENTRAL_TEST_GRANT_NOT_READY");
+  }
   await currentPolicy(db, scope.organisationId);
   const { customer, personId } = await faceTarget(db, scope, input.customerId);
-  const provider = new HikCentralAccessProvider(fetch, await loadHikCentralRuntimeConfiguration(scope.organisationId));
+  if (customer.accessCompanyId && !await db.customer.findFirst({ where: { id: customer.accessCompanyId, organisationId: scope.organisationId, OR: [
+    { leads: { some: { facilityId: input.facilityId } } }, { reservations: { some: { facilityId: input.facilityId } } }, { tenancies: { some: { facilityId: input.facilityId } } },
+  ] }, select: { id: true } })) throw Error("FACILITY_FORBIDDEN");
   if (personId) {
+    const provider = new HikCentralAccessProvider(fetch, await loadHikCentralRuntimeConfiguration(scope.organisationId));
     const verified = await provider.personById(personId);
     if (!verified.ok || (customer.lastName && verified.data.familyName && verified.data.familyName.trim().toLowerCase() !== customer.lastName.trim().toLowerCase())) throw Error("HIKCENTRAL_PERSON_LOOKUP_FAILED");
-  } else await assertNoExistingPerson(provider, customer);
+  }
   const token = randomBytes(32).toString("base64url"), expiresAt = new Date(Date.now() + 20 * 60_000);
   await db.$transaction(async tx => {
     await lockCustomer(tx, customer.id);
@@ -79,7 +88,7 @@ export async function issueHikCentralFaceHandoff(scope: RequestScope, input: { f
     if (linked.personId !== personId || linked.customer.firstName?.trim() !== customer.firstName?.trim() || linked.customer.lastName?.trim() !== customer.lastName?.trim() || (existing?.version ?? 0) !== input.version || existing && ["WAITING_REVIEW", "SENDING", "PROVIDER_UNCERTAIN"].includes(existing.status)) throw Error("PHOTO_CHANGED");
     await tx.hikCentralFaceHandoff.deleteMany({ where: { customerId: customer.id, usedAt: null } });
     const handoff = await tx.hikCentralFaceHandoff.create({ data: { tokenHash: tokenHash(token), customerId: customer.id, organisationId: scope.organisationId, facilityId: input.facilityId, personId, firstNameSnapshot: customer.firstName?.trim() ?? null, lastNameSnapshot: customer.lastName?.trim() ?? null, photoVersion: input.version, issuedById: scope.userId, expiresAt } });
-    await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: input.facilityId, actorId: scope.userId, action: "hikcentral_face.handoff_issued", entityType: "HikCentralFaceHandoff", entityId: handoff.id, after: { customerId: customer.id, personId, version: input.version, identityCheckedInPerson: true, expiresAt: expiresAt.toISOString() } } });
+    await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: input.facilityId, actorId: scope.userId, action: "hikcentral_face.handoff_issued", entityType: "HikCentralFaceHandoff", entityId: handoff.id, after: { customerId: customer.id, personId, version: input.version, identityCheckedInPerson: !input.syntheticTest, syntheticTestReason: input.syntheticTest ? input.syntheticTestReason!.trim() : null, expiresAt: expiresAt.toISOString() } } });
   });
   return { token, expiresAt: expiresAt.toISOString() };
 }
@@ -94,17 +103,21 @@ async function activeHandoff(token: string) {
   const scope: RequestScope = { userId: issuer.id, organisationId: handoff.organisationId, facilityIds: access.allowedFacilityIds ?? [], unrestrictedFacilities: access.allowedFacilityIds === null };
   const { customer, personId } = await faceTarget(db, scope, handoff.customerId);
   if (personId !== handoff.personId || !sameCustomerName(customer, handoff) || ((await db.hikCentralFaceCapture.findUnique({ where: { customerId: customer.id } }))?.version ?? 0) !== handoff.photoVersion) throw Error("PHOTO_CHANGED");
-  return { handoff, scope, customer };
+  const issued = await db.auditEvent.findFirst({ where: { organisationId: scope.organisationId, action: "hikcentral_face.handoff_issued", entityType: "HikCentralFaceHandoff", entityId: handoff.id }, select: { after: true } });
+  const syntheticTestReason = (issued?.after as { syntheticTestReason?: unknown } | null)?.syntheticTestReason;
+  if (syntheticTestReason && (!scope.unrestrictedFacilities || !currentRoleAccess(issuer.roleAssignments.filter(a => a.role.organisationId === handoff.organisationId), "integrations.manage", handoff.facilityId).allowed)) throw Error("FORBIDDEN");
+  return { handoff, scope, customer, syntheticTestReason: typeof syntheticTestReason === "string" ? syntheticTestReason : null };
 }
 
 export async function hikCentralFaceHandoff(token: string) {
-  const { handoff, scope, customer } = await activeHandoff(token);
+  const { handoff, scope, customer, syntheticTestReason } = await activeHandoff(token);
   const current = await currentPolicy(db, scope.organisationId);
-  return { name: customer.companyName || [customer.firstName, customer.lastName].filter(Boolean).join(" ") || "Customer", unitNumber: "", purpose: "hikcentral" as const, notice: current.notice, consentLabel: current.consentLabel, alternativeContact: current.alternativeContact, retentionHours: current.retentionHours, policyHash: current.hash, expiresAt: handoff.expiresAt.toISOString() };
+  const notice = handoffNotice(current, syntheticTestReason);
+  return { name: customer.companyName || [customer.firstName, customer.lastName].filter(Boolean).join(" ") || "Customer", unitNumber: "", purpose: "hikcentral" as const, notice: notice.notice, consentLabel: notice.consentLabel, alternativeContact: current.alternativeContact, retentionHours: current.retentionHours, policyHash: current.hash, expiresAt: handoff.expiresAt.toISOString() };
 }
 
 export async function captureHikCentralFaceHandoff(token: string, input: { policyHash: string; consent: boolean; image: File }) {
-  const { handoff, scope, customer } = await activeHandoff(token);
+  const { handoff, scope, customer, syntheticTestReason } = await activeHandoff(token);
   if (!input.consent || input.policyHash !== policyHash) throw Error("PHOTO_CONSENT_REQUIRED");
   const image = await normaliseFacialPhoto(input.image);
   try {
@@ -116,10 +129,10 @@ export async function captureHikCentralFaceHandoff(token: string, input: { polic
       const existing = await tx.hikCentralFaceCapture.findUnique({ where: { customerId: customer.id } });
       if (current.hash !== input.policyHash || linked.personId !== handoff.personId || !sameCustomerName(linked.customer, handoff) || !tokenRow || tokenRow.usedAt || tokenRow.expiresAt <= new Date() || (existing?.version ?? 0) !== handoff.photoVersion || existing && ["WAITING_REVIEW", "SENDING", "PROVIDER_UNCERTAIN"].includes(existing.status)) throw Error("PHOTO_CHANGED");
       const now = new Date(), version = handoff.photoVersion + 1;
-      const values = { organisationId: scope.organisationId, facilityId: handoff.facilityId, personId: handoff.personId, firstNameSnapshot: handoff.firstNameSnapshot, lastNameSnapshot: handoff.lastNameSnapshot, version, status: "WAITING_REVIEW", encryptedImage: encryptPhoto(image, binding(customer.id, version)), imageSha256: createHash("sha256").update(image).digest("hex"), policyVersion: current.version, policyHash: current.hash, consentNotice: JSON.stringify(current), consentAt: now, expiresAt: new Date(now.getTime() + current.retentionHours * 3600_000), reviewedAt: null, transferStartedAt: null, providerAcceptedAt: null, erasedAt: null };
+      const values = { organisationId: scope.organisationId, facilityId: handoff.facilityId, personId: handoff.personId, firstNameSnapshot: handoff.firstNameSnapshot, lastNameSnapshot: handoff.lastNameSnapshot, version, status: "WAITING_REVIEW", encryptedImage: encryptPhoto(image, binding(customer.id, version)), imageSha256: createHash("sha256").update(image).digest("hex"), policyVersion: current.version, policyHash: current.hash, consentNotice: JSON.stringify(handoffNotice(current, syntheticTestReason)), consentAt: now, expiresAt: new Date(now.getTime() + current.retentionHours * 3600_000), reviewedAt: null, transferStartedAt: null, providerAcceptedAt: null, erasedAt: null };
       const photo = await tx.hikCentralFaceCapture.upsert({ where: { customerId: customer.id }, create: { customerId: customer.id, ...values }, update: values });
       await tx.hikCentralFaceHandoff.update({ where: { id: handoff.id }, data: { usedAt: now } });
-      await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: handoff.facilityId, actorId: scope.userId, action: "hikcentral_face.customer_submitted", entityType: "HikCentralFaceCapture", entityId: photo.id, after: { customerId: customer.id, personId: handoff.personId, version, imageSha256: values.imageSha256, policyHash: current.hash, consentAt: now.toISOString(), expiresAt: values.expiresAt.toISOString() } } });
+      await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: handoff.facilityId, actorId: scope.userId, action: "hikcentral_face.customer_submitted", entityType: "HikCentralFaceCapture", entityId: photo.id, after: { customerId: customer.id, personId: handoff.personId, version, syntheticTestReason, imageSha256: values.imageSha256, policyHash: current.hash, consentAt: now.toISOString(), expiresAt: values.expiresAt.toISOString() } } });
     });
   } finally { image.fill(0); }
 }
@@ -150,7 +163,7 @@ export async function decideHikCentralFace(scope: RequestScope, id: string, vers
     const candidate = await staffPhoto(db, scope, id);
     if (!candidate.personId) {
       const provider = new HikCentralAccessProvider(fetch, await loadHikCentralRuntimeConfiguration(scope.organisationId));
-      await assertNoExistingPerson(provider, await requireLeasingCustomer(scope, candidate.customerId));
+      await assertNoExistingCustomerCode(provider, scope.organisationId, candidate.customerId);
       const organizations = await provider.listOrganizations();
       const matches = organizations.ok ? organizations.data.organizations.filter(item => item.name.trim().toUpperCase() === "STOR24") : [];
       if (matches.length !== 1 || !matches[0].indexCode || /^TEMP-/i.test(matches[0].indexCode)) throw Error("HIKCENTRAL_DEPARTMENT_REQUIRED");
@@ -213,11 +226,24 @@ export async function decideHikCentralFace(scope: RequestScope, id: string, vers
     if (updated.count !== 1) throw Error("PHOTO_CHANGED");
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: photo.facilityId, actorId: scope.userId, action: accepted ? "hikcentral_face.api_accepted_person_readback" : "hikcentral_face.provider_uncertain", entityType: "HikCentralFaceCapture", entityId: id, after: { customerId: photo.customerId, personId: resolvedPersonId, version, deviceApplied: false } } });
   });
+  let accessStatus: string | undefined;
   if (accepted) {
-    try { await reconcileCustomerFaceAccess(scope, photo.customerId, photo.facilityId); }
-    catch (error) { await db.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: photo.facilityId, actorId: scope.userId, action: "hikcentral_face.access_reconcile_failed", entityType: "HikCentralFaceCapture", entityId: id, after: { customerId: photo.customerId, code: error instanceof Error ? error.message : "UNKNOWN" } } }); }
+    try {
+      const submitted = await db.auditEvent.findFirst({ where: { organisationId: scope.organisationId, entityType: "HikCentralFaceCapture", entityId: id, action: "hikcentral_face.customer_submitted", after: { path: ["version"], equals: version } }, orderBy: { occurredAt: "desc" }, select: { after: true } });
+      const testReason = (submitted?.after as { syntheticTestReason?: unknown } | null)?.syntheticTestReason;
+      if (typeof testReason === "string") {
+        if (!scope.unrestrictedFacilities || !resolvedPersonId) throw Error("HIKCENTRAL_TEST_GRANT_NOT_READY");
+        await approveCustomerFaceVisit(scope, photo.customerId, photo.facilityId, false, { expectedPersonId: resolvedPersonId, reason: testReason });
+        const grants = (await customerFaceAccessReadiness(scope, photo.customerId, photo.facilityId)).grants;
+        if (grants.length !== 2 || grants.some(grant => grant.status !== "GRANTED" || grant.personId !== resolvedPersonId)) throw Error("HIKCENTRAL_GRANT_UNCONFIRMED");
+        accessStatus = "GRANTED";
+      } else await reconcileCustomerFaceAccess(scope, photo.customerId, photo.facilityId);
+    } catch (error) {
+      accessStatus = "REVIEW_REQUIRED";
+      await db.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: photo.facilityId, actorId: scope.userId, action: "hikcentral_face.access_reconcile_failed", entityType: "HikCentralFaceCapture", entityId: id, after: { customerId: photo.customerId, code: error instanceof Error ? error.message : "UNKNOWN" } } });
+    }
   }
-  return { status };
+  return accessStatus ? { status, accessStatus } : { status };
 }
 
 export async function expireHikCentralFaceCaptures() {
