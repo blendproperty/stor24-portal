@@ -72,11 +72,11 @@ export async function issueHikCentralFaceHandoff(scope: RequestScope, input: { f
   }
   await currentPolicy(db, scope.organisationId);
   const { customer, personId } = await faceTarget(db, scope, input.customerId);
-  const provider = new HikCentralAccessProvider(fetch, await loadHikCentralRuntimeConfiguration(scope.organisationId));
   if (personId) {
+    const provider = new HikCentralAccessProvider(fetch, await loadHikCentralRuntimeConfiguration(scope.organisationId));
     const verified = await provider.personById(personId);
     if (!verified.ok || (customer.lastName && verified.data.familyName && verified.data.familyName.trim().toLowerCase() !== customer.lastName.trim().toLowerCase())) throw Error("HIKCENTRAL_PERSON_LOOKUP_FAILED");
-  } else await assertNoExistingCustomerCode(provider, scope.organisationId, customer.id);
+  }
   const token = randomBytes(32).toString("base64url"), expiresAt = new Date(Date.now() + 20 * 60_000);
   await db.$transaction(async tx => {
     await lockCustomer(tx, customer.id);

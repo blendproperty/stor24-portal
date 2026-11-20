@@ -118,6 +118,7 @@ test("customer-scoped Counter face capture needs consent and review before one p
     await issueHikCentralFaceHandoff(scope, { customerId: newcomer.id, facilityId: facility.id, version: 0 });
     await assert.rejects(issueHikCentralFaceHandoff({ ...scope, unrestrictedFacilities: false, facilityIds: [facility.id] }, { customerId: newcomer.id, facilityId: facility.id, version: 0, syntheticTest: true, syntheticTestReason: "Automatic virtual lead test" }), /HIKCENTRAL_TEST_GRANT_NOT_READY/);
     const newHandoff = await issueHikCentralFaceHandoff(scope, { customerId: newcomer.id, facilityId: facility.id, version: 0, syntheticTest: true, syntheticTestReason: "Automatic virtual lead test" });
+    assert.equal(newPersonCalls.filter(path => path.endsWith("/person/personCode/personInfo")).length, 0);
     await db.customer.update({ where: { id: newcomer.id }, data: { firstName: "Changed" } });
     await assert.rejects(hikCentralFaceHandoff(newHandoff.token), /PHOTO_CHANGED/);
     await db.customer.update({ where: { id: newcomer.id }, data: { firstName: "Jane" } });
