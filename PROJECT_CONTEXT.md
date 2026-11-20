@@ -9140,4 +9140,3 @@ Validation follow-up: the project typecheck and targeted ESLint for the candidat
 - Merge: PR #883 is not merged at this record.
 - Deployment and configuration: not deployed; no live HikCentral or STOR24 configuration changed.
 - Live production verification: not performed. Staff tablet capture, a real company representative's consent and identity check, HikCentral face acceptance, access-level readback and physical reader UAT remain open. Existing lockout policy approval and all wider provider, data, training and release gates remain open.
-
