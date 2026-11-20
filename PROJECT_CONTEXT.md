@@ -1,3 +1,40 @@
+## 2026-11-20 — Midpoint second-floor clockwise renumbering
+
+- **Implementation:** User requested the same sequence as the first floor starting at 337. All 194 second-floor units were renumbered 337–530 via the existing platform batch; crosswalk records prior and revised numbers. Local PNG and A3/A4 PDFs were generated; they are not deployed assets.
+- **Testing:** All 194 original and revised numbers were unique. Before applying, every live second-floor map position matched its corresponding live first-floor position, with numbering offset by 194. The batch entries were checked, the platform preview showed 194 changes and 194 map labels, and both PDFs contained 337–530 exactly once; the map was visually reviewed.
+- **Commit and push:** Documentation candidate; consult Git for its current remote head.
+- **Merge:** Documentation promotion is separate from the applied data change and remains to be verified.
+- **Deployment and configuration:** Authenticated inventory workflow returned “194 units renumbered without changing the saved map layout.” No application deployment or floor-opening configuration change.
+- **Live production verification:** Authenticated second-floor map displayed 194 unique numbers 337–530; sampled positions 337, 338, 339, 354, 403 and 530 matched the generated map. The floor remained under construction. Full database relation checks, physical signage, staff/device acceptance, historical documents, provider, data, training and approval gates remain open.
+
+## 2026-11-20 — Midpoint first-floor clockwise renumbering
+
+- **Implementation:** Brett authorised the first-floor sequence starting at the indoor unit closest to the ground-floor 001 position. The platform batch renumbered all 194 first-floor units, from 143 to 336. Current unit 260 became 143; the crosswalk records the full prior-to-revised mapping. Map and A3/A4 PDF exports are local, not deployed assets.
+- **Testing:** All 194 proposed destinations and prior numbers were unique; the platform preview reported 194 changes and 194 linked labels and passed its collision checks. All form entries were compared with the proposed mapping before apply. Both PDFs were checked to contain 143–336 once and the map was visually reviewed. The source layout was the 27 October snapshot; only selected current positions were compared, not a full current geometry audit.
+- **Commit and push:** Documentation candidate; consult Git for current branch and exact publication status.
+- **Merge:** Documentation promotion remains separate from the live data change and must be verified.
+- **Deployment and configuration:** Applied through the existing authenticated inventory renumbering workflow; the platform returned “194 units renumbered without changing the saved map layout.” No code deployment, floor opening or provider configuration change.
+- **Live production verification:** Immediately after the batch, the authenticated first-floor map displayed 194 unique unit numbers 143–336; sampled positions 143, 144, 145, 160, 209 and 336 matched the revised plan. The floor remained under construction. Full database relationship checks, physical signage, staff/device acceptance, historical documents, provider, data, training and approval gates remain open.
+
+## 2026-11-20 — Midpoint first-floor numbering map
+
+- **Implementation:** Created a local shareable PNG and A3/A4 PDFs from the 27 October 2026 first-floor inventory and map snapshot. The crosswalk records units 143–336. No application code or production records changed.
+- **Testing:** The snapshot contains 194 linked first-floor units, each with a matching map label; crosswalk coverage is 143–336. Both generated PDFs were checked for all 194 numbers once, and the rendered map was visually reviewed. The current live inventory and physical labels were not checked.
+- **Commit and push:** This documentation is a candidate on the numbering branch; consult Git for its exact remote status. The image and PDFs are local output and are not in the repository.
+- **Merge:** Documentation promotion is pending; verify the target branch separately.
+- **Deployment and configuration:** None for this image.
+- **Live production verification:** None for the first-floor image. Physical signage, current map changes, staff acceptance and existing data, provider, training and approval gates remain open.
+
+## 2026-11-19 — Midpoint ground-floor numbering format
+
+- **Implementation:** Brett reports manually renumbering units 10–99 to 010–099 in the platform. The crosswalk now records 001–099, preserving 100–530; the original October mapping is retained as `numbering-crosswalk-historical-20261027.csv`. Units 001–009 were already shown in that format before this task.
+- **Shareable map:** On 2026-11-19 a ground-floor PNG and A3/A4 PDFs were rendered locally from the public map. Both PDFs were checked to contain all 142 unit numbers once; layout was visually inspected. These files are local output, not deployed or included in this PR. Physical signage remains unverified.
+- **Testing:** Crosswalk has 530 unique destination numbers. Public booking API readback on 2026-11-19 returned 142 ground-floor units; all 142 IDs and numbers matched the original ID mapping with the requested zero padding, including 90 numbers 010–099 and no two-digit 10–99. All 142 linked public map labels matched their unit numbers. Brett supplied a screenshot of a database count query returning zero for Midpoint two-digit numbers; the screenshot alone does not prove the query text or its scope.
+- **Commit and push:** Documentation candidate; consult Git for the exact commit and remote status.
+- **Merge:** Documentation promotion must be verified separately; the platform data change was made manually.
+- **Deployment and configuration:** Brett reports the manual platform change; no application deployment was performed for this work. The original brett-admin SSH key was successfully used; sudo access was not authenticated. A replacement public key was reportedly added through Hostinger but has not been independently verified or tested; review its authorization and any security alert separately.
+- **Live production verification:** Public booking feed and linked map labels verified as above. No independent privileged database audit or verification of reservations, issued documents, provider integrations or physical signage was performed. Staff/device UAT, physical label checks, communications, recovery and all existing data, provider, training and approval gates remain open.
+
 ## 2026-11-17 — BlendSign callback concurrency release
 
 - Implementation: PR #849 serializes completion using the existing facility lock, rechecks the signed document, requests retry for simultaneous inbox creation and prevents a late failure from overwriting success. The earlier provider-side idempotency and outage task was already completed in August and remains recorded separately.
@@ -9112,4 +9149,3 @@ Validation follow-up: the project typecheck and targeted ESLint for the candidat
 - Merge: PR #883 is not merged at this record.
 - Deployment and configuration: not deployed; no live HikCentral or STOR24 configuration changed.
 - Live production verification: not performed. Staff tablet capture, a real company representative's consent and identity check, HikCentral face acceptance, access-level readback and physical reader UAT remain open. Existing lockout policy approval and all wider provider, data, training and release gates remain open.
-
