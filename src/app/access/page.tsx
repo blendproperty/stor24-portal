@@ -16,6 +16,7 @@ import { db } from "@/lib/db";
 import { HikCentralExistingPersonLink } from "@/components/hikcentral-existing-person-link";
 import { HikCentralFaceCaptureWorkspace } from "@/components/hikcentral-face-capture-workspace";
 import { HikCentralSiteClearance } from "@/components/hikcentral-site-clearance";
+import { CompanyFacePersonForm } from "@/components/company-face-person-form";
 
 export const metadata = { title: "Biometric access" };
 export const dynamic = "force-dynamic";
@@ -44,19 +45,21 @@ export default async function AccessPage({ searchParams }: { searchParams: Promi
     db.customer.findMany({ where: { organisationId: scope.organisationId }, select: { id: true, firstName: true, lastName: true, companyName: true }, orderBy: { updatedAt: "desc" } }),
     db.facility.findMany({ where: { organisationId: scope.organisationId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]) : [[], []];
-  const [capturePeople, captureFacilities] = captureScope ? await Promise.all([
-    db.customer.findMany({ where: { ...leasingCustomerWhere(captureScope, captureScope.facilityIds), type: "INDIVIDUAL", firstName: { not: null }, lastName: { not: null } }, include: { integrationIdentityLink: true, hikCentralFaceCapture: true, hikCentralAccessGrants: { select: { facilityId: true, status: true } } }, orderBy: { updatedAt: "desc" } }),
+  const [capturePeople, captureFacilities, companyCustomers] = captureScope ? await Promise.all([
+    db.customer.findMany({ where: { ...leasingCustomerWhere(captureScope, captureScope.facilityIds), type: "INDIVIDUAL", firstName: { not: null }, lastName: { not: null } }, include: { accessCompany: { select: { companyName: true } }, integrationIdentityLink: true, hikCentralFaceCapture: true, hikCentralAccessGrants: { select: { facilityId: true, status: true } } }, orderBy: { updatedAt: "desc" } }),
     db.facility.findMany({ where: facilityWhere(captureScope), select: { id: true, name: true }, orderBy: { name: "asc" } }),
-  ]) : [[], []];
+    db.customer.findMany({ where: { ...leasingCustomerWhere(captureScope, captureScope.facilityIds), type: "BUSINESS", companyName: { not: null } }, select: { id: true, companyName: true }, orderBy: { updatedAt: "desc" } }),
+  ]) : [[], [], []];
   return <div className="page-stack face-page">
     <PageHeader eyebrow="Physical security" title="Facial access" description="Staff prepare a private tablet photo visit. After the customer consents, an integration manager reviews and sends the image to HikCentral." />
     {reservation && <a className="button button-secondary" href={`/operations/move-in?reservation=${encodeURIComponent(reservation)}`}>Back to move-in checks</a>}
     <ol className="face-journey" aria-label="Customer photo steps">
-      <li><span>1</span><div><strong>Choose the customer</strong><p>Staff check the original ID against STOR24. A manager links anyone already in HikCentral; new people are created after photo review.</p></div></li>
+      <li><span>1</span><div><strong>Choose the person</strong><p>For a company, add each authorised person below. Staff check that person&apos;s original ID before preparing their photo. A manager links anyone already in HikCentral.</p></div></li>
       <li><span>2</span><div><strong>Take the photo on the tablet</strong><p>Staff prepare a QR code. The customer scans it, agrees and takes their own photo.</p></div></li>
       <li><span>3</span><div><strong>Review and send</strong><p>Staff review the saved image before sending it to HikCentral.</p></div></li>
     </ol>
-    {captureScope ? <HikCentralFaceCaptureWorkspace people={capturePeople.map(customer => ({ customerId: customer.id, customerName: [customer.firstName, customer.lastName].filter(Boolean).join(" "), personId: customer.integrationIdentityLink?.hikCentralPersonId ?? null, linkStatus: customer.integrationIdentityLink?.status ?? null, accessGrants: customer.hikCentralAccessGrants, photo: customer.hikCentralFaceCapture ? { id: customer.hikCentralFaceCapture.id, version: customer.hikCentralFaceCapture.version, status: customer.hikCentralFaceCapture.status, consentAt: customer.hikCentralFaceCapture.consentAt.toISOString(), providerAcceptedAt: customer.hikCentralFaceCapture.providerAcceptedAt?.toISOString() ?? null, syntheticTest: customer.hikCentralFaceCapture.consentNotice.includes('"syntheticTestReason":') } : null }))} facilities={captureFacilities} canSend={canLinkExistingPerson} canSyntheticTest={canLinkExistingPerson} /> : null}
+    {captureScope ? <CompanyFacePersonForm companies={companyCustomers.map(company => ({ id: company.id, name: company.companyName ?? "Company" }))} /> : null}
+    {captureScope ? <HikCentralFaceCaptureWorkspace people={capturePeople.map(customer => ({ customerId: customer.id, customerName: [customer.firstName, customer.lastName].filter(Boolean).join(" ") + (customer.accessCompany?.companyName ? ` · ${customer.accessCompany.companyName}` : ""), personId: customer.integrationIdentityLink?.hikCentralPersonId ?? null, linkStatus: customer.integrationIdentityLink?.status ?? null, accessGrants: customer.hikCentralAccessGrants, photo: customer.hikCentralFaceCapture ? { id: customer.hikCentralFaceCapture.id, version: customer.hikCentralFaceCapture.version, status: customer.hikCentralFaceCapture.status, consentAt: customer.hikCentralFaceCapture.consentAt.toISOString(), providerAcceptedAt: customer.hikCentralFaceCapture.providerAcceptedAt?.toISOString() ?? null, syntheticTest: customer.hikCentralFaceCapture.consentNotice.includes('"syntheticTestReason":') } : null }))} facilities={captureFacilities} canSend={canLinkExistingPerson} canSyntheticTest={canLinkExistingPerson} /> : null}
     {captureScope ? <HikCentralSiteClearance facilities={captureFacilities} /> : null}
     {canLinkExistingPerson ? <details className="face-provider-records"><summary>Already in HikCentral? <span>Manager: link an existing person without creating a duplicate</span></summary><HikCentralExistingPersonLink customers={linkCustomers.map(customer => ({ id: customer.id, name: customer.companyName || [customer.firstName, customer.lastName].filter(Boolean).join(" ") || "Unnamed customer" }))} facilities={linkFacilities} /></details> : null}
     <details className="face-provider-records face-settings" open={!control.enabled}><summary>Photo collection settings <span>{control.enabled ? "On — owner controls and interim rules" : "Off — photo uploads are paused"}</span></summary><PhotoCollectionControl initial={control} /></details>

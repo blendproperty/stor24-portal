@@ -13,17 +13,17 @@ import { sendHikCentralLockedNotice, sendHikCentralLockWarning } from "@/lib/hik
 export async function customerFaceAccessReadiness(scope: RequestScope, customerId: string, facilityId: string, now = new Date()) {
   await requireFacility(scope, facilityId);
   await requireLeasingCustomer(scope, customerId);
-  const [customer, link, photo, tenancies, approval, manualLock, mapping, grants] = await Promise.all([
-    db.customer.findFirst({ where: { id: customerId, organisationId: scope.organisationId }, select: { id: true } }),
+  const customer = await db.customer.findFirst({ where: { id: customerId, organisationId: scope.organisationId }, select: { id: true, accessCompanyId: true } });
+  if (!customer) throw Error("NOT_FOUND");
+  const [link, photo, tenancies, approval, manualLock, mapping, grants] = await Promise.all([
     db.integrationIdentityLink.findUnique({ where: { customerId } }),
     db.hikCentralFaceCapture.findUnique({ where: { customerId } }),
-    db.tenancy.findMany({ where: { customerId, facilityId, status: { in: ["ACTIVE", "NOTICE_GIVEN"] }, occupancies: { some: { status: { in: ["ACTIVE", "NOTICE_GIVEN"] }, accessState: { not: "REVOKED" } } } }, select: { id: true, accountId: true, occupancies: { where: { status: { in: ["ACTIVE", "NOTICE_GIVEN"] }, accessState: { not: "REVOKED" } }, select: { id: true } } } }),
+    db.tenancy.findMany({ where: { customerId: customer.accessCompanyId ?? customerId, facilityId, status: { in: ["ACTIVE", "NOTICE_GIVEN"] }, occupancies: { some: { status: { in: ["ACTIVE", "NOTICE_GIVEN"] }, accessState: { not: "REVOKED" } } } }, select: { id: true, accountId: true, occupancies: { where: { status: { in: ["ACTIVE", "NOTICE_GIVEN"] }, accessState: { not: "REVOKED" } }, select: { id: true } } } }),
     db.hikCentralAccessApproval.findUnique({ where: { customerId_facilityId: { customerId, facilityId } } }),
     db.hikCentralAccessLock.findUnique({ where: { customerId_facilityId: { customerId, facilityId } } }),
     db.integrationConnection.findFirst({ where: { organisationId: scope.organisationId, facilityId, category: HIKCENTRAL_CATEGORY, provider: HIKCENTRAL_PROVIDER } }),
     db.hikCentralAccessGrant.findMany({ where: { organisationId: scope.organisationId, facilityId, customerId } }),
   ]);
-  if (!customer) throw Error("NOT_FOUND");
   const handovers = tenancies.length ? await db.auditEvent.findMany({ where: { organisationId: scope.organisationId, facilityId, entityType: "Tenancy", action: "tenancy.key_handover_confirmed", entityId: { in: tenancies.map(item => item.id) } }, select: { entityId: true } }) : [];
   const handedOver = new Set(handovers.map(item => item.entityId));
   const approvedVisit = !!approval && !!photo && !approval.revokedAt && approval.expiresAt > now && approval.photoId === photo.id && approval.photoVersion === photo.version && ["WAITING_REVIEW", "PROVIDER_ACCEPTED"].includes(photo.status);
@@ -45,7 +45,7 @@ export async function customerFaceAccessReadiness(scope: RequestScope, customerI
       const review = await verifiedArrearsAccessReview(scope, tenancy.accountId, southAfricaDateKey(now));
       if (!review.paymentCleared && review.sourceChargeId && review.reviewOn && review.blockers.every(item => item.startsWith("Seven calendar days have not elapsed"))) warningCandidates.push({ accountId: tenancy.accountId, sourceChargeId: review.sourceChargeId, reviewOn: review.reviewOn });
       if (review.eligible) {
-        const notices = await db.communicationLog.findMany({ where: { organisationId: scope.organisationId, facilityId, customerId, messageType: "FACE_ACCESS_LOCK_WARNING", status: "SUCCEEDED", deliveredAt: { not: null } }, orderBy: { deliveredAt: "desc" }, take: 10, select: { metadata: true, deliveredAt: true } });
+        const notices = await db.communicationLog.findMany({ where: { organisationId: scope.organisationId, facilityId, customerId: customer.accessCompanyId ?? customerId, messageType: "FACE_ACCESS_LOCK_WARNING", status: "SUCCEEDED", deliveredAt: { not: null } }, orderBy: { deliveredAt: "desc" }, take: 10, select: { metadata: true, deliveredAt: true } });
         const noticeReady = !!lockPolicy && notices.some(notice => { const evidence = notice.metadata as { sourceChargeId?: unknown; approvalReference?: unknown; policyHash?: unknown } | null; return evidence?.sourceChargeId === review.sourceChargeId && evidence.approvalReference === lockPolicy.approvalReference && evidence.policyHash === hikCentralLockPolicyHash(lockPolicy) && !!notice.deliveredAt && notice.deliveredAt.getTime() <= now.getTime() - lockPolicy.noticeHours * 60 * 60_000; });
         if (noticeReady) { arrearsLocked = true; financialLockSourceChargeId = review.sourceChargeId; } else arrearsNoticePending = true;
       }
@@ -66,7 +66,7 @@ export async function customerFaceAccessReadiness(scope: RequestScope, customerI
     financialEvidenceUnavailable ? "Payment evidence could not be checked" : null,
     !mapped ? "Block24 and Midpoint non-tenant readers or nightly site clearance are not fully configured" : null,
   ].filter((value): value is string => Boolean(value));
-  return { eligible: blockers.length === 0, accessClearance: (activeTenancy || approvedVisit) && !arrearsLocked && !manuallyLocked, approvalExpiresAt: approvedVisit ? approval.expiresAt : null, syntheticTestActive: approvedVisit && approval.reason.startsWith("Synthetic API assignment test:"), arrearsLocked, arrearsNoticePending, financialLockSourceChargeId, warningCandidates, manuallyLocked, accessLocked: arrearsLocked || manuallyLocked, restorationReady: activeTenancy && paymentCleared && !financialEvidenceUnavailable && !manuallyLocked, blockers, personId: link?.hikCentralPersonId ?? null, grants, mapping: mapped ? { accessLevelIds: config.accessLevelIds as string[], doorIndexCodes: config.doorIndexCodes as string[] } : null };
+  return { eligible: blockers.length === 0, accessClearance: (activeTenancy || approvedVisit) && !arrearsLocked && !manuallyLocked, approvalExpiresAt: approvedVisit ? approval.expiresAt : null, syntheticTestActive: approvedVisit && approval.reason.startsWith("Synthetic API assignment test:"), arrearsLocked, arrearsNoticePending, financialLockSourceChargeId, warningCandidates, billingCustomerId: customer.accessCompanyId ?? customerId, manuallyLocked, accessLocked: arrearsLocked || manuallyLocked, restorationReady: activeTenancy && paymentCleared && !financialEvidenceUnavailable && !manuallyLocked, blockers, personId: link?.hikCentralPersonId ?? null, grants, mapping: mapped ? { accessLevelIds: config.accessLevelIds as string[], doorIndexCodes: config.doorIndexCodes as string[] } : null };
 }
 
 export async function hikCentralSiteClearance(scope: RequestScope, facilityId: string, now = new Date()) {
@@ -174,8 +174,8 @@ export async function reconcileCustomerFaceAccess(scope: RequestScope, customerI
     }
     if (readiness.arrearsLocked && readiness.financialLockSourceChargeId) {
       let notified = false;
-      try { notified = await sendHikCentralLockedNotice(scope, customerId, facilityId, readiness.financialLockSourceChargeId); } catch { /* A failed notice cannot undo a confirmed provider revocation. */ }
-      if (!notified) await db.task.create({ data: { organisationId: scope.organisationId, facilityId, customerId, title: "Face lock notice needs delivery review", description: "HikCentral access was removed, but the customer lock notice was not confirmed. Review the communication log and contact the customer through an approved channel.", priority: "HIGH" } });
+      try { notified = await sendHikCentralLockedNotice(scope, readiness.billingCustomerId, facilityId, readiness.financialLockSourceChargeId); } catch { /* A failed notice cannot undo a confirmed provider revocation. */ }
+      if (!notified) await db.task.create({ data: { organisationId: scope.organisationId, facilityId, customerId: readiness.billingCustomerId, title: "Face lock notice needs delivery review", description: "HikCentral access was removed, but the customer lock notice was not confirmed. Review the communication log and contact the customer through an approved channel.", priority: "HIGH" } });
     }
     return { status: readiness.accessLocked ? "LOCKED" : "REVOKED", blockers: readiness.blockers };
   }
@@ -208,6 +208,14 @@ export async function reconcileCustomerFaceAccess(scope: RequestScope, customerI
   return { status: external ? "EXTERNAL" : "GRANTED", blockers: [] };
 }
 
+/** A company handover or move-out changes eligibility for each of its named people. */
+export async function reconcileCustomerAndCompanyPeople(scope: RequestScope, customerId: string, facilityId: string) {
+  const people = await db.customer.findMany({ where: { accessCompanyId: customerId, organisationId: scope.organisationId }, select: { id: true } });
+  const results = await Promise.allSettled([customerId, ...people.map(person => person.id)].map(id => reconcileCustomerFaceAccess(scope, id, facilityId)));
+  const failed = results.find(result => result.status === "rejected");
+  if (failed?.status === "rejected") throw failed.reason;
+}
+
 export async function approveCustomerFaceAccessRestoration(scope: RequestScope, customerId: string, facilityId: string) {
   const readiness = await customerFaceAccessReadiness(scope, customerId, facilityId);
   if (!readiness.eligible || !readiness.restorationReady || readiness.grants.filter(item => item.status === "LOCKED").length !== 2) throw Error("HIKCENTRAL_RESTORATION_NOT_READY");
@@ -229,7 +237,7 @@ export async function processHikCentralAccessLocks(now = new Date()) {
     try {
       const readiness = await customerFaceAccessReadiness(scope, row.customerId, row.facilityId, now);
       if (readiness.syntheticTestActive) continue;
-      for (const candidate of readiness.warningCandidates) await sendHikCentralLockWarning(scope, row.customerId, row.facilityId, candidate, now);
+      for (const candidate of readiness.warningCandidates) await sendHikCentralLockWarning(scope, readiness.billingCustomerId, row.facilityId, candidate, now);
       if (readiness.accessLocked || !readiness.accessClearance) {
         const result = await reconcileCustomerFaceAccess(scope, row.customerId, row.facilityId, now);
         if (result.status === "LOCKED") locked++;

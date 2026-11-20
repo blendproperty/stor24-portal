@@ -10,6 +10,8 @@ import { encryptIntegrationSecret } from "../../src/lib/integrations/integration
 import { approveCustomerFaceAccessRestoration, approveCustomerFaceVisit, confirmHikCentralSiteEmpty, customerFaceAccessReadiness, hikCentralSiteClearance, processHikCentralAccessLocks, reconcileCustomerFaceAccess, revokeCustomerFaceVisit, setCustomerFaceManualLock } from "../../src/lib/hikcentral-customer-access";
 import { MIDPOINT_NON_TENANT_DOORS, STOR24_FACE_DOORS } from "../../src/lib/integrations/hikcentral-door-scope";
 import { disableHikCentralLockPolicy, hikCentralLockPolicy, saveHikCentralLockPolicy } from "../../src/lib/hikcentral-lock-policy";
+import { addCompanyFacePerson } from "../../src/lib/company-face-people";
+import { requireLeasingCustomer } from "../../src/lib/leasing-customer-scope";
 
 test("customer-scoped Counter face capture needs consent and review before one provider update", async () => {
   assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci");
@@ -188,6 +190,16 @@ test("customer-scoped Counter face capture needs consent and review before one p
     assert.deepEqual(writes.slice(0, 2), ["add:12", "add:7"]);
     assert.deepEqual(writes.slice(2).sort(), ["delete:12", "delete:7"].sort());
     const firstTenancy = await activeUnit("one");
+    const company = await db.customer.create({ data: { organisationId: org.id, type: "BUSINESS", companyName: "Synthetic company" } });
+    await db.lead.create({ data: { facilityId: facility.id, customerId: company.id, source: "STAFF" } });
+    await assert.rejects(addCompanyFacePerson(scope, { companyId: company.id, firstName: "Alice", lastName: "Agent", authorised: false }), /COMPANY_PERSON_INVALID/);
+    const companyPerson = await addCompanyFacePerson(scope, { companyId: company.id, firstName: "Alice", lastName: "Agent", authorised: true });
+    assert.equal((await requireLeasingCustomer({ ...scope, unrestrictedFacilities: false, facilityIds: [facility.id] }, companyPerson.customerId)).accessCompanyId, company.id);
+    const companyUnit = await db.unit.create({ data: { facilityId: facility.id, unitTypeId: unitType.id, number: "company", monthlyRate: 100 } });
+    const companyAccount = await db.account.create({ data: { customerId: company.id, accountNumber: `${key}-company` } });
+    const companyTenancy = await db.tenancy.create({ data: { facilityId: facility.id, customerId: company.id, accountId: companyAccount.id, status: "ACTIVE", paymentMethod: "EFT", startDate: new Date("2026-11-01"), occupancies: { create: { unitId: companyUnit.id, status: "ACTIVE", startDate: new Date("2026-11-01"), monthlyRate: 100 } } } });
+    await db.auditEvent.create({ data: { organisationId: org.id, facilityId: facility.id, actorId: staff.id, action: "tenancy.key_handover_confirmed", entityType: "Tenancy", entityId: companyTenancy.id } });
+    assert.ok(!(await customerFaceAccessReadiness(scope, companyPerson.customerId, facility.id)).blockers.includes("No active handed-over tenancy or current manager-approved visit"));
     assert.equal((await reconcileCustomerFaceAccess(scope, newcomer.id, facility.id)).status, "GRANTED");
     assert.deepEqual(writes.slice(-2), ["add:12", "add:7"]);
     await assert.rejects(saveHikCentralMapping(scope, { facilityId: facility.id, organisationIndexCode: "97", doorIndexCodes: [...STOR24_FACE_DOORS].reverse(), accessLevelIds: ["12", "7"], nightlyClearanceRequired: true }), /HIKCENTRAL_ACTIVE_GRANTS_REVIEW_REQUIRED/);

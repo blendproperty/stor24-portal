@@ -16,6 +16,11 @@ export function leasingCustomerWhere(
       { leads: { some: { facilityId: { in: facilityIds } } } },
       { reservations: { some: { facilityId: { in: facilityIds } } } },
       { tenancies: { some: { facilityId: { in: facilityIds } } } },
+      { accessCompany: { OR: [
+        { leads: { some: { facilityId: { in: facilityIds } } } },
+        { reservations: { some: { facilityId: { in: facilityIds } } } },
+        { tenancies: { some: { facilityId: { in: facilityIds } } } },
+      ] } },
     ],
   };
 }
