@@ -195,6 +195,9 @@ test("customer-scoped Counter face capture needs consent and review before one p
     await assert.rejects(addCompanyFacePerson(scope, { companyId: company.id, firstName: "Alice", lastName: "Agent", authorised: false }), /COMPANY_PERSON_INVALID/);
     const companyPerson = await addCompanyFacePerson(scope, { companyId: company.id, firstName: "Alice", lastName: "Agent", authorised: true });
     assert.equal((await requireLeasingCustomer({ ...scope, unrestrictedFacilities: false, facilityIds: [facility.id] }, companyPerson.customerId)).accessCompanyId, company.id);
+    const otherFacility = await db.facility.create({ data: { organisationId: org.id, name: "Unrelated facility", code: `${key}-other` } });
+    assert.ok((await customerFaceAccessReadiness(scope, companyPerson.customerId, otherFacility.id)).blockers.includes("Company is not linked to this facility"));
+    await assert.rejects(issueHikCentralFaceHandoff(scope, { customerId: companyPerson.customerId, facilityId: otherFacility.id, version: 0 }), /FACILITY_FORBIDDEN/);
     const companyUnit = await db.unit.create({ data: { facilityId: facility.id, unitTypeId: unitType.id, number: "company", monthlyRate: 100 } });
     const companyAccount = await db.account.create({ data: { customerId: company.id, accountNumber: `${key}-company` } });
     const companyTenancy = await db.tenancy.create({ data: { facilityId: facility.id, customerId: company.id, accountId: companyAccount.id, status: "ACTIVE", paymentMethod: "EFT", startDate: new Date("2026-11-01"), occupancies: { create: { unitId: companyUnit.id, status: "ACTIVE", startDate: new Date("2026-11-01"), monthlyRate: 100 } } } });

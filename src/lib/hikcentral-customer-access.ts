@@ -15,6 +15,9 @@ export async function customerFaceAccessReadiness(scope: RequestScope, customerI
   await requireLeasingCustomer(scope, customerId);
   const customer = await db.customer.findFirst({ where: { id: customerId, organisationId: scope.organisationId }, select: { id: true, accessCompanyId: true } });
   if (!customer) throw Error("NOT_FOUND");
+  const companyAtFacility = !customer.accessCompanyId || !!await db.customer.findFirst({ where: { id: customer.accessCompanyId, organisationId: scope.organisationId, OR: [
+    { leads: { some: { facilityId } } }, { reservations: { some: { facilityId } } }, { tenancies: { some: { facilityId } } },
+  ] }, select: { id: true } });
   const [link, photo, tenancies, approval, manualLock, mapping, grants] = await Promise.all([
     db.integrationIdentityLink.findUnique({ where: { customerId } }),
     db.hikCentralFaceCapture.findUnique({ where: { customerId } }),
@@ -60,6 +63,7 @@ export async function customerFaceAccessReadiness(scope: RequestScope, customerI
     !link?.hikCentralPersonId || link.status !== "ACTIVE" ? "HikCentral person is not linked" : null,
     photo?.status !== "PROVIDER_ACCEPTED" || photo.personId !== link?.hikCentralPersonId ? "Face is not confirmed in HikCentral" : null,
     !activeTenancy && !approvedVisit ? "No active handed-over tenancy or current manager-approved visit" : null,
+    !companyAtFacility ? "Company is not linked to this facility" : null,
     arrearsLocked ? "Verified charge remains unpaid seven days after the due date" : null,
     arrearsNoticePending ? "Seven-day arrears review is due, but an approved lockout warning has not been delivered and linked to the charge" : null,
     manuallyLocked ? "Manager has locked facial entry for this customer" : null,
@@ -103,6 +107,7 @@ export async function setCustomerFaceManualLock(scope: RequestScope, customerId:
 export async function approveCustomerFaceVisit(scope: RequestScope, customerId: string, facilityId: string, photoMatchesId: boolean, syntheticTest?: { expectedPersonId: string; reason: string }) {
   await requireFacility(scope, facilityId);
   await requireLeasingCustomer(scope, customerId);
+  if ((await customerFaceAccessReadiness(scope, customerId, facilityId)).blockers.includes("Company is not linked to this facility")) throw Error("FACILITY_FORBIDDEN");
   if (!scope.userId || (!photoMatchesId && !syntheticTest) || await db.tenancy.count({ where: { customerId } })) throw Error("HIKCENTRAL_VISIT_NOT_READY");
   const photo = await db.hikCentralFaceCapture.findUnique({ where: { customerId } });
   if (!photo || photo.facilityId !== facilityId || !(syntheticTest ? photo.status === "PROVIDER_ACCEPTED" : photo.status === "WAITING_REVIEW" ? photo.expiresAt > new Date() : photo.status === "PROVIDER_ACCEPTED" && photo.providerAcceptedAt && photo.providerAcceptedAt > new Date(Date.now() - 2 * 60 * 60_000))) throw Error("HIKCENTRAL_VISIT_NOT_READY");
