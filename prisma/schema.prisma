@@ -416,6 +416,9 @@ model Customer {
   firstName            String?
   lastName             String?
   companyName          String?
+  accessCompanyId      String?
+  accessCompany        Customer?          @relation("CompanyFacePeople", fields: [accessCompanyId], references: [id], onDelete: SetNull)
+  accessPeople         Customer[]         @relation("CompanyFacePeople")
   email                String?
   phone                String?
   phoneVerifiedAt      DateTime?
@@ -447,6 +450,7 @@ model Customer {
 
   @@index([organisationId, email])
   @@index([organisationId, phone])
+  @@index([accessCompanyId])
 }
 
 model Lead {

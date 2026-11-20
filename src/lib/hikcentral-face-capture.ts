@@ -72,6 +72,9 @@ export async function issueHikCentralFaceHandoff(scope: RequestScope, input: { f
   }
   await currentPolicy(db, scope.organisationId);
   const { customer, personId } = await faceTarget(db, scope, input.customerId);
+  if (customer.accessCompanyId && !await db.customer.findFirst({ where: { id: customer.accessCompanyId, organisationId: scope.organisationId, OR: [
+    { leads: { some: { facilityId: input.facilityId } } }, { reservations: { some: { facilityId: input.facilityId } } }, { tenancies: { some: { facilityId: input.facilityId } } },
+  ] }, select: { id: true } })) throw Error("FACILITY_FORBIDDEN");
   if (personId) {
     const provider = new HikCentralAccessProvider(fetch, await loadHikCentralRuntimeConfiguration(scope.organisationId));
     const verified = await provider.personById(personId);

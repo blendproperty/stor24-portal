@@ -9,7 +9,7 @@ import { db } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
 import { facilityWhere, type RequestScope } from "@/lib/scope";
 import { southAfricaDateKey } from "@/lib/south-africa-time";
-import { reconcileCustomerFaceAccess } from "@/lib/hikcentral-customer-access";
+import { reconcileCustomerAndCompanyPeople } from "@/lib/hikcentral-customer-access";
 
 type Database = Prisma.TransactionClient;
 const reservationInclude = {
@@ -143,9 +143,10 @@ export async function confirmReservationMoveIn(scope: RequestScope, reservationI
   });
   if (!completed.idempotent) {
     const tenancy = await db.tenancy.findUniqueOrThrow({ where: { id: completed.tenancyId }, select: { customerId: true, facilityId: true } });
-    const photo = await db.hikCentralFaceCapture.findUnique({ where: { customerId: tenancy.customerId }, select: { status: true } });
-    if (photo?.status === "PROVIDER_ACCEPTED") {
-      try { await reconcileCustomerFaceAccess(scope, tenancy.customerId, tenancy.facilityId); }
+    const photo = await db.hikCentralFaceCapture.findFirst({ where: { customerId: tenancy.customerId, status: "PROVIDER_ACCEPTED" } });
+    const companyPhoto = await db.hikCentralFaceCapture.findFirst({ where: { customer: { accessCompanyId: tenancy.customerId }, status: "PROVIDER_ACCEPTED" } });
+    if (photo || companyPhoto) {
+      try { await reconcileCustomerAndCompanyPeople(scope, tenancy.customerId, tenancy.facilityId); }
       catch (error) { await db.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: tenancy.facilityId, actorId: scope.userId, action: "hikcentral_face.access_reconcile_failed", entityType: "Tenancy", entityId: completed.tenancyId, after: { customerId: tenancy.customerId, code: error instanceof Error ? error.message : "UNKNOWN" } } }); }
     }
   }

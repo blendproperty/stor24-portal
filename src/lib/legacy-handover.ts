@@ -11,7 +11,7 @@ import { floorMapSelection, unitIsOperational } from "@/lib/floor-availability";
 import { resolvedPhotoPolicy } from "@/lib/facial-photo-control";
 import { primaryTrialPolicy } from "@/lib/unit58-primary-photo-trial";
 import type { Prisma } from "@/generated/prisma/client";
-import { reconcileCustomerFaceAccess } from "@/lib/hikcentral-customer-access";
+import { reconcileCustomerAndCompanyPeople } from "@/lib/hikcentral-customer-access";
 
 type Database=Prisma.TransactionClient;
 async function scoped(database:Database,scope:RequestScope,id:string) {
@@ -77,7 +77,7 @@ export async function confirmLegacyHandover(scope:RequestScope,id:string,identit
     return {tenancyId:id,idempotent:false};
   });
   if (!completed.idempotent) {
-    try { await reconcileCustomerFaceAccess(scope, initial.tenancy.customerId, initial.tenancy.facilityId); }
+    try { await reconcileCustomerAndCompanyPeople(scope, initial.tenancy.customerId, initial.tenancy.facilityId); }
     catch (error) { await db.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: initial.tenancy.facilityId, actorId: scope.userId, action: "hikcentral_face.access_reconcile_failed", entityType: "Tenancy", entityId: id, after: { customerId: initial.tenancy.customerId, code: error instanceof Error ? error.message : "UNKNOWN" } } }); }
   }
   return completed;
