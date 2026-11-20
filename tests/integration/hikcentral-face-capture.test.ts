@@ -286,10 +286,15 @@ test("customer-scoped Counter face capture needs consent and review before one p
       assert.match(String(url), /\/person\/personCode\/personInfo$/);
       return Response.json({ code: "0", data: { personId: "1150", personCode: hikCentralCustomerCode(org.id, alreadyAtHikCentral.id), orgIndexCode: "97", personGivenName: "Brett", personFamilyName: "Dovey" } });
     }) as typeof fetch;
-    await assert.rejects(issueHikCentralFaceHandoff(scope, { customerId: alreadyAtHikCentral.id, facilityId: facility.id, version: 0 }), /HIKCENTRAL_PERSON_REVIEW_REQUIRED/);
-    assert.equal(await db.hikCentralFaceHandoff.count({ where: { customerId: alreadyAtHikCentral.id } }), 0);
+    const existingCodeHandoff = await issueHikCentralFaceHandoff(scope, { customerId: alreadyAtHikCentral.id, facilityId: facility.id, version: 0 });
+    const existingCodeDetails = await hikCentralFaceHandoff(existingCodeHandoff.token);
+    await captureHikCentralFaceHandoff(existingCodeHandoff.token, { policyHash: existingCodeDetails.policyHash, consent: true, image });
+    const existingCodePhoto = await db.hikCentralFaceCapture.findUniqueOrThrow({ where: { customerId: alreadyAtHikCentral.id } });
+    (await previewHikCentralFace(scope, existingCodePhoto.id, existingCodePhoto.version)).fill(0);
+    await assert.rejects(decideHikCentralFace(scope, existingCodePhoto.id, existingCodePhoto.version, "SEND"), /HIKCENTRAL_PERSON_REVIEW_REQUIRED/);
+    assert.equal((await db.hikCentralFaceCapture.findUniqueOrThrow({ where: { id: existingCodePhoto.id } })).status, "WAITING_REVIEW");
     globalThis.fetch = (async () => Response.json({ code: "1028", msg: "Search temporarily unavailable" })) as typeof fetch;
-    await assert.rejects(issueHikCentralFaceHandoff(scope, { customerId: alreadyAtHikCentral.id, facilityId: facility.id, version: 0 }), /HIKCENTRAL_PERSON_LOOKUP_FAILED/);
+    await assert.rejects(decideHikCentralFace(scope, existingCodePhoto.id, existingCodePhoto.version, "SEND"), /HIKCENTRAL_PERSON_LOOKUP_FAILED/);
   } finally {
     globalThis.fetch = previousFetch;
     for (const [index, name] of ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_SMS_FROM", "AUTH_SECRET"].entries()) if (previousTwilio[index] === undefined) delete process.env[name]; else process.env[name] = previousTwilio[index];
