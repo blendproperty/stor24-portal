@@ -103,7 +103,7 @@ test("customer-scoped Counter face capture needs consent and review before one p
       if (path.endsWith("/org/orgList")) return Response.json({ code: "0", data: { list: [{ orgIndexCode: "97", orgName: "STOR24", parentOrgIndexCode: "1" }] } });
       if (path.endsWith("/person/personCode/personInfo")) return created
         ? Response.json({ code: "0", data: { personId: "2001", personCode, orgIndexCode: "97", personGivenName: "Jane", personFamilyName: "Tester" } })
-        : Response.json({ code: "1001", msg: "Person not found" });
+        : Response.json({ code: "128", msg: "The request resource does not exist" });
       assert.match(path, /\/person\/single\/add$/);
       const body = JSON.parse(String(init?.body));
       assert.equal(body.personCode, personCode);
