@@ -91,6 +91,7 @@ export function HikCentralFaceCaptureWorkspace({ people, facilities, canSend, ca
     setBusy(true); setError("");
     try {
       const response = await fetch("/api/v1/access/hikcentral-face", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, id: person.photo.id, version: person.photo.version }), cache: "no-store" });
+      if (!response.headers.get("content-type")?.includes("application/json")) throw Error(`HikCentral send returned HTTP ${response.status}. Refresh and check this person's photo and access status before trying again.`);
       const body = await response.json(); if (!response.ok) throw Error(body.error?.message ?? body.error ?? "HikCentral status could not be confirmed.");
       if (body.data?.accessStatus === "REVIEW_REQUIRED") { setError("HikCentral accepted the face, but automatic door assignment needs review. Refresh and check the access status before another upload."); return; }
       window.location.reload();
