@@ -66,6 +66,7 @@ export function HikCentralFaceCaptureWorkspace({ people, facilities, canSend, ca
     setBusy(true); setError(""); setHandoff(null);
     try {
       const response = await fetch("/api/v1/access/hikcentral-face", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "prepare", customerId, facilityId, version: person.photo?.version ?? 0, identityChecked: !virtualTest && identityChecked, syntheticTest: virtualTest, syntheticTestReason: virtualTest ? testReason : undefined, testAcknowledged: virtualTest && testAcknowledged }), cache: "no-store" });
+      if (!response.headers.get("content-type")?.includes("application/json")) throw Error(`Photo preparation returned HTTP ${response.status}. Please wait a minute and retry.`);
       const body = await response.json(); if (!response.ok) throw Error(body.error?.message ?? body.error ?? "Could not prepare the customer photo screen.");
       const url = `https://stor24.co.za/walk-in/photo#capture=${body.data.token}`;
       setHandoff({ url, qr: await QRCode.toDataURL(url, { margin: 2, width: 240 }), expiresAt: body.data.expiresAt });
