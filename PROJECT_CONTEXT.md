@@ -9121,3 +9121,12 @@ Validation follow-up: the project typecheck and targeted ESLint for the candidat
 - **Testing:** Existing read-only migration preflight passed 18 synthetic checks on 23 November; no real extract, import, reconciliation or acceptance test was performed.
 - **Commit and push:** This documentation update is prepared on a dedicated branch; verify remote promotion separately. **Merge:** pending. **Deployment and configuration:** no runtime or configuration change. **Live production verification:** not applicable to this scope decision; no production migration was performed.
 - **Outstanding:** Finance integration, approvals, and all other launch and provider gates remain open. The billing production hold remains in place.
+
+## 2026-11-23: Migration record promotion and MRI sandbox readback
+
+- **Implementation:** No application or financial code changed. The migration decision in the preceding entry was documented in PR #885.
+- **Testing:** PR #885 exact head fa9b536cb6a3b6ebf380cef002c9e524be290644 passed CI 45118769932, merchandise transactions 45118769891, security 45118769908 and restricted runtime 45118769873. The earlier 18 migration checks used synthetic data.
+- **Commit and push / merge:** PR #885 merged to main as 264342fd8e47d2c8767097da9f40fe2c7a9e85d5. This supersedes the preceding entry's merge-pending statement. This follow-up evidence is a separate documentation candidate pending promotion.
+- **Deployment and configuration:** No runtime or configuration changes were made for these records. The signed-in sandbox check records its result and does not submit a journal.
+- **Live production verification:** On 23 November at 07:40 SAST the signed-in MRI sandbox screen reported successful BlendTest sign-in, exact target discovery and property read, with zero accessible properties. No provider journal or financial entry was submitted.
+- **Outstanding:** Annelien stated on 19 November that STOR24 was not yet set up in the finance system and she intended to load it the following week; completion remains unconfirmed. Accessible dedicated test property/entity, approved GL/VAT/source/basis mappings, provider journal import and lookup contract, finance ownership and acceptance remain open. The billing production hold remains in place.
