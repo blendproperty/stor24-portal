@@ -29,10 +29,10 @@ export async function sendWhatChimpNotice(noticeId: string, send = (message: Ema
   await db.auditEvent.create({ data: { organisationId: claim.organisationId, facilityId: claim.facilityId, action: 'whatchimp.enquiry.notice', entityType: 'Lead', entityId: claim.leadId, after: { providerAccepted: accepted, inboxVerified: false } } });
 }
 
-export async function processWhatChimpNotices(organisationId: string) {
+export async function processWhatChimpNotices(organisationId: string, send?: (message: EmailMessage) => Promise<void>) {
   const notices = await db.configurationProfile.findMany({ where: { organisationId, domain: WHAT_CHIMP_NOTICE, status: 'PENDING' }, orderBy: { createdAt: 'asc' }, take: 10, select: { id: true } });
   let errors = 0;
-  for (const notice of notices) { try { await sendWhatChimpNotice(notice.id); } catch { errors++; } }
+  for (const notice of notices) { try { await sendWhatChimpNotice(notice.id, send); } catch { errors++; } }
   const review = await db.configurationProfile.count({ where: { organisationId, domain: WHAT_CHIMP_NOTICE, OR: [{ status: 'REVIEW_REQUIRED' }, { status: 'SENDING', updatedAt: { lt: new Date(Date.now() - 10 * 60_000) } }] } });
   return { checked: notices.length, errors, review };
 }
