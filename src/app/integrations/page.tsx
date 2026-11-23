@@ -29,7 +29,7 @@ import {
 import { listHikCentralConfiguration } from "@/lib/integrations/hikcentral-configuration";
 import { hikCentralReadiness } from "@/lib/integrations/hikcentral-readiness";
 import { SOCIAL_NOTICE_DOMAIN } from "@/lib/whatchimp-social-contract";
-import { WHAT_CHIMP_NOTICE } from "@/lib/whatchimp-enquiry-contract";
+import { WHAT_CHIMP_NOTICE } from "@/lib/whatchimp-notice-domain";
 
 export const metadata = { title: "Integrations" };
 export const dynamic = "force-dynamic";

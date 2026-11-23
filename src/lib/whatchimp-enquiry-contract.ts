@@ -5,7 +5,7 @@ import { leadSlaSchema, slaFromStoreHours, type LeadSlaPolicy } from './lead-sla
 export const WHAT_CHIMP_BOT = '475943';
 export const WHAT_CHIMP_DOMAIN = 'WHATCHIMP_INTAKE';
 export const WHAT_CHIMP_SESSION = 'WHATCHIMP_ENQUIRY';
-export const WHAT_CHIMP_NOTICE = 'WHATCHIMP_ENQUIRY_NOTICE';
+export { WHAT_CHIMP_NOTICE } from './whatchimp-notice-domain';
 export const enquiryFields = ['use', 'items', 'start', 'duration', 'size', 'viewing', 'name'] as const;
 export type EnquiryField = typeof enquiryFields[number];
 const phone = z.string().trim().regex(/^\+?[1-9]\d{7,14}$/).transform(v => `+${v.replace(/^\+/, '')}`);
