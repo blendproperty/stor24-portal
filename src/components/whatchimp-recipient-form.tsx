@@ -23,9 +23,9 @@ export function WhatChimpRecipientForm() {
       setMessage('Recipient saved.');
     } catch { setMessage('Could not save. Check the facility and recipient permissions.'); }
   }
-  return <section className="panel panel-spacious"><h2>WhatsApp enquiry follow-up</h2><p>Choose who receives new WhatsApp enquiries for a connected store.</p>
-    <div className="form-grid"><label>Store <select value={facility} onChange={e => { setFacility(e.target.value); setRecipient(settings?.connections.find(c => c.facilityId === e.target.value)?.recipientUserId ?? ''); }}><option value="">Select a connected store</option>{settings?.facilities.filter(f => settings.connections.some(c => c.facilityId === f.id)).map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select></label>
+  return <section className="panel panel-spacious social-provision"><h2>WhatsApp enquiry follow-up</h2><p>Choose who receives new WhatsApp enquiries for a connected store.</p>
+    <div className="social-provision-fields"><label>Store <select value={facility} onChange={e => { setFacility(e.target.value); setRecipient(settings?.connections.find(c => c.facilityId === e.target.value)?.recipientUserId ?? ''); }}><option value="">Select a connected store</option>{settings?.facilities.filter(f => settings.connections.some(c => c.facilityId === f.id)).map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select></label>
       <label>Assigned recipient <select value={recipient} onChange={e => setRecipient(e.target.value)}><option value="">Select a person</option>{settings?.users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}</select></label></div>
-    <button type="button" disabled={!facility || !recipient || message === 'Saving…'} onClick={save}>Save recipient</button><p role="status">{message}</p>
+    <div className="social-provision-actions"><button type="button" className="button button-primary" disabled={!facility || !recipient || message === 'Saving…'} onClick={save}>Save recipient</button></div><p role="status">{message}</p>
   </section>;
 }

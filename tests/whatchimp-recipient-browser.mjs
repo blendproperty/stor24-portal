@@ -21,7 +21,7 @@ try {
   for (const width of [1440, 375]) {
     await page.setViewportSize({ width, height: 900 });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'recipient form must not overflow');
-    for (const field of await page.locator('select').all()) { const box = await field.boundingBox(); assert.ok(box && box.x >= 0 && box.x + box.width <= width); }
+    for (const label of await page.locator('.social-provision-fields label').all()) { const box = await label.boundingBox(), field = await label.locator('select').boundingBox(); assert.ok(box && field && field.x >= box.x && field.x + field.width <= width && field.y > box.y, 'field must fit below its label'); }
   }
   await page.getByRole('button', { name: 'Save recipient' }).click();
   await page.getByText('Recipient saved.').waitFor(); assert.deepEqual(saved, { facilityId: 'f', recipientUserId: 'u' });
