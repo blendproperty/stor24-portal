@@ -14,7 +14,7 @@ test('social intake validates, scopes, deduplicates and claims notification once
   try {
     const facility = await db.facility.create({ data: { organisationId: org.id, code: id, name: 'Fixture Midpoint' } });
     const user = await db.user.create({ data: { organisationId: org.id, name: 'Fixture staff', email: `${id}@example.invalid` } });
-    const role = await db.role.create({ data: { organisationId: org.id, name: 'Fixture sales', permissions: ['leads.view'] } });
+    const role = await db.role.create({ data: { organisationId: org.id, name: 'Fixture sales', permissions: ['leads.view', 'leads.manage'] } });
     await db.roleAssignment.create({ data: { userId: user.id, roleId: role.id, facilityId: facility.id } });
     const create = (channel: 'facebook' | 'instagram') => db.configurationProfile.create({ data: { organisationId: org.id, facilityId: facility.id, domain: SOCIAL_INTAKE_DOMAIN, name: channel, status: 'READY', config: { enabled: true, channel, botId: '72238', keyHash: keyHash(token + channel), facilityId: facility.id, recipientUserId: user.id, recipientEmail: user.email } } });
     const fb = await create('facebook'), ig = await create('instagram');
@@ -35,7 +35,7 @@ test('social intake validates, scopes, deduplicates and claims notification once
     assert.equal(first.phase, 'SUBMITTED'); assert.equal(first.leadReference, again.leadReference);
     await assert.rejects(call({ ...data, requirements: 'Changed' }), /SOCIAL_ALREADY_SUBMITTED/);
     const lead = await db.lead.findUniqueOrThrow({ where: { id: first.leadReference! }, include: { customer: true } });
-    assert.equal(lead.source, 'Facebook Messenger'); assert.equal(lead.customer?.phone, '+27821234567');
+    assert.equal(lead.source, 'Facebook Messenger'); assert.equal(lead.customer?.phone, '+27821234567'); assert.equal(lead.assignedToId, user.id);
     assert.equal(await db.task.count({ where: { organisationId: org.id } }), 1);
     const notice = await db.configurationProfile.findFirstOrThrow({ where: { organisationId: org.id, domain: SOCIAL_NOTICE_DOMAIN, name: lead.id } });
     let sent = 0;
@@ -44,7 +44,8 @@ test('social intake validates, scopes, deduplicates and claims notification once
     assert.equal(sent, 1); assert.equal((await db.configurationProfile.findUniqueOrThrow({ where: { id: notice.id } })).status, 'ACCEPTED');
     const second = await captureSocialEnquiry(ig.id, { action: 'start' }, keyHash(token + 'instagram'));
     const next = await captureSocialEnquiry(ig.id, { ...data, enquiryKey: second.enquiryKey! }, keyHash(token + 'instagram'));
-    assert.equal((await db.lead.findUniqueOrThrow({ where: { id: next.leadReference! } })).source, 'Instagram');
+    const instagramLead = await db.lead.findUniqueOrThrow({ where: { id: next.leadReference! } });
+    assert.equal(instagramLead.source, 'Instagram'); assert.equal(instagramLead.assignedToId, user.id);
     const failed = await db.configurationProfile.findFirstOrThrow({ where: { organisationId: org.id, domain: SOCIAL_NOTICE_DOMAIN, name: next.leadReference! } });
     await sendSocialNotice(failed.id, async () => { throw Error('ambiguous'); });
     await sendSocialNotice(failed.id, send);
@@ -64,6 +65,10 @@ test('social intake validates, scopes, deduplicates and claims notification once
     await sendSocialNotice(withoutPermission.id, send);
     assert.equal(sent, 1);
     assert.equal((await db.configurationProfile.findUniqueOrThrow({ where: { id: withoutPermission.id } })).status, 'REVIEW_REQUIRED');
+    const fifth = await call({ action: 'start' });
+    const noAccess = await call({ ...data, enquiryKey: fifth.enquiryKey! });
+    assert.equal((await db.lead.findUniqueOrThrow({ where: { id: noAccess.leadReference! } })).assignedToId, null);
+    assert.equal((await db.configurationProfile.findFirstOrThrow({ where: { organisationId: org.id, domain: SOCIAL_NOTICE_DOMAIN, name: noAccess.leadReference! } })).status, 'REVIEW_REQUIRED');
     await db.configurationProfile.update({ where: { id: fb.id }, data: { status: 'DISABLED' } });
     await assert.rejects(call({ action: 'probe' }), /SOCIAL_DISABLED/);
   } finally { await db.organisation.delete({ where: { id: org.id } }); await db.$disconnect(); }
