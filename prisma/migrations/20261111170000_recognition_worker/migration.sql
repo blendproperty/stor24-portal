@@ -1,0 +1,6 @@
+CREATE TABLE "BillingRecognitionLease" ("organisationId" TEXT PRIMARY KEY, "token" TEXT NOT NULL, "expiresAt" TIMESTAMP(3) NOT NULL, "updatedAt" TIMESTAMP(3) NOT NULL);
+CREATE TABLE "BillingRecognitionRun" ("id" TEXT PRIMARY KEY, "organisationId" TEXT NOT NULL, "startedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "finishedAt" TIMESTAMP(3), "status" TEXT NOT NULL, "processed" INTEGER NOT NULL DEFAULT 0, "held" INTEGER NOT NULL DEFAULT 0, CONSTRAINT "BillingRecognitionRun_status_check" CHECK ("status" IN ('RUNNING','COMPLETED','FAILED')));
+CREATE INDEX "BillingRecognitionRun_organisationId_startedAt_idx" ON "BillingRecognitionRun"("organisationId", "startedAt");
+CREATE TABLE "BillingRecognitionIssue" ("id" TEXT PRIMARY KEY, "organisationId" TEXT NOT NULL, "facilityId" TEXT NOT NULL, "accountId" TEXT NOT NULL, "groupKey" TEXT NOT NULL, "representativeId" TEXT NOT NULL, "code" TEXT NOT NULL, "status" TEXT NOT NULL DEFAULT 'HELD', "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "BillingRecognitionIssue_status_check" CHECK ("status" IN ('HELD','RELEASED')));
+CREATE UNIQUE INDEX "BillingRecognitionIssue_organisationId_groupKey_key" ON "BillingRecognitionIssue"("organisationId", "groupKey");
+CREATE INDEX "BillingRecognitionIssue_organisationId_status_idx" ON "BillingRecognitionIssue"("organisationId", "status");

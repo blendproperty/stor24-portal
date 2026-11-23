@@ -17,6 +17,7 @@
  * a reasonable guess at a shape, not a verified contract.
  */
 import { db } from "@/lib/db";
+import type { Prisma } from "@/generated/prisma/client";
 
 export type BillingDocumentCompanyDetails = {
   companyName?: string;
@@ -44,10 +45,10 @@ function asStringArray(value: unknown): string[] | undefined {
   return lines.length ? lines : undefined;
 }
 
-export async function getBillingDocumentCompanyDetails(organisationId: string, facilityId: string | null): Promise<BillingDocumentCompanyDetails> {
+export async function getBillingDocumentCompanyDetails(organisationId: string, facilityId: string | null, client: Prisma.TransactionClient = db): Promise<BillingDocumentCompanyDetails> {
   const [storeInfo, banking] = await Promise.all([
-    db.configurationProfile.findFirst({ where: { organisationId, facilityId, domain: "STORE_INFORMATION", name: "Default", status: "READY" }, select: { config: true } }),
-    db.configurationProfile.findFirst({ where: { organisationId, facilityId, domain: "BANKING_ACCOUNTING", name: "Default", status: "READY" }, select: { config: true } }),
+    client.configurationProfile.findFirst({ where: { organisationId, facilityId, domain: "STORE_INFORMATION", name: "Default", status: "READY" }, select: { config: true } }),
+    client.configurationProfile.findFirst({ where: { organisationId, facilityId, domain: "BANKING_ACCOUNTING", name: "Default", status: "READY" }, select: { config: true } }),
   ]);
   const store = asRecord(storeInfo?.config);
   const bank = asRecord(banking?.config);

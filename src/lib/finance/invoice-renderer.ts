@@ -54,6 +54,7 @@ export type InvoiceRenderInput = {
   unitLabel?: string;
   accountNumber: string;
   currentBalance: number | string;
+  futureChargeExcluded?: boolean;
   lines: InvoiceLedgerLine[];
   payNowUrl?: string;
 };
@@ -117,9 +118,9 @@ export function renderInvoiceHtml(input: InvoiceRenderInput): string {
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;margin-top:14px;">
       <tr><td style="text-align:right;padding:3px 0;font-size:13px;color:${BRAND.muted};">Subtotal</td><td style="text-align:right;padding:3px 0;font-size:13px;color:${BRAND.ink};width:120px;">${formatZar(subtotal)}</td></tr>
       <tr><td style="text-align:right;padding:3px 0;font-size:13px;color:${BRAND.muted};">VAT</td><td style="text-align:right;padding:3px 0;font-size:13px;color:${BRAND.ink};">${formatZar(vatTotal)}</td></tr>
-      <tr><td style="text-align:right;padding:8px 0 0;font-size:16px;font-weight:900;color:${BRAND.ink};border-top:1px solid ${BRAND.line};">Total due</td><td style="text-align:right;padding:8px 0 0;font-size:16px;font-weight:900;color:${BRAND.ink};border-top:1px solid ${BRAND.line};">${formatZar(grandTotal)}</td></tr>
+      <tr><td style="text-align:right;padding:8px 0 0;font-size:16px;font-weight:900;color:${BRAND.ink};border-top:1px solid ${BRAND.line};">${input.futureChargeExcluded ? "Invoice total" : "Total due"}</td><td style="text-align:right;padding:8px 0 0;font-size:16px;font-weight:900;color:${BRAND.ink};border-top:1px solid ${BRAND.line};">${formatZar(grandTotal)}</td></tr>
     </table>
-    <p style="margin:16px 0 0;font-size:12px;color:${BRAND.mutedSoft};">Current account balance (including this invoice): <strong style="color:${BRAND.ink};">${formatZar(input.currentBalance)}</strong></p>
+    <p style="margin:16px 0 0;font-size:12px;color:${BRAND.mutedSoft};">${input.futureChargeExcluded ? "Current account balance (excluding this future invoice)" : "Current account balance (including this invoice)"}: <strong style="color:${BRAND.ink};">${formatZar(input.currentBalance)}</strong></p>
     ${payNowBlock}
     ${bankingLines.length ? `<div style="margin-top:18px;padding:14px 16px;background:${BRAND.bg};border-radius:12px;font-size:12px;color:${BRAND.muted};line-height:1.7;"><strong style="color:${BRAND.ink};">Bank transfer</strong><br>${bankingLines.map(escapeHtml).join("<br>")}</div>` : ""}
     ${input.company.registrationNumber || input.company.vatNumber ? `<p style="margin:16px 0 0;font-size:11px;color:${BRAND.mutedSoft};">${input.company.companyName ? escapeHtml(input.company.companyName) + " " : ""}${input.company.registrationNumber ? `Reg no: ${escapeHtml(input.company.registrationNumber)} ` : ""}${input.company.vatNumber ? `VAT no: ${escapeHtml(input.company.vatNumber)}` : ""}</p>` : ""}
