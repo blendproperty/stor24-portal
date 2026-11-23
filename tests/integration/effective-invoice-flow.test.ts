@@ -53,7 +53,7 @@ test("isolated reviewed invoice to effective-date recognition with production ho
     assert.ok(await readScheduledInvoiceDraft(scope, account.id));
     await db.document.delete({ where: { id: collision.id } });
     const attempts = await Promise.allSettled([approveScheduledInvoiceDraftInIsolatedTest(scope, account.id, period, draft.fingerprint), approveScheduledInvoiceDraftInIsolatedTest(scope, account.id, period, draft.fingerprint)]);
-    const success = attempts.find(result => result.status === "fulfilled"); assert.ok(success && success.status === "fulfilled");
+    const success = attempts.find(result => result.status === "fulfilled"); assert.ok(success && success.status === "fulfilled", `All approvals failed: ${attempts.filter(result => result.status === "rejected").map(result => String(result.reason)).join("; ")}`);
     const staged = success.value;
     assert.equal(staged.total, 1250);
     const retry = await approveScheduledInvoiceDraftInIsolatedTest(scope, account.id, period, draft.fingerprint);

@@ -1,0 +1,10 @@
+.handover-check .legacy-photo-confirmation { margin:14px 0 0; padding:14px 16px; border:1px solid #b9d7c3; border-radius:10px; background:#ebf7ee; color:#174e30; font-size:14px; font-weight:700; }
+.legacy-photo-handoff { margin:20px 0; padding:20px; border:1px solid #d6e0d7; border-radius:16px; background:#f7f9f5; color:#173528; }
+.legacy-photo-handoff h4 { margin:0 0 8px; font-size:18px; }
+.legacy-photo-handoff p { max-width:68ch; margin:0 0 16px; line-height:1.5; }
+.legacy-photo-handoff form { display:grid; gap:14px; justify-items:start; }
+.legacy-photo-handoff label { display:flex; align-items:flex-start; gap:10px; max-width:70ch; }
+.legacy-photo-handoff label input { width:20px; height:20px; flex:none; margin-top:1px; }
+.legacy-photo-handoff-ready { margin-top:20px; padding:16px; border:1px solid #b9d7c3; border-radius:10px; background:#fff; }
+.legacy-photo-handoff-ready img { display:block; max-width:100%; height:auto; }
+@media(max-width:700px) { .legacy-photo-handoff { padding:16px; } .legacy-photo-handoff .button { width:100%; } }

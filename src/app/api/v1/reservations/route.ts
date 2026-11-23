@@ -42,7 +42,7 @@ export async function GET() {
         orderBy: { name: "asc" },
       }),
       db.customer.findMany({
-        where: { organisationId: scope.organisationId, OR: [leasingCustomerWhere(scope, scope.facilityIds), { id: { in: created.map(item => item.entityId) }, leads: { none: {} }, reservations: { none: {} }, tenancies: { none: {} } }] },
+        where: { organisationId: scope.organisationId, reservationArchivedAt: null, OR: [leasingCustomerWhere(scope, scope.facilityIds), { id: { in: created.map(item => item.entityId) }, leads: { none: {} }, reservations: { none: {} }, tenancies: { none: {} } }] },
         select: { id: true, type: true, firstName: true, lastName: true, companyName: true, email: true, phone: true },
         orderBy: { updatedAt: "desc" },
       }),

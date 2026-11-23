@@ -1,3 +1,4 @@
+import { MIDPOINT_JOB_CARD_ROLE, validMidpointJobCardRole } from "@/lib/maintenance-job-policy";
 import { db } from "@/lib/db";
 import { hashInvitationToken } from "@/lib/invitation-service";
 import { acceptInvitationSchema } from "@/lib/validators";
@@ -31,6 +32,10 @@ export async function POST(request: Request) {
     return Response.json({ error: { code: "ROLE_UNAVAILABLE", message: "The assigned role is no longer available." } }, { status: 409 });
   }
   if (invitation.roleName === "Facility manager" && !facility) return Response.json({ error: { code: "FACILITY_REQUIRED", message: "This invitation needs a valid facility. Ask an administrator for a new invitation." } }, { status: 409 });
+
+  if (role.name === MIDPOINT_JOB_CARD_ROLE && !validMidpointJobCardRole(invitation.email, role.permissions, facility)) {
+    return Response.json({ error: { code: "JOB_CARD_SCOPE_REQUIRED", message: "This invitation needs the Midpoint job-card role and store." } }, { status: 409 });
+  }
 
   try {
     const passwordHash = await hash(parsed.data.password, 12);

@@ -26,9 +26,10 @@ try {
   await page.goto(base+"?policy");await expect(page.getByText("Gate activation unavailable",{exact:true})).toBeVisible();
 page.on("pageerror",error=>errors.push(error.message));
   await page.route("**/api/tenant/access-photo**",route=>{
-    if(route.request().method()!=="GET") { tenantWrites.push(route.request().method()); return route.fulfill({status:409,json:{error:"Your booking has changed. Please refresh before continuing."}}); }
+    if(route.request().method()!=="GET") { tenantWrites.push(route.request().method()); assert.match(route.request().postData(), /camera-photo\.png/); return route.fulfill({status:409,json:{error:"Your booking has changed. Please refresh before continuing."}}); }
     return route.fulfill({json:{data:{available,policy:available?{version:"ci",hash:"ci-hash",notice:"Synthetic browser fixture. This is not legal wording or a real consent record.",consentLabel:"Preview only — consent wording awaiting legal approval.",retentionHours:24,alternativeContact:"Speak to the training store."}:null,photo:tenantPhoto}}});
   });
+  await page.route("**/api/tenant/legacy-access-photo**",route=>route.fulfill({json:{data:{available:true,policy:{version:"unit58-primary-photo-only-trial-2026-11-16",hash:"trial-hash",notice:"Synthetic Unit 58 primary photo trial with no provider access.",consentLabel:"I consent to the photo-only trial",retentionHours:1,alternativeContact:"Test store"},photo:null}}}));
   await page.route("**/api/v1/access/photos**",async route=>{
     if(route.request().method()==="POST") {writes.push(route.request().url());return route.fulfill({status:409,json:{error:"This photograph has changed or expired. Refresh before continuing."}});}
     return route.fulfill({contentType:"image/png",body:Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jMioAAAAASUVORK5CYII=","base64")});
@@ -36,7 +37,7 @@ page.on("pageerror",error=>errors.push(error.message));
   await mkdir("output/facial-access",{recursive:true});
   for(const width of [1440,390]) {
     await page.setViewportSize({width,height:1000});await page.goto(base);await page.evaluate(()=>document.fonts.ready);
-    await expect(page.getByText("No customer photographs queued")).toBeVisible();
+    await expect(page.getByText("No booking photographs queued")).toBeVisible();
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
     assert.equal(await page.locator(".face-steps p").first().evaluate(el=>getComputedStyle(el).fontWeight),"400");
     await page.screenshot({path:`output/facial-access/${width}.png`,fullPage:true});
@@ -47,9 +48,17 @@ page.on("pageerror",error=>errors.push(error.message));
   await expect(page.getByRole("img")).toHaveCount(0);assert.equal(writes.length,1);
   await page.goto(`${base}?photo&readonly`);await expect(page.getByRole("button",{name:"View privately"})).toHaveCount(0);
   await page.goto(`${base}?tenant`);await expect(page.getByText("Your store will arrange this step with you as part of your move-in.",{exact:false})).toBeVisible();await expect(page.locator('input[type="file"]')).toHaveCount(0);
+  await page.goto(`${base}?primary-trial`);await expect(page.getByText("Test your photograph capture.")).toBeVisible();await expect(page.getByText("This trial does not activate precinct access.")).toBeVisible();await expect(page.getByLabel('Take an access photograph')).toHaveAttribute('capture','user');
+  await page.setViewportSize({width:390,height:1000});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
+  await page.screenshot({path:'output/facial-access/primary-trial-390.png',fullPage:true});
+  await page.goto(`${base}?tenant`);
   await page.screenshot({path:'output/facial-access/tenant-redesign-held.png',fullPage:true});
   available=true;await page.reload();await expect(page.locator('input[type="checkbox"]')).not.toBeChecked();
   await expect(page.locator('input[name="policyHash"]')).toHaveValue("ci-hash");
+  await expect(page.getByRole('button',{name:'Submit photograph',exact:true})).toBeDisabled();
+  await expect(page.getByLabel('Take an access photograph')).toHaveAttribute('capture','user');
+  await page.getByLabel('Take an access photograph').setInputFiles({name:'camera-photo.png',mimeType:'image/png',buffer:Buffer.from('fixture')});
+  await expect(page.getByText('camera-photo.png',{exact:true})).toBeVisible();
   for (const width of [1440,768,390,320]) {
     await page.setViewportSize({width,height:1000}); await page.evaluate(()=>document.fonts.ready);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
@@ -61,12 +70,13 @@ page.on("pageerror",error=>errors.push(error.message));
   await page.getByRole('button',{name:'Submit photograph',exact:true}).click();
   assert.equal(await page.locator('input[name="consent"]').evaluate(el=>el.validity.valueMissing),true);
   assert.equal(tenantWrites.length,0);
-  await page.getByText('How we use your photograph',{exact:true}).click();
   await expect(page.getByText('Synthetic browser fixture.',{exact:false})).toBeVisible();
+  await page.getByText('How we use your photograph',{exact:true}).click();
+  await expect(page.getByText('Synthetic browser fixture.',{exact:false})).toBeHidden();
   await page.getByRole('button',{name:'Refresh status',exact:true}).click();
   await expect(page.getByText('Add your photograph',{exact:true})).toBeVisible();
   await expect(page.locator('input[type="checkbox"]')).not.toBeChecked();
-  await page.getByLabel('Choose your access photograph').setInputFiles({name:'training-photo.png',mimeType:'image/png',buffer:Buffer.from('fixture')});
+  await page.getByLabel('Take an access photograph').setInputFiles({name:'camera-photo.png',mimeType:'image/png',buffer:Buffer.from('fixture')});
   await page.locator('input[type="checkbox"]').check();
   await page.getByRole('button',{name:'Submit photograph',exact:true}).click();
   await expect(page.getByRole('alert')).toHaveText('Your booking has changed. Please refresh before continuing.');

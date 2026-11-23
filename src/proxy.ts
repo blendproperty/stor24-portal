@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { sessionCookieName, verifySessionToken } from "@/lib/session";
 import { canVisit } from "@/lib/navigation-access";
+import { jobCardManagerRouteAllowed, MIDPOINT_JOB_CARD_PAGE, MIDPOINT_JOB_CARD_PERMISSION, MIDPOINT_JOB_CARD_ROLE } from "@/lib/maintenance-job-policy";
 import { db } from "@/lib/db";
 import { pageSecurityHeaders } from "@/lib/content-security-policy";
 
@@ -27,8 +28,11 @@ export function isPublicPathname(pathname: string) {
   if (pathname === "/api/internal/arrears-review-schedules") return true;
   // Only the dedicated enquiry handler accepts the scoped WhatChimp intake key.
   if (pathname === "/api/integrations/whatchimp/enquiry") return true;
+  if (pathname === "/api/integrations/whatchimp/social") return true;
   // Tenant APIs enforce separate tenant sessions; never accept the staff cookie as tenant authentication.
   if (pathname === "/my" || /^\/my\/orders\/[A-Za-z0-9_-]+$/.test(pathname) || pathname.startsWith("/api/tenant/")) return true;
+  // The capture page/API validate a single-use token and reject an active staff session.
+  if (/^\/access\/capture\/[A-Za-z0-9_-]{43}$/.test(pathname) || pathname === "/api/access/capture") return true;
   return publicPagePrefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix)) ||
     publicApiPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix));
 }
@@ -59,6 +63,13 @@ async function authorize(request: NextRequest, next: () => NextResponse) {
   if (session?.mfaVerified !== true && !mfaSetupPath) {
     if (pathname.startsWith("/api/")) return Response.json({ error: { code: "MFA_REQUIRED", message: "Complete two-step verification before using the staff portal." } }, { status: 403 });
     return NextResponse.redirect(new URL(user?.mfaCredential?.enabledAt ? "/login" : "/mfa-setup", request.url));
+  }
+  if (user?.roleAssignments.some(assignment => assignment.role.name === MIDPOINT_JOB_CARD_ROLE || assignment.role.permissions.includes(MIDPOINT_JOB_CARD_PERMISSION))) {
+    if (!jobCardManagerRouteAllowed(pathname, request.method)) {
+      if (pathname.startsWith("/api/")) return Response.json({ error: { code: "FORBIDDEN", message: "This account can only manage Midpoint job cards." } }, { status: 403 });
+      return NextResponse.redirect(new URL(MIDPOINT_JOB_CARD_PAGE, request.url));
+    }
+    if (pathname === MIDPOINT_JOB_CARD_PAGE) return next();
   }
   if (!pathname.startsWith("/api/") && user && !canVisit(pathname, {
     owner: user.roleAssignments.some(a => a.facilityId === null && a.role.name === "Organisation owner"),

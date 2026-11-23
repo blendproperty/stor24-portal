@@ -9,6 +9,7 @@ const rule = (base: string, steps: string[], organisation = false): Rule => ({ b
 // Commas mean AND, pipes mean OR. @owner uses a current database assignment, never the JWT label.
 // Missing guides/steps fail closed; the coverage test requires an explicit editorial decision.
 export const guideAccessRules: Record<string, Rule> = {
+  "midpoint-job-cards": rule("maintenance.job_cards.manage", ["", "", "", ""]),
   "training-debtor": rule("@owner|@manager|@custom-move-in", ["", "@owner", ""]),
   "collection-schedules": rule("collection_schedules.view,collections.view", ["", "collection_schedules.manage,collections.manage", "collection_schedules.approve,collections.manage,billing.documents.send", "collection_schedules.manage,collections.manage"]),
   "staff-event-emails": rule("staff_event_emails.view,operations.view", ["", "staff_event_emails.manage", "staff_event_emails.approve", "staff_event_emails.manage"]),
@@ -25,6 +26,7 @@ export const guideAccessRules: Record<string, Rule> = {
   "staff-followups": rule("operations.view", ["", "operations.manage", "operations.manage", "", ""]),
   "operational-forms": rule("operations.view", ["", "", "", ""]),
   "operational-checklists": rule("operations.view", ["", "operations.manage", "", "operations.manage"]),
+  "checklist-report": rule("operations.view", ["", "", ""]),
   "operational-padlocks": rule("operations.view", ["", "operations.manage", "", "operations.manage"]),
   advertising: rule("@owner", ["", "", ""], true),
   "rent-reviews": rule("@owner", ["", "", ""], true),
@@ -53,6 +55,7 @@ export const guideAccessRules: Record<string, Rule> = {
   "monthly-billing": rule("billing.view", ["", "billing.manage", "billing.manage", "billing.manage"]),
   tenants: rule("operations.view", ["", "operations.manage", "@owner", "operations.manage", "ledger.view", "reservations.manage,move_in.create,ledger.view"]),
   leads: rule("leads.view", ["leads.create,operations.manage", "", "reservations.manage", "reservations.manage,operations.manage"]),
+  "multi-unit-move-in": rule("move_in.create", ["", "", ""]),
   "unsigned-move-in": rule("move_in.create", ["reservations.manage", "", "", "integrations.view,operations.manage"]),
   "walk-in-tablet": rule("reservations.manage", ["", "", ""]),
   "assisted-signing": rule("move_in.create", ["", "", ""]),
@@ -91,6 +94,7 @@ export const guideAccessRules: Record<string, Rule> = {
   settings: rule("configuration.view,configuration.manage,users.view,users.manage,integrations.view,integrations.manage", ["", "", "", "", ""]),
   communications: rule("operations.view,communications.view", ["", "@owner", "", "", "operations.manage", "@owner"]),
   integrations: rule("operations.view,integrations.view", ["", "", "operations.manage", "", "integrations.manage,@owner"]),
+  "whatchimp-social": rule("@owner", ["", "", ""], true),
   hikvision: rule("integrations.view,integrations.manage", ["", "", "", ""], true),
   "netcash-settings": rule("integrations.view,integrations.manage", ["", "", "", ""], true),
   phone: rule("phone.view", ["", "operations.view,leads.view,reservations.manage,ledger.view", "operations.manage"]),

@@ -2,7 +2,7 @@ import { updateArrearsReviewTaskStatus } from "../../src/lib/arrears-review-task
 import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
-import { build } from "esbuild";
+import { build } from "./build-commonjs";
 import { createRequire } from "node:module";
 import { Prisma } from "../../src/generated/prisma/client";
 import { db } from "../../src/lib/db";

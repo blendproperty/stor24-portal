@@ -10,9 +10,9 @@ type Attempt = { ok: true; providerReference?: string } | { ok: false; code: str
 export async function sendNotificationOnce(input: {
   organisationId: string; facilityId: string; customerId: string;
   templateId: string | null; channel: "EMAIL" | "SMS";
-  messageType: "RESERVATION_CONFIRMED" | "VIEWING_BOOKED" | "BOOKING_PRICE_REVIEW";
+  messageType: "RESERVATION_CONFIRMED" | "VIEWING_BOOKED" | "BOOKING_PRICE_REVIEW" | "FACE_ACCESS_LOCK_WARNING" | "FACE_ACCESS_LOCKED";
   recipient: string; idempotencyKey: string; provider: string;
-  payload: unknown; send: () => Promise<Attempt>;
+  payload: unknown; evidence?: { sourceChargeId: string; approvalReference: string; policyHash: string }; send: () => Promise<Attempt>;
 }): Promise<boolean> {
   const payloadHash = createHash("sha256").update(JSON.stringify(input.payload)).digest("hex");
   const recipientHash = privacyHash(input.recipient);
@@ -24,7 +24,7 @@ export async function sendNotificationOnce(input: {
       templateId: input.templateId, channel: input.channel, direction: "OUTBOUND", messageType: input.messageType,
       recipientHash, idempotencyKey: input.idempotencyKey, provider: input.provider,
       status: "PENDING", attempts: 1, nextRetryAt: null,
-      metadata: { payloadHash, deliveryOutcome: "IN_PROGRESS", ...(retainedText ? { historyEvidence: retainedText } : {}) },
+      metadata: { payloadHash, deliveryOutcome: "IN_PROGRESS", ...input.evidence, ...(retainedText ? { historyEvidence: retainedText } : {}) },
     } });
   } catch (error) {
     if (!(error && typeof error === "object" && "code" in error && error.code === "P2002")) return false;
@@ -50,7 +50,7 @@ export async function sendNotificationOnce(input: {
       sentAt: result.ok ? new Date() : null, failedAt: result.ok ? null : new Date(), nextRetryAt: null,
       failureCode: result.ok ? null : uncertain ? "DELIVERY_REVIEW_REQUIRED" : result.code,
       failureMessage: result.ok ? null : uncertain ? "Delivery could not be confirmed. Review the provider record before retrying." : "The provider rejected this notification. Review before retrying.",
-      metadata: { payloadHash, deliveryOutcome: result.ok ? "ACCEPTED" : uncertain ? "UNCERTAIN" : "REJECTED", ...(retainedText ? { historyEvidence: retainedText } : {}) },
+      metadata: { payloadHash, deliveryOutcome: result.ok ? "ACCEPTED" : uncertain ? "UNCERTAIN" : "REJECTED", ...input.evidence, ...(retainedText ? { historyEvidence: retainedText } : {}) },
     } });
   } catch { return false; } // The pending claim remains durable if finalisation fails.
   return result.ok;

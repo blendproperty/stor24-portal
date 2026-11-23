@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
+import type { Prisma } from "@/generated/prisma/client";
 import { lockCustomerContact } from "@/lib/customer-contact-lock";
 import { emailProvider, escapeEmailHtml } from "@/lib/email";
 import { tenantCode, tenantCodeHash, tenantCustomerScope, tenantToken, tenantTokenHash, TENANT_CHALLENGE_COOKIE, TENANT_CODE_MS, TENANT_SESSION_COOKIE, TENANT_SESSION_MS } from "@/lib/tenant-portal-security";
@@ -23,6 +24,11 @@ export function tenantEmailHtml(title: string, body: string) {
   return `<!doctype html><html><body style="margin:0;background:#f5f3ea;color:#071411;font-family:Arial,sans-serif"><div style="max-width:560px;margin:32px auto;background:#fff;padding:32px;border-top:6px solid #ff5a0a;border-radius:18px"><img src="${escapeEmailHtml(origin)}/brand/stor24-logo-official-email-20260909.png" width="183" alt="STOR24"><h1 style="font-size:28px">${escapeEmailHtml(title)}</h1>${body}<p style="margin-top:32px;color:#52615b;font-size:12px">STOR24 · Space for life in motion.</p></div></body></html>`;
 }
 
+const tenantLoginEligibility: Prisma.CustomerWhereInput = { OR: [
+  { emailVerifiedAt: { not: null }, OR: [{ accounts: { some: {} } }, { reservations: { some: { publicLease: { status: "SIGNED" } } } }] },
+  { tenancies: { some: { documents: { some: { type: "LEASE_AGREEMENT", provider: "BLENDSIGN", status: "SIGNED", signedAt: { not: null }, externalId: { not: null } } } } } },
+] };
+
 export async function startTenantChallenge(organisationSlug: string, email: string, id = tenantToken()) {
   // Remove expired authentication material after a 24-hour troubleshooting window.
   // Business records and the separate security audit trail are not deleted.
@@ -33,13 +39,13 @@ export async function startTenantChallenge(organisationSlug: string, email: stri
   const codeHash = tenantCodeHash(id, code);
   const organisation = await db.organisation.findUnique({ where: { slug: organisationSlug }, select: { id: true } });
   const candidates = organisation ? await db.customer.findMany({
-    where: { organisationId: organisation.id, email: { equals: email, mode: "insensitive" }, emailVerifiedAt: { not: null }, OR: [{ accounts: { some: {} } }, { reservations: { some: { publicLease: { status: "SIGNED" } } } }] },
+    where: { organisationId: organisation.id, email: { equals: email, mode: "insensitive" }, ...tenantLoginEligibility },
     select: { id: true },
   }) : [];
   // Lock and recheck before recording IDs so a concurrent contact change cannot revive an old challenge.
   const customers = await db.$transaction(async tx => {
     for (const candidate of [...candidates].sort((a, b) => a.id.localeCompare(b.id))) await lockCustomerContact(tx, candidate.id);
-    const eligible = organisation ? await tx.customer.findMany({ where: { organisationId: organisation.id, id: { in: candidates.map(customer => customer.id) }, email: { equals: email, mode: "insensitive" }, emailVerifiedAt: { not: null }, OR: [{ accounts: { some: {} } }, { reservations: { some: { publicLease: { status: "SIGNED" } } } }] }, select: { id: true } }) : [];
+    const eligible = organisation ? await tx.customer.findMany({ where: { organisationId: organisation.id, id: { in: candidates.map(customer => customer.id) }, email: { equals: email, mode: "insensitive" }, ...tenantLoginEligibility }, select: { id: true } }) : [];
     await tx.tenantPortalChallenge.create({ data: { id, organisationId: organisation?.id ?? "unmatched", email, codeHash, customerIds: eligible.map(customer => customer.id), expiresAt: new Date(Date.now() + TENANT_CODE_MS) } });
     return eligible;
   });
@@ -65,6 +71,8 @@ export async function verifyTenantChallenge(id: string, code: string, database =
   const token = tenantToken();
   await database.$transaction(async tx => {
     for (const customerId of [...challenge.customerIds].sort()) await lockCustomerContact(tx, customerId);
+    const candidates = await tx.customer.findMany({ where: { organisationId: challenge.organisationId, id: { in: challenge.customerIds }, email: { equals: challenge.email, mode: "insensitive" }, ...tenantLoginEligibility }, select: { id: true, emailVerifiedAt: true } });
+    for (const customer of candidates.filter(item => !item.emailVerifiedAt)) await tx.customer.update({ where: { id: customer.id }, data: { emailVerifiedAt: new Date() } });
     const customers = await tx.customer.findMany({ where: tenantCustomerScope(challenge), select: { id: true } });
     if (!customers.length) throw new Error("TENANT_INVALID_CODE");
     const consumed = await tx.tenantPortalChallenge.updateMany({ where: { id, consumedAt: null, expiresAt: { gt: new Date() } }, data: { consumedAt: new Date() } });

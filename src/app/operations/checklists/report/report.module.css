@@ -1,0 +1,18 @@
+.workspace, .workspace section { min-width: 0; }
+.filters { display: flex; flex-wrap: wrap; align-items: end; gap: .85rem; }
+.filters > :is(label, div) { display: grid; flex: 1 1 10rem; min-width: 0; gap: .35rem; }
+.filters :is(input, select) { width: 100%; min-width: 0; }
+.workspace tbody th { text-transform: none; letter-spacing: normal; font-size: .82rem; }
+.runs { display: grid; gap: .6rem; margin-top: .75rem; }
+.run { min-width: 0; border: 1px solid var(--line); border-radius: 10px; }
+.run summary { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .85rem; padding: .85rem 1rem; cursor: pointer; }
+.run summary::before { content: "+"; font-weight: 700; }
+.run[open] summary::before { content: "−"; }
+.runIdentity { display: grid; flex: 1 1 13rem; gap: .15rem; }
+.runIdentity span, .runBody dt { color: var(--muted); }
+.runBody { display: grid; justify-items: start; min-width: 0; gap: .85rem; padding: .85rem 1rem; border-top: 1px solid var(--line); }
+.runBody dl { display: flex; flex-wrap: wrap; gap: .6rem 1.25rem; margin: 0; }
+.runBody dd { margin: 0; font-weight: 650; }
+.runBody p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.runBody :global(.table-wrap) { width: 100%; }
+.runBody table { min-width: 34rem; table-layout: fixed; overflow-wrap: anywhere; }

@@ -299,6 +299,7 @@ export const createInvitationSchema = z.object({
     "Collections",
     "Finance",
     "Auditor / read only",
+    "Midpoint job card manager",
   ]),
   facilityCode: z.string().trim().max(40).optional(),
 });
@@ -351,6 +352,7 @@ export const unitNoteSchema = z.object({
 });
 
 export const maintenanceSchema = z.object({
+  jobCard: z.boolean().optional(),
   facilityId: z.string().cuid(),
   unitId: z.string().cuid().optional(),
   title: z.string().trim().min(2).max(160),
@@ -358,6 +360,19 @@ export const maintenanceSchema = z.object({
   priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).default("NORMAL"),
   dueAt: z.iso.datetime().optional(),
 });
+
+export const maintenanceJobActionSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("manage"),
+    updatedAt: z.iso.datetime(),
+    status: z.enum(["OPEN", "SCHEDULED", "IN_PROGRESS", "BLOCKED"]),
+    contractor: z.string().trim().max(200),
+    scheduledFor: z.iso.datetime().nullable(),
+    progressNotes: z.string().trim().max(4000),
+  }),
+  z.object({ action: z.literal("report"), updatedAt: z.iso.datetime(), evidence: z.string().trim().min(2).max(4000) }),
+  z.object({ action: z.enum(["verify", "return", "cancel"]), updatedAt: z.iso.datetime(), note: z.string().trim().min(2).max(4000) }),
+]);
 
 export const updateMaintenanceSchema = z.object({
   status: z.enum(["OPEN", "SCHEDULED", "IN_PROGRESS", "BLOCKED", "COMPLETED", "CANCELLED"]),

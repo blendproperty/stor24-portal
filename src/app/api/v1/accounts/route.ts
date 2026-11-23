@@ -8,10 +8,10 @@ import { accountPaymentSchema } from "@/lib/validators";
 import { sendWhatsAppTemplate } from "@/lib/whatsapp";
 import { formatSouthAfricaDate } from "@/lib/south-africa-time";
 
-export async function GET(request?: Request) {
+export async function GET(request: Request) {
   try {
     const { organisationId, allowedFacilityIds } = await requirePermission("ledger.view");
-    const accountId = request ? new URL(request.url).searchParams.get("accountId") : null;
+    const accountId = new URL(request.url).searchParams.get("accountId");
     const accounts = await db.account.findMany({
       where: { ...(accountId ? { id: accountId } : {}), customer: { organisationId }, tenancy: allowedFacilityIds ? { facilityId: { in: allowedFacilityIds } } : undefined },
       include: { customer: true, tenancy: { include: { facility: true, documents: { where: { type: "LEASE_AGREEMENT" }, orderBy: { createdAt: "desc" } }, occupancies: { where: { status: { in: ["PENDING", "ACTIVE", "NOTICE_GIVEN"] } }, include: { unit: { include: { unitType: true } } }, orderBy: { startDate: "desc" }, take: 1 } } }, ledgerEntries: { orderBy: [{ effectiveAt: "desc" }, { createdAt: "desc" }], take: 50 }, payments: { orderBy: { createdAt: "desc" }, take: 25 } },

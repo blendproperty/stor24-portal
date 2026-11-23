@@ -1,8 +1,10 @@
+import { MIDPOINT_JOB_CARD_PAGE, MIDPOINT_JOB_CARD_PERMISSION } from "./maintenance-job-policy";
 import { hasPermission } from "./permissions";
 
 export type NavigationAccess = { owner: boolean; permissions: string[] };
 // Navigation hints only. Existing page/API and facility-scope checks remain authoritative.
 const rules: Record<string, string[]> = {
+  [MIDPOINT_JOB_CARD_PAGE]: [MIDPOINT_JOB_CARD_PERMISSION],
   "/operations/event-emails": ["staff_event_emails.view"],
   "/reservations/prices": ["reservation_prices.view"],
   "/tenants": ["operations.view"], "/users": ["@owner"],

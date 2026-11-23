@@ -138,10 +138,16 @@ try {for(const width of [1440,1024,768,390,320]) {
     record.rows=items.map((label,i)=>({...makeRow(String(i),`Daily · ${label}`),state:i<7?"PASS":"PENDING"}));
     await page.getByRole("button",{name:"Reload saved records"}).click();
     await expect(page.getByRole("heading",{name:"Management checklist",exact:true})).toBeVisible();
+    const management = page.getByRole("region",{name:"Walkthrough route"});
+    await expect(management.getByText("7 of 19 checks saved")).toBeVisible();
+    await expect(management.getByRole("button",{name:/CCTV display working properly Pass/})).toBeVisible();
+    await expect(management.getByRole("button",{name:/Friday tests/})).toHaveCount(0);
     const workbook=page.getByRole("region",{name:"Weekly checklist sheet"});
+    if (!(await workbook.isVisible())) await page.getByText("View weekly history",{exact:true}).click();
     await expect(workbook.getByRole("rowheader",{name:"Date",exact:true})).toBeVisible();
     await expect(workbook.getByText("Weekly TEST-Friday",{exact:true})).toHaveCount(2);
     await expect(workbook.getByRole("rowheader",{name:"CCTV display working properly",exact:true})).toBeVisible();
+    await expect(workbook.getByLabel(/^Result:/)).toHaveCount(0);
     assert.ok(await workbook.evaluate(region=>{
       const headers=region.querySelectorAll("thead tr:first-child th");
       return headers[0].offsetWidth>3*headers[1].offsetWidth && region.scrollHeight<=region.clientHeight+1;

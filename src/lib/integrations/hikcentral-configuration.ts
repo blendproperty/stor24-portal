@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { HikCentralAccessProvider, type HikCentralProviderConfiguration } from "@/lib/integrations/hikcentral-provider";
+import { STOR24_FACE_DOORS } from "@/lib/integrations/hikcentral-door-scope";
 import { decryptIntegrationSecret, encryptIntegrationSecret, integrationEncryptionConfigured } from "@/lib/integrations/integration-secret-vault";
 import type { RequestScope } from "@/lib/scope";
 import { requireFacility } from "@/lib/scope";
@@ -11,6 +12,7 @@ export const HIKCENTRAL_PROVIDER = "HIKCENTRAL";
 
 const credentialsSchema = z.object({
   endpoint: z.url().max(500),
+  userId: z.string().trim().min(1).max(32).regex(/^[^'\/:*?"<>|]+$/).optional(),
   appKey: z.string().trim().min(1).max(500).optional(),
   appSecret: z.string().trim().min(1).max(1000).optional(),
   // Not a secret: identifies a specific TLS certificate so we can pin to it when the
@@ -29,12 +31,14 @@ const credentialsSchema = z.object({
 
 const mappingSchema = z.object({
   facilityId: z.string().cuid(),
-  organisationIndexCode: z.string().trim().min(1).max(200),
+  organisationIndexCode: z.string().trim().min(1).max(200).refine((code) => !/^TEMP-/i.test(code), "Use a verified HikCentral organisation index code."),
   doorIndexCodes: z.array(z.string().trim().min(1).max(200)).min(1).max(200).transform((items) => [...new Set(items)]),
-});
+  accessLevelIds: z.array(z.string().trim().min(1).max(64)).max(2).refine((items) => (items.length === 0 || items.length === 2) && new Set(items).size === items.length).optional(),
+  nightlyClearanceRequired: z.boolean().optional(),
+}).refine((value) => !value.accessLevelIds?.length || (value.nightlyClearanceRequired === true && value.doorIndexCodes.length === STOR24_FACE_DOORS.length && STOR24_FACE_DOORS.every(id => value.doorIndexCodes.includes(id))), "Confirm nightly empty-site clearance and map exactly three Block24 doors and the thirteen approved Midpoint non-tenant doors before enabling both access levels.");
 
-type StoredCredentials = { endpoint?: unknown; appKeyEncrypted?: unknown; appSecretEncrypted?: unknown; pinnedCertSha256Fingerprint?: unknown; regionIndexCode?: unknown };
-type StoredMapping = { organisationIndexCode?: unknown; doorIndexCodes?: unknown };
+type StoredCredentials = { endpoint?: unknown; userId?: unknown; appKeyEncrypted?: unknown; appSecretEncrypted?: unknown; pinnedCertSha256Fingerprint?: unknown; regionIndexCode?: unknown };
+type StoredMapping = { organisationIndexCode?: unknown; doorIndexCodes?: unknown; accessLevelIds?: unknown; nightlyClearanceRequired?: unknown };
 
 function safeEndpoint(value: string) {
   const url = new URL(value);
@@ -62,6 +66,7 @@ export async function listHikCentralConfiguration(scope: RequestScope) {
     encryptionReady: integrationEncryptionConfigured(),
     company: {
       endpoint: configuredString(credentials.endpoint) ? credentials.endpoint : "",
+      userId: configuredString(credentials.userId) ? credentials.userId : "",
       appKeyConfigured: configuredString(credentials.appKeyEncrypted),
       appSecretConfigured: configuredString(credentials.appSecretEncrypted),
       pinnedCertSha256Fingerprint: configuredString(credentials.pinnedCertSha256Fingerprint) ? credentials.pinnedCertSha256Fingerprint : "",
@@ -78,6 +83,8 @@ export async function listHikCentralConfiguration(scope: RequestScope) {
         ...facility,
         organisationIndexCode: configuredString(config.organisationIndexCode) ? config.organisationIndexCode : "",
         doorIndexCodes: Array.isArray(config.doorIndexCodes) ? config.doorIndexCodes.filter(configuredString) : [],
+        accessLevelIds: Array.isArray(config.accessLevelIds) ? config.accessLevelIds.filter(configuredString) : [],
+        nightlyClearanceRequired: config.nightlyClearanceRequired === true,
         status: connection?.status ?? "DISCONNECTED",
         lastHealthAt: connection?.lastHealthAt?.toISOString() ?? null,
         lastSuccessAt: connection?.lastSuccessAt?.toISOString() ?? null,
@@ -105,6 +112,7 @@ export async function saveHikCentralCredentials(scope: RequestScope, input: unkn
     : configuredString(oldConfig.regionIndexCode) ? oldConfig.regionIndexCode : undefined;
   const config = {
     endpoint,
+    userId: parsed.userId ?? (configuredString(oldConfig.userId) ? oldConfig.userId : undefined),
     appKeyEncrypted,
     appSecretEncrypted,
     ...(pinnedCertSha256Fingerprint ? { pinnedCertSha256Fingerprint } : {}),
@@ -121,32 +129,72 @@ export async function saveHikCentralMapping(scope: RequestScope, input: unknown)
   const parsed = mappingSchema.parse(input);
   const facility = await requireFacility(scope, parsed.facilityId);
   const existing = await db.integrationConnection.findFirst({ where: { organisationId: scope.organisationId, facilityId: facility.id, category: HIKCENTRAL_CATEGORY, provider: HIKCENTRAL_PROVIDER } });
-  const config = { organisationIndexCode: parsed.organisationIndexCode, doorIndexCodes: parsed.doorIndexCodes };
+  const config = { organisationIndexCode: parsed.organisationIndexCode, doorIndexCodes: parsed.doorIndexCodes, accessLevelIds: parsed.accessLevelIds ?? [], nightlyClearanceRequired: parsed.nightlyClearanceRequired === true };
+  const old = (existing?.config ?? {}) as StoredMapping;
+  if (old.organisationIndexCode !== config.organisationIndexCode || JSON.stringify(old.doorIndexCodes ?? []) !== JSON.stringify(config.doorIndexCodes) || JSON.stringify(old.accessLevelIds ?? []) !== JSON.stringify(config.accessLevelIds) || old.nightlyClearanceRequired !== config.nightlyClearanceRequired) {
+    if (await db.hikCentralAccessGrant.count({ where: { organisationId: scope.organisationId, facilityId: facility.id, status: { in: ["PENDING", "GRANTED", "LOCKED", "REVOKE_PENDING", "REVIEW_REQUIRED"] } } })) throw Error("HIKCENTRAL_ACTIVE_GRANTS_REVIEW_REQUIRED");
+  }
   const connection = existing
     ? await db.integrationConnection.update({ where: { id: existing.id }, data: { status: "CONFIGURED", config, failureCode: null, failureMessage: null } })
     : await db.integrationConnection.create({ data: { organisationId: scope.organisationId, facilityId: facility.id, category: HIKCENTRAL_CATEGORY, provider: HIKCENTRAL_PROVIDER, status: "CONFIGURED", config } });
   const previous = (existing?.config ?? {}) as StoredMapping;
-  await db.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: facility.id, actorId: scope.userId, action: "integration.hikcentral.mapping.updated", entityType: "IntegrationConnection", entityId: connection.id, before: existing ? { organisationIndexCode: previous.organisationIndexCode ?? null, doorIndexCodes: previous.doorIndexCodes ?? [] } : undefined, after: config } });
+  await db.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: facility.id, actorId: scope.userId, action: "integration.hikcentral.mapping.updated", entityType: "IntegrationConnection", entityId: connection.id, before: existing ? { organisationIndexCode: previous.organisationIndexCode ?? null, doorIndexCodes: previous.doorIndexCodes ?? [], accessLevelIds: previous.accessLevelIds ?? [] } : undefined, after: config } });
   return connection;
 }
 
-export async function loadHikCentralRuntimeConfiguration(organisationId: string, facilityId: string): Promise<HikCentralProviderConfiguration> {
+export async function loadHikCentralRuntimeConfiguration(organisationId: string, facilityId?: string): Promise<HikCentralProviderConfiguration> {
   const [company, mapping] = await Promise.all([
     companyConnection(organisationId),
-    db.integrationConnection.findFirst({ where: { organisationId, facilityId, category: HIKCENTRAL_CATEGORY, provider: HIKCENTRAL_PROVIDER } }),
+    facilityId ? db.integrationConnection.findFirst({ where: { organisationId, facilityId, category: HIKCENTRAL_CATEGORY, provider: HIKCENTRAL_PROVIDER } }) : null,
   ]);
   const credentials = (company?.config ?? {}) as StoredCredentials;
   const facility = (mapping?.config ?? {}) as StoredMapping;
   if (!configuredString(credentials.endpoint) || !configuredString(credentials.appKeyEncrypted) || !configuredString(credentials.appSecretEncrypted)) throw new Error("CONFIG_REQUIRED:HIKCENTRAL_CREDENTIALS");
-  if (!configuredString(facility.organisationIndexCode) || !Array.isArray(facility.doorIndexCodes) || !facility.doorIndexCodes.length) throw new Error("CONFIG_REQUIRED:HIKCENTRAL_FACILITY_MAPPING");
+  const facilities: HikCentralProviderConfiguration["facilities"] = {};
+  if (facilityId) {
+    if (!configuredString(facility.organisationIndexCode) || !Array.isArray(facility.doorIndexCodes) || !facility.doorIndexCodes.length) throw new Error("CONFIG_REQUIRED:HIKCENTRAL_FACILITY_MAPPING");
+    facilities[facilityId] = { organisationIndexCode: facility.organisationIndexCode, doorIndexCodes: facility.doorIndexCodes.filter(configuredString) };
+  }
   return {
     baseUrl: credentials.endpoint,
     appKey: decryptIntegrationSecret(credentials.appKeyEncrypted),
     appSecret: decryptIntegrationSecret(credentials.appSecretEncrypted),
-    facilities: { [facilityId]: { organisationIndexCode: facility.organisationIndexCode, doorIndexCodes: facility.doorIndexCodes.filter(configuredString) } },
+    ...(configuredString(credentials.userId) ? { userId: credentials.userId } : {}),
+    facilities,
     ...(configuredString(credentials.pinnedCertSha256Fingerprint) ? { pinnedCertSha256: credentials.pinnedCertSha256Fingerprint } : {}),
     ...(configuredString(credentials.regionIndexCode) ? { regionIndexCodes: [credentials.regionIndexCode] } : {}),
   };
+}
+
+export async function discoverHikCentralDoors(scope: RequestScope, facilityId: string) {
+  await requireFacility(scope, facilityId);
+  const company = await companyConnection(scope.organisationId);
+  const credentials = (company?.config ?? {}) as StoredCredentials;
+  if (!configuredString(credentials.endpoint) || !configuredString(credentials.appKeyEncrypted) || !configuredString(credentials.appSecretEncrypted)) throw new Error("CONFIG_REQUIRED:HIKCENTRAL_CREDENTIALS");
+  const provider = new HikCentralAccessProvider(fetch, {
+    baseUrl: credentials.endpoint,
+    appKey: decryptIntegrationSecret(credentials.appKeyEncrypted),
+    appSecret: decryptIntegrationSecret(credentials.appSecretEncrypted),
+    ...(configuredString(credentials.userId) ? { userId: credentials.userId } : {}),
+    facilities: {},
+    ...(configuredString(credentials.pinnedCertSha256Fingerprint) ? { pinnedCertSha256: credentials.pinnedCertSha256Fingerprint } : {}),
+  });
+  return provider.listDoors();
+}
+
+export async function inspectHikCentralAccess(scope: RequestScope, facilityId: string) {
+  await requireFacility(scope, facilityId);
+  const provider = new HikCentralAccessProvider(fetch, await loadHikCentralRuntimeConfiguration(scope.organisationId, facilityId));
+  const accessLevels = await provider.listAccessLevels();
+  if (!accessLevels.ok) return accessLevels;
+  const [organizations, version] = await Promise.all([provider.listOrganizations(), provider.version()]);
+  return { ok: true as const, providerReference: "hikcentral", data: { version: version.ok ? version.data : null, versionError: version.ok ? null : version.message, accessLevels: accessLevels.data.levels, organizations: organizations.ok ? organizations.data.organizations : [], organizationError: organizations.ok ? null : organizations.message } };
+}
+
+export async function lookupHikCentralPerson(scope: RequestScope, facilityId: string, personCode: string) {
+  await requireFacility(scope, facilityId);
+  const provider = new HikCentralAccessProvider(fetch, await loadHikCentralRuntimeConfiguration(scope.organisationId));
+  return provider.personByCode(personCode);
 }
 
 export async function testHikCentralConnection(scope: RequestScope, facilityId: string) {

@@ -1,13 +1,14 @@
 import { createHash } from "node:crypto";
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { retryBillingSerialization } from "@/lib/billing-transaction-retry";
 import { buildAccountStatement } from "@/lib/finance/account-statement";
 import { scheduledBillingGroupHash } from "@/lib/scheduled-billing-group";
 
 // Internal primitive only; no production route or scheduler invokes it.
 export async function recogniseScheduledBillingCharge(id: string, now = new Date()) {
   if (!Number.isFinite(now.getTime())) throw new Error("BILLING_RECOGNITION_TIME_INVALID");
-  return db.$transaction(async tx => {
+  return retryBillingSerialization(() => db.$transaction(async tx => {
     const identity = await tx.scheduledBillingCharge.findUnique({ where: { id }, select: { accountId: true } });
     if (!identity) throw new Error("BILLING_RECOGNITION_NOT_FOUND");
     await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${identity.accountId} FOR UPDATE`;
@@ -48,5 +49,5 @@ export async function recogniseScheduledBillingCharge(id: string, now = new Date
     await tx.account.update({ where: { id: charge.accountId }, data: { balance: { increment: delta } } });
     await tx.auditEvent.create({ data: { organisationId: charge.organisationId, facilityId: charge.facilityId, action: "billing.scheduled_charge_recognised", entityType: "Account", entityId: charge.accountId, after: { invoiceId: charge.invoiceId, scheduledChargeIds: lines.map(line => line.id), effectiveAt: charge.effectiveAt.toISOString(), netAmount: delta.toFixed(2) } } });
     return { ledgerEntryId: requestedLedgerId, alreadyRecognised: false };
-  }, { isolationLevel: "Serializable", timeout: 20000 });
+  }, { isolationLevel: "Serializable", timeout: 20000 }));
 }

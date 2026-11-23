@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { randomBytes, randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
-import { build } from "esbuild";
+import { build } from "./build-commonjs";
 import { db } from "../../src/lib/db";
 import { tenantSessionForToken, verifyTenantChallenge } from "../../src/lib/tenant-portal-auth";
 import { tenantCodeHash, tenantTokenHash } from "../../src/lib/tenant-portal-security";

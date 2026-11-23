@@ -1,6 +1,7 @@
 import {retainBillingPlanVersion,readBillingPlanVersions} from "./billing-plan-history";
 import { createHash } from "node:crypto";
 import { db } from "@/lib/db";
+import { retryBillingSerialization } from "@/lib/billing-transaction-retry";
 import { Prisma } from "@/generated/prisma/client";
 import type { RequestScope } from "@/lib/scope";
 import { billingPlanSchema, calculateMonthlyBill, currentBillingPeriod, nextBillingPeriod, periodDates, type BillingPlan } from "./monthly-billing-policy";
@@ -38,7 +39,7 @@ export async function monthlyBillingInvoices(scope: RequestScope, accountId: str
 }
 export async function saveMonthlyBillingPlan(scope: RequestScope, accountId: string, value: unknown) {
   const plan = billingPlanSchema.parse(value);
-  return db.$transaction(async tx => {
+  return retryBillingSerialization(() => db.$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${accountId} FOR UPDATE`;
     const { tenancy, profile } = await context(tx, scope, accountId);
     const history=await retainBillingPlanVersion(tx,{organisationId:scope.organisationId,facilityId:tenancy.facilityId,accountId,actorId:scope.userId,plan,previousPlan:profile?.config,previousReady:profile?.status==="READY",previousUpdatedAt:profile?.updatedAt??null});
@@ -46,7 +47,7 @@ export async function saveMonthlyBillingPlan(scope: RequestScope, accountId: str
     const result = await tx.configurationProfile.upsert({ where: { organisationId_facilityId_domain_name: { organisationId: scope.organisationId, facilityId: tenancy.facilityId, domain: DOMAIN, name: accountId } }, create: { organisationId: scope.organisationId, facilityId: tenancy.facilityId, domain: DOMAIN, name: accountId, status: "READY", config: plan }, update: { config: plan, status: "READY" } });
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: tenancy.facilityId, actorId: scope.userId, action: "billing.plan_approved", entityType: "Account", entityId: accountId, before: profile?.config ?? Prisma.JsonNull, after: plan } });
     return result.config as unknown as BillingPlan;
-  },{isolationLevel:"Serializable",timeout:20000});
+  },{isolationLevel:"Serializable",timeout:20000}));
 }
 export async function monthlyBillingHistory(scope:RequestScope,accountId:string,before?:number){
  return db.$transaction(async tx=>{const {tenancy}=await context(tx,scope,accountId);return readBillingPlanVersions(tx,scope.organisationId,tenancy.facilityId,accountId,before)},{isolationLevel:"RepeatableRead",timeout:20000});
@@ -102,7 +103,7 @@ export async function postMonthlyBilling(scope: RequestScope, accountId: string,
 const DRAFT_DOMAIN = "NEXT_MONTH_INVOICE_DRAFT";
 export async function prepareScheduledNextBilling(scope: RequestScope, accountId: string, period: string, fingerprint: string, now = new Date()) {
   if (process.env.NEXT_MONTH_INVOICING_ENABLED !== "true" || period !== nextBillingPeriod(now)) throw new Error("BILLING_SCHEDULE_DISABLED");
-  return db.$transaction(async tx => {
+  return retryBillingSerialization(() => db.$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${accountId} FOR UPDATE`;
     const { account, tenancy, profile } = await context(tx, scope, accountId);
     await tx.$queryRaw`SELECT "id" FROM "Facility" WHERE "id" = ${tenancy.facilityId} FOR UPDATE`;
@@ -117,7 +118,7 @@ export async function prepareScheduledNextBilling(scope: RequestScope, accountId
     else await tx.configurationProfile.create({data:{organisationId:scope.organisationId,facilityId:tenancy.facilityId,domain:DRAFT_DOMAIN,name,status:"READY",config:{period,fingerprint}}});
     await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:tenancy.facilityId,actorId:null,action:"billing.draft_prepared",entityType:"Account",entityId:accountId,after:{period,fingerprint}}});
     return {period,fingerprint};
-  }, {isolationLevel:"Serializable",timeout:20000});
+  }, {isolationLevel:"Serializable",timeout:20000}));
 }
 async function assertDraftEligibility(tx: Client, scope: RequestScope, account: {customerId:string}, tenancy: {id:string;facilityId:string;status:string}, profile: {status:string;config:Prisma.JsonValue}|null, period: string) {
   if (tenancy.status !== "ACTIVE") throw new Error("BILLING_NOTICE_POLICY_REVIEW");
@@ -149,7 +150,7 @@ export async function approveScheduledInvoiceDraft(scope: RequestScope, accountI
 export async function approveScheduledInvoiceDraftInIsolatedTest(scope: RequestScope, accountId: string, period: string, fingerprint: string) {
   if (process.env.NODE_ENV !== "test" || process.env.MERCHANDISE_DB_TEST !== "isolated-ci" || !process.env.DATABASE_URL || new URL(process.env.DATABASE_URL).hostname !== "localhost") throw new Error("BILLING_ISOLATED_TEST_ONLY");
   if (period !== nextBillingPeriod() || periodDates(period).effectiveAt <= new Date()) throw new Error("BILLING_DRAFT_REVIEW");
-  return db.$transaction(async tx => {
+  return retryBillingSerialization(() => db.$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${accountId} FOR UPDATE`;
     const { account, tenancy, profile } = await context(tx, scope, accountId);
     await tx.$queryRaw`SELECT "id" FROM "Facility" WHERE "id" = ${tenancy.facilityId} FOR UPDATE`;
@@ -180,7 +181,7 @@ export async function approveScheduledInvoiceDraftInIsolatedTest(scope: RequestS
     await tx.configurationProfile.update({ where: { id: draft.id }, data: { status: "STAGED" } });
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: tenancy.facilityId, actorId: scope.userId, action: "billing.invoice_staged", entityType: "Account", entityId: accountId, after: { period, invoiceNumber, documentId: document.id, fingerprint } } });
     return { documentId: document.id, invoiceNumber, total: bill.total, alreadyStaged: false };
-  }, { isolationLevel: "Serializable", timeout: 20000 });
+  }, { isolationLevel: "Serializable", timeout: 20000 }));
 }
 async function postBilling(scope: RequestScope, accountId: string, period: string, fingerprint: string, actorId: string | null, scheduled: boolean) {
   // Future-effective balances need a reliable recognition and reconciliation mechanism.

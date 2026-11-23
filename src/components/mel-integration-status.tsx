@@ -56,8 +56,8 @@ export function MelIntegrationStatus({
           <div>
             <h2>MEL identity links</h2>
             <p className="panel-subtitle">
-              Links between STOR24 customers and their access-provider records
-              will appear here once identity linking is enabled and verified.
+              Verified links between STOR24 customers and their access-provider records
+              appear here. A link does not itself grant access to a door.
             </p>
           </div>
         </div>

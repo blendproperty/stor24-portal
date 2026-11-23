@@ -13,6 +13,7 @@ export const leadUpdateSchema = z.object({
   marketProfile: marketProfileSchema.optional(),
   updatedAt: z.iso.datetime(),
   stage: z.enum(["NEW", "CONTACTED", "QUALIFIED", "QUOTED", "VIEWING_BOOKED", "RESERVED", "WON", "LOST", "HANDOVER_REVIEW"]),
+  lossReason: z.string().trim().max(500).nullable().optional(),
   nextActionAt: z.iso.datetime().nullable(),
   expectedMoveIn: z.iso.date().nullable().optional(),
   notes: z.string().trim().max(2000),
@@ -65,6 +66,7 @@ export async function updateLead(scope: RequestScope, id: string, input: LeadUpd
     const converted = (await legacyHandedOverLeadIds(scope,[lead],tx)).has(lead.id) || (candidateIds.length > 0 && Boolean(await tx.auditEvent.findFirst({ where: { organisationId: scope.organisationId, facilityId: lead.facilityId, entityType: "Tenancy", entityId: { in: candidateIds }, action: "tenancy.key_handover_confirmed" }, select: { id: true } })));
     const hasConvertedBooking = lead.reservations.some(r => r.status === "CONVERTED");
     const displayedStage = converted ? "WON" : lead.stage === "WON" ? "HANDOVER_REVIEW" : lead.stage;
+    if (input.stage === "LOST" && lead.stage !== "LOST" && !input.lossReason?.trim()) throw new Error("LEAD_LOSS_REASON_REQUIRED");
     if (input.stage === "HANDOVER_REVIEW" && displayedStage !== "HANDOVER_REVIEW") throw new Error("LEAD_BOOKING_STAGE");
     if (input.stage === "WON" && !converted) throw new Error("LEAD_BOOKING_STAGE");
     if (input.stage === "RESERVED" && !hasConvertedBooking && !lead.reservations.some(r => r.status === "ACTIVE" && r.journey === "RENTAL")) throw new Error("LEAD_BOOKING_STAGE");
@@ -81,14 +83,15 @@ export async function updateLead(scope: RequestScope, id: string, input: LeadUpd
     const changed = await tx.lead.updateMany({ where: { id, updatedAt: new Date(input.updatedAt) }, data: {
       ...(input.enquiryLocation !== undefined ? { enquiryLocation: location ?? Prisma.DbNull } : {}),
       stage: input.stage === "HANDOVER_REVIEW" ? lead.stage : input.stage, nextActionAt: input.nextActionAt ? new Date(input.nextActionAt) : null,
+      ...(input.lossReason !== undefined ? { lossReason: input.lossReason?.trim() || null } : {}),
       ...(input.expectedMoveIn !== undefined ? { expectedMoveIn: input.expectedMoveIn ? new Date(`${input.expectedMoveIn}T00:00:00.000Z`) : null } : {}),
       notes: input.notes || null, assignedToId: input.assignedToId,
     } });
     if (changed.count !== 1) throw new Error("CONFLICT");
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: lead.facilityId, actorId: scope.userId,
       action: "lead.updated", entityType: "Lead", entityId: id,
-      before: { expectedMoveIn: lead.expectedMoveIn?.toISOString() ?? null, enquiryLocation: lead.enquiryLocation, stage: lead.stage, nextActionAt: lead.nextActionAt?.toISOString() ?? null, assignedToId: lead.assignedToId, notes: lead.notes },
-      after: { expectedMoveIn: input.expectedMoveIn === undefined ? lead.expectedMoveIn?.toISOString() ?? null : input.expectedMoveIn, enquiryLocation: location, stage: input.stage === "HANDOVER_REVIEW" ? lead.stage : input.stage, nextActionAt: input.nextActionAt, assignedToId: input.assignedToId, notes: input.notes || null } } });
+      before: { expectedMoveIn: lead.expectedMoveIn?.toISOString() ?? null, enquiryLocation: lead.enquiryLocation, stage: lead.stage, lossReason: lead.lossReason, nextActionAt: lead.nextActionAt?.toISOString() ?? null, assignedToId: lead.assignedToId, notes: lead.notes },
+      after: { expectedMoveIn: input.expectedMoveIn === undefined ? lead.expectedMoveIn?.toISOString() ?? null : input.expectedMoveIn, enquiryLocation: location, stage: input.stage === "HANDOVER_REVIEW" ? lead.stage : input.stage, lossReason: input.lossReason === undefined ? lead.lossReason : input.lossReason?.trim() || null, nextActionAt: input.nextActionAt, assignedToId: input.assignedToId, notes: input.notes || null } } });
     if(input.marketProfile)await tx.auditEvent.create({data:{organisationId:scope.organisationId,facilityId:lead.facilityId,actorId:scope.userId,action:'lead.market_profile.captured',entityType:'Lead',entityId:id,after:{marketProfile:input.marketProfile}}});
     return { id };
   });

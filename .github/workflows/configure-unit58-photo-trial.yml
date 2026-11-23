@@ -1,0 +1,60 @@
+name: Configure Unit 58 photo trial
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Enable or disable the signed Unit 58 photo-only trial
+        required: true
+        type: choice
+        options: [enable, disable]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: stor24-crm-production
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.22.1
+      - name: Require exact main release
+        if: inputs.action == 'enable'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          DEPLOY_REF: main
+        run: node scripts/verify-release.mjs
+      - name: Configure SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          test -n "$VPS_HOST" && test -n "$VPS_KNOWN_HOSTS" && test -n "$VPS_SSH_KEY"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/stor24_crm
+          chmod 600 ~/.ssh/known_hosts ~/.ssh/stor24_crm
+      - name: Set bounded photo-only policy
+        env:
+          ACTION: ${{ inputs.action }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          test -n "$VPS_USER"
+          if test "$ACTION" = enable; then
+            template=$(node -e "const p=require('./docs/unit58-photo-trial-policy.json');process.stdout.write(JSON.stringify(p))")
+          else
+            template='{}'
+          fi
+          { printf '%s\n' "$ACTION"; printf '%s\n' "$template"; git rev-parse HEAD; } |
+            ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -i ~/.ssh/stor24_crm "$VPS_USER@$VPS_HOST" \
+              'bash /opt/stor24-crm/scripts/configure-unit58-photo-trial.sh'

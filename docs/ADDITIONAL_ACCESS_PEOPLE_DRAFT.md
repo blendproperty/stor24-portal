@@ -1,10 +1,12 @@
 # Additional authorised people — implementation draft
 
-5 November 2026. A local candidate implements nominations and supervised additional-person photo collection and review. It is not released, configured for production, or connected to HikCentral.
+13 November 2026. Nominations and supervised additional-person photo capture and review are deployed with collection held by policy. They are not configured for live biometric collection or connected to HikCentral.
 
 ## Configuration boundary
 
 Additional-person collection is disabled unless an organisation-specific entry exists in `ADDITIONAL_ACCESS_POLICIES_JSON` with `enabled: true`, a version, notice, consent label, approval reference and a retention period in hours. This is separate from the primary-customer policy. No approved wording or production setting is supplied here. The collection also requires the existing encryption key and a recent successful expiry-worker heartbeat. Configuration does not itself constitute legal approval or activate access.
+
+`ADDITIONAL_PERSON_FACIAL_NOTICE_FOR_APPROVAL.md` contains proposed person-facing wording and an explicit decision list for Liezl and the precinct operator. It is a draft and supplies no approval reference or live setting.
 
 Staff must have access management permission for the facility. The screen requires a witnessed confirmation that the nominated person is present and has accepted the displayed notice; the checkbox records the staff operator's attestation, not independent identity verification. Photographs are encrypted and version-bound, removed on withdrawal or rejection and processed by the expiry worker. These controls still require independent review and real staff acceptance before use.
 
@@ -30,4 +32,14 @@ Use synthetic data for automated tests covering two people on one booking, a per
 
 ## Status
 
-The local candidate has been committed and pushed for draft review; see PROJECT_CONTEXT.md for the dated test evidence. It has not been merged, deployed, configured or verified live. Legal/privacy review, provider contract and mapping, physical UAT, staff training and business acceptance remain open. This draft does not authorise collecting real additional-user biometric data or changing physical access.
+The tablet capture-to-review code was merged in PR #803 and automatically deployed by guarded run 43409597636 for `da93206ee4608e6c795037220cea5aca1eac5b0c` on 13 November 2026; see PROJECT_CONTEXT.md for dated evidence. The separate notice remains a draft, `ADDITIONAL_ACCESS_POLICIES_JSON` was not enabled by this release, and no HikCentral or door mapping was changed. A live expired-link page and public health response were checked, but real photo collection, runtime role privileges on the new table, provider enrolment, reader entry/removal and staff UAT were not verified. Legal/privacy review, alternative entry, provider retention/deletion, physical installation, training and business acceptance remain open. This draft does not authorise collecting real additional-user biometric data or changing physical access.
+
+## Unit 58 photo-only trial candidate, 13 November 2026
+
+Brett authorised a separate, limited test using the signed Unit 58 booking without a real payment or Hikvision enrolment. Signing converted that booking to a draft BlendSign tenancy, so the trial checks that exact reservation-to-tenancy link, signed BlendSign document, account/customer/unit match and pending unit occupancy. The candidate policy in `unit58-photo-trial-policy.json` states the test-only purpose, personal consent, one-hour live-copy expiry and the unresolved encrypted-backup risk. It is not Liezl's general additional-person facial policy. Other bookings retain the verified-payment gate. The trial configuration is default-off and requires a separate guarded production workflow; code deployment alone cannot collect a real additional-person photo. An authorised customer still must nominate the person, the person must personally consent on the tablet, and staff must verify identity. Confirm no backup was taken with the trial photo before describing its removal as complete. Do not infer Hikvision enrolment, physical access, provider retention or legal approval from this trial.
+
+## Unit 58 correction, 16 November 2026
+
+Brett clarified that the first test must capture the account holder's own photo before any nominated additional person. The additional-person trial was disabled after a brief configuration window; John Wayne remains nominated but has no photo or access. The corrected bounded policy targets only the signed Unit 58 primary customer, allows a no-payment photo-only test, and does not create a Hikvision request or door grant. Additional-person collection remains off. The customer must personally review the trial notice and consent in My STOR24; staff can privately preview and review the photo in Move-in. The one-hour live-copy expiry and encrypted-backup limitation still apply. General additional-person policy, reader enrolment, physical entry and staff UAT remain separate gates.
+
+The operator workflow was clarified later on 16 November: the customer service operator uses the staff tablet at the facility, checks the original ID, and supervises the account holder reading the notice, taking their photo and selecting consent. The operator submits the form in Move-in and then privately reviews the saved photo. This staff-assisted path uses the same exact-booking photo-only policy and no-payment exception. Customer portal sign-in is not required for this supervised test. The staff session stays under operator control; do not hand an unlocked staff dashboard to the customer.

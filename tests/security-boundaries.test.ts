@@ -65,7 +65,7 @@ async function load(entry: string, state: ReturnType<typeof fixture>) {
       builder.onResolve({ filter: /^@\/lib\/(db|session)$/ }, args => ({ path: args.path, namespace: "fixture" }));
       builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__fixture.db;" : "export const getSession=async()=>__fixture.session;" }));
       builder.onResolve({ filter: /^@\/lib\/integrations\/twilio-provider$/ }, args => ({ path: args.path, namespace: "provider" }));
-      builder.onLoad({ filter: /.*/, namespace: "provider" }, () => ({ contents: "export class TwilioWhatsAppProvider { async sendTemplate(...args) { __fixture.sends.push(args); return {ok:true,providerReference:'synthetic-message'}; } }" }));
+      builder.onLoad({ filter: /.*/, namespace: "provider" }, () => ({ contents: "export class TwilioWhatsAppProvider { async sendTemplate(...args) { __fixture.sends.push(args); return {ok:true,providerReference:'synthetic-message'}; } } export const normalizeTwilioRecipient=(value)=>value; export class TwilioSmsProvider { send() { throw Error('Unexpected SMS send'); } }" }));
     } }],
   });
   const loaded = { exports: {} as Row };
@@ -749,10 +749,13 @@ test("selected customer cleanup rejects staff, cross-origin, empty and duplicate
   const api = await load("./src/app/api/v1/admin/test-customers/route.ts", state);
   const call = (body: Row, origin = "https://example.invalid") => api.POST(new Request("https://example.invalid/api/v1/admin/test-customers", { method: "POST", headers: { origin, "content-type": "application/json" }, body: JSON.stringify(body) }));
   assert.equal((await call({ action: "preview", ids: ["customer-a"] })).status, 403);
+  assert.equal((await call({ action: "archive", ids: ["customer-a"], fingerprint: "a".repeat(64) })).status, 403);
   state.grant("*", null, "Organisation owner");
   assert.equal((await call({ action: "preview", ids: ["customer-a"] }, "https://foreign.invalid")).status, 403);
   for (const ids of [[], ["customer-a", "customer-a"], Array.from({length:101}, (_,i) => `id-${i}`)]) assert.equal((await call({ action: "preview", ids })).status, 422);
   assert.equal((await call({ action: "delete", ids: ["customer-a"], fingerprint: "a".repeat(64), confirmation: "yes" })).status, 422);
+  assert.equal((await call({ action: "archive", ids: ["customer-a", "customer-a"], fingerprint: "a".repeat(64) })).status, 422);
+  assert.equal((await call({ action: "restore", ids: ["customer-a"], fingerprint: "bad" })).status, 422);
   assert.deepEqual(state.writes, []);
 });
 

@@ -37,6 +37,17 @@ const nextConfig: NextConfig = {
         headers: securityHeaders,
       },
       {
+        source: "/access/capture/:path*",
+        headers: [
+          ...securityHeaders.map(header => header.key === "Permissions-Policy" ? { ...header, value: "camera=(self), microphone=(), geolocation=()" } : header.key === "Referrer-Policy" ? { ...header, value: "no-referrer" } : header),
+          { key: "Cache-Control", value: "private, no-store, max-age=0" },
+        ],
+      },
+      {
+        source: "/my",
+        headers: securityHeaders.map(header => header.key === "Permissions-Policy" ? { ...header, value: "camera=(self), microphone=(), geolocation=()" } : header),
+      },
+      {
         source: "/identity",
         // Authenticated ID previews use short-lived browser blob URLs, never the shared image optimiser.
         headers: securityHeaders.map(header => header.key === "Content-Security-Policy"

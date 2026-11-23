@@ -407,6 +407,7 @@ model MapElement {
 }
 
 model Customer {
+  reservationArchivedAt DateTime?
   staffNotes CustomerNote[]
   id                   String             @id @default(cuid())
   organisationId       String
@@ -415,6 +416,9 @@ model Customer {
   firstName            String?
   lastName             String?
   companyName          String?
+  accessCompanyId      String?
+  accessCompany        Customer?          @relation("CompanyFacePeople", fields: [accessCompanyId], references: [id], onDelete: SetNull)
+  accessPeople         Customer[]         @relation("CompanyFacePeople")
   email                String?
   phone                String?
   phoneVerifiedAt      DateTime?
@@ -437,14 +441,20 @@ model Customer {
   biometricEnrollments BiometricEnrollment[]
   merchandiseRequests  TenantMerchandiseRequest[]
   integrationIdentityLink IntegrationIdentityLink?
+  hikCentralFaceCapture HikCentralFaceCapture?
+  hikCentralAccessGrants HikCentralAccessGrant[]
+  hikCentralAccessApproval HikCentralAccessApproval[]
+  hikCentralAccessLocks HikCentralAccessLock[]
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
   @@index([organisationId, email])
   @@index([organisationId, phone])
+  @@index([accessCompanyId])
 }
 
 model Lead {
+  lossReason String?
   enquiryLocation Json?
   productLine String @default("STORAGE")
   businessDetails Json?
@@ -755,6 +765,63 @@ model IntegrationIdentityLink {
   @@index([hikCentralPersonId])
 }
 
+model HikCentralAccessGrant {
+  id             String   @id @default(cuid())
+  organisationId String
+  facilityId     String
+  customerId     String
+  customer       Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  personId       String
+  accessLevelId  String
+  status         String   @default("PENDING")
+  lastError      String?
+  grantedAt      DateTime?
+  revokedAt      DateTime?
+  lastCheckedAt  DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([customerId, facilityId, accessLevelId])
+  @@index([organisationId, facilityId, status])
+}
+
+model HikCentralAccessApproval {
+  id             String   @id @default(cuid())
+  organisationId String
+  facilityId     String
+  customerId     String
+  customer       Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  approvedById   String
+  reason         String
+  photoId        String
+  photoVersion   Int
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([customerId, facilityId])
+  @@index([organisationId, facilityId, expiresAt])
+}
+
+model HikCentralAccessLock {
+  id             String   @id @default(cuid())
+  organisationId String
+  facilityId     String
+  customerId     String
+  customer       Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  lockedAt       DateTime
+  lockedById     String
+  unlockedAt     DateTime?
+  unlockedById   String?
+  reason         String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([customerId, facilityId])
+  @@index([organisationId, facilityId, lockedAt])
+}
+
 // Central, provider-independent record of an access decision. Deliberately
 // separate from the HikCentral/MEL provider calls that carry it out: `state`
 // tracks STOR24's own desired -> pending -> confirmed/failed lifecycle, so a
@@ -922,6 +989,69 @@ model LegacyAccessPhoto {
   @@index([status, expiresAt])
 }
 
+// The customer sees only a short-lived photo page on the separate Counter origin.
+model LegacyPhotoHandoff {
+  id String @id @default(cuid())
+  tokenHash String @unique
+  tenancyId String
+  photoVersion Int
+  issuedById String
+  organisationId String
+  facilityId String
+  expiresAt DateTime
+  usedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([tenancyId, expiresAt])
+}
+
+// The provider face belongs to a person/customer, independent of bookings and units.
+model HikCentralFaceCapture {
+  id String @id @default(cuid())
+  customerId String @unique
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  organisationId String
+  facilityId String
+  personId String?
+  firstNameSnapshot String?
+  lastNameSnapshot String?
+  version Int @default(1)
+  status String @default("WAITING_REVIEW")
+  encryptedImage String? @db.Text
+  imageSha256 String
+  policyVersion String
+  policyHash String
+  consentNotice String @db.Text
+  consentAt DateTime
+  expiresAt DateTime
+  reviewedAt DateTime?
+  transferStartedAt DateTime?
+  providerAcceptedAt DateTime?
+  erasedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, expiresAt])
+}
+
+model HikCentralFaceHandoff {
+  id String @id @default(cuid())
+  tokenHash String @unique
+  customerId String
+  organisationId String
+  facilityId String
+  personId String?
+  firstNameSnapshot String?
+  lastNameSnapshot String?
+  photoVersion Int
+  issuedById String
+  expiresAt DateTime
+  usedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([customerId, expiresAt])
+}
+
 // Nominations do not grant access and cannot substitute for the person's consent.
 model AdditionalAccessPerson {
   id            String @id @default(cuid())
@@ -944,6 +1074,22 @@ model AdditionalAccessPerson {
   updatedAt     DateTime @updatedAt
 
   @@index([reservationId, status])
+}
+
+// A short-lived, single-use link lets the nominated person consent on an unsigned tablet.
+model AdditionalPhotoHandoff {
+  id           String @id @default(cuid())
+  tokenHash    String @unique
+  personId     String
+  photoVersion Int
+  issuedById   String
+  organisationId String
+  facilityId   String
+  expiresAt    DateTime
+  usedAt       DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([personId, expiresAt])
 }
 
 model CollectionCase {
@@ -1656,6 +1802,13 @@ model MaintenanceRequest {
   assignedTo     User?             @relation(fields: [assignedToId], references: [id])
   title          String
   description    String?
+  jobCard            Boolean @default(false)
+  contractor         String?
+  scheduledFor       DateTime?
+  progressNotes      String?
+  completionEvidence String?
+  repairReportedAt   DateTime?
+  verificationNote   String?
   status         MaintenanceStatus @default(OPEN)
   priority       TaskPriority      @default(NORMAL)
   dueAt          DateTime?
@@ -2414,4 +2567,29 @@ model BillingRecognitionIssue {
   updatedAt DateTime @updatedAt
   @@unique([organisationId, groupKey])
   @@index([organisationId, status])
+
+}
+
+model MultiUnitMoveIn {
+  id String @id @default(cuid())
+  organisationId String
+  facilityId String
+  customerId String
+  requestKey String
+  requestHash String
+  items MultiUnitMoveInItem[]
+  createdAt DateTime @default(now())
+  @@unique([organisationId, requestKey])
+}
+
+model MultiUnitMoveInItem {
+  id String @id @default(cuid())
+  batchId String
+  batch MultiUnitMoveIn @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  unitId String
+  unitNumber String
+  documentId String
+  accountId String
+  tenancyId String
+  @@unique([batchId, unitId])
 }

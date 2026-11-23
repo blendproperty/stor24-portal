@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Isolated delegates model only the exercised authorization boundaries. */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { build } from "esbuild";
+import { build } from "./integration/build-commonjs";
 import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
 import { newIdentityAccess } from "../src/lib/booking-access";
@@ -48,6 +48,26 @@ test("assisted legacy photo capture requires same-origin access management",asyn
   assert.equal((await route.POST(request('https://foreign.invalid'))).status,403);assert.equal(db.calls,0);
   db.denied=true;assert.equal((await route.POST(request('https://fixture.invalid'))).status,403);assert.equal(db.calls,0);
   db.denied=false;assert.equal((await route.POST(request('https://fixture.invalid'))).status,201);assert.deepEqual(db.permissionNames,['access.manage','access.manage']);assert.equal(db.calls,1);
+});
+
+test("move-in staff can capture only the exact primary photo trial",async()=>{
+  const database:Bag={calls:0,permissionNames:[],legacyAccessPhoto:{findFirst:async()=>({tenancyId:"other",policyVersion:"unit58-primary-photo-only-trial-2026-11-16"})}};
+  const route=await load("src/app/api/v1/access/legacy-trial-photo/route.ts",database,restricted,{
+    "scope":"export const requirePermissionScope=async p=>{__db.permissionNames.push(p);if(p!=='move_in.create')throw Error('FORBIDDEN');return __auth};export const facilityWhere=()=>({id:'own'});",
+    "unit58-primary-photo-trial":"export const primaryTrialPolicy=async(_db,_org,id)=>id==='unit58'?{enabled:true}:null;",
+    "request-security":"export const sameOrigin=r=>r.headers.get('origin')==='https://fixture.invalid';export const rateLimit=async()=>false;",
+    "dlp-transfer-service":"export const protectDlpResponse=async r=>r;",
+    "legacy-access-photo":"export const submitAssistedLegacyPhoto=async()=>{__db.calls++;return {id:'test'}};export const withdrawAssistedLegacyPhoto=async()=>{__db.calls++};export const previewLegacyPhoto=async()=>{__db.calls++;return new Uint8Array()};export const reviewLegacyPhoto=async()=>{__db.calls++};",
+  });
+  const request=(id:string,origin="https://fixture.invalid")=>{const form=new FormData();form.set('tenancyId',id);form.set('image',new File(['test'],'test.jpg',{type:'image/jpeg'}));return new Request('https://fixture.invalid/api/v1/access/legacy-trial-photo?action=assisted-submit',{method:'POST',headers:{origin},body:form});};
+  assert.equal((await route.POST(request('unit58','https://foreign.invalid'))).status,403);
+  assert.equal((await route.POST(request('other'))).status,403);
+  assert.equal(database.calls,0);
+  assert.equal((await route.POST(request('unit58'))).status,201);
+  assert.equal(database.calls,1);
+  assert.equal((await route.GET(new Request('https://fixture.invalid/api/v1/access/legacy-trial-photo?id=other'))).status,403);
+  assert.equal(database.calls,1);
+  assert.ok(database.permissionNames.every((name:string)=>name==='move_in.create'));
 });
 
 test("reporting and move-in pages use their own permission scope despite unrelated facility/global roles", async () => {
@@ -146,6 +166,7 @@ test("global credential save and facility mapping retain their distinct legitima
   const db = {
     facility: { findFirst: async ({ where }: Bag) => where.AND[0].id === own && where.AND[1].organisationId === "org" ? { id: own } : null },
     integrationConnection: { findFirst: async () => null, create: async ({ data }: Bag) => { writes.push(data); return { id: "connection", ...data }; } },
+    hikCentralAccessGrant: { count: async () => 0 },
     auditEvent: { create: async () => ({}) },
   };
   try {
@@ -155,6 +176,8 @@ test("global credential save and facility mapping retain their distinct legitima
     assert.notEqual(writes[0].config.appSecretEncrypted, "synthetic-secret");
     await service.saveHikCentralMapping(restricted, { facilityId: own, organisationIndexCode: "synthetic", doorIndexCodes: ["door"] });
     assert.equal(writes.length, 2); assert.equal(writes[1].facilityId, own);
+    await assert.rejects(service.saveHikCentralMapping(restricted, { facilityId: own, organisationIndexCode: "TEMP-CONNECTION-TEST", doorIndexCodes: ["door"] }), /Use a verified HikCentral organisation index code/);
+    assert.equal(writes.length, 2);
     await assert.rejects(service.saveHikCentralMapping(restricted, { facilityId: foreign, organisationIndexCode: "synthetic", doorIndexCodes: ["door"] }), /FACILITY_FORBIDDEN/);
     assert.equal(writes.length, 2);
   } finally { if (previous === undefined) delete process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY; else process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY = previous; }

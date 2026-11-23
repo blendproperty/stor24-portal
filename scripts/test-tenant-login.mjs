@@ -138,6 +138,27 @@ try {
   await expect(page.locator(".tenant-photo-details")).not.toHaveAttribute("open", "");
   assert.deepEqual(errors,[]);await page.close();
  }
+ {
+  const page=await browser.newPage({viewport:{width:390,height:900}}), errors=[], nominations=[];
+  page.on("pageerror",error=>errors.push(error.message));
+  await page.route("**/api/**",route=>{
+   const path=new URL(route.request().url()).pathname;
+   if(path==="/api/tenant/additional-access-people"){
+    if(route.request().method()==="POST") { nominations.push(route.request().postDataJSON()); return route.fulfill({json:{data:{id:"person-1",name:"Synthetic Test Person",status:"NOMINATED"}}}); }
+    return route.fulfill({json:{data:[]}});
+   }
+   if(path==="/api/tenant/accounts")return route.fulfill({json:{data:{accounts:[{id:"account-58",accountNumber:"TEST-58",balance:"0",currency:"ZAR",tenancy:{id:"tenancy-58",status:"DRAFT",facility:{name:"Training store"},occupancies:[{unit:{id:"unit-58",number:"58"}}]}}],documents:[{id:"signed-58",type:"LEASE_AGREEMENT",createdAt:new Date().toISOString(),tenancy:{accountId:"account-58"}}],agreements:[],payments:[],merchandiseRequests:[],expiresAt:new Date(Date.now()+1800000).toISOString(),units:[{key:"account:account-58",unitId:"unit-58",number:"58",facilityName:"Training store",accountId:"account-58",status:"DRAFT",accessState:"PENDING",reservations:[{id:"booking-58",publicReference:"ST24-PREVIEW",packageSelection:null}]}]}}});
+   return route.fulfill({status:404,json:{error:"Synthetic unavailable"}});
+  });
+  await page.goto(`http://127.0.0.1:${server.address().port}/my?step=access-photo`);
+  await expect(page.getByRole("heading",{name:"Additional people"})).toBeVisible();
+  await page.getByLabel("Full name").fill("Synthetic Test Person");
+  await page.getByRole("button",{name:"Add person"}).click();
+  await expect(page.getByText("Synthetic Test Person — nominated, access not active")).toBeVisible();
+  assert.deepEqual(nominations,[{reservationId:"booking-58",name:"Synthetic Test Person"}]);
+  assert.deepEqual(errors,[]);await page.close();
+ }
+ console.log("PASS signed-tenancy Unit 58 nomination remains visible and uses its linked booking without activating access");
  console.log("PASS customer dashboard at 1440/1024/768/390/320px: responsive columns, section navigation and mobile touch targets; UAT regressions: visible package/items, test statement explanation, pending/accepted/replacement/missing identity, refresh, released package, hidden review balance and unit isolation; zero writes");
  console.log("PASS move-in: single section at desktop/390/320px, precinct purpose, held upload, staff-only link removed, payment blocker preserved, active/revoked states");
  console.log("PASS desktop/mobile: editable prefill, fragment removed, no automatic OTP, changed email payload, code reset, invalid/no hint and no overflow");

@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import { authErrorResponse, requirePermission } from "@/lib/auth-guards";
+import { MIDPOINT_JOB_CARD_ROLE, MIDPOINT_MAINTENANCE_MANAGER, MIDPOINT_STORE, midpointMaintenanceRole, validMidpointJobCardRole } from "@/lib/maintenance-job-policy";
+import { sameOrigin } from "@/lib/request-security";
 import { db } from "@/lib/db";
 import { operationsTaskPage } from "@/lib/operations-task-service";
 import { currentRoleAccess } from "@/lib/current-role-access";
@@ -12,10 +14,16 @@ export async function GET() {
   try {
     const { organisationId, allowedFacilityIds, user } = await requirePermission("operations.view");
     const facilityScope = allowedFacilityIds ? { in: allowedFacilityIds } : undefined;
-    const [tasks, notes, maintenance, products, storagePackages, dailyCloses, facilities, taskPage] = await Promise.all([
+    const [tasks, notes, maintenance, jobCards, products, storagePackages, dailyCloses, facilities, taskPage] = await Promise.all([
       db.task.findMany({ omit: { operationalChecklist: true, operationalForm: true }, where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { facility: true, assignee: { select: { id: true, name: true } } }, orderBy: [{ status: "asc" }, { dueAt: "asc" }], take: 100 }),
       db.unitNote.findMany({ where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { unit: true, author: { select: { id: true, name: true } } }, orderBy: { createdAt: "desc" }, take: 30 }),
-      db.maintenanceRequest.findMany({ where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { facility: true, unit: true, assignedTo: { select: { id: true, name: true } } }, orderBy: [{ status: "asc" }, { dueAt: "asc" }], take: 100 }),
+      db.maintenanceRequest.findMany({ where: { organisationId, jobCard: false, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { facility: true, unit: true, assignedTo: { select: { id: true, name: true } } }, orderBy: [{ status: "asc" }, { dueAt: "asc" }], take: 100 }),
+      db.maintenanceRequest.findMany({
+        where: { organisationId, jobCard: true, ...(facilityScope ? { facilityId: facilityScope } : {}) },
+        include: { facility: { select: { name: true } }, unit: { select: { number: true } }, assignedTo: { select: { name: true } } },
+        orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
+        take: 100,
+      }),
       db.product.findMany({ where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { facility: true }, orderBy: { name: "asc" } }),
       db.storagePackage.findMany({ where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { facility: true, items: { include: { product: true } } }, orderBy: [{ facilityId: "asc" }, { sortOrder: "asc" }, { name: "asc" }] }),
       db.dailyClose.findMany({ where: { organisationId, ...(facilityScope ? { facilityId: facilityScope } : {}) }, include: { facility: true, closedBy: { select: { id: true, name: true } } }, orderBy: { businessDate: "desc" }, take: 30 }),
@@ -34,8 +42,11 @@ export async function GET() {
       }),
       operationsTaskPage({ organisationId, userId: user.id, facilityIds: allowedFacilityIds ?? [], unrestrictedFacilities: allowedFacilityIds === null }),
     ]);
+    const midpoint = facilities.find(facility => facility.name === MIDPOINT_STORE);
+    const jobCardRole = midpoint && currentRoleAccess(user.roleAssignments, "operations.manage", midpoint.id).allowed
+      ? midpointMaintenanceRole(user.email) : null;
     const dailyCloseFacilityIds = facilities.filter(facility => currentRoleAccess(user.roleAssignments, "daily_close.perform", facility.id).allowed).map(facility => facility.id);
-    return Response.json({ data: { tasks, notes, maintenance, products, storagePackages, dailyCloses, facilities, dailyCloseFacilityIds, taskPage } });
+    return Response.json({ data: { tasks, notes, maintenance, jobCards, products, storagePackages, dailyCloses, facilities, dailyCloseFacilityIds, taskPage, jobCardRole } });
   } catch (error) { return authErrorResponse(error); }
 }
 
@@ -84,10 +95,15 @@ export async function POST(request: Request) {
       if (!unit) throw new Error("FORBIDDEN");
       result = await createAudited(tx => tx.unitNote.create({ data: { organisationId, authorId: user.id, ...input } }));
     } else if (body.kind === "maintenance") {
-      const input = maintenanceSchema.parse(body.payload);
+      const { jobCard = false, ...input } = maintenanceSchema.parse(body.payload);
       await ensureFacility(input.facilityId);
+      if (jobCard && (!sameOrigin(request) || midpointMaintenanceRole(user.email) !== "verifier" ||
+        !await db.facility.count({ where: { id: input.facilityId, organisationId, name: MIDPOINT_STORE, active: true } }))) {
+        throw new Error("FORBIDDEN");
+      }
       result = await db.$transaction(async (tx) => {
         if (input.unitId) {
+          await tx.$queryRaw`SELECT "id" FROM "Unit" WHERE "id" = ${input.unitId} AND "facilityId" = ${input.facilityId} FOR UPDATE`;
           const unit = await tx.unit.findFirst({ where: { id: input.unitId, facilityId: input.facilityId } });
           if (!unit) throw new Error("FORBIDDEN");
           if (!["AVAILABLE", "SERVICE"].includes(unit.status)) throw new Error("UNIT_NOT_AVAILABLE");
@@ -96,7 +112,20 @@ export async function POST(request: Request) {
             if (claimed.count !== 1) throw new Error("UNIT_NOT_AVAILABLE");
           }
         }
-        const maintenance = await tx.maintenanceRequest.create({ data: { organisationId, ...input, dueAt: input.dueAt ? new Date(input.dueAt) : undefined } });
+        let assignedToId: string | undefined;
+        if (jobCard) {
+          const staff = await tx.user.findMany({
+            where: { organisationId, active: true, email: { equals: MIDPOINT_MAINTENANCE_MANAGER, mode: "insensitive" } },
+            select: { id: true, email: true, roleAssignments: { include: { role: true, facility: true } } },
+          });
+          assignedToId = staff.length === 1 && staff[0].roleAssignments.some(assignment =>
+            assignment.facilityId === input.facilityId && assignment.role.name === MIDPOINT_JOB_CARD_ROLE &&
+            validMidpointJobCardRole(staff[0].email, assignment.role.permissions, assignment.facility))
+            ? staff[0].id : undefined;
+        }
+        const maintenance = await tx.maintenanceRequest.create({
+          data: { organisationId, ...input, jobCard, assignedToId, dueAt: input.dueAt ? new Date(input.dueAt) : undefined },
+        });
         await tx.auditEvent.create({ data: { organisationId, actorId: user.id, action: "maintenance.create", entityType: "maintenance", entityId: maintenance.id, after: maintenance } });
         return maintenance;
       });

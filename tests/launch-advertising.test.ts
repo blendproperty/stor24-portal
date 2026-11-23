@@ -22,6 +22,7 @@ test("every approved launch creative retains only its verified platform metadata
 });
 
 test("unknown, mixed-platform, mismatched and identifying tags fail closed without raw text", () => {
+  assert.deepEqual(advertisingFromSearch("utm_source=google&utm_medium=cpc&utm_campaign=stor24_midrand_pmax&utm_id=24452876850&utm_content=ad_123"),{campaign:"stor24_midrand_pmax",campaignId:"24452876850"});
   const base="utm_source=google&utm_medium=cpc&utm_campaign=stor24_midrand_search";
   assert.deepEqual(advertisingFromSearch(base+"&utm_content=private@example.invalid&utm_term=private@example.invalid"),{campaign:"stor24_midrand_search",campaignId:"24315694704"});
   for (const query of ["utm_campaign=private@example.invalid",base.replace("google","facebook"),base.replace("cpc","social"),base+"&utm_id=24315692802",base.replace("stor24_midrand_search","__proto__")]) assert.equal(advertisingFromSearch(query),undefined);

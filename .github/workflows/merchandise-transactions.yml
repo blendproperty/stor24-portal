@@ -113,10 +113,12 @@ jobs:
       - run: npx tsx --test tests/integration/bulk-unit-pricing.test.ts
       - run: npx tsx --test tests/integration/operational-checklists.test.ts
       - run: npx tsx --test tests/integration/operational-forms.test.ts
+      - run: npx tsx --test tests/integration/midpoint-maintenance-job-cards.test.ts
       - run: npx tsx --test tests/integration/scheduled-work.test.ts
       - run: npx tsx --test tests/integration/faeez-workflow-permissions.test.ts
       - run: npx tsx --test tests/integration/micro-warehousing.test.ts
       - run: npx tsx --test tests/integration/facial-photos.test.ts
+      - run: npx tsx --test tests/integration/hikcentral-face-capture.test.ts
       - run: npx tsx --test tests/integration/identity-documents.test.ts
       - run: npx tsx --test tests/integration/recurring-charge-report.test.ts
       - run: npx tsx --test tests/integration/billing-plan-history-evidence.test.ts
@@ -130,10 +132,15 @@ jobs:
         env:
           NODE_ENV: test
       - run: npx tsx --test tests/integration/next-month-review.test.ts
+
+      - run: npx tsx --test tests/integration/multi-unit-reservation.test.ts
+      - run: npx tsx --test tests/integration/multi-unit-move-in.test.ts
       - run: npx tsx --test tests/integration/initial-rent.test.ts
       - run: npx tsx --test tests/integration/rent-reviews.test.ts
       - run: npx tsx --test tests/integration/lead-sla.test.ts
       - run: npx tsx --test tests/integration/whatchimp-enquiry.test.ts
+      - run: npx tsx --test tests/integration/whatchimp-social.test.ts
+      - run: npx tsx --test tests/integration/whatchimp-social-provision.test.ts
       - run: npx tsx --test tests/integration/debit-order-runs.test.ts
       - run: npx tsx --test tests/integration/debit-mandate-session.test.ts
       - run: npx tsx --test tests/integration/mandate-report-recovery.test.ts
@@ -170,6 +177,7 @@ jobs:
         run: npx tsx scripts/test-synthetic-restore.ts
         env:
           POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+      - run: npx tsx --test tests/integration/blendsign-webhook-safety.test.ts
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:

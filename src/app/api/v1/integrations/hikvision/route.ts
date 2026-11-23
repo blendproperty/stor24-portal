@@ -1,7 +1,7 @@
 import { ZodError } from "zod";
 
 import { authErrorResponse } from "@/lib/auth-guards";
-import { listHikCentralConfiguration, saveHikCentralCredentials, saveHikCentralMapping, testHikCentralConnection } from "@/lib/integrations/hikcentral-configuration";
+import { discoverHikCentralDoors, inspectHikCentralAccess, listHikCentralConfiguration, saveHikCentralCredentials, saveHikCentralMapping, testHikCentralConnection } from "@/lib/integrations/hikcentral-configuration";
 import { requirePermissionScope } from "@/lib/scope";
 
 export const dynamic = "force-dynamic";
@@ -46,6 +46,14 @@ export async function POST(request: Request) {
   try {
     const body = await request.json() as { action?: string; facilityId?: string };
     const scope = await requirePermissionScope("integrations.manage", body.facilityId);
+    if (body.action === "discover-doors" && body.facilityId) {
+      const result = await discoverHikCentralDoors(scope, body.facilityId);
+      return Response.json({ data: result }, { status: result.ok ? 200 : 422 });
+    }
+    if (body.action === "inspect-access" && body.facilityId) {
+      const result = await inspectHikCentralAccess(scope, body.facilityId);
+      return Response.json({ data: result }, { status: result.ok ? 200 : 422 });
+    }
     if (body.action !== "test-connection" || !body.facilityId) return Response.json({ error: { code: "UNKNOWN_ACTION", message: "Select a facility to test." } }, { status: 400 });
     const result = await testHikCentralConnection(scope, body.facilityId);
     return Response.json({ data: result, configuration: await listHikCentralConfiguration(scope) }, { status: result.ok ? 200 : 422 });

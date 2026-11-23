@@ -61,6 +61,14 @@
       "household storage midrand"
     ]
   },
+  "stor24_midrand_pmax": {
+    "id": "24452876850",
+    "name": "STOR24 | Performance Max | Midrand",
+    "source": "google",
+    "medium": "cpc",
+    "ads": {},
+    "keywords": []
+  },
   "stor24_micro_warehouse": {
     "id": "24352709658",
     "name": "STOR24 | Micro-Warehouse",

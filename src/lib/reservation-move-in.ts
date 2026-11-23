@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
 import { facilityWhere, type RequestScope } from "@/lib/scope";
 import { southAfricaDateKey } from "@/lib/south-africa-time";
+import { reconcileCustomerAndCompanyPeople } from "@/lib/hikcentral-customer-access";
 
 type Database = Prisma.TransactionClient;
 const reservationInclude = {
@@ -84,9 +85,9 @@ export async function getReservationMoveInReadiness(scope: RequestScope, reserva
   return (await reservationReadiness(db, scope, reservationId)).view;
 }
 
-/** Caller authorises move_in.create for this facility. No signing dispatch, payment posting or door provisioning. */
+/** Caller authorises move_in.create for this facility. Provider access is reconciled only after handover commits. */
 export async function confirmReservationMoveIn(scope: RequestScope, reservationId: string) {
-  return db.$transaction(async tx => {
+  const completed = await db.$transaction(async tx => {
     const target = await tx.reservation.findFirst({ where: { id: reservationId, facility: facilityWhere(scope), customer: { organisationId: scope.organisationId } }, select: { unitId: true, facilityId: true } });
     if (!target) throw new Error("NOT_FOUND");
     await requireOperationalUnit(tx, target.facilityId, target.unitId);
@@ -140,4 +141,14 @@ export async function confirmReservationMoveIn(scope: RequestScope, reservationI
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: existing.facilityId, actorId: scope.userId, action: "tenancy.key_handover_confirmed", entityType: "Tenancy", entityId: tenancy.id, after: { reservationId, accountId: state.account.id, leaseId: lease.id, paymentIds: state.receipts.map(payment => payment.id), requiredAmount: state.view.requiredAmount, paidAmount: state.view.paidAmount, accessState: "PENDING" } } });
     return { tenancyId: tenancy.id, idempotent: false };
   });
+  if (!completed.idempotent) {
+    const tenancy = await db.tenancy.findUniqueOrThrow({ where: { id: completed.tenancyId }, select: { customerId: true, facilityId: true } });
+    const photo = await db.hikCentralFaceCapture.findFirst({ where: { customerId: tenancy.customerId, status: "PROVIDER_ACCEPTED" } });
+    const companyPhoto = await db.hikCentralFaceCapture.findFirst({ where: { customer: { accessCompanyId: tenancy.customerId }, status: "PROVIDER_ACCEPTED" } });
+    if (photo || companyPhoto) {
+      try { await reconcileCustomerAndCompanyPeople(scope, tenancy.customerId, tenancy.facilityId); }
+      catch (error) { await db.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: tenancy.facilityId, actorId: scope.userId, action: "hikcentral_face.access_reconcile_failed", entityType: "Tenancy", entityId: completed.tenancyId, after: { customerId: tenancy.customerId, code: error instanceof Error ? error.message : "UNKNOWN" } } }); }
+    }
+  }
+  return completed;
 }

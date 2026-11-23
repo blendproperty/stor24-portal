@@ -7,7 +7,7 @@ import { tenantCodeHash, tenantTokenHash } from "../src/lib/tenant-portal-securi
 test("OTP verification consumes once, rejects expired/exhausted and changed owners", async () => {
   const previousSecret = process.env.AUTH_SECRET;
   process.env.AUTH_SECRET = "isolated-test-secret-not-used-in-production";
-  let attempts = 0, consumed = false, expired = false, eligible = true;
+  let attempts = 0, consumed = false, expired = false, eligible = true, emailVerified = false;
   const sessions: { tokenHash: string; customerIds: string[] }[] = [];
   const id = "test-challenge";
   const fake = { tenantPortalChallenge: { updateMany: async () => {
@@ -19,7 +19,11 @@ test("OTP verification consumes once, rejects expired/exhausted and changed owne
     return eligible ? [{ id: "own" }] : [];
   } }, $transaction: async (work: (tx: unknown) => Promise<void>) => work({
     $executeRaw: async () => 1,
-    customer: { findMany: async () => eligible ? [{ id: "own" }] : [] },
+    customer: { findMany: async ({ where }: { where: { emailVerifiedAt?: { not: null }; OR?: unknown[] } }) => {
+      if (where.emailVerifiedAt) return eligible && emailVerified ? [{ id: "own" }] : [];
+      assert.ok(where.OR, "signed staff lease is checked again when verifying the code");
+      return eligible ? [{ id: "own", emailVerifiedAt: emailVerified ? new Date() : null }] : [];
+    }, update: async ({ where }: { where: { id: string } }) => { assert.equal(where.id, "own"); emailVerified = true; } },
     tenantPortalChallenge: { updateMany: async () => { if (consumed) return { count: 0 }; consumed = true; return { count: 1 }; } },
     tenantPortalSession: { create: async ({ data }: { data: { tokenHash: string; customerIds: string[] } }) => { sessions.push(data); } },
     auditEvent: { create: async () => ({}) },
@@ -32,6 +36,7 @@ test("OTP verification consumes once, rejects expired/exhausted and changed owne
     await assert.rejects(verify(id, "123456"), /INVALID_CODE/);
     eligible = true;
     const token = await verify(id, "123456");
+    assert.equal(emailVerified, true, "valid email code verifies a signed staff customer");
     assert.equal(sessions.length, 1);
     assert.equal(sessions[0].tokenHash, tenantTokenHash(token));
     assert.deepEqual(sessions[0].customerIds, ["own"]);

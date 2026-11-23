@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
-import { build } from "esbuild";
+import { build } from "./build-commonjs";
 import { db } from "../../src/lib/db";
 import { verificationHash, emailVerificationHash, verifyPublicReservation, verifyPublicReservationEmail } from "../../src/lib/public-booking-service";
 import { normalizeTwilioRecipient } from "../../src/lib/integrations/twilio-provider";

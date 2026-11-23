@@ -77,7 +77,7 @@ export function ReservationsWorkspace({initialCustomerId="",canReviewPrices=fals
   const [lifecycleBusy, setLifecycleBusy] = useState(false);
   const [lifecycleBlocked, setLifecycleBlocked] = useState(false);
   const uncertainLifecycle = "We could not confirm the reservation change. Review its current status before trying again. After checking, reload this page to start another change.";
-  const uncertainCreate = "We could not confirm whether the reservation was created. Review reservations before trying again. After checking the unit, reload this page to start another save.";
+  const uncertainCreate = "We could not confirm whether the reservations were created. Review the customer and all selected units before trying again. After checking, reload this page to start another save.";
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [readBusy, setReadBusy] = useState(true);
@@ -137,8 +137,10 @@ export function ReservationsWorkspace({initialCustomerId="",canReviewPrices=fals
   );
   async function create(form: FormData) {
     if (createRequest.current || lifecycleRequest.current || lifecycleBlocked || createBlocked || !loaded || readBusy) return;
+    const selectedUnits = form.getAll("unitId").map(String);
+    if (!selectedUnits.length) { setError("Select at least one available unit."); return; }
     const input = {
-      facilityId: String(form.get("facilityId") ?? ""), customerId: String(form.get("customerId") ?? ""), unitId: String(form.get("unitId") ?? ""), quotedRate: String(form.get("quotedRate") ?? ""),
+      facilityId: String(form.get("facilityId") ?? ""), customerId: String(form.get("customerId") ?? ""), unitId: selectedUnits[0], quotedRate: String(form.get(`quotedRate:${selectedUnits[0]}`) ?? ""),
       holdExpiresAt: String(form.get("holdExpiresAt") ?? "") || undefined, intendedMoveIn: String(form.get("intendedMoveIn") ?? "") || undefined,
     };
     const controller = new AbortController(); createRequest.current = controller;
@@ -147,24 +149,23 @@ export function ReservationsWorkspace({initialCustomerId="",canReviewPrices=fals
     setError("");
     setNotice("");
     try {
-      const response = await fetch("/api/v1/reservations", { method: "POST", signal: controller.signal, headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
+      const batch = selectedUnits.length > 1;
+      const body = batch ? { facilityId: input.facilityId, customerId: input.customerId, holdExpiresAt: input.holdExpiresAt, intendedMoveIn: input.intendedMoveIn, units: selectedUnits.map(unitId => ({ unitId, quotedRate: Number(form.get(`quotedRate:${unitId}`)) })) } : input;
+      const response = await fetch(batch ? "/api/v1/reservations/batch" : "/api/v1/reservations", { method: "POST", signal: controller.signal, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       if (response.status === 401 || response.status === 403) {
         setDialog(false); setData(emptyData); setLoaded(false); setFacilityId(""); setQuery(""); setSignedOut(response.status === 401);
         setReadError(response.status === 401 ? "Your session has ended. Sign in again to create reservations." : "Reservation access is unavailable. Please contact your administrator if you require access."); return;
       }
       if ([400, 404, 409, 422].includes(response.status)) {
-        setError(response.status === 409 ? "That unit is no longer available. Refresh and choose another unit." : "Check the reservation details and try again."); return;
+        setError(response.status === 409 ? "One or more units are no longer available. Refresh and choose again." : "Check the reservation details and try again."); return;
       }
       if (!response.ok) throw new Error("RESERVATION_SAVE_UNCERTAIN");
-      const confirmation = z.object({ data: z.object({
-        id: z.string().min(1), status: z.literal("ACTIVE"), facilityId: z.literal(input.facilityId), customerId: z.literal(input.customerId), unitId: z.literal(input.unitId),
-        quotedRate: money.refine(value => Number(value) === Number(input.quotedRate)),
-        holdExpiresAt: input.holdExpiresAt ? z.literal(new Date(input.holdExpiresAt).toISOString()) : z.null(),
-        intendedMoveIn: input.intendedMoveIn ? z.literal(new Date(input.intendedMoveIn).toISOString()) : z.null(),
-      }) });
-      confirmation.parse(await response.json());
+      const row = z.object({ id: z.string().min(1), status: z.literal("ACTIVE"), facilityId: z.literal(input.facilityId), customerId: z.literal(input.customerId), unitId: z.string().min(1), quotedRate: money, holdExpiresAt: input.holdExpiresAt ? z.literal(new Date(input.holdExpiresAt).toISOString()) : z.null(), intendedMoveIn: input.intendedMoveIn ? z.literal(new Date(input.intendedMoveIn).toISOString()) : z.null() });
+      const payload = await response.json();
+      const confirmed = batch ? z.array(row).length(selectedUnits.length).parse(payload.data) : [row.parse(payload.data)];
+      if (new Set(confirmed.map(item => item.unitId)).size !== selectedUnits.length || confirmed.some(item => !selectedUnits.includes(item.unitId) || Number(item.quotedRate) !== Number(form.get(`quotedRate:${item.unitId}`)))) throw new Error("RESERVATION_CONFIRMATION_MISMATCH");
       if (controller.signal.aborted) throw new Error("RESERVATION_SAVE_TIMEOUT");
-      setDialog(false); setNotice("Reservation created and the unit is now held.");
+      setDialog(false); setNotice(`${selectedUnits.length} reservation${selectedUnits.length === 1 ? "" : "s"} created and the selected unit${selectedUnits.length === 1 ? " is" : "s are"} now held.`);
       await load();
     } catch {
       setCreateBlocked(true); setError(uncertainCreate);
@@ -534,7 +535,7 @@ function ReservationDialog({
               ))}
             </select>
           </label>
-          <div className="inventory-form-wide"><ReservationUnitPicker key={facilityId} units={units} maps={data.facilities.find(f=>f.id===facilityId)?.maps ?? []} initialUnitId={units[0]?.id}/></div>
+          <div className="inventory-form-wide"><ReservationUnitPicker key={facilityId} units={units} maps={data.facilities.find(f=>f.id===facilityId)?.maps ?? []} multiple/></div>
           <label>
             Hold expires
             <input
@@ -564,7 +565,7 @@ function ReservationDialog({
               disabled={busy || blocked || !units.length}
             >
               <CalendarCheck size={15} />
-              {busy ? "Reserving…" : "Reserve unit"}
+              {busy ? "Reserving…" : "Reserve selected units"}
             </button>
             {blocked ? <button type="button" className="button button-secondary" onClick={review}>Review reservations</button> : null}
           </div>
