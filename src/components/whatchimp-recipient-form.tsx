@@ -17,7 +17,10 @@ export function WhatChimpRecipientForm() {
       if (!response.ok) throw Error();
       const refreshed = await fetch('/api/v1/integrations/whatchimp-enquiry-recipient', { cache: 'no-store' });
       if (!refreshed.ok) throw Error();
-      setSettings((await refreshed.json()).data); setMessage('Recipient saved.');
+      const data: Settings = (await refreshed.json()).data;
+      setSettings(data);
+      if (!data.connections.some(c => c.facilityId === facility && c.recipientUserId === recipient)) throw Error();
+      setMessage('Recipient saved.');
     } catch { setMessage('Could not save. Check the facility and recipient permissions.'); }
   }
   return <section className="panel panel-spacious"><h2>WhatsApp enquiry follow-up</h2><p>Choose who receives new WhatsApp enquiries for a connected store.</p>

@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { db } from '../../src/lib/db';
 import { captureWhatChimpEnquiry } from '../../src/lib/whatchimp-enquiry-service';
-import { sendWhatChimpNotice } from '../../src/lib/whatchimp-enquiry-notice';
+import { processWhatChimpNotices, sendWhatChimpNotice } from '../../src/lib/whatchimp-enquiry-notice';
 import { keyHash, WHAT_CHIMP_DOMAIN, WHAT_CHIMP_NOTICE } from '../../src/lib/whatchimp-enquiry-contract';
+import { configureEnquiryRecipient } from '../../src/lib/whatchimp-enquiry-recipient';
+import { POST as configureRoute } from '../../src/app/api/v1/integrations/whatchimp-enquiry-recipient/route';
 
 test('WhatsApp capture assigns an authorised recipient and sends only one notice', async () => {
   assert.equal(process.env.MERCHANDISE_DB_TEST, 'isolated-ci');
@@ -13,10 +15,24 @@ test('WhatsApp capture assigns an authorised recipient and sends only one notice
   const org = await db.organisation.create({ data: { name: 'WhatsApp fixture', slug: id } });
   try {
     const facility = await db.facility.create({ data: { organisationId: org.id, code: id, name: 'Fixture store' } });
+    const owner = await db.user.create({ data: { organisationId: org.id, name: 'Owner', email: `owner-${id}@example.invalid`, passwordHash: 'fixture' } });
     const user = await db.user.create({ data: { organisationId: org.id, name: 'Fixture staff', email: `${id}@example.invalid` } });
+    const ownerRole = await db.role.create({ data: { organisationId: org.id, name: 'Organisation owner', permissions: [] } });
+    await db.roleAssignment.create({ data: { userId: owner.id, roleId: ownerRole.id } });
     const role = await db.role.create({ data: { organisationId: org.id, name: 'Fixture sales', permissions: ['leads.view', 'leads.manage'] } });
     await db.roleAssignment.create({ data: { userId: user.id, roleId: role.id, facilityId: facility.id } });
-    const config = await db.configurationProfile.create({ data: { organisationId: org.id, facilityId: facility.id, domain: WHAT_CHIMP_DOMAIN, name: 'bot475943', status: 'READY', config: { enabled: true, botId: '475943', keyHash: keyHash(token), facilityId: facility.id, recipientUserId: user.id, recipientEmail: user.email } } });
+    const config = await db.configurationProfile.create({ data: { organisationId: org.id, facilityId: facility.id, domain: WHAT_CHIMP_DOMAIN, name: 'bot475943', status: 'READY', config: { enabled: true, botId: '475943', keyHash: keyHash(token), facilityId: facility.id } } });
+    const actor = { id: owner.id, organisationId: org.id, sessionVersion: owner.sessionVersion }, settings = { facilityId: facility.id, recipientUserId: user.id };
+    await assert.rejects(configureEnquiryRecipient({ ...actor, sessionVersion: actor.sessionVersion + 1 }, settings), /FORBIDDEN/);
+    await assert.rejects(configureEnquiryRecipient(actor, { ...settings, facilityId: 'wrong' }), /INTAKE_RECIPIENT_INVALID/);
+    await db.roleAssignment.deleteMany({ where: { userId: user.id } });
+    await assert.rejects(configureEnquiryRecipient(actor, settings), /INTAKE_RECIPIENT_INVALID/);
+    await db.roleAssignment.create({ data: { userId: user.id, roleId: role.id, facilityId: facility.id } });
+    await configureEnquiryRecipient(actor, settings);
+    const csrf = new Request('http://localhost/api/v1/integrations/whatchimp-enquiry-recipient', { method: 'POST', headers: { origin: 'https://other.invalid', 'content-type': 'application/json' }, body: '{}' });
+    assert.equal((await configureRoute(csrf)).status, 403);
+    const audit = JSON.stringify(await db.auditEvent.findMany({ where: { organisationId: org.id } }));
+    assert.ok(!audit.includes(token) && !audit.includes(keyHash(token)));
     const call = (phone: string) => captureWhatChimpEnquiry(config.id, { action: 'start', botId: '475943', phone }, new Date(), keyHash(token));
     const [one, again] = await Promise.all([call('+27810000001'), call('+27810000001')]);
     assert.equal(one.leadReference, again.leadReference);
@@ -33,7 +49,13 @@ test('WhatsApp capture assigns an authorised recipient and sends only one notice
     await sendWhatChimpNotice(failed.id, send);
     assert.equal(sent, 1);
     assert.equal((await db.configurationProfile.findUniqueOrThrow({ where: { id: failed.id } })).status, 'REVIEW_REQUIRED');
+    assert.equal((await processWhatChimpNotices(org.id)).review, 1);
+    const pending = await call('+27810000004');
+    const withheld = await db.configurationProfile.findFirstOrThrow({ where: { organisationId: org.id, domain: WHAT_CHIMP_NOTICE, name: pending.leadReference! } });
     await db.roleAssignment.deleteMany({ where: { userId: user.id } });
+    await sendWhatChimpNotice(withheld.id, send);
+    assert.equal(sent, 1);
+    assert.equal((await db.configurationProfile.findUniqueOrThrow({ where: { id: withheld.id } })).status, 'REVIEW_REQUIRED');
     const three = await call('+27810000003');
     assert.equal((await db.lead.findUniqueOrThrow({ where: { id: three.leadReference! } })).assignedToId, null);
     assert.equal((await db.configurationProfile.findFirstOrThrow({ where: { organisationId: org.id, domain: WHAT_CHIMP_NOTICE, name: three.leadReference! } })).status, 'REVIEW_REQUIRED');

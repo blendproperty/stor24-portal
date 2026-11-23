@@ -28,3 +28,11 @@ export async function sendWhatChimpNotice(noticeId: string, send = (message: Ema
   await db.configurationProfile.updateMany({ where: { id: noticeId, status: 'SENDING' }, data: { status: accepted ? 'ACCEPTED' : 'REVIEW_REQUIRED' } });
   await db.auditEvent.create({ data: { organisationId: claim.organisationId, facilityId: claim.facilityId, action: 'whatchimp.enquiry.notice', entityType: 'Lead', entityId: claim.leadId, after: { providerAccepted: accepted, inboxVerified: false } } });
 }
+
+export async function processWhatChimpNotices(organisationId: string) {
+  const notices = await db.configurationProfile.findMany({ where: { organisationId, domain: WHAT_CHIMP_NOTICE, status: 'PENDING' }, orderBy: { createdAt: 'asc' }, take: 10, select: { id: true } });
+  let errors = 0;
+  for (const notice of notices) { try { await sendWhatChimpNotice(notice.id); } catch { errors++; } }
+  const review = await db.configurationProfile.count({ where: { organisationId, domain: WHAT_CHIMP_NOTICE, OR: [{ status: 'REVIEW_REQUIRED' }, { status: 'SENDING', updatedAt: { lt: new Date(Date.now() - 10 * 60_000) } }] } });
+  return { checked: notices.length, errors, review };
+}

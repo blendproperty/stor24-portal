@@ -1,14 +1,13 @@
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { authErrorResponse, requireOwner } from '@/lib/auth-guards';
-import { currentRoleAccess } from '@/lib/current-role-access';
 import { reportRequestBody } from '@/lib/report-request-body';
 import { sameOrigin } from '@/lib/request-security';
 import { intakeConfigSchema, WHAT_CHIMP_DOMAIN } from '@/lib/whatchimp-enquiry-contract';
+import { configureEnquiryRecipient, enquiryRecipientInput } from '@/lib/whatchimp-enquiry-recipient';
 
 export const dynamic = 'force-dynamic';
 const headers = { 'Cache-Control': 'no-store, max-age=0, private' };
-const inputSchema = z.object({ facilityId: z.string().min(1), recipientUserId: z.string().min(1) }).strict();
 
 export async function GET() {
   try {
@@ -27,17 +26,8 @@ export async function POST(request: Request) {
   if (!sameOrigin(request)) return Response.json({ error: { message: 'Request rejected.' } }, { status: 403, headers });
   try {
     const owner = await requireOwner();
-    const input = inputSchema.parse(await reportRequestBody(request, 4096));
-    const organisationId = owner.user.organisationId;
-    await db.$transaction(async tx => {
-      const facility = await tx.facility.findFirst({ where: { id: input.facilityId, organisationId, active: true } });
-      const recipient = await tx.user.findFirst({ where: { id: input.recipientUserId, organisationId, active: true }, include: { roleAssignments: { include: { role: true } } } });
-      const profiles = await tx.configurationProfile.findMany({ where: { organisationId, facilityId: input.facilityId, domain: WHAT_CHIMP_DOMAIN, name: 'bot475943', status: 'READY' } });
-      const parsed = profiles.length === 1 ? intakeConfigSchema.safeParse(profiles[0].config) : null;
-      if (!facility || !recipient || !currentRoleAccess(recipient.roleAssignments, 'leads.view', input.facilityId).allowed || !currentRoleAccess(recipient.roleAssignments, 'leads.manage', input.facilityId).allowed || !parsed?.success || !parsed.data.enabled || parsed.data.facilityId !== input.facilityId) throw Error('INTAKE_RECIPIENT_INVALID');
-      await tx.configurationProfile.update({ where: { id: profiles[0].id }, data: { config: { ...parsed.data, recipientUserId: recipient.id, recipientEmail: recipient.email } } });
-      await tx.auditEvent.create({ data: { organisationId, facilityId: input.facilityId, actorId: owner.user.id, action: 'whatchimp.enquiry.recipient_configured', entityType: 'ConfigurationProfile', entityId: profiles[0].id, after: { recipientUserId: recipient.id } } });
-    });
+    const input = enquiryRecipientInput.parse(await reportRequestBody(request, 4096));
+    await configureEnquiryRecipient({ id: owner.user.id, organisationId: owner.user.organisationId, sessionVersion: owner.user.sessionVersion }, input);
     return Response.json({ data: { configured: true } }, { headers });
   } catch (error) {
     if (error instanceof z.ZodError || error instanceof Error && error.message === 'INTAKE_RECIPIENT_INVALID') return Response.json({ error: { message: 'Check the active facility, connection and recipient permissions.' } }, { status: 409, headers });
