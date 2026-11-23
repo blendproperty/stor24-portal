@@ -5,6 +5,7 @@ import { leadSlaSchema, slaFromStoreHours, type LeadSlaPolicy } from './lead-sla
 export const WHAT_CHIMP_BOT = '475943';
 export const WHAT_CHIMP_DOMAIN = 'WHATCHIMP_INTAKE';
 export const WHAT_CHIMP_SESSION = 'WHATCHIMP_ENQUIRY';
+export { WHAT_CHIMP_NOTICE } from './whatchimp-notice-domain';
 export const enquiryFields = ['use', 'items', 'start', 'duration', 'size', 'viewing', 'name'] as const;
 export type EnquiryField = typeof enquiryFields[number];
 const phone = z.string().trim().regex(/^\+?[1-9]\d{7,14}$/).transform(v => `+${v.replace(/^\+/, '')}`);
@@ -18,7 +19,7 @@ export const enquiryRequestSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('probe'), botId: z.literal(WHAT_CHIMP_BOT) }).strict(),
 ]);
 export type EnquiryRequest = z.infer<typeof enquiryRequestSchema>;
-export const intakeConfigSchema = z.object({ enabled: z.boolean(), botId: z.literal(WHAT_CHIMP_BOT), keyHash: z.string().regex(/^[a-f0-9]{64}$/), facilityId: z.string().min(1) }).strict();
+export const intakeConfigSchema = z.object({ enabled: z.boolean(), botId: z.literal(WHAT_CHIMP_BOT), keyHash: z.string().regex(/^[a-f0-9]{64}$/), facilityId: z.string().min(1), recipientUserId: z.string().min(1).optional(), recipientEmail: z.email().max(320).optional() }).strict().refine(v => Boolean(v.recipientUserId) === Boolean(v.recipientEmail), 'Recipient and email must be configured together');
 export function keyHash(value: string) { return createHash('sha256').update(value).digest('hex'); }
 export function matchesIntakeKey(value: string, hash: string) {
   if (value.length < 32 || value.length > 200 || !/^[a-f0-9]{64}$/.test(hash)) return false;
