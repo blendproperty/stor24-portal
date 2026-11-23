@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
-import { enquiryRequestSchema, intakeConfigSchema, keyHash, matchesIntakeKey, WHAT_CHIMP_DOMAIN } from '@/lib/whatchimp-enquiry-contract';
+import { enquiryRequestSchema, intakeConfigSchema, keyHash, matchesIntakeKey, WHAT_CHIMP_DOMAIN, WHAT_CHIMP_NOTICE } from '@/lib/whatchimp-enquiry-contract';
 import { captureWhatChimpEnquiry } from '@/lib/whatchimp-enquiry-service';
+import { sendWhatChimpNotice } from '@/lib/whatchimp-enquiry-notice';
 import { rateLimit } from '@/lib/request-security';
 import { ZodError } from 'zod';
 import { parseWhatChimpBody } from '@/lib/whatchimp-enquiry-body';
@@ -27,6 +28,10 @@ export async function POST(request: Request) {
     const body = await boundedBody(request);
     const input = enquiryRequestSchema.parse(await parseWhatChimpBody(body, request.headers.get('content-type')));
     const result = await captureWhatChimpEnquiry(matched[0].id, input, new Date(), keyHash(token));
+    if (result.leadReference) {
+      const notice = await db.configurationProfile.findFirst({ where: { organisationId: matched[0].organisationId, facilityId: matched[0].facilityId, domain: WHAT_CHIMP_NOTICE, name: result.leadReference, status: 'PENDING' } });
+      if (notice) await sendWhatChimpNotice(notice.id).catch(() => undefined);
+    }
     return Response.json(result, { headers });
   } catch (e) {
     if (e instanceof ZodError || e instanceof SyntaxError) return Response.json({ ok: false, error: 'Invalid enquiry request.' }, { status: 422, headers });

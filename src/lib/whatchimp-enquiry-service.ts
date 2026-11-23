@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { db } from '@/lib/db';
 import { Prisma } from '@/generated/prisma/client';
-import { enquiryFields, enquirySummary, intakeCalendar, intakeConfigSchema, intakeHours, WHAT_CHIMP_DOMAIN, WHAT_CHIMP_SESSION, type EnquiryField, type EnquiryRequest } from './whatchimp-enquiry-contract';
+import { currentRoleAccess } from '@/lib/current-role-access';
+import { enquiryFields, enquirySummary, intakeCalendar, intakeConfigSchema, intakeHours, WHAT_CHIMP_DOMAIN, WHAT_CHIMP_SESSION, WHAT_CHIMP_NOTICE, type EnquiryField, type EnquiryRequest } from './whatchimp-enquiry-contract';
 
 type Session = { phone: string; leadId: string; customerId: string; answers: Partial<Record<EnquiryField, string>>; submitted: boolean; generatedNotes: string; taskId?: string };
 export async function resolveIntakeCalendar(organisationId: string, facilityId: string) {
@@ -36,7 +37,10 @@ export async function captureWhatChimpEnquiry(connectionId: string, input: Enqui
       const reusable = prior ? await tx.customer.findFirst({ where: { id: prior.customerId, organisationId, phone: input.phone, phoneVerifiedAt: null, tenancies: { none: {} }, reservations: { none: {} } } }) : null;
       // A previous bot-created prospect may be reused. Never infer tenant identity from a phone match.
       const customer = reusable ?? await tx.customer.create({ data: { organisationId, firstName: input.displayName || 'WhatsApp enquiry', phone: input.phone, communicationConsent: { source: 'WHATCHIMP_STORAGE_ENQUIRY', purpose: 'RESPOND_TO_ENQUIRY', recordedAt: now.toISOString(), whatsapp: true, email: false, sms: false, phone: false } } });
-      const lead = await tx.lead.create({ data: { facilityId, customerId: customer.id, source: 'WhatsApp', stage: 'NEW', nextActionAt: hours.nextOpening } });
+      const recipient = config.recipientUserId ? await tx.user.findFirst({ where: { id: config.recipientUserId, organisationId, active: true }, include: { roleAssignments: { include: { role: true } } } }) : null;
+      const eligible = recipient && recipient.email.trim().toLowerCase() === config.recipientEmail?.trim().toLowerCase() && currentRoleAccess(recipient.roleAssignments, 'leads.view', facilityId).allowed && currentRoleAccess(recipient.roleAssignments, 'leads.manage', facilityId).allowed;
+      const lead = await tx.lead.create({ data: { facilityId, customerId: customer.id, source: 'WhatsApp', stage: 'NEW', nextActionAt: hours.nextOpening, assignedToId: eligible ? recipient.id : null } });
+      if (config.recipientUserId) await tx.configurationProfile.create({ data: { organisationId, facilityId, domain: WHAT_CHIMP_NOTICE, name: lead.id, status: eligible ? 'PENDING' : 'REVIEW_REQUIRED', config: { connectionId, recipientUserId: config.recipientUserId } } });
       const state: Session = { phone: input.phone, leadId: lead.id, customerId: customer.id, answers: {}, submitted: false, generatedNotes: '' };
       record = await tx.configurationProfile.create({ data: { organisationId, facilityId, domain: WHAT_CHIMP_SESSION, name: randomUUID(), status: 'CAPTURING', config: state as unknown as Prisma.InputJsonValue } });
       await tx.auditEvent.create({ data: { organisationId, facilityId, action: 'whatchimp.enquiry.started', entityType: 'Lead', entityId: lead.id, after: { source: 'WhatsApp', stage: 'NEW', sessionId: record.id, routing } } });

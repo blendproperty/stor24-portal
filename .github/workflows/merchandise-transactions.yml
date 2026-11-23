@@ -139,6 +139,7 @@ jobs:
       - run: npx tsx --test tests/integration/rent-reviews.test.ts
       - run: npx tsx --test tests/integration/lead-sla.test.ts
       - run: npx tsx --test tests/integration/whatchimp-enquiry.test.ts
+      - run: npx tsx --test tests/integration/whatchimp-enquiry-notice.test.ts
       - run: npx tsx --test tests/integration/whatchimp-social.test.ts
       - run: npx tsx --test tests/integration/whatchimp-social-provision.test.ts
       - run: npx tsx --test tests/integration/debit-order-runs.test.ts

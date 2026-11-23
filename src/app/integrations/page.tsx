@@ -29,6 +29,7 @@ import {
 import { listHikCentralConfiguration } from "@/lib/integrations/hikcentral-configuration";
 import { hikCentralReadiness } from "@/lib/integrations/hikcentral-readiness";
 import { SOCIAL_NOTICE_DOMAIN } from "@/lib/whatchimp-social-contract";
+import { WHAT_CHIMP_NOTICE } from "@/lib/whatchimp-enquiry-contract";
 
 export const metadata = { title: "Integrations" };
 export const dynamic = "force-dynamic";
@@ -49,7 +50,7 @@ export default async function IntegrationsPage() {
   const scope = await requirePermissionScope("operations.view");
   const leadScope = await requirePermissionScope("leads.view").catch(() => null);
   const socialNotices = leadScope ? await db.configurationProfile.findMany({
-    where: { organisationId: leadScope.organisationId, domain: SOCIAL_NOTICE_DOMAIN, status: { in: ["PENDING", "SENDING", "REVIEW_REQUIRED"] }, AND: [
+    where: { organisationId: leadScope.organisationId, domain: { in: [SOCIAL_NOTICE_DOMAIN, WHAT_CHIMP_NOTICE] }, status: { in: ["PENDING", "SENDING", "REVIEW_REQUIRED"] }, AND: [
       ...(leadScope.unrestrictedFacilities ? [] : [{ facilityId: { in: leadScope.facilityIds } }]),
       ...(scope.unrestrictedFacilities ? [] : [{ facilityId: { in: scope.facilityIds } }]),
     ] },
@@ -420,7 +421,7 @@ export default async function IntegrationsPage() {
         </div>
       </section>
       {leadScope && <section className="panel panel-spacious">
-        <h2>Social enquiry email notices needing attention</h2>
+        <h2>Messaging enquiry email notices needing attention</h2>
         <p className="panel-subtitle">Pending notices await processing. Sending or review required may have reached the provider; check before sending again. Accepted means provider acceptance, not inbox delivery. Showing the oldest 50.</p>
         {socialNotices.length === 0 ? <p>No pending or uncertain social enquiry notices.</p> : <ul>{socialNotices.map(notice => <li key={notice.id}><Link href={`/leads?lead=${encodeURIComponent(notice.name)}`}>Open enquiry</Link> — {notice.status.replaceAll("_", " ")} — {formatSouthAfricaDateTime(notice.createdAt)}</li>)}</ul>}
       </section>}
