@@ -19,7 +19,7 @@ export async function provisionSocialPair(actor: { id: string; organisationId: s
     if (!owner?.passwordHash || owner.sessionVersion !== actor.sessionVersion || !currentRoleAccess(owner.roleAssignments).owner) throw Error('FORBIDDEN');
     const facility = await tx.facility.findFirst({ where: { id: value.facilityId, organisationId: actor.organisationId, active: true }, select: { id: true } });
     const recipient = await tx.user.findFirst({ where: { id: value.recipientUserId, organisationId: actor.organisationId, active: true }, include: { roleAssignments: { include: { role: true } } } });
-    if (!facility || !recipient || recipient.email.trim().toLowerCase() !== value.recipientEmail.trim().toLowerCase() || !currentRoleAccess(recipient.roleAssignments, 'leads.view', facility.id).allowed) throw Error('SOCIAL_SCOPE_INVALID');
+    if (!facility || !recipient || recipient.email.trim().toLowerCase() !== value.recipientEmail.trim().toLowerCase() || !currentRoleAccess(recipient.roleAssignments, 'leads.view', facility.id).allowed || !currentRoleAccess(recipient.roleAssignments, 'leads.manage', facility.id).allowed) throw Error('SOCIAL_SCOPE_INVALID');
     const existing = await tx.configurationProfile.findMany({ where: { organisationId: actor.organisationId, facilityId: facility.id, domain: SOCIAL_INTAKE_DOMAIN } });
     if (existing.some(p => p.status === 'READY')) throw Error('SOCIAL_CONNECTION_EXISTS');
     for (const [channel, id, token] of [['facebook', value.facebookBotId, facebook], ['instagram', value.instagramBotId, instagram]] as const) {

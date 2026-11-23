@@ -17,7 +17,7 @@ test('provisioning creates two scoped keys once, without logging secrets', async
     const owner = await db.user.create({ data: { organisationId: org.id, name: 'Owner', email: `owner-${id}@example.invalid`, passwordHash: 'fixture' } });
     const recipient = await db.user.create({ data: { organisationId: org.id, name: 'Staff', email: `staff-${id}@example.invalid` } });
     const ownerRole = await db.role.create({ data: { organisationId: org.id, name: 'Organisation owner', permissions: [] } });
-    const staffRole = await db.role.create({ data: { organisationId: org.id, name: 'Lead manager', permissions: ['leads.view'] } });
+    const staffRole = await db.role.create({ data: { organisationId: org.id, name: 'Lead manager', permissions: ['leads.view', 'leads.manage'] } });
     await db.roleAssignment.create({ data: { userId: owner.id, roleId: ownerRole.id } });
     await db.roleAssignment.create({ data: { userId: recipient.id, roleId: staffRole.id, facilityId: facility.id } });
     const actor = { id: owner.id, organisationId: org.id, sessionVersion: owner.sessionVersion };
@@ -28,6 +28,10 @@ test('provisioning creates two scoped keys once, without logging secrets', async
     assert.equal(await db.configurationProfile.count({ where: { organisationId: org.id, domain: SOCIAL_INTAKE_DOMAIN } }), 0);
     await db.roleAssignment.deleteMany({ where: { userId: recipient.id } });
     await assert.rejects(provisionSocialPair(actor, input), /SOCIAL_SCOPE_INVALID/);
+    const viewRole = await db.role.create({ data: { organisationId: org.id, name: 'Lead viewer', permissions: ['leads.view'] } });
+    await db.roleAssignment.create({ data: { userId: recipient.id, roleId: viewRole.id, facilityId: facility.id } });
+    await assert.rejects(provisionSocialPair(actor, input), /SOCIAL_SCOPE_INVALID/);
+    await db.roleAssignment.deleteMany({ where: { userId: recipient.id } });
     await db.roleAssignment.create({ data: { userId: recipient.id, roleId: staffRole.id, facilityId: facility.id } });
     const result = await provisionSocialPair(actor, input);
     assert.notEqual(result.facebook, result.instagram);
