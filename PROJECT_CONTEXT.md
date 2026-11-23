@@ -9113,3 +9113,11 @@ Validation follow-up: the project typecheck and targeted ESLint for the candidat
 - Deployment and configuration: Deploy to VPS run `44787651127` succeeded. It applied migration `20261120150000_company_face_people`, built and started image `stor24-crm:c28ad0279`, and reported a healthy container, no OOM and local HTTP 200 at 2026-11-20 17:57:52 UTC. No HikCentral provider setting or person was changed by the deployment.
 - Live production verification: public `https://portal.stor24.co.za/api/health` reported app and database OK at 2026-11-20 17:59:18 UTC. The signed-in Facial access screen was not independently inspected after deployment, and no live company person, tablet photo, HikCentral face send, access-level readback or reader scan was performed. Staff and real-person UAT, the existing lockout policy approval, and all wider provider, data, retention, training and release gates remain open.
 
+
+## 2026-11-23: Legacy migration scope clarified
+
+- **Decision and evidence:** Brett confirmed on 23 November 2026 that STOR24 has no tenants yet and no information to migrate. The legacy tenant-data migration rehearsal is not applicable to the current launch. The Asana parent task was closed on that basis, not as an executed import.
+- **Implementation:** No importer or production data changes were made. Facility setup and other launch-data tasks remain separate.
+- **Testing:** Existing read-only migration preflight passed 18 synthetic checks on 23 November; no real extract, import, reconciliation or acceptance test was performed.
+- **Commit and push:** This documentation update is prepared on a dedicated branch; verify remote promotion separately. **Merge:** pending. **Deployment and configuration:** no runtime or configuration change. **Live production verification:** not applicable to this scope decision; no production migration was performed.
+- **Outstanding:** Finance integration, approvals, and all other launch and provider gates remain open. The billing production hold remains in place.
