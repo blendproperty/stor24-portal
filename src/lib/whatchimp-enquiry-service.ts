@@ -1,16 +1,18 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { db } from '@/lib/db';
 import { Prisma } from '@/generated/prisma/client';
 import { currentRoleAccess } from '@/lib/current-role-access';
 import { attachWhatsAppJourney, websiteJourneyReference } from './whatsapp-website-journey';
 import { enquiryFields, enquirySummary, intakeCalendar, intakeConfigSchema, intakeHours, WHAT_CHIMP_DOMAIN, WHAT_CHIMP_SESSION, WHAT_CHIMP_NOTICE, type EnquiryField, type EnquiryRequest } from './whatchimp-enquiry-contract';
 
+type AdReferral = { messageId: string; adId: string };
+
 type Session = { phone: string; leadId: string; customerId: string; answers: Partial<Record<EnquiryField, string>>; submitted: boolean; generatedNotes: string; taskId?: string };
 export async function resolveIntakeCalendar(organisationId: string, facilityId: string) {
   const profiles = await db.configurationProfile.findMany({ where: { organisationId, facilityId, status: 'READY', OR: [{ domain: 'LEAD_SLA', name: 'policy' }, { domain: 'STORE_INFORMATION', name: 'Default' }] }, select: { domain: true, config: true } });
   return intakeCalendar(profiles.find(p => p.domain === 'LEAD_SLA')?.config, profiles.find(p => p.domain === 'STORE_INFORMATION')?.config);
 }
-export async function captureWhatChimpEnquiry(connectionId: string, input: EnquiryRequest, now = new Date(), verifiedKeyHash?: string, { requireWebsiteReference = false, attempt = 0 } = {}): Promise<{ ok: boolean; enquiryKey?: string; leadReference?: string; phase: string; routing: string; staffed: boolean; nextOpening: string | null; timezone: string; message: string }> {
+export async function captureWhatChimpEnquiry(connectionId: string, input: EnquiryRequest, now = new Date(), verifiedKeyHash?: string, { requireWebsiteReference = false, adReferral, attempt = 0 }: { requireWebsiteReference?: boolean; adReferral?: AdReferral; attempt?: number } = {}): Promise<{ ok: boolean; enquiryKey?: string; leadReference?: string; phase: string; routing: string; staffed: boolean; nextOpening: string | null; timezone: string; message: string }> {
   const connection = await db.configurationProfile.findUnique({ where: { id: connectionId } });
   if (!connection?.facilityId || connection.domain !== WHAT_CHIMP_DOMAIN || connection.status !== 'READY') throw Error('INTAKE_DISABLED');
   const config = intakeConfigSchema.parse(connection.config);
@@ -27,12 +29,17 @@ export async function captureWhatChimpEnquiry(connectionId: string, input: Enqui
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`${organisationId}:${facilityId}:whatchimp:${input.phone}`}, 0))`;
     const live = await tx.configurationProfile.findUnique({ where: { id: connectionId } });
     if (!live || live.updatedAt.getTime() !== connection.updatedAt.getTime() || !intakeConfigSchema.parse(live.config).enabled) throw Error('INTAKE_DISABLED');
+    const adReceipt = adReferral ? createHash('sha256').update(adReferral.messageId).digest('hex') : undefined;
+    if (adReceipt && await tx.auditEvent.findFirst({
+      where: { organisationId, facilityId, action: 'whatchimp.ad_referral.received', entityType: 'WhatsAppAdReferral', entityId: adReceipt },
+      select: { id: true },
+    })) throw Error('INTAKE_AD_REPLAY');
     const suppliedKey = 'enquiryKey' in input ? input.enquiryKey : undefined;
     let record = suppliedKey ? await tx.configurationProfile.findFirst({ where: { organisationId, facilityId, domain: WHAT_CHIMP_SESSION, name: suppliedKey } }) : await tx.configurationProfile.findFirst({ where: { organisationId, facilityId, domain: WHAT_CHIMP_SESSION, ...(input.action === 'route' ? {} : { status: 'CAPTURING' }), config: { path: ['phone'], equals: input.phone } }, orderBy: { createdAt: 'desc' } });
     if (suppliedKey && (!record || (record.config as unknown as Session).phone !== input.phone)) throw Error('INTAKE_NOT_FOUND');
     if (!record && input.action === 'update') throw Error('INTAKE_NOT_FOUND');
     if (!record && input.action === 'submit') throw Error('INTAKE_NOT_FOUND');
-    const taggedStart = input.action === 'start' && Boolean(websiteJourneyReference(input.incomingMessage));
+    const taggedStart = input.action === 'start' && Boolean(adReferral || websiteJourneyReference(input.incomingMessage));
     const replacesClosedSession = taggedStart && record && await tx.lead.findFirst({
       where: { id: (record.config as unknown as Session).leadId, facilityId, facility: { organisationId }, stage: { in: ['WON', 'LOST'] } },
       select: { id: true },
@@ -61,7 +68,21 @@ export async function captureWhatChimpEnquiry(connectionId: string, input: Enqui
     const hasReference = Boolean(websiteJourneyReference(messageWithReference));
     const attached = hasReference && lead.stage === 'NEW' && !state.submitted
       && await attachWhatsAppJourney(tx, { organisationId, facilityId }, lead.id, messageWithReference, now);
-    if ((requireWebsiteReference || replacesClosedSession) && !attached) throw Error('INTAKE_REFERENCE_NOT_ATTACHED');
+    if (adReferral && adReceipt) {
+      const attributionScope = { organisationId, facilityId, action: 'lead.attribution.captured', entityType: 'Lead', entityId: lead.id };
+      const existing = await tx.auditEvent.findFirst({
+        where: { organisationId, facilityId, entityType: 'Lead', entityId: lead.id, action: { in: ['lead.attribution.captured', 'public_lead.created'] }, after: { path: ['attribution'], not: Prisma.AnyNull } },
+        select: { id: true },
+      });
+      if (!existing) await tx.auditEvent.create({ data: { ...attributionScope,
+        after: { source: 'WHATSAPP_AD_REFERRAL', attribution: { source: 'meta', medium: 'paid_social', method: 'whatsapp_ad', adId: adReferral.adId } },
+      } });
+      await tx.auditEvent.create({ data: {
+        organisationId, facilityId, action: 'whatchimp.ad_referral.received', entityType: 'WhatsAppAdReferral', entityId: adReceipt,
+        after: { leadId: lead.id, attached: !existing },
+      } });
+    }
+    if ((requireWebsiteReference || (replacesClosedSession && !adReferral)) && !attached) throw Error('INTAKE_REFERENCE_NOT_ATTACHED');
     // An in-progress bot can receive the website reference as its current answer.
     if (input.action === 'update' && hasReference) {
       return { ok: false, enquiryKey: record.name, leadReference: lead.id, phase: 'ATTRIBUTION_ONLY',
@@ -96,5 +117,5 @@ export async function captureWhatChimpEnquiry(connectionId: string, input: Enqui
     const phase = input.action === 'update' ? `SAVE_${input.field.toUpperCase()}` : input.action === 'submit' ? 'SUBMITTED' : input.action === 'route' ? 'ROUTED' : 'START';
     return { ok: true, enquiryKey: record.name, leadReference: lead.id, phase, routing, staffed: hours.staffed, nextOpening, timezone: 'Africa/Johannesburg', message };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }); }
-  catch (e) { if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2034' && attempt < 2) return captureWhatChimpEnquiry(connectionId, input, now, verifiedKeyHash, { requireWebsiteReference, attempt: attempt + 1 }); throw e; }
+  catch (e) { if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2034' && attempt < 2) return captureWhatChimpEnquiry(connectionId, input, now, verifiedKeyHash, { requireWebsiteReference, adReferral, attempt: attempt + 1 }); throw e; }
 }

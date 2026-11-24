@@ -2,7 +2,7 @@ import { leadSourceLabel, websiteSourceLabel } from "@/lib/lead-sources";
 import type { LeadMarketProfile } from './lead-market-profile';
 export const leadStages = ["NEW", "CONTACTED", "QUALIFIED", "QUOTED", "VIEWING_BOOKED", "RESERVED", "HANDOVER_REVIEW", "WON", "LOST"] as const;
 export const stageLabels: Record<string, string> = { NEW: "New enquiry", CONTACTED: "Contacted", QUALIFIED: "Qualified", QUOTED: "Quoted", VIEWING_BOOKED: "Viewing booked", RESERVED: "Reserved", HANDOVER_REVIEW: "Handover review", WON: "Moved in", LOST: "Lost" };
-export type ReportingLead = { marketProfile?:LeadMarketProfile|null; stage: string; source: string; createdAt: string; nextActionAt: string | null; attribution: { source: string; medium?: string; landingPage: string; conversionPage: string } | null; reservations: { status: string; quotedRate: number; convertedTenancyId: string | null }[] };
+export type ReportingLead = { marketProfile?:LeadMarketProfile|null; stage: string; source: string; createdAt: string; nextActionAt: string | null; attribution: { source: string; medium?: string; method?: string; landingPage?: string; conversionPage?: string } | null; reservations: { status: string; quotedRate: number; convertedTenancyId: string | null }[] };
 export function leadReport(leads: ReportingLead[], now = new Date()) {
   const open = leads.filter(l => !["WON", "LOST"].includes(l.stage));
   const won = leads.filter(l => l.stage === "WON").length;
@@ -15,13 +15,13 @@ export function leadReport(leads: ReportingLead[], now = new Date()) {
     return { label: start.toISOString().slice(0, 10), count: 0, start: start.getTime() - 2*3600000 };
   });
   for (const lead of leads) {
-    const key = lead.attribution ? `${websiteSourceLabel(lead.attribution)} · website` : leadSourceLabel(lead.source) || "Unknown";
+    const key = lead.attribution ? `${websiteSourceLabel(lead.attribution)} · ${lead.attribution.method === "whatsapp_ad" ? "WhatsApp" : "website"}` : leadSourceLabel(lead.source) || "Unknown";
     const current = sources.get(key) ?? { total: 0, won: 0 }; current.total++; if (lead.stage === "WON") current.won++; sources.set(key, current);
     const channel = leadSourceLabel(lead.source) || "Unknown";
     const channelCounts = channels.get(channel) ?? { total: 0, won: 0 }; channelCounts.total++; if (lead.stage === "WON") channelCounts.won++; channels.set(channel, channelCounts);
     const origin = lead.attribution ? websiteSourceLabel(lead.attribution) : "Unknown";
     const originCounts = acquisition.get(origin) ?? { total: 0, won: 0 }; originCounts.total++; if (lead.stage === "WON") originCounts.won++; acquisition.set(origin, originCounts);
-    if (lead.attribution) { const route = `${lead.attribution.landingPage} → ${lead.attribution.conversionPage}`; paths.set(route, (paths.get(route) ?? 0) + 1); }
+    if (lead.attribution?.landingPage && lead.attribution.conversionPage) { const route = `${lead.attribution.landingPage} → ${lead.attribution.conversionPage}`; paths.set(route, (paths.get(route) ?? 0) + 1); }
     const at = new Date(lead.createdAt).getTime(); const week = weeks.findLast(w => at >= w.start); if (week && at <= now.getTime()) week.count++;
   }
   const breakdown=(field:keyof LeadMarketProfile)=>{const values=new Map<string,number>();for(const l of leads){const recorded=l.marketProfile?.[field];const key=!recorded||recorded==='UNKNOWN'?'Unknown':recorded;values.set(key,(values.get(key)??0)+1);}return [...values].map(([label,count])=>({label,count}));};

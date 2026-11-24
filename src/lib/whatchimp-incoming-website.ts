@@ -32,11 +32,18 @@ const messageIncoming = z.object({
     direction: z.literal('incoming'),
     type: z.literal('text'),
     text: z.string(),
+    provider_message_id: z.string().optional(),
+    referral: z.unknown().optional(),
   }) }),
 });
 
 export function readWhatChimpIncoming(value: unknown, eventId: string) {
   const parsed = messageIncoming.safeParse(value);
   if (!parsed.success || parsed.data.id !== eventId || parsed.data.channel.id !== parsed.data.data.message.channel.id) return null;
-  return { phone: parsed.data.contact.phone, text: parsed.data.data.message.text };
+  const message = parsed.data.data.message;
+  const referral = z.object({ source: z.literal('ad'), ad_id: z.string().regex(/^\d{1,32}$/) }).safeParse(message.referral);
+  const ad = referral.success && message.provider_message_id && /^wamid\.[A-Za-z0-9_+/=-]{1,512}$/.test(message.provider_message_id)
+    ? { adId: referral.data.ad_id, messageId: message.provider_message_id }
+    : undefined;
+  return { phone: parsed.data.contact.phone, text: message.text, ad };
 }

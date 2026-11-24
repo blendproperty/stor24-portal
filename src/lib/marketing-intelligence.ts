@@ -138,7 +138,7 @@ export function marketingIntelligence(
     { path: string; leads: number; won: number }
   >();
   for (const l of leads)
-    if (l.attribution) {
+    if (l.attribution?.landingPage) {
       const path = l.attribution.landingPage;
       const row = landingPages.get(path) ?? { path, leads: 0, won: 0 };
       row.leads++;

@@ -20,16 +20,16 @@ export async function POST(request: Request) {
   catch { return new Response(null, { status: 400, headers }); }
 
   const incoming = readWhatChimpIncoming(payload, eventId);
-  const reference = websiteJourneyReference(incoming?.text);
-  if (!incoming || !reference) return new Response(null, { status: 204, headers });
+  const reference = incoming?.ad ? undefined : websiteJourneyReference(incoming?.text);
+  if (!incoming || (!reference && !incoming.ad)) return new Response(null, { status: 204, headers });
   try {
     const connection = await resolveWebsiteIntake();
     if (!connection) return new Response(null, { status: 503, headers });
     await captureWhatChimpEnquiry(connection.id, {
-      action: 'start', botId: WHAT_CHIMP_BOT, phone: incoming.phone, incomingMessage: `STOR24-REF-${reference}`,
-    }, new Date(), connection.keyHash, { requireWebsiteReference: true });
+      action: 'start', botId: WHAT_CHIMP_BOT, phone: incoming.phone, incomingMessage: reference ? `STOR24-REF-${reference}` : undefined,
+    }, new Date(), connection.keyHash, { requireWebsiteReference: Boolean(reference), adReferral: incoming.ad });
   } catch (error) {
-    if (!(error instanceof Error) || error.message !== 'INTAKE_REFERENCE_NOT_ATTACHED') return new Response(null, { status: 503, headers });
+    if (!(error instanceof Error) || !['INTAKE_REFERENCE_NOT_ATTACHED', 'INTAKE_AD_REPLAY'].includes(error.message)) return new Response(null, { status: 503, headers });
   }
   return new Response(null, { status: 204, headers });
 }

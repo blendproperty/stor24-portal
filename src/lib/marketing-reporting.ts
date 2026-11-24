@@ -13,8 +13,9 @@ export type MarketingLead = {
     advertising?: AdvertisingAttribution;
     campaignId?: string | null;
     linkId?: string | null;
-    landingPage: string;
-    conversionPage: string;
+    landingPage?: string;
+    conversionPage?: string;
+    whatsAppAdId?: string;
   } | null;
 };
 export type MarketingActivity = {
@@ -86,6 +87,18 @@ export function marketingReport(
   const advertising = new Map<string, {campaign:string; campaignId:string; source:string; medium:string; content:string; adId:string; adGroupId:string; adSetId:string; term:string; leads:number; won:number}>();
   for (const lead of selected) {
     const ad = lead.attribution?.advertising;
+    const whatsAppAdId = lead.attribution?.whatsAppAdId;
+    if (whatsAppAdId) {
+      const key = JSON.stringify(["whatsapp_ad", whatsAppAdId]);
+      const row = advertising.get(key) ?? {
+        campaign: "Click-to-WhatsApp", campaignId: "", source: "Meta", medium: "paid_social",
+        content: "—", adId: whatsAppAdId, adGroupId: "Unknown", adSetId: "—", term: "—", leads: 0, won: 0,
+      };
+      row.leads++;
+      if (lead.won) row.won++;
+      advertising.set(key, row);
+      continue;
+    }
     if (!ad) continue;
     const key = JSON.stringify([ad.campaign, ad.content ?? "", ad.term ?? ""]);
     const row = advertising.get(key) ?? {campaign:ad.campaign,campaignId:ad.campaignId,source:lead.attribution!.source,medium:lead.attribution!.medium,content:ad.content??"Unknown",adId:ad.adId??"Unknown",adGroupId:ad.adGroupId??"Unknown",adSetId:ad.adSetId??"Unknown",term:ad.term??"Unknown",leads:0,won:0};

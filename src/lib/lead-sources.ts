@@ -4,7 +4,7 @@ export function leadSourceLabel(source: string) {
 }
 
 export function websiteSourceLabel(attribution: {source: string; medium?: string}) {
-  const platform = ({google: "Google", bing: "Bing", facebook: "Facebook", instagram: "Instagram", linkedin: "LinkedIn", tiktok: "TikTok", youtube: "YouTube", x: "X", pinterest: "Pinterest", newsletter: "Newsletter", direct: "Direct", other: "Other"} as Record<string, string>)[attribution.source] ?? "Other";
+  const platform = ({google: "Google", bing: "Bing", facebook: "Facebook", meta: "Meta", instagram: "Instagram", linkedin: "LinkedIn", tiktok: "TikTok", youtube: "YouTube", x: "X", pinterest: "Pinterest", newsletter: "Newsletter", direct: "Direct", other: "Other"} as Record<string, string>)[attribution.source] ?? "Other";
   if (["cpc", "paid_social", "display"].includes(attribution.medium ?? "")) return `${platform}${attribution.medium === "display" ? " Display" : ""} Ad`;
   if (attribution.medium === "organic") return `${platform} Search`;
   if (attribution.medium === "social") return `${platform} Social`;

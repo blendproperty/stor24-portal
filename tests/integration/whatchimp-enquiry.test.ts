@@ -137,6 +137,27 @@ test('isolated WhatChimp intake saves progressive answers, preserves staff state
       assert.equal((await db.lead.findUniqueOrThrow({ where: { id: open.leadReference! } })).stage, 'LOST');
       assert.equal((await request(returning)).status, 204);
       assert.equal(await db.lead.count({ where: { facilityId: facility.id } }), before + 1);
+
+      const adPhone = '+27810000007';
+      const adMessage = { ...message, text: 'Ad enquiry', provider_message_id: 'wamid.fixtureAd',
+        referral: { source: 'ad', ad_id: '6054718821', ctwa_clid: 'not-stored' } };
+      const adPayload = { ...payload, contact: { phone: adPhone }, data: { message: adMessage } };
+      assert.equal((await request({ ...adPayload, test: true })).status, 204);
+      assert.equal((await request({ ...adPayload, data: { message: { ...adMessage, referral: { source: 'post', ad_id: '6054718821' } } } })).status, 204);
+      assert.equal(await db.lead.count({ where: { facilityId: facility.id } }), before + 1);
+      assert.deepEqual((await Promise.all([request(adPayload), request(adPayload)])).map(r => r.status), [204, 204]);
+      const adLead = await db.lead.findFirstOrThrow({ where: { facilityId: facility.id, customer: { phone: adPhone } } });
+      assert.equal(adLead.source, 'WhatsApp');
+      const adEvidence = await db.auditEvent.findMany({ where: { entityId: adLead.id, action: 'lead.attribution.captured' } });
+      assert.deepEqual(adEvidence.map(e => e.after), [{ source: 'WHATSAPP_AD_REFERRAL',
+        attribution: { source: 'meta', medium: 'paid_social', method: 'whatsapp_ad', adId: '6054718821' } }]);
+      await db.lead.update({ where: { id: adLead.id }, data: { stage: 'LOST' } });
+      assert.equal((await request(adPayload)).status, 204);
+      assert.equal(await db.lead.count({ where: { facilityId: facility.id } }), before + 2);
+      const alreadyAttributed = { ...adPayload, contact: { phone: sessionPhone },
+        data: { message: { ...adMessage, provider_message_id: 'wamid.fixtureWebsite' } } };
+      assert.equal((await request(alreadyAttributed)).status, 204);
+      assert.equal(await db.auditEvent.count({ where: { entityId: fresh.id, action: 'lead.attribution.captured' } }), 1);
     } finally {
       if (previousSecret === undefined) delete process.env.WHATCHIMP_STOR24_INCOMING_SECRET;
       else process.env.WHATCHIMP_STOR24_INCOMING_SECRET = previousSecret;
