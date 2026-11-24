@@ -3,7 +3,7 @@ import {marketProfileSchema} from "./lead-market-profile";
 import { db } from "./db";
 import { createHash } from "node:crypto";
 import { facilityWhere, requireFacility, type RequestScope } from "./scope";
-import { leadAttributionSchema } from "./lead-attribution";
+import { savedLeadAttributionSchema } from "./lead-attribution";
 import {
   marketingInput,
   marketingUpdate,
@@ -65,7 +65,7 @@ export async function marketingWorkspace(scope: RequestScope) {
     : [];
   const attribution = new Map(
     evidence.flatMap((e) => {
-      const parsed = leadAttributionSchema.safeParse(
+      const parsed = savedLeadAttributionSchema.safeParse(
         (e.after as { attribution?: unknown } | null)?.attribution,
       );
       return parsed.success ? [[e.entityId, parsed.data] as const] : [];
@@ -99,7 +99,8 @@ export async function marketingWorkspace(scope: RequestScope) {
     })),
     leads: leads.map((l) => {
       const a = attribution.get(l.id) ?? null;
-      const c = a?.campaignId ? known.get(a.campaignId) : null;
+      const website = a && a.method !== "whatsapp_ad" ? a : null;
+      const c = website?.campaignId ? known.get(website.campaignId) : null;
       const valid = c?.facilityId === l.facilityId;
       return {
         marketProfile:profiles.get(l.id)??null,
@@ -111,13 +112,14 @@ export async function marketingWorkspace(scope: RequestScope) {
           ? {
               source: a.source,
               medium: a.medium,
-              landingPage: a.landingPage,
-              conversionPage: a.conversionPage,
-              ...(a.advertising ? {advertising:a.advertising} : {}),
+              whatsAppAdId: a.method === "whatsapp_ad" ? a.adId : undefined,
+              landingPage: website?.landingPage,
+              conversionPage: website?.conversionPage,
+              advertising: website?.advertising,
               campaignId: valid ? c.id : null,
               linkId:
-                valid && c.links.some((link) => link.id === a.linkId)
-                  ? a.linkId
+                valid && c.links.some((link) => link.id === website?.linkId)
+                  ? website?.linkId
                   : null,
             }
           : null,

@@ -15,3 +15,12 @@ export const leadAttributionSchema = z.object({
   advertising: z.custom<AdvertisingAttribution>(validAdvertising).optional(),
 }).strict().refine(value => !value.advertising || advertisingMatches(value.advertising, value.source, value.medium), "Advertising source mismatch");
 export type LeadAttribution = z.infer<typeof leadAttributionSchema>;
+
+const whatsAppAdAttributionSchema = z.strictObject({
+  source: z.literal("meta"),
+  medium: z.literal("paid_social"),
+  method: z.literal("whatsapp_ad"),
+  adId: z.string().regex(/^\d{1,32}$/),
+});
+export const savedLeadAttributionSchema = z.union([leadAttributionSchema, whatsAppAdAttributionSchema]);
+export type SavedLeadAttribution = z.infer<typeof savedLeadAttributionSchema>;

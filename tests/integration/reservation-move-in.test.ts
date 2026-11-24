@@ -6,6 +6,8 @@ import test from "node:test";
 import { createHash, randomUUID } from "node:crypto";
 import { db } from "../../src/lib/db";
 import { confirmReservationMoveIn, getReservationMoveInReadiness } from "../../src/lib/reservation-move-in";
+import { marketingWorkspace } from "../../src/lib/marketing-service";
+import { marketingReport } from "../../src/lib/marketing-reporting";
 import { moveIn } from "../../src/lib/leasing-service";
 import { recordReservationReceipt } from "../../src/lib/reservation-payment";
 import { settleVerifiedBookingPayment } from "../../src/lib/payments/booking-payment-settlement";
@@ -150,13 +152,26 @@ test("isolated PostgreSQL signed reservation handover", async t => {
     });
     await t.test("concurrent confirmation preserves the signed PDF, exact account, balance and payments", async () => {
       const f = await fixture();
-      const lead = await db.lead.create({ data: { facilityId: f.facility.id, customerId: f.customer.id, source: "CI enquiry", stage: "RESERVED" } });
+      const lead = await db.lead.create({ data: { facilityId: f.facility.id, customerId: f.customer.id, source: "WhatsApp", stage: "RESERVED" } });
       await db.reservation.update({ where: { id: f.reservation.id }, data: { leadId: lead.id } });
+      await db.auditEvent.create({ data: { organisationId: f.org.id, facilityId: f.facility.id,
+        entityType: "Lead", entityId: lead.id, action: "lead.attribution.captured", after: {
+          source: "WHATSAPP_AD_REFERRAL", attribution: { source: "meta", medium: "paid_social", method: "whatsapp_ad", adId: "6054718821" },
+        },
+      } });
+      assert.equal((await marketingWorkspace(f.scope)).leads.find(row => row.id === lead.id)?.won, false);
       assert.equal((await getReservationMoveInReadiness(f.scope, f.reservation.id)).ready, true);
       const [a, b] = await Promise.all([confirmReservationMoveIn(f.scope, f.reservation.id), confirmReservationMoveIn(f.scope, f.reservation.id)]);
       assert.equal(a.tenancyId, b.tenancyId);
       assert.equal((await db.lead.findUniqueOrThrow({ where: { id: lead.id } })).stage, "WON");
       assert.equal(await db.auditEvent.count({ where: { entityId: lead.id, action: "lead.stage_changed" } }), 1);
+      const marketing = await marketingWorkspace(f.scope);
+      const attributed = marketing.leads.find(row => row.id === lead.id);
+      assert.equal(attributed?.attribution?.whatsAppAdId, "6054718821");
+      assert.equal(attributed?.source, "WhatsApp");
+      assert.equal(attributed?.won, true);
+      const report = marketingReport(marketing.leads, marketing.campaigns, "2000-01-01", "2099-12-31", f.facility.id);
+      assert.deepEqual(report.advertising.map(({ adId, leads, won }) => ({ adId, leads, won })), [{ adId: "6054718821", leads: 1, won: 1 }]);
       const tenancy = await db.tenancy.findUniqueOrThrow({ where: { id: a.tenancyId }, include: { occupancies: true, documents: true } });
       assert.equal(tenancy.accountId, f.account.id);
       assert.equal(tenancy.status, "ACTIVE");

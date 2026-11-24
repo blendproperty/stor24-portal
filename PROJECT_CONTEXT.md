@@ -6,6 +6,13 @@
 - **Commit and push:** Candidate branch `codex/whatsapp-closed-enquiry-20261124`. Check GitHub for its exact head and protected checks.
 - **Merge, deployment and live verification:** Pending for this fix. Website attribution remains off until a real tagged chat records its original source in Lead to Lease. Billing production hold remains in place.
 
+## 2026-11-24 — Direct-to-WhatsApp paid acquisition and move-in
+
+- **Implementation:** The signed WhatChimp message receiver for STOR24 WhatsApp ending 6824 records the authenticated Meta ad ID on the WhatsApp enquiry. The provider message ID is hashed for delivery deduplication. Previously recorded attribution is preserved. Lead to Lease and Marketing report the direct ad without a fabricated website path or ad placement. The existing reservation handover supplies conversion evidence.
+- **Testing:** WhatChimp's built-in From an ad example confirmed the provider field shape. Local typecheck, scoped lint and 24 tests against isolated PostgreSQL verified authenticated intake, test-event isolation, duplicate delivery, preservation of an existing journey and one attributed conversion after signed reservation handover.
+- **Commit and push:** Candidate branch `codex/whatsapp-ad-attribution-20261124`. Track the exact commit and protected checks in GitHub.
+- **Merge, deployment and live verification:** Pending protected rollout. The STOR24 Meta account's active ad sets currently link to the website. Direct-ad verification needs a real click-to-WhatsApp referral from an ad, and live conversion verification needs a genuine attributed handover. Billing production hold remains in place.
+
 ## 2026-11-24 — WhatsApp acquisition during an open enquiry
 
 - **Provider configuration:** Created and activated the separate WhatChimp bot `STOR24 | Website WhatsApp enquiries` for messages containing `STOR24-REF-`. Mapped `Their first message` into the CRM start request and verified the copied move-in date field and submitted continuation. The regular menu was preserved.

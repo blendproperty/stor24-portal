@@ -2,7 +2,7 @@ import { enquiryLocationInputSchema, recordEnquiryLocation, readEnquiryLocation 
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { facilityWhere, type RequestScope } from "@/lib/scope";
-import { leadAttributionSchema } from "@/lib/lead-attribution";
+import { savedLeadAttributionSchema } from "@/lib/lead-attribution";
 import { z } from "zod";
 import { marketProfileSchema } from './lead-market-profile';
 import { leadFollowupWhere } from "./lead-followup-policy";
@@ -47,7 +47,7 @@ export async function leadsWorkspace(scope: RequestScope, followupsDue = false) 
   const legacyWon=await legacyHandedOverLeadIds(scope,leads);
   const attribution = new Map(evidence.flatMap(event => {
     const after = event.after as { attribution?: unknown } | null;
-    const parsed = leadAttributionSchema.safeParse(after?.attribution);
+    const parsed = savedLeadAttributionSchema.safeParse(after?.attribution);
     return parsed.success ? [[event.entityId, parsed.data] as const] : [];
   }));
   const marketProfiles=new Map(evidence.flatMap(event=>{const parsed=marketProfileSchema.safeParse((event.after as {marketProfile?:unknown}|null)?.marketProfile);return parsed.success?[[event.entityId,parsed.data] as const]:[];}));
