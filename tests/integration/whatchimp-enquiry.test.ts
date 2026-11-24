@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { db } from '../../src/lib/db';
 import { defaultLeadSla } from '../../src/lib/lead-sla-policy';
 import { captureWhatChimpEnquiry } from '../../src/lib/whatchimp-enquiry-service';
 import { enquiryFields, keyHash, WHAT_CHIMP_DOMAIN, WHAT_CHIMP_SESSION } from '../../src/lib/whatchimp-enquiry-contract';
 import { POST } from '../../src/app/api/integrations/whatchimp/enquiry/route';
 import { POST as journeyPOST } from '../../src/app/api/public/v1/whatsapp-journey/route';
+import { POST as incomingPOST } from '../../src/app/api/integrations/whatchimp/website-incoming/route';
 import { issueWhatsAppJourney, attachWhatsAppJourney } from '../../src/lib/whatsapp-website-journey';
 
 test('isolated WhatChimp intake saves progressive answers, preserves staff state and queues one after-hours task', async () => {
@@ -82,6 +83,55 @@ test('isolated WhatChimp intake saves progressive answers, preserves staff state
     assert.equal(await db.customer.count({ where: { organisationId: another.id } }), 0);
     assert.equal(await db.reservation.count({ where: { facilityId: facility.id } }), 0);
     assert.equal(await db.communicationLog.count({ where: { organisationId: org.id } }), 0);
+
+    const rollingReference = await issueWhatsAppJourney(journey, after);
+    const taggedAnswer = await call({ ...base, action: 'update', enquiryKey: next.enquiryKey!,
+      field: 'items', value: `Storage enquiry\nSTOR24-REF-${rollingReference}` });
+    assert.equal(taggedAnswer.phase, 'ATTRIBUTION_ONLY');
+    const preserved = await db.configurationProfile.findFirstOrThrow({ where: { organisationId: org.id, name: next.enquiryKey! } });
+    assert.deepEqual((preserved.config as { answers: unknown }).answers, {});
+    assert.equal(await db.auditEvent.count({ where: { entityId: next.leadReference!, action: 'lead.attribution.captured' } }), 1);
+
+    const sessionPhone = '+27810000005';
+    const open = await call({ botId: base.botId, action: 'start', phone: sessionPhone });
+    const signedReference = await issueWhatsAppJourney(journey);
+    const secret = randomBytes(32);
+    const previousSecret = process.env.WHATCHIMP_STOR24_INCOMING_SECRET;
+    process.env.WHATCHIMP_STOR24_INCOMING_SECRET = `whsec_${secret.toString('base64')}`;
+    try {
+      const eventId = 'evt_signed_fixture';
+      const channel = { id: 'ch_fixture', type: 'whatsapp', phone: '+27600186824' };
+      const message = { channel, type: 'text', direction: 'incoming', text: `Storage enquiry\nSTOR24-REF-${signedReference}` };
+      const payload = { id: eventId, type: 'message.incoming', test: false, channel,
+        contact: { phone: sessionPhone }, data: { message } };
+      function request(event: unknown, sign = true, ageSeconds = 0, key = secret) {
+        const timestamp = String(Math.floor(Date.now() / 1000) - ageSeconds);
+        const body = JSON.stringify(event);
+        const signature = createHmac('sha256', key).update(`${eventId}.${timestamp}.${body}`).digest('base64');
+        return incomingPOST(new Request('http://localhost/api/integrations/whatchimp/website-incoming', {
+          method: 'POST', body, headers: {
+            'webhook-id': eventId, 'webhook-timestamp': timestamp,
+            ...(sign ? { 'webhook-signature': `v1,${signature}` } : {}),
+          },
+        }));
+      }
+      const before = await db.lead.count({ where: { facilityId: facility.id } });
+      assert.equal((await request(payload, false)).status, 401);
+      assert.equal((await request(payload, true, 0, randomBytes(32))).status, 401);
+      assert.equal((await request(payload, true, 600)).status, 401);
+      assert.equal((await request({ ...payload, test: true })).status, 204);
+      assert.equal((await request({ ...payload, channel: { ...channel, phone: '+27690420108' } })).status, 204);
+      assert.equal((await request({ ...payload, data: { message: { ...message, text: 'Ordinary private message' } } })).status, 204);
+      assert.equal(await db.auditEvent.count({ where: { entityId: open.leadReference!, action: 'lead.attribution.captured' } }), 0);
+      assert.equal((await request(payload)).status, 204);
+      assert.equal((await request({ ...payload, contact: { phone: '+27810000006' } })).status, 204);
+      assert.equal(await db.lead.count({ where: { facilityId: facility.id } }), before);
+      assert.equal(await db.auditEvent.count({ where: { entityId: open.leadReference!, action: 'lead.attribution.captured' } }), 1);
+    } finally {
+      if (previousSecret === undefined) delete process.env.WHATCHIMP_STOR24_INCOMING_SECRET;
+      else process.env.WHATCHIMP_STOR24_INCOMING_SECRET = previousSecret;
+    }
+
     await db.configurationProfile.update({ where: { id: config.id }, data: { config: { enabled: false, botId: '475943', keyHash: keyHash(token), facilityId: facility.id } } });
     await assert.rejects(call({ action: 'probe', botId: '475943' }), /INTAKE_DISABLED/);
   } finally { await db.organisation.delete({ where: { id: org.id } }); await db.organisation.delete({ where: { id: another.id } }); await db.$disconnect(); }

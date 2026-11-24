@@ -13,21 +13,25 @@ export async function parseWhatChimpBody(body: string, contentType: string | nul
   }
   return values;
 }
-export async function boundedEnquiryBody(request: Request) {
-  if (Number(request.headers.get('content-length')) > 8192) throw Error('INTAKE_BODY_TOO_LARGE');
+export async function boundedEnquiryBytes(request: Request, maximum: number) {
+  if (Number(request.headers.get('content-length')) > maximum) throw Error('INTAKE_BODY_TOO_LARGE');
   const reader = request.body?.getReader();
-  if (!reader) return '';
+  if (!reader) return Buffer.alloc(0);
   const chunks: Uint8Array[] = [];
   let bytes = 0;
   for (;;) {
     const chunk = await reader.read();
     if (chunk.done) break;
     bytes += chunk.value.byteLength;
-    if (bytes > 8192) {
+    if (bytes > maximum) {
       await reader.cancel();
       throw Error('INTAKE_BODY_TOO_LARGE');
     }
     chunks.push(chunk.value);
   }
-  return Buffer.concat(chunks).toString('utf8');
+  return Buffer.concat(chunks);
+}
+
+export async function boundedEnquiryBody(request: Request) {
+  return (await boundedEnquiryBytes(request, 8192)).toString('utf8');
 }
