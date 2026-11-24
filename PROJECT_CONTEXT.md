@@ -1,3 +1,11 @@
+## 2026-11-24 — Tagged WhatsApp enquiries after a closed lead
+
+- **Production evidence:** WhatChimp is connected for incoming messages from STOR24 WhatsApp ending 6824 only. CRM deployment 45393132599 loaded the signing secret. The signed provider test and a labelled real message both received HTTP 204. Read-only verification found the test reference still pending and its prior chat session still marked CAPTURING while the linked lead was LOST. The website flag remained off.
+- **Implementation:** A tagged start can open a fresh lead when its previous chat session still points to a WON or LOST lead. The transaction requires the pending reference to be successfully attached before committing the fresh lead. The previous lead and its attribution remain intact.
+- **Testing:** The isolated PostgreSQL case covers the signed returning chat, fresh linked attribution, preserved lost status and a replay with no duplicate. Production retest remains pending.
+- **Commit and push:** Candidate branch `codex/whatsapp-closed-enquiry-20261124`. Check GitHub for its exact head and protected checks.
+- **Merge, deployment and live verification:** Pending for this fix. Website attribution remains off until a real tagged chat records its original source in Lead to Lease. Billing production hold remains in place.
+
 ## 2026-11-24 — WhatsApp acquisition during an open enquiry
 
 - **Provider configuration:** Created and activated the separate WhatChimp bot `STOR24 | Website WhatsApp enquiries` for messages containing `STOR24-REF-`. Mapped `Their first message` into the CRM start request and verified the copied move-in date field and submitted continuation. The regular menu was preserved.

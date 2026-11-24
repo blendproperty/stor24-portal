@@ -32,6 +32,12 @@ export async function captureWhatChimpEnquiry(connectionId: string, input: Enqui
     if (suppliedKey && (!record || (record.config as unknown as Session).phone !== input.phone)) throw Error('INTAKE_NOT_FOUND');
     if (!record && input.action === 'update') throw Error('INTAKE_NOT_FOUND');
     if (!record && input.action === 'submit') throw Error('INTAKE_NOT_FOUND');
+    const taggedStart = input.action === 'start' && Boolean(websiteJourneyReference(input.incomingMessage));
+    const replacesClosedSession = taggedStart && record && await tx.lead.findFirst({
+      where: { id: (record.config as unknown as Session).leadId, facilityId, facility: { organisationId }, stage: { in: ['WON', 'LOST'] } },
+      select: { id: true },
+    });
+    if (replacesClosedSession) record = null;
     if (!record) {
       const earlier = await tx.configurationProfile.findFirst({ where: { organisationId, facilityId, domain: WHAT_CHIMP_SESSION, config: { path: ['phone'], equals: input.phone } }, orderBy: { createdAt: 'desc' } });
       const prior = earlier?.config as Session | undefined;
@@ -55,7 +61,7 @@ export async function captureWhatChimpEnquiry(connectionId: string, input: Enqui
     const hasReference = Boolean(websiteJourneyReference(messageWithReference));
     const attached = hasReference && lead.stage === 'NEW' && !state.submitted
       && await attachWhatsAppJourney(tx, { organisationId, facilityId }, lead.id, messageWithReference, now);
-    if (requireWebsiteReference && !attached) throw Error('INTAKE_REFERENCE_NOT_ATTACHED');
+    if ((requireWebsiteReference || replacesClosedSession) && !attached) throw Error('INTAKE_REFERENCE_NOT_ATTACHED');
     // An in-progress bot can receive the website reference as its current answer.
     if (input.action === 'update' && hasReference) {
       return { ok: false, enquiryKey: record.name, leadReference: lead.id, phase: 'ATTRIBUTION_ONLY',
