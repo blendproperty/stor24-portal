@@ -1,3 +1,13 @@
+## 2026-11-24 — Live website WhatsApp attribution
+
+- **Implementation:** PR #898 opens a fresh tagged enquiry when the previous WhatsApp session points to a closed lead, while preserving the previous lead.
+- **Testing:** Lint, type checking and isolated PostgreSQL verification passed for the returning closed-lead scenario, acquisition attachment and replay deduplication.
+- **Commit and push:** The CRM fix was pushed at `9baeb813fd67536030982961604f472dca7248fa`.
+- **Merge:** PR #898 merged into main as `27e3e2519f80258d9131fd7866309508c18a1985`. Exact-main CI 45397010840, security 45397010694, transactions 45397010730 and restricted runtime 45397010690 passed.
+- **Deployment and configuration:** CRM signing-secret deployment 45393132599 and fix deployment 45399496287 succeeded. WhatChimp incoming messages are scoped to STOR24 WhatsApp ending 6824. Website attribution was enabled after the production CRM verification passed.
+- **Live production verification:** WhatChimp replayed the real tagged chat at 15:07 SAST after deployment and received HTTP 204. The production database check returned VERIFIED for one consumed reference linked to a Lead to Lease enquiry with Google CPC acquisition and WhatsApp as the contact channel. The public endpoint confirmed `captureJourney=true` and the existing STOR24 WhatsApp destination. The CRM app and database reported healthy, and the unsigned receiver probe returned HTTP 401.
+- **Outstanding:** Direct-to-WhatsApp ad referral attribution and a live attributed move-in are unverified. The billing production hold remains in place. This entry supersedes the earlier WhatsApp activation status below.
+
 ## 2026-11-24 — Tagged WhatsApp enquiries after a closed lead
 
 - **Production evidence:** WhatChimp is connected for incoming messages from STOR24 WhatsApp ending 6824 only. CRM deployment 45393132599 loaded the signing secret. The signed provider test and a labelled real message both received HTTP 204. Read-only verification found the test reference still pending and its prior chat session still marked CAPTURING while the linked lead was LOST. The website flag remained off.
