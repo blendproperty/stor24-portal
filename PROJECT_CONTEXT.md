@@ -1,3 +1,12 @@
+## 2026-11-24 — Website acquisition bridge for WhatsApp enquiries
+
+- **Implementation:** Added authenticated issuance of a short-lived one-use journey reference scoped to the active Midpoint STOR24 WhatsApp intake. CRM saves the reference's consented website source, medium, campaign and page journey with the existing attribution event while retaining WhatsApp as the contact channel. Retries cannot reuse the reference or replace attribution. The inbound message is used transiently to find the marker.
+- **Testing:** CRM typecheck, focused lint and six intake contract and form parser tests passed. The isolated PostgreSQL case passed authentication, concurrent starts, cross-store denial, expiry, replay and the existing handoff. Its schema was installed using Prisma db push after an older artwork migration failed on a clean database.
+- **Commit and push:** Candidate branch `codex/whatsapp-source-capture-20261124` with companion website branch `codex/whatsapp-source-bridge-20261124`. See each branch's Git history for the pushed head.
+- **Merge:** Pending protected review and checks.
+- **Deployment and configuration:** Pending. The companion website flag defaults off until the active WhatChimp flow forwards the original reference into CRM and existing chat paths are verified.
+- **Live production verification:** No live tagged enquiry or move-in exercised for this bridge. Direct-to-WhatsApp Meta campaign referral evidence, staff UAT and existing provider, data and finance gates remain open. Billing production hold remains in place.
+
 ## 2026-11-17 — BlendSign callback concurrency release
 
 - Implementation: PR #849 serializes completion using the existing facility lock, rechecks the signed document, requests retry for simultaneous inbox creation and prevents a late failure from overwriting success. The earlier provider-side idempotency and outage task was already completed in August and remains recorded separately.
