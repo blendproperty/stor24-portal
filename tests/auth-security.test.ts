@@ -24,11 +24,17 @@ test("arrears review worker delegates only its exact path to bearer authenticati
   assert.equal((await proxy(new NextRequest("https://example.invalid/api/internal/arrears-review-schedules-extra"))).status, 401);
 });
 
-test('WhatChimp intake delegates only its exact path to scoped handler authentication', () => {
+test('WhatChimp intake delegates only its exact paths to scoped handler authentication', async () => {
   assert.equal(isPublicPathname('/api/integrations/whatchimp/enquiry'), true);
   assert.equal(isPublicPathname('/api/integrations/whatchimp/social'), true);
+  assert.equal(isPublicPathname('/api/integrations/whatchimp/website-incoming'), true);
+  for (const path of ['/api/integrations/whatchimp/website-incoming/private', '/api/integrations/whatchimp/website-incoming-extra']) assert.equal(isPublicPathname(path), false);
   for (const path of ['/api/integrations/whatchimp/social/private', '/api/integrations/whatchimp/social-extra']) assert.equal(isPublicPathname(path), false);
   for (const path of ['/api/integrations/whatchimp', '/api/integrations/whatchimp/enquiry/private', '/api/integrations/whatchimp/enquiry-extra', '/api/v1/leads']) assert.equal(isPublicPathname(path), false);
+  const websiteWebhook = 'https://example.invalid/api/integrations/whatchimp/website-incoming';
+  const pass = await proxy(new NextRequest(websiteWebhook, { method: 'POST' }));
+  assert.equal(pass.headers.get('x-middleware-next'), '1');
+  assert.equal((await proxy(new NextRequest(websiteWebhook + '/private', { method: 'POST' }))).status, 401);
 });
 
 test('alert worker exemption is exact and never exposes recipient administration', () => {

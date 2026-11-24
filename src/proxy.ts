@@ -29,6 +29,8 @@ export function isPublicPathname(pathname: string) {
   // Only the dedicated enquiry handler accepts the scoped WhatChimp intake key.
   if (pathname === "/api/integrations/whatchimp/enquiry") return true;
   if (pathname === "/api/integrations/whatchimp/social") return true;
+  // The website receiver authenticates WhatChimp's signature on the raw request.
+  if (pathname === "/api/integrations/whatchimp/website-incoming") return true;
   // Tenant APIs enforce separate tenant sessions; never accept the staff cookie as tenant authentication.
   if (pathname === "/my" || /^\/my\/orders\/[A-Za-z0-9_-]+$/.test(pathname) || pathname.startsWith("/api/tenant/")) return true;
   // The capture page/API validate a single-use token and reject an active staff session.
