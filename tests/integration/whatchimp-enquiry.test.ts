@@ -127,6 +127,16 @@ test('isolated WhatChimp intake saves progressive answers, preserves staff state
       assert.equal((await request({ ...payload, contact: { phone: '+27810000006' } })).status, 204);
       assert.equal(await db.lead.count({ where: { facilityId: facility.id } }), before);
       assert.equal(await db.auditEvent.count({ where: { entityId: open.leadReference!, action: 'lead.attribution.captured' } }), 1);
+
+      const closed = await db.lead.update({ where: { id: open.leadReference! }, data: { stage: 'LOST' } });
+      const freshReference = await issueWhatsAppJourney(journey);
+      const returning = { ...payload, data: { message: { ...message, text: `Storage enquiry\nSTOR24-REF-${freshReference}` } } };
+      assert.equal((await request(returning)).status, 204);
+      const fresh = await db.lead.findFirstOrThrow({ where: { facilityId: facility.id, customerId: closed.customerId, stage: 'NEW' } });
+      assert.equal(await db.auditEvent.count({ where: { entityId: fresh.id, action: 'lead.attribution.captured' } }), 1);
+      assert.equal((await db.lead.findUniqueOrThrow({ where: { id: open.leadReference! } })).stage, 'LOST');
+      assert.equal((await request(returning)).status, 204);
+      assert.equal(await db.lead.count({ where: { facilityId: facility.id } }), before + 1);
     } finally {
       if (previousSecret === undefined) delete process.env.WHATCHIMP_STOR24_INCOMING_SECRET;
       else process.env.WHATCHIMP_STOR24_INCOMING_SECRET = previousSecret;
