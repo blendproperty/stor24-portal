@@ -22,6 +22,12 @@ After the review's send action, submit to CRM and branch on routing. During save
 
 ## Hours and operations
 
+### Website acquisition through WhatsApp
+
+The website can request a one-time reference from `POST /api/public/v1/whatsapp-journey` using its existing server credential and the consented website journey. Each reference is valid for 24 hours, is limited to the configured Midpoint intake, and is burnt when its acquisition and page history are saved to a lead. WhatsApp stays the lead's contact channel. The CRM reads a reference from the optional `incomingMessage` on `start` or `route` without storing the message. The reference cannot replace an existing attribution or change a submitted enquiry.
+
+Before enabling `STOR24_WHATSAPP_ATTRIBUTION_ENABLED=true` on the website, verify that the active STOR24 WhatsApp automation forwards the reference from the customer's first inbound message to the CRM start or route request. Pass it as a form field, preserving the dedicated intake credential and current request mapping. Check the live keyword and fallback interaction on this channel only. A customer must be able to proceed with an ordinary message, with analytics declined, and after an expired or edited reference. Check a tagged website arrival, two page visits, a real WhatsApp send, the existing staff handoff and the same Lead to Lease record with the website source and WhatsApp contact. Leave the flag disabled until this handoff passes. A Meta ad that opens WhatsApp directly still requires verified provider referral evidence.
+
 Calendar is read on each request from the facility's saved Enquiry response SLA policy. Saved store office hours are the fallback; example hours are never used. South Africa time (+02:00), saved holidays and next opening are respected. Missing/invalid calendar queues for review and never promises an available agent. Edit the existing backend Settings / Enquiry response SLA or store office hours; do not maintain a separate provider calendar.
 
 Lead source is WhatsApp and stage starts NEW, with a linked prospect. Progressive notes contain the answer summary and Omnichannel conversation link. Existing staff notes/stage/booking state are preserved. No unit, lease, payment, OTP or notification is created by intake. Staff continue in the existing lead-to-lease workflow. Follow-up tasks and provider enquiry session state are durable and scoped; disabling the profile revokes capture.

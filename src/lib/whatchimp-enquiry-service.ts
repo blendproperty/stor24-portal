@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { db } from '@/lib/db';
 import { Prisma } from '@/generated/prisma/client';
 import { currentRoleAccess } from '@/lib/current-role-access';
+import { attachWhatsAppJourney } from './whatsapp-website-journey';
 import { enquiryFields, enquirySummary, intakeCalendar, intakeConfigSchema, intakeHours, WHAT_CHIMP_DOMAIN, WHAT_CHIMP_SESSION, WHAT_CHIMP_NOTICE, type EnquiryField, type EnquiryRequest } from './whatchimp-enquiry-contract';
 
 type Session = { phone: string; leadId: string; customerId: string; answers: Partial<Record<EnquiryField, string>>; submitted: boolean; generatedNotes: string; taskId?: string };
@@ -50,6 +51,9 @@ export async function captureWhatChimpEnquiry(connectionId: string, input: Enqui
     const previousState = JSON.stringify(state);
     const lead = await tx.lead.findFirst({ where: { id: state.leadId, facilityId, customerId: state.customerId, facility: { organisationId } }, select: { id: true, notes: true, stage: true, reservations: { select: { id: true }, take: 1 } } });
     if (!lead) throw Error('INTAKE_NOT_FOUND');
+    if (lead.stage === 'NEW' && !state.submitted && (input.action === 'start' || input.action === 'route')) {
+      await attachWhatsAppJourney(tx, { organisationId, facilityId }, lead.id, input.incomingMessage, now);
+    }
     if (input.action === 'update') {
       if (state.submitted) { if (state.answers[input.field] !== input.value) throw Error('INTAKE_SUBMITTED'); }
       else state.answers[input.field] = input.value;

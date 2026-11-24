@@ -6,6 +6,8 @@ import { defaultLeadSla } from '../../src/lib/lead-sla-policy';
 import { captureWhatChimpEnquiry } from '../../src/lib/whatchimp-enquiry-service';
 import { enquiryFields, keyHash, WHAT_CHIMP_DOMAIN, WHAT_CHIMP_SESSION } from '../../src/lib/whatchimp-enquiry-contract';
 import { POST } from '../../src/app/api/integrations/whatchimp/enquiry/route';
+import { POST as journeyPOST } from '../../src/app/api/public/v1/whatsapp-journey/route';
+import { issueWhatsAppJourney, attachWhatsAppJourney } from '../../src/lib/whatsapp-website-journey';
 
 test('isolated WhatChimp intake saves progressive answers, preserves staff state and queues one after-hours task', async () => {
   assert.equal(process.env.MERCHANDISE_DB_TEST, 'isolated-ci');
@@ -14,7 +16,7 @@ test('isolated WhatChimp intake saves progressive answers, preserves staff state
   const org = await db.organisation.create({ data: { name: 'WhatChimp fixture', slug: seed } });
   const another = await db.organisation.create({ data: { name: 'Other fixture', slug: seed + '-other' } });
   try {
-    const facility = await db.facility.create({ data: { organisationId: org.id, code: seed, name: 'Fixture Midpoint' } });
+    const facility = await db.facility.create({ data: { organisationId: org.id, code: seed, name: 'Fixture Midpoint', publicSlug: 'midpoint', publicBookingEnabled: true } });
     const config = await db.configurationProfile.create({ data: { organisationId: org.id, facilityId: facility.id, domain: WHAT_CHIMP_DOMAIN, name: 'bot475943', status: 'READY', config: { enabled: true, botId: '475943', keyHash: keyHash(token), facilityId: facility.id } } });
     const policy = await db.configurationProfile.create({ data: { organisationId: org.id, facilityId: facility.id, domain: 'LEAD_SLA', name: 'policy', status: 'READY', config: { ...defaultLeadSla, windows: [1,2,3,4,5,6].map(day => ({ day, start: 420, end: 1140 })), holidays: ['2026-11-04'] } } });
     const during = new Date('2026-10-13T08:00:00Z'), after = new Date('2026-10-13T18:00:00Z');
@@ -26,10 +28,24 @@ test('isolated WhatChimp intake saves progressive answers, preserves staff state
     assert.equal(formProbe.status, 200);
     assert.equal((await formProbe.json()).phase, 'PROBE');
     assert.equal(await db.lead.count({ where: { facilityId: facility.id } }), 0);
-    const starts = await Promise.all([call({ ...base, action: 'start' }), call({ ...base, action: 'start' })]);
+    const attribution = { version: 1, consent: 'granted', landingPage: '/', conversionPage: '/contact', pages: ['/', '/contact'], source: 'google', medium: 'cpc', method: 'utm' } as const;
+    const journey = { ...attribution, pages: [...attribution.pages] };
+    assert.equal((await journeyPOST(new Request('http://localhost/api/public/v1/whatsapp-journey', { method: 'POST', body: JSON.stringify(journey) }))).status, 401);
+    const reference = await issueWhatsAppJourney(journey, after);
+    assert.match(reference ?? '', /^[a-f0-9]{32}$/);
+    const incomingMessage = `Storage enquiry\nSTOR24-REF-${reference}`;
+    const otherFacility = await db.facility.create({ data: { organisationId: another.id, code: seed + '-other', name: 'Other fixture' } });
+    await db.$transaction(tx => attachWhatsAppJourney(tx, { organisationId: another.id, facilityId: otherFacility.id }, 'foreign', incomingMessage, after));
+    assert.equal(await db.auditEvent.count({ where: { organisationId: another.id, action: 'lead.attribution.captured' } }), 0);
+    const expired = await issueWhatsAppJourney(journey, new Date(after.getTime() - 86400000));
+    assert.ok(expired);
+    const starts = await Promise.all([call({ ...base, action: 'start', incomingMessage }), call({ ...base, action: 'start', incomingMessage })]);
     assert.equal(starts[0].phase, 'START');
     assert.equal(starts[0].enquiryKey, starts[1].enquiryKey);
     const enquiryKey = starts[0].enquiryKey!;
+    const captured = await db.auditEvent.findMany({ where: { organisationId: org.id, entityId: starts[0].leadReference!, action: 'lead.attribution.captured' } });
+    assert.equal(captured.length, 1);
+    assert.deepEqual(captured[0].after, { source: 'WHATSAPP_WEBSITE_JOURNEY', attribution: journey });
     assert.equal(await db.lead.count({ where: { facilityId: facility.id } }), 1);
     await assert.rejects(call({ ...base, action: 'submit', enquiryKey }), /INTAKE_INCOMPLETE/);
     await assert.rejects(call({ ...base, phone: '+27810000002', action: 'update', enquiryKey, field: 'items', value: 'Boxes' }), /INTAKE_NOT_FOUND/);
@@ -55,6 +71,9 @@ test('isolated WhatChimp intake saves progressive answers, preserves staff state
     await assert.rejects(call({ ...base, action: 'update', enquiryKey, field: 'items', value: 'Changed after submission' }), /INTAKE_SUBMITTED/);
     const next = await call({ ...base, action: 'start' }, during);
     assert.notEqual(next.enquiryKey, enquiryKey); assert.equal(next.routing, 'STAFF');
+    await call({ ...base, action: 'start', incomingMessage }, after);
+    await call({ ...base, action: 'start', incomingMessage: `STOR24-REF-${expired}` }, after);
+    assert.equal(await db.auditEvent.count({ where: { organisationId: org.id, entityId: next.leadReference!, action: 'lead.attribution.captured' } }), 0);
     await db.configurationProfile.update({ where: { id: policy.id }, data: { config: { ...defaultLeadSla, windows: [{ day: 2, start: 1000, end: 1140 }] } } });
     assert.equal((await call({ action: 'probe', botId: '475943' }, during)).staffed, false);
     assert.equal((await POST(new Request('http://localhost/api/integrations/whatchimp/enquiry', { method: 'POST', body: '{}' }))).status, 401);
