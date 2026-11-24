@@ -7,6 +7,8 @@ export function leadReport(leads: ReportingLead[], now = new Date()) {
   const open = leads.filter(l => !["WON", "LOST"].includes(l.stage));
   const won = leads.filter(l => l.stage === "WON").length;
   const sources = new Map<string, { total: number; won: number }>();
+  const acquisition = new Map<string, { total: number; won: number }>();
+  const channels = new Map<string, { total: number; won: number }>();
   const paths = new Map<string, number>();
   const weeks = Array.from({ length: 8 }, (_, i) => {
     const start = new Date(now.getTime() + 2*3600000); start.setUTCDate(start.getUTCDate() - (7 * (7 - i)) - ((start.getUTCDay() + 6) % 7)); start.setUTCHours(0, 0, 0, 0);
@@ -15,6 +17,10 @@ export function leadReport(leads: ReportingLead[], now = new Date()) {
   for (const lead of leads) {
     const key = lead.attribution ? `${websiteSourceLabel(lead.attribution)} · website` : leadSourceLabel(lead.source) || "Unknown";
     const current = sources.get(key) ?? { total: 0, won: 0 }; current.total++; if (lead.stage === "WON") current.won++; sources.set(key, current);
+    const channel = leadSourceLabel(lead.source) || "Unknown";
+    const channelCounts = channels.get(channel) ?? { total: 0, won: 0 }; channelCounts.total++; if (lead.stage === "WON") channelCounts.won++; channels.set(channel, channelCounts);
+    const origin = lead.attribution ? websiteSourceLabel(lead.attribution) : "Unknown";
+    const originCounts = acquisition.get(origin) ?? { total: 0, won: 0 }; originCounts.total++; if (lead.stage === "WON") originCounts.won++; acquisition.set(origin, originCounts);
     if (lead.attribution) { const route = `${lead.attribution.landingPage} → ${lead.attribution.conversionPage}`; paths.set(route, (paths.get(route) ?? 0) + 1); }
     const at = new Date(lead.createdAt).getTime(); const week = weeks.findLast(w => at >= w.start); if (week && at <= now.getTime()) week.count++;
   }
@@ -25,5 +31,7 @@ export function leadReport(leads: ReportingLead[], now = new Date()) {
     pipelineValue: open.reduce((sum, l) => sum + l.reservations.filter(r => r.status === "ACTIVE").reduce((n, r) => n + r.quotedRate, 0), 0),
     stages: leadStages.map(stage => ({ stage, label: stageLabels[stage], count: leads.filter(l => l.stage === stage).length })),
     sources: [...sources.entries()].map(([label, values]) => ({ label, ...values })).sort((a,b) => b.total-a.total),
+    acquisition: [...acquisition.entries()].map(([label, values]) => ({ label, ...values })).sort((a,b) => b.total-a.total),
+    channels: [...channels.entries()].map(([label, values]) => ({ label, ...values })).sort((a,b) => b.total-a.total),
     paths: [...paths.entries()].map(([label, count]) => ({ label, count })).sort((a,b) => b.count-a.count), weeks };
 }
