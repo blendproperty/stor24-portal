@@ -9327,3 +9327,10 @@ Batch review is invalidated if the operator edits account billing terms; the syn
 - Provider configuration verified: the Gmail test account is active with team-only visibility, STOR24 WhatsApp 6824 and STOR24 social channels allowed; Katlego remains set to all chats on his allowed channels with 6824 denied. The STOR24 team has two members, queue mode, no assigned chats, and the provider reports no bot or sequence sends chats to it. Brett reports the access and routing are sorted; the provider readback does not yet verify those claims, and his response on Hub visibility is ambiguous.
 - Testing: main CI 45342851248 and transaction run 45342851160 succeeded for merged reporting change 2433a32e. No privacy isolation, positive team handoff, ABC attribution or advert-to-move-in production test was verified. Deployment remains unconfirmed. Preserve the billing production hold.
 - This record is a documentation-branch update requiring promotion. Full ABC implementation, CRM handoff, notification, provider configuration and privacy gates remain outstanding.
+
+## 2026-11-24 — ABC reporting production receipt
+
+- Implementation and testing: PR #891 separates existing consented tracked acquisition from recorded enquiry channel; prior focused tests and main CI/transaction checks passed as recorded above.
+- Commit and push: PR head 0216f769; merge: 2433a32e576302b8ae81cf6391360b63671b43df on main. Deployment: Deploy to VPS run 45345092477 succeeded 24 November at 09:03 SAST for 2433a32. Configuration: no provider or billing configuration changed as part of this verification.
+- Live production verification: refreshed authenticated Lead to Lease and observed distinct Tracked origin and Recorded enquiry channels sections, with missing journey attribution labelled Unknown. This is a screen readback, not an end-to-end journey or provider test.
+- Outstanding: capture and link reliable advertising attribution through WhatsApp, route and recover enquiries, verify privacy, assignment and notifications, and test the journey through genuine move-in. Task 5 remains open and billing hold remains. This receipt requires promotion to main.
