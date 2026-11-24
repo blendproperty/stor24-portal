@@ -49,6 +49,7 @@ try{
   const page=await browser.newPage({viewport:{width,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
   const base=`http://127.0.0.1:${server.address().port}`;
   await page.goto(base);await expect(page.getByRole('heading',{name:'Leads & sales performance'})).toBeVisible();await expect(page.locator('.leads-name')).toHaveCount(7);
+  await expect(page.getByRole('heading',{name:'Tracked origin'})).toBeVisible();await expect(page.getByRole('heading',{name:'Recorded enquiry channels'})).toBeVisible();await expect(page.locator('.leads-chart').filter({has:page.getByRole('heading',{name:'Tracked origin'})})).toContainText('Unknown');
   if(!await page.locator('.leads-search').evaluate(label=>{const input=label.querySelector('input'),icon=label.querySelector('svg');return input.getBoundingClientRect().left+parseFloat(getComputedStyle(input).paddingLeft)>icon.getBoundingClientRect().right+4;}))throw Error('Search text overlaps the icon');
   await expect(page.locator('.profile-card-heading').first()).toContainText('7 enquiries');
 

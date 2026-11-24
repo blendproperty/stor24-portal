@@ -16,3 +16,13 @@ test("journey schema accepts public paths and rejects private tokens, queries an
   assert.equal(leadAttributionSchema.safeParse({...base,consent:"denied"}).success,false);
   assert.equal(leadAttributionSchema.safeParse({...base,pages:Array(13).fill("/")}).success,false);
 });
+test("acquisition separates a tracked advert from the WhatsApp contact channel",()=>{
+  const report=leadReport([
+    {...lead,source:"WhatsApp",attribution:{source:"google",medium:"cpc",landingPage:"/",conversionPage:"/contact"},stage:"WON"},
+    {...lead,source:"WhatsApp"},
+  ]);
+  assert.deepEqual(report.acquisition.find(row=>row.label==="Google Ad"),{label:"Google Ad",total:1,won:1});
+  assert.deepEqual(report.acquisition.find(row=>row.label==="Unknown"),{label:"Unknown",total:1,won:0});
+  assert.equal(report.acquisition.some(row=>row.label==="WhatsApp"),false);
+  assert.deepEqual(report.channels.find(row=>row.label==="WhatsApp"),{label:"WhatsApp",total:2,won:1});
+});
