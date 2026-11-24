@@ -2,10 +2,10 @@
 
 - **Implementation:** Added authenticated issuance of a short-lived one-use journey reference scoped to the active Midpoint STOR24 WhatsApp intake. CRM saves the reference's consented website source, medium, campaign and page journey with the existing attribution event while retaining WhatsApp as the contact channel. Retries cannot reuse the reference or replace attribution. The inbound message is used transiently to find the marker.
 - **Testing:** CRM typecheck, focused lint and six intake contract and form parser tests passed. The isolated PostgreSQL case passed authentication, concurrent starts, cross-store denial, expiry, replay and the existing handoff. Its schema was installed using Prisma db push after an older artwork migration failed on a clean database.
-- **Commit and push:** Candidate branch `codex/whatsapp-source-capture-20261124` with companion website branch `codex/whatsapp-source-bridge-20261124`. See each branch's Git history for the pushed head.
-- **Merge:** Pending protected review and checks.
-- **Deployment and configuration:** Pending. The companion website flag defaults off until the active WhatChimp flow forwards the original reference into CRM and existing chat paths are verified.
-- **Live production verification:** No live tagged enquiry or move-in exercised for this bridge. Direct-to-WhatsApp Meta campaign referral evidence, staff UAT and existing provider, data and finance gates remain open. Billing production hold remains in place.
+- **Commit and push:** CRM implementation branch `codex/whatsapp-source-capture-20261124` pushed through `4463a648`. The website release and its verification are recorded in website PRs #294 and #295.
+- **Merge:** CRM PR #893 passed protected checks and squash merged as `834056bf`. Exact-main CI 45353388050, security 45353387794, transactions 45353387915 and restricted runtime 45353387774 passed.
+- **Deployment and configuration:** CRM deployment 45355896799 succeeded. The companion website flag remains off until the active WhatChimp flow forwards the reference and CRM pickup is verified. Billing production hold remains in place.
+- **Live production verification:** Production health reported app and database OK. The newly deployed issuance route returned HTTP 401 without its server credential. The live website retained the existing STOR24 WhatsApp destination and reported `captureJourney=false`. Live tagged enquiry, assignment and linked move-in, direct-to-WhatsApp Meta campaign referral evidence, staff UAT and existing provider, data and finance gates remain open.
 
 ## 2026-11-17 — BlendSign callback concurrency release
 
