@@ -9321,3 +9321,9 @@ Batch review is invalidated if the operator edits account billing terms; the syn
 - Configuration: Created a separate STOR24 team in WhatChimp and, with Brett's approval, added Katlego. Provider readback shows one member, queue mode, and no bots or sequences routing to this team. This does not itself restrict conversation access or deliver enquiries. Katlego's channel permissions were not changed.
 - Testing and live verification: team and membership were read back in the provider UI; no routing or privacy isolation test has passed. The Gmail test-account invitation remains unsent. Automatic WhatsApp handoff, team routing, isolation, attribution and customer journey verification remain outstanding. Billing production hold remains in place.
 - Project record: this receipt is on a documentation branch and requires promotion to main; it is not a runtime deployment.
+
+## 2026-11-24 — WhatsApp access and routing live recheck
+
+- Provider configuration verified: the Gmail test account is active with team-only visibility, STOR24 WhatsApp 6824 and STOR24 social channels allowed; Katlego remains set to all chats on his allowed channels with 6824 denied. The STOR24 team has two members, queue mode, no assigned chats, and the provider reports no bot or sequence sends chats to it. Brett reports the access and routing are sorted; the provider readback does not yet verify those claims, and his response on Hub visibility is ambiguous.
+- Testing: main CI 45342851248 and transaction run 45342851160 succeeded for merged reporting change 2433a32e. No privacy isolation, positive team handoff, ABC attribution or advert-to-move-in production test was verified. Deployment remains unconfirmed. Preserve the billing production hold.
+- This record is a documentation-branch update requiring promotion. Full ABC implementation, CRM handoff, notification, provider configuration and privacy gates remain outstanding.
