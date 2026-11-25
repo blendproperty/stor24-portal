@@ -3,6 +3,7 @@ import test from "node:test";
 import { build } from "esbuild";
 import { createRequire } from "node:module";
 import { Prisma } from "../src/generated/prisma/client";
+import { privacyHash } from "../src/lib/request-security";
 
 // Execute the real routes, validators, guards and services against synthetic
 // records. Only persistence and the signed-session reader are substituted.
@@ -76,7 +77,7 @@ async function load(entry: string, state: ReturnType<typeof fixture>) {
 test("manual WhatsApp send and retry authorize the recipient independently of the supplied facility", async () => {
   const state = fixture(); state.grant("operations.manage"); state.grant("reports.view", null);
   for (const customer of state.tables.customer) Object.assign(customer, { phone: "+27820000000", communicationConsent: { whatsapp: true } });
-  const log: Row = { id: "failed", organisationId: "org", channel: "WHATSAPP", status: "FAILED", facilityId: null, customerId: "customer-b", customer: state.tables.customer[1], messageType: "PAYMENT_REMINDER", metadata: { variables: {} }, idempotencyKey: "synthetic-failed-message", attempts: 0, providerRef: "SMsynthetic", failedAt: new Date(), failureCode: "DELIVERY_FAILED" };
+  const log: Row = { id: "failed", organisationId: "org", channel: "WHATSAPP", status: "FAILED", facilityId: null, customerId: "customer-b", customer: state.tables.customer[1], messageType: "PAYMENT_REMINDER", recipientHash: privacyHash("+27820000000"), metadata: { variables: {} }, idempotencyKey: "synthetic-failed-message", attempts: 0, providerRef: "SMsynthetic", failedAt: new Date(), failureCode: "DELIVERY_FAILED" };
   state.db.communicationLog = {
     findFirst: async ({ where }: Row) => matches(log, where) ? log : null,
     findUnique: async () => null,
