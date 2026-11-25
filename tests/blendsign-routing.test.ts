@@ -32,3 +32,7 @@ test("debit-order merge keys match the active BlendSign template", () => {
   assert.doesNotMatch(source, /debitOrder\.commencementDate/);
   assert.doesNotMatch(source, /debitOrder\.amount/);
 });
+
+test("lease envelopes omit the retired security deposit binding", () => {
+  assert.doesNotMatch(source, /lease\.deposit/);
+});

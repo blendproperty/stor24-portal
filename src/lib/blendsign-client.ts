@@ -111,7 +111,6 @@ export async function createBlendSignLeaseEnvelope(input: LeaseEnvelopeInput): P
     "unit.size": unitSize(input.unit.unitType),
     "lease.startDate": input.startDate.toISOString().slice(0, 10),
     "lease.monthlyRental": input.monthlyRate.toFixed(2),
-    "lease.deposit": input.monthlyRate.toFixed(2),
   };
   data["owner.companyName"] = owner.legalName || owner.dbaName || input.facility.name;
   if (owner.registrationNumber) data["owner.registrationNumber"] = owner.registrationNumber;
