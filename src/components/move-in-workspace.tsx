@@ -3,7 +3,7 @@
 import { InitialRentFields } from "./initial-rent-fields";
 import { MoveInProgressNav } from "./move-in-progress-nav";
 import type { MoveInProgress } from "@/lib/move-in-progress";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Plus, Search, X, Warehouse, FileCheck2, Wallet, ShieldCheck, Camera, KeyRound } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
@@ -43,7 +43,6 @@ type Reservation = {
   quotedRate: number;
   legacyHandover?: boolean;
   legacyAccountId?: string | null;
-  legacySigned?: boolean;
   readiness: ReservationMoveInReadiness | null;
 };
 
@@ -53,6 +52,7 @@ export function MoveInWorkspace({
   customers,
   reservations,
   initialReservationId,
+  trainingEntry,
   action,
 }: {
   facilities: Facility[];
@@ -60,6 +60,7 @@ export function MoveInWorkspace({
   customers: Customer[];
   reservations: Reservation[];
   initialReservationId?: string;
+  trainingEntry?: ReactNode;
   action: (data: FormData) => void | Promise<void>;
 }) {
   const initialReservation = reservations.find(
@@ -232,13 +233,18 @@ export function MoveInWorkspace({
         description={
           step === 1
             ? "Select an available unit using size or floor-area availability."
-            : selectedReservation?.readiness
+            : selectedReservation?.legacyHandover
+              ? "Review the existing lease and account before continuing."
+              : selectedReservation?.readiness
               ? "Review the existing signed agreement, payment and move-in date before recording key handover."
               : "Complete the booking details, then review and sign the agreement with the customer now."
         }
+        action={selectedReservation?.leadId
+          ? <a className="button button-secondary" href={`/leads?lead=${encodeURIComponent(selectedReservation.leadId)}`}><ArrowLeft size={16} aria-hidden="true" /> Back to enquiry</a>
+          : step === 1 ? <a className="button button-secondary" href="/operations/move-in/multiple">Move in multiple units</a> : undefined}
       />
-      {selectedReservation?.leadId && <a className="button button-secondary" href={`/leads?lead=${encodeURIComponent(selectedReservation.leadId)}`}>Back to enquiry journey</a>}
-      {(step === 1 || !selectedReservation?.readiness) && <MoveInProgressNav steps={[
+      {trainingEntry}
+      {(step === 1 || (!selectedReservation?.readiness && !selectedReservation?.legacyHandover)) && <MoveInProgressNav steps={[
         { label: "Select unit", icon: Warehouse, status: selectedId ? `Unit ${selected?.number}` : "Choose a unit", complete: Boolean(selectedId), onClick: () => setStep(1) },
         { label: "Agreement", icon: FileCheck2, status: selectedReservation?.readiness?.signed ? "Signed" : "Not signed", complete: Boolean(selectedReservation?.readiness?.signed), onClick: selectedId ? () => setStep(2) : undefined },
         { label: "Payment", icon: Wallet, status: selectedReservation?.readiness?.paymentVerified ? "Verified" : "Awaiting payment", complete: Boolean(selectedReservation?.readiness?.paymentVerified), onClick: selectedReservation?.readiness ? () => setStep(2) : undefined },
@@ -450,7 +456,7 @@ export function MoveInWorkspace({
           </aside>
         </section>
       ) : selectedReservation?.legacyHandover ? (
-        <section className="panel panel-spacious"><h2>Continue the existing lease</h2><p>This booking already has a lease. Use the existing record rather than creating another agreement.</p>{selectedReservation.legacySigned ? <a className="button button-primary" href="#legacy-handovers">Open existing lease handover</a> : selectedReservation.legacyAccountId ? <a className="button button-primary" href={`/operations/accounts?accountId=${encodeURIComponent(selectedReservation.legacyAccountId)}`}>Open pending lease and account</a> : <p>The linked lease needs staff review.</p>}</section>
+        <section className="panel panel-spacious"><h2>Continue the existing lease</h2><p>This booking already has a lease. Use the existing record rather than creating another agreement.</p>{selectedReservation.legacyAccountId ? <a className="button button-primary" href={`/operations/accounts?accountId=${encodeURIComponent(selectedReservation.legacyAccountId)}`}>Open pending lease and account</a> : <p>The linked lease needs staff review.</p>}</section>
       ) : selectedReservation?.readiness ? (
         <ReservationMoveInConfirmation key={selectedReservation.id} reservationId={selectedReservation.id}
           customerName={selectedCustomer?.name ?? selectedReservation.label} unitNumber={selected?.number ?? ""}

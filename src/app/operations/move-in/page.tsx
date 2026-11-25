@@ -1,4 +1,6 @@
 import { TrainingEntry } from "@/components/move-in-training";
+import { PageHeader } from "@/components/page-header";
+import { ArrowLeft } from "lucide-react";
 import { getMoveInProgress } from "@/lib/move-in-progress";
 import { requireSession } from "@/lib/auth-guards";
 import { hasPermission } from "@/lib/permissions";
@@ -24,6 +26,23 @@ export default async function MoveInPage({ searchParams }: { searchParams: Promi
     canReviewPhoto:auth.role==="Organisation owner" || Boolean(readiness.photoPolicy?.trial||readiness.trialPhoto) || auth.user.roleAssignments.some(a=>(!a.facilityId || a.facilityId===t.facilityId)&&hasPermission(a.role.permissions,"access.manage")),
     ...readiness,
   }}));
+  const linkedReservation = data.reservations.find(reservation =>
+    reservation.id === initialReservationId && reservation.status === "CONVERTED" && reservation.publicLease?.status !== "SIGNED",
+  );
+  const linkedHandover = legacy.find(item => item.id === linkedReservation?.convertedTenancyId);
+  if (linkedReservation && linkedHandover) {
+    const enquiryHref = linkedReservation.leadId
+      ? `/leads?lead=${encodeURIComponent(linkedReservation.leadId)}`
+      : "/operations/move-in";
+    return (
+      <div className="page-stack">
+        <PageHeader eyebrow="Operations centre · Accounts" title="Move in"
+          description="Complete the remaining checks on the signed lease before handing over keys."
+          action={<a className="button button-secondary" href={enquiryHref}><ArrowLeft size={16} aria-hidden="true" />{linkedReservation.leadId ? "Back to enquiry" : "Back to Move in"}</a>} />
+        <LegacyHandoverList items={[linkedHandover]} focused />
+      </div>
+    );
+  }
   const reservations = await Promise.all(data.reservations.filter(reservation => reservation.status === "ACTIVE" || (reservation.id === initialReservationId && reservation.status === "CONVERTED")).map(async reservation => ({
     progress: reservation.publicLease?.status === "SIGNED" ? await getMoveInProgress(scope, reservation.id) : undefined,
     canReviewPhoto: auth.role === "Organisation owner" || auth.user.roleAssignments.some(a => (!a.facilityId || a.facilityId === reservation.facilityId) && hasPermission(a.role.permissions, "access.view")),
@@ -35,13 +54,17 @@ export default async function MoveInPage({ searchParams }: { searchParams: Promi
     quotedRate: Number(reservation.quotedRate),
     legacyHandover: reservation.status === "CONVERTED" && reservation.publicLease?.status !== "SIGNED",
     legacyAccountId: data.tenancies.find(t=>t.id===reservation.convertedTenancyId)?.accountId ?? null,
-    legacySigned: Boolean(data.tenancies.find(t=>t.id===reservation.convertedTenancyId)?.documents.some(d=>d.status==="SIGNED")),
     readiness: reservation.publicLease?.status === "SIGNED" ? await getReservationMoveInReadiness(scope, reservation.id) : null,
   })));
-  return <><TrainingEntry/><a className="button button-secondary" href="/operations/move-in/multiple">Move in multiple available units for one customer</a><MoveInWorkspace action={moveInAction}
-    initialReservationId={initialReservationId}
-    facilities={data.facilities.map(({ id, name }) => ({ id, name }))}
-    units={data.facilities.flatMap((facility) => facility.units.filter(unit => unit.floorOperational).map((unit) => ({ id: unit.id, facilityId: unit.facilityId, number: unit.number, floor: unit.floor ?? "", zone: unit.zone ?? "", status: unit.status, monthlyRate: Number(unit.monthlyRate), typeName: unit.unitType.name, width: unit.unitType.widthMetres === null ? null : Number(unit.unitType.widthMetres), length: unit.unitType.lengthMetres === null ? null : Number(unit.unitType.lengthMetres), area: unit.unitType.areaSqMetres === null ? null : Number(unit.unitType.areaSqMetres), features: unit.unitType.features })))}
-    customers={data.customers.map((customer) => ({ id: customer.id, name: customer.companyName || [customer.firstName, customer.lastName].filter(Boolean).join(" ") || "Unnamed customer", email: customer.email }))}
-    reservations={reservations}/><LegacyHandoverList items={legacy.filter(t=>!t.handedOver || (t.canReviewPhoto && t.photo && ["WAITING_REVIEW","APPROVED","PENDING_PROVIDER"].includes(t.photo.status)))}/></>;
+  return (
+    <div className="page-stack">
+      <MoveInWorkspace action={moveInAction} trainingEntry={<TrainingEntry />}
+        initialReservationId={initialReservationId}
+        facilities={data.facilities.map(({ id, name }) => ({ id, name }))}
+        units={data.facilities.flatMap((facility) => facility.units.filter(unit => unit.floorOperational).map((unit) => ({ id: unit.id, facilityId: unit.facilityId, number: unit.number, floor: unit.floor ?? "", zone: unit.zone ?? "", status: unit.status, monthlyRate: Number(unit.monthlyRate), typeName: unit.unitType.name, width: unit.unitType.widthMetres === null ? null : Number(unit.unitType.widthMetres), length: unit.unitType.lengthMetres === null ? null : Number(unit.unitType.lengthMetres), area: unit.unitType.areaSqMetres === null ? null : Number(unit.unitType.areaSqMetres), features: unit.unitType.features })))}
+        customers={data.customers.map((customer) => ({ id: customer.id, name: customer.companyName || [customer.firstName, customer.lastName].filter(Boolean).join(" ") || "Unnamed customer", email: customer.email }))}
+        reservations={reservations} />
+      <LegacyHandoverList items={legacy.filter(item => !item.handedOver || (item.canReviewPhoto && item.photo && ["WAITING_REVIEW", "APPROVED", "PENDING_PROVIDER"].includes(item.photo.status)))} />
+    </div>
+  );
 }
