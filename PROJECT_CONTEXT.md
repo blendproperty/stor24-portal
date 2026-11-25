@@ -1,3 +1,13 @@
+## 2026-11-25 — Direct-to-WhatsApp paid acquisition production rollout
+
+- **Implementation:** Signed WhatChimp referrals on STOR24 WhatsApp ending 6824 carry the exact Meta ad ID into Lead to Lease. Marketing reports enquiries and verified move-ins by that ID. No campaign name, placement or website path is inferred from the provider event.
+- **Testing:** Scoped lint, type checking and 24 isolated PostgreSQL tests passed. The signed referral fixture verified capture, duplicate handling and existing attribution preservation. The signed reservation fixture verified one move-in against the original ad ID after handover.
+- **Commit and push:** PR #900 head was `3d38bc4e7a6ac980e48f5c0e8edbbd56d4efb9cd`.
+- **Merge:** PR #900 merged on 24 November as `a9f06a94837627348ef68960d42ffdf44f7c4443`. Main CI 45406141465, security 45406141482, transactions 45406141629 and restricted runtime 45406141501 succeeded.
+- **Deployment and configuration:** VPS run 45408843597 succeeded for the merged release. The existing signed WhatChimp receiver remained scoped to 6824. Billing production hold remains in place.
+- **Live production verification:** On 25 November, the CRM and database reported healthy, the unsigned receiver returned HTTP 401, and the website returned `captureJourney=true` with the STOR24 chat destination. On 24 November, WhatChimp delivered the real tagged website chat, and production verified one consumed reference linked to a Lead to Lease enquiry with Google CPC acquisition and WhatsApp contact. Website record PR #296 merged as `7bd56d74`.
+- **Outstanding:** The active STOR24 ad sets checked on 24 November use website destinations. A real direct-to-WhatsApp ad enquiry and a genuine attributed move-in still require live verification. Keep Task 5 open.
+
 ## 2026-11-24 — Tagged WhatsApp enquiries after a closed lead
 
 - **Production evidence:** WhatChimp is connected for incoming messages from STOR24 WhatsApp ending 6824 only. CRM deployment 45393132599 loaded the signing secret. The signed provider test and a labelled real message both received HTTP 204. Read-only verification found the test reference still pending and its prior chat session still marked CAPTURING while the linked lead was LOST. The website flag remained off.
