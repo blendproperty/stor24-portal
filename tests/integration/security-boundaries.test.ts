@@ -10,6 +10,7 @@ import { requireFacility } from "../../src/lib/scope";
 import { createCustomer, createLead, requireLeasingCustomer } from "../../src/lib/leasing-service";
 import { listIdentityLinks } from "../../src/lib/mel-integration-status-service";
 import { listCommunicationLogs } from "../../src/lib/communication-log-service";
+import { privacyHash } from "../../src/lib/request-security";
 
 
 test("isolated PostgreSQL security boundaries and safe staff projections", async t => {
@@ -69,7 +70,7 @@ test("isolated PostgreSQL security boundaries and safe staff projections", async
       const request = (body: unknown) => new Request("https://example.invalid/api/v1/communications", { method: "POST", headers: { origin: "https://example.invalid", "content-type": "application/json" }, body: JSON.stringify(body) });
       const send = (customerId: string, facilityId = a.id) => sendApi.POST(request({ customerId, facilityId, messageType: "PAYMENT_REMINDER", variables: {}, idempotencyKey: randomUUID() }));
       const retry = async (customerId: string, facilityId: string | null = null) => {
-        const log = await db.communicationLog.create({ data: { organisationId: org.id, facilityId, customerId, channel: "WHATSAPP", status: "FAILED", messageType: "PAYMENT_REMINDER", recipientHash: "synthetic", metadata: { variables: {} }, idempotencyKey: randomUUID(), providerRef: "SMsynthetic", failedAt: new Date(), failureCode: "DELIVERY_FAILED" } });
+        const log = await db.communicationLog.create({ data: { organisationId: org.id, facilityId, customerId, channel: "WHATSAPP", status: "FAILED", messageType: "PAYMENT_REMINDER", recipientHash: privacyHash("+27820000000"), metadata: { variables: {} }, idempotencyKey: randomUUID(), providerRef: "SMsynthetic", failedAt: new Date(), failureCode: "DELIVERY_FAILED" } });
         const response = await retryApi.POST(request({ logId: log.id }));
         if (response.status === 403) assert.equal((await db.communicationLog.findUniqueOrThrow({ where: { id: log.id } })).attempts, 1);
         return response;
