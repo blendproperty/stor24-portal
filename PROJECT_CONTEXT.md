@@ -1,3 +1,11 @@
+## 2026-11-25 — Move-in layout for a linked signed lease
+
+- **Implementation:** Move in opens the existing signed lease and that booking's handover card directly. The page shows the signed agreement, verified payment, access photo, and outstanding handover checks in one view. Existing pending-lease, public-booking training and multi-unit entry points remain available. This is a presentation change with existing photo, identity, payment and key-handover enforcement.
+- **Testing:** TypeScript and scoped lint passed. Seven focused reservation and training tests passed. A browser fixture rendered the actual Move in page with branded styling at 1440, 768, 390 and 320 pixels. It verified exact booking selection, agreement and enquiry links, disabled handover, pending lease recovery, booking training and general queue access. The existing multi-unit browser test passed at 1440, 390 and 320 pixels. No live records were used.
+- **Commit and push:** Candidate branch `codex/move-in-signed-lease-layout-20261125`. The pull request records its exact head and protected checks.
+- **Merge and deployment:** Pending at this checkpoint.
+- **Live production verification:** Pending an authenticated readback after deployment. Task 7 remains open until Katlego reports staff acceptance. The billing production hold remains in place.
+
 ## 2026-11-25 — Task 6 WhatsApp retry content verification
 
 - **Implementation:** New WhatsApp attempts retain the original template values using the configured integration vault. Manual retry checks the saved values, original template when recorded, and recipient. A historical hash-only record with nonempty values stays in delivery review. No billing or automation switch changes.
