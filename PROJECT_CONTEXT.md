@@ -11,7 +11,10 @@
 - **Implementation:** Task 6 claims each signed Twilio inbound WhatsApp event once. The inbound receipt, communication log, staff task and STOP consent change commit together. An already processed event cannot revoke later consent when Twilio replays it.
 - **Testing:** Fourteen focused WhatsApp consent, delivery, retry and configuration tests passed. The two isolated PostgreSQL callback tests passed, including concurrent STOP replay, rollback when saving consent fails and preservation of later consent. Typecheck and scoped lint passed.
 - **Commit and push:** Candidate branch `codex/whatsapp-inbound-consent-20261125`. See the pull request for the pushed head and protected checks.
-- **Merge, deployment and live verification:** Pending. First tenant handover and consenting-handset checks remain open. The billing production hold remains in place.
+- **Merge:** PR #902 passed protected checks on head cf44dbdf and merged as f56fa914. Exact-main CI 45539733928, security 45539733926, transactions 45539733780 and restricted runtime 45539733807 passed.
+- **Deployment and configuration:** VPS deployment 45541801277 succeeded for f56fa914. The billing production hold remains in place.
+- **Live production verification:** CRM app and database healthy after deployment. Both Twilio inbound and status endpoints rejected unsigned requests with HTTP 403. Website attribution remains enabled on the WhatsApp number ending 6824. WhatChimp's separate STOP bot is active on that number. Its pretend-contact preview reached the opt-out confirmation and showed the marketing opt-in change. Its stats reported zero live runs in the last 30 days.
+- **Outstanding:** Controlled handset delivery, failed-delivery retry and a real Twilio STOP are pending. The separate Task 5 production handover remains pending the first genuine tenant.
 
 ## 2026-11-25 — Direct-to-WhatsApp paid acquisition production rollout
 
