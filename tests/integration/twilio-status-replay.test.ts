@@ -4,6 +4,8 @@ import { createHmac, randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import { build } from "./build-commonjs";
 import { db } from "../../src/lib/db";
+import { POST as inbound } from "../../src/app/api/webhooks/twilio/inbound/route";
+import { privacyHash } from "../../src/lib/request-security";
 import type { Prisma } from "../../src/generated/prisma/client";
 
 test("isolated PostgreSQL callback replay and rollback", async () => {
@@ -78,6 +80,61 @@ test("isolated PostgreSQL callback replay and rollback", async () => {
       const failed = await db.communicationLog.findUniqueOrThrow({ where: { id: reviewed.id } });
       assert.equal(failed.status, "FAILED"); assert.equal(failed.nextRetryAt, null); assert.ok(failed.failedAt);
     }
+  } finally {
+    if (saved.token === undefined) delete process.env.TWILIO_AUTH_TOKEN; else process.env.TWILIO_AUTH_TOKEN = saved.token;
+    if (saved.url === undefined) delete process.env.APP_URL; else process.env.APP_URL = saved.url;
+    await db.$disconnect();
+  }
+});
+
+test("signed inbound WhatsApp retries preserve consent and one staff task", async () => {
+  assert.equal(process.env.MERCHANDISE_DB_TEST, "isolated-ci");
+  assert.equal(new URL(process.env.DATABASE_URL!).hostname, "localhost");
+  const saved = { token: process.env.TWILIO_AUTH_TOKEN, url: process.env.APP_URL };
+  const url = "https://example.invalid/api/webhooks/twilio/inbound";
+  const key = randomUUID();
+  const phone = "+27710000071";
+  const consent = { whatsapp: true, email: true };
+  process.env.TWILIO_AUTH_TOKEN = "synthetic-inbound-token";
+  process.env.APP_URL = "https://example.invalid";
+  const org = await db.organisation.create({ data: { name: "Inbound fixture", slug: key } });
+  const customer = await db.customer.create({ data: { organisationId: org.id, communicationConsent: consent } });
+  await db.communicationLog.create({ data: { organisationId: org.id, customerId: customer.id, channel: "WHATSAPP",
+    direction: "OUTBOUND", provider: "twilio", recipientHash: privacyHash(phone), idempotencyKey: key } });
+  function request() {
+    const fields = { Body: " STOP ", From: `whatsapp:${phone}`, MessageSid: key };
+    const signature = createHmac("sha1", "synthetic-inbound-token")
+      .update(url + Object.entries(fields).map(([name, value]) => name + value).join("")).digest("base64");
+    return new Request(url, { method: "POST", headers: { "x-twilio-signature": signature }, body: new URLSearchParams(fields) });
+  }
+  const counts = async () => Promise.all([
+    db.webhookInbox.count({ where: { organisationId: org.id } }),
+    db.communicationLog.count({ where: { organisationId: org.id, direction: "INBOUND" } }),
+    db.task.count({ where: { organisationId: org.id } }),
+  ]);
+  const readConsent = async () => (await db.customer.findUniqueOrThrow({ where: { id: customer.id } })).communicationConsent;
+  try {
+    const original = db.$transaction, transaction = db.$transaction.bind(db);
+    db.$transaction = (async (callback: (tx: Prisma.TransactionClient) => Promise<unknown>) => transaction(async tx => callback(new Proxy(tx, {
+      get(target, property) {
+        if (property === "customer") return { ...target.customer, update: async () => { throw Error("SYNTHETIC_CONSENT_FAILURE"); } };
+        return Reflect.get(target, property);
+      },
+    })))) as typeof db.$transaction;
+    try { await assert.rejects(inbound(request()), /SYNTHETIC_CONSENT_FAILURE/); }
+    finally { db.$transaction = original; }
+    assert.deepEqual(await counts(), [0, 0, 0]);
+    assert.deepEqual(await readConsent(), consent);
+    assert.deepEqual((await Promise.all([inbound(request()), inbound(request()), inbound(request())])).map(r => r.status), [200, 200, 200]);
+    assert.deepEqual(await counts(), [1, 1, 1]);
+    const optedOut = await readConsent() as { whatsapp: boolean; email: boolean; optedOutAt: string };
+    assert.equal(optedOut.whatsapp, false);
+    assert.equal(optedOut.email, true);
+    assert.ok(optedOut.optedOutAt);
+    await db.customer.update({ where: { id: customer.id }, data: { communicationConsent: consent } });
+    assert.equal((await inbound(request())).status, 200);
+    assert.deepEqual(await readConsent(), consent);
+    assert.deepEqual(await counts(), [1, 1, 1]);
   } finally {
     if (saved.token === undefined) delete process.env.TWILIO_AUTH_TOKEN; else process.env.TWILIO_AUTH_TOKEN = saved.token;
     if (saved.url === undefined) delete process.env.APP_URL; else process.env.APP_URL = saved.url;

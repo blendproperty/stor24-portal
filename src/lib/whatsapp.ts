@@ -108,10 +108,11 @@ export function canRetryWhatsAppDelivery(log: { status: string; providerRef: str
   return metadata.deliveryOutcome === "REJECTED" || Boolean(log.providerRef && log.failedAt) || ["CONFIG_REQUIRED", "INVALID_RECIPIENT", "INVALID_CONTENT_SID"].includes(log.failureCode ?? "");
 }
 
-export async function recordWhatsAppOptOut(customerId: string, at = new Date()) {
-  const customer = await db.customer.findUnique({ where: { id: customerId }, select: { communicationConsent: true } });
+export async function recordWhatsAppOptOut(tx: Prisma.TransactionClient, customerId: string, at = new Date()) {
+  await tx.$queryRaw`SELECT "id" FROM "Customer" WHERE "id" = ${customerId} FOR UPDATE`;
+  const customer = await tx.customer.findUnique({ where: { id: customerId }, select: { communicationConsent: true } });
   if (!customer) return;
   const current = customer.communicationConsent && typeof customer.communicationConsent === "object" && !Array.isArray(customer.communicationConsent)
     ? customer.communicationConsent as Record<string, unknown> : {};
-  await db.customer.update({ where: { id: customerId }, data: { communicationConsent: { ...current, whatsapp: false, optedOutAt: at.toISOString(), source: "WHATSAPP_INBOUND" } } });
+  await tx.customer.update({ where: { id: customerId }, data: { communicationConsent: { ...current, whatsapp: false, optedOutAt: at.toISOString(), source: "WHATSAPP_INBOUND" } } });
 }
