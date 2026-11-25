@@ -1,3 +1,10 @@
+## 2026-11-25 — Task 6 WhatsApp retry content verification
+
+- **Implementation:** New WhatsApp attempts retain the original template values using the configured integration vault. Manual retry checks the saved values, original template when recorded, and recipient. A historical hash-only record with nonempty values stays in delivery review. No billing or automation switch changes.
+- **Testing:** Scoped lint and TypeScript passed. Six tests, three against isolated PostgreSQL, verify original provider values, concurrent retry, unknown history, template and recipient mismatch, delivery callbacks and replayed STOP.
+- **Commit and push:** Candidate branch `codex/whatsapp-exact-retry-20261125`. The exact head and protected checks are in GitHub.
+- **Merge, deployment and live verification:** Pending for retry follow-up. The inbound STOP change from PR #902 merged separately as `f56fa914`. Production handset delivery, retry and STOP acceptance remain open. The billing production hold remains in place.
+
 ## 2026-11-25 — Task 5 live handover gate and Task 6 inbound WhatsApp consent
 
 - **Task 5 acceptance:** Brett deferred the live attribution check until the first genuine tenant handover. The production read-only query found zero WhatsApp-linked handovers. There is no separate test campaign. Website-to-WhatsApp attribution remains live, and native ad referral validation is deferred until a campaign uses that destination.

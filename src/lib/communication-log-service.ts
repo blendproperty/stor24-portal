@@ -6,7 +6,7 @@ import { requireLeasingCustomer } from "@/lib/leasing-service";
 import type { Prisma } from "@/generated/prisma/client";
 import { communicationFiltersSchema, communicationDateRange, type CommunicationFilters, type CommunicationLogRead } from "./communication-log-query";
 import { communicationCursor, readCommunicationCursor } from "./communication-log-cursor";
-import { canRetryWhatsAppDelivery } from "./whatsapp";
+import { canRetryWhatsAppDelivery, readWhatsAppRetryVariables } from "./whatsapp";
 
 function communicationWhere(scope: RequestScope): Prisma.CommunicationLogWhereInput {
   return { organisationId: scope.organisationId, channel: { in: ["EMAIL", "SMS", "WHATSAPP"] }, AND: [
@@ -65,6 +65,6 @@ export async function communicationLogPage(scope: RequestScope, input: Communica
       channel: row.channel as "EMAIL" | "SMS" | "WHATSAPP", direction: row.direction === "INBOUND" ? "INBOUND" : row.direction === "OUTBOUND" ? "OUTBOUND" : "UNKNOWN", messageType: row.messageType, status: row.status,
       queuedAt: row.queuedAt.toISOString(), sentAt: row.sentAt?.toISOString() ?? null, deliveredAt: row.deliveredAt?.toISOString() ?? null, readAt: row.readAt?.toISOString() ?? null,
       failureCode: row.failureCode ? (/^[A-Za-z0-9_-]{1,100}$/.test(row.failureCode) ? row.failureCode : "REVIEW_REQUIRED") : null,
-      canRetryWhatsApp: row.channel === "WHATSAPP" && row.direction === "OUTBOUND" && canRetryWhatsAppDelivery(row) })),
+      canRetryWhatsApp: row.channel === "WHATSAPP" && row.direction === "OUTBOUND" && canRetryWhatsAppDelivery(row) && readWhatsAppRetryVariables(row.metadata) !== null })),
   };
 }

@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { db } from "@/lib/db";
 import { TwilioWhatsAppProvider } from "@/lib/integrations/twilio-provider";
 import { privacyHash } from "@/lib/request-security";
+import { decryptIntegrationSecret, encryptIntegrationSecret, integrationEncryptionConfigured } from "@/lib/integrations/integration-secret-vault";
 import { getWhatsAppAutomationState, whatsAppServerGateEnabled } from "@/lib/integrations/whatsapp-automation";
 
 export const WHATSAPP_TEMPLATE_ENV = {
@@ -29,6 +30,25 @@ export function hasWhatsAppConsent(value: unknown): value is Consent {
   return consent.whatsapp === true && !consent.optedOutAt;
 }
 
+function templateVariablesHash(variables: Record<string, string>) {
+  return createHash("sha256").update(JSON.stringify(Object.entries(variables).sort(([a], [b]) => a.localeCompare(b)))).digest("hex");
+}
+
+export function readWhatsAppRetryVariables(value: unknown): Record<string, string> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const metadata = value as Record<string, unknown>;
+  let variables = metadata.variables;
+  if (typeof metadata.retryVariablesEncrypted === "string") {
+    try { variables = JSON.parse(decryptIntegrationSecret(metadata.retryVariablesEncrypted)); }
+    catch { return null; }
+  }
+  if (variables === undefined && metadata.variablesHash === templateVariablesHash({})) return {};
+  if (!variables || typeof variables !== "object" || Array.isArray(variables)
+    || !Object.values(variables).every(value => typeof value === "string")) return null;
+  const result = variables as Record<string, string>;
+  return typeof metadata.variablesHash !== "string" || metadata.variablesHash === templateVariablesHash(result) ? result : null;
+}
+
 export async function sendWhatsAppTemplate(input: {
   organisationId: string;
   facilityId?: string;
@@ -44,7 +64,10 @@ export async function sendWhatsAppTemplate(input: {
   if (!input.allowWhenAutomationDisabled && !(await getWhatsAppAutomationState(input.organisationId)).enabled) return { ok: false as const, code: "AUTOMATION_DISABLED" };
   const contentSid = process.env[WHATSAPP_TEMPLATE_ENV[input.messageType]];
   if (!contentSid) return { ok: false as const, code: "TEMPLATE_NOT_CONFIGURED" };
-  const variablesHash = createHash("sha256").update(JSON.stringify(Object.entries(input.variables).sort(([a], [b]) => a.localeCompare(b)))).digest("hex");
+  const variablesHash = templateVariablesHash(input.variables);
+  const retryVariables = Object.keys(input.variables).length && integrationEncryptionConfigured()
+    ? { retryVariablesEncrypted: encryptIntegrationSecret(JSON.stringify(input.variables)) }
+    : {};
 
   const delivery: Prisma.CommunicationLogUncheckedCreateInput = {
     organisationId: input.organisationId,
@@ -57,7 +80,7 @@ export async function sendWhatsAppTemplate(input: {
     provider: "twilio",
     status: "PENDING",
     idempotencyKey: input.idempotencyKey,
-    metadata: { contentSid, variablesHash, deliveryOutcome: "IN_PROGRESS" },
+    metadata: { contentSid, variablesHash, ...retryVariables, deliveryOutcome: "IN_PROGRESS" },
   };
   let log;
   try {
@@ -91,7 +114,7 @@ export async function sendWhatsAppTemplate(input: {
       failureMessage: accepted ? null : uncertain ? "Delivery could not be confirmed. Review the provider record before retrying." : !result.ok ? result.message : null,
       failedAt: accepted ? null : new Date(),
       nextRetryAt: null,
-      metadata: { contentSid, variablesHash, deliveryOutcome: accepted ? "ACCEPTED" : uncertain ? "UNCERTAIN" : "REJECTED" },
+      metadata: { contentSid, variablesHash, ...retryVariables, deliveryOutcome: accepted ? "ACCEPTED" : uncertain ? "UNCERTAIN" : "REJECTED" },
     } });
   } catch {
     // The durable pending claim prevents a resend after uncertain finalisation.

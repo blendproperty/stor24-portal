@@ -4,6 +4,7 @@ import { build } from "./build-commonjs";
 import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
 import { db } from "../../src/lib/db";
+import { privacyHash } from "../../src/lib/request-security";
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 test("isolated PostgreSQL WhatsApp attempt and manual-retry claims", async () => {
@@ -17,7 +18,8 @@ test("isolated PostgreSQL WhatsApp attempt and manual-retry claims", async () =>
   const role = await db.role.create({ data: { organisationId: org.id, name: "Message operator", permissions: ["operations.manage"] } });
   await db.roleAssignment.create({ data: { userId: user.id, roleId: role.id, facilityId: facility.id } });
   let sends = 0, reject = false;
-  const provider = async () => { sends++; return reject ? { ok: false, retryable: true, code: "NETWORK_ERROR", message: "Synthetic timeout" } : { ok: true, providerReference: `SMsynthetic-${sends}` }; };
+  const sentVariables: Record<string, string>[] = [];
+  const provider = async (_recipient: string, _template: string, variables: Record<string, string>) => { sentVariables.push(variables); sends++; return reject ? { ok: false, retryable: true, code: "NETWORK_ERROR", message: "Synthetic timeout" } : { ok: true, providerReference: `SMsynthetic-${sends}` }; };
   const output = await build({ stdin: { contents: 'export { sendWhatsAppTemplate } from "./src/lib/whatsapp"; export { POST } from "./src/app/api/v1/communications/retry-whatsapp/route";', loader: "ts", resolveDir: process.cwd() }, bundle: true, write: false, platform: "node", format: "cjs", packages: "external", plugins: [{ name: "isolated-provider", setup(builder) {
     builder.onResolve({ filter: /^@\/lib\/(db|session|integrations\/twilio-provider)$/ }, args => ({ path: args.path, namespace: "fixture" }));
     builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.endsWith("/db") ? "export const db=__db;" : args.path.endsWith("/session") ? "export const getSession=async()=>__session;" : "export class TwilioWhatsAppProvider {sendTemplate(...args) {return __provider(...args);}} export const normalizeTwilioRecipient=(value)=>value; export class TwilioSmsProvider { send() { throw Error('Unexpected SMS send'); } }" }));
@@ -27,6 +29,8 @@ test("isolated PostgreSQL WhatsApp attempt and manual-retry claims", async () =>
   const input = { organisationId: org.id, facilityId: facility.id, customerId: customer.id, recipient: customer.phone, consent: customer.communicationConsent, messageType: "PAYMENT_REMINDER", variables: { "1": "Synthetic" }, idempotencyKey: key, allowWhenAutomationDisabled: true };
   const retry = (logId: string) => loaded.exports.POST(new Request("https://example.invalid/api/v1/communications/retry-whatsapp", { method: "POST", headers: { origin: "https://example.invalid", "content-type": "application/json" }, body: JSON.stringify({ logId }) }));
   const envKey = "TWILIO_WHATSAPP_PAYMENT_REMINDER_SID", previous = process.env[envKey]; process.env[envKey] = "HXsynthetic";
+  const previousVault = process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY;
+  process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY = "isolated-whatsapp-claim-test-vault";
   try {
     const results = await Promise.all([1, 2, 3].map(() => loaded.exports.sendWhatsAppTemplate(input)));
     assert.ok(results.some(result => result.ok)); assert.equal(sends, 1);
@@ -34,9 +38,26 @@ test("isolated PostgreSQL WhatsApp attempt and manual-retry claims", async () =>
     assert.equal((await loaded.exports.sendWhatsAppTemplate(input)).code, "DUPLICATE"); assert.equal(sends, 1);
     assert.equal((await loaded.exports.sendWhatsAppTemplate({ ...input, customerId: "foreign" })).code, "IDEMPOTENCY_CONFLICT");
 
-    const failed = await db.communicationLog.create({ data: { organisationId: org.id, facilityId: facility.id, customerId: customer.id, channel: "WHATSAPP", messageType: "PAYMENT_REMINDER", recipientHash: "synthetic", idempotencyKey: randomUUID(), status: "FAILED", providerRef: "SMfailed", failedAt: new Date(), failureCode: "DELIVERY_FAILED", metadata: { variables: { "1": "Synthetic" } } } });
+    const original = await db.communicationLog.findUniqueOrThrow({ where: { idempotencyKey: key } });
+    const metadata = original.metadata as Record<string, unknown>;
+    assert.equal(metadata.variables, undefined);
+    assert.equal(typeof metadata.retryVariablesEncrypted, "string");
+    const failed = await db.communicationLog.update({ where: { id: original.id }, data: {
+      status: "FAILED", failedAt: new Date(), failureCode: "DELIVERY_FAILED",
+    } });
+    await db.communicationLog.update({ where: { id: failed.id }, data: { metadata: { ...metadata, retryVariablesEncrypted: null } as Row } });
+    assert.equal((await retry(failed.id)).status, 409);
+    assert.equal(sends, 1);
+    await db.communicationLog.update({ where: { id: failed.id }, data: { recipientHash: privacyHash("+27821111111"), metadata: original.metadata as Row } });
+    assert.equal((await retry(failed.id)).status, 409);
+    process.env[envKey] = "HXdifferent";
+    await db.communicationLog.update({ where: { id: failed.id }, data: { recipientHash: original.recipientHash } });
+    assert.equal((await retry(failed.id)).status, 409);
+    assert.equal(sends, 1);
+    process.env[envKey] = "HXsynthetic";
     const retries = await Promise.all([retry(failed.id), retry(failed.id), retry(failed.id)]);
     assert.ok(retries.every(response => [202, 409].includes(response.status))); assert.equal(sends, 2);
+    assert.deepEqual(sentVariables, [input.variables, input.variables]);
     assert.equal(await db.communicationLog.count({ where: { idempotencyKey: `whatsapp-retry:${failed.id}` } }), 1);
     assert.equal((await db.communicationLog.findUniqueOrThrow({ where: { id: failed.id } })).attempts, 2);
     assert.equal((await retry(failed.id)).status, 202); assert.equal(sends, 2);
@@ -55,6 +76,7 @@ test("isolated PostgreSQL WhatsApp attempt and manual-retry claims", async () =>
     assert.equal(await db.communicationLog.count({ where: { idempotencyKey: `whatsapp-retry:${reviewed.id}` } }), 0);
   } finally {
     if (previous === undefined) delete process.env[envKey]; else process.env[envKey] = previous;
+    if (previousVault === undefined) delete process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY; else process.env.INTEGRATION_CONFIG_ENCRYPTION_KEY = previousVault;
     await db.$disconnect();
   }
 });
