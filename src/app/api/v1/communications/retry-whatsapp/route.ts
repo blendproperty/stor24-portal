@@ -2,8 +2,8 @@ import { db } from "@/lib/db";
 import { authErrorResponse } from "@/lib/auth-guards";
 import { requireFacility, requirePermissionScope } from "@/lib/scope";
 import { requireLeasingCustomer } from "@/lib/leasing-service";
-import { sameOrigin } from "@/lib/request-security";
-import { canRetryWhatsAppDelivery, sendWhatsAppTemplate, type WhatsAppMessageType } from "@/lib/whatsapp";
+import { privacyHash, sameOrigin } from "@/lib/request-security";
+import { canRetryWhatsAppDelivery, readWhatsAppRetryVariables, sendWhatsAppTemplate, WHATSAPP_TEMPLATE_ENV, type WhatsAppMessageType } from "@/lib/whatsapp";
 
 export async function POST(request: Request) {
   try {
@@ -18,7 +18,12 @@ export async function POST(request: Request) {
     if (!customer.phone) return Response.json({ error: "Retry is not available for this message." }, { status: 404 });
     if (!canRetryWhatsAppDelivery(log)) return Response.json({ error: "Review delivery with the provider before sending again.", code: "DELIVERY_REVIEW_REQUIRED" }, { status: 409 });
     const metadata = log.metadata as Record<string, unknown>;
-    const variables = metadata.variables && typeof metadata.variables === "object" && !Array.isArray(metadata.variables) ? metadata.variables as Record<string, string> : {};
+    const variables = readWhatsAppRetryVariables(metadata);
+    const currentTemplate = process.env[WHATSAPP_TEMPLATE_ENV[log.messageType as WhatsAppMessageType]];
+    if (!variables || !currentTemplate || (typeof metadata.contentSid === "string" && currentTemplate !== metadata.contentSid)
+      || log.recipientHash !== privacyHash(customer.phone)) {
+      return Response.json({ error: "The original WhatsApp message could not be verified for retry. Review the template and recipient before sending again.", code: "DELIVERY_REVIEW_REQUIRED" }, { status: 409 });
+    }
     const result = await sendWhatsAppTemplate({ organisationId: log.organisationId, facilityId: log.facilityId ?? undefined, customerId: customer.id, recipient: customer.phone, consent: customer.communicationConsent, messageType: log.messageType as WhatsAppMessageType, variables, idempotencyKey: `whatsapp-retry:${log.id}`, allowWhenAutomationDisabled: true });
     if ("attempted" in result && result.attempted) await db.communicationLog.updateMany({ where: { id: log.id, attempts: log.attempts }, data: { attempts: { increment: 1 }, nextRetryAt: null } });
     if (!result.ok) return Response.json({ error: result.code === "DELIVERY_REVIEW_REQUIRED" ? "Review delivery with the provider before sending again." : "The retry was not confirmed. Review this message in Communications.", code: result.code, data: result }, { status: ["CONSENT_REQUIRED", "DELIVERY_REVIEW_REQUIRED", "IDEMPOTENCY_CONFLICT"].includes(result.code) ? 409 : 502 });
