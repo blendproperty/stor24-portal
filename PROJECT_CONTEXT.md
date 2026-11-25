@@ -2,8 +2,11 @@
 
 - **Implementation:** New WhatsApp attempts retain the original template values using the configured integration vault. Manual retry checks the saved values, original template when recorded, and recipient. A historical hash-only record with nonempty values stays in delivery review. No billing or automation switch changes.
 - **Testing:** Scoped lint and TypeScript passed. Six tests, three against isolated PostgreSQL, verify original provider values, concurrent retry, unknown history, template and recipient mismatch, delivery callbacks and replayed STOP.
-- **Commit and push:** Candidate branch `codex/whatsapp-exact-retry-20261125`. The exact head and protected checks are in GitHub.
-- **Merge, deployment and live verification:** Pending for retry follow-up. The inbound STOP change from PR #902 merged separately as `f56fa914`. Production handset delivery, retry and STOP acceptance remain open. The billing production hold remains in place.
+- **Commit and push:** PR #903 exact head `e932cb9a8bb896fb3751fb5dfe112b1309363825` passed protected CI 45542286865, security 45542287018, transactions 45542286912 and restricted-runtime 45542287195.
+- **Merge:** PR #903 squash merged as `10a5f3ca1038570e7bdbf52bbf6bdfc557bb71cb`. Exact-main CI 45543842183, security 45543842140, transactions 45543842115 and restricted-runtime 45543842202 passed.
+- **Deployment and configuration:** Production VPS deployment 45546076362 succeeded. The billing production hold remains in place.
+- **Live production verification:** The CRM and database reported healthy after deployment. The unauthenticated retry endpoint returned HTTP 401. Both unsigned Twilio endpoint requests returned HTTP 403. Website WhatsApp attribution remains enabled for the correct number.
+- **Outstanding:** As instructed on 25 November, leave live Twilio delivery, failed-delivery retry and real STOP pending until a dedicated test handset is available. Task 6 stays open.
 
 ## 2026-11-25 — Task 5 live handover gate and Task 6 inbound WhatsApp consent
 
