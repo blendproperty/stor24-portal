@@ -1,3 +1,11 @@
+## 2026-11-25 — Task 5 live handover gate and Task 6 inbound WhatsApp consent
+
+- **Task 5 acceptance:** Brett deferred the live attribution check until the first genuine tenant handover. The production read-only query found zero WhatsApp-linked handovers. There is no separate test campaign. Website-to-WhatsApp attribution remains live, and native ad referral validation is deferred until a campaign uses that destination.
+- **Implementation:** Task 6 claims each signed Twilio inbound WhatsApp event once. The inbound receipt, communication log, staff task and STOP consent change commit together. An already processed event cannot revoke later consent when Twilio replays it.
+- **Testing:** Fourteen focused WhatsApp consent, delivery, retry and configuration tests passed. The two isolated PostgreSQL callback tests passed, including concurrent STOP replay, rollback when saving consent fails and preservation of later consent. Typecheck and scoped lint passed.
+- **Commit and push:** Candidate branch `codex/whatsapp-inbound-consent-20261125`. See the pull request for the pushed head and protected checks.
+- **Merge, deployment and live verification:** Pending. First tenant handover and consenting-handset checks remain open. The billing production hold remains in place.
+
 ## 2026-11-25 — Direct-to-WhatsApp paid acquisition production rollout
 
 - **Implementation:** Signed WhatChimp referrals on STOR24 WhatsApp ending 6824 carry the exact Meta ad ID into Lead to Lease. Marketing reports enquiries and verified move-ins by that ID. No campaign name, placement or website path is inferred from the provider event.
