@@ -38,7 +38,7 @@ test("staff handbook is a real current PDF with all23 acceptance items and prote
   auditFailure = true; assert.equal((await loaded.exports.GET()).status, 500);
   auditFailure = false; dlpBlocked = true; audited = false; assert.equal((await loaded.exports.GET()).status, 422); assert.equal(audited, false);
   dlpBlocked = false;
-  for (const [key, filename, pages] of [["facilities-guide", "STOR24-Facilities-Manager-Guide-2026-11-26.pdf", 9], ["facilities-training", "STOR24-Facilities-Manager-Training-2026-11-26.pdf", 5]] as const) {
+  for (const [key, filename, pages] of [["facilities-guide", "STOR24-Facilities-Manager-Guide-2026-11-26.pdf", 9], ["facilities-training", "STOR24-Facilities-Manager-Training-2026-11-26.pdf", 16]] as const) {
     const request = new Request(`https://portal.example/api/v1/operations/staff-guide?document=${key}`);
     expectedBytes = await readFile(`private/staff-training/${filename}`); expectedResource = `${key}-2026-11-26`; expectedId = expectedResource;
     assert.equal((await PDFDocument.load(expectedBytes)).getPageCount(), pages);
