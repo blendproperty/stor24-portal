@@ -1,11 +1,13 @@
 import { db } from "@/lib/db";
 import { facilityWhere, type RequestScope } from "@/lib/scope";
 import { identityRequired } from "@/lib/identity-document-security";
+import { usesWalkInPhoto, walkInHandoverPhoto } from "@/lib/walk-in-photo";
 import { resolvedPhotoPolicy } from "@/lib/facial-photo-control";
 
 export type MoveInProgress = {
   identityStatus: string; identityAccepted: boolean; identityRequired: boolean;
   photoStatus: string; photoReviewed: boolean; photoCollectionEnabled: boolean;
+  counterPhoto?: boolean;
   handedOver: boolean; handedOverAt: string | null; publicReference: string | null;
 };
 
@@ -13,14 +15,16 @@ export type MoveInProgress = {
 export async function getMoveInProgress(scope: RequestScope, reservationId: string): Promise<MoveInProgress> {
   const booking = await db.reservation.findFirst({
     where: { id: reservationId, facility: facilityWhere(scope), customer: { organisationId: scope.organisationId } },
-    select: { status: true, source: true, journey: true, createdAt: true, publicReference: true, convertedTenancyId: true,
-      customer: { select: { email: true } },
+    select: { id: true, customerId: true, facilityId: true, status: true, source: true, journey: true, createdAt: true, publicReference: true, convertedTenancyId: true,
+      customer: { select: { email: true, type: true } },
       identityDocument: { select: { status: true, policyHash: true } },
       facialPhoto: { select: { status: true, policyHash: true, expiresAt: true, erasedAt: true, reviewedAt: true, reviewedById: true } } },
   });
   if (!booking) throw new Error("NOT_FOUND");
   const idPolicy = identityRequired(scope.organisationId, booking.createdAt, reservationId, booking.customer.email, booking.journey === "RENTAL" ? booking.source : undefined);
-  const photoPolicy = await resolvedPhotoPolicy(db, scope.organisationId);
+  const counterPhoto = usesWalkInPhoto(booking);
+  const hikCentralPhoto = counterPhoto ? await walkInHandoverPhoto(db, scope.organisationId, booking) : null;
+  const photoPolicy = counterPhoto ? null : await resolvedPhotoPolicy(db, scope.organisationId);
   const identityAccepted = Boolean(booking.identityDocument?.status === "ACCEPTED" && (!idPolicy || booking.identityDocument.policyHash === idPolicy.hash));
   const photo = booking.facialPhoto;
   const photoCurrent = Boolean(photo && !photo.erasedAt && (photo.expiresAt === null || photo.expiresAt > new Date()) && photo.policyHash === photoPolicy?.hash);
@@ -31,8 +35,9 @@ export async function getMoveInProgress(scope: RequestScope, reservationId: stri
   }) : null;
   return {
     identityStatus: booking.identityDocument?.status ?? "NOT_UPLOADED", identityAccepted, identityRequired: Boolean(idPolicy),
-    photoStatus: photo ? photoCurrent ? photo.status : ["WITHDRAWN", "REJECTED"].includes(photo.status) ? photo.status : "EXPIRED" : "NOT_CAPTURED",
-    photoReviewed: Boolean(photo?.reviewedAt && photo?.reviewedById) && photoStored && ["APPROVED", "PENDING_PROVIDER"].includes(photo!.status), photoCollectionEnabled: Boolean(photoPolicy?.enabled),
+    ...(counterPhoto ? { counterPhoto } : {}),
+    photoStatus: counterPhoto ? hikCentralPhoto?.status ?? "NOT_CAPTURED" : photo ? photoCurrent ? photo.status : ["WITHDRAWN", "REJECTED"].includes(photo.status) ? photo.status : "EXPIRED" : "NOT_CAPTURED",
+    photoReviewed: counterPhoto ? hikCentralPhoto?.status === "PROVIDER_ACCEPTED" : Boolean(photo?.reviewedAt && photo?.reviewedById) && photoStored && ["APPROVED", "PENDING_PROVIDER"].includes(photo!.status), photoCollectionEnabled: Boolean(photoPolicy?.enabled),
     handedOver: Boolean(handover), handedOverAt: handover?.occurredAt.toISOString() ?? null, publicReference: booking.publicReference,
   };
 }

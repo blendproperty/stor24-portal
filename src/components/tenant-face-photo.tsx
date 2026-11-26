@@ -6,6 +6,7 @@ import { ArrowRight, Camera, Check, ChevronDown, Clock3, FileImage, RefreshCw, S
 
 type PhotoState = {
   available: boolean;
+  counterPhotoStatus?: string;
   policy: { version: string; hash: string; notice: string; consentLabel: string; retentionHours: number | null; alternativeContact: string } | null;
   photo: { version: number; status: string; expiresAt: string | null; erasedAt: string | null } | null;
 };
@@ -42,6 +43,12 @@ export function TenantFacePhoto({ reservationId, tenancyId }: { reservationId?: 
     } catch (err) { form.reset(); setFile(null); setState(null); setError(err instanceof Error ? err.message : "Your photo could not be saved. Please refresh."); }
     finally { setBusy(false); }
   }
+  if (state?.counterPhotoStatus) return <section className="tenant-card face-tenant">
+    <h2>Your Counter access photograph</h2>
+    <p role="status">{state.counterPhotoStatus === "PROVIDER_ACCEPTED" ? "Your tablet photo was accepted by HikCentral."
+      : state.counterPhotoStatus === "WAITING_REVIEW" || state.counterPhotoStatus === "SENDING" ? "Your tablet photo is with our team."
+      : "Ask the store team to check the photo for your Counter visit."}</p>
+  </section>;
   return <section className="tenant-card face-tenant">
     <header className="face-customer-heading">
       <span className="face-customer-eyebrow">{trial ? "UNIT 58 · PHOTO-ONLY TRIAL" : "PART OF YOUR MOVE-IN"}</span>

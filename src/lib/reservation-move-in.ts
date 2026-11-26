@@ -9,10 +9,12 @@ import { db } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
 import { facilityWhere, type RequestScope } from "@/lib/scope";
 import { southAfricaDateKey } from "@/lib/south-africa-time";
+import { usesWalkInPhoto, walkInHandoverPhoto } from "@/lib/walk-in-photo";
 import { reconcileCustomerAndCompanyPeople } from "@/lib/hikcentral-customer-access";
 
 type Database = Prisma.TransactionClient;
 const reservationInclude = {
+  customer: { select: { type: true } },
   facility: { select: { closedFloors: true } },
   publicLease: { select: { id: true, status: true, signedAt: true, signedPdfSha256: true, paymentMethod: true, mandate: { select: { status: true } } } },
   packageSelection: { select: { priceSnapshot: true } },
@@ -54,7 +56,13 @@ export async function reservationReadiness(database: Database, scope: RequestSco
   if (!unitIsOperational(reservation.unit, reservation.facility.closedFloors)) blockers.push("This floor is not operational. Staff must arrange an operational unit before move-in.");
   if (!forPhoto && !(await identityGate(database, scope.organisationId, reservation.id, reservation.createdAt, "HANDOVER"))) blockers.push("The identity document needs staff acceptance before key handover.");
   // Photo collection eligibility must not depend on approval of the photo being collected.
-  if (!forPhoto && !(await approvedPhotoForHandover(await database.facialPhotoSubmission.findUnique({ where: { reservationId } }), scope.organisationId, database))) blockers.push("A current, staff-approved access photo is required before key handover.");
+  const counterPhoto = !forPhoto && usesWalkInPhoto(reservation);
+  const hikCentralPhoto = counterPhoto ? await walkInHandoverPhoto(database, scope.organisationId, reservation) : null;
+  if (counterPhoto) {
+    if (hikCentralPhoto?.status !== "PROVIDER_ACCEPTED") blockers.push("The access photo from this tablet visit must be reviewed and accepted by HikCentral before key handover.");
+  } else if (!forPhoto && !(await approvedPhotoForHandover(await database.facialPhotoSubmission.findUnique({ where: { reservationId } }), scope.organisationId, database))) {
+    blockers.push("A current, staff-approved access photo is required before key handover.");
+  }
   const handedOver = forPhoto && reservation.status === "CONVERTED" && reservation.convertedTenancyId &&
     ["ACTIVE", "NOTICE_GIVEN"].includes(reservation.convertedTenancy?.status ?? "") && reservation.convertedTenancy?.occupancies.some(occupancy => occupancy.unitId === reservation.unitId) &&
     Boolean(await database.auditEvent.findFirst({ where: { organisationId: scope.organisationId, entityId: reservation.convertedTenancyId, action: "tenancy.key_handover_confirmed" }, select: { id: true } }));
@@ -69,7 +77,7 @@ export async function reservationReadiness(database: Database, scope: RequestSco
     ? "A test payment is recorded. It does not clear the real booking for key collection."
     : "The required booking payment has not been verified in full on this account.");
   if (account?.ledgerEntries.some(entry => entry.type === "REFUND" || entry.type === "REVERSAL")) blockers.push("A refund or reversal requires account review before key collection.");
-  return { reservation, account, receipts, view: {
+  return { reservation, account, receipts, hikCentralPhoto, view: {
     mandateStatus: reservation.publicLease?.paymentMethod === "DEBIT_ORDER" ? reservation.publicLease.mandate?.status ?? "NOT_STARTED" : null,
     signed, leaseId: reservation.publicLease?.id ?? null, signedAt: reservation.publicLease?.signedAt?.toISOString() ?? null,
     ...(pricing.needsReview ? { amountReviewRequired: true } : {}),
@@ -93,7 +101,7 @@ export async function confirmReservationMoveIn(scope: RequestScope, reservationI
     await requireOperationalUnit(tx, target.facilityId, target.unitId);
     await tx.$queryRaw`SELECT "id" FROM "Unit" WHERE "id" = ${target.unitId} FOR UPDATE`;
     await tx.$queryRaw`SELECT "id" FROM "Reservation" WHERE "id" = ${reservationId} FOR UPDATE`;
-    const existing = await tx.reservation.findUniqueOrThrow({ where: { id: reservationId } });
+    const existing = await tx.reservation.findUniqueOrThrow({ where: { id: reservationId }, include: { customer: { select: { type: true } } } });
     if (existing.status === "CONVERTED" && existing.convertedTenancyId) {
       const handover = await tx.auditEvent.findFirst({ where: { entityId: existing.convertedTenancyId, action: "tenancy.key_handover_confirmed", organisationId: scope.organisationId } });
       if (handover) return { tenancyId: existing.convertedTenancyId, idempotent: true };
@@ -101,6 +109,7 @@ export async function confirmReservationMoveIn(scope: RequestScope, reservationI
     }
     const accountNumber = `ST24-T-${reservationId}`;
     await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "accountNumber" = ${accountNumber} FOR UPDATE`;
+    if (usesWalkInPhoto(existing)) await tx.$queryRaw`SELECT "id" FROM "Customer" WHERE "id" = ${existing.customerId} FOR UPDATE`;
     const state = await reservationReadiness(tx, scope, reservationId);
     if (!state.view.ready || !state.account || !state.reservation.intendedMoveIn) throw new Error("MOVE_IN_NOT_READY");
     const unit = await tx.unit.findUniqueOrThrow({ where: { id: target.unitId } });
@@ -126,7 +135,7 @@ export async function confirmReservationMoveIn(scope: RequestScope, reservationI
       await tx.account.update({where:{id:state.account.id},data:{balance:{increment:publicCheckoutTotal(state.reservation)}}});
     }
     const occupancy = await tx.occupancy.findFirstOrThrow({ where: { tenancyId: tenancy.id, unitId: unit.id } });
-    await requestPhotoActivation(tx, scope, reservationId, occupancy.id);
+    if (!state.hikCentralPhoto) await requestPhotoActivation(tx, scope, reservationId, occupancy.id);
     const claimed = await tx.reservation.updateMany({ where: { id: reservationId, status: "ACTIVE", convertedTenancyId: null }, data: { status: "CONVERTED", convertedTenancyId: tenancy.id } });
     if (claimed.count !== 1) throw new Error("CONFLICT");
     await tx.unit.update({ where: { id: unit.id }, data: { status: "OCCUPIED" } });
@@ -138,7 +147,7 @@ export async function confirmReservationMoveIn(scope: RequestScope, reservationI
           action: "lead.stage_changed", entityType: "Lead", entityId: lead.id, before: { stage: lead.stage }, after: { stage: "WON", reservationId, tenancyId: tenancy.id } } });
       }
     }
-    await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: existing.facilityId, actorId: scope.userId, action: "tenancy.key_handover_confirmed", entityType: "Tenancy", entityId: tenancy.id, after: { reservationId, accountId: state.account.id, leaseId: lease.id, paymentIds: state.receipts.map(payment => payment.id), requiredAmount: state.view.requiredAmount, paidAmount: state.view.paidAmount, accessState: "PENDING" } } });
+    await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: existing.facilityId, actorId: scope.userId, action: "tenancy.key_handover_confirmed", entityType: "Tenancy", entityId: tenancy.id, after: { reservationId, accountId: state.account.id, leaseId: lease.id, paymentIds: state.receipts.map(payment => payment.id), requiredAmount: state.view.requiredAmount, paidAmount: state.view.paidAmount, accessState: "PENDING", ...(state.hikCentralPhoto ? { hikCentralPhotoId: state.hikCentralPhoto.id, hikCentralPhotoVersion: state.hikCentralPhoto.version } : {}) } } });
     return { tenancyId: tenancy.id, idempotent: false };
   });
   if (!completed.idempotent) {
