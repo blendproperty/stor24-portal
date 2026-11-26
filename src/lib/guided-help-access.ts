@@ -57,7 +57,7 @@ export const guideAccessRules: Record<string, Rule> = {
   leads: rule("leads.view", ["leads.create,operations.manage", "", "reservations.manage", "reservations.manage,operations.manage"]),
   "multi-unit-move-in": rule("move_in.create", ["", "", ""]),
   "unsigned-move-in": rule("move_in.create", ["reservations.manage", "", "", "integrations.view,operations.manage"]),
-  "walk-in-tablet": rule("reservations.manage", ["", "", ""]),
+  "walk-in-tablet": rule("reservations.manage", ["", "", "move_in.create", ""]),
   "assisted-signing": rule("move_in.create", ["", "", ""]),
   accounts: rule("ledger.view", ["", "", "", "payments.manage,operations.manage,billing.documents.send"]),
   payments: rule("ledger.view,payments.manage", ["", "", "", ""]),

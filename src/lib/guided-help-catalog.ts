@@ -2,10 +2,10 @@ import type { WorkflowGuide } from "./guided-help";
 
 // Each entry describes the current staff interface, including its unfinished controls.
 // Selectors are editorial constants scoped to main.content; no form actions run here.
-type Lesson = [title: string, body: string, selector: string, missing?: string, caution?: string];
+type Lesson = [title: string, body: string, selector: string, missing?: string, caution?: string, stepId?: string];
 function guide(id: string, title: string, category: string, route: string, screen: string, description: string, lessons: Lesson[]): WorkflowGuide {
-  return { id, title, category, description, duration: `${Math.max(2, Math.ceil(lessons.length * .7))} min`, steps: lessons.map(([heading, body, selector, missing, caution], index) => ({
-    id: `${id}-${index + 1}`, title: heading, body, route, screen, selector, target: id,
+  return { id, title, category, description, duration: `${Math.max(2, Math.ceil(lessons.length * .7))} min`, steps: lessons.map(([heading, body, selector, missing, caution, stepId], index) => ({
+    id: stepId ?? `${id}-${index + 1}`, title: heading, body, route, screen, selector, target: id,
     missing: missing ?? `Open ${screen} and wait for it to load. Check your permission and store scope if the area is unavailable. You can keep reading without changing a record.`, caution,
   })) };
 }
@@ -179,7 +179,8 @@ export const extendedGuides: WorkflowGuide[] = [
   guide("walk-in-tablet", "Hand the website journey to a walk-in customer", "Customer journey", "/operations/walk-in", "Walk-in tablet", "Prepare the counter tablet, let the customer complete the website journey, then continue from the saved booking.", [
     ["Prepare the correct store", "Choose the customer’s store and prepare a tablet visit. This creates a temporary handover, not a customer or booking. In the installed STOR24 Counter app, scan the visit QR shown here or enter its eight-character code within five minutes. Both open the same visit and work once. Install the app once from stor24.co.za/walk-in.", '.lease-signing-panel'],
     ["Hand the device to the customer", "Confirm the correct store has opened on the tablet, then hand it to the customer. The customer selects a unit, enters their own details, verifies their contact details, supplies identity and reads and initials the saved agreement clauses before signing. Staff must not provide the customer’s acceptance or signature.", '.lease-signing-panel'],
-    ["Clear the tablet and complete Move In", "When the customer finishes, use Finish visit and clear tablet before another customer uses the device. The booking is retained. Refresh this staff page, choose the exact recent booking and continue Move In; payment, identity, access and key-handover checks still apply.", '.lease-signing-panel'],
+    ["Enable the access photo", "On the matching walk-in booking, check the customer's original ID in person and select Enable access photo on this tablet. When the agreement is signed, the customer can consent and take the photo in the same tablet visit. An integration manager still reviews and sends it to HikCentral. Use Facial access later if capture is deferred.", '.lease-signing-panel', undefined, undefined, "walk-in-tablet-access-photo"],
+    ["Clear the tablet and complete Move In", "When the customer finishes, use Finish visit and clear tablet before another customer uses the device. The booking is retained. Refresh this staff page, choose the exact recent booking and continue Move In; payment, identity, access and key-handover checks still apply.", '.lease-signing-panel', undefined, undefined, "walk-in-tablet-3"],
   ]),
   guide("assisted-signing", "Complete signing during a visit or call", "Customer journey", "/operations/lease-signing", "Agreement signing", "Guide the customer through agreement review and signing without waiting for an emailed return.", [
     ["Review with the customer", "Check the saved lease and customer before opening signing. For a walk-in, let the customer review, initial and sign on the counter device. For a phone-in, copy and share the customer signing link during the call; the customer provides their own acceptance and signature.", '[data-guide="assisted-signing"]'],

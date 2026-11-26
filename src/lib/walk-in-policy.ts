@@ -2,6 +2,9 @@ import { createHash, randomBytes, randomInt } from "node:crypto";
 
 export const WALK_IN_LAUNCH_MS = 5 * 60 * 1000;
 export const WALK_IN_VISIT_MS = 60 * 60 * 1000;
+export function walkInPhotoToken(customerTokenHash: string) {
+  return createHash("sha256").update(`walk-in-photo:${customerTokenHash}`).digest("base64url");
+}
 export function walkInToken() { return randomBytes(32).toString("hex"); }
 const CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 export function walkInCode() { return Array.from({ length: 8 }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join(""); }

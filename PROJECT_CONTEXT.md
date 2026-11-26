@@ -9439,3 +9439,23 @@ Batch review is invalidated if the operator edits account billing terms; the syn
 - **Deployment and configuration:** VPS deployment 45768257953 succeeded. No permission, finance or provider settings changed.
 - **Live production verification:** On 26 November at approximately 08:31 SAST the authenticated owner downloaded Facilities training PDF from Operations; its SHA-256 matched the revised 16-page repository copy. The service and database health check reported OK. This was not a download under Katlego's own login. The accountant guide was prepared as a separate file, not a portal download.
 - **Outstanding:** Katlego and trainer UAT, Carmen's account access, meeting time, walkthrough and pack requirements are unverified. Existing provider, data, real reader, financial, training and approval gates remain open.
+
+
+## 2026-11-26 | Counter walk-in access photo candidate
+
+- **Implementation:** The matching recent Counter booking lets same-store reservations and move-in staff record the in-person original ID check and enable the optional access photo on the current tablet. The upload is bound to the active redeemed visit, exact signed individual rental, facility and one-use photo record. Explicit consent, encrypted private review and integration-manager HikCentral submission use the existing capture path. The booking can proceed if the customer defers capture. Existing manual Facial access fallback remains available. No permission grants, schema migration, payment rules or door configuration are part of this change.
+- **Testing:** Local CRM type check and scoped ESLint passed. The isolated walk-in suite passed 10 checks, including real multipart submission of a synthetic image to private review, denial before signature, false consent, revoked issuer permission, ordinary website origin, cancelled booking, mismatched visit, subsequent upload and cleared visit. The guide access suite passed 11 checks. Further protected CI and consenting staff/tablet UAT pending.
+- **Commit and push:** Recorded with the implementation on codex/walk-in-single-tablet-20261126, paired with the same-named branch in blendproperty/stor24. **Merge:** Pending coordinated protected review. **Deployment and configuration:** Pending; website companion can go first because it stays idle when the CRM provides no photo status. **Live production verification:** None for the new flow.
+- **Outstanding:** Confirm staff access at the intended store, physical tablet camera and clear flow, actual HikCentral acceptance and reader readback, final facial policy approval, provider/device erasure, backup retention, training and existing acceptance gates. No real photos, provider writes, door changes or live bookings were used in local testing.
+
+### 2026-11-26 | Counter walk-in candidate review evidence
+
+- CRM draft PR #917 and website draft PR #297 are paired. The CRM handoff audit distinguishes Counter sessions from standalone photo QR sessions, and the instructional step IDs preserve prior staff reading progress.
+- The combined isolated database and guide access tests passed 21/21. The earlier full guide browser run rendered 90 guides and 377 steps with zero operational writes or browser errors. A local webpack-generated type check surfaced the existing optional GET request declaration in the unchanged staff-guide route. The standard protected build remains the release gate.
+- Merge, deployment, live tablet acceptance, provider readback and final facial policy approval remain pending.
+
+### 2026-11-26 | Illustrated one-QR walk-in training preview
+
+- Prepared standalone STOR24-Walk-In-Tablet-Guide-One-QR-Preview.pdf for internal staff training. Covers Android/iPad setup, one QR or visit code, signing, in-person ID check, same-session photo and consent, tablet clearing, integration-manager review, Move In and fallback. The PDF was not published to the portal.
+- Evidence: 11 rendered A4 pages inspected; 11 PDF bookmarks, 10 contents links and 8 external links verified. Images show the public entry screen, synthetic Counter screens and labelled staff examples. SHA-256: 79be077b49ffdebc62a6c1a730a74d590a689288ab9fff10bb79d4ed6fb385d7.
+- The training record accompanies CRM draft PR #917 and references website draft PR #297. No merge, deployment, live tablet acceptance, HikCentral provider/device readback or facial-policy approval is implied by the training artifact.
