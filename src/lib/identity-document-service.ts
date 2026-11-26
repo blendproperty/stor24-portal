@@ -2,7 +2,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { facilityWhere, type RequestScope } from "@/lib/scope";
 import { integrationEncryptionConfigured } from "@/lib/integrations/integration-secret-vault";
-import { decryptIdentity, encryptIdentity, identityAccessMatches, identityPolicy, identityRequired, normaliseIdentityPage } from "@/lib/identity-document-security";
+import { decryptIdentity, encryptIdentity, identityAccessMatches, identityRequired, normaliseIdentityPage } from "@/lib/identity-document-security";
 
 type Database = Prisma.TransactionClient;
 export const identitySummary = { id: true, reservationId: true, version: true, status: true, documentType: true, pageCount: true, acknowledgedAt: true, retentionMode: true, expiresAt: true, reviewedAt: true, erasedAt: true, replacementReason: true } as const;
@@ -27,7 +27,7 @@ async function collectionReady(database: Database) {
 }
 export async function identityStatus(reference: string, token: string) {
   const booking = await publicBooking(db, reference, token);
-  const policy = identityRequired(booking.customer.organisationId, booking.createdAt, booking.id, booking.customer.email);
+  const policy = identityRequired(booking.customer.organisationId, booking.createdAt, booking.id, booking.customer.email, booking.source);
   const document = await db.identityDocument.findUnique({ where: { reservationId: booking.id }, select: { ...identitySummary, policyHash: true } });
   let available = false;
   if (policy) { try { await collectionReady(db); available = true; } catch { /* Fail closed for new uploads, retain readable status. */ } }
@@ -39,7 +39,7 @@ export async function identityStatus(reference: string, token: string) {
 }
 export async function submitIdentity(reference: string, token: string, input: { expectedVersion: number; policyHash: string; acknowledged: boolean; documentType: string; pages: File[] }) {
   const booking = await publicBooking(db, reference, token);
-  const policy = identityRequired(booking.customer.organisationId, booking.createdAt, booking.id, booking.customer.email);
+  const policy = identityRequired(booking.customer.organisationId, booking.createdAt, booking.id, booking.customer.email, booking.source);
   if (!policy) throw new Error("ID_POLICY_UNAVAILABLE");
   if (!input.acknowledged || policy.hash !== input.policyHash) throw new Error("ID_NOTICE_REQUIRED");
   if (!policy.acceptedTypes.some(type => type === input.documentType) || input.pages.length !== (input.documentType === "ID_CARD" ? 2 : 1)) throw new Error("ID_INVALID");
@@ -51,7 +51,7 @@ export async function submitIdentity(reference: string, token: string, input: { 
     return await db.$transaction(async tx => {
       await lock(tx, booking.id);
       const currentBooking = await publicBooking(tx, reference, token);
-      const currentPolicy = identityRequired(currentBooking.customer.organisationId, currentBooking.createdAt, currentBooking.id, currentBooking.customer.email);
+      const currentPolicy = identityRequired(currentBooking.customer.organisationId, currentBooking.createdAt, currentBooking.id, currentBooking.customer.email, currentBooking.source);
       if (!currentPolicy || currentPolicy.hash !== input.policyHash) throw new Error("ID_NOTICE_REQUIRED");
       await collectionReady(tx);
       const previous = await tx.identityDocument.findUnique({ where: { reservationId: booking.id } });
@@ -77,9 +77,8 @@ export async function withdrawIdentity(reference: string, token: string, version
   });
 }
 export async function identityGate(database: Database, organisationId: string, reservationId: string, createdAt: Date, stage: "SIGN" | "HANDOVER") {
-  if (!identityPolicy(organisationId)) return true;
-  const booking = await database.reservation.findUnique({ where: { id: reservationId }, select: { publicReference: true, customer: { select: { email: true } } } });
-  const policy = identityRequired(organisationId, createdAt, reservationId, booking?.customer.email);
+  const booking = await database.reservation.findUnique({ where: { id: reservationId }, select: { publicReference: true, source: true, journey: true, customer: { select: { email: true } } } });
+  const policy = identityRequired(organisationId, createdAt, reservationId, booking?.customer.email, booking?.journey === "RENTAL" ? booking.source : undefined);
   if (!policy) return true;
   if (!booking?.publicReference) return true; // This policy applies to online bookings; assisted intake is a separate workflow.
   const document = await database.identityDocument.findUnique({ where: { reservationId } });
@@ -93,7 +92,7 @@ async function scopedDocument(database: Database, scope: RequestScope, id: strin
   if (!initial) throw new Error("NOT_FOUND");
   await lock(database, initial.reservationId);
   const document = await database.identityDocument.findUniqueOrThrow({ where: { id }, include: { reservation: { include: { customer: { select: { email: true } }, convertedTenancy: { select: { status: true, customerId: true, facilityId: true } } } } } });
-  const policy = identityRequired(scope.organisationId, document.reservation.createdAt, document.reservationId, document.reservation.customer.email);
+  const policy = identityRequired(scope.organisationId, document.reservation.createdAt, document.reservationId, document.reservation.customer.email, document.reservation.source);
   const tenancy = document.reservation.convertedTenancy;
   const retainedTenancy = document.retentionMode === "TENANCY" && document.reservation.status === "CONVERTED" && tenancy && ["ACTIVE", "NOTICE_GIVEN"].includes(tenancy.status) && tenancy.customerId === document.reservation.customerId && tenancy.facilityId === document.reservation.facilityId;
   if (document.version !== version || !pending.includes(document.status) || !copyWithinRetention(document) || !document.encryptedPages || (document.reservation.status !== "ACTIVE" && !retainedTenancy) || !policy || policy.hash !== document.policyHash) throw new Error("ID_CHANGED");

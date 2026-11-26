@@ -63,7 +63,7 @@ test("full terms acceptance is server enforced against the displayed fingerprint
 test("server refuses missing or stale terms consent and saves exact accepted edition", async () => {
   const original = Reflect.get(db, "$transaction");
   let saved: unknown; let audits = 0;
-  const tx = { $queryRaw: async () => [], publicReservationLease: {
+  const tx = { $queryRaw: async () => [], reservation: { findUnique: async () => null }, publicReservationLease: {
     findUnique: async () => ({ id: "sample", reservationId: "sample", status: "READY", version: STORAGE_TERMS_VERSION, content: renderReviewLeaseDocument(context), sha256: "a".repeat(64), paymentMethod: "DEBIT_ORDER", expiresAt: new Date(Date.now() + 60000), reservation: { status: "ACTIVE", publicReference: "SAMPLE", customer: { organisationId: "sample" } } }),
     updateMany: async (args: unknown) => { saved = args; return { count: 1 }; },
   }, auditEvent: { create: async () => { audits++; } } };
@@ -82,7 +82,7 @@ test("server refuses missing or stale terms consent and saves exact accepted edi
 test("an unsigned previous edition still requires its own complete terms consent after publication", async () => {
   const original = Reflect.get(db, "$transaction");
   let writes = 0;
-  const tx = { $queryRaw: async () => [], publicReservationLease: {
+  const tx = { $queryRaw: async () => [], reservation: { findUnique: async () => null }, publicReservationLease: {
     findUnique: async () => ({ status: "READY", version: PREVIOUS_STORAGE_TERMS_VERSION, sha256: "a".repeat(64), expiresAt: new Date(Date.now() + 60000), reservation: { status: "ACTIVE", customer: { organisationId: "sample" } } }),
     updateMany: async () => { writes++; return { count: 1 }; },
   } };
