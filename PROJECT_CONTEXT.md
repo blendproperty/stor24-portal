@@ -1,14 +1,12 @@
-## 2026-11-26 — Facilities guide downloads candidate
+## 2026-11-26 — Facilities guide downloads production release
 
-- **Implementation:** Operations offers separate Facilities manager guide PDF and Facilities training PDF buttons alongside the general staff handbook. The existing staff-guide endpoint uses an explicit document allowlist, current operations.view permission, confidential DLP decision and per-document audit with content hash. The existing handbook URL remains compatible.
-- **Testing:** The route test verified exact 9-page and 5-page PDFs, permissions, DLP denial, audit failure, unknown and traversal inputs, response headers and bytes. Browser tests verified all three downloads and hashes, errors and duplicate guard at 1440, 390 and 320 pixels. Operations recovery and premium workspace browser tests, scoped lint and typecheck passed. Production build and protected checks remain pending.
-- **Commit and push:** Candidate branch codex/facilities-guide-downloads-20261126; consult the PR for its exact head and checks.
-- **Merge:** Pending.
-- **Deployment and configuration:** Pending. No role or provider settings changed.
-- **Live production verification:** Pending deployment and live download checks. On 26 November the owner reviewed Katlego Makhubele's active Store 1 - Midpoint custom access: View tenant operations was selected; no permissions were changed. This is not a download under Katlego's own login.
-- **Outstanding:** Katlego's own download and staff acceptance remain unverified. Existing provider, data, financial, training and reader gates remain open.
-
-
+- **Implementation:** Operations offers separate Facilities manager guide PDF and Facilities training PDF buttons alongside the general staff handbook. An explicit document allowlist preserves operations.view authorisation, confidential DLP and per-document audit with content hash; the original handbook URL remains compatible.
+- **Testing:** Route tests verified exact 9-page and 5-page files, permissions, DLP denial, audit failure, unknown and traversal inputs, headers and bytes. Browser tests verified all three downloads and hashes, errors and duplicate guard at 1440, 390 and 320 pixels. Operations recovery, premium workspace, scoped lint and typecheck passed. PR #913 CI 45757193142, security 45757193053, transactions 45757193134 and restricted runtime 45757193160 passed. Exact-main CI 45759113360, security 45759113393, transactions 45759113399 and restricted runtime 45759113364 passed.
+- **Commit and push:** Implementation commit 09fe827b5d234844796d4634d04a9c2ad5deaec5 was pushed on codex/facilities-guide-downloads-20261126 as PR #913. This release-evidence entry is a separate follow-up.
+- **Merge:** PR #913 squash merged as e4eaf6ef1a3ad68ee99cf4910ac895a6b1e93eee.
+- **Deployment and configuration:** VPS deployment 45760885525 succeeded. No role, provider or billing settings changed.
+- **Live production verification:** On 26 November at approximately 07:24 SAST the authenticated owner saw both buttons in Operations and downloaded each PDF; both downloaded files matched their repository originals by SHA-256. The health endpoint reported service and database OK. Read-only user settings showed Katlego Makhubele active at Store 1 - Midpoint with View tenant operations selected, corresponding to operations.view; no permission changes were made. This was not a download under Katlego's own login.
+- **Outstanding:** Katlego's own download and staff acceptance of the review-copy guide and training remain unverified. Existing provider, data, financial, real reader, training and approval gates remain open.
 
 ## 2026-11-26 — Facilities visual guidance production release
 
@@ -18,7 +16,7 @@
 - **Merge:** PR #911 squash merged as da7a7801c03d807a08db813bb9cbe98a747d16cf. Exact-main CI 45752551457, security 45752551374, transactions 45752551384 and restricted runtime 45752551470 passed.
 - **Deployment and configuration:** VPS deployment 45754462833 succeeded. No billing or provider settings were changed.
 - **Live production verification:** On 26 November at approximately 06:23 SAST, an authenticated owner opened Operations and saw the contextual tip. Turn tips off removed it; Guide me's switch restored it; Show me the steps opened the five-step Operations walkthrough. Guidance was left on. This was a read-only workflow except for the browser preference and guide reading position; no customer, payment, access or handover action was performed.
-- **Outstanding:** Katlego and the facilities manager have not yet accepted the updated guidance or documents. Real participant photo/reader checks, provider and financial approvals, data, training and existing launch gates remain open. The PDFs are not yet offered by the existing general staff handbook download.
+- **Outstanding:** Katlego and the facilities manager have not yet accepted the updated guidance or documents. Real participant photo/reader checks, provider and financial approvals, data, training and existing launch gates remain open. At that earlier release the PDFs were not yet offered in Operations; see the later downloads release above.
 
 ## 2026-11-26 — Facilities visual guidance candidate
 
