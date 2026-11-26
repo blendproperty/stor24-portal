@@ -97,7 +97,7 @@ export async function issueHikCentralFaceHandoff(scope: RequestScope, input: { f
     }
     await tx.hikCentralFaceHandoff.deleteMany({ where: { customerId: customer.id, usedAt: null } });
     const handoff = await tx.hikCentralFaceHandoff.create({ data: { tokenHash: tokenHash(token), customerId: customer.id, organisationId: scope.organisationId, facilityId: input.facilityId, personId, firstNameSnapshot: customer.firstName?.trim() ?? null, lastNameSnapshot: customer.lastName?.trim() ?? null, photoVersion: input.version, issuedById: scope.userId, expiresAt } });
-    await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: input.facilityId, actorId: scope.userId, action: "hikcentral_face.handoff_issued", entityType: "HikCentralFaceHandoff", entityId: handoff.id, after: { customerId: customer.id, personId, version: input.version, identityCheckedInPerson: !input.syntheticTest, syntheticTestReason: input.syntheticTest ? input.syntheticTestReason!.trim() : null, expiresAt: expiresAt.toISOString() } } });
+    await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: input.facilityId, actorId: scope.userId, action: "hikcentral_face.handoff_issued", entityType: "HikCentralFaceHandoff", entityId: handoff.id, after: { customerId: customer.id, personId, version: input.version, identityCheckedInPerson: !input.syntheticTest, walkIn: Boolean(walkIn), syntheticTestReason: input.syntheticTest ? input.syntheticTestReason!.trim() : null, expiresAt: expiresAt.toISOString() } } });
   });
   return { token, expiresAt: expiresAt.toISOString() };
 }
@@ -115,7 +115,9 @@ async function activeHandoff(token: string, walkIn?: WalkInPhotoBinding) {
   const { customer, personId } = await faceTarget(db, scope, handoff.customerId);
   if (personId !== handoff.personId || !sameCustomerName(customer, handoff) || ((await db.hikCentralFaceCapture.findUnique({ where: { customerId: customer.id } }))?.version ?? 0) !== handoff.photoVersion) throw Error("PHOTO_CHANGED");
   const issued = await db.auditEvent.findFirst({ where: { organisationId: scope.organisationId, action: "hikcentral_face.handoff_issued", entityType: "HikCentralFaceHandoff", entityId: handoff.id }, select: { after: true } });
-  const syntheticTestReason = (issued?.after as { syntheticTestReason?: unknown } | null)?.syntheticTestReason;
+  const issuance = issued?.after as { syntheticTestReason?: unknown; walkIn?: boolean } | null;
+  if (Boolean(issuance?.walkIn) !== Boolean(walkIn)) throw Error("PHOTO_CHANGED");
+  const syntheticTestReason = issuance?.syntheticTestReason;
   if (syntheticTestReason && (!scope.unrestrictedFacilities || !currentRoleAccess(issuer.roleAssignments.filter(a => a.role.organisationId === handoff.organisationId), "integrations.manage", handoff.facilityId).allowed)) throw Error("FORBIDDEN");
   return { handoff, scope, customer, syntheticTestReason: typeof syntheticTestReason === "string" ? syntheticTestReason : null };
 }

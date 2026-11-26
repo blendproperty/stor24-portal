@@ -134,6 +134,9 @@ test("isolated PostgreSQL tablet visit and booking boundaries", async t => {
       await db.role.update({ where: { id: role.id }, data: { permissions: ["reservations.manage"] } });
       assert.equal((await publicPhoto(photoRequest("{}"))).status, 403);
       await db.role.update({ where: { id: role.id }, data: { permissions: ["reservations.manage", "move_in.create"] } });
+      const standalone = photoRequest(JSON.stringify({ token: photoToken }));
+      standalone.headers.delete("x-stor24-walk-in-photo-session");
+      assert.notEqual((await publicPhoto(standalone)).status, 200);
       const details = await publicPhoto(photoRequest("{}"));
       assert.equal(details.status, 200);
       const { data: { policyHash } } = await details.json();
