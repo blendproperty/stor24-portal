@@ -10,6 +10,7 @@ export function facialPhotoError(error: unknown) {
     PHOTO_CONSENT_REQUIRED: [409, "Read and accept the current consent notice before continuing."],
     PHOTO_POLICY_PENDING: [409, "Photo collection is switched off or its settings are unavailable. Contact your store about access."],
     PHOTO_MAINTENANCE_REQUIRED: [503, "Photo collection is temporarily unavailable. Contact your store."],
+    PHOTO_COUNTER_VISIT_REQUIRED: [409, "Check the access photo from your Counter visit with the store team."],
     PHOTO_BOOKING_NOT_READY: [409, "A signed agreement, verified booking payment and an active reservation are required."],
     PHOTO_CHANGED: [409, "This photograph has changed or expired. Refresh before continuing."],
     PHOTO_PREVIEW_REQUIRED: [409, "Open and review this version of the photograph before approving it."],

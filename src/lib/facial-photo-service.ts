@@ -4,6 +4,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { facilityWhere, type RequestScope } from "@/lib/scope";
 import { tenantCustomerScope } from "@/lib/tenant-portal-security";
+import { usesWalkInPhoto, walkInHandoverPhoto } from "@/lib/walk-in-photo";
 import { reservationReadiness } from "@/lib/reservation-move-in";
 import { decryptPhoto, encryptPhoto, normaliseFacialPhoto } from "@/lib/facial-photo-security";
 import { integrationEncryptionConfigured } from "@/lib/integrations/integration-secret-vault";
@@ -18,7 +19,7 @@ export const photoSummary = { id: true, reservationId: true, version: true, stat
 const binding = (reservationId: string, version: number) => `reservation:${reservationId}:photo:${version}`;
 
 async function tenantBooking(database: Database, session: Tenant, reservationId: string) {
-  const reservation = await database.reservation.findFirst({ where: { id: reservationId, customer: tenantCustomerScope(session), facility: { organisationId: session.organisationId } } });
+  const reservation = await database.reservation.findFirst({ where: { id: reservationId, customer: tenantCustomerScope(session), facility: { organisationId: session.organisationId } }, include: { customer: { select: { type: true } } } });
   if (!reservation) throw new Error("TENANT_NOT_FOUND");
   return reservation;
 }
@@ -42,7 +43,11 @@ export async function requireBookingEligible(database: Database, organisationId:
 }
 
 export async function tenantPhotoStatus(session: Tenant, reservationId: string) {
-  await tenantBooking(db, session, reservationId);
+  const reservation = await tenantBooking(db, session, reservationId);
+  if (usesWalkInPhoto(reservation)) {
+    const photo = await walkInHandoverPhoto(db, session.organisationId, reservation);
+    return { available: false, policy: null, photo: null, counterPhotoStatus: photo?.status ?? "NOT_CAPTURED" };
+  }
   let available = false;
   const policy = await resolvedPhotoPolicy(db, session.organisationId);
   try { await readyToCollect(db, session.organisationId); await requireBookingEligible(db, session.organisationId, reservationId); available = true; } catch { /* Read-only status is still available during policy/provider holds. */ }
@@ -52,7 +57,7 @@ export async function tenantPhotoStatus(session: Tenant, reservationId: string) 
 }
 
 export async function submitTenantPhoto(session: Tenant, input: { reservationId: string; policyHash: string; consent: boolean; expectedVersion: number; image: File }) {
-  await tenantBooking(db, session, input.reservationId);
+  if (usesWalkInPhoto(await tenantBooking(db, session, input.reservationId))) throw new Error("PHOTO_COUNTER_VISIT_REQUIRED");
   const policy = await readyToCollect(db, session.organisationId);
   if (!input.consent || policy.hash !== input.policyHash) throw new Error("PHOTO_CONSENT_REQUIRED");
   await requireBookingEligible(db, session.organisationId, input.reservationId);
@@ -62,6 +67,7 @@ export async function submitTenantPhoto(session: Tenant, input: { reservationId:
       await tx.$queryRaw`SELECT "id" FROM "Organisation" WHERE "id" = ${session.organisationId} FOR UPDATE`;
       await lockBooking(tx, input.reservationId);
       const reservation = await tenantBooking(tx, session, input.reservationId);
+      if (usesWalkInPhoto(reservation)) throw new Error("PHOTO_COUNTER_VISIT_REQUIRED");
       const currentPolicy = await readyToCollect(tx, session.organisationId);
       if (currentPolicy.hash !== input.policyHash) throw new Error("PHOTO_CONSENT_REQUIRED");
       await requireBookingEligible(tx, session.organisationId, input.reservationId);

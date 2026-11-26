@@ -4,6 +4,9 @@ import { createHash, randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { walkInPhotoToken } from "../../src/lib/walk-in-policy";
 import { activeWalkInPhoto } from "../../src/lib/walk-in-photo";
+import { confirmReservationMoveIn, getReservationMoveInReadiness } from "../../src/lib/reservation-move-in";
+import { submitTenantPhoto, tenantPhotoStatus } from "../../src/lib/facial-photo-service";
+import { getMoveInProgress } from "../../src/lib/move-in-progress";
 import { db } from "../../src/lib/db";
 import { startWalkIn, redeemWalkIn, activeWalkIn, walkInView, endWalkIn } from "../../src/lib/walk-in-service";
 import { createPublicReservation } from "../../src/lib/public-booking-service";
@@ -166,6 +169,60 @@ test("isolated PostgreSQL tablet visit and booking boundaries", async t => {
       assert.equal(await db.auditEvent.count({ where: { entityId: v.id, action: "walk_in.tablet_cleared" } }), 1);
       assert.equal(await db.payment.count({ where: { account: { customer: { organisationId: org.id } } } }), 0);
       assert.equal(await db.tenancy.count({ where: { facilityId: facility.id } }), 0);
+      const photoBlocker = /tablet visit must be reviewed and accepted by HikCentral/;
+      const readiness = () => getReservationMoveInReadiness(scope, reservation.id);
+      const progress = () => getMoveInProgress(scope, reservation.id);
+      assert.match((await readiness()).blockers.join(" "), photoBlocker);
+      assert.equal((await progress()).photoStatus, "WAITING_REVIEW");
+      const tenant = { organisationId: org.id, customerIds: [reservation.customerId], email: request.email };
+      await db.customer.update({ where: { id: reservation.customerId }, data: { emailVerifiedAt: new Date() } });
+      assert.deepEqual(await tenantPhotoStatus(tenant, reservation.id), { available: false, policy: null, photo: null, counterPhotoStatus: "WAITING_REVIEW" });
+      await assert.rejects(submitTenantPhoto(tenant, { reservationId: reservation.id, consent: true, policyHash,
+        expectedVersion: 0, image: new File([new Uint8Array(image)], "synthetic.jpg", { type: "image/jpeg" }),
+      }), /PHOTO_COUNTER_VISIT_REQUIRED/);
+      await assert.rejects(confirmReservationMoveIn(scope, reservation.id), /MOVE_IN_NOT_READY/);
+
+      // The provider suite exercises the actual preview/send/readback. Seed its accepted result on the photo uploaded above.
+      const personId = "CI-HIKCENTRAL-PERSON";
+      await db.integrationIdentityLink.create({ data: { organisationId: org.id, customerId: reservation.customerId, hikCentralPersonId: personId, status: "ACTIVE" } });
+      const approvedAt = new Date();
+      await db.hikCentralFaceCapture.update({ where: { id: saved.id }, data: {
+        personId, status: "PROVIDER_ACCEPTED", encryptedImage: null, erasedAt: approvedAt, reviewedAt: approvedAt, providerAcceptedAt: approvedAt,
+      } });
+      assert.equal((await progress()).photoReviewed, true);
+      assert.doesNotMatch((await readiness()).blockers.join(" "), photoBlocker);
+      assert.equal((await readiness()).paymentVerified, false);
+
+      const signedPdf = Buffer.from("Synthetic signed agreement PDF");
+      await db.publicReservationLease.update({ where: { reservationId: reservation.id }, data: {
+        signedPdf, signedPdfSha256: createHash("sha256").update(signedPdf).digest("hex"),
+        sha256: createHash("sha256").update("Synthetic agreement").digest("hex"),
+      } });
+      const amount = (await readiness()).requiredAmount;
+      assert.ok(amount > 0);
+      const account = await db.account.create({ data: { accountNumber: `ST24-T-${reservation.id}`, customerId: reservation.customerId, balance: -amount } });
+      const receiptKey = randomUUID();
+      await db.payment.create({ data: { accountId: account.id, amount, method: "EFT", status: "SUCCEEDED", processedAt: new Date(), idempotencyKey: receiptKey } });
+      await db.ledgerEntry.create({ data: { accountId: account.id, amount, type: "PAYMENT", description: "Synthetic receipt", effectiveAt: new Date(), externalRef: receiptKey, createdById: user.id } });
+      for (const changed of [{ version: saved.version + 1 }, { facilityId: "another-store" }, { status: "PROVIDER_REMOVED" }]) {
+        await db.hikCentralFaceCapture.update({ where: { id: saved.id }, data: changed });
+        assert.match((await readiness()).blockers.join(" "), photoBlocker);
+        await assert.rejects(confirmReservationMoveIn(scope, reservation.id), /MOVE_IN_NOT_READY/);
+        await db.hikCentralFaceCapture.update({ where: { id: saved.id }, data: { version: saved.version, facilityId: facility.id, status: "PROVIDER_ACCEPTED" } });
+      }
+      await db.integrationIdentityLink.update({ where: { customerId: reservation.customerId }, data: { hikCentralPersonId: "other-person" } });
+      assert.match((await readiness()).blockers.join(" "), photoBlocker);
+      await db.integrationIdentityLink.update({ where: { customerId: reservation.customerId }, data: { hikCentralPersonId: personId } });
+
+      assert.equal((await readiness()).ready, true);
+      const handover = await confirmReservationMoveIn(scope, reservation.id);
+      assert.equal(handover.idempotent, false);
+      assert.equal((await confirmReservationMoveIn(scope, reservation.id)).idempotent, true);
+      assert.equal(await db.facialPhotoSubmission.count({ where: { reservationId: reservation.id } }), 0);
+      const evidence = await db.auditEvent.findFirstOrThrow({ where: { entityId: handover.tenancyId, action: "tenancy.key_handover_confirmed" } });
+      assert.equal((evidence.after as { hikCentralPhotoId?: string }).hikCentralPhotoId, saved.id);
+      assert.equal((await progress()).photoReviewed, true);
+
     });
   } finally { await db.$disconnect(); }
 });

@@ -10,9 +10,49 @@ export const walkInPhotoReservation = {
   publicLease: { select: { status: true, signedAt: true } },
 } satisfies Prisma.ReservationSelect;
 
+export function usesWalkInPhoto(reservation: { source: string; journey: string; customer: { type: string } }) {
+  return reservation.source === "PUBLIC_WALK_IN" && reservation.journey === "RENTAL" && reservation.customer.type === "INDIVIDUAL";
+}
+
+/** The consumed tablet handoff identifies exactly the version it captured. Clearing the tablet preserves that evidence. */
+export async function walkInHandoverPhoto(
+  database: Prisma.TransactionClient,
+  organisationId: string,
+  reservation: { id: string; customerId: string; facilityId: string },
+) {
+  const visit = await database.walkInVisit.findUnique({
+    where: { reservationId: reservation.id },
+    select: { customerTokenHash: true, organisationId: true, facilityId: true },
+  });
+  if (!visit?.customerTokenHash || visit.organisationId !== organisationId || visit.facilityId !== reservation.facilityId) return null;
+
+  const tokenHash = createHash("sha256").update(walkInPhotoToken(visit.customerTokenHash)).digest("hex");
+  const [handoff, photo] = await Promise.all([
+    database.hikCentralFaceHandoff.findUnique({ where: { tokenHash },
+      select: { customerId: true, organisationId: true, facilityId: true, usedAt: true, photoVersion: true },
+    }),
+    database.hikCentralFaceCapture.findUnique({ where: { customerId: reservation.customerId },
+      select: { id: true, version: true, organisationId: true, facilityId: true, personId: true, status: true, consentAt: true, reviewedAt: true, providerAcceptedAt: true },
+    }),
+  ]);
+  if (!handoff?.usedAt || !photo || handoff.customerId !== reservation.customerId ||
+      handoff.organisationId !== organisationId || handoff.facilityId !== reservation.facilityId ||
+      photo.organisationId !== organisationId || photo.facilityId !== reservation.facilityId ||
+      photo.version !== handoff.photoVersion + 1 || photo.consentAt.getTime() !== handoff.usedAt.getTime()) return null;
+
+  if (photo.status === "PROVIDER_ACCEPTED") {
+    // Provider acceptance erases the local copy. The current active person link is the remaining access evidence.
+    const link = await database.integrationIdentityLink.findUnique({ where: { customerId: reservation.customerId },
+      select: { organisationId: true, status: true, hikCentralPersonId: true },
+    });
+    if (!photo.personId || !photo.reviewedAt || !photo.providerAcceptedAt || link?.organisationId !== organisationId ||
+        link.status !== "ACTIVE" || link.hikCentralPersonId !== photo.personId) return { ...photo, status: "PROVIDER_UNCERTAIN" };
+  }
+  return photo;
+}
+
 export function eligibleWalkInReservation(reservation: Prisma.ReservationGetPayload<{ select: typeof walkInPhotoReservation }> | null) {
-  return Boolean(reservation?.source === "PUBLIC_WALK_IN" && reservation.journey === "RENTAL" &&
-    ["ACTIVE", "CONVERTED"].includes(reservation.status) && reservation.customer.type === "INDIVIDUAL");
+  return Boolean(reservation && usesWalkInPhoto(reservation) && ["ACTIVE", "CONVERTED"].includes(reservation.status));
 }
 
 type WalkInPhotoVisit = {
