@@ -1,3 +1,12 @@
+## 2026-11-26 — Midpoint ground and first floor unit guide for Boitumelo
+
+- **Implementation:** Prepared a six-page Word and PDF reference with both floor maps and per-unit areas, widths and lengths. Ground floor covers 001–142, including outdoor units 001–003. First floor covers the applied clockwise sequence 143–336. Local delivery files: `output/stor24-midpoint-unit-guide-20261126/STOR24 Midpoint Unit Numbering and Sizes.docx` and its PDF companion.
+- **Testing:** Checked all 336 schedule rows field by field against the source data in both files and visually reviewed all six pages. Ground-floor map geometry and labels matched the public readback by unit ID. The first-floor map and applied 20 November crosswalk matched the 27 October inventory and type records by unit ID. The ground-floor schedule marks 74 units whose width and length are missing from the public inventory.
+- **Commit and push:** This context entry is the only repository change and is recorded on `codex/unit-number-format-20261119`. The handoff files are local.
+- **Merge:** The context entry is on the numbering branch for PR #873. Its promotion to main remains open.
+- **Deployment and configuration:** Document-only handoff. No application deployment, database write, or floor-opening change was performed.
+- **Live production verification:** On 26 November 2026 the public Midpoint booking API returned 142 ground-floor unit records and matching map labels, and still listed First Floor as coming soon. First-floor dimensions are from the dated inventory snapshot. Live first-floor size readback, physical door-label checks, staff and device acceptance, full database relationship verification, historical document checks, and existing provider, data, training and approval gates remain open.
+
 ## 2026-11-20 — Midpoint second-floor clockwise renumbering
 
 - **Implementation:** User requested the same sequence as the first floor starting at 337. All 194 second-floor units were renumbered 337–530 via the existing platform batch; crosswalk records prior and revised numbers. Local PNG and A3/A4 PDFs were generated; they are not deployed assets.
