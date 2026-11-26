@@ -1,3 +1,15 @@
+## 2026-11-26 — Facilities visual guidance candidate
+
+- **Implementation:** Authenticated staff guidance now starts on, with an authorised page tip, on/off control, numbered highlights and expandable payment, ID and photo explanations on signed-booking move-in. Previous browser reading progress is migrated once; subsequent opt-out remains per user and browser. The separate offline tutorial retains its existing setting. Added facilities manager and trainer PDFs using invented component fixtures and Katlego's Unit 043 rehearsal as a training reference. They are review copies.
+- **Testing:** Local guided-help browser fixture passed all 90 guides and 376 steps, permission revocation, cross-tab opt-out, migration, storage denial, responsive guided panel and no operational writes. Twenty-three guide-state and permission tests passed. Scoped lint passed with one pre-existing internal-navigation warning. The clean production build and typecheck passed. The browser suite was rerun after the mobile spacing adjustment: 390px tip and inline explanations, switch-off, migration and all 90 guides / 376 steps passed with zero operational writes and zero browser errors. Both PDFs were rendered and text bounds checked. PR CI found a 305px horizontal overflow in the premium workspace; the guidance indicator was compacted at narrow widths and the premium workspace browser test passed locally. Protected CI must recheck the fix.
+- **Commit and push:** Implementation commit `7eb2a724` was pushed on `codex/facility-visual-guidance-20261126` as PR #911. This evidence update is a subsequent candidate commit; check its exact head and protected checks before promotion.
+- **Merge:** Pending protected checks and review.
+- **Deployment and configuration:** Pending. No provider or billing configuration changed.
+- **Live production verification:** On 26 November an authenticated owner viewed the current Operations workspace and its existing Start here, checklists, task and maintenance controls. The new page tips and documents have not been verified live.
+- **Outstanding:** Facilities-manager and Katlego UAT and training acceptance, real device/reader verification, provider, data, finance and approval gates remain open. Guide progress is reading evidence only. The existing general staff handbook download has not been replaced.
+
+
+
 ## 2026-11-25 — Move-in layout for a linked signed lease
 
 - **Implementation:** Move in opens the existing signed lease and that booking's handover card directly. The page shows the signed agreement, verified payment, access photo, and outstanding handover checks in one view. Existing pending-lease, public-booking training and multi-unit entry points remain available. This is a presentation change with existing photo, identity, payment and key-handover enforcement.

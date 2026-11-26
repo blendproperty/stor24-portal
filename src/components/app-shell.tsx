@@ -211,7 +211,7 @@ export function AppShell({ children, session, facilityLabel = "Your facilities",
             </button>
           </div>
         </header>
-        <main className="content" id="workspace-content" tabIndex={-1}>{signOutError && <p className="form-error" role="alert">{signOutError}</p>}{children}</main>
+        <main className="content" id="workspace-content" tabIndex={-1}><div id="guide-page-tip" />{signOutError && <p className="form-error" role="alert">{signOutError}</p>}{children}</main>
         <BrandCorner key={pathname} pathname={pathname} />
       </div>
     </div>

@@ -50,9 +50,9 @@ export function filterGuides(query: string, category: string, workflowGuides: Wo
 
 export type GuideProgress = { step: number; reviewed: string[] };
 export type GuidePreferences = { version: 1; enabled: boolean; activeGuide: string | null; progress: Record<string, GuideProgress> };
-export const emptyGuidePreferences: GuidePreferences = { version: 1, enabled: false, activeGuide: null, progress: {} };
+export const emptyGuidePreferences: GuidePreferences = { version: 1, enabled: true, activeGuide: null, progress: {} };
 
-export function guideStorageKey(userId: string) { return `stor24:guided-help:v1:${encodeURIComponent(userId)}`; }
+export function guideStorageKey(userId: string) { return `stor24:guided-help:v2:${encodeURIComponent(userId)}`; }
 
 /** Browser state is untrusted; only known guide and step IDs can be restored. */
 export function parseGuidePreferences(raw: string | null, workflowGuides: WorkflowGuide[]): GuidePreferences {

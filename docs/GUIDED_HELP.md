@@ -4,6 +4,10 @@ Expanded across the staff backend on 21 September 2026. The earlier three-guide 
 
 ## Using it
 
+The 26 November 2026 candidate displays an authorised page tip at the top of the staff workspace, with **Show me the steps** and **Turn tips off**. Guide mode starts on for each user and browser. A one-time transition from the earlier storage key retains known reading progress and starts tips on; any later switch-off is respected. Open **Guide me** and use the **Guide mode** switch to turn tips back on. The move-in card also offers expandable payment, ID and photo explanations. These explanations and the page tip disappear when Guide mode is off. This applies to authenticated staff workspaces; the separate offline tutorial retains its own device setting.
+
+The move-in guide includes the ID and photo cards, alongside agreement, payment and key-handover checks. The coloured outline and numbered label point to the current area; they do not operate it. A reviewed photo does not establish provider access or a working reader. The role-specific guide and training PDFs are in `private/staff-training`; their pictured examples use invented fixture data and are review copies until deployment and staff acceptance.
+
 Choose **Guide me** in the staff toolbar. **Help with this page** starts its main tutorial; **Also on this screen** exposes additional workflows such as payment, transfer, move-out, statements, packages and setup. Search matches titles, descriptions and step text. Work area filters the library. Clear filters restores every guide available to your account.
 
 Starting a tutorial turns **Guide mode** on. **Show me on this page** outlines the relevant visible area without operating it. **Read & next** records reading only. Back, the checklist, Restart, Pause and Close remain available. Escape closes the guide unless a business modal owns the interaction. Modal forms remain above the tutorial. Switching off removes highlights and returns to the library; it does not erase reading progress. Reloading does not automatically reopen a guide.
