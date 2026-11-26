@@ -17,18 +17,23 @@ const policySchema = z.object({
   customerEmailHashes: z.array(z.string().regex(/^[a-f0-9]{64}$/)).min(1).max(20).optional(),
 }).refine(policy => !(policy.reservationIds && policy.customerEmailHashes), "Choose one customer scope")
   .refine(policy => policy.retentionMode === "TENANCY" ? policy.retentionHours === undefined : policy.retentionHours !== undefined, "Choose tenancy retention or a fixed expiry");
-export function identityPolicy(organisationId: string) {
-  if (!process.env.IDENTITY_DOCUMENT_POLICIES_JSON) return null;
+export function identityPolicy(organisationId: string, source?: string) {
+  const configured = source === "PUBLIC_WALK_IN"
+    ? process.env.IDENTITY_DOCUMENT_COUNTER_POLICIES_JSON
+    : process.env.IDENTITY_DOCUMENT_POLICIES_JSON;
+  if (!configured) return null;
   try {
-    const policies = JSON.parse(process.env.IDENTITY_DOCUMENT_POLICIES_JSON);
+    const policies = JSON.parse(configured);
     if (!policies || typeof policies !== "object" || Array.isArray(policies)) throw new Error();
     if (!Object.hasOwn(policies, organisationId)) return null;
     const policy = policySchema.parse(policies[organisationId]);
     return { ...policy, hash: createHash("sha256").update(JSON.stringify(policy)).digest("hex") };
   } catch { throw new Error("ID_POLICY_UNAVAILABLE"); }
 }
-export function identityRequired(organisationId: string, createdAt: Date, reservationId?: string, customerEmail?: string | null) {
-  const policy = identityPolicy(organisationId);
+export function identityRequired(organisationId: string, createdAt: Date, reservationId?: string, customerEmail?: string | null, source?: string) {
+  // A separately approved Counter policy has no effect on ordinary website or staff bookings.
+  const counter = source === "PUBLIC_WALK_IN" ? identityPolicy(organisationId, source) : null;
+  const policy = counter && createdAt >= new Date(counter.effectiveFrom) ? counter : identityPolicy(organisationId);
   if (!policy || createdAt < new Date(policy.effectiveFrom)) return null;
   // A controlled pilot must never enable collection for the rest of the store.
   if (policy.reservationIds && (!reservationId || !policy.reservationIds.includes(reservationId))) return null;

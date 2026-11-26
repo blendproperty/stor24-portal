@@ -31,6 +31,35 @@ test("isolated PostgreSQL private identity workflow", async t => {
     return { org, facility, user, customer, booking, scope, input, reference: booking.publicReference!, token: access.token };
   }
   try {
+    await t.test("a Counter-only policy requires upload for a new walk-in with no prior record", async () => {
+      const f = await fixture(), other = await fixture();
+      const policies = JSON.parse(process.env.IDENTITY_DOCUMENT_POLICIES_JSON!);
+      const counterPolicy = { ...policies[f.org.id], version: "counter-only" };
+      delete policies[f.org.id];
+      delete policies[other.org.id];
+      process.env.IDENTITY_DOCUMENT_POLICIES_JSON = JSON.stringify(policies);
+      process.env.IDENTITY_DOCUMENT_COUNTER_POLICIES_JSON = JSON.stringify({ [f.org.id]: counterPolicy, [other.org.id]: counterPolicy });
+      try {
+        await db.reservation.update({ where: { id: f.booking.id }, data: { source: "PUBLIC_WALK_IN" } });
+        await db.reservation.update({ where: { id: other.booking.id }, data: { source: "PUBLIC_WEBSITE" } });
+        const ready = await identityStatus(f.reference, f.token);
+        assert.equal(ready.required, true);
+        assert.equal(ready.available, true);
+        assert.equal(ready.canContinue, false);
+        assert.equal((await identityStatus(other.reference, other.token)).required, false);
+        assert.deepEqual(await preparePublicReservationLease(f.reference, "EFT", f.token), { ok: false, code: "IDENTITY_REQUIRED" });
+        const document = await submitIdentity(f.reference, f.token, { ...f.input, policyHash: ready.policy!.hash });
+        assert.ok((await identityStatus(f.reference, f.token)).canContinue);
+        assert.ok((await preparePublicReservationLease(f.reference, "EFT", f.token)).ok);
+        assert.equal(await identityGate(db, f.org.id, f.booking.id, f.booking.createdAt, "HANDOVER"), false);
+        await previewIdentity(f.scope, document.id, 1, 0);
+        await previewIdentity(f.scope, document.id, 1, 1);
+        await reviewIdentity(f.scope, document.id, 1, "ACCEPT");
+        assert.equal(await identityGate(db, f.org.id, f.booking.id, f.booking.createdAt, "HANDOVER"), true);
+      } finally {
+        delete process.env.IDENTITY_DOCUMENT_COUNTER_POLICIES_JSON;
+      }
+    });
     await t.test("identity return recovers only a current agreement after a quote change", async () => {
       const f = await fixture();
       await submitIdentity(f.reference, f.token, f.input);

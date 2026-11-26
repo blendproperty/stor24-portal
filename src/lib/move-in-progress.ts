@@ -13,13 +13,13 @@ export type MoveInProgress = {
 export async function getMoveInProgress(scope: RequestScope, reservationId: string): Promise<MoveInProgress> {
   const booking = await db.reservation.findFirst({
     where: { id: reservationId, facility: facilityWhere(scope), customer: { organisationId: scope.organisationId } },
-    select: { status: true, createdAt: true, publicReference: true, convertedTenancyId: true,
+    select: { status: true, source: true, createdAt: true, publicReference: true, convertedTenancyId: true,
       customer: { select: { email: true } },
       identityDocument: { select: { status: true, policyHash: true } },
       facialPhoto: { select: { status: true, policyHash: true, expiresAt: true, erasedAt: true, reviewedAt: true, reviewedById: true } } },
   });
   if (!booking) throw new Error("NOT_FOUND");
-  const idPolicy = identityRequired(scope.organisationId, booking.createdAt, reservationId, booking.customer.email);
+  const idPolicy = identityRequired(scope.organisationId, booking.createdAt, reservationId, booking.customer.email, booking.source);
   const photoPolicy = await resolvedPhotoPolicy(db, scope.organisationId);
   const identityAccepted = Boolean(booking.identityDocument?.status === "ACCEPTED" && (!idPolicy || booking.identityDocument.policyHash === idPolicy.hash));
   const photo = booking.facialPhoto;
