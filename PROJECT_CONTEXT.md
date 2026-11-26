@@ -9453,3 +9453,9 @@ Batch review is invalidated if the operator edits account billing terms; the syn
 - CRM draft PR #917 and website draft PR #297 are paired. The CRM handoff audit distinguishes Counter sessions from standalone photo QR sessions, and the instructional step IDs preserve prior staff reading progress.
 - The combined isolated database and guide access tests passed 21/21. The earlier full guide browser run rendered 90 guides and 377 steps with zero operational writes or browser errors. A local webpack-generated type check surfaced the existing optional GET request declaration in the unchanged staff-guide route. The standard protected build remains the release gate.
 - Merge, deployment, live tablet acceptance, provider readback and final facial policy approval remain pending.
+
+### 2026-11-26 | Illustrated one-QR walk-in training preview
+
+- Prepared standalone STOR24-Walk-In-Tablet-Guide-One-QR-Preview.pdf for internal staff training. Covers Android/iPad setup, one QR or visit code, signing, in-person ID check, same-session photo and consent, tablet clearing, integration-manager review, Move In and fallback. The PDF was not published to the portal.
+- Evidence: 11 rendered A4 pages inspected; 11 PDF bookmarks, 10 contents links and 8 external links verified. Images show the public entry screen, synthetic Counter screens and labelled staff examples. SHA-256: 79be077b49ffdebc62a6c1a730a74d590a689288ab9fff10bb79d4ed6fb385d7.
+- The training record accompanies CRM draft PR #917 and references website draft PR #297. No merge, deployment, live tablet acceptance, HikCentral provider/device readback or facial-policy approval is implied by the training artifact.
