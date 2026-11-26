@@ -1,3 +1,13 @@
+## 2026-11-26 — Facilities visual guidance production release
+
+- **Implementation:** Authenticated staff have contextual page tips, an on/off switch, numbered walkthrough highlights and expandable move-in payment, ID and photo explanations. Guidance defaults on in a new browser setting; an individual's later choice is retained per browser. The offline tutorial has its separate setting. Facilities manager and trainer PDFs are review copies; their illustrations use invented component data.
+- **Testing:** Local typecheck, production build, scoped lint and 23 guide-state/access tests passed. The browser suite covered 90 guides and 376 steps, the 305px workspace, 390px tip, permission revocation, preference migration and cross-tab switch-off, with no operational writes. PR #911 head 7e5d7651 passed CI 45750990844, security 45750990821, transactions 45750990828 and restricted runtime 45750990826.
+- **Commit and push:** Implementation branch codex/facility-visual-guidance-20261126, PR #911. This release-evidence update is a separate candidate; check its exact head and promotion status.
+- **Merge:** PR #911 squash merged as da7a7801c03d807a08db813bb9cbe98a747d16cf. Exact-main CI 45752551457, security 45752551374, transactions 45752551384 and restricted runtime 45752551470 passed.
+- **Deployment and configuration:** VPS deployment 45754462833 succeeded. No billing or provider settings were changed.
+- **Live production verification:** On 26 November at approximately 06:23 SAST, an authenticated owner opened Operations and saw the contextual tip. Turn tips off removed it; Guide me's switch restored it; Show me the steps opened the five-step Operations walkthrough. Guidance was left on. This was a read-only workflow except for the browser preference and guide reading position; no customer, payment, access or handover action was performed.
+- **Outstanding:** Katlego and the facilities manager have not yet accepted the updated guidance or documents. Real participant photo/reader checks, provider and financial approvals, data, training and existing launch gates remain open. The PDFs are not yet offered by the existing general staff handbook download.
+
 ## 2026-11-26 — Facilities visual guidance candidate
 
 - **Implementation:** Authenticated staff guidance now starts on, with an authorised page tip, on/off control, numbered highlights and expandable payment, ID and photo explanations on signed-booking move-in. Previous browser reading progress is migrated once; subsequent opt-out remains per user and browser. The separate offline tutorial retains its existing setting. Added facilities manager and trainer PDFs using invented component fixtures and Katlego's Unit 043 rehearsal as a training reference. They are review copies.
