@@ -5,6 +5,11 @@ import { readFile, mkdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 const pdf = await readFile('private/staff-training/stor24-staff-handbook-2026-10-15.pdf');
+const facilities = {
+  'facilities-guide': { label: 'Facilities manager guide PDF', filename: 'STOR24-Facilities-Manager-Guide-2026-11-26.pdf' },
+  'facilities-training': { label: 'Facilities training PDF', filename: 'STOR24-Facilities-Manager-Training-2026-11-26.pdf' },
+};
+for (const document of Object.values(facilities)) document.bytes = await readFile(`private/staff-training/${document.filename}`);
 const css = (await readFile('src/app/globals.css', 'utf8') + '\n' + await readFile('src/styles/stor24-brand.css', 'utf8')).replace('@import "tailwindcss";', '');
 const bundle = await build({ stdin: { contents: `import React from 'react';import {createRoot} from 'react-dom/client';import {StaffHandbookDownload} from './src/components/staff-handbook-download';createRoot(document.getElementById('root')).render(<main><h1>Operations</h1><StaffHandbookDownload/></main>);`, resolveDir: process.cwd(), loader: 'jsx' }, bundle: true, write: false, format: 'esm', jsx: 'automatic' });
 const server = createServer((req, res) => { res.setHeader('Content-Type', req.url === '/app.js' ? 'text/javascript' : 'text/html'); res.end(req.url === '/app.js' ? bundle.outputFiles[0].text : `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div id="root"></div><script type="module" src="/app.js"></script></body></html>`); });
@@ -16,8 +21,13 @@ try {
     const page = await browser.newPage({ viewport: { width, height: 800 } });
     const errors = []; page.on('pageerror', error => errors.push(error.message));
     let mode = 'success', requests = 0, release;
-    await page.route('**/api/v1/operations/staff-guide', async route => {
+    await page.route('**/api/v1/operations/staff-guide**', async route => {
       requests++; assert.equal(route.request().method(), 'GET');
+      const key = new URL(route.request().url()).searchParams.get('document');
+      if (key) {
+        assert.ok(facilities[key], `unexpected document ${key}`);
+        return route.fulfill({ contentType: 'application/pdf', body: facilities[key].bytes });
+      }
       if (mode === 'hold') await new Promise(resolve => { release = resolve; });
       if (['401', '403', '422', '500'].includes(mode)) return route.fulfill({ status: Number(mode), json: { error: { message: mode === '422' ? 'Data protection blocked this download.' : 'Handbook temporarily unavailable.' } } });
       if (mode === 'html') return route.fulfill({ contentType: 'text/html', body: '<html>Sign in</html>' });
@@ -44,10 +54,17 @@ try {
     assert.equal(createHash('sha256').update(await readFile(await file.path())).digest('hex'), createHash('sha256').update(pdf).digest('hex'));
     await expect(page.getByRole('alert')).toHaveCount(0);
     assert.equal(page.url(), origin);
+    for (const document of Object.values(facilities)) {
+      const event = page.waitForEvent('download');
+      await page.getByRole('button', {name: document.label, exact: true}).click();
+      const file = await event;
+      assert.equal(file.suggestedFilename(), document.filename);
+      assert.equal(createHash('sha256').update(await readFile(await file.path())).digest('hex'), createHash('sha256').update(document.bytes).digest('hex'));
+    }
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
     assert.deepEqual(errors, []);
     await page.screenshot({ path: `output/staff-handbook-download/${width}.png` });
     await page.close();
   }
-  console.log('Handbook normal button download, exact PDF hash, denied/DLP/server/malformed recovery and duplicate guard passed at1440/390/320.');
+  console.log('Three document downloads, exact PDF hashes, denied/DLP/server/malformed recovery and duplicate guard passed at 1440/390/320.');
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
