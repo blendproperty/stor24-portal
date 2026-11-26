@@ -34,10 +34,10 @@
 
 - **Implementation:** Move in opens the existing signed lease and that booking's handover card directly. The page shows the signed agreement, verified payment, access photo, and outstanding handover checks in one view. Existing pending-lease, public-booking training and multi-unit entry points remain available. This is a presentation change with existing photo, identity, payment and key-handover enforcement.
 - **Testing:** TypeScript and scoped lint passed. Seven focused reservation and training tests passed. A browser fixture rendered the actual Move in page with branded styling at 1440, 768, 390 and 320 pixels. It verified exact booking selection, agreement and enquiry links, disabled handover, pending lease recovery, booking training and general queue access. The existing multi-unit browser test passed at 1440, 390 and 320 pixels. No live records were used.
-- **Commit and push:** Candidate branch `codex/move-in-signed-lease-layout-20261125`. The pull request records its exact head and protected checks.
-- **Merge and deployment:** Pending at this checkpoint.
-- **Live production verification:** Pending an authenticated readback after deployment. Task 7 remains open until Katlego reports staff acceptance. The billing production hold remains in place.
-
+- **Commit and push:** PR #905 exact head `12bec0f987b770988a75f6cecd3d3ef312541b95` passed CI 45556540593, security 45556540642, transactions 45556540785 and restricted runtime 45556540669.
+- **Merge:** PR #905 squash merged as `bde8a1f1995c469e6b9222e90a877ca581741425`. The complete merged tree matched the tested PR head. Exact-main CI 45561070742, security 45561070675, transactions 45561070662 and restricted runtime 45561070769 passed.
+- **Deployment and configuration:** Normal production VPS run 45562948957, job 139030776433, passed its exact-main gate and deployed the verified ref. The billing production hold remains in place.
+- **Live production verification:** On 25 November 2026 the authenticated Midpoint Unit 043 view opened its signed lease directly, showed the original agreement link and verified initial payment, and kept handover disabled with identity and access-photo checks outstanding. The old unsigned and unpaid prompts were absent. Public CRM health returned HTTP 200 with service and database OK at 06:50 UTC. This was a read-only check. Task 7 stays open until Katlego signs off on an eligible test reservation.
 ## 2026-11-25 — Task 6 WhatsApp retry content verification
 
 - **Implementation:** New WhatsApp attempts retain the original template values using the configured integration vault. Manual retry checks the saved values, original template when recorded, and recipient. A historical hash-only record with nonempty values stays in delivery review. No billing or automation switch changes.
