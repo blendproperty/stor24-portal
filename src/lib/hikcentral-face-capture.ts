@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { activeWalkInPhoto, type WalkInPhotoBinding } from "@/lib/walk-in-photo";
 import { currentRoleAccess } from "@/lib/current-role-access";
 import { decryptPhoto, encryptPhoto, normaliseFacialPhoto } from "@/lib/facial-photo-security";
 import { loadHikCentralRuntimeConfiguration } from "@/lib/integrations/hikcentral-configuration";
@@ -63,7 +64,7 @@ async function lockCustomer(database: Database, customerId: string) {
   await database.$queryRaw`SELECT "id" FROM "Customer" WHERE "id" = ${customerId} FOR UPDATE`;
 }
 
-export async function issueHikCentralFaceHandoff(scope: RequestScope, input: { facilityId: string; customerId: string; version: number; syntheticTest?: boolean; syntheticTestReason?: string }) {
+export async function issueHikCentralFaceHandoff(scope: RequestScope, input: { facilityId: string; customerId: string; version: number; syntheticTest?: boolean; syntheticTestReason?: string }, walkIn?: { token: string; expiresAt: Date }) {
   await requireFacility(scope, input.facilityId);
   if (input.syntheticTest && (!scope.unrestrictedFacilities || !input.syntheticTestReason || input.syntheticTestReason.trim().length < 8 || input.syntheticTestReason.trim().length > 200)) throw Error("HIKCENTRAL_TEST_GRANT_NOT_READY");
   if (input.syntheticTest) {
@@ -80,12 +81,20 @@ export async function issueHikCentralFaceHandoff(scope: RequestScope, input: { f
     const verified = await provider.personById(personId);
     if (!verified.ok || (customer.lastName && verified.data.familyName && verified.data.familyName.trim().toLowerCase() !== customer.lastName.trim().toLowerCase())) throw Error("HIKCENTRAL_PERSON_LOOKUP_FAILED");
   }
-  const token = randomBytes(32).toString("base64url"), expiresAt = new Date(Date.now() + 20 * 60_000);
+  const token = walkIn?.token ?? randomBytes(32).toString("base64url");
+  const expiresAt = walkIn?.expiresAt ?? new Date(Date.now() + 20 * 60_000);
   await db.$transaction(async tx => {
     await lockCustomer(tx, customer.id);
     const linked = await faceTarget(tx, scope, customer.id);
     const existing = await tx.hikCentralFaceCapture.findUnique({ where: { customerId: customer.id } });
     if (linked.personId !== personId || linked.customer.firstName?.trim() !== customer.firstName?.trim() || linked.customer.lastName?.trim() !== customer.lastName?.trim() || (existing?.version ?? 0) !== input.version || existing && ["WAITING_REVIEW", "SENDING", "PROVIDER_UNCERTAIN"].includes(existing.status)) throw Error("PHOTO_CHANGED");
+    if (walkIn) {
+      const previous = await tx.hikCentralFaceHandoff.findUnique({ where: { tokenHash: tokenHash(token) } });
+      if (previous) {
+        if (previous.usedAt || previous.personId !== linked.personId || !sameCustomerName(linked.customer, previous) || previous.photoVersion !== input.version) throw Error("PHOTO_CHANGED");
+        if (previous.expiresAt > new Date()) return;
+      }
+    }
     await tx.hikCentralFaceHandoff.deleteMany({ where: { customerId: customer.id, usedAt: null } });
     const handoff = await tx.hikCentralFaceHandoff.create({ data: { tokenHash: tokenHash(token), customerId: customer.id, organisationId: scope.organisationId, facilityId: input.facilityId, personId, firstNameSnapshot: customer.firstName?.trim() ?? null, lastNameSnapshot: customer.lastName?.trim() ?? null, photoVersion: input.version, issuedById: scope.userId, expiresAt } });
     await tx.auditEvent.create({ data: { organisationId: scope.organisationId, facilityId: input.facilityId, actorId: scope.userId, action: "hikcentral_face.handoff_issued", entityType: "HikCentralFaceHandoff", entityId: handoff.id, after: { customerId: customer.id, personId, version: input.version, identityCheckedInPerson: !input.syntheticTest, syntheticTestReason: input.syntheticTest ? input.syntheticTestReason!.trim() : null, expiresAt: expiresAt.toISOString() } } });
@@ -93,12 +102,14 @@ export async function issueHikCentralFaceHandoff(scope: RequestScope, input: { f
   return { token, expiresAt: expiresAt.toISOString() };
 }
 
-async function activeHandoff(token: string) {
+async function activeHandoff(token: string, walkIn?: WalkInPhotoBinding) {
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) throw Error("PHOTO_CHANGED");
   const handoff = await db.hikCentralFaceHandoff.findUnique({ where: { tokenHash: tokenHash(token) } });
   if (!handoff || handoff.usedAt || handoff.expiresAt <= new Date()) throw Error("PHOTO_CHANGED");
   const issuer = await db.user.findFirst({ where: { id: handoff.issuedById, organisationId: handoff.organisationId, active: true }, include: { roleAssignments: { include: { role: true } } } });
-  const access = currentRoleAccess(issuer?.roleAssignments.filter(a => a.role.organisationId === handoff.organisationId) ?? [], "access.manage", handoff.facilityId);
+  const assignments = issuer?.roleAssignments.filter(a => a.role.organisationId === handoff.organisationId) ?? [];
+  const access = currentRoleAccess(assignments, walkIn ? "move_in.create" : "access.manage", handoff.facilityId);
+  if (walkIn && !currentRoleAccess(assignments, "reservations.manage", handoff.facilityId).allowed) throw Error("FORBIDDEN");
   if (!issuer || !access.allowed) throw Error("FORBIDDEN");
   const scope: RequestScope = { userId: issuer.id, organisationId: handoff.organisationId, facilityIds: access.allowedFacilityIds ?? [], unrestrictedFacilities: access.allowedFacilityIds === null };
   const { customer, personId } = await faceTarget(db, scope, handoff.customerId);
@@ -109,19 +120,20 @@ async function activeHandoff(token: string) {
   return { handoff, scope, customer, syntheticTestReason: typeof syntheticTestReason === "string" ? syntheticTestReason : null };
 }
 
-export async function hikCentralFaceHandoff(token: string) {
-  const { handoff, scope, customer, syntheticTestReason } = await activeHandoff(token);
+export async function hikCentralFaceHandoff(token: string, walkIn?: WalkInPhotoBinding) {
+  const { handoff, scope, customer, syntheticTestReason } = await activeHandoff(token, walkIn);
   const current = await currentPolicy(db, scope.organisationId);
   const notice = handoffNotice(current, syntheticTestReason);
   return { name: customer.companyName || [customer.firstName, customer.lastName].filter(Boolean).join(" ") || "Customer", unitNumber: "", purpose: "hikcentral" as const, notice: notice.notice, consentLabel: notice.consentLabel, alternativeContact: current.alternativeContact, retentionHours: current.retentionHours, policyHash: current.hash, expiresAt: handoff.expiresAt.toISOString() };
 }
 
-export async function captureHikCentralFaceHandoff(token: string, input: { policyHash: string; consent: boolean; image: File }) {
-  const { handoff, scope, customer, syntheticTestReason } = await activeHandoff(token);
+export async function captureHikCentralFaceHandoff(token: string, input: { policyHash: string; consent: boolean; image: File }, walkIn?: WalkInPhotoBinding) {
+  const { handoff, scope, customer, syntheticTestReason } = await activeHandoff(token, walkIn);
   if (!input.consent || input.policyHash !== policyHash) throw Error("PHOTO_CONSENT_REQUIRED");
   const image = await normaliseFacialPhoto(input.image);
   try {
     await db.$transaction(async tx => {
+      if (walkIn) await activeWalkInPhoto(tx, walkIn, true);
       await lockCustomer(tx, customer.id);
       const current = await currentPolicy(tx, scope.organisationId);
       const linked = await faceTarget(tx, scope, customer.id);

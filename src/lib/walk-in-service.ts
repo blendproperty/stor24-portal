@@ -3,8 +3,9 @@ import { db } from "./db";
 import { facilityWhere, type RequestScope } from "./scope";
 import { walkInCode, walkInCodeHash, walkInToken, walkInTokenHash, walkInUsable, WALK_IN_LAUNCH_MS, WALK_IN_VISIT_MS } from "./walk-in-policy";
 import QRCode from "qrcode";
+import { walkInPhotoReservation, walkInPhotoStatus } from "./walk-in-photo";
 
-const include = { facility: { select: { id: true, name: true, publicSlug: true, active: true, publicBookingEnabled: true } }, createdBy: { select: { active: true, roleAssignments: { include: { role: true } } } }, reservation: { select: { publicReference: true } } };
+const include = { facility: { select: { id: true, name: true, publicSlug: true, active: true, publicBookingEnabled: true } }, createdBy: { select: { active: true, roleAssignments: { include: { role: true } } } }, reservation: { select: { publicReference: true, ...walkInPhotoReservation } } };
 export async function startWalkIn(scope: RequestScope, facilityId: string) {
   const facility = await db.facility.findFirst({ where: { AND: [{ id: facilityId, active: true, publicBookingEnabled: true, publicSlug: { not: null } }, facilityWhere(scope)] } });
   if (!facility) throw new Error("FACILITY_FORBIDDEN");
@@ -38,7 +39,7 @@ export async function activeWalkIn(token: string) {
 }
 export async function walkInView(token: string) {
   const visit = await activeWalkIn(token);
-  return { id: visit.id, facilitySlug: visit.facility.publicSlug, facilityName: visit.facility.name, expiresAt: visit.expiresAt.toISOString(), reference: visit.reservation?.publicReference ?? null };
+  return { id: visit.id, facilitySlug: visit.facility.publicSlug, facilityName: visit.facility.name, expiresAt: visit.expiresAt.toISOString(), reference: visit.reservation?.publicReference ?? null, photoStatus: await walkInPhotoStatus(visit) };
 }
 export async function endWalkIn(token: string) {
   const hash = walkInTokenHash(token);
