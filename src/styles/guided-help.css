@@ -79,6 +79,21 @@
 .guide-finished p { font-size: 13px; color: #5e7259; }
 .guide-finished > button { display: flex; margin-top: 20px; }
 .guide-highlight { position: fixed; z-index: 45; pointer-events: none; border: 2px solid #ed721f; border-radius: 12px; box-shadow: 0 0 0 4px #ed721f20; }
+.guide-highlight > span { position: absolute; top: -5px; left: 0; transform: translateY(-100%); max-width: min(280px, 80vw); padding: 5px 9px; border-radius: 8px; background: #a83e00; color: #fff; font-size: 12px; font-weight: 700; line-height: 1.3; }
+.guide-context-tip { display: flex; gap: 12px; align-items: flex-start; margin: 0 0 20px; padding: 15px 17px; border: 1px solid #b7ceb0; border-left: 4px solid #367547; border-radius: 12px; background: #f1f7ec; color: #183b2d; }
+.guide-tip-icon { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 50%; background: #dbead3; }
+.guide-context-tip strong { font-size: 14px; }
+.guide-context-tip p { margin: 4px 0 6px; font-size: 13px; line-height: 1.5; }
+.guide-context-tip button { border: 0; background: transparent; color: #205330; font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
+.guide-context-tip button:focus-visible { outline: 3px solid #e25a0b; outline-offset: 3px; }
+.guide-context-tip div > button { display: inline-flex; align-items: center; gap: 5px; padding: 3px 0; }
+.guide-tip-off { margin-left: auto; flex: none; padding: 5px; }
+.guide-inline-tip { margin: 10px 0; font-size: 12px; line-height: 1.5; }
+.guide-inline-tip summary { cursor: pointer; color: #245737; font-weight: 750; }
+.guide-inline-tip summary:focus-visible { outline: 3px solid #e25a0b; outline-offset: 3px; }
+.guide-inline-tip p { padding: 10px; border-radius: 8px; background: #edf5e9; color: #244b32; }
+body.guide-tips-off .guide-inline-tip { display: none; }
+@media (max-width: 600px) { .guide-context-tip { flex-wrap: wrap; } .guide-context-tip div { flex: 1 1 calc(100% - 50px); min-width: 0; } .guide-tip-off { margin-left: 46px; } }
 [data-guide] { scroll-margin-top: 90px; }
 @media (min-width: 1200px) {
   .guided-help-open .app-main { margin-right: 410px; }
@@ -100,7 +115,7 @@
   .guide-trigger { gap: 6px; padding: 7px 9px; font-size: 12px; }
   .guide-step h3 { font-size: 21px; }
 }
-@media print { .guide-trigger, .guide-panel, .guide-highlight { display: none !important; } .guided-help-open .app-main { margin-right: 0; } }
+@media print { .guide-trigger, .guide-panel, .guide-highlight, .guide-context-tip, .guide-inline-tip { display: none !important; } .guided-help-open .app-main { margin-right: 0; } }
 .guide-library-filters { display: grid; gap: 10px; margin-bottom: 16px; }
 .guide-library-filters label { display: grid; gap: 5px; font-size: 12px; font-weight: 700; }
 .guide-library-filters input, .guide-library-filters select { width: 100%; min-width: 0; box-sizing: border-box; padding: 10px; border: 1px solid #c9d5d0; border-radius: 8px; color: #183d32; background: white; font: inherit; }

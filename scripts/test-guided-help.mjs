@@ -68,8 +68,17 @@ try {
   const panel = page.locator("#guided-help-panel");
   await page.goto(base);
   await expect(panel).toHaveCount(0);
+  const tip = page.getByRole("complementary", {name: "Tip for Your operational overview"});
+  await expect(tip).toBeVisible();
+  await page.screenshot({path: "output/guided-help/desktop-page-tip.png"});
+  await tip.getByRole("button", {name: "Turn tips off"}).click();
+  await expect(tip).toHaveCount(0);
+  await page.reload();
+  await expect(tip).toHaveCount(0);
   await page.getByRole("button", {name: "Guide me", exact: false}).click();
   await expect(page.getByRole("switch", {name: "Guide mode"})).toHaveAttribute("aria-checked", "false");
+  await page.getByRole("switch", {name: "Guide mode"}).click();
+  await expect(page.getByRole("switch", {name: "Guide mode"})).toHaveAttribute("aria-checked", "true");
   await expect(panel.getByRole("heading", {name: "Your operational overview"})).toBeVisible();
   await page.screenshot({path: "output/guided-help/desktop-library.png"});
   await panel.getByRole("button", {name: /01 Find your way around/}).click();
@@ -123,6 +132,9 @@ try {
   await page.getByRole("link", {name: "Move in", exact: true}).click();
   await expect(page).toHaveURL(/move-in\?reservation=fixture-reservation/);
   await expect(page.getByRole("heading", {name: "Move-in checks", exact: true})).toBeVisible();
+  await page.getByText("How do I check the ID?").click();
+  await expect(page.getByText(/Check every submitted page and match the original/)).toBeVisible();
+  await expect(page.getByText("What happens with the photo?")).toBeVisible();
   await panel.getByRole("button", {name: "Read & next"}).click();
   await panel.getByRole("button", {name: "Read & next"}).click();
   await panel.getByRole("button", {name: "Show me on this page"}).click();
@@ -145,8 +157,36 @@ try {
   await other.getByRole("switch").click();
   await expect(panel.getByRole("switch")).toHaveAttribute("aria-checked", "false");
   await expect(panel.getByRole("heading", {name: "Choose a workflow"})).toBeVisible();
+  await page.goto(`${base}/operations/move-in?reservation=fixture-reservation`);
+  await expect(page.getByText("How do I check the ID?")).toBeHidden();
   await other.close();
   results.push("Cross-tab switch-off clears active guidance");
+
+  const migrated = await browser.newContext();
+  await migrated.addInitScript(() => localStorage.setItem("stor24:guided-help:v1:fixture-staff-a", JSON.stringify({version: 1, enabled: false, activeGuide: "orientation", progress: {orientation: {step: 1, reviewed: ["overview"]}}})));
+  const migratedPage = await migrated.newPage();
+  await migratedPage.goto(base);
+  await expect(migratedPage.getByRole("complementary", {name: "Tip for Your operational overview"})).toBeVisible();
+  await migratedPage.getByRole("button", {name: /Guide me/}).click();
+  await expect(migratedPage.getByRole("button", {name: /Continue where you left off/})).toContainText("step 2 of 4");
+  await migratedPage.getByRole("switch", {name: "Guide mode"}).click();
+  await migratedPage.reload();
+  await expect(migratedPage.getByRole("complementary", {name: "Tip for Your operational overview"})).toHaveCount(0);
+  await migrated.close();
+  results.push("Existing progress migrates with tips on once, and a later switch-off persists");
+
+  const mobile = await browser.newContext({viewport: {width: 390, height: 900}});
+  const mobilePage = await mobile.newPage();
+  await mobilePage.goto(`${base}/operations/move-in?reservation=fixture-reservation`);
+  const mobileTip = mobilePage.getByRole("complementary", {name: "Tip for Move in"});
+  await expect(mobileTip).toBeVisible();
+  await expect(mobilePage.getByText("What counts as payment?")).toBeVisible();
+  assert.equal(await mobilePage.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await mobilePage.screenshot({path: "output/guided-help/mobile-page-tip.png"});
+  await mobileTip.getByRole("button", {name: "Turn tips off"}).click();
+  await expect(mobilePage.getByText("What counts as payment?")).toBeHidden();
+  await mobile.close();
+  results.push("Mobile contextual tip and inline explanations fit the screen and switch off together");
 
   for (const width of [390, 768, 1280]) {
     await page.setViewportSize({width, height: 900});
@@ -295,7 +335,7 @@ try {
   guideAccessDenied = false;
   guidePersona = [{facilityId: "fixture-store", role: {name: "Custom read only", permissions: ["ledger.view"]}}];
   // Even forged persisted admin progress cannot restore an unavailable guide.
-  await page.evaluate(() => localStorage.setItem("stor24:guided-help:v1:fixture-staff-a", JSON.stringify({version:1,enabled:true,activeGuide:"program-defaults",progress:{"program-defaults":{step:2,reviewed:[]}}})));
+  await page.evaluate(() => localStorage.setItem("stor24:guided-help:v2:fixture-staff-a", JSON.stringify({version:1,enabled:true,activeGuide:"program-defaults",progress:{"program-defaults":{step:2,reviewed:[]}}})));
   await page.goto(`${base}/settings`);
   await page.getByRole("button", {name: /Guide me/}).click();
   await expect(panel.locator(".guide-card")).toHaveCount(4); // Account, transfer, statement and access-request guidance only.

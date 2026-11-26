@@ -37,7 +37,7 @@ export const guideAccessRules: Record<string, Rule> = {
   "move-in-training": rule("@owner|@manager|@custom-move-in", ["", "", ""]),
   orientation: rule("operations.view", ["", "", "leads.view,reservations.manage,ledger.view,collections.view", ""]),
   reservations: rule("reservations.manage", ["", "", "", "", "move_in.create"]),
-  "move-in": rule("move_in.create", ["reservations.manage", "", "", "payments.manage", "", ""]),
+  "move-in": rule("move_in.create", ["reservations.manage", "", "", "payments.manage", "", "", "", ""]),
   identity: rule("identity.review", ["", "", "", ""]),
   mri: rule("mri.view", ["", "mri.manage", "", "mri.manage"], true),
   "collection-notices": rule("collections.view", ["", "collections.manage", "collections.manage", "collections.manage,billing.documents.send"]),

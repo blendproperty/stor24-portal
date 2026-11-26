@@ -13,7 +13,14 @@ const preferenceEvent = "stor24-guided-help-change";
 const unsavedPreferences = new Map<string, string>();
 function readPreferences(key: string) {
   if (unsavedPreferences.has(key)) return unsavedPreferences.get(key)!;
-  try { return window.localStorage.getItem(key); } catch { return null; }
+  try {
+    const current = window.localStorage.getItem(key);
+    if (current !== null) return current;
+    const previous = window.localStorage.getItem(key.replace(":v2:", ":v1:"));
+    if (!previous) return null;
+    const parsed = JSON.parse(previous);
+    return parsed && parsed.version === 1 ? JSON.stringify({ ...parsed, enabled: true }) : null;
+  } catch { return null; }
 }
 function subscribe(callback: () => void) {
   window.addEventListener("storage", callback);
@@ -45,7 +52,7 @@ function findTarget(step: GuideStep) {
 }
 
 /** Highlight is visual only: it never clicks, focuses or changes a business form. */
-function GuideHighlight({ step }: { step: GuideStep }) {
+function GuideHighlight({ step, number }: { step: GuideStep; number: number }) {
   const [rectangle, setRectangle] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   useEffect(() => {
     let frame = 0;
@@ -71,7 +78,7 @@ function GuideHighlight({ step }: { step: GuideStep }) {
     if (target) resize.observe(target);
     return () => { cancelAnimationFrame(frame); observer.disconnect(); resize.disconnect(); window.removeEventListener("resize", measure); window.removeEventListener("scroll", measure, true); };
   }, [step]);
-  return rectangle ? <div className="guide-highlight" style={rectangle} aria-hidden="true" /> : null;
+  return rectangle ? <div className="guide-highlight" style={rectangle} aria-hidden="true"><span>{number} · {step.title}</span></div> : null;
 }
 
 export function GuidedHelp({ userId, searchItems, access }: { userId: string; searchItems: Destination[]; access: NavigationAccess }) {
@@ -147,7 +154,7 @@ export function GuidedHelp({ userId, searchItems, access }: { userId: string; se
   }
 
   useEffect(() => {
-    if (!open && !searchOpen) return;
+    if (!open && !searchOpen && !preferences.enabled) return;
     const refresh = () => { setCatalogue(null); setLoadFailed(false); void loadCatalogue(); };
     // Recheck fresh database permissions on navigation, focus and while help stays open.
     // Failure closes access to previously loaded guides; private responses are never cached.
@@ -155,7 +162,7 @@ export function GuidedHelp({ userId, searchItems, access }: { userId: string; se
     window.addEventListener("focus", refresh);
     void loadCatalogue();
     return () => { clearInterval(timer); window.removeEventListener("focus", refresh); cancelLoad(); };
-  }, [open, searchOpen, pathname, userId, loadCatalogue, cancelLoad]);
+  }, [open, searchOpen, preferences.enabled, pathname, userId, loadCatalogue, cancelLoad]);
 
   useEffect(() => {
     if (!open) return;
@@ -171,13 +178,25 @@ export function GuidedHelp({ userId, searchItems, access }: { userId: string; se
 
   useEffect(() => { if (open) heading.current?.focus(); }, [open, view, index, guide?.id]);
 
+  useEffect(() => {
+    document.body.classList.toggle("guide-tips-off", !preferences.enabled);
+    return () => document.body.classList.remove("guide-tips-off");
+  }, [preferences.enabled]);
+
   return <>
     <WorkspaceFinder items={searchItems} access={access} guides={workflowGuides} loading={!catalogue && !loadFailed} loadFailed={loadFailed} onOpen={() => { setCatalogue(null); setLoadFailed(false); setSearchOpen(true); }} onClose={() => setSearchOpen(false)} onGuide={id => start(id)} />
     <button ref={trigger} type="button" className={`guide-trigger ${preferences.enabled ? "is-enabled" : ""}`} aria-expanded={open} aria-controls={open ? "guided-help-panel" : undefined} title="Tutorials and help with this page" onClick={() => open ? close() : showLibrary()}>
       <Compass size={18} aria-hidden="true" /><span>Guide me</span>{preferences.enabled && <span className="guide-enabled-dot" aria-label="Guide mode on" />}
     </button>
+    {preferences.enabled && !open && catalogue && help.guideId && typeof document !== "undefined" && document.getElementById("guide-page-tip") && createPortal(
+      <aside className="guide-context-tip" aria-label={`Tip for ${help.title}`}>
+        <span className="guide-tip-icon" aria-hidden="true"><Compass size={20} /></span>
+        <div><strong>Tip for this screen: {help.title}</strong><p>{help.body}</p><button type="button" onClick={() => start(help.guideId!)}>Show me the steps <ArrowRight size={15} aria-hidden="true" /></button></div>
+        <button className="guide-tip-off" type="button" onClick={() => persist({ ...preferences, enabled: false })}>Turn tips off</button>
+      </aside>, document.getElementById("guide-page-tip")!
+    )}
     {open && createPortal(<>
-      {active && onStepPage && <GuideHighlight key={`${guide.id}:${step.id}`} step={step} />}
+      {active && onStepPage && <GuideHighlight key={`${guide.id}:${step.id}`} step={step} number={index + 1} />}
       <aside id="guided-help-panel" className="guide-panel" aria-label="STOR24 guided help">
         <div className="guide-panel-header"><span><Compass size={19} aria-hidden="true" /> YOUR WORKFLOW COMPANION</span><button type="button" className="guide-icon" aria-label="Close guided help" onClick={close}><X size={20} /></button></div>
         <div className="guide-panel-scroll">
