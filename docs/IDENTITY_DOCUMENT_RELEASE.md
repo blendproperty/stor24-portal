@@ -39,3 +39,9 @@ Before enabling: Liezl/legal must approve why a full copy is necessary, accepted
 ## Release verification
 
 Tests cover policy hold, policy changes, limits/metadata removal, encryption binding, cookie/session isolation, concurrent replacement, scope restrictions, both-page preview, stale approval, actual signing/handover enforcement, accepted-copy erasure and OTP rotation/replay. Browser fixtures use invented names and synthetic images. Live verification must remain a read-only check of the held screen, authentication boundaries, deployed version and retention worker until collection is explicitly approved. No provider gate/biometric test is included.
+
+## New website and Counter rentals — 26 November 2026
+
+Brett confirmed Liezl approved the existing customer notice for all new website and Counter rentals, with tenancy retention for customers who complete the rental. Configure the same organisation policy for both journeys in `IDENTITY_DOCUMENT_NEW_RENTAL_POLICIES_JSON`, using the exact notice and acknowledgement in `IDENTITY_DOCUMENT_CUSTOMER_NOTICE.md`. Set `retentionMode` to `TENANCY` and an ISO effective timestamp at activation. Preserve `IDENTITY_DOCUMENT_POLICIES_JSON` for bookings created before the new effective time. The original customer notice's configuration section records the earlier limited rollout.
+
+The new policy requires upload before signing and staff acceptance before handover. It applies to website and Counter rentals created from the approved effective time. The booking still carries the ID until conversion. Existing cleanup rules and consent controls apply. Verify the deployed revision, current cleanup heartbeat, encrypted storage, exact organisation and live configuration. A consenting rehearsal should check a fresh rental through both channels and a physical tablet and reader for Counter.

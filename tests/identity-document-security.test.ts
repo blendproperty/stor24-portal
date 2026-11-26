@@ -76,3 +76,23 @@ test("chunked oversized multipart ID uploads are stopped before parsing", async 
   await assert.rejects(boundedIdentityForm(new Request("http://localhost", { method: "POST", body, duplex: "half" } as RequestInit)), /ID_INVALID/);
   assert.equal(cancelled, true);
 });
+
+test("new public rentals share prospective identity requirements and older bookings retain their policy", () => {
+  const legacy = { enabled: true, fullCopyApproved: true, effectiveFrom: "2026-01-01T00:00:00Z", version: "legacy", approvalReference: "synthetic", notice: "Synthetic test fixture only, not an approved privacy notice.", acknowledgementLabel: "Synthetic acknowledgement only", retentionHours: 24, acceptedTypes: ["PASSPORT"], alternativeContact: "Training store", reservationIds: ["older"] };
+  const shared = { ...legacy, effectiveFrom: "2026-11-26T10:00:00Z", version: "shared", retentionMode: "TENANCY", reservationIds: undefined, retentionHours: undefined };
+  process.env.IDENTITY_DOCUMENT_POLICIES_JSON = JSON.stringify({ org: legacy });
+  process.env.IDENTITY_DOCUMENT_NEW_RENTAL_POLICIES_JSON = JSON.stringify({ org: shared });
+  try {
+    const before = new Date("2026-11-26T09:59:59Z"), after = new Date("2026-11-26T10:00:00Z");
+    for (const source of ["PUBLIC_WALK_IN", "PUBLIC_WEBSITE"]) {
+      assert.equal(identityRequired("org", before, "older", null, source)?.hash, identityPolicy("org")?.hash);
+      assert.equal(identityRequired("org", before, "older-unscoped", null, source), null);
+      assert.equal(identityRequired("org", after, "new", null, source)?.hash, identityPolicy("org", "new-rental")?.hash);
+    }
+    assert.equal(identityRequired("org", after, "viewing", null, "PUBLIC_VIEWING"), null);
+    assert.equal(identityRequired("org", after, "internal", null, "INTERNAL"), null);
+  } finally {
+    delete process.env.IDENTITY_DOCUMENT_POLICIES_JSON;
+    delete process.env.IDENTITY_DOCUMENT_NEW_RENTAL_POLICIES_JSON;
+  }
+});

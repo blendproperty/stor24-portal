@@ -7,6 +7,6 @@ export default async function IdentityPage({ searchParams }: { searchParams: Pro
   const { reservation } = await searchParams;
   const scope = await requirePermissionScope("identity.review");
   let enabled = false;
-  try { enabled = Boolean(identityPolicy(scope.organisationId) || identityPolicy(scope.organisationId, "PUBLIC_WALK_IN")); } catch { /* An invalid policy also holds collection. */ }
+  try { enabled = Boolean(identityPolicy(scope.organisationId) || identityPolicy(scope.organisationId, "new-rental")); } catch { /* An invalid policy also holds collection. */ }
   return <IdentityReview key={reservation ?? "queue"} enabled={enabled} reservationId={reservation} />;
 }

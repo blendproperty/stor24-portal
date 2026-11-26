@@ -77,8 +77,8 @@ export async function withdrawIdentity(reference: string, token: string, version
   });
 }
 export async function identityGate(database: Database, organisationId: string, reservationId: string, createdAt: Date, stage: "SIGN" | "HANDOVER") {
-  const booking = await database.reservation.findUnique({ where: { id: reservationId }, select: { publicReference: true, source: true, customer: { select: { email: true } } } });
-  const policy = identityRequired(organisationId, createdAt, reservationId, booking?.customer.email, booking?.source);
+  const booking = await database.reservation.findUnique({ where: { id: reservationId }, select: { publicReference: true, source: true, journey: true, customer: { select: { email: true } } } });
+  const policy = identityRequired(organisationId, createdAt, reservationId, booking?.customer.email, booking?.journey === "RENTAL" ? booking.source : undefined);
   if (!policy) return true;
   if (!booking?.publicReference) return true; // This policy applies to online bookings; assisted intake is a separate workflow.
   const document = await database.identityDocument.findUnique({ where: { reservationId } });

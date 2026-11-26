@@ -17,9 +17,9 @@ const policySchema = z.object({
   customerEmailHashes: z.array(z.string().regex(/^[a-f0-9]{64}$/)).min(1).max(20).optional(),
 }).refine(policy => !(policy.reservationIds && policy.customerEmailHashes), "Choose one customer scope")
   .refine(policy => policy.retentionMode === "TENANCY" ? policy.retentionHours === undefined : policy.retentionHours !== undefined, "Choose tenancy retention or a fixed expiry");
-export function identityPolicy(organisationId: string, source?: string) {
-  const configured = source === "PUBLIC_WALK_IN"
-    ? process.env.IDENTITY_DOCUMENT_COUNTER_POLICIES_JSON
+export function identityPolicy(organisationId: string, rollout: "existing" | "new-rental" = "existing") {
+  const configured = rollout === "new-rental"
+    ? process.env.IDENTITY_DOCUMENT_NEW_RENTAL_POLICIES_JSON
     : process.env.IDENTITY_DOCUMENT_POLICIES_JSON;
   if (!configured) return null;
   try {
@@ -31,9 +31,10 @@ export function identityPolicy(organisationId: string, source?: string) {
   } catch { throw new Error("ID_POLICY_UNAVAILABLE"); }
 }
 export function identityRequired(organisationId: string, createdAt: Date, reservationId?: string, customerEmail?: string | null, source?: string) {
-  // A separately approved Counter policy has no effect on ordinary website or staff bookings.
-  const counter = source === "PUBLIC_WALK_IN" ? identityPolicy(organisationId, source) : null;
-  const policy = counter && createdAt >= new Date(counter.effectiveFrom) ? counter : identityPolicy(organisationId);
+  const publicRental = source === "PUBLIC_WALK_IN" || source === "PUBLIC_WEBSITE";
+  const newRental = publicRental ? identityPolicy(organisationId, "new-rental") : null;
+  // Keep the policy applicable when a pre-rollout booking was created.
+  const policy = newRental && createdAt >= new Date(newRental.effectiveFrom) ? newRental : identityPolicy(organisationId);
   if (!policy || createdAt < new Date(policy.effectiveFrom)) return null;
   // A controlled pilot must never enable collection for the rest of the store.
   if (policy.reservationIds && (!reservationId || !policy.reservationIds.includes(reservationId))) return null;

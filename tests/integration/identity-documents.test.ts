@@ -31,14 +31,14 @@ test("isolated PostgreSQL private identity workflow", async t => {
     return { org, facility, user, customer, booking, scope, input, reference: booking.publicReference!, token: access.token };
   }
   try {
-    await t.test("a Counter-only policy requires upload for a new walk-in with no prior record", async () => {
+    await t.test("new Counter and website customers must upload the same ID documents", async () => {
       const f = await fixture(), other = await fixture();
       const policies = JSON.parse(process.env.IDENTITY_DOCUMENT_POLICIES_JSON!);
-      const counterPolicy = { ...policies[f.org.id], version: "counter-only" };
+      const rentalPolicy = { ...policies[f.org.id], version: "new-rental" };
       delete policies[f.org.id];
       delete policies[other.org.id];
       process.env.IDENTITY_DOCUMENT_POLICIES_JSON = JSON.stringify(policies);
-      process.env.IDENTITY_DOCUMENT_COUNTER_POLICIES_JSON = JSON.stringify({ [f.org.id]: counterPolicy, [other.org.id]: counterPolicy });
+      process.env.IDENTITY_DOCUMENT_NEW_RENTAL_POLICIES_JSON = JSON.stringify({ [f.org.id]: rentalPolicy, [other.org.id]: rentalPolicy });
       try {
         await db.reservation.update({ where: { id: f.booking.id }, data: { source: "PUBLIC_WALK_IN" } });
         await db.reservation.update({ where: { id: other.booking.id }, data: { source: "PUBLIC_WEBSITE" } });
@@ -46,7 +46,10 @@ test("isolated PostgreSQL private identity workflow", async t => {
         assert.equal(ready.required, true);
         assert.equal(ready.available, true);
         assert.equal(ready.canContinue, false);
-        assert.equal((await identityStatus(other.reference, other.token)).required, false);
+        const website = await identityStatus(other.reference, other.token);
+        assert.equal(website.policy?.hash, ready.policy?.hash);
+        assert.equal(website.canContinue, false);
+        assert.deepEqual(await preparePublicReservationLease(other.reference, "EFT", other.token), { ok: false, code: "IDENTITY_REQUIRED" });
         assert.deepEqual(await preparePublicReservationLease(f.reference, "EFT", f.token), { ok: false, code: "IDENTITY_REQUIRED" });
         const document = await submitIdentity(f.reference, f.token, { ...f.input, policyHash: ready.policy!.hash });
         assert.ok((await identityStatus(f.reference, f.token)).canContinue);
@@ -57,7 +60,7 @@ test("isolated PostgreSQL private identity workflow", async t => {
         await reviewIdentity(f.scope, document.id, 1, "ACCEPT");
         assert.equal(await identityGate(db, f.org.id, f.booking.id, f.booking.createdAt, "HANDOVER"), true);
       } finally {
-        delete process.env.IDENTITY_DOCUMENT_COUNTER_POLICIES_JSON;
+        delete process.env.IDENTITY_DOCUMENT_NEW_RENTAL_POLICIES_JSON;
       }
     });
     await t.test("identity return recovers only a current agreement after a quote change", async () => {
