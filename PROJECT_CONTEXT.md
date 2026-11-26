@@ -1,3 +1,15 @@
+## 2026-11-26 — Facilities guide downloads candidate
+
+- **Implementation:** Operations offers separate Facilities manager guide PDF and Facilities training PDF buttons alongside the general staff handbook. The existing staff-guide endpoint uses an explicit document allowlist, current operations.view permission, confidential DLP decision and per-document audit with content hash. The existing handbook URL remains compatible.
+- **Testing:** The route test verified exact 9-page and 5-page PDFs, permissions, DLP denial, audit failure, unknown and traversal inputs, response headers and bytes. Browser tests verified all three downloads and hashes, errors and duplicate guard at 1440, 390 and 320 pixels. Operations recovery and premium workspace browser tests, scoped lint and typecheck passed. Production build and protected checks remain pending.
+- **Commit and push:** Candidate branch codex/facilities-guide-downloads-20261126; consult the PR for its exact head and checks.
+- **Merge:** Pending.
+- **Deployment and configuration:** Pending. No role or provider settings changed.
+- **Live production verification:** Pending deployment and live download checks. On 26 November the owner reviewed Katlego Makhubele's active Store 1 - Midpoint custom access: View tenant operations was selected; no permissions were changed. This is not a download under Katlego's own login.
+- **Outstanding:** Katlego's own download and staff acceptance remain unverified. Existing provider, data, financial, training and reader gates remain open.
+
+
+
 ## 2026-11-26 — Facilities visual guidance production release
 
 - **Implementation:** Authenticated staff have contextual page tips, an on/off switch, numbered walkthrough highlights and expandable move-in payment, ID and photo explanations. Guidance defaults on in a new browser setting; an individual's later choice is retained per browser. The offline tutorial has its separate setting. Facilities manager and trainer PDFs are review copies; their illustrations use invented component data.
