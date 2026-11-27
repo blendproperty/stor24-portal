@@ -28,6 +28,17 @@ test('isolated transfers consume one original occupancy and retain valid transac
   await t.test('same unit and dates before the original occupancy start cannot alter units or create history',async()=>{
    const f=await fixture(),before=await state(f);await assert.rejects(transfer(f.scope,{tenancyId:f.tenancy.id,toUnitId:f.units[0].id,effectiveAt:new Date('2026-10-15')}),/CONFLICT/);await assert.rejects(transfer(f.scope,{tenancyId:f.tenancy.id,toUnitId:f.units[1].id,effectiveAt:new Date('2025-12-31')}),/CONFLICT/);assert.deepEqual(await state(f),before);
   });
+  await t.test('a reserved destination leaves the tenancy, units and account unchanged', async () => {
+   const f = await fixture();
+   await db.unit.update({ where: { id: f.units[1].id }, data: { status: 'RESERVED' } });
+   const before = await state(f);
+   await assert.rejects(transfer(f.scope, {
+    tenancyId: f.tenancy.id,
+    toUnitId: f.units[1].id,
+    effectiveAt: new Date('2026-10-15'),
+   }), /CONFLICT/);
+   assert.deepEqual(await state(f), before);
+  });
   await t.test('an audit failure rolls back source consumption, destination claim and new occupancy',async()=>{
    const f=await fixture(),before=await state(f);await db.$executeRawUnsafe(`CREATE FUNCTION ci_reject_transfer_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='tenancy.transferred' THEN RAISE EXCEPTION 'Synthetic transfer audit failure'; END IF; RETURN NEW; END $$`);await db.$executeRawUnsafe(`CREATE TRIGGER ci_reject_transfer_audit BEFORE INSERT ON "AuditEvent" FOR EACH ROW EXECUTE FUNCTION ci_reject_transfer_audit()`);
    try{await assert.rejects(transfer(f.scope,{tenancyId:f.tenancy.id,toUnitId:f.units[1].id,effectiveAt:new Date('2026-10-15')}),/Synthetic transfer audit failure/);assert.deepEqual(await state(f),before);}finally{await db.$executeRawUnsafe(`DROP TRIGGER ci_reject_transfer_audit ON "AuditEvent"`);await db.$executeRawUnsafe(`DROP FUNCTION ci_reject_transfer_audit()`);}
