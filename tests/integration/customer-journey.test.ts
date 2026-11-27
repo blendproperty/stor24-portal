@@ -250,6 +250,7 @@ test("isolated PostgreSQL connected customer journey", async t => {
         ...input, unitId: cancellationUnit.id, email: `${key}-cancel@example.invalid`,
         phone: "+15005550007", idempotencyKey: randomUUID(),
       }, "synthetic-cancellation");
+      assert.ok(pending.reference);
       assert.ok((await verifyPublicReservation(pending.reference, smsCode)).ok);
       const held = await db.reservation.findUniqueOrThrow({ where: { publicReference: pending.reference } });
       assert.ok(held.leadId);
