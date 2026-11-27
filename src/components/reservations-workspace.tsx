@@ -157,6 +157,10 @@ export function ReservationsWorkspace({initialCustomerId="",canReviewPrices=fals
         setReadError(response.status === 401 ? "Your session has ended. Sign in again to create reservations." : "Reservation access is unavailable. Please contact your administrator if you require access."); return;
       }
       if ([400, 404, 409, 422].includes(response.status)) {
+        const failure = await response.json().catch(() => null);
+        if (failure?.error?.code === "SIGNED_RESERVATION_REQUIRES_HANDOVER") {
+          setError("Open the signed reservation in Move in to cancel it before key handover, or refresh its current status."); return;
+        }
         setError(response.status === 409 ? "One or more units are no longer available. Refresh and choose again." : "Check the reservation details and try again."); return;
       }
       if (!response.ok) throw new Error("RESERVATION_SAVE_UNCERTAIN");

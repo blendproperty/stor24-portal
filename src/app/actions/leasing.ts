@@ -10,9 +10,28 @@ import { confirmReservationMoveIn } from "@/lib/reservation-move-in";
 import { db } from "@/lib/db";
 import { facilityWhere, requirePermissionScope } from "@/lib/scope";
 import { confirmLegacyHandover } from "@/lib/legacy-handover";
+import { cancellationMessages, cancelBeforeHandover } from "@/lib/cancel-before-handover";
 
 const text = (data: FormData, key: string) => String(data.get(key) ?? "").trim() || undefined;
 const number = (data: FormData, key: string) => text(data, key) ? Number(text(data, key)) : undefined;
+
+export async function cancelBeforeHandoverAction(data: FormData): Promise<{ error: string } | undefined> {
+  const reservationId = text(data, "reservationId");
+  const reason = text(data, "reason");
+  if (!reservationId || reservationId.length > 100 || !reason || reason.length > 500 || data.get("keysNotHandedOver") !== "on") {
+    return { error: "Enter a reason and confirm that the keys were never handed over." };
+  }
+  const scope = await requirePermissionScope("reservations.manage");
+  try {
+    await cancelBeforeHandover(scope, reservationId, reason);
+  } catch (error) {
+    const message = error instanceof Error ? cancellationMessages[error.message] : undefined;
+    if (message) return { error: message };
+    throw error;
+  }
+  for (const path of ["/tenants", "/units", "/reservations", "/leads", "/operations/accounts", "/operations/move-in", "/my"]) revalidatePath(path);
+  redirect(`/operations/move-in?reservation=${encodeURIComponent(reservationId)}`);
+}
 
 /**
  * Creates the pending lease, then continues directly to assisted signing.
