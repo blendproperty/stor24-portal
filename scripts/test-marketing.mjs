@@ -93,7 +93,7 @@ const bundle = await build({
         }));
         b.onLoad({ filter: /.*/, namespace: "actions" }, () => ({
           contents:
-            "export async function confirmReservationMoveInAction(){throw Error('Unexpected handover')} export async function recordReservationPaymentAction(){throw Error('Unexpected payment')}",
+            "export async function confirmReservationMoveInAction(){throw Error('Unexpected handover')} export async function recordReservationPaymentAction(){throw Error('Unexpected payment')} export async function cancelBeforeHandoverAction(){throw Error('Unexpected cancellation')}",
         }));
       },
     },
