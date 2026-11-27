@@ -360,10 +360,12 @@ export async function cancelReservation(
   await requireFacility(scope, reservation.facilityId);
   if (reservation.status !== "ACTIVE") throw new Error("CONFLICT");
   return db.$transaction(async (tx) => {
-    const entity = await tx.reservation.update({
-      where: { id: reservation.id },
+    const claimed = await tx.reservation.updateMany({
+      where: { id: reservation.id, status: "ACTIVE", publicLease: { isNot: { status: "SIGNED" } } },
       data: { status: "CANCELLED" },
     });
+    if (!claimed.count) throw new Error("SIGNED_RESERVATION_REQUIRES_HANDOVER");
+    const entity = await tx.reservation.findUniqueOrThrow({ where: { id: reservation.id } });
     const tenancy = reservation.convertedTenancy;
     const safeUatDraft =
       tenancy &&
@@ -517,14 +519,14 @@ export async function expireReservation(
   const previousHoldExpiresAt = reservation.holdExpiresAt;
   return db.$transaction(async (tx) => {
     const claimed = await tx.reservation.updateMany({
-      where: { id: reservation.id, status: "ACTIVE", holdExpiresAt: { lte: new Date() } },
+      where: { id: reservation.id, status: "ACTIVE", holdExpiresAt: { lte: new Date() }, publicLease: { isNot: { status: "SIGNED" } } },
       data: {
         status: "EXPIRED",
         verificationCodeHash: null,
         verificationExpiresAt: null,
       },
     });
-    if (claimed.count !== 1) throw new Error("CONFLICT");
+    if (claimed.count !== 1) throw new Error("SIGNED_RESERVATION_REQUIRES_HANDOVER");
     const entity = await tx.reservation.findUniqueOrThrow({ where: { id: reservation.id } });
     const otherActive = await tx.reservation.count({
       where: {

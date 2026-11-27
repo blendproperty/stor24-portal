@@ -24,7 +24,7 @@ const bundle = await build({ absWorkingDir: root, entryPoints: ["tests/browser/g
   b.onResolve({filter: /^next\/(navigation|link|image)$/}, args => ({path: args.path, namespace: "fixture"}));
   b.onLoad({filter: /.*/, namespace: "fixture"}, args => ({contents: navigation + (args.path === "next/link" ? "\nexport default Link;" : args.path === "next/image" ? "\nexport default Image;" : ""), loader: "jsx", resolveDir: root}));
   b.onResolve({filter: /^@\/app\/actions\//}, args => ({path: args.path, namespace: "actions"}));
-  b.onLoad({filter: /.*/, namespace: "actions"}, () => ({contents: "export async function confirmReservationMoveInAction() { throw new Error('Unexpected handover'); } export async function recordReservationPaymentAction() { throw new Error('Unexpected payment'); }"}));
+  b.onLoad({filter: /.*/, namespace: "actions"}, () => ({contents: "export async function confirmReservationMoveInAction() { throw new Error('Unexpected handover'); } export async function recordReservationPaymentAction() { throw new Error('Unexpected payment'); } export async function cancelBeforeHandoverAction() { throw new Error('Unexpected cancellation'); }"}));
 } }] });
 const style = (await Promise.all(["src/app/globals.css", "src/styles/stor24-brand.css", "src/styles/guided-help.css", "src/styles/identity-review.css", "src/styles/staff-workspace.css"].map(file => readFile(file, "utf8")))).join("\n").replace('@import "tailwindcss";', "");
 const customer = { id: "fixture-customer", firstName: "Example", lastName: "Customer", companyName: null, email: "fixture@example.invalid", phone: null };

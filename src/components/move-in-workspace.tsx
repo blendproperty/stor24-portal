@@ -30,6 +30,7 @@ type Customer = { id: string; name: string; email: string | null };
 type Reservation = {
   leadId?: string | null;
   canRecordPayment?: boolean;
+  canCancel?: boolean;
   canReviewPhoto?: boolean;
   progress?: MoveInProgress;
   canReviewIdentity?: boolean;
@@ -460,7 +461,7 @@ export function MoveInWorkspace({
       ) : selectedReservation?.readiness ? (
         <ReservationMoveInConfirmation key={selectedReservation.id} reservationId={selectedReservation.id}
           customerName={selectedCustomer?.name ?? selectedReservation.label} unitNumber={selected?.number ?? ""}
-          progress={selectedReservation.progress} canReviewPhoto={selectedReservation.canReviewPhoto} canReviewIdentity={selectedReservation.canReviewIdentity} canRecordPayment={selectedReservation.canRecordPayment} readiness={selectedReservation.readiness} onBack={() => setStep(1)} />
+          progress={selectedReservation.progress} canReviewPhoto={selectedReservation.canReviewPhoto} canReviewIdentity={selectedReservation.canReviewIdentity} canRecordPayment={selectedReservation.canRecordPayment} canCancel={selectedReservation.canCancel} readiness={selectedReservation.readiness} onBack={() => setStep(1)} />
       ) : (
         <section className="panel panel-spacious">
           <form key={`${selectedId}:${reservationId}`} action={action} className="move-in-form">

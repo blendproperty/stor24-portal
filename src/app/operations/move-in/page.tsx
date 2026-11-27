@@ -12,6 +12,7 @@ import { southAfricaDateKey } from "@/lib/south-africa-time";
 import { getReservationMoveInReadiness } from "@/lib/reservation-move-in";
 import { legacyHandoverReadiness } from "@/lib/legacy-handover";
 import { LegacyHandoverList } from "@/components/legacy-handover-list";
+import { CancelBeforeHandoverForm } from "@/components/cancel-before-handover-form";
 
 export const metadata = { title: "Move in" };
 
@@ -20,6 +21,15 @@ export default async function MoveInPage({ searchParams }: { searchParams: Promi
   const scope = await requirePermissionScope("move_in.create");
   const data = await listLeasing(scope);
   const auth = await requireSession();
+  const canCancel = (facilityId: string) => auth.role === "Organisation owner" || auth.user.roleAssignments.some(assignment =>
+    (!assignment.facilityId || assignment.facilityId === facilityId) && hasPermission(assignment.role.permissions, "reservations.manage"));
+  const selectedBooking = data.reservations.find(reservation => reservation.id === initialReservationId);
+  if (selectedBooking?.status === "CANCELLED") {
+    return <div className="page-stack">
+      <PageHeader eyebrow="Operations centre" title="Booking cancelled" description="The signed agreement and booking records remain in the customer history." />
+      <a className="button button-secondary" href="/reservations">Back to reservations</a>
+    </div>;
+  }
   const legacy = await Promise.all(data.tenancies.filter(t=>["DRAFT","ACTIVE","NOTICE_GIVEN"].includes(t.status) && t.documents.some(d=>d.status==="SIGNED")).map(async t=>{const readiness=await legacyHandoverReadiness(scope,t.id);return {
     id:t.id,accountId:t.accountId,label:`${t.facility.name} · ${t.occupancies[0]?.unit.number ?? "Unit needs review"} · ${t.customer.companyName || t.customer.firstName || "Customer"}`,
     possibleLeads:data.reservations.some(r=>r.convertedTenancyId===t.id)?[]:data.leads.filter(l=>l.facilityId===t.facilityId&&l.customerId===t.customerId&&l.stage!=="LOST"&&!data.reservations.some(r=>r.leadId===l.id)).map(l=>({id:l.id,label:`${l.source} · ${southAfricaDateKey(l.createdAt)} · ${l.stage.replaceAll("_"," ")}`})),
@@ -40,6 +50,8 @@ export default async function MoveInPage({ searchParams }: { searchParams: Promi
           description="Complete the remaining checks on the signed lease before handing over keys."
           action={<a className="button button-secondary" href={enquiryHref}><ArrowLeft size={16} aria-hidden="true" />{linkedReservation.leadId ? "Back to enquiry" : "Back to Move in"}</a>} />
         <LegacyHandoverList items={[linkedHandover]} focused />
+        {!linkedHandover.handedOver && data.tenancies.some(tenancy => tenancy.id === linkedHandover.id && tenancy.status === "DRAFT") && canCancel(linkedReservation.facilityId) &&
+          <CancelBeforeHandoverForm reservationId={linkedReservation.id} />}
       </div>
     );
   }
@@ -48,6 +60,7 @@ export default async function MoveInPage({ searchParams }: { searchParams: Promi
     canReviewPhoto: auth.role === "Organisation owner" || auth.user.roleAssignments.some(a => (!a.facilityId || a.facilityId === reservation.facilityId) && hasPermission(a.role.permissions, "access.view")),
     canReviewIdentity: auth.role === "Organisation owner" || auth.user.roleAssignments.some(a => (!a.facilityId || a.facilityId === reservation.facilityId) && hasPermission(a.role.permissions, "identity.review")),
     canRecordPayment: auth.role === "Organisation owner" || auth.user.roleAssignments.some(a => (!a.facilityId || a.facilityId === reservation.facilityId) && hasPermission(a.role.permissions, "payments.manage")),
+    canCancel: reservation.status === "ACTIVE" && canCancel(reservation.facilityId),
     leadId: reservation.leadId, id: reservation.id, facilityId: reservation.facilityId, customerId: reservation.customerId, unitId: reservation.unitId,
     label: `${reservation.unit.number} · ${reservation.customer.companyName || reservation.customer.firstName || "Customer"}`,
     paymentMethod: reservation.paymentMethod, intendedMoveIn: reservation.intendedMoveIn ? southAfricaDateKey(reservation.intendedMoveIn) : null,

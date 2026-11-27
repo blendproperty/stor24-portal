@@ -78,7 +78,7 @@ test("reporting and move-in pages use their own permission scope despite unrelat
     await graphs.default();
     const page = await load("src/app/operations/move-in/page.tsx", db, restricted, {
       "leasing-service": "export const listLeasing=async(s)=>{__db.scopes.push(s);return {facilities:[],customers:[],reservations:[],tenancies:[]}};",
-      "leasing": "export const moveInAction=async()=>{};export const confirmLegacyHandoverAction=async()=>{};",
+      "leasing": "export const moveInAction=async()=>{};export const confirmLegacyHandoverAction=async()=>{};export const cancelBeforeHandoverAction=async()=>{throw Error('Unexpected cancellation')};",
       "move-in-workspace": "export const MoveInWorkspace=()=>null;", "move-in-training": "export const TrainingEntry=()=>null;",
     });
     await page.default({ searchParams: Promise.resolve({}) });

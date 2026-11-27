@@ -10,9 +10,10 @@ import { useState } from "react";
 import { FileCheck2, Wallet, CalendarDays, ArrowUpRight, CircleAlert, KeyRound, Check, ShieldCheck, Camera, Warehouse } from "lucide-react";
 import type { ReservationMoveInReadiness } from "@/lib/reservation-move-in";
 import { confirmReservationMoveInAction } from "@/app/actions/leasing";
+import { CancelBeforeHandoverForm } from "./cancel-before-handover-form";
 
-export function ReservationMoveInConfirmation({ reservationId, customerName, unitNumber, readiness, canRecordPayment = false, canReviewIdentity = false, canReviewPhoto = false, progress, onBack }: {
-  progress?: MoveInProgress; canReviewPhoto?: boolean; canReviewIdentity?: boolean; canRecordPayment?: boolean; reservationId: string; customerName: string; unitNumber: string; readiness: ReservationMoveInReadiness; onBack: () => void;
+export function ReservationMoveInConfirmation({ reservationId, customerName, unitNumber, readiness, canRecordPayment = false, canReviewIdentity = false, canReviewPhoto = false, canCancel = false, progress, onBack }: {
+  progress?: MoveInProgress; canReviewPhoto?: boolean; canReviewIdentity?: boolean; canRecordPayment?: boolean; canCancel?: boolean; reservationId: string; customerName: string; unitNumber: string; readiness: ReservationMoveInReadiness; onBack: () => void;
 }) {
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState("");
@@ -70,5 +71,5 @@ export function ReservationMoveInConfirmation({ reservationId, customerName, uni
       </div>
     </form>}
     </section>
-  </section></>;
+  </section>{canCancel && !handedOver && <CancelBeforeHandoverForm reservationId={reservationId} />}</>;
 }
