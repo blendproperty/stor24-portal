@@ -1,3 +1,12 @@
+## 2026-11-27 — STOR24 WhatsApp fallback activated
+
+- **Implementation:** The imported No Match flow was assigned to Blend Property Group (+27 60 018 6824) and was in Draft. Reviewed the existing message and the “Any other message” trigger. See [the WhatChimp bot](https://dashboard.whatchimp.com/bots?id=06180ca8-f965-422b-beb5-32795da81dc1).
+- **Testing:** Used the WhatChimp Test tab with a pretend contact. The fallback returned the saved STOR24 MENU, ENQUIRY, FAQ and STAFF guidance. The active STOR24 welcome menu simulator accepted MENU and reached the list selection. No real WhatsApp message was sent.
+- **Commit and push:** This is a documentation-only evidence update. Git history records its revision and publication.
+- **Merge:** Refer to the Git history and pull request for this record’s publication to main. The WhatChimp setting is independent of repository promotion.
+- **Deployment and configuration:** Changed only the bot status from Draft to Active in WhatChimp. No message copy, keywords, billing settings, or application runtime changed or required deployment.
+- **Live production verification:** Reopened the WhatChimp Bots list and verified Active, “Any other message” and the expected WhatsApp channel. Live handset receipt and routing still require confirmation. Existing CRM and staff routing UAT, provider, billing production hold, data, training and approval gates remain open.
+
 ## 2026-11-26 — Facilities guide downloads production release
 
 - **Implementation:** Operations offers separate Facilities manager guide PDF and Facilities training PDF buttons alongside the general staff handbook. An explicit document allowlist preserves operations.view authorisation, confidential DLP and per-document audit with content hash; the original handbook URL remains compatible.
