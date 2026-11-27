@@ -15,7 +15,7 @@ import { completePublicReservationLease, getPublicReservationLease, preparePubli
 import { LEASE_CLAUSE_KEYS } from "../../src/lib/lease-agreement-content";
 import { recordReservationReceipt } from "../../src/lib/reservation-payment";
 import { confirmReservationMoveIn, getReservationMoveInReadiness } from "../../src/lib/reservation-move-in";
-import { giveNotice, moveOut } from "../../src/lib/leasing-service";
+import { cancelReservation, giveNotice, moveOut } from "../../src/lib/leasing-service";
 import { getStatementData } from "../../src/lib/finance/statement-data";
 import { startTenantChallenge, tenantSessionForToken, verifyTenantChallenge } from "../../src/lib/tenant-portal-auth";
 
@@ -241,6 +241,29 @@ test("isolated PostgreSQL connected customer journey", async t => {
       assert.equal(await db.tenancy.count({ where: { accountId: account.id } }), 1);
       assert.ok(attemptedHosts.length > 0);
       assert.ok(attemptedHosts.every(host => ["api.twilio.com", "comms.twilio.com"].includes(host)));
+    });
+    await t.test("verified unpaid website booking cancels through staff and retains the enquiry", async () => {
+      const cancellationUnit = await db.unit.create({ data: {
+        facilityId: facility.id, unitTypeId: unitType.id, number: "J-CANCEL", floor: "Ground Floor", monthlyRate: 100,
+      } });
+      const pending = await createPublicReservation({
+        ...input, unitId: cancellationUnit.id, email: `${key}-cancel@example.invalid`,
+        phone: "+15005550007", idempotencyKey: randomUUID(),
+      }, "synthetic-cancellation");
+      assert.ok((await verifyPublicReservation(pending.reference, smsCode)).ok);
+      const held = await db.reservation.findUniqueOrThrow({ where: { publicReference: pending.reference } });
+      assert.ok(held.leadId);
+      assert.equal(held.status, "ACTIVE");
+      assert.equal((await db.unit.findUniqueOrThrow({ where: { id: cancellationUnit.id } })).status, "RESERVED");
+      const result = await cancelReservation(scope, held.id);
+      assert.equal(result.status, "CANCELLED");
+      assert.equal(result.unitReleased, true);
+      assert.equal((await db.unit.findUniqueOrThrow({ where: { id: cancellationUnit.id } })).status, "AVAILABLE");
+      const enquiry = await db.lead.findUniqueOrThrow({ where: { id: held.leadId }, include: { reservations: true } });
+      assert.equal(enquiry.stage, "QUOTED");
+      assert.equal(enquiry.reservations.find(item => item.id === held.id)?.status, "CANCELLED");
+      await assert.rejects(cancelReservation(scope, held.id), /CONFLICT/);
+      assert.equal(await db.auditEvent.count({ where: { entityId: held.id, action: "reservation.cancelled" } }), 1);
     });
     await t.test("J12 committed verification survives notification-log failure", async () => {
       const nextUnit = await db.unit.create({ data: { facilityId: facility.id, unitTypeId: unitType.id, number: "NOTIFICATION-RECOVERY", floor: "Ground Floor", monthlyRate: 100 } });
