@@ -6,6 +6,7 @@
 - **Merge:** The context entry is on the numbering branch for PR #873. Its promotion to main remains open.
 - **Deployment and configuration:** Document-only handoff. No application deployment, database write, or floor-opening change was performed.
 - **Live production verification:** On 26 November 2026 the public Midpoint booking API returned 142 ground-floor unit records and matching map labels, and still listed First Floor as coming soon. First-floor dimensions are from the dated inventory snapshot. Live first-floor size readback, physical door-label checks, staff and device acceptance, full database relationship verification, historical document checks, and existing provider, data, training and approval gates remain open.
+- **Distribution on 27 November 2026:** Outlook Sent Items confirmed the PDF named STOR24 Midpoint Unit Numbering and Sizes was emailed at 10:42 SAST to Luke Weschta, Katlego Makhubele, Joy Makgoba and Boitumelo. Recipient inbox delivery and acknowledgement are unverified. This distribution did not change the existing release or verification status.
 
 ## 2026-11-20 — Midpoint second-floor clockwise renumbering
 
